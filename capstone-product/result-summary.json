@@ -1,0 +1,3476 @@
+{
+  "inputs": {
+    "neverd": "ca33d557398585a4d571be88bd0ec2ef34845089",
+    "capstone": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "variants": {
+      "clang-memory-output": {
+        "source": "round1412-clang-memory-current-dev",
+        "patch": "clang-memory-output.patch",
+        "patch_sha256": "17b51fd087698dde8a645c52737271d7d4f060965d06dfa86bdf2b1d4dfea52c",
+        "tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+        "changed": [
+          "X86VectorOutput.c.o"
+        ],
+        "added": [
+          "X86EvexMemoryOutput.c.o"
+        ]
+      }
+    },
+    "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
+    "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
+    "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
+    "scope": "Repeat all 96 product observations on current NeverD dev after the MIPS historical-mode merge, using the exact published Capstone source tree and latest LLVM fork source. All original R1399 evidence remains unchanged.",
+    "qualification_pending": [
+      "Exact current dev integration and timing"
+    ],
+    "validation_entry": {
+      "qualified_capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "qualification": "/Users/gmh/code/NeverD/build-capstone-speed-20261022/round1399-clang-memory-product/qualification.json",
+      "original_product_run": {
+        "id": 44181762990,
+        "head_sha": "02b2a6e3c9b31b367e33a2a414c8e5c1f6da5151",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44181762990",
+        "run_attempt": 1
+      }
+    },
+    "timing_protocol": {
+      "cycles": 32,
+      "calibration_cpu_ms": 100,
+      "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
+      "consumer_unchanged": true,
+      "publication_qualified": false
+    },
+    "public_state_scope": "Seeded complete-state product probe plus separate four-compiler 69140480 public records, 17825792 private records and 6427654 protected-page checks per compiler."
+  },
+  "complete": true,
+  "run": {
+    "id": 44197220421,
+    "head_sha": "bb78f370d6b383c7b9bd3053f3e943af6feb3891",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44197220421",
+    "run_attempt": 1
+  },
+  "source": {
+    "neverd": "ca33d557398585a4d571be88bd0ec2ef34845089",
+    "capstone": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "llvm_fork": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "llvm_source": "/home/runner/work/test_mac_intel/test_mac_intel/neverd/third_party/llvm-project"
+  },
+  "llvm_identity": {
+    "revision": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked": {}
+  },
+  "managed_source_identity": {
+    "neverd_highway": {
+      "repository": "https://github.com/NeverSight/highway.git",
+      "branch": "master",
+      "commit": "1693ca7926ed12c5520623564e465cff97d93374",
+      "sha256": "f5149df5acb77cd9730ed8e5160f2deff0b02fe49cc45443fd396fdb5f0519d2"
+    },
+    "neverd_simdutf": {
+      "repository": "https://github.com/NeverSight/simdutf.git",
+      "branch": "master",
+      "commit": "8d82299606e675b50de8dc16fd118aae4b65bfde",
+      "sha256": "48e9c9fc33940bcc81cdaec785ce6e21ea20f7b03b7a26bff56abb41d2cf5126"
+    },
+    "neverd_simdjson": {
+      "repository": "https://github.com/NeverSight/simdjson.git",
+      "branch": "master",
+      "commit": "edb7016c62efbe6155226896cdba5736307190e3",
+      "sha256": "e4e849bbb16878f8555501cc09bf4a6d90d4a06ccfc67a202a3c030486c3823d"
+    },
+    "neverd_tbb": {
+      "repository": "https://github.com/NeverSight/oneTBB.git",
+      "branch": "master",
+      "commit": "d26e0502ca39f888c1266cbbf1e2c2226d31e41b",
+      "sha256": "98300a443e43d047eabae27d3e30232efe7508b20d8e24a92ff2d54ef511761b"
+    },
+    "neverd_mimalloc": {
+      "repository": "https://github.com/NeverSight/mimalloc.git",
+      "branch": "main3",
+      "commit": "e8e7bc41ce904b4c83fe20e87d93f24d5286315a",
+      "sha256": "aea4126df4ada4e8f733e2a0f08642a8aabe6c2afc01886a1a9a259c18231ac3"
+    }
+  },
+  "tests": {
+    "base": [
+      "100% tests passed, 0 tests failed out of 34"
+    ],
+    "clang-memory-output": [
+      "100% tests passed, 0 tests failed out of 34"
+    ]
+  },
+  "states": {
+    "base": "40068 15880932718584834093",
+    "clang-memory-output": "40068 15880932718584834093"
+  },
+  "rows": [
+    {
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "images",
+      "reps": 65,
+      "signature": [
+        1885260,
+        0,
+        15006354699355715141,
+        767228540
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000404770664029,
+          "ci95": [
+            0.9982004167455958,
+            1.001618345479739
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9993645997920768,
+          "ci95": [
+            0.9976362644638449,
+            1.000972058598228
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 65,
+      "signature": [
+        1885260,
+        0,
+        15006354699355715141,
+        767228540
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003000300346985,
+          "ci95": [
+            0.9978280810146868,
+            1.0030193937986296
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0005384130297257,
+          "ci95": [
+            0.9979028739170659,
+            1.0039886881647813
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 17,
+      "signature": [
+        493068,
+        0,
+        12648689402617106501,
+        208117434
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994995914442034,
+          "ci95": [
+            0.9986186693355018,
+            1.0009515792555723
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0004100481393592,
+          "ci95": [
+            0.9989694649593392,
+            1.0014514015422447
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 17,
+      "signature": [
+        493068,
+        0,
+        12648689402617106501,
+        208117434
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000266505001493,
+          "ci95": [
+            0.9992704001334125,
+            1.001077197404268
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9995071920895605,
+          "ci95": [
+            0.9988933165388619,
+            1.0002349059854045
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 15,
+      "signature": [
+        435060,
+        0,
+        6139539121445165829,
+        375297540
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0009440696146965,
+          "ci95": [
+            0.9994021934992213,
+            1.0030586287652428
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0019357058985585,
+          "ci95": [
+            0.9996376883334896,
+            1.0028791996732538
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 15,
+      "signature": [
+        435060,
+        0,
+        6139539121445165829,
+        375297540
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998599907655144,
+          "ci95": [
+            0.9995920183605561,
+            1.0004458895496515
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9993896208896318,
+          "ci95": [
+            0.999039783951389,
+            0.9999173955275625
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images",
+      "reps": 89,
+      "signature": [
+        2265050,
+        3115,
+        16962085690809311727,
+        161734538
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999188851464496,
+          "ci95": [
+            0.9949659156181249,
+            1.0070952810404963
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0011038459172719,
+          "ci95": [
+            0.9958758514213115,
+            1.0064371769922595
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 89,
+      "signature": [
+        2265050,
+        3115,
+        16962085690809311727,
+        161734538
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994343993145463,
+          "ci95": [
+            0.9987990307679235,
+            1.0014216723642086
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0003407613104418,
+          "ci95": [
+            0.9987445406658038,
+            1.002053566851056
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 1,
+      "launch": "images",
+      "reps": 22,
+      "signature": [
+        559900,
+        770,
+        2416893203151067405,
+        47595636
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9990766943892071,
+          "ci95": [
+            0.9970092932497716,
+            1.002270672159148
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9971591138637247,
+          "ci95": [
+            0.9917885578592381,
+            1.001056051879982
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 22,
+      "signature": [
+        559900,
+        770,
+        2416893203151067405,
+        47595636
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995447459613822,
+          "ci95": [
+            0.998894850566152,
+            1.0003615446688725
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9994941164975947,
+          "ci95": [
+            0.9986006001758091,
+            0.9999495005605438
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "reps": 13,
+      "signature": [
+        330850,
+        455,
+        9654126669519425759,
+        67442648
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0006947772189472,
+          "ci95": [
+            0.9966085149174084,
+            1.0070154321870786
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0003762140438581,
+          "ci95": [
+            0.9991373145556646,
+            1.005106493699024
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 13,
+      "signature": [
+        330850,
+        455,
+        9654126669519425759,
+        67442648
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999681714440347,
+          "ci95": [
+            0.9994095636629405,
+            1.0012404332200764
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997553119853848,
+          "ci95": [
+            0.9994319127888185,
+            1.000166264046867
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "images",
+      "reps": 18,
+      "signature": [
+        5092308,
+        54,
+        16974803543808769549,
+        2098693566
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9992855857387266,
+          "ci95": [
+            0.9986117397322449,
+            1.0004438105876252
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0007494804571744,
+          "ci95": [
+            0.998980449170112,
+            1.002237559171009
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 18,
+      "signature": [
+        5092308,
+        54,
+        16974803543808769549,
+        2098693566
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000311955698463,
+          "ci95": [
+            0.99966616331281,
+            1.0013479292931795
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0003144687152536,
+          "ci95": [
+            0.9997028629158062,
+            1.0011050396772827
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        2263248,
+        24,
+        17565747584236164613,
+        964212584
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999736104158821,
+          "ci95": [
+            0.9984627373949804,
+            1.0011908834098424
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0001467259017667,
+          "ci95": [
+            0.999395100148249,
+            1.0015703895635535
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        2263248,
+        24,
+        17565747584236164613,
+        964212584
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999572291759492,
+          "ci95": [
+            0.9994135272603193,
+            1.0004402316696024
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997277618012289,
+          "ci95": [
+            0.9989818329139836,
+            1.0006299295466983
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "images",
+      "reps": 6,
+      "signature": [
+        1697436,
+        18,
+        4142809533973441021,
+        845084238
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004084028013724,
+          "ci95": [
+            0.9983529730559009,
+            1.0013958244658263
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9995782644761229,
+          "ci95": [
+            0.9986596996040021,
+            1.0013180483503288
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 6,
+      "signature": [
+        1697436,
+        18,
+        4142809533973441021,
+        845084238
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0002577241887947,
+          "ci95": [
+            0.9992583903081269,
+            1.0010952661057408
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.000227401016488,
+          "ci95": [
+            0.9976145740860668,
+            1.001548358036682
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 3,
+      "launch": "images",
+      "reps": 26,
+      "signature": [
+        7355556,
+        78,
+        12695331913943471341,
+        3031446262
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000360510891885,
+          "ci95": [
+            0.9996421298395651,
+            1.0009415039502232
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0000843747768644,
+          "ci95": [
+            0.9996069222522844,
+            1.000711015626998
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 26,
+      "signature": [
+        7355556,
+        78,
+        12695331913943471341,
+        3031446262
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998876548974795,
+          "ci95": [
+            0.9995837015859177,
+            1.000112346928999
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9996528889485559,
+          "ci95": [
+            0.9993667663812892,
+            0.9997907308726953
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "images",
+      "reps": 17,
+      "signature": [
+        4414798,
+        59755,
+        6586553106680166621,
+        1800956336
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9989477641373692,
+          "ci95": [
+            0.9981282617422722,
+            1.0005999798326106
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9995995935747568,
+          "ci95": [
+            0.9988500321388398,
+            1.0009127627224559
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 17,
+      "signature": [
+        4414798,
+        59755,
+        6586553106680166621,
+        1800956336
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991020400160127,
+          "ci95": [
+            0.9985442430063634,
+            0.9997023320216412
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9996974526552758,
+          "ci95": [
+            0.9987888983133946,
+            1.0006118818725858
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        2077552,
+        28120,
+        18181879010259129125,
+        879557840
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007062231751969,
+          "ci95": [
+            0.9995397688459968,
+            1.001823116710196
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.000068912693763,
+          "ci95": [
+            0.9993666263146335,
+            1.0014954879285443
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        2077552,
+        28120,
+        18181879010259129125,
+        879557840
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999437016813988,
+          "ci95": [
+            0.9995033943253843,
+            1.0005379153474934
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9998899913369514,
+          "ci95": [
+            0.9995369488263697,
+            1.0005656501264388
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        1298470,
+        17575,
+        18199114599289802973,
+        713942810
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007658899524703,
+          "ci95": [
+            0.9987449604760894,
+            1.0021769411973498
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997422893553451,
+          "ci95": [
+            0.9986960269232708,
+            1.0019022772976791
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        1298470,
+        17575,
+        18199114599289802973,
+        713942810
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001304675922478,
+          "ci95": [
+            0.9984693488468368,
+            1.00129961638887
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9994988161095387,
+          "ci95": [
+            0.9984720787341634,
+            1.0005722915157007
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 3,
+      "launch": "images",
+      "reps": 22,
+      "signature": [
+        5713268,
+        77330,
+        7926656586590158629,
+        2330649376
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001995311847598,
+          "ci95": [
+            0.9993500843842049,
+            1.0006762388538537
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.000509287797134,
+          "ci95": [
+            0.9999343746034419,
+            1.000813413450185
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 23,
+      "signature": [
+        5972962,
+        80845,
+        17623819517628744925,
+        2436587984
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0002837669981868,
+          "ci95": [
+            0.9999748916575021,
+            1.0006477235071096
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.000444647877842,
+          "ci95": [
+            0.9997741235995663,
+            1.0008835651855237
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 77,
+      "signature": [
+        1734271,
+        0,
+        16955722602318078761,
+        754107893
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007887283930117,
+          "ci95": [
+            1.0002393731103782,
+            1.0013727982992489
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0006954758893039,
+          "ci95": [
+            0.9996093783774298,
+            1.0015328596094342
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 78,
+      "signature": [
+        1756794,
+        0,
+        16605528824012392133,
+        763901502
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999774421777541,
+          "ci95": [
+            0.9995438881005473,
+            1.0003993497910444
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.999870496181212,
+          "ci95": [
+            0.9996171925577729,
+            1.0005527121948945
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 53,
+      "signature": [
+        1193719,
+        0,
+        8736126649998529193,
+        649777509
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004435094866904,
+          "ci95": [
+            0.9993154869596163,
+            1.0015445907797687
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9994765380246695,
+          "ci95": [
+            0.9980054234553237,
+            1.0009922935686144
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 54,
+      "signature": [
+        1216242,
+        0,
+        12336137060376721477,
+        662037462
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0006035685719927,
+          "ci95": [
+            0.999614577769947,
+            1.002768093422505
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.000740111221321,
+          "ci95": [
+            0.9989708820146498,
+            1.0021706266890953
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 3,
+      "launch": "images",
+      "reps": 206,
+      "signature": [
+        4639738,
+        0,
+        11629800286132498117,
+        1947102318
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995713111140994,
+          "ci95": [
+            0.9985723618941612,
+            1.0006351259887836
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9994920270684813,
+          "ci95": [
+            0.9992714607753697,
+            1.0001240883821407
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 217,
+      "signature": [
+        4887491,
+        0,
+        12444181618877955177,
+        2051073801
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994096736127924,
+          "ci95": [
+            0.9991087292779557,
+            1.0005415416998602
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9998991579050592,
+          "ci95": [
+            0.9993176486676474,
+            1.0008529769732155
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "reps": 81,
+      "signature": [
+        1941813,
+        0,
+        5106875434381339571,
+        1047408165
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000300589635154,
+          "ci95": [
+            0.9958534568679236,
+            1.0020899579349365
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9996498071398311,
+          "ci95": [
+            0.9967880637474895,
+            1.0038263624216541
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 81,
+      "signature": [
+        1941813,
+        0,
+        5106875434381339571,
+        1047408165
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9993247576211906,
+          "ci95": [
+            0.9985035927965047,
+            1.0004092523777564
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9991320014594514,
+          "ci95": [
+            0.9988152952480782,
+            0.9999536944025316
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 16,
+      "signature": [
+        383568,
+        0,
+        2054118168438396069,
+        212095600
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004597088166927,
+          "ci95": [
+            0.9996935465122423,
+            1.002085875016749
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0002087092314254,
+          "ci95": [
+            0.9985938117876556,
+            1.0007243886318573
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 16,
+      "signature": [
+        383568,
+        0,
+        2054118168438396069,
+        212095600
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998365973969314,
+          "ci95": [
+            0.9990447064495307,
+            1.0004746032469622
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0001290800105518,
+          "ci95": [
+            0.9993651548718079,
+            1.0007757058723057
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        191784,
+        0,
+        8311131569586220005,
+        162820680
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000932790446062,
+          "ci95": [
+            0.998439374808843,
+            1.0026735877671633
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9987232039822507,
+          "ci95": [
+            0.99762356668915,
+            0.9995651257937408
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 12,
+      "signature": [
+        287676,
+        0,
+        6513759373111551173,
+        244231020
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999837655733489,
+          "ci95": [
+            0.999580747945665,
+            1.000096844521995
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0006206041316574,
+          "ci95": [
+            0.999672839892827,
+            1.0009907151433177
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-sort",
+      "mode": 0,
+      "launch": "images",
+      "reps": 103,
+      "signature": [
+        1899835,
+        0,
+        13030755405300450211,
+        1049275729
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0029962363303244,
+          "ci95": [
+            0.9991118684089418,
+            1.006539282842009
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0003934376006103,
+          "ci95": [
+            0.9980624234948902,
+            1.0041763148254081
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-sort",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 105,
+      "signature": [
+        1936725,
+        0,
+        3582677208570655923,
+        1069650015
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000383307779905,
+          "ci95": [
+            0.999817812491578,
+            1.0009406468170252
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997877685027805,
+          "ci95": [
+            0.999458211882497,
+            1.0007991835041161
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        4304555,
+        3555,
+        15317671955829873631,
+        2582671625
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994247818745492,
+          "ci95": [
+            0.9984720660390203,
+            1.000161478334149
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9995836398105252,
+          "ci95": [
+            0.9986104649426342,
+            1.0014816233287132
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        4304555,
+        3555,
+        15317671955829873631,
+        2582671625
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000037726547859,
+          "ci95": [
+            0.9996678158894733,
+            1.0004588342233605
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997686697990547,
+          "ci95": [
+            0.9989241906293987,
+            1.0004704668704685
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 3,
+      "signature": [
+        2582733,
+        2133,
+        13350051667106787423,
+        1592234040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997172055029502,
+          "ci95": [
+            0.9985113819995785,
+            1.0006464832079538
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0177527399868498,
+          "ci95": [
+            1.0166551451033419,
+            1.0191693433661098
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 3,
+      "signature": [
+        2582733,
+        2133,
+        13350051667106787423,
+        1592234040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999576245343184,
+          "ci95": [
+            0.9989280097006336,
+            1.000474607486844
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0188396394363817,
+          "ci95": [
+            1.0180226087189734,
+            1.0195025360423937
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1362754360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000130195010247,
+          "ci95": [
+            0.9992665160562715,
+            1.001517921878626
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0188842873181883,
+          "ci95": [
+            1.017766291770596,
+            1.0199031882960599
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1362754360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0008094935911678,
+          "ci95": [
+            0.999464689409256,
+            1.0020683097604883
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0191863835243526,
+          "ci95": [
+            1.0183788602585286,
+            1.0199716692189105
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 3,
+      "launch": "images",
+      "reps": 7,
+      "signature": [
+        6026377,
+        4977,
+        10215425446401738079,
+        3615740275
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9988111886650759,
+          "ci95": [
+            0.998293072041472,
+            0.9993781471714875
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9992039915212834,
+          "ci95": [
+            0.9977771985841872,
+            0.999950524310401
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 7,
+      "signature": [
+        6026377,
+        4977,
+        10215425446401738079,
+        3615740275
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004913272780418,
+          "ci95": [
+            0.9999900848243278,
+            1.0008287752611318
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0000124035620175,
+          "ci95": [
+            0.9995890132852694,
+            1.0010819556596704
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 48,
+      "signature": [
+        4536144,
+        0,
+        1758934608141460773,
+        2079842208
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0006910140649683,
+          "ci95": [
+            1.000081675373846,
+            1.0016678467469122
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997580531501046,
+          "ci95": [
+            0.9988848467264919,
+            1.0020318462955653
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 49,
+      "signature": [
+        4630647,
+        0,
+        17719176078726474773,
+        2123172254
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000516266094301,
+          "ci95": [
+            0.9990816905930697,
+            1.0011944936854407
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0007039940261082,
+          "ci95": [
+            0.9998074572216897,
+            1.0013124321780928
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 19,
+      "signature": [
+        1795557,
+        0,
+        17641028928571029845,
+        854896165
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0006254995029098,
+          "ci95": [
+            0.9996991576413959,
+            1.0012652918780718
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9999920455565314,
+          "ci95": [
+            0.9993883994756905,
+            1.0006915081740488
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 19,
+      "signature": [
+        1795557,
+        0,
+        17641028928571029845,
+        854896165
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000335739083671,
+          "ci95": [
+            0.9995983893298386,
+            1.0012733468945658
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0005383861300245,
+          "ci95": [
+            0.9999841340258262,
+            1.0012329934222712
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 13,
+      "signature": [
+        1228539,
+        0,
+        14839374833353037205,
+        710624473
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995953996487189,
+          "ci95": [
+            0.9987611088076171,
+            1.0003062593871848
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997176326501835,
+          "ci95": [
+            0.9982622076673631,
+            1.001121758119036
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 13,
+      "signature": [
+        1228539,
+        0,
+        14839374833353037205,
+        710624473
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999830153572441,
+          "ci95": [
+            0.9991104403320357,
+            1.001422773359692
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0005866372711332,
+          "ci95": [
+            0.9991591224179011,
+            1.001201694213477
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 68,
+      "signature": [
+        6426204,
+        0,
+        417680769749717157,
+        2946443128
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999786348607194,
+          "ci95": [
+            0.9996259524852785,
+            1.0003421493630722
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9995965843490275,
+          "ci95": [
+            0.9992143574833786,
+            1.000219375688893
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 69,
+      "signature": [
+        6520707,
+        0,
+        11406250584831255701,
+        2989773174
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000131586565904,
+          "ci95": [
+            0.9992000210520776,
+            1.0006758005682723
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9998158353209954,
+          "ci95": [
+            0.9994133044636688,
+            1.0004629985458806
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 6,
+      "signature": [
+        5227872,
+        12780,
+        7137381921111751565,
+        2393409780
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9985266352674551,
+          "ci95": [
+            0.9973765313320754,
+            0.9999330218094402
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9992116158818497,
+          "ci95": [
+            0.9983765859417877,
+            1.0018489316771333
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        4356560,
+        10650,
+        4613362280357764937,
+        1994508150
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0012332565194404,
+          "ci95": [
+            0.9996920730618932,
+            1.0021978143343881
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.000372658102279,
+          "ci95": [
+            0.9991401028415906,
+            1.0015030907943383
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 3,
+      "signature": [
+        2613936,
+        6390,
+        14796607081077732657,
+        1234253346
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9992312323521897,
+          "ci95": [
+            0.9984464145815721,
+            0.9999689436788636
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9998338006375458,
+          "ci95": [
+            0.9988135450653657,
+            1.0006889943678765
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 3,
+      "signature": [
+        2613936,
+        6390,
+        14796607081077732657,
+        1234253346
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001129750697828,
+          "ci95": [
+            0.9994644240345247,
+            1.0008367941486394
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9996812569803643,
+          "ci95": [
+            0.999344243995439,
+            1.0007183525780876
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        951463788
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000124853631885,
+          "ci95": [
+            0.9991720132983488,
+            1.0011900311694006
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9991313097431569,
+          "ci95": [
+            0.9977082582037585,
+            1.0010142619068083
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        951463788
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000595504196911,
+          "ci95": [
+            0.9980455767865948,
+            1.001030426070218
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0001007152434305,
+          "ci95": [
+            0.9986783543323282,
+            1.001194302474665
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        6970496,
+        17040,
+        2971414651265800773,
+        3191213040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997547279575834,
+          "ci95": [
+            0.9985555343334451,
+            1.0004449388209122
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9995275142510862,
+          "ci95": [
+            0.9986626813698285,
+            1.0000556622283185
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        6970496,
+        17040,
+        2971414651265800773,
+        3191213040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997896703185759,
+          "ci95": [
+            0.9992131140883038,
+            1.000078790265682
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997791618588527,
+          "ci95": [
+            0.9989798766716573,
+            1.0001418339124886
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 24,
+      "signature": [
+        4812000,
+        0,
+        7741572349746978469,
+        1961032704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9986795213400388,
+          "ci95": [
+            0.9974650673921108,
+            1.0013810310772144
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0019060397554815,
+          "ci95": [
+            1.0003292231876006,
+            1.004550478807475
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 24,
+      "signature": [
+        4812000,
+        0,
+        7741572349746978469,
+        1961032704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994997006832942,
+          "ci95": [
+            0.9987279498536376,
+            1.0007647325730191
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9991091929378437,
+          "ci95": [
+            0.9982101221736357,
+            1.0005052025658168
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 11,
+      "signature": [
+        2205500,
+        0,
+        15163282356743802865,
+        939088359
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999472189180449,
+          "ci95": [
+            0.9986992637531514,
+            1.0005526681837273
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9994976982348875,
+          "ci95": [
+            0.9991148217069858,
+            1.0000552808265992
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 11,
+      "signature": [
+        2205500,
+        0,
+        15163282356743802865,
+        939088359
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998718999551467,
+          "ci95": [
+            0.999128417376395,
+            1.0006381492666307
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9996685013163014,
+          "ci95": [
+            0.9993476548190746,
+            1.000552930168715
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 7,
+      "signature": [
+        1403500,
+        0,
+        4299453880173547825,
+        686304234
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003678062186432,
+          "ci95": [
+            0.9985484306510234,
+            1.0012761207434422
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9994023228925377,
+          "ci95": [
+            0.9977639998743232,
+            1.0006428671794194
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 7,
+      "signature": [
+        1403500,
+        0,
+        4299453880173547825,
+        686304234
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999630090483577,
+          "ci95": [
+            0.9993199235909342,
+            1.0010808727174203
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0001232516559944,
+          "ci95": [
+            0.9987967589975655,
+            1.0010320006207296
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 35,
+      "signature": [
+        7017500,
+        0,
+        14025483590632773233,
+        2859839360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004569201269407,
+          "ci95": [
+            0.9998363448953759,
+            1.0015860473004337
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0000554583458405,
+          "ci95": [
+            0.9991450370298941,
+            1.0004791238877482
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 37,
+      "signature": [
+        7418500,
+        0,
+        8016627814274282129,
+        3023258752
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998054948959669,
+          "ci95": [
+            0.9994243420519162,
+            1.0004383670826174
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.00003738783904,
+          "ci95": [
+            0.9996159217877095,
+            1.0005081657944883
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 1,
+      "launch": "images",
+      "reps": 510,
+      "signature": [
+        2736150,
+        0,
+        12117455035099541347,
+        1468328250
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0005170581914498,
+          "ci95": [
+            0.9965580702715612,
+            1.0046301851368233
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9974840622951868,
+          "ci95": [
+            0.9938738688336574,
+            1.0004004422930328
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 592,
+      "signature": [
+        3176080,
+        0,
+        12741018244021941141,
+        1704412400
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000548406390042,
+          "ci95": [
+            0.9998294554756975,
+            1.000609375252174
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0001979549525757,
+          "ci95": [
+            0.9994494364491334,
+            1.0008958716770473
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 2,
+      "launch": "images",
+      "reps": 337,
+      "signature": [
+        1808005,
+        0,
+        4674273332049031230,
+        1072607307
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9988150360298104,
+          "ci95": [
+            0.9957568399250059,
+            1.0026815918136684
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9989265533146177,
+          "ci95": [
+            0.9964710242516579,
+            1.0032475361046718
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 373,
+      "signature": [
+        2001145,
+        0,
+        17513566827541985530,
+        1187188503
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999863701994346,
+          "ci95": [
+            0.9986456842929818,
+            1.0018106226837582
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0006251211179706,
+          "ci95": [
+            0.9993031753675325,
+            1.0020477096879823
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 568,
+      "signature": [
+        1962440,
+        0,
+        16187935432736538861,
+        1048483128
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0010577240610825,
+          "ci95": [
+            0.9993617817293514,
+            1.002236677104493
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.000289475639501,
+          "ci95": [
+            0.9994434066487354,
+            1.0012325299878948
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 538,
+      "signature": [
+        1858790,
+        0,
+        1505371956579601511,
+        993105498
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9988203609386658,
+          "ci95": [
+            0.998202776400595,
+            0.9997791750552675
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997364961893769,
+          "ci95": [
+            0.9989186487255229,
+            1.0005234664386666
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 361,
+      "signature": [
+        1247255,
+        0,
+        638757071730183970,
+        883240289
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9980463023485455,
+          "ci95": [
+            0.995106596280172,
+            1.000049204296238
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9986045382557396,
+          "ci95": [
+            0.994192598328298,
+            1.0012238803312847
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 413,
+      "signature": [
+        1426915,
+        0,
+        5158324690832913174,
+        1010466037
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0011795387588847,
+          "ci95": [
+            0.9989002144274663,
+            1.0021361339054315
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0005320410591843,
+          "ci95": [
+            0.9978168884528117,
+            1.001625571422299
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 0,
+      "launch": "images",
+      "reps": 775,
+      "signature": [
+        4463225,
+        0,
+        7268813876919132706,
+        2757859200
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003158299521582,
+          "ci95": [
+            0.9986843335034833,
+            1.0027484512695228
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9992201923141968,
+          "ci95": [
+            0.9964546447771129,
+            1.001058682382614
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 943,
+      "signature": [
+        5430737,
+        0,
+        753405831773656042,
+        3355691904
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.001209224769086,
+          "ci95": [
+            0.999833943196712,
+            1.0028970795914405
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0003328469991204,
+          "ci95": [
+            0.9989111588465385,
+            1.0028635080944601
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 474,
+      "signature": [
+        2729766,
+        0,
+        13458887463790381999,
+        1741986972
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999054082537047,
+          "ci95": [
+            0.9988537267250344,
+            1.0023507302166186
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9994825043604068,
+          "ci95": [
+            0.9971638250459082,
+            1.000528822003007
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 478,
+      "signature": [
+        2752802,
+        0,
+        16804585585973677635,
+        1756687284
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997781495987175,
+          "ci95": [
+            0.9990982975879743,
+            1.00087020391507
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9995342433637691,
+          "ci95": [
+            0.9991676583237419,
+            1.0007932370224784
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 298,
+      "signature": [
+        1716182,
+        0,
+        16566516101182585119,
+        1412507186
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9980100554381544,
+          "ci95": [
+            0.9971075610541603,
+            1.0005298707135832
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0007034309062135,
+          "ci95": [
+            0.9983020747429963,
+            1.0029989595446478
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 299,
+      "signature": [
+        1721941,
+        0,
+        4357317451258985246,
+        1417247143
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996651176948477,
+          "ci95": [
+            0.9985109279653805,
+            1.0012287478329633
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9998022806169735,
+          "ci95": [
+            0.9982257760710662,
+            1.0008751984363942
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 277,
+      "signature": [
+        2150628,
+        0,
+        5022709494817477409,
+        1858460311
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0009162723767457,
+          "ci95": [
+            0.9997254973726177,
+            1.0026993602454572
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0002120223229678,
+          "ci95": [
+            0.9989875302924405,
+            1.0033315626209167
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 300,
+      "signature": [
+        2329200,
+        0,
+        1074412647726915621,
+        2012772900
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996685715487951,
+          "ci95": [
+            0.9993982746194419,
+            1.0002275275658752
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.999635224871499,
+          "ci95": [
+            0.9988036679419445,
+            1.0009828248327075
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 155,
+      "signature": [
+        1203420,
+        0,
+        11792426789766999713,
+        1064536435
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996094799108004,
+          "ci95": [
+            0.9982039449712186,
+            1.001348728777356
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0002289875013302,
+          "ci95": [
+            0.999518110505191,
+            1.0008624486200821
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 151,
+      "signature": [
+        1172364,
+        0,
+        5121689491487475105,
+        1037064527
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003192747189384,
+          "ci95": [
+            0.9986666503172439,
+            1.0013911350966147
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0006837266150383,
+          "ci95": [
+            0.9992323191508004,
+            1.0016480468866626
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 100,
+      "signature": [
+        776400,
+        0,
+        6421587509670115877,
+        872387200
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991453063039405,
+          "ci95": [
+            0.9975945017351678,
+            1.0035250233077346
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0001240864893393,
+          "ci95": [
+            0.9988493803678461,
+            1.0029572501463349
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 101,
+      "signature": [
+        784164,
+        0,
+        16681364181389827873,
+        881111072
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994827205065233,
+          "ci95": [
+            0.9985995355175872,
+            1.0011261635463309
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9997643155746586,
+          "ci95": [
+            0.9985777156014106,
+            1.0016585094009152
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 355,
+      "signature": [
+        2756220,
+        0,
+        11003715862608722081,
+        2381781265
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991896066686241,
+          "ci95": [
+            0.9974600360017847,
+            1.00108033975715
+          ]
+        },
+        "clang-memory-output": {
+          "median": 1.0006405337904427,
+          "ci95": [
+            0.9996144840318645,
+            1.0017417374126643
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 332,
+      "signature": [
+        2577648,
+        0,
+        8446670267937519653,
+        2227468676
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000996023137252,
+          "ci95": [
+            0.9988478662008207,
+            1.0009765893648042
+          ]
+        },
+        "clang-memory-output": {
+          "median": 0.9989706609530788,
+          "ci95": [
+            0.9979914310197087,
+            1.0000412351295813
+          ]
+        }
+      }
+    }
+  ],
+  "losses": {
+    "clang-memory-output": []
+  },
+  "aa_outside_one_percent": [],
+  "cleanup": {
+    "bytes": 1479697290,
+    "removed": true
+  },
+  "raw": "product/product-clang-memory-current-dev-ubuntu-24.04-clang",
+  "avx32_corpus": {
+    "provenance": {
+      "package": "libjpeg62-turbo-dev",
+      "version": "1:2.1.5-4",
+      "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_i386.deb",
+      "package_sha256": "7539d7d7a4fe527071f737ce4919887cde17dfc72d6b3fa9d0176b4dacb6e412",
+      "text_sha256": "4d879d6881a2ee0c2e1b48456ef0153149f788674220dfd89ec0da7c60064a1d",
+      "members": {
+        "jccolor-avx2.asm.o": {
+          "sha256": "2e8b1ae43c6d15a5f0bad04857f4db30b599c792ae128ab9fdbf36ffce3d2db5",
+          "functions": 7,
+          "section_bytes": 8384
+        },
+        "jcgray-avx2.asm.o": {
+          "sha256": "a53b3309db8314a3a72b087ef0fc2cd371ce4c55e2d159c1207298620f9dda9c",
+          "functions": 7,
+          "section_bytes": 4800
+        },
+        "jcsample-avx2.asm.o": {
+          "sha256": "ac100c60c2dc894f6be87393c35833a913749c93962bd94c84366ba8cf0dcc3d",
+          "functions": 2,
+          "section_bytes": 672
+        },
+        "jdcolor-avx2.asm.o": {
+          "sha256": "21ab2e5647b6191d3434ca327240c7a3673623a0894cef8b7906af297282d163",
+          "functions": 7,
+          "section_bytes": 5792
+        },
+        "jdmerge-avx2.asm.o": {
+          "sha256": "edc189ef3a3fc43041d718f584ad04bbc942426439f6df003931a6855a2145dd",
+          "functions": 14,
+          "section_bytes": 6464
+        },
+        "jdsample-avx2.asm.o": {
+          "sha256": "4d1c213560ab99f952e12f3f54b1c9743e42a3ecddc38ca0a63bcf668c6903e4",
+          "functions": 4,
+          "section_bytes": 1824
+        },
+        "jfdctint-avx2.asm.o": {
+          "sha256": "ad7dbb14a23fd3fbc5ed3333dc901e2b5dccd24c3862c76a554325d0c9af9e35",
+          "functions": 1,
+          "section_bytes": 832
+        },
+        "jidctint-avx2.asm.o": {
+          "sha256": "edbdc208b82031fccf1caa14b0037792331f84598c18c8cedb3dd8a541c509ed",
+          "functions": 1,
+          "section_bytes": 1344
+        },
+        "jquanti-avx2.asm.o": {
+          "sha256": "c7c2f57f57c5c5c62ae6684fa78e7d96f4cf67fc65486c13b416e75a67b844d3",
+          "functions": 2,
+          "section_bytes": 384
+        }
+      },
+      "selection": "ELF .text in AVX2 i386 libjpeg.a objects, extents bounded by external assembly entry symbols within each object"
+    },
+    "selected_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      25,
+      27,
+      29,
+      31,
+      33,
+      35,
+      37,
+      38,
+      40,
+      41,
+      42,
+      43,
+      44
+    ],
+    "functions": 45,
+    "selected_functions": 37,
+    "selected_instructions": 7764,
+    "selected_bytes": 29664,
+    "intervals_sha256": "9d41a35a2ee1832768ce9d30b0728176d50fa840f339e8c3729095fef75b4429",
+    "executable_was_run": false,
+    "selection": "Same 37 canonical SIMD function extents used in the frozen standalone benchmark."
+  },
+  "original_probe_equivalence": {
+    "checks": [
+      {
+        "case": "mips64el-ls",
+        "mode": 0,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          11803516
+        ]
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 1,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          12242202
+        ]
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 2,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          25019836
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          116594087
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          120526573
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          140847373
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          105938608
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          109944730
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          142788562
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 0,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9451953
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 1,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9793609
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 2,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          12259953
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 0,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          12930965
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 1,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          13255975
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 2,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          20352585
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 0,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          1817242
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 1,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          2163438
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 2,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          5187896
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 0,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          10187143
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 1,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          10435797
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 2,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          15931282
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          516534325
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 1,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          530744680
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 2,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          681377180
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 0,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          43330046
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 1,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          44994535
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 2,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          54663421
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 0,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          398901630
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 1,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          411417782
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 2,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          475731894
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 0,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          81709696
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 1,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          85371669
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 2,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          98043462
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 0,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2823667
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 1,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2879075
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 2,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          3182811
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 0,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1805727
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 1,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1845921
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 2,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          2446649
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 0,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3558528
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 1,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3675078
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 2,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          4739957
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 0,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6709243
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 1,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6867977
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 2,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          8723872
+        ]
+      }
+    ],
+    "unchanged": true
+  },
+  "batch_probe_equivalence": {
+    "checks": [
+      {
+        "case": "putty-32-0.85",
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          116594087
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          105938608
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9451953
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          516534325
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          43330046
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          398901630
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          81709696
+        ]
+      },
+      {
+        "case": "scalar32",
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2823667
+        ]
+      },
+      {
+        "case": "scalar64",
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1805727
+        ]
+      },
+      {
+        "case": "simd64",
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3558528
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6709243
+        ]
+      }
+    ],
+    "unchanged": true,
+    "capacity": 64,
+    "fallback": "Decoder::decodeOneLight"
+  },
+  "publication_authorized_by_report": false,
+  "statistical_scope": "2000 deterministic resamples of 32 interleaved balanced cycles; no outlier removal"
+}
