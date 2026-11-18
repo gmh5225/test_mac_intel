@@ -1,0 +1,37 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "472e062e08d5a63b40e8a9b8082f16a279552c99",
+    "sha256": "fd01ec9eb0798dd58f4534f164dc5382e9d7c0efad890e174287a2728ccf574b",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "43cd62e2e876c13805eb4be46f068f45534f9a01a0eb5d5b41450a3d0855c694"
+  },
+  "rows": [
+    {
+      "host": "memory-owned-admission-four-ubuntu-22.04-clang-44279170154",
+      "variants": {
+        "base": {
+          "indirect_jumps": []
+        },
+        "scan": {
+          "indirect_jumps": []
+        }
+      }
+    },
+    {
+      "host": "memory-owned-admission-four-ubuntu-24.04-clang-44279170154",
+      "variants": {
+        "base": {
+          "indirect_jumps": []
+        },
+        "scan": {
+          "indirect_jumps": []
+        }
+      }
+    }
+  ],
+  "parser_sha256": "c262b193c9d71d86cc86e8d03b9cbf48ad2c8bb4b99a7efab22ac5de448c4c0c",
+  "finding": "The memory-owned dispatch retains no indirect jump in the ordinary Clang iterator. The extra R1481 reserved-case jump table is absent.",
+  "limits": "This confirms the compiler-lowering hypothesis only. Dynamic instruction counts, memory-writer costs and native timings are judged independently; no other-ISA performance inference follows from x86 object identity."
+}
