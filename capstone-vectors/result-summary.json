@@ -1,0 +1,1669 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44208730484,
+    "head_sha": "a5d1d7c2fdceb32cfcfeddc5b6dc3aeea592b12c",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44208730484",
+    "run_attempt": 1
+  },
+  "protocol": {
+    "source": {
+      "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+      "source_parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+      "baseline_patch_sha256": "2159258d74ab609692d42b9868171dadde011b522f370878a6495b62f2a87480",
+      "variants": {
+        "output": {
+          "tree": "565a7134bd148691c072308fad8612d04110fce3",
+          "sha256": "b246e263af4c03e97a7911b3c2aed2ccb72b70d0f1373b01e665085d8adc8e6e",
+          "experiment": "round1411-mode-caller-shape",
+          "semantic_run": {
+            "id": 44200457326,
+            "head_sha": "f0aadf9280514d54d180e5bdb97cbdb8eee89bb6",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44200457326",
+            "run_attempt": 1
+          }
+        }
+      }
+    },
+    "original_decision": {
+      "disposition": "Hold: the completed 84 native and 96 mixed observations contain two losses and five A/A flags; do not publish the mode selector.",
+      "source": {
+        "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+        "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+        "source_parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+        "baseline_patch_sha256": "2159258d74ab609692d42b9868171dadde011b522f370878a6495b62f2a87480",
+        "variants": {
+          "output": {
+            "tree": "565a7134bd148691c072308fad8612d04110fce3",
+            "sha256": "b246e263af4c03e97a7911b3c2aed2ccb72b70d0f1373b01e665085d8adc8e6e",
+            "experiment": "round1411-mode-caller-shape",
+            "semantic_run": {
+              "id": 44200457326,
+              "head_sha": "f0aadf9280514d54d180e5bdb97cbdb8eee89bb6",
+              "status": "completed",
+              "conclusion": "success",
+              "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44200457326",
+              "run_attempt": 1
+            }
+          }
+        }
+      },
+      "runs": {
+        "native": {
+          "id": 44203886093,
+          "head_sha": "8e87153b63a322d82a0bdd8e60838dc14ea86d2f",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203886093",
+          "run_attempt": 1
+        },
+        "mixed": {
+          "id": 44202553832,
+          "head_sha": "8b62bc54f821b8ca1c354aee56739fdca3e34f80",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44202553832",
+          "run_attempt": 1
+        }
+      },
+      "rows": 180,
+      "losses": [
+        {
+          "suite": "native",
+          "host": "mode-caller-ubuntu-22.04-clang-1",
+          "case": "libssl3t64-amd64",
+          "panel": "simd-functions",
+          "mode": "detail",
+          "launch": "images",
+          "aa": 1.0004718554874044,
+          "aa_ci95": [
+            0.9984496820703475,
+            1.0066485262982758
+          ],
+          "variant": "output",
+          "gain": 0.9879201686001825,
+          "ci95": [
+            0.9863545900490539,
+            0.9909459793933955
+          ],
+          "vs_iced": 1.112731193799131,
+          "vs_fast": 0.690381428156732
+        },
+        {
+          "suite": "mixed",
+          "host": "mode-caller-images-four-ubuntu-24.04-clang-44202553832",
+          "case": "arm-cp",
+          "panel": null,
+          "mode": 0,
+          "launch": "images",
+          "aa": 0.9893834662373067,
+          "aa_ci95": [
+            0.9798842741735639,
+            0.9992619041610942
+          ],
+          "variant": "output",
+          "gain": 0.9837567683811166,
+          "ci95": [
+            0.977050899779939,
+            0.9961900535413946
+          ],
+          "vs_iced": null,
+          "vs_fast": null
+        }
+      ],
+      "aa_flags": [
+        {
+          "suite": "native",
+          "host": "mode-caller-ubuntu-24.04-clang-1",
+          "case": "libssl3t64-i386",
+          "panel": "all-functions",
+          "mode": "scan",
+          "launch": "images",
+          "aa": 0.9893936618241144,
+          "aa_ci95": [
+            0.9880791628186172,
+            0.9915159834820474
+          ]
+        },
+        {
+          "suite": "mixed",
+          "host": "mode-caller-images-four-ubuntu-22.04-clang-44202553832",
+          "case": "amd64-ls",
+          "panel": null,
+          "mode": 0,
+          "launch": "images",
+          "aa": 1.0134414691048659,
+          "aa_ci95": [
+            0.9760728327831627,
+            1.0743352738650302
+          ]
+        },
+        {
+          "suite": "mixed",
+          "host": "mode-caller-images-four-ubuntu-22.04-clang-44202553832",
+          "case": "amd64-ls",
+          "panel": null,
+          "mode": 0,
+          "launch": "same-file-fixed",
+          "aa": 1.010953532310598,
+          "aa_ci95": [
+            0.9604513013444471,
+            1.0455264408654932
+          ]
+        },
+        {
+          "suite": "mixed",
+          "host": "mode-caller-images-four-ubuntu-24.04-clang-44202553832",
+          "case": "arm-cp",
+          "panel": null,
+          "mode": 0,
+          "launch": "images",
+          "aa": 0.9893834662373067,
+          "aa_ci95": [
+            0.9798842741735639,
+            0.9992619041610942
+          ]
+        },
+        {
+          "suite": "mixed",
+          "host": "mode-caller-images-four-ubuntu-24.04-clang-44202553832",
+          "case": "amd64-ls",
+          "panel": null,
+          "mode": 0,
+          "launch": "images",
+          "aa": 0.9877979444916491,
+          "aa_ci95": [
+            0.9854972129284792,
+            0.9913239814894051
+          ]
+        }
+      ],
+      "observed": "PE32 output improves, but Clang14 SSL64 detail loses 1.21% in ordinary image launches with A/A near 1. Its fixed-file comparison also loses 0.63%, below the one-percent cutoff. A mixed ARM raw loss coincides with a noisy A/A control.",
+      "uncertainty": "The selector adds work on 64-bit fallback paths and relocates five existing EVEX functions. Native timing does not yet separate their causal contributions. Do not discard image-launch losses or claim all controls passed.",
+      "portable_fix": "../round1422-mode-code-section/portable-review.json",
+      "cleanup_complete": true,
+      "publication_qualified": false
+    },
+    "purpose": "Separate the three added mode-selector instructions from five relocated EVEX functions and any associated data placement. The former adds 1,122,780 retired simulated instructions on both SSL64 format and detail in Clang14; its native contribution is unknown.",
+    "intervention": "In a diagnostic copy of the exact candidate executable, change only the single direct call in X86_disasmIter from X86_tryModeSimpleOutput to the already present original X86_trySimpleOutput. All file bytes outside its signed relative displacement, all section sizes and all symbol addresses are identical.",
+    "predictions": "If the bypass recovers SSL64 while retaining candidate placement, selector work contributes to the loss. If bypass remains slower than baseline, placement or other process context contributes. No specific hardware cache mechanism is inferred without measurement.",
+    "cases": [
+      "SSL64 SIMD format/detail",
+      "JPEG64 SIMD format/detail",
+      "SSL32 all-functions format/detail"
+    ],
+    "profiles": [
+      "ubuntu-22.04 clang",
+      "ubuntu-24.04 clang"
+    ],
+    "cycles": 60,
+    "calibration_cpu_ms": 100,
+    "launches": [
+      "images",
+      "same-file-fixed"
+    ],
+    "observations_per_profile": 12,
+    "comparisons": [
+      "candidate/baseline",
+      "bypass/baseline",
+      "candidate/bypass",
+      "identical-copy/baseline"
+    ],
+    "frozen_consumer": true,
+    "source_and_scope_unchanged": true,
+    "native_qualification": false,
+    "publication_qualified": false,
+    "original_losses_preserved": true
+  },
+  "profiles": [
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "bypass": {
+        "passed": true,
+        "call_pc": 1546371,
+        "file_offset": 1546371,
+        "original_target": 4156608,
+        "replacement_target": 1546496,
+        "modified_byte_offsets": [
+          1546372,
+          1546373,
+          1546374
+        ],
+        "all_other_bytes_identical": true,
+        "all_symbols_identical": true,
+        "before_sha256": "1637a93f1a11833ce622decfd62b56b77b2d949bd42cc73a548ed928680ece00",
+        "after_sha256": "ff1625aad2c9eb1e092c8daad2335afd082980323f372551169d55e02e8c8875",
+        "purpose": "Diagnostic placement-preserving bypass only; not a runtime source or publication candidate."
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 1643176383,
+        "files": 4814
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "bypass": {
+        "passed": true,
+        "call_pc": 1425306,
+        "file_offset": 1425306,
+        "original_target": 3543872,
+        "replacement_target": 1425424,
+        "modified_byte_offsets": [
+          1425307,
+          1425308,
+          1425309
+        ],
+        "all_other_bytes_identical": true,
+        "all_symbols_identical": true,
+        "before_sha256": "0daaea75fd5f1917a6096ba91cc82ebd37cc19df44b67eeab0cc2ca8c2e590bd",
+        "after_sha256": "6466acd4061fe43d541f055e519f7b16827ae3af5d33020a9ed11fbba8b0a3bb",
+        "purpose": "Diagnostic placement-preserving bypass only; not a runtime source or publication candidate."
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 1590844240,
+        "files": 4814
+      }
+    }
+  ],
+  "rows": [
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "format",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9980426881114307,
+          "ci95": [
+            0.9948795593140766,
+            1.0008555703367503
+          ]
+        },
+        "candidate": {
+          "gain": 0.9895686114014806,
+          "ci95": [
+            0.9880017676196741,
+            0.9935619073266516
+          ]
+        },
+        "bypass": {
+          "gain": 0.9978543996415459,
+          "ci95": [
+            0.9948918063883929,
+            1.0003242181548209
+          ]
+        },
+        "selector": {
+          "gain": 0.9920641429555959,
+          "ci95": [
+            0.9900276979787682,
+            0.9962684141031093
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9997070572555489,
+          "ci95": [
+            0.9979689111076666,
+            1.0009681634681367
+          ]
+        },
+        "candidate": {
+          "gain": 0.9919548975617536,
+          "ci95": [
+            0.9902045934597931,
+            0.99347110189203
+          ]
+        },
+        "bypass": {
+          "gain": 0.9996130343936926,
+          "ci95": [
+            0.9974575525188871,
+            1.0014101959239117
+          ]
+        },
+        "selector": {
+          "gain": 0.992156761405813,
+          "ci95": [
+            0.9913862695350406,
+            0.9931337276924237
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9990875772631553,
+          "ci95": [
+            0.9971682137236194,
+            1.0014902857699
+          ]
+        },
+        "candidate": {
+          "gain": 0.9872709291393005,
+          "ci95": [
+            0.9851196823152656,
+            0.9916190637556276
+          ]
+        },
+        "bypass": {
+          "gain": 0.9969229693576751,
+          "ci95": [
+            0.9934469043886842,
+            0.9982058337895703
+          ]
+        },
+        "selector": {
+          "gain": 0.9922553269392274,
+          "ci95": [
+            0.9893887257463023,
+            0.9944263399030774
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.998233497849988,
+          "ci95": [
+            0.9969890591915971,
+            1.00083950708066
+          ]
+        },
+        "candidate": {
+          "gain": 0.9908711354085179,
+          "ci95": [
+            0.9890621981842767,
+            0.991849196123153
+          ]
+        },
+        "bypass": {
+          "gain": 0.999485033770779,
+          "ci95": [
+            0.9985237641869633,
+            1.0008662667079427
+          ]
+        },
+        "selector": {
+          "gain": 0.9923622037614388,
+          "ci95": [
+            0.9889865836564542,
+            0.9938743351947574
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.995404037937212,
+          "ci95": [
+            0.9928269479695703,
+            0.9975610177993808
+          ]
+        },
+        "candidate": {
+          "gain": 0.9906784629172891,
+          "ci95": [
+            0.9884318381141843,
+            0.9927738037512711
+          ]
+        },
+        "bypass": {
+          "gain": 0.9939832317308321,
+          "ci95": [
+            0.9919025766425273,
+            0.9964038382028666
+          ]
+        },
+        "selector": {
+          "gain": 0.9978459495829776,
+          "ci95": [
+            0.9965468019454157,
+            0.9997643575113243
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996510234350842,
+          "ci95": [
+            0.9982633386446226,
+            1.000654978268602
+          ]
+        },
+        "candidate": {
+          "gain": 0.9908872038352695,
+          "ci95": [
+            0.9891993882643224,
+            0.991555702695382
+          ]
+        },
+        "bypass": {
+          "gain": 0.9970839674843756,
+          "ci95": [
+            0.9938893033484979,
+            0.9985228771349526
+          ]
+        },
+        "selector": {
+          "gain": 0.99465774413889,
+          "ci95": [
+            0.9928255760356758,
+            0.9958721866243353
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9988816799986537,
+          "ci95": [
+            0.9962987486245349,
+            1.0003857620467294
+          ]
+        },
+        "candidate": {
+          "gain": 0.9952572799650976,
+          "ci95": [
+            0.9925053480638839,
+            0.9974327784674014
+          ]
+        },
+        "bypass": {
+          "gain": 0.9999421654206695,
+          "ci95": [
+            0.9982546872161371,
+            1.0025164238290007
+          ]
+        },
+        "selector": {
+          "gain": 0.9945595918022901,
+          "ci95": [
+            0.9918110971733448,
+            0.9983404544451429
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9995337565994493,
+          "ci95": [
+            0.997901055262561,
+            1.000396305418519
+          ]
+        },
+        "candidate": {
+          "gain": 0.9946040964868004,
+          "ci95": [
+            0.9929202009625454,
+            0.9963461300255148
+          ]
+        },
+        "bypass": {
+          "gain": 1.0000650625507028,
+          "ci95": [
+            0.9993617766399261,
+            1.0018562124346455
+          ]
+        },
+        "selector": {
+          "gain": 0.9939239597118796,
+          "ci95": [
+            0.9922854666281421,
+            0.9957314502529512
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "format",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9957401439758249,
+          "ci95": [
+            0.9942964223404486,
+            0.9976394769055856
+          ]
+        },
+        "candidate": {
+          "gain": 1.0396610551785683,
+          "ci95": [
+            1.037566265708673,
+            1.0412490310555111
+          ]
+        },
+        "bypass": {
+          "gain": 0.9931142596525544,
+          "ci95": [
+            0.9927843680815818,
+            0.9950172942855979
+          ]
+        },
+        "selector": {
+          "gain": 1.0464881433971347,
+          "ci95": [
+            1.0450631798027734,
+            1.0478823797770263
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0001253384744815,
+          "ci95": [
+            0.9992229925148278,
+            1.0007336571103433
+          ]
+        },
+        "candidate": {
+          "gain": 1.040973666786666,
+          "ci95": [
+            1.0400147321047597,
+            1.0420013271783541
+          ]
+        },
+        "bypass": {
+          "gain": 0.9999438843929269,
+          "ci95": [
+            0.999271312831046,
+            1.0009443155652527
+          ]
+        },
+        "selector": {
+          "gain": 1.0404309103590732,
+          "ci95": [
+            1.0395711369804634,
+            1.040944456937261
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "detail",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9977362121206266,
+          "ci95": [
+            0.9940244260512804,
+            1.000610965235794
+          ]
+        },
+        "candidate": {
+          "gain": 1.0365151638779717,
+          "ci95": [
+            1.0336525867714472,
+            1.038332738461834
+          ]
+        },
+        "bypass": {
+          "gain": 0.994735604084776,
+          "ci95": [
+            0.9905407178557369,
+            0.9973468745149487
+          ]
+        },
+        "selector": {
+          "gain": 1.041038918089122,
+          "ci95": [
+            1.038206707999667,
+            1.046011405148186
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0003184872164295,
+          "ci95": [
+            0.9996163498889011,
+            1.0019514613966547
+          ]
+        },
+        "candidate": {
+          "gain": 1.0349488509244393,
+          "ci95": [
+            1.03405091300122,
+            1.0358438825556735
+          ]
+        },
+        "bypass": {
+          "gain": 1.0001980121682439,
+          "ci95": [
+            0.99927650728205,
+            1.0012620748510552
+          ]
+        },
+        "selector": {
+          "gain": 1.0343064713533359,
+          "ci95": [
+            1.0328947096272456,
+            1.035395832028542
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "format",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0000350817176797,
+          "ci95": [
+            0.9986548328336236,
+            1.0011307119206714
+          ]
+        },
+        "candidate": {
+          "gain": 0.9931626631568082,
+          "ci95": [
+            0.9920725882130357,
+            0.9942077374006051
+          ]
+        },
+        "bypass": {
+          "gain": 0.9998412006138041,
+          "ci95": [
+            0.998543543220758,
+            1.0008440757841748
+          ]
+        },
+        "selector": {
+          "gain": 0.9935548390562806,
+          "ci95": [
+            0.9925055381143366,
+            0.9947817709866467
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9993545285641976,
+          "ci95": [
+            0.9987952584815954,
+            1.000521002621963
+          ]
+        },
+        "candidate": {
+          "gain": 0.9917572038954404,
+          "ci95": [
+            0.9908177121340049,
+            0.9922779716449255
+          ]
+        },
+        "bypass": {
+          "gain": 0.9992827622416405,
+          "ci95": [
+            0.9985494273203771,
+            1.000558359282723
+          ]
+        },
+        "selector": {
+          "gain": 0.9925547606229699,
+          "ci95": [
+            0.9917048259649628,
+            0.9932466116249026
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9994056428710432,
+          "ci95": [
+            0.9983305069863571,
+            1.0014271427976165
+          ]
+        },
+        "candidate": {
+          "gain": 0.9994012917596291,
+          "ci95": [
+            0.997672472409645,
+            1.000605718556225
+          ]
+        },
+        "bypass": {
+          "gain": 1.0006342775430763,
+          "ci95": [
+            0.9992727508058954,
+            1.0017239605227686
+          ]
+        },
+        "selector": {
+          "gain": 0.997474604443968,
+          "ci95": [
+            0.9964091091182672,
+            0.9990444567192058
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000151621498119,
+          "ci95": [
+            0.9990708779943421,
+            1.0011469435163565
+          ]
+        },
+        "candidate": {
+          "gain": 0.997921417130727,
+          "ci95": [
+            0.9973906551450857,
+            0.9992195629552549
+          ]
+        },
+        "bypass": {
+          "gain": 1.0007500349401734,
+          "ci95": [
+            0.9999057476455009,
+            1.0018791415290278
+          ]
+        },
+        "selector": {
+          "gain": 0.9973216070529631,
+          "ci95": [
+            0.9966069927273193,
+            0.9979849005372685
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9994389073514691,
+          "ci95": [
+            0.9986464711569447,
+            1.0002576240662846
+          ]
+        },
+        "candidate": {
+          "gain": 0.9957485976616843,
+          "ci95": [
+            0.9947798636332149,
+            0.9963365962425867
+          ]
+        },
+        "bypass": {
+          "gain": 1.001421901883404,
+          "ci95": [
+            1.0008638322378218,
+            1.0019274348183382
+          ]
+        },
+        "selector": {
+          "gain": 0.9940949066820934,
+          "ci95": [
+            0.9937909012063392,
+            0.9951632942847
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996427490699838,
+          "ci95": [
+            0.9988472269448252,
+            1.0003960827416847
+          ]
+        },
+        "candidate": {
+          "gain": 0.9958272212662485,
+          "ci95": [
+            0.9949019956882059,
+            0.9968820997532947
+          ]
+        },
+        "bypass": {
+          "gain": 1.0006946176480005,
+          "ci95": [
+            0.9999777057337939,
+            1.0013801212713058
+          ]
+        },
+        "selector": {
+          "gain": 0.9949605329548517,
+          "ci95": [
+            0.99429378111301,
+            0.9954518915165274
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0006509728707653,
+          "ci95": [
+            0.9992180299941353,
+            1.0011543226097077
+          ]
+        },
+        "candidate": {
+          "gain": 0.9988253255360187,
+          "ci95": [
+            0.9972586480179686,
+            0.999476532206552
+          ]
+        },
+        "bypass": {
+          "gain": 1.0017800127862855,
+          "ci95": [
+            1.0006484176742798,
+            1.0026731654241434
+          ]
+        },
+        "selector": {
+          "gain": 0.9968210130082209,
+          "ci95": [
+            0.9958957014344082,
+            0.9981154375907382
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0004552851047777,
+          "ci95": [
+            0.9987756981480327,
+            1.0013582027071026
+          ]
+        },
+        "candidate": {
+          "gain": 0.9974051533479104,
+          "ci95": [
+            0.996343770418292,
+            0.9985725081870854
+          ]
+        },
+        "bypass": {
+          "gain": 1.0006532500311671,
+          "ci95": [
+            1.0000489359480158,
+            1.0013285120197593
+          ]
+        },
+        "selector": {
+          "gain": 0.9967558491022371,
+          "ci95": [
+            0.9960268860580926,
+            0.9976720227809506
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "format",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996042071955689,
+          "ci95": [
+            0.9988664387206025,
+            1.0009922786872383
+          ]
+        },
+        "candidate": {
+          "gain": 1.0117278044138232,
+          "ci95": [
+            1.0111455374995342,
+            1.0125793920134682
+          ]
+        },
+        "bypass": {
+          "gain": 1.000143434505878,
+          "ci95": [
+            0.9990705675087049,
+            1.0010479361222653
+          ]
+        },
+        "selector": {
+          "gain": 1.0119975555638003,
+          "ci95": [
+            1.0111107067328824,
+            1.0127972289833365
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9998221605307434,
+          "ci95": [
+            0.9995652817344333,
+            1.0001018155564914
+          ]
+        },
+        "candidate": {
+          "gain": 1.0119280855621882,
+          "ci95": [
+            1.011437293214131,
+            1.0124791600753924
+          ]
+        },
+        "bypass": {
+          "gain": 1.0000324207612876,
+          "ci95": [
+            0.9995566167713392,
+            1.000516698114513
+          ]
+        },
+        "selector": {
+          "gain": 1.0121286453793834,
+          "ci95": [
+            1.0113642719967184,
+            1.0126693128738324
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "detail",
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996553429175372,
+          "ci95": [
+            0.9981574970893935,
+            1.002825242678462
+          ]
+        },
+        "candidate": {
+          "gain": 1.009212138177764,
+          "ci95": [
+            1.0079285255115624,
+            1.0104471301622926
+          ]
+        },
+        "bypass": {
+          "gain": 1.0003037381027784,
+          "ci95": [
+            0.9979442611650007,
+            1.0016312143940327
+          ]
+        },
+        "selector": {
+          "gain": 1.0095196422310315,
+          "ci95": [
+            1.008404232813012,
+            1.0107658977530234
+          ]
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0004325063339108,
+          "ci95": [
+            0.9991689796052039,
+            1.0013557683643124
+          ]
+        },
+        "candidate": {
+          "gain": 1.0101879936475093,
+          "ci95": [
+            1.0090237104194266,
+            1.011301330152893
+          ]
+        },
+        "bypass": {
+          "gain": 1.000167894563395,
+          "ci95": [
+            0.999229407135362,
+            1.0004726655459697
+          ]
+        },
+        "selector": {
+          "gain": 1.0109096980071386,
+          "ci95": [
+            1.0092588380757825,
+            1.0121307837408966
+          ]
+        }
+      }
+    }
+  ],
+  "costs": [
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "mode": 0,
+      "counts": {
+        "integer": {
+          "case": "libssl3t64-amd64",
+          "mode": 0,
+          "variant": "integer",
+          "events": {
+            "Ir": 135208776,
+            "Dr": 27346352,
+            "Dw": 22341784,
+            "I1mr": 57475,
+            "D1mr": 39336,
+            "D1mw": 66,
+            "ILmr": 947,
+            "DLmr": 611,
+            "DLmw": 0,
+            "Bc": 20264904,
+            "Bcm": 626638,
+            "Bi": 489118,
+            "Bim": 133353
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            163233596
+          ],
+          "collected_traversals": 2
+        },
+        "output": {
+          "case": "libssl3t64-amd64",
+          "mode": 0,
+          "variant": "output",
+          "events": {
+            "Ir": 135208776,
+            "Dr": 27346352,
+            "Dw": 22341784,
+            "I1mr": 52596,
+            "D1mr": 39336,
+            "D1mw": 66,
+            "ILmr": 947,
+            "DLmr": 611,
+            "DLmw": 0,
+            "Bc": 20264904,
+            "Bcm": 626638,
+            "Bi": 489118,
+            "Bim": 133353
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            163233596
+          ],
+          "collected_traversals": 2
+        },
+        "bypass": {
+          "case": "libssl3t64-amd64",
+          "mode": 0,
+          "variant": "bypass",
+          "events": {
+            "Ir": 135208776,
+            "Dr": 27346352,
+            "Dw": 22341784,
+            "I1mr": 52596,
+            "D1mr": 39336,
+            "D1mw": 66,
+            "ILmr": 947,
+            "DLmr": 611,
+            "DLmw": 0,
+            "Bc": 20264904,
+            "Bcm": 626638,
+            "Bi": 489118,
+            "Bim": 133353
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            163233596
+          ],
+          "collected_traversals": 2
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "mode": 1,
+      "counts": {
+        "integer": {
+          "case": "libssl3t64-amd64",
+          "mode": 1,
+          "variant": "integer",
+          "events": {
+            "Ir": 329511827,
+            "Dr": 71406273,
+            "Dw": 51263347,
+            "I1mr": 1709382,
+            "D1mr": 87792,
+            "D1mw": 542,
+            "ILmr": 2431,
+            "DLmr": 1555,
+            "DLmw": 0,
+            "Bc": 46218813,
+            "Bcm": 1992565,
+            "Bi": 1182898,
+            "Bim": 223511
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            198842488
+          ],
+          "collected_traversals": 2
+        },
+        "output": {
+          "case": "libssl3t64-amd64",
+          "mode": 1,
+          "variant": "output",
+          "events": {
+            "Ir": 330634607,
+            "Dr": 71780533,
+            "Dw": 51263347,
+            "I1mr": 1822474,
+            "D1mr": 87792,
+            "D1mw": 542,
+            "ILmr": 2432,
+            "DLmr": 1555,
+            "DLmw": 0,
+            "Bc": 46593073,
+            "Bcm": 1970291,
+            "Bi": 1182898,
+            "Bim": 223511
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            198842488
+          ],
+          "collected_traversals": 2
+        },
+        "bypass": {
+          "case": "libssl3t64-amd64",
+          "mode": 1,
+          "variant": "bypass",
+          "events": {
+            "Ir": 329511827,
+            "Dr": 71406273,
+            "Dw": 51263347,
+            "I1mr": 1798286,
+            "D1mr": 87792,
+            "D1mw": 542,
+            "ILmr": 2431,
+            "DLmr": 1555,
+            "DLmw": 0,
+            "Bc": 46218813,
+            "Bcm": 1992565,
+            "Bi": 1182898,
+            "Bim": 223511
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            198842488
+          ],
+          "collected_traversals": 2
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-22.04-clang-1",
+      "mode": 2,
+      "counts": {
+        "integer": {
+          "case": "libssl3t64-amd64",
+          "mode": 2,
+          "variant": "integer",
+          "events": {
+            "Ir": 499073250,
+            "Dr": 110763178,
+            "Dw": 77678393,
+            "I1mr": 3864256,
+            "D1mr": 195217,
+            "D1mw": 2143,
+            "ILmr": 2666,
+            "DLmr": 2195,
+            "DLmw": 0,
+            "Bc": 73562929,
+            "Bcm": 3431693,
+            "Bi": 2269273,
+            "Bim": 224799
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            1236926053058296301
+          ],
+          "collected_traversals": 2
+        },
+        "output": {
+          "case": "libssl3t64-amd64",
+          "mode": 2,
+          "variant": "output",
+          "events": {
+            "Ir": 500196030,
+            "Dr": 111137438,
+            "Dw": 77678393,
+            "I1mr": 4006397,
+            "D1mr": 195217,
+            "D1mw": 2143,
+            "ILmr": 2667,
+            "DLmr": 2195,
+            "DLmw": 0,
+            "Bc": 73937189,
+            "Bcm": 3440390,
+            "Bi": 2269273,
+            "Bim": 224799
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            1236926053058296301
+          ],
+          "collected_traversals": 2
+        },
+        "bypass": {
+          "case": "libssl3t64-amd64",
+          "mode": 2,
+          "variant": "bypass",
+          "events": {
+            "Ir": 499073250,
+            "Dr": 110763178,
+            "Dw": 77678393,
+            "I1mr": 3956954,
+            "D1mr": 195217,
+            "D1mw": 2143,
+            "ILmr": 2666,
+            "DLmr": 2195,
+            "DLmw": 0,
+            "Bc": 73562929,
+            "Bcm": 3431693,
+            "Bi": 2269273,
+            "Bim": 224799
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            1236926053058296301
+          ],
+          "collected_traversals": 2
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "mode": 0,
+      "counts": {
+        "integer": {
+          "case": "libssl3t64-amd64",
+          "mode": 0,
+          "variant": "integer",
+          "events": {
+            "Ir": 141246718,
+            "Dr": 29922320,
+            "Dw": 24477752,
+            "I1mr": 951,
+            "D1mr": 37834,
+            "D1mw": 42,
+            "ILmr": 846,
+            "DLmr": 593,
+            "DLmw": 0,
+            "Bc": 20886850,
+            "Bcm": 512079,
+            "Bi": 356286,
+            "Bim": 89163
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            163233596
+          ],
+          "collected_traversals": 2
+        },
+        "output": {
+          "case": "libssl3t64-amd64",
+          "mode": 0,
+          "variant": "output",
+          "events": {
+            "Ir": 141246718,
+            "Dr": 29922320,
+            "Dw": 24477752,
+            "I1mr": 945,
+            "D1mr": 37834,
+            "D1mw": 42,
+            "ILmr": 846,
+            "DLmr": 593,
+            "DLmw": 0,
+            "Bc": 20886850,
+            "Bcm": 505608,
+            "Bi": 356286,
+            "Bim": 89163
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            163233596
+          ],
+          "collected_traversals": 2
+        },
+        "bypass": {
+          "case": "libssl3t64-amd64",
+          "mode": 0,
+          "variant": "bypass",
+          "events": {
+            "Ir": 141246718,
+            "Dr": 29922320,
+            "Dw": 24477752,
+            "I1mr": 945,
+            "D1mr": 37834,
+            "D1mw": 42,
+            "ILmr": 846,
+            "DLmr": 593,
+            "DLmw": 0,
+            "Bc": 20886850,
+            "Bcm": 505608,
+            "Bi": 356286,
+            "Bim": 89163
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            163233596
+          ],
+          "collected_traversals": 2
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "mode": 1,
+      "counts": {
+        "integer": {
+          "case": "libssl3t64-amd64",
+          "mode": 1,
+          "variant": "integer",
+          "events": {
+            "Ir": 322192502,
+            "Dr": 71245567,
+            "Dw": 50658186,
+            "I1mr": 18556,
+            "D1mr": 52646,
+            "D1mw": 153,
+            "ILmr": 1976,
+            "DLmr": 1499,
+            "DLmw": 0,
+            "Bc": 46359670,
+            "Bcm": 2119384,
+            "Bi": 1237397,
+            "Bim": 228945
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            198842488
+          ],
+          "collected_traversals": 2
+        },
+        "output": {
+          "case": "libssl3t64-amd64",
+          "mode": 1,
+          "variant": "output",
+          "events": {
+            "Ir": 322941022,
+            "Dr": 71619827,
+            "Dw": 50658186,
+            "I1mr": 18592,
+            "D1mr": 52646,
+            "D1mw": 153,
+            "ILmr": 1976,
+            "DLmr": 1499,
+            "DLmw": 0,
+            "Bc": 46733930,
+            "Bcm": 2124884,
+            "Bi": 1237397,
+            "Bim": 228945
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            198842488
+          ],
+          "collected_traversals": 2
+        },
+        "bypass": {
+          "case": "libssl3t64-amd64",
+          "mode": 1,
+          "variant": "bypass",
+          "events": {
+            "Ir": 322192502,
+            "Dr": 71245567,
+            "Dw": 50658186,
+            "I1mr": 18468,
+            "D1mr": 52646,
+            "D1mw": 153,
+            "ILmr": 1975,
+            "DLmr": 1499,
+            "DLmw": 0,
+            "Bc": 46359670,
+            "Bcm": 2114577,
+            "Bi": 1237397,
+            "Bim": 228945
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            198842488
+          ],
+          "collected_traversals": 2
+        }
+      }
+    },
+    {
+      "profile": "mode-dispatch-counterfactual-ubuntu-24.04-clang-1",
+      "mode": 2,
+      "counts": {
+        "integer": {
+          "case": "libssl3t64-amd64",
+          "mode": 2,
+          "variant": "integer",
+          "events": {
+            "Ir": 487912642,
+            "Dr": 109896808,
+            "Dw": 77093394,
+            "I1mr": 69622,
+            "D1mr": 74795,
+            "D1mw": 397,
+            "ILmr": 2208,
+            "DLmr": 2140,
+            "DLmw": 0,
+            "Bc": 73596455,
+            "Bcm": 4185371,
+            "Bi": 2323770,
+            "Bim": 341674
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            1236926053058296301
+          ],
+          "collected_traversals": 2
+        },
+        "output": {
+          "case": "libssl3t64-amd64",
+          "mode": 2,
+          "variant": "output",
+          "events": {
+            "Ir": 488661162,
+            "Dr": 110271068,
+            "Dw": 77093394,
+            "I1mr": 83115,
+            "D1mr": 74795,
+            "D1mw": 397,
+            "ILmr": 2209,
+            "DLmr": 2140,
+            "DLmw": 0,
+            "Bc": 73970715,
+            "Bcm": 4189525,
+            "Bi": 2323770,
+            "Bim": 341674
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            1236926053058296301
+          ],
+          "collected_traversals": 2
+        },
+        "bypass": {
+          "case": "libssl3t64-amd64",
+          "mode": 2,
+          "variant": "bypass",
+          "events": {
+            "Ir": 487912642,
+            "Dr": 109896808,
+            "Dw": 77093394,
+            "I1mr": 79037,
+            "D1mr": 74795,
+            "D1mw": 397,
+            "ILmr": 2208,
+            "DLmr": 2140,
+            "DLmw": 0,
+            "Bc": 73596455,
+            "Bcm": 4194931,
+            "Bi": 2323770,
+            "Bim": 341674
+          },
+          "result": [
+            187130,
+            0,
+            10532909426399429135,
+            1236926053058296301
+          ],
+          "collected_traversals": 2
+        }
+      }
+    }
+  ],
+  "aa_flags": [],
+  "native_qualification": false,
+  "publication_qualified": false,
+  "scope": "Diagnostic within-image intervention; retain all original failures and both launch contexts. Native ratios do not identify a specific hardware cache mechanism."
+}
