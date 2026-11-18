@@ -1,0 +1,50 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index e1cae865..ec1c2e96 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -86,8 +86,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+ #if defined(__clang__)
+ 			if ((opcode & 0xfe) == 0xc4)
+-				return X86_writeVex32Output(code, size, insn,
+-							    insn_size);
++				return X86_writeVex32Output(
++					code, size, insn, insn_size,
++					x86_simple_registers[3], wide);
+ #endif
+ 			const bool imm8 = opcode == 0x6a;
+ 			if (size < (imm8 ? 2u : 5u))
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 23852372..fc4f1b63 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -93,8 +93,10 @@ X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
+ /* PUSH and VEX32 share the exceptional arm. The opcode distinguishes them
+  * after the ordinary vector arm, keeping its direct call unchanged. */
+ #define X86_PLAN_VEX32 X86_PLAN_PUSH_IMMEDIATE
+-CAPSTONE_INTERNAL bool X86_writeVex32Output(const uint8_t *code, size_t size,
+-					    cs_insn *insn, uint16_t *insn_size);
++CAPSTONE_INTERNAL bool
++X86_writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
++		     uint16_t *insn_size, const struct X86SimpleRegister *regs,
++		     bool wide);
+ #else
+ #define X86_PLAN_VEX32 0
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 6e584416..270e1835 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -159,8 +159,11 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
+ 
+ X86_VEX32_OUTPUT_CODE
+ bool X86_writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
+-			  uint16_t *insn_size)
++			  uint16_t *insn_size,
++			  const struct X86SimpleRegister *regs, bool wide)
+ {
++	(void)regs;
++	(void)wide;
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+ 	/* LDS/LES, extended registers and W=1 retain the
+      * canonical reader. The admitted rows use only XMM/YMM0..7. */
