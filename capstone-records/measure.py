@@ -9,7 +9,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-full-init-domain-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-optional-mapper-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-full-init-domain-') as tmp:
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in (['X86','MIPS','AARCH64','PPC','RISCV','LOONGARCH','ARC','TRICORE'] if os.environ['BUILD_ARCHS']=='extra' else ['X86','MIPS','AARCH64'])] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={};ownedlibs={}
   active=mixed
-  write('scope',dict(active=active,policy='Four-backend Known-domain full and partial initialization',inactive_requirement='All runtime objects and linked consumer must be byte-identical'))
+  write('scope',dict(active=active,policy='Optional mapping callback in four-backend build',inactive_requirement='All runtime objects and linked consumer must be byte-identical'))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
   for key in ('base','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
@@ -54,8 +54,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-full-init-domain-') as tmp:
     with gzip.open(e/(key+'-linked-assembly.gz'),'wb') as stream:stream.write(sp.check_output(['objdump','-dr',f]))
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':
-    run(['cmake','--build',b,'--target','arm_private_stream','arm_post_index','--parallel','4'],'callback-build')
-    run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_arm_(private_stream|post_index)$'],'callback-contract')
+    run(['cmake','--build',b,'--target','arm_private_stream','arm_post_index','mapping','x86_simple_output','--parallel','4'],'callback-build')
+    run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_(arm_private_stream|arm_post_index|mapping|x86_simple_output)$'],'callback-contract')
     if active:
      run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-arm.cpp','-ldl','-o',t/'verify-arm'],'records-link')
      run([t/'verify-arm',libs['base'],libs['scan']],'records')
@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-full-init-domain-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert not added,added
-   expected={'cs.c.o'} if active else set()
+   expected={'cs.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/ARM/ARMModule.c.o','arch/AArch64/AArch64Module.c.o','arch/Mips/MipsModule.c.o'} if active else set()
    assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
@@ -79,7 +79,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-full-init-domain-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Known-domain full and partial initialization; preserve complete records, original images and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Optional mapping callback; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -100,9 +100,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-full-init-domain-') as tmp:
     gate['rows'].append(dict(case=case,mode=mode,ir_delta=pair['scan']['events']['Ir']-pair['base']['events']['Ir']))
    gate['passive_counts_not_increased']=all(x['ir_delta']<=0 for x in gate['rows'])
   write('codegen-gate',gate)
-  if gate['passive_counts_not_increased'] is False:
-   write('complete',dict(cases=0,cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False,reason='Passive instruction counts increased; inspect lowering before native timing'))
-   raise SystemExit(0)
+  gate['native_timing_policy']='Always measure the added branch and removed callbacks; event counts alone are not a speed gate.'
+  write('codegen-gate',gate)
   data=[]
   for x in cases:
    for mode in (0,1,2):
