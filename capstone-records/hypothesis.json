@@ -1,8 +1,11 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "basis": "R1296 qualified ARM-only constructed-operand initialization, but the four-backend build still uses full MCInst_Init for ARM. This is independent of the held VEX32 feature.",
-  "change": "Reuse the existing MIPS partial-initialization branch for ARM only in the established four-backend CMake profile. Preserve operand zero, all common metadata defaults, tied indices and public detail initialization.",
-  "prediction": "Reduce ARM temporary initialization writes and executed work without changing constructed operands. Explicitly measure x86, AArch64 and MIPS: their code generation and layout can still change.",
-  "validation": "Current-baseline full public records, cursor and error differential; read-before-construction observer; 0xa5/0x5a poisoning; compiler/configuration coverage; frozen real inputs with A/A and fixed-image timing.",
-  "publication_qualified": false
+  "prior_source": "035e1d24bf6143bee9159a5618883c37544542d3",
+  "evidence": "../round1468-arm-mixed-initialization/native-review.json",
+  "observation": "R1468 Clang adds 2 executed instructions per ordinary AArch64/full x86 fallback and 3 per MIPS detailed decode. AArch64 host assembly retains a SystemZ dialect comparison inside a branch whose architectural domain is only ARM/MIPS. Native ARM raw improves 7-17%, but passive regressions block publication.",
+  "change": "In the exact four-backend profile after X86 handling, use AArch64 as the only remaining full-initialization case. Project the admitted ARM/MIPS architecture to explicit constants for the shared initializer, retaining the owning helper and future per-architecture dialect decisions.",
+  "invariant": "CMake defines CAPSTONE_ARM_AARCH64_MIPS_X86 only for ARM;AARCH64;MIPS;X86. cs_open rejects architectures without arch_configs[arch].arch_init; the only runtime write to cs_struct.arch is its initial assignment in cs_open. After the existing X86 branch, ARM/AArch64/MIPS are exhaustive. Other profiles retain the original MIPS equality branch.",
+  "prediction": "Eliminate the added common architecture branch and impossible SystemZ check while retaining partial ARM initialization. Verify generated work and native passive controls; do not assume layout neutrality.",
+  "publication_qualified": false,
+  "codegen_gate": "Before native timing, fixed-guest counts must not increase for AArch64 raw, MIPS detail, PE32 format or PE64 format. Unsupported ARM-host Callgrind is reported and does not skip native measurement."
 }
