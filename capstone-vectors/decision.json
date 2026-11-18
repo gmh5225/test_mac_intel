@@ -1,0 +1,34 @@
+{
+  "complete": true,
+  "status": "plan-class-invariant-verified-native-comparison-required",
+  "source_tree": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
+  "all_four_compiler_semantics_passed": true,
+  "plan_class_invariant": "All 2048 cells checked; exactly the four PUSH and two VEX32 entries share this plan, and their high bit distinguishes them.",
+  "changed_runtime_objects": [
+    "arch/X86/X86OutputIterator.c.o"
+  ],
+  "increases": [
+    {
+      "host": "vex32-plan-class-bit-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "ir_change": 16352,
+      "instruction_reduction": -3.119363917747364e-05
+    }
+  ],
+  "finding": "The class-bit predicate removes two executed instructions per exceptional-arm visit in Clang14. Active Clang observations have no instruction increases. The small GCC13 increase is entirely __strchr_avx2 in a byte-identical control. Native throughput remains unqualified.",
+  "native_qualification_requested": true,
+  "native_protocol": "../round1461-vex32-exception-native",
+  "publication_qualified": false,
+  "cleaned_bytes": 7522726409,
+  "identical_control_observation": {
+    "profile": "ubuntu-24.04 GCC13",
+    "case": "libssl3t64-amd64",
+    "mode": "detail",
+    "extra_ir": 16352,
+    "function": "__strchr_avx2",
+    "all_runtime_objects_and_linked_binary_identical": true,
+    "capstone_function_ir_unchanged": true,
+    "interpretation": "Observed instruction divergence is confined to libc in a byte-identical control. No code regression or hardware-cache mechanism is inferred."
+  }
+}
