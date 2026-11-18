@@ -78,18 +78,21 @@ with tempfile.TemporaryDirectory(prefix='capstone-small-alias-mixed-') as tmp:
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
    if launch=='images':args=[str(bins[key]),*tail]
+   elif launch=='images-fixed':args=['setarch',platform.machine(),'-R',str(bins[key]),*tail]
    else:
     with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
     assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
+    args=[str(image),*tail]
+    if launch=='same-file-fixed':args=['setarch',platform.machine(),'-R',*args]
    return json.loads(sp.check_output(args,text=True))
   data=[]
   for x in cases:
-   for mode in (0,1,2):
-    for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+   for mode in ((0,1,2) if x['name'] in ('arm64-ls','mips64el-ls','putty-32-0.85','putty-64-0.85') else (0,)):
+    selected_launches=launches+(['images-fixed','same-file'] if x['name']=='arm-cp' and mode==0 else [])
+    for launch in selected_launches:
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*120e6/warm['cpu_ns'])))
      runs=[];reference=None;keys=['base','aa','output']
-     for k in range(32):
+     for k in range(64):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
@@ -98,6 +101,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-small-alias-mixed-') as tmp:
        ticks[v].append(vout['cpu_ns'])
       runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
      data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  assert len(data)==34
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))

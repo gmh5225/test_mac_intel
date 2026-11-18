@@ -20,34 +20,44 @@
       }
     }
   },
-  "cycles": 32,
-  "native_target_ms": 80,
-  "mixed_target_ms": 80,
-  "launches": [
-    "images",
-    "same-file-fixed"
-  ],
-  "native_rows": 84,
-  "mixed_rows": 96,
+  "original_run": {
+    "id": 44205770136,
+    "head_sha": "7ba34a9c0747e65076cdbdc2d673a9cf8ceab8d9",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44205770136",
+    "run_attempt": 1
+  },
+  "original_loss": {
+    "host": "alias-call-shape-images-four-ubuntu-24.04-clang-44205770136",
+    "case": "arm-cp",
+    "panel": null,
+    "mode": 0,
+    "launch": "images",
+    "aa": 0.9902629799099877,
+    "aa_ci95": [
+      0.9740686653828028,
+      1.0022569465121542
+    ],
+    "variant": "output",
+    "gain": 0.9861372976953441,
+    "ci95": [
+      0.9778193786044265,
+      1.0022328332606363
+    ],
+    "vs_iced": null,
+    "vs_fast": null
+  },
+  "original_losses_preserved": true,
+  "source_and_consumer_unchanged": true,
   "profiles": [
     "ubuntu-22.04 clang",
     "ubuntu-24.04 clang"
   ],
-  "inactive_compilers": "GCC11 and GCC13 exact released object and executable identity passed in the four-compiler scope run.",
-  "prior_failures_preserved": [
-    "../round1405-alias-call-shape-native/native-review.json",
-    "../round1410-alias-launch-factors/decision.json",
-    "../round1415-clang-rolled-alias/code-size-review.json"
-  ],
-  "purpose": "Measure the compact private Clang alias parser on the published memory-output baseline. The mixed cost consumer keeps every original text and read-only symbol at its original position; verify the actual native consumers independently and retain all writable data movement.",
-  "gates": "Both launch controls, every scalar/SIMD PE32/64 control and ARM/AArch64/MIPS case, complete source and consumer identity, and all A/A flags and losses. Static counts and code size are not actual throughput qualification.",
-  "cost_evidence": {
-    "id": 44203984817,
-    "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
-    "status": "completed",
-    "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
-    "run_attempt": 1
-  },
+  "cycles": 64,
+  "calibration_cpu_ms": 120,
+  "observations_per_profile": 34,
+  "scope": "Repeat every raw mixed control, PE32/PE64 text and detail, and the AArch64/MIPS output gains. Retain both original image and fixed-file launches. For the sole ARM cp raw outlier, also measure separate images with fixed ASLR and same inode with ordinary ASLR.",
+  "controls": "The four ARM cp launches separate the joint image/ASLR control into its two factors. They do not by themselves establish hardware cache causes. No original observation is removed or reclassified as passing.",
   "publication_qualified": false
 }
