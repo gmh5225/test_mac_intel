@@ -35,7 +35,8 @@ _Atomic uintptr_t stage_entry_sp, incoming_x19;
 static struct handshake state;
 static struct sample samples[stages_count];
 static pthread_t worker;
-static int entry_only, raw_entry, visits_entry, exact_entry;
+static int entry_only, raw_entry, visits_entry, exact_entry, raw_sp;
+static unsigned lookup_offset;
 static uintptr_t expected_return, expected_outer, owner, stack_low, stack_high;
 struct stack_rule {
   uintptr_t offset, depth;
@@ -90,26 +91,23 @@ static uintptr_t raw_pc(unw_cursor_t *cursor) {
   return (uintptr_t)ptrauth_strip((void *)value, ptrauth_key_return_address);
 }
 
-static void check_raw_caller(unw_cursor_t *cursor, uintptr_t sp) {
+static int check_raw_caller(unw_cursor_t *cursor, uintptr_t sp) {
   unw_word_t saved_sp, saved_x19;
-  unw_get_reg(cursor, UNW_REG_SP, &saved_sp);
-  unw_get_reg(cursor, UNW_ARM64_X19, &saved_x19);
-  fprintf(stderr, "walk pc=%lx expected=%lx sp=%lx expected=%lx x19=%lx expected=%lx\n",
-          raw_pc(cursor), expected_return, (unsigned long)saved_sp, sp,
-          (unsigned long)saved_x19, (unsigned long)atomic_load(&incoming_x19));
   if (raw_pc(cursor) != expected_return ||
-      unw_get_reg(cursor, UNW_REG_SP, &saved_sp) || saved_sp != sp ||
+      unw_get_reg(cursor, UNW_REG_SP, &saved_sp) ||
       unw_get_reg(cursor, UNW_ARM64_X19, &saved_x19) ||
       saved_x19 != atomic_load(&incoming_x19))
-    fprintf(stderr,"caller state differs\n");
+    _exit(31);
   if (unw_step(cursor) <= 0 || raw_pc(cursor) != expected_outer)
-    fprintf(stderr,"outer differs actual=%lx expected=%lx\n",raw_pc(cursor),expected_outer);
+    _exit(32);
+  return saved_sp == sp;
 }
 
 // Both walks use Darwin libunwind and the loaded image's registered tables.
 // The first starts in the handler. The second starts at the exact interrupted
 // PC, independently of whether this system exposes it when leaving _sigtramp.
-static void raw_entry_walk(const arm_thread_state64_t *regs) {
+static void raw_entry_walk(const ucontext_t *uc) {
+  const arm_thread_state64_t *regs = &uc->uc_mcontext->__ss;
   unw_cursor_t cursor;
   const uintptr_t sp = arm_thread_state64_get_sp(*regs);
   if (sp != atomic_load(&stage_entry_sp) || !at_signal_trampoline(&cursor) ||
@@ -120,49 +118,21 @@ static void raw_entry_walk(const arm_thread_state64_t *regs) {
     if (unw_step(&cursor) <= 0)
       _exit(34);
   }
-  check_raw_caller(&cursor, sp);
+  raw_sp = check_raw_caller(&cursor, sp);
 
-  const uintptr_t live_lr = arm_thread_state64_get_lr(*regs);
-  if (live_lr != expected_return)
-    _exit(39);
-  const uintptr_t system_lr = (uintptr_t)ptrauth_sign_unauthenticated(
-      (void *)live_lr, ptrauth_key_return_address, sp);
-  unw_context_t local;
-  if (unw_getcontext(&local) || unw_init_local(&cursor, &local) ||
-      unw_set_reg(&cursor, UNW_REG_SP, sp) ||
-      unw_set_reg(&cursor, UNW_ARM64_FP, arm_thread_state64_get_fp(*regs)) ||
-      unw_set_reg(&cursor, UNW_ARM64_LR, system_lr))
+  if (arm_thread_state64_get_lr(*regs) != expected_return ||
+      ndDarwinArm64eInitIndexedEntryCursor(&cursor, uc, owner + NDArm64eInstructionAlignment, &lookup_offset) ||
+      !ndDarwinArm64eInitIndexedEntryCursor(&cursor, uc, owner, &lookup_offset) ||
+      raw_pc(&cursor) != owner + lookup_offset)
     _exit(35);
-  for (int i = UNW_ARM64_X19; i <= UNW_ARM64_X28; ++i)
-    if (unw_set_reg(&cursor, i, regs->__x[i - UNW_ARM64_X0]))
+  for (unsigned i = 0; i < NDArm64ePreservedDCount; ++i) {
+    unw_fpreg_t value;
+    if (unw_get_fpreg(&cursor, UNW_ARM64_D8 + i, &value) ||
+        memcmp(&value, &uc->uc_mcontext->__ns.__v[NDArm64eFirstPreservedD + i], sizeof(value)))
       _exit(36);
-  const uintptr_t pc = arm_thread_state64_get_pc(*regs);
-  void *address = ptrauth_sign_unauthenticated((void *)pc,
-                                                ptrauth_key_return_address, sp);
-  unw_proc_info_t info;
-  int ipset = unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)address);
-  int lookup = unw_get_proc_info(&cursor, &info);
-  fprintf(stderr, "lookup=%d ipset=%d ip=%lx entry=%lx found=%lx..%lx\n",lookup, ipset, raw_pc(&cursor), pc, (unsigned long)info.start_ip, (unsigned long)info.end_ip);
-  fprintf(stderr,"recipe=%lx size=%u\n", (unsigned long)info.unwind_info, info.unwind_info_size);
-  if (!info.unwind_info) {
-    address = ptrauth_sign_unauthenticated((void *)(pc + 1), ptrauth_key_return_address, sp);
-    ipset = unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)address);
-    lookup = unw_get_proc_info(&cursor, &info);
-    fprintf(stderr,"interior lookup=%d ipset=%d ip=%lx found=%lx..%lx recipe=%lx size=%u\n",lookup,ipset,raw_pc(&cursor),(unsigned long)info.start_ip,(unsigned long)info.end_ip,(unsigned long)info.unwind_info,info.unwind_info_size);
   }
-  if (ipset ||
-      unw_set_reg(&cursor, UNW_REG_SP, sp) || (raw_pc(&cursor) != pc && raw_pc(&cursor) != pc + 1) ||
-      unw_get_proc_info(&cursor, &info) || info.start_ip != pc ||
-      info.end_ip <= pc)
+  if (unw_step(&cursor) <= 0 || !check_raw_caller(&cursor, sp))
     _exit(37);
-  unw_word_t cur_lr, cur_sp;
-  unw_get_reg(&cursor, UNW_ARM64_LR, &cur_lr);
-  unw_get_reg(&cursor, UNW_REG_SP, &cur_sp);
-  fprintf(stderr,"exact before step live_lr=%lx sys_lr=%lx cur_lr=%lx sp=%lx csp=%lx fmt=%x\n",live_lr,system_lr,(unsigned long)cur_lr,sp,(unsigned long)cur_sp,(unsigned)info.format);
-  if (unw_step(&cursor) <= 0)
-    _exit(40);
-  fprintf(stderr,"exact step returned\n");
-  check_raw_caller(&cursor, sp);
   exact_entry = 1;
 }
 
@@ -175,7 +145,7 @@ static void observe(int signal, siginfo_t *info, void *context) {
   if (raw_entry) {
     if (signal != SIGUSR1)
       _exit(38);
-    raw_entry_walk(regs);
+    raw_entry_walk(uc);
     atomic_store(&state.done, 1);
     return;
   }
@@ -355,7 +325,7 @@ int main(int argc, char **argv) {
   if (!out)
     return 7;
   if (raw_entry) {
-    fprintf(out, "%d %d\n", visits_entry, exact_entry);
+    fprintf(out, "%d %d %d %u\n", visits_entry, exact_entry, raw_sp, lookup_offset);
     return fclose(out) || dlclose(image);
   }
   for (int i = 0; i < (entry_only ? 1 : stages_count); ++i) {

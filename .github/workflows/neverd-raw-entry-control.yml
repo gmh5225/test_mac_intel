@@ -31,7 +31,7 @@ jobs:
         run: |
           ulimit -c 0
           /usr/bin/clang -target arm64e-apple-macosx15.0 -dynamiclib -DNEVERD_TEST_EXPLICIT_RA frame.S old.S -o frame.dylib
-          /usr/bin/clang -target arm64e-apple-macosx15.0 -O2 -I../neverd/include observer.c caller.S -o observer
+          /usr/bin/clang -target arm64e-apple-macosx15.0 -O2 -Iinclude -I../neverd/include observer.c caller.S -o observer
           /usr/bin/codesign --verify --strict frame.dylib
           /usr/bin/codesign --verify --strict observer
           for i in 1 2 3; do
