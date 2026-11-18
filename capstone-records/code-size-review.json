@@ -1,0 +1,80 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "tree": "5d99b28b0cb4ddb67bc9f3691e2f584b9e8b10a4",
+    "sha256": "71c74367b221f4cdb2e16047cda1da54221871d92f61d5579d4f0d036280b377",
+    "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+    "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+    "complete": true,
+    "publication_qualified": false,
+    "mapping_object_unchanged": true
+  },
+  "profiles": [
+    {
+      "profile": "clang-rolled-alias-cost-four-ubuntu-22.04-clang-44201935338",
+      "inactive_binary_identity": false,
+      "active": true,
+      "parser": [
+        {
+          "symbol": "map_set_alias_id_trie_impl",
+          "positions": [
+            [
+              "t",
+              2942128,
+              3035
+            ]
+          ]
+        }
+      ],
+      "common_text_changes": 0,
+      "readonly_moves": 1450,
+      "readonly_deltas": [
+        4096
+      ]
+    },
+    {
+      "profile": "clang-rolled-alias-cost-four-ubuntu-22.04-gcc-44201935338",
+      "inactive_binary_identity": true,
+      "active": false,
+      "parser": [],
+      "common_text_changes": 0,
+      "readonly_moves": 0,
+      "readonly_deltas": []
+    },
+    {
+      "profile": "clang-rolled-alias-cost-four-ubuntu-24.04-clang-44201935338",
+      "inactive_binary_identity": false,
+      "active": true,
+      "parser": [
+        {
+          "symbol": "map_set_alias_id_trie_impl",
+          "positions": [
+            [
+              "t",
+              2329552,
+              373
+            ]
+          ]
+        }
+      ],
+      "common_text_changes": 0,
+      "readonly_moves": 0,
+      "readonly_deltas": []
+    },
+    {
+      "profile": "clang-rolled-alias-cost-four-ubuntu-24.04-gcc-44201935338",
+      "inactive_binary_identity": true,
+      "active": false,
+      "parser": [],
+      "common_text_changes": 0,
+      "readonly_moves": 0,
+      "readonly_deltas": []
+    }
+  ],
+  "finding": "Clang14 still emits a 3035-byte parser and shifts common read-only data by one page. Clang18 does honor the rolled-loop direction: its parser is 373 bytes and common text/read-only symbols keep their original positions. Both GCC executables remain exactly identical to release. The four-compiler source still lacks native qualification.",
+  "followup": "../round1417-clang-small-alias",
+  "publication_qualified": false,
+  "native_qualification": false,
+  "compiler_pass_cause": "Not yet attributed. R1417 captures frontend IR, optimized IR and compiler loop remarks for both source variants; do not assume the pragma failed at the frontend."
+}
