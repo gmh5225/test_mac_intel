@@ -55,7 +55,12 @@ try:
    core.write_text(text.replace('MCInst mci;','MCInst mci;\nif (handle->arch == CS_ARCH_ARM) memset(&mci, 0xa5, sizeof(mci));'))
   targets=[] if phase!='observer' else ['--target','capstone_static',*(['arm_post_index','arm_private_stream','arm_reg_access','cstest'] if profile!='diet' else ['api','instruction_bytes','sstream'])]
   run(['cmake','--build',b,'--config','Release',*targets,'--parallel','4'],phase+'-build')
-  extra=['-R',('^unit_arm_(post_index|private_stream|reg_access)$' if profile!='diet' else '^unit_(api|instruction_bytes|sstream)$')] if phase=='observer' else []
+  diet_units=['api','utils','mapping','register_descriptors','sstream','instruction_bytes','mcinst','feature_mode',
+              'arm_writeback_postprocess','aarch64_postprocess','aarch64_scan','mips_scan',
+              'x86_reg_access','detail_option','text_option','x86_encoding_accuracy','x86_scan_batch','x86_buffer_bounds','x86_memory_scale']
+  pattern='^unit_('+'|'.join(diet_units)+')$' if profile=='diet' else '^unit_'
+  if phase=='observer':pattern='^unit_arm_(post_index|private_stream|reg_access)$' if profile!='diet' else '^unit_(api|instruction_bytes|sstream)$'
+  extra=['-R',pattern]
   run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','--parallel','4',*extra],phase+'-tests')
   tests[phase]=(e/(phase+'-tests.log')).read_text(errors='replace')
   if 'ARM' in architectures and profile!='diet':
