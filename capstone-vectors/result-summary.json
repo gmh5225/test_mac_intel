@@ -1,0 +1,123 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44217379606,
+    "head_sha": "c63ea2f31e53dbc2b5616b551b8cbc919198fdc1",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44217379606",
+    "run_attempt": 1
+  },
+  "source": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "tree": "05cd4ab4e93930097461afd973351b9a80b675e4",
+    "sha256": "1ff538dea7c4ea7b4ebbeeba7f2b71d0e8609dd8f60e8edcd271e77e61d962e2",
+    "files": [
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86GenVexPublicPlans.inc",
+      "suite/synctools/x86_operand_specializations.py"
+    ]
+  },
+  "profiles": [
+    {
+      "profile": "vex32-musttail-selector-cost-ubuntu-22.04-clang-1",
+      "cleanup": {
+        "removed": true,
+        "bytes": 1882830170,
+        "files": 4848
+      },
+      "tail": {
+        "assembly": "\n/tmp/capstone-vex32-musttail-selector-cost-vx37zz86/build/CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\nDisassembly of section .cs_x86_vex32_scan:\n\n0000000000000000 <decodeVex32OrGeneric>:\n   0:\t8a 44 24 08          \tmov    0x8(%rsp),%al\n   4:\t84 c0                \ttest   %al,%al\n   6:\t75 22                \tjne    2a <decodeVex32OrGeneric+0x2a>\n   8:\t48 83 fa 02          \tcmp    $0x2,%rdx\n   c:\t72 1c                \tjb     2a <decodeVex32OrGeneric+0x2a>\n   e:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)\n  12:\t75 16                \tjne    2a <decodeVex32OrGeneric+0x2a>\n  14:\t80 3e c5             \tcmpb   $0xc5,(%rsi)\n  17:\t75 11                \tjne    2a <decodeVex32OrGeneric+0x2a>\n  19:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)\n  1d:\t72 0b                \tjb     2a <decodeVex32OrGeneric+0x2a>\n  1f:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  23:\tc6 44 24 08 00       \tmovb   $0x0,0x8(%rsp)\n  28:\teb 16                \tjmp    40 <decodeVex32PlanOrGeneric>\n  2a:\t88 44 24 08          \tmov    %al,0x8(%rsp)\n  2e:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  32:\te9 00 00 00 00       \tjmp    37 <decodeVex32OrGeneric+0x37>\n\t\t\t33: R_X86_64_PLT32\t.text+0x6d19c\n",
+        "instructions": [
+          "   0:\t8a 44 24 08          \tmov    0x8(%rsp),%al",
+          "   4:\t84 c0                \ttest   %al,%al",
+          "   6:\t75 22                \tjne    2a <decodeVex32OrGeneric+0x2a>",
+          "   8:\t48 83 fa 02          \tcmp    $0x2,%rdx",
+          "   c:\t72 1c                \tjb     2a <decodeVex32OrGeneric+0x2a>",
+          "   e:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)",
+          "  12:\t75 16                \tjne    2a <decodeVex32OrGeneric+0x2a>",
+          "  14:\t80 3e c5             \tcmpb   $0xc5,(%rsi)",
+          "  17:\t75 11                \tjne    2a <decodeVex32OrGeneric+0x2a>",
+          "  19:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)",
+          "  1d:\t72 0b                \tjb     2a <decodeVex32OrGeneric+0x2a>",
+          "  1f:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  23:\tc6 44 24 08 00       \tmovb   $0x0,0x8(%rsp)",
+          "  28:\teb 16                \tjmp    40 <decodeVex32PlanOrGeneric>",
+          "  2a:\t88 44 24 08          \tmov    %al,0x8(%rsp)",
+          "  2e:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  32:\te9 00 00 00 00       \tjmp    37 <decodeVex32OrGeneric+0x37>"
+        ],
+        "stack_changes": [],
+        "calls_or_returns": [],
+        "passed": true,
+        "scope": "No stack frame and no ordinary call/return in the selector. The seventh incoming argument may be read from the caller stack; original fallback target changes are checked separately."
+      },
+      "completed": true
+    },
+    {
+      "profile": "vex32-musttail-selector-cost-ubuntu-22.04-gcc-1",
+      "cleanup": {
+        "removed": true,
+        "bytes": 1862440933,
+        "files": 4848
+      },
+      "completed": true
+    },
+    {
+      "profile": "vex32-musttail-selector-cost-ubuntu-24.04-clang-1",
+      "cleanup": {
+        "removed": true,
+        "bytes": 1753602083,
+        "files": 4833
+      },
+      "tail": {
+        "assembly": "\n/tmp/capstone-vex32-musttail-selector-cost-_rj9w56e/build/CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\nDisassembly of section .cs_x86_vex32_scan:\n\n0000000000000000 <decodeVex32OrGeneric>:\n   0:\t41 51                \tpush   %r9\n   2:\t44 0f b6 5c 24 10    \tmovzbl 0x10(%rsp),%r11d\n   8:\t45 84 db             \ttest   %r11b,%r11b\n   b:\t74 10                \tje     1d <decodeVex32OrGeneric+0x1d>\n   d:\t44 88 5c 24 10       \tmov    %r11b,0x10(%rsp)\n  12:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  16:\t41 59                \tpop    %r9\n  18:\te9 00 00 00 00       \tjmp    1d <decodeVex32OrGeneric+0x1d>\n\t\t\t19: R_X86_64_PLT32\t.text+0x4effc\n  1d:\t48 83 fa 02          \tcmp    $0x2,%rdx\n  21:\t72 ea                \tjb     d <decodeVex32OrGeneric+0xd>\n  23:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)\n  27:\t75 e4                \tjne    d <decodeVex32OrGeneric+0xd>\n  29:\t80 3e c5             \tcmpb   $0xc5,(%rsi)\n  2c:\t75 df                \tjne    d <decodeVex32OrGeneric+0xd>\n  2e:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)\n  32:\t72 d9                \tjb     d <decodeVex32OrGeneric+0xd>\n  34:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  38:\tc6 44 24 10 00       \tmovb   $0x0,0x10(%rsp)\n  3d:\t41 59                \tpop    %r9\n  3f:\teb 0f                \tjmp    50 <decodeVex32PlanOrGeneric>\n",
+        "instructions": [
+          "   0:\t41 51                \tpush   %r9",
+          "   2:\t44 0f b6 5c 24 10    \tmovzbl 0x10(%rsp),%r11d",
+          "   8:\t45 84 db             \ttest   %r11b,%r11b",
+          "   b:\t74 10                \tje     1d <decodeVex32OrGeneric+0x1d>",
+          "   d:\t44 88 5c 24 10       \tmov    %r11b,0x10(%rsp)",
+          "  12:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  16:\t41 59                \tpop    %r9",
+          "  18:\te9 00 00 00 00       \tjmp    1d <decodeVex32OrGeneric+0x1d>",
+          "  1d:\t48 83 fa 02          \tcmp    $0x2,%rdx",
+          "  21:\t72 ea                \tjb     d <decodeVex32OrGeneric+0xd>",
+          "  23:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)",
+          "  27:\t75 e4                \tjne    d <decodeVex32OrGeneric+0xd>",
+          "  29:\t80 3e c5             \tcmpb   $0xc5,(%rsi)",
+          "  2c:\t75 df                \tjne    d <decodeVex32OrGeneric+0xd>",
+          "  2e:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)",
+          "  32:\t72 d9                \tjb     d <decodeVex32OrGeneric+0xd>",
+          "  34:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  38:\tc6 44 24 10 00       \tmovb   $0x0,0x10(%rsp)",
+          "  3d:\t41 59                \tpop    %r9",
+          "  3f:\teb 0f                \tjmp    50 <decodeVex32PlanOrGeneric>"
+        ],
+        "stack_changes": [
+          "   0:\t41 51                \tpush   %r9",
+          "  16:\t41 59                \tpop    %r9",
+          "  3d:\t41 59                \tpop    %r9"
+        ],
+        "calls_or_returns": [],
+        "passed": false,
+        "scope": "No stack frame and no ordinary call/return in the selector. The seventh incoming argument may be read from the caller stack; original fallback target changes are checked separately."
+      },
+      "completed": false
+    },
+    {
+      "profile": "vex32-musttail-selector-cost-ubuntu-24.04-gcc-1",
+      "cleanup": {
+        "removed": true,
+        "bytes": 1859315590,
+        "files": 4848
+      },
+      "completed": true
+    }
+  ],
+  "original_frameless_hypothesis_failed": true,
+  "publication_qualified": false,
+  "followup": "../round1441-vex32-tail-cost-observation/profile-review.json",
+  "native_pending": "../round1444-vex32-tail-native/protocol.json"
+}
