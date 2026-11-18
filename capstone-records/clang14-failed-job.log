@@ -1,0 +1,575 @@
+﻿2026-11-18T06:14:38.9293895Z Current runner version: '2.338.2'
+2026-11-18T06:14:38.9317212Z ##[group]Runner Image Provisioner
+2026-11-18T06:14:38.9318015Z Hosted Compute Agent
+2026-11-18T06:14:38.9318627Z Version: 20261103.629
+2026-11-18T06:14:38.9319191Z Commit: 15dbd9ccb5dbf34fae002b6ed1a2670f52df37bc
+2026-11-18T06:14:38.9319855Z Build Date: 2026-11-03T17:26:59Z
+2026-11-18T06:14:38.9320468Z Worker ID: {4ee1bf1e-2514-44fa-824b-565d5e54a1f4}
+2026-11-18T06:14:38.9321072Z Region: westus2
+2026-11-18T06:14:38.9321605Z Cloud: Azure
+2026-11-18T06:14:38.9322091Z ##[endgroup]
+2026-11-18T06:14:38.9323159Z ##[group]Operating System
+2026-11-18T06:14:38.9323830Z Ubuntu
+2026-11-18T06:14:38.9324579Z 22.04.5
+2026-11-18T06:14:38.9325104Z LTS
+2026-11-18T06:14:38.9325565Z ##[endgroup]
+2026-11-18T06:14:38.9326013Z ##[group]Runner Image
+2026-11-18T06:14:38.9326963Z Image: ubuntu-22.04
+2026-11-18T06:14:38.9327475Z Version: 20261111.360.2
+2026-11-18T06:14:38.9328615Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261111.360/images/ubuntu/Ubuntu2204-Readme.md
+2026-11-18T06:14:38.9329871Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261111.360
+2026-11-18T06:14:38.9330762Z ##[endgroup]
+2026-11-18T06:14:38.9331720Z ##[group]GITHUB_TOKEN Permissions
+2026-11-18T06:14:38.9333339Z Contents: read
+2026-11-18T06:14:38.9333875Z Metadata: read
+2026-11-18T06:14:38.9334666Z ##[endgroup]
+2026-11-18T06:14:38.9336813Z Secret source: Actions
+2026-11-18T06:14:38.9337689Z Cache mode: write
+2026-11-18T06:14:38.9338428Z Prepare workflow directory
+2026-11-18T06:14:38.9763035Z Prepare all required actions
+2026-11-18T06:14:38.9805659Z Getting action download info
+2026-11-18T06:14:39.2880356Z Download action repository 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+2026-11-18T06:14:39.4643557Z Download action repository 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a' (SHA:043fb46d1a93c77aae656e7c1c64a875d1fc6a0a)
+2026-11-18T06:14:39.6589565Z Complete job name: cost (ubuntu-22.04, clang, four)
+2026-11-18T06:14:39.7241417Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+2026-11-18T06:14:39.7242245Z with:
+2026-11-18T06:14:39.7242618Z   sparse-checkout: capstone-records
+2026-11-18T06:14:39.7243070Z   persist-credentials: false
+2026-11-18T06:14:39.7243486Z   repository: gmh5225/test_mac_intel
+2026-11-18T06:14:39.7247010Z   token: ***
+2026-11-18T06:14:39.7247486Z   ssh-strict: true
+2026-11-18T06:14:39.7247889Z   ssh-user: git
+2026-11-18T06:14:39.7248222Z   clean: true
+2026-11-18T06:14:39.7248582Z   sparse-checkout-cone-mode: true
+2026-11-18T06:14:39.7248994Z   fetch-depth: 1
+2026-11-18T06:14:39.7249334Z   fetch-tags: false
+2026-11-18T06:14:39.7249686Z   show-progress: true
+2026-11-18T06:14:39.7250205Z   lfs: false
+2026-11-18T06:14:39.7250549Z   submodules: false
+2026-11-18T06:14:39.7250925Z   set-safe-directory: true
+2026-11-18T06:14:39.7251379Z   allow-unsafe-pr-checkout: false
+2026-11-18T06:14:39.7252076Z env:
+2026-11-18T06:14:39.7252428Z   BUILD_ARCHS: four
+2026-11-18T06:14:39.7252821Z   MEASURE_CC: clang
+2026-11-18T06:14:39.7253172Z ##[endgroup]
+2026-11-18T06:14:39.8873464Z Syncing repository: gmh5225/test_mac_intel
+2026-11-18T06:14:39.8875363Z ##[group]Getting Git version info
+2026-11-18T06:14:39.8875974Z Working directory is '/home/runner/work/test_mac_intel/test_mac_intel'
+2026-11-18T06:14:39.8876901Z [command]/usr/bin/git version
+2026-11-18T06:14:39.8908153Z git version 2.56.1
+2026-11-18T06:14:39.8927423Z ##[endgroup]
+2026-11-18T06:14:39.8938445Z Temporarily overriding HOME='/home/runner/work/_temp/d57d1501-c0e3-4804-8dd3-f0cac0a2fe7a' before making global git config changes
+2026-11-18T06:14:39.8940093Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-18T06:14:39.8945214Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/test_mac_intel/test_mac_intel
+2026-11-18T06:14:39.8985433Z Deleting the contents of '/home/runner/work/test_mac_intel/test_mac_intel'
+2026-11-18T06:14:39.8992992Z ##[group]Determining repository object format
+2026-11-18T06:14:39.8996247Z ##[endgroup]
+2026-11-18T06:14:39.8997131Z ##[group]Initializing the repository
+2026-11-18T06:14:39.8998086Z [command]/usr/bin/git init /home/runner/work/test_mac_intel/test_mac_intel
+2026-11-18T06:14:39.9100315Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-18T06:14:39.9101571Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-18T06:14:39.9102644Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-18T06:14:39.9103548Z hint: call:
+2026-11-18T06:14:39.9104436Z hint:
+2026-11-18T06:14:39.9105055Z hint: 	git config --global init.defaultBranch <name>
+2026-11-18T06:14:39.9105760Z hint:
+2026-11-18T06:14:39.9106430Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-18T06:14:39.9107505Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-18T06:14:39.9108417Z hint:
+2026-11-18T06:14:39.9108920Z hint: 	git branch -m <name>
+2026-11-18T06:14:39.9109482Z hint:
+2026-11-18T06:14:39.9110169Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-18T06:14:39.9111419Z Initialized empty Git repository in /home/runner/work/test_mac_intel/test_mac_intel/.git/
+2026-11-18T06:14:39.9113638Z [command]/usr/bin/git remote add origin https://github.com/gmh5225/test_mac_intel
+2026-11-18T06:14:39.9148753Z ##[endgroup]
+2026-11-18T06:14:39.9149662Z ##[group]Disabling automatic garbage collection
+2026-11-18T06:14:39.9152156Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-18T06:14:39.9182788Z ##[endgroup]
+2026-11-18T06:14:39.9183616Z ##[group]Setting up auth
+2026-11-18T06:14:39.9184444Z Removing SSH command configuration
+2026-11-18T06:14:39.9188498Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-18T06:14:39.9219659Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-18T06:14:39.9513077Z Removing HTTP extra header
+2026-11-18T06:14:39.9518576Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-18T06:14:39.9549233Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-18T06:14:39.9763586Z Removing includeIf entries pointing to credentials config files
+2026-11-18T06:14:39.9768706Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-18T06:14:39.9812961Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-18T06:14:40.0058158Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-18T06:14:40.0100662Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git.path /home/runner/work/_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.0134208Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.0170100Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.0207270Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.0243081Z ##[endgroup]
+2026-11-18T06:14:40.0244266Z ##[group]Fetching the repository
+2026-11-18T06:14:40.0249557Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --filter=blob:none --depth=1 origin +59faf3ab09b7791e87de1b1e89eb19f391db4b61:refs/remotes/origin/codex/capstone-iterator-leaf-factorial
+2026-11-18T06:14:40.3089618Z From https://github.com/gmh5225/test_mac_intel
+2026-11-18T06:14:40.3090629Z  * [new ref]         59faf3ab09b7791e87de1b1e89eb19f391db4b61 -> origin/codex/capstone-iterator-leaf-factorial
+2026-11-18T06:14:40.3098272Z [command]/usr/bin/git branch --list --remote origin/codex/capstone-iterator-leaf-factorial
+2026-11-18T06:14:40.3124466Z   origin/codex/capstone-iterator-leaf-factorial
+2026-11-18T06:14:40.3131543Z [command]/usr/bin/git rev-parse refs/remotes/origin/codex/capstone-iterator-leaf-factorial
+2026-11-18T06:14:40.3153659Z 59faf3ab09b7791e87de1b1e89eb19f391db4b61
+2026-11-18T06:14:40.3157693Z ##[endgroup]
+2026-11-18T06:14:40.3158577Z ##[group]Determining the checkout info
+2026-11-18T06:14:40.3159578Z ##[endgroup]
+2026-11-18T06:14:40.3160396Z ##[group]Setting up sparse checkout
+2026-11-18T06:14:40.3162024Z [command]/usr/bin/git sparse-checkout set capstone-records
+2026-11-18T06:14:40.3199677Z ##[endgroup]
+2026-11-18T06:14:40.3200728Z ##[group]Checking out the ref
+2026-11-18T06:14:40.3203106Z [command]/usr/bin/git checkout --progress --force -B codex/capstone-iterator-leaf-factorial refs/remotes/origin/codex/capstone-iterator-leaf-factorial
+2026-11-18T06:14:40.5346840Z Switched to a new branch 'codex/capstone-iterator-leaf-factorial'
+2026-11-18T06:14:40.5348138Z branch 'codex/capstone-iterator-leaf-factorial' set up to track 'origin/codex/capstone-iterator-leaf-factorial'.
+2026-11-18T06:14:40.5353261Z ##[endgroup]
+2026-11-18T06:14:40.5393540Z [command]/usr/bin/git log -1 --format=%H
+2026-11-18T06:14:40.5419627Z 59faf3ab09b7791e87de1b1e89eb19f391db4b61
+2026-11-18T06:14:40.5427812Z ##[group]Removing auth
+2026-11-18T06:14:40.5428285Z Removing SSH command configuration
+2026-11-18T06:14:40.5431707Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-18T06:14:40.5463759Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-18T06:14:40.5691029Z Removing HTTP extra header
+2026-11-18T06:14:40.5693619Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-18T06:14:40.5726438Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-18T06:14:40.5952252Z Removing includeIf entries pointing to credentials config files
+2026-11-18T06:14:40.5954350Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-18T06:14:40.5979598Z includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git.path
+2026-11-18T06:14:40.5980793Z includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git/worktrees/*.path
+2026-11-18T06:14:40.5981516Z includeif.gitdir:/github/workspace/.git.path
+2026-11-18T06:14:40.5982101Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-11-18T06:14:40.5990252Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git.path
+2026-11-18T06:14:40.6023081Z /home/runner/work/_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.6032903Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-8a1e149b\-03d6\-435c\-81c9\-48fa37161736\.config
+2026-11-18T06:14:40.6106375Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git/worktrees/*.path
+2026-11-18T06:14:40.6132573Z /home/runner/work/_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.6141665Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-8a1e149b\-03d6\-435c\-81c9\-48fa37161736\.config
+2026-11-18T06:14:40.6178632Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-11-18T06:14:40.6203397Z /github/runner_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.6210077Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-8a1e149b\-03d6\-435c\-81c9\-48fa37161736\.config
+2026-11-18T06:14:40.6250990Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-11-18T06:14:40.6275029Z /github/runner_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config
+2026-11-18T06:14:40.6283500Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-8a1e149b\-03d6\-435c\-81c9\-48fa37161736\.config
+2026-11-18T06:14:40.6319280Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-18T06:14:40.6546411Z Removing credentials config '/home/runner/work/_temp/git-credentials-8a1e149b-03d6-435c-81c9-48fa37161736.config'
+2026-11-18T06:14:40.6556565Z ##[endgroup]
+2026-11-18T06:14:40.6884371Z ##[group]Run actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+2026-11-18T06:14:40.6885101Z with:
+2026-11-18T06:14:40.6885487Z   repository: NeverSight/capstone
+2026-11-18T06:14:40.6885984Z   ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
+2026-11-18T06:14:40.6886466Z   path: source
+2026-11-18T06:14:40.6886843Z   persist-credentials: false
+2026-11-18T06:14:40.6890065Z   token: ***
+2026-11-18T06:14:40.6890437Z   ssh-strict: true
+2026-11-18T06:14:40.6890809Z   ssh-user: git
+2026-11-18T06:14:40.6891198Z   clean: true
+2026-11-18T06:14:40.6891587Z   sparse-checkout-cone-mode: true
+2026-11-18T06:14:40.6892020Z   fetch-depth: 1
+2026-11-18T06:14:40.6892381Z   fetch-tags: false
+2026-11-18T06:14:40.6892759Z   show-progress: true
+2026-11-18T06:14:40.6893133Z   lfs: false
+2026-11-18T06:14:40.6893480Z   submodules: false
+2026-11-18T06:14:40.6893860Z   set-safe-directory: true
+2026-11-18T06:14:40.6894680Z   allow-unsafe-pr-checkout: false
+2026-11-18T06:14:40.6895301Z env:
+2026-11-18T06:14:40.6895709Z   BUILD_ARCHS: four
+2026-11-18T06:14:40.6896077Z   MEASURE_CC: clang
+2026-11-18T06:14:40.6896441Z ##[endgroup]
+2026-11-18T06:14:40.7653213Z Syncing repository: NeverSight/capstone
+2026-11-18T06:14:40.7657594Z ##[group]Getting Git version info
+2026-11-18T06:14:40.7658266Z Working directory is '/home/runner/work/test_mac_intel/test_mac_intel/source'
+2026-11-18T06:14:40.7690897Z [command]/usr/bin/git version
+2026-11-18T06:14:40.7725167Z git version 2.56.1
+2026-11-18T06:14:40.7741785Z ##[endgroup]
+2026-11-18T06:14:40.7750854Z Temporarily overriding HOME='/home/runner/work/_temp/ba7ebdf5-41dd-48f2-bb97-d178b3a0269b' before making global git config changes
+2026-11-18T06:14:40.7752904Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-18T06:14:40.7756062Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/test_mac_intel/test_mac_intel/source
+2026-11-18T06:14:40.7790644Z ##[group]Determining repository object format
+2026-11-18T06:14:40.7792605Z ##[endgroup]
+2026-11-18T06:14:40.7793644Z ##[group]Initializing the repository
+2026-11-18T06:14:40.7797243Z [command]/usr/bin/git init /home/runner/work/test_mac_intel/test_mac_intel/source
+2026-11-18T06:14:40.7839202Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-18T06:14:40.7840593Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-18T06:14:40.7841724Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-18T06:14:40.7842887Z hint: call:
+2026-11-18T06:14:40.7843243Z hint:
+2026-11-18T06:14:40.7843673Z hint: 	git config --global init.defaultBranch <name>
+2026-11-18T06:14:40.7844440Z hint:
+2026-11-18T06:14:40.7845250Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-18T06:14:40.7846155Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-18T06:14:40.7846803Z hint:
+2026-11-18T06:14:40.7847162Z hint: 	git branch -m <name>
+2026-11-18T06:14:40.7847749Z hint:
+2026-11-18T06:14:40.7848559Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-18T06:14:40.7849522Z Initialized empty Git repository in /home/runner/work/test_mac_intel/test_mac_intel/source/.git/
+2026-11-18T06:14:40.7851177Z [command]/usr/bin/git remote add origin https://github.com/NeverSight/capstone
+2026-11-18T06:14:40.7884899Z ##[endgroup]
+2026-11-18T06:14:40.7885989Z ##[group]Disabling automatic garbage collection
+2026-11-18T06:14:40.7887997Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-18T06:14:40.7921790Z ##[endgroup]
+2026-11-18T06:14:40.7922759Z ##[group]Setting up auth
+2026-11-18T06:14:40.7923540Z Removing SSH command configuration
+2026-11-18T06:14:40.7927821Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-18T06:14:40.7961362Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-18T06:14:40.8179514Z Removing HTTP extra header
+2026-11-18T06:14:40.8186217Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-18T06:14:40.8218647Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-18T06:14:40.8439610Z Removing includeIf entries pointing to credentials config files
+2026-11-18T06:14:40.8444351Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-18T06:14:40.8517762Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-18T06:14:40.8745105Z [command]/usr/bin/git config --file /home/runner/work/_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-18T06:14:40.8783805Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git.path /home/runner/work/_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:40.9273129Z [command]/usr/bin/git config --local includeIf.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git/worktrees/*.path /home/runner/work/_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:40.9892079Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/source/.git.path /github/runner_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:40.9928255Z [command]/usr/bin/git config --local includeIf.gitdir:/github/workspace/source/.git/worktrees/*.path /github/runner_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:40.9957868Z ##[endgroup]
+2026-11-18T06:14:40.9958890Z ##[group]Fetching the repository
+2026-11-18T06:14:40.9963530Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 25da25371c0e19e1cf57b394446e3f705cecd2a9
+2026-11-18T06:14:46.5685733Z From https://github.com/NeverSight/capstone
+2026-11-18T06:14:46.5686430Z  * branch            25da25371c0e19e1cf57b394446e3f705cecd2a9 -> FETCH_HEAD
+2026-11-18T06:14:46.5694455Z [command]/usr/bin/git rev-parse --verify --quiet 25da25371c0e19e1cf57b394446e3f705cecd2a9^{object}
+2026-11-18T06:14:46.5720542Z 25da25371c0e19e1cf57b394446e3f705cecd2a9
+2026-11-18T06:14:46.5725352Z ##[endgroup]
+2026-11-18T06:14:46.5725934Z ##[group]Determining the checkout info
+2026-11-18T06:14:46.5726597Z ##[endgroup]
+2026-11-18T06:14:46.5730224Z [command]/usr/bin/git sparse-checkout disable
+2026-11-18T06:14:46.5769663Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-18T06:14:46.5798151Z ##[group]Checking out the ref
+2026-11-18T06:14:46.5801705Z [command]/usr/bin/git checkout --progress --force 25da25371c0e19e1cf57b394446e3f705cecd2a9
+2026-11-18T06:14:46.9575827Z Note: switching to '25da25371c0e19e1cf57b394446e3f705cecd2a9'.
+2026-11-18T06:14:46.9576215Z 
+2026-11-18T06:14:46.9576445Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-18T06:14:46.9577227Z changes and commit them, and you can discard any commits you make in this
+2026-11-18T06:14:46.9577935Z state without impacting any branches by switching back to a branch.
+2026-11-18T06:14:46.9578333Z 
+2026-11-18T06:14:46.9578697Z If you want to create a new branch to retain commits you create, you may
+2026-11-18T06:14:46.9579237Z do so (now or later) by using -c with the switch command. Example:
+2026-11-18T06:14:46.9579546Z 
+2026-11-18T06:14:46.9579677Z   git switch -c <new-branch-name>
+2026-11-18T06:14:46.9580122Z 
+2026-11-18T06:14:46.9580529Z Or undo this operation with:
+2026-11-18T06:14:46.9580714Z 
+2026-11-18T06:14:46.9580926Z   git switch -
+2026-11-18T06:14:46.9581174Z 
+2026-11-18T06:14:46.9581901Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-18T06:14:46.9582372Z 
+2026-11-18T06:14:46.9585201Z HEAD is now at 25da253 Use compact canonical alias lookup in mixed Clang builds
+2026-11-18T06:14:46.9607677Z ##[endgroup]
+2026-11-18T06:14:46.9649299Z [command]/usr/bin/git log -1 --format=%H
+2026-11-18T06:14:46.9675294Z 25da25371c0e19e1cf57b394446e3f705cecd2a9
+2026-11-18T06:14:46.9684735Z ##[group]Removing auth
+2026-11-18T06:14:46.9685426Z Removing SSH command configuration
+2026-11-18T06:14:46.9687797Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-18T06:14:46.9719151Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-18T06:14:46.9944195Z Removing HTTP extra header
+2026-11-18T06:14:46.9948466Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-18T06:14:46.9979848Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-18T06:14:47.0202579Z Removing includeIf entries pointing to credentials config files
+2026-11-18T06:14:47.0206096Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-18T06:14:47.0230975Z includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git.path
+2026-11-18T06:14:47.0231779Z includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git/worktrees/*.path
+2026-11-18T06:14:47.0232176Z includeif.gitdir:/github/workspace/source/.git.path
+2026-11-18T06:14:47.0232496Z includeif.gitdir:/github/workspace/source/.git/worktrees/*.path
+2026-11-18T06:14:47.0239577Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git.path
+2026-11-18T06:14:47.0264575Z /home/runner/work/_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:47.0273187Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git.path \/home\/runner\/work\/_temp\/git\-credentials\-25128d71\-433d\-43ea\-9dae\-c145b7fbec50\.config
+2026-11-18T06:14:47.0305310Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git/worktrees/*.path
+2026-11-18T06:14:47.0332246Z /home/runner/work/_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:47.0340081Z [command]/usr/bin/git config --local --unset includeif.gitdir:/home/runner/work/test_mac_intel/test_mac_intel/source/.git/worktrees/*.path \/home\/runner\/work\/_temp\/git\-credentials\-25128d71\-433d\-43ea\-9dae\-c145b7fbec50\.config
+2026-11-18T06:14:47.0371694Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/source/.git.path
+2026-11-18T06:14:47.0393138Z /github/runner_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:47.0399787Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/source/.git.path \/github\/runner_temp\/git\-credentials\-25128d71\-433d\-43ea\-9dae\-c145b7fbec50\.config
+2026-11-18T06:14:47.0431973Z [command]/usr/bin/git config --local --get-all includeif.gitdir:/github/workspace/source/.git/worktrees/*.path
+2026-11-18T06:14:47.0453757Z /github/runner_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config
+2026-11-18T06:14:47.0460732Z [command]/usr/bin/git config --local --unset includeif.gitdir:/github/workspace/source/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-25128d71\-433d\-43ea\-9dae\-c145b7fbec50\.config
+2026-11-18T06:14:47.0492635Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-18T06:14:47.0716694Z Removing credentials config '/home/runner/work/_temp/git-credentials-25128d71-433d-43ea-9dae-c145b7fbec50.config'
+2026-11-18T06:14:47.0740163Z ##[endgroup]
+2026-11-18T06:14:47.0864517Z ##[group]Run sudo apt-get update -qq
+2026-11-18T06:14:47.0864877Z [36;1msudo apt-get update -qq[0m
+2026-11-18T06:14:47.0865183Z [36;1msudo apt-get install -y valgrind linux-tools-generic[0m
+2026-11-18T06:14:47.0865530Z [36;1mpython3 -m venv "$RUNNER_TEMP/capstone-elf-venv"[0m
+2026-11-18T06:14:47.0865841Z [36;1msource "$RUNNER_TEMP/capstone-elf-venv/bin/activate"[0m
+2026-11-18T06:14:47.0866136Z [36;1mpip install pyelftools==0.32[0m
+2026-11-18T06:14:47.0866401Z [36;1mpython3 capstone-records/prepare_baseline.py[0m
+2026-11-18T06:14:47.0866673Z [36;1mpython3 capstone-records/measure.py[0m
+2026-11-18T06:14:47.0944293Z shell: /usr/bin/bash -e {0}
+2026-11-18T06:14:47.0944547Z env:
+2026-11-18T06:14:47.0944714Z   BUILD_ARCHS: four
+2026-11-18T06:14:47.0944886Z   MEASURE_CC: clang
+2026-11-18T06:14:47.0945052Z ##[endgroup]
+2026-11-18T06:14:57.9812185Z Reading package lists...
+2026-11-18T06:14:58.3351050Z Building dependency tree...
+2026-11-18T06:14:58.3361018Z Reading state information...
+2026-11-18T06:14:58.5966770Z The following additional packages will be installed:
+2026-11-18T06:14:58.5967359Z   gdb libbabeltrace1 libboost-regex1.74.0 libc-dev-bin libc6 libc6-dbg
+2026-11-18T06:14:58.5971804Z   libc6-dev libc6-i386 libdebuginfod-common libdebuginfod1 libipt2
+2026-11-18T06:14:58.5976260Z   libsource-highlight-common libsource-highlight4v5 linux-tools-5.15.0-203
+2026-11-18T06:14:58.5980780Z   linux-tools-5.15.0-203-generic
+2026-11-18T06:14:58.5992025Z Suggested packages:
+2026-11-18T06:14:58.5992429Z   gdb-doc gdbserver glibc-doc manpages-dev valgrind-dbg valgrind-mpi
+2026-11-18T06:14:58.5992910Z   kcachegrind alleyoop valkyrie
+2026-11-18T06:14:58.5993192Z Recommended packages:
+2026-11-18T06:14:58.5993411Z   manpages-dev libc-devtools libnss-nis libnss-nisplus
+2026-11-18T06:14:58.6400058Z The following NEW packages will be installed:
+2026-11-18T06:14:58.6400838Z   gdb libbabeltrace1 libboost-regex1.74.0 libc6-dbg libdebuginfod-common
+2026-11-18T06:14:58.6407638Z   libdebuginfod1 libipt2 libsource-highlight-common libsource-highlight4v5
+2026-11-18T06:14:58.6410624Z   linux-tools-5.15.0-203 linux-tools-5.15.0-203-generic linux-tools-generic
+2026-11-18T06:14:58.6411105Z   valgrind
+2026-11-18T06:14:58.6417377Z The following packages will be upgraded:
+2026-11-18T06:14:58.6426140Z   libc-dev-bin libc6 libc6-dev libc6-i386
+2026-11-18T06:14:58.6617452Z 4 upgraded, 13 newly installed, 0 to remove and 18 not upgraded.
+2026-11-18T06:14:58.6618275Z Need to get 49.0 MB of archives.
+2026-11-18T06:14:58.6618643Z After this operation, 143 MB of additional disk space will be used.
+2026-11-18T06:14:58.6619069Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [144 B]
+2026-11-18T06:14:58.8885216Z Get:2 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libdebuginfod-common all 0.186-1ubuntu0.1 [7996 B]
+2026-11-18T06:14:58.9577534Z Get:3 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-dev amd64 2.35-0ubuntu3.18 [2100 kB]
+2026-11-18T06:14:59.0715357Z Get:4 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc-dev-bin amd64 2.35-0ubuntu3.18 [20.3 kB]
+2026-11-18T06:14:59.1406055Z Get:5 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-i386 amd64 2.35-0ubuntu3.18 [2837 kB]
+2026-11-18T06:14:59.2706076Z Get:6 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6 amd64 2.35-0ubuntu3.18 [3236 kB]
+2026-11-18T06:14:59.4098448Z Get:7 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 libbabeltrace1 amd64 1.5.8-2build1 [160 kB]
+2026-11-18T06:14:59.4830435Z Get:8 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libdebuginfod1 amd64 0.186-1ubuntu0.1 [12.8 kB]
+2026-11-18T06:14:59.5520401Z Get:9 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 libipt2 amd64 2.0.5-1 [46.4 kB]
+2026-11-18T06:14:59.6210707Z Get:10 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 libsource-highlight-common all 3.1.9-4.1build2 [64.5 kB]
+2026-11-18T06:14:59.6901743Z Get:11 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 libboost-regex1.74.0 amd64 1.74.0-14ubuntu3 [511 kB]
+2026-11-18T06:14:59.7686400Z Get:12 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 libsource-highlight4v5 amd64 3.1.9-4.1build2 [207 kB]
+2026-11-18T06:14:59.8409869Z Get:13 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 gdb amd64 12.1-0ubuntu1~22.04.2 [3920 kB]
+2026-11-18T06:14:59.9939759Z Get:14 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 linux-tools-5.15.0-203 amd64 5.15.0-203.213 [8031 kB]
+2026-11-18T06:15:00.2500581Z Get:15 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 linux-tools-5.15.0-203-generic amd64 5.15.0-203.213 [1792 B]
+2026-11-18T06:15:00.3189656Z Get:16 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 linux-tools-generic amd64 5.15.0.203.175 [2336 B]
+2026-11-18T06:15:00.3890545Z Get:17 http://azure.archive.ubuntu.com/ubuntu jammy-updates/main amd64 libc6-dbg amd64 2.35-0ubuntu3.18 [13.8 MB]
+2026-11-18T06:15:00.7601414Z Get:18 http://azure.archive.ubuntu.com/ubuntu jammy/main amd64 valgrind amd64 1:3.18.1-1ubuntu2 [14.1 MB]
+2026-11-18T06:15:01.3431338Z Preconfiguring packages ...
+2026-11-18T06:15:01.4069402Z Fetched 49.0 MB in 2s (20.3 MB/s)
+2026-11-18T06:15:01.4307650Z Selecting previously unselected package libdebuginfod-common.
+2026-11-18T06:15:01.4613469Z (Reading database ... 
+2026-11-18T06:15:01.4613857Z (Reading database ... 5%
+2026-11-18T06:15:01.4614203Z (Reading database ... 10%
+2026-11-18T06:15:01.4614547Z (Reading database ... 15%
+2026-11-18T06:15:01.4614731Z (Reading database ... 20%
+2026-11-18T06:15:01.4614913Z (Reading database ... 25%
+2026-11-18T06:15:01.4615099Z (Reading database ... 30%
+2026-11-18T06:15:01.4615288Z (Reading database ... 35%
+2026-11-18T06:15:01.4615467Z (Reading database ... 40%
+2026-11-18T06:15:01.4615653Z (Reading database ... 45%
+2026-11-18T06:15:01.4615859Z (Reading database ... 50%
+2026-11-18T06:15:01.4978677Z (Reading database ... 55%
+2026-11-18T06:15:01.6486002Z (Reading database ... 60%
+2026-11-18T06:15:01.8890060Z (Reading database ... 65%
+2026-11-18T06:15:02.0282295Z (Reading database ... 70%
+2026-11-18T06:15:02.2538268Z (Reading database ... 75%
+2026-11-18T06:15:02.4032785Z (Reading database ... 80%
+2026-11-18T06:15:02.6354820Z (Reading database ... 85%
+2026-11-18T06:15:02.8413352Z (Reading database ... 90%
+2026-11-18T06:15:03.0404911Z (Reading database ... 95%
+2026-11-18T06:15:03.0405269Z (Reading database ... 100%
+2026-11-18T06:15:03.0405980Z (Reading database ... 264803 files and directories currently installed.)
+2026-11-18T06:15:03.0472522Z Preparing to unpack .../libdebuginfod-common_0.186-1ubuntu0.1_all.deb ...
+2026-11-18T06:15:03.0537537Z Unpacking libdebuginfod-common (0.186-1ubuntu0.1) ...
+2026-11-18T06:15:03.1161520Z Preparing to unpack .../libc6-dev_2.35-0ubuntu3.18_amd64.deb ...
+2026-11-18T06:15:03.1181689Z Unpacking libc6-dev:amd64 (2.35-0ubuntu3.18) over (2.35-0ubuntu3.15) ...
+2026-11-18T06:15:03.4223172Z Preparing to unpack .../libc-dev-bin_2.35-0ubuntu3.18_amd64.deb ...
+2026-11-18T06:15:03.4247486Z Unpacking libc-dev-bin (2.35-0ubuntu3.18) over (2.35-0ubuntu3.15) ...
+2026-11-18T06:15:03.4852512Z Preparing to unpack .../libc6-i386_2.35-0ubuntu3.18_amd64.deb ...
+2026-11-18T06:15:03.4889473Z Unpacking libc6-i386 (2.35-0ubuntu3.18) over (2.35-0ubuntu3.15) ...
+2026-11-18T06:15:03.7035002Z Preparing to unpack .../libc6_2.35-0ubuntu3.18_amd64.deb ...
+2026-11-18T06:15:03.8290249Z Unpacking libc6:amd64 (2.35-0ubuntu3.18) over (2.35-0ubuntu3.15) ...
+2026-11-18T06:15:04.0667402Z Setting up libc6:amd64 (2.35-0ubuntu3.18) ...
+2026-11-18T06:15:04.4482975Z Selecting previously unselected package libbabeltrace1:amd64.
+2026-11-18T06:15:04.4556849Z (Reading database ... 
+2026-11-18T06:15:04.4557172Z (Reading database ... 5%
+2026-11-18T06:15:04.4557470Z (Reading database ... 10%
+2026-11-18T06:15:04.4557754Z (Reading database ... 15%
+2026-11-18T06:15:04.4557982Z (Reading database ... 20%
+2026-11-18T06:15:04.4558519Z (Reading database ... 25%
+2026-11-18T06:15:04.4558820Z (Reading database ... 30%
+2026-11-18T06:15:04.4559321Z (Reading database ... 35%
+2026-11-18T06:15:04.4559510Z (Reading database ... 40%
+2026-11-18T06:15:04.4559691Z (Reading database ... 45%
+2026-11-18T06:15:04.4559867Z (Reading database ... 50%
+2026-11-18T06:15:04.4589770Z (Reading database ... 55%
+2026-11-18T06:15:04.4615471Z (Reading database ... 60%
+2026-11-18T06:15:04.4644363Z (Reading database ... 65%
+2026-11-18T06:15:04.4779008Z (Reading database ... 70%
+2026-11-18T06:15:04.4929486Z (Reading database ... 75%
+2026-11-18T06:15:04.5006069Z (Reading database ... 80%
+2026-11-18T06:15:04.5251597Z (Reading database ... 85%
+2026-11-18T06:15:04.5509073Z (Reading database ... 90%
+2026-11-18T06:15:04.5626197Z (Reading database ... 95%
+2026-11-18T06:15:04.5626478Z (Reading database ... 100%
+2026-11-18T06:15:04.5626790Z (Reading database ... 264810 files and directories currently installed.)
+2026-11-18T06:15:04.5689312Z Preparing to unpack .../00-libbabeltrace1_1.5.8-2build1_amd64.deb ...
+2026-11-18T06:15:04.5696825Z Unpacking libbabeltrace1:amd64 (1.5.8-2build1) ...
+2026-11-18T06:15:04.5942392Z Selecting previously unselected package libdebuginfod1:amd64.
+2026-11-18T06:15:04.6133831Z Preparing to unpack .../01-libdebuginfod1_0.186-1ubuntu0.1_amd64.deb ...
+2026-11-18T06:15:04.6142351Z Unpacking libdebuginfod1:amd64 (0.186-1ubuntu0.1) ...
+2026-11-18T06:15:04.6348475Z Selecting previously unselected package libipt2.
+2026-11-18T06:15:04.6540970Z Preparing to unpack .../02-libipt2_2.0.5-1_amd64.deb ...
+2026-11-18T06:15:04.6548739Z Unpacking libipt2 (2.0.5-1) ...
+2026-11-18T06:15:04.7028495Z Selecting previously unselected package libsource-highlight-common.
+2026-11-18T06:15:04.7223187Z Preparing to unpack .../03-libsource-highlight-common_3.1.9-4.1build2_all.deb ...
+2026-11-18T06:15:04.7231426Z Unpacking libsource-highlight-common (3.1.9-4.1build2) ...
+2026-11-18T06:15:04.7661874Z Selecting previously unselected package libboost-regex1.74.0:amd64.
+2026-11-18T06:15:04.7856801Z Preparing to unpack .../04-libboost-regex1.74.0_1.74.0-14ubuntu3_amd64.deb ...
+2026-11-18T06:15:04.7865091Z Unpacking libboost-regex1.74.0:amd64 (1.74.0-14ubuntu3) ...
+2026-11-18T06:15:04.8195093Z Selecting previously unselected package libsource-highlight4v5.
+2026-11-18T06:15:04.8391295Z Preparing to unpack .../05-libsource-highlight4v5_3.1.9-4.1build2_amd64.deb ...
+2026-11-18T06:15:04.8399186Z Unpacking libsource-highlight4v5 (3.1.9-4.1build2) ...
+2026-11-18T06:15:04.8630358Z Selecting previously unselected package gdb.
+2026-11-18T06:15:04.8824529Z Preparing to unpack .../06-gdb_12.1-0ubuntu1~22.04.2_amd64.deb ...
+2026-11-18T06:15:04.8831899Z Unpacking gdb (12.1-0ubuntu1~22.04.2) ...
+2026-11-18T06:15:05.0096045Z Selecting previously unselected package linux-tools-5.15.0-203.
+2026-11-18T06:15:05.0292410Z Preparing to unpack .../07-linux-tools-5.15.0-203_5.15.0-203.213_amd64.deb ...
+2026-11-18T06:15:05.0299347Z Unpacking linux-tools-5.15.0-203 (5.15.0-203.213) ...
+2026-11-18T06:15:05.2283771Z Selecting previously unselected package linux-tools-5.15.0-203-generic.
+2026-11-18T06:15:05.2474140Z Preparing to unpack .../08-linux-tools-5.15.0-203-generic_5.15.0-203.213_amd64.deb ...
+2026-11-18T06:15:05.2527552Z Unpacking linux-tools-5.15.0-203-generic (5.15.0-203.213) ...
+2026-11-18T06:15:05.2840542Z Selecting previously unselected package linux-tools-generic.
+2026-11-18T06:15:05.3033619Z Preparing to unpack .../09-linux-tools-generic_5.15.0.203.175_amd64.deb ...
+2026-11-18T06:15:05.3041351Z Unpacking linux-tools-generic (5.15.0.203.175) ...
+2026-11-18T06:15:05.3239483Z Selecting previously unselected package libc6-dbg:amd64.
+2026-11-18T06:15:05.3436059Z Preparing to unpack .../10-libc6-dbg_2.35-0ubuntu3.18_amd64.deb ...
+2026-11-18T06:15:05.3443299Z Unpacking libc6-dbg:amd64 (2.35-0ubuntu3.18) ...
+2026-11-18T06:15:05.5470401Z Selecting previously unselected package valgrind.
+2026-11-18T06:15:05.5667836Z Preparing to unpack .../11-valgrind_1%3a3.18.1-1ubuntu2_amd64.deb ...
+2026-11-18T06:15:05.5729737Z Unpacking valgrind (1:3.18.1-1ubuntu2) ...
+2026-11-18T06:15:06.1669117Z Setting up linux-tools-5.15.0-203 (5.15.0-203.213) ...
+2026-11-18T06:15:06.1694820Z Setting up libdebuginfod-common (0.186-1ubuntu0.1) ...
+2026-11-18T06:15:06.3212382Z 
+2026-11-18T06:15:06.3212891Z Creating config file /etc/profile.d/debuginfod.sh with new version
+2026-11-18T06:15:06.4210148Z 
+2026-11-18T06:15:06.4210723Z Creating config file /etc/profile.d/debuginfod.csh with new version
+2026-11-18T06:15:06.5025459Z Setting up libdebuginfod1:amd64 (0.186-1ubuntu0.1) ...
+2026-11-18T06:15:06.5069418Z Setting up libsource-highlight-common (3.1.9-4.1build2) ...
+2026-11-18T06:15:06.5138240Z Setting up libc6-dbg:amd64 (2.35-0ubuntu3.18) ...
+2026-11-18T06:15:06.5157156Z Setting up libboost-regex1.74.0:amd64 (1.74.0-14ubuntu3) ...
+2026-11-18T06:15:06.6031897Z Setting up libipt2 (2.0.5-1) ...
+2026-11-18T06:15:06.6050169Z Setting up libbabeltrace1:amd64 (1.5.8-2build1) ...
+2026-11-18T06:15:06.6071452Z Setting up linux-tools-5.15.0-203-generic (5.15.0-203.213) ...
+2026-11-18T06:15:06.6089952Z Setting up libc6-i386 (2.35-0ubuntu3.18) ...
+2026-11-18T06:15:06.6119786Z Setting up libc-dev-bin (2.35-0ubuntu3.18) ...
+2026-11-18T06:15:06.6148348Z Setting up valgrind (1:3.18.1-1ubuntu2) ...
+2026-11-18T06:15:06.6200139Z Setting up libsource-highlight4v5 (3.1.9-4.1build2) ...
+2026-11-18T06:15:06.6220149Z Setting up linux-tools-generic (5.15.0.203.175) ...
+2026-11-18T06:15:06.8119993Z Setting up gdb (12.1-0ubuntu1~22.04.2) ...
+2026-11-18T06:15:06.8149717Z Setting up libc6-dev:amd64 (2.35-0ubuntu3.18) ...
+2026-11-18T06:15:06.8176490Z Processing triggers for man-db (2.10.2-1) ...
+2026-11-18T06:15:06.8200099Z Not building database; man-db/auto-update is not 'true'.
+2026-11-18T06:15:06.8213260Z Processing triggers for libc-bin (2.35-0ubuntu3.15) ...
+2026-11-18T06:15:09.8113969Z 
+2026-11-18T06:15:09.8114654Z Running kernel seems to be up-to-date.
+2026-11-18T06:15:09.8114973Z 
+2026-11-18T06:15:09.8115098Z Services to be restarted:
+2026-11-18T06:15:09.8160344Z  systemctl restart chrony.service
+2026-11-18T06:15:09.8200061Z  systemctl restart containerd.service
+2026-11-18T06:15:09.8239365Z  systemctl restart cron.service
+2026-11-18T06:15:09.8391402Z  systemctl restart haveged.service
+2026-11-18T06:15:09.8466340Z  systemctl restart hv-kvp-daemon.service
+2026-11-18T06:15:09.8504147Z  systemctl restart irqbalance.service
+2026-11-18T06:15:09.8543278Z  systemctl restart mono-xsp4.service
+2026-11-18T06:15:09.8582739Z  systemctl restart multipathd.service
+2026-11-18T06:15:09.8657240Z  systemctl restart packagekit.service
+2026-11-18T06:15:09.8695840Z  systemctl restart php8.1-fpm.service
+2026-11-18T06:15:09.8733781Z  systemctl restart polkit.service
+2026-11-18T06:15:09.8772588Z  systemctl restart rsyslog.service
+2026-11-18T06:15:09.8810186Z  systemctl restart serial-getty@ttyS0.service
+2026-11-18T06:15:09.8849023Z  systemctl restart snapd.service
+2026-11-18T06:15:09.8887534Z  systemctl restart ssh.service
+2026-11-18T06:15:09.8927361Z  systemctl restart systemd-journald.service
+2026-11-18T06:15:09.9008250Z  systemctl restart systemd-networkd.service
+2026-11-18T06:15:09.9049188Z  systemctl restart systemd-resolved.service
+2026-11-18T06:15:09.9090644Z  systemctl restart systemd-udevd.service
+2026-11-18T06:15:09.9167736Z 
+2026-11-18T06:15:09.9169660Z Service restarts being deferred:
+2026-11-18T06:15:09.9170067Z  /etc/needrestart/restart.d/dbus.service
+2026-11-18T06:15:09.9174750Z  systemctl restart docker.service
+2026-11-18T06:15:09.9175151Z  systemctl restart getty@tty1.service
+2026-11-18T06:15:09.9175556Z  systemctl restart hosted-compute-agent.service
+2026-11-18T06:15:09.9175883Z  systemctl restart networkd-dispatcher.service
+2026-11-18T06:15:09.9176134Z  systemctl restart systemd-logind.service
+2026-11-18T06:15:09.9176360Z  systemctl restart user@1001.service
+2026-11-18T06:15:09.9176581Z  systemctl restart walinuxagent.service
+2026-11-18T06:15:09.9176732Z 
+2026-11-18T06:15:09.9176814Z No containers need to be restarted.
+2026-11-18T06:15:09.9176956Z 
+2026-11-18T06:15:09.9177052Z No user sessions are running outdated binaries.
+2026-11-18T06:15:09.9177220Z 
+2026-11-18T06:15:09.9177705Z No VM guests are running outdated hypervisor (qemu) binaries on this host.
+2026-11-18T06:15:14.8299883Z Collecting pyelftools==0.32
+2026-11-18T06:15:14.8762561Z   Downloading pyelftools-0.32-py3-none-any.whl (188 kB)
+2026-11-18T06:15:14.8981667Z      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 188.5/188.5 KB 9.2 MB/s eta 0:00:00
+2026-11-18T06:15:14.9141907Z Installing collected packages: pyelftools
+2026-11-18T06:15:14.9872188Z Successfully installed pyelftools-0.32
+2026-11-18T06:15:15.3502465Z Verified the published baseline fetched directly, including its exact commit contents and tree.
+2026-11-18T06:15:15.4310327Z download-7cf6eb05
+2026-11-18T06:15:16.1677978Z download-08c3a448
+2026-11-18T06:15:16.4842346Z download-4c70267c
+2026-11-18T06:15:18.4839118Z download-d01fdb5a
+2026-11-18T06:15:19.8130910Z download-1299ab6f
+2026-11-18T06:15:20.1486496Z download-99b2531e
+2026-11-18T06:15:20.5073708Z fixture-scalar32
+2026-11-18T06:15:20.8851489Z fixture-scalar64
+2026-11-18T06:15:21.2186167Z fixture-simd64
+2026-11-18T06:15:21.6740815Z consumer
+2026-11-18T06:15:23.5384465Z configure
+2026-11-18T06:15:25.0343734Z build-base
+2026-11-18T06:16:24.9200759Z link-base
+2026-11-18T06:16:25.1258553Z apply-candidate
+2026-11-18T06:16:25.1318985Z stage-tested-source
+2026-11-18T06:16:25.1576696Z unstage-tested-source
+2026-11-18T06:16:25.1730256Z build-candidate
+2026-11-18T06:16:26.3120832Z link-candidate
+2026-11-18T06:16:26.5574844Z Traceback (most recent call last):
+2026-11-18T06:16:26.5576782Z   File "/home/runner/work/test_mac_intel/test_mac_intel/capstone-records/measure.py", line 53, in <module>
+2026-11-18T06:16:26.5577737Z     write(key+'-object-proof',object_proof(key,t/'baseline-plan.o',objdir/'arch/X86/X86OutputIterator.c.o'))
+2026-11-18T06:16:26.5578360Z   File "/home/runner/work/test_mac_intel/test_mac_intel/capstone-records/layout.py", line 80, in object_proof
+2026-11-18T06:16:26.5578762Z     assert label in ('signature', 'classbit')
+2026-11-18T06:16:26.5578987Z AssertionError
+2026-11-18T06:16:26.5714904Z ##[error]Process completed with exit code 1.
+2026-11-18T06:16:26.5776330Z ##[group]Run rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
+2026-11-18T06:16:26.5776773Z [36;1mrm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"[0m
+2026-11-18T06:16:26.5832337Z shell: /usr/bin/bash -e {0}
+2026-11-18T06:16:26.5832547Z env:
+2026-11-18T06:16:26.5832705Z   BUILD_ARCHS: four
+2026-11-18T06:16:26.5832876Z   MEASURE_CC: clang
+2026-11-18T06:16:26.5833224Z ##[endgroup]
+2026-11-18T06:16:27.4238700Z ##[group]Run actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+2026-11-18T06:16:27.4239019Z with:
+2026-11-18T06:16:27.4239277Z   name: iterator-leaf-factorial-four-ubuntu-22.04-clang-44249894586
+2026-11-18T06:16:27.4239577Z   path: evidence/
+2026-11-18T06:16:27.4239745Z   retention-days: 14
+2026-11-18T06:16:27.4239922Z   if-no-files-found: warn
+2026-11-18T06:16:27.4240117Z   compression-level: 6
+2026-11-18T06:16:27.4240291Z   overwrite: false
+2026-11-18T06:16:27.4240461Z   include-hidden-files: false
+2026-11-18T06:16:27.4240650Z   archive: true
+2026-11-18T06:16:27.4240805Z env:
+2026-11-18T06:16:27.4240957Z   BUILD_ARCHS: four
+2026-11-18T06:16:27.4241121Z   MEASURE_CC: clang
+2026-11-18T06:16:27.4241282Z ##[endgroup]
+2026-11-18T06:16:27.5522639Z With the provided path, there will be 28 files uploaded
+2026-11-18T06:16:27.5527448Z Artifact name is valid!
+2026-11-18T06:16:27.5527780Z Root directory input is valid!
+2026-11-18T06:16:27.9564143Z Uploading artifact: iterator-leaf-factorial-four-ubuntu-22.04-clang-44249894586.zip
+2026-11-18T06:16:27.9592523Z Beginning upload of artifact content to blob storage
+2026-11-18T06:16:28.4380191Z Uploaded bytes 74265
+2026-11-18T06:16:28.5140898Z Finished uploading artifact content to blob storage!
+2026-11-18T06:16:28.5141594Z SHA256 digest of uploaded artifact is 624ec4ef87ae572b170f87008bb86e11ece7fc037206fdb56cfb992900410dd1
+2026-11-18T06:16:28.5142302Z Finalizing artifact upload
+2026-11-18T06:16:29.0625593Z Artifact iterator-leaf-factorial-four-ubuntu-22.04-clang-44249894586 successfully finalized. Artifact ID 14404140894
+2026-11-18T06:16:29.0626763Z Artifact iterator-leaf-factorial-four-ubuntu-22.04-clang-44249894586 has been successfully uploaded! Final size is 74265 bytes. Artifact ID is 14404140894
+2026-11-18T06:16:29.0628544Z Artifact download URL: https://github.com/gmh5225/test_mac_intel/actions/runs/44249894586/artifacts/14404140894
+2026-11-18T06:16:29.0796710Z Post job cleanup.
+2026-11-18T06:16:29.1583631Z Post job cleanup.
+2026-11-18T06:16:29.2320362Z [command]/usr/bin/git version
+2026-11-18T06:16:29.2353595Z git version 2.56.1
+2026-11-18T06:16:29.2381742Z Temporarily overriding HOME='/home/runner/work/_temp/e48bcaa3-c084-45b9-a7f7-bff3e15fc6fa' before making global git config changes
+2026-11-18T06:16:29.2383008Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-18T06:16:29.2386656Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/test_mac_intel/test_mac_intel
+2026-11-18T06:16:29.2415165Z Removing SSH command configuration
+2026-11-18T06:16:29.2419914Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-18T06:16:29.2449970Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-18T06:16:29.2670693Z Removing HTTP extra header
+2026-11-18T06:16:29.2675521Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-18T06:16:29.2708069Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-18T06:16:29.2942382Z Removing includeIf entries pointing to credentials config files
+2026-11-18T06:16:29.2949764Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-18T06:16:29.2988545Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-18T06:16:29.3350706Z Cleaning up orphan processes
