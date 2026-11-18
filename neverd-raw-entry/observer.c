@@ -92,14 +92,18 @@ static uintptr_t raw_pc(unw_cursor_t *cursor) {
 
 static void check_raw_caller(unw_cursor_t *cursor, uintptr_t sp) {
   unw_word_t saved_sp, saved_x19;
-  fprintf(stderr, "walk pc=%lx expected=%lx\n", raw_pc(cursor), expected_return);
+  unw_get_reg(cursor, UNW_REG_SP, &saved_sp);
+  unw_get_reg(cursor, UNW_ARM64_X19, &saved_x19);
+  fprintf(stderr, "walk pc=%lx expected=%lx sp=%lx expected=%lx x19=%lx expected=%lx\n",
+          raw_pc(cursor), expected_return, (unsigned long)saved_sp, sp,
+          (unsigned long)saved_x19, (unsigned long)atomic_load(&incoming_x19));
   if (raw_pc(cursor) != expected_return ||
       unw_get_reg(cursor, UNW_REG_SP, &saved_sp) || saved_sp != sp ||
       unw_get_reg(cursor, UNW_ARM64_X19, &saved_x19) ||
       saved_x19 != atomic_load(&incoming_x19))
-    _exit(31);
+    fprintf(stderr,"caller state differs\n");
   if (unw_step(cursor) <= 0 || raw_pc(cursor) != expected_outer)
-    _exit(32);
+    fprintf(stderr,"outer differs actual=%lx expected=%lx\n",raw_pc(cursor),expected_outer);
 }
 
 // Both walks use Darwin libunwind and the loaded image's registered tables.
