@@ -1,0 +1,42 @@
+name: Share output option validation and prove compiled archives identical
+on:
+  push:
+    branches: [codex/capstone-output-option-owner]
+    paths: [capstone-access-loop/**, .github/workflows/capstone-register-loop.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: ubuntu-22.04, compiler: clang, extended: '0' }
+          - { host: ubuntu-24.04, compiler: clang, extended: '0' }
+          - { host: ubuntu-22.04, compiler: gcc, extended: '0' }
+          - { host: ubuntu-24.04, compiler: gcc, extended: '0' }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 40
+    env:
+      TOOLCHAIN: ${{ matrix.compiler }}
+      EXTENDED: ${{ matrix.extended }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-access-loop
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62
+          path: source
+          persist-credentials: false
+      - run: python capstone-access-loop/verify.py
+      - if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: output-option-owner-${{ matrix.host }}-${{ matrix.compiler }}
+          path: evidence/
+          retention-days: 14
