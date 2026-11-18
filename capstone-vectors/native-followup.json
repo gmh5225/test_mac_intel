@@ -1,0 +1,65 @@
+{
+  "inputs": {
+    "baseline_commit": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+    "source_parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "variants": {
+      "output": {
+        "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
+        "sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
+        "experiment": "round1446-vex32-archive-order",
+        "semantic_run": {
+          "id": 44223370515,
+          "head_sha": "68f211a8c52225881a83fae3fc7477bf3b9863e8",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44223370515",
+          "run_attempt": 1
+        },
+        "member_identity_run": {
+          "id": 44225231899,
+          "head_sha": "479636501a7cd09038ad13e9738e4e80885feaab",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44225231899",
+          "run_attempt": 1
+        }
+      }
+    }
+  },
+  "cycles": 32,
+  "native_target_ms": 80,
+  "mixed_target_ms": 80,
+  "launches": [
+    "images",
+    "same-file-fixed"
+  ],
+  "native_rows": 84,
+  "mixed_rows": 96,
+  "profiles": [
+    "ubuntu-22.04 clang",
+    "ubuntu-24.04 clang"
+  ],
+  "purpose": "Measure VEX32 output through two existing plan cells and the original vector call site, with archive member order restoring the original vector code positions. Use the newly published compact-alias baseline.",
+  "source_identity": {
+    "id": 44225231899,
+    "head_sha": "479636501a7cd09038ad13e9738e4e80885feaab",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44225231899",
+    "run_attempt": 1
+  },
+  "cost_evidence": {
+    "id": 44223370515,
+    "head_sha": "68f211a8c52225881a83fae3fc7477bf3b9863e8",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44223370515",
+    "run_attempt": 1
+  },
+  "semantic_scope": "129171462 complete private/public records and protected extents per compiler. All compiled members equal the measured cost source; only the new member order changes. Original iterator text and all its function sizes/positions are unchanged, apart from the verified original vector call relocation and two plan cells.",
+  "remaining_cost": "Clang14/18 simulated SSL64 format instructions increased about 0.34/0.35%; these observations remain visible. Restored linked vector positions are not a native throughput verdict.",
+  "gates": "Retain every native/mixed observation, A/A flag and slowdown, including losses below 1%. Portable configurations and product integration remain separate requirements. No timings transfer across changed link contexts.",
+  "publication_qualified": false
+}

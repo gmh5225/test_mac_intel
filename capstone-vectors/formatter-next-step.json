@@ -1,0 +1,92 @@
+{
+  "complete": true,
+  "census_run": {
+    "id": 44218679962,
+    "head_sha": "ad3de258931ce2d306f74f604a0bfb35c394179b",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44218679962",
+    "run_attempt": 1
+  },
+  "scope": "Coverage counts from completely decoded real functions, not timings and not the separately filtered common-iced SIMD panel.",
+  "counts": [
+    {
+      "case": "libjpeg62-turbo-amd64",
+      "total": 60157,
+      "admission": {
+        "original": 46278,
+        "fallback": 13879
+      },
+      "remaining_memory": 6956,
+      "remaining_memory_fraction": 0.11563076616187642,
+      "nonmemory_vmovdqa": 0,
+      "compared_partial_function_records_not_counted": 0
+    },
+    {
+      "case": "libzstd1-amd64",
+      "total": 172407,
+      "admission": {
+        "original": 147347,
+        "fallback": 25060
+      },
+      "remaining_memory": 14802,
+      "remaining_memory_fraction": 0.08585498268631785,
+      "nonmemory_vmovdqa": 0,
+      "compared_partial_function_records_not_counted": 0
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "total": 840116,
+      "admission": {
+        "original": 759562,
+        "fallback": 80554
+      },
+      "remaining_memory": 47292,
+      "remaining_memory_fraction": 0.05629222631160459,
+      "nonmemory_vmovdqa": 117,
+      "compared_partial_function_records_not_counted": 316
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "total": 8278,
+      "admission": {
+        "original": 3674,
+        "fallback": 1999,
+        "added": 2605
+      },
+      "remaining_memory": 1351,
+      "remaining_memory_fraction": 0.16320367238463396,
+      "nonmemory_vmovdqa": 358,
+      "compared_partial_function_records_not_counted": 0
+    },
+    {
+      "case": "libssl3t64-i386",
+      "total": 745698,
+      "admission": {
+        "original": 699715,
+        "fallback": 45983
+      },
+      "remaining_memory": 32406,
+      "remaining_memory_fraction": 0.043457270905916334,
+      "nonmemory_vmovdqa": 0,
+      "compared_partial_function_records_not_counted": 0
+    }
+  ],
+  "root_boundary": "The original 32-bit C4/C5 simple-output table cells are zero, so they miss before the existing vector writer. The zero-plan-miss prototype reaches 2605 more real JPEG32 instructions and improves format/detail about 40%, but Clang14 expands ordinary iterator text by 16 bytes and moves 4035 native/983 mixed text symbols. Its nine losses remain disqualifying.",
+  "current_hypothesis": "../round1443-vex32-existing-plan/hypothesis.json",
+  "residual_register_cause": "vex_register_row requires three NDS operands except immediate shifts. Two-register VMOVDQA therefore has no generated row despite writeVectorRegisters already accepting a register count.",
+  "residual_memory_cause": "The VEX32 helper deliberately admits only register ModR/M. The existing indexed vector memory writer accepts only VMOVAPS and one FMA shape with a base/index/disp8, and writes 64-bit address records. The real residuals are mostly VMOVDQU, VPMADDWD, VMOVDQA and VPADD*. Enabling that old writer alone will not cover those forms.",
+  "next_boundary": "After qualifying entry dispatch, generate uniform two-register rows from the canonical decoder and share the existing complete-record writer at the same token position. For memory, extend a canonical address/operand owner; retain explicit 32-bit address fields, displacement, SIB, access, groups, error and cursor semantics.",
+  "iced_source": {
+    "repository": "/Users/gmh/code/iced",
+    "revision": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31",
+    "file": "src/rust/iced-x86/src/formatter/fast.rs",
+    "lines": [
+      839,
+      848,
+      996
+    ],
+    "observation": "FastFormatter starts from normalized instruction Code and operand kinds, loads code-indexed mnemonic data and emits register/memory fields directly. This supports using existing canonical admission data and shared writers; it does not justify caching mutable Capstone options or discarding public detail fields."
+  },
+  "publication_qualified": false
+}
