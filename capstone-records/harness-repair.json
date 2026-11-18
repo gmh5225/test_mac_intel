@@ -1,19 +1,26 @@
 {
   "failed_run": {
-    "id": 44289104193,
-    "head_sha": "bb00ccdfbc9134f451d2e350b1729edac86dfaed",
+    "id": 44294016291,
+    "head_sha": "e064bf25a548b962de7bfe5e18d9f97ae8c72f56",
     "status": "completed",
     "conclusion": "failure",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44289104193",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44294016291",
     "run_attempt": 1
   },
-  "reason": "A/A image copied with copyfile lost executable mode; the first original-image A/A subprocess failed before any complete timing panel or PMU record.",
-  "fix": "Use copy2 for the identical executable, matching existing native workflows.",
   "source_changed": false,
   "consumer_changed": false,
-  "cleanup": {
-    "bytes": 142513949,
-    "removed": true
+  "reason": "Calibration uses 2 repeats; the frozen consumer accumulates result across repeats. Seeding the full-result reference during calibration incorrectly compares different work amounts at the first measured launch.",
+  "fix": "Compare first-pass records across repeat counts, and complete accumulated records only at the same repeat count. Keep every equal-work baseline/A/A/candidate comparison.",
+  "reproduction": {
+    "input": "/Users/gmh/code/NeverD/build-capstone-speed-20261022/round1489-arm-tagged-hardware/native/arm-tagged-hardware-four-ubuntu-24.04-arm-clang-44289854057/pmu-samples.json",
+    "case": "scalar32",
+    "mode": 1,
+    "repeats": 240,
+    "first_instructions": 5365,
+    "accumulated_instructions": 1287600
   },
-  "local_reproduction": "Copying an owned executable with copyfile fails to execute; copy2 preserves its mode and executes successfully. An initial attempt using /bin/echo hit macOS protected file flags during copystat, so the reproduction uses an ordinary owned executable like the CI binary."
+  "cleanup": {
+    "bytes": 142514067,
+    "removed": true
+  }
 }

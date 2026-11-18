@@ -37,12 +37,15 @@ def cost_probe(binaries, cases, temporary, evidence, run):
     permission = sp.run(['sudo', '-n', 'sysctl', '-w', 'kernel.perf_event_paranoid=-1'], capture_output=True, text=True)
     assert permission.returncode == 0, permission.stderr
     audit = dict(original_setting=original, permission_stdout=permission.stdout, groups={})
-    references, repeats, counters, samples = {}, {}, [], []
+    references, first_pass, repeats, counters, samples = {}, {}, {}, [], []
 
     def checked_output(output, name, mode):
+        first_pass.setdefault((name, mode), output['first'])
+        assert first_pass[name, mode] == output['first']
         value = (output['first'], output['result'])
-        references.setdefault((name, mode), value)
-        assert references[name, mode] == value
+        key = name, mode, output['repeats']
+        references.setdefault(key, value)
+        assert references[key] == value
 
     def parse_counts(raw, requested):
         counts, running = {}, {}
