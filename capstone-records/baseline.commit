@@ -1,13 +1,16 @@
-tree d10943fa32307a2c7383ed457bca5174756c62a1
-parent 413b606f938a39d053fd61ef83a6277eec4e4f6e
-author NeverSightAI <neversightai@gmail.com> 1794933998 +0800
-committer NeverSightAI <neversightai@gmail.com> 1794933998 +0800
+tree d2f2cdc5930b4fbab7d1507085c30f3a5a25068a
+parent 3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62
+author NeverSightAI <neversightai@gmail.com> 1794967017 +0800
+committer NeverSightAI <neversightai@gmail.com> 1794967017 +0800
 
-X86: project canonical EVEX register scans without operands
+Use compact canonical alias lookup in mixed Clang builds
 
-Derive compact public-ID and length plans from the existing full-decoder
-probes, sharing reserved-field admission with the vector output path.
-Complete unprefixed register forms avoid operand construction when both
-text and detail are disabled; adapters and all misses retain their current
-precedence and fallback. Keep the new code and data in separate sections
-on ELF x86-64 full userspace builds.
+Route AArch64 and non-DIET MIPS alias IDs through their generated tries.
+Share delimiter handling, the existing 15-byte limit and no-alias result
+with the original parser. Keep the private Clang parser compact and its
+ELF code and tables separate from the original hot functions.
+
+Restrict the implementation to configurations with an active caller;
+preserve GCC and existing dedicated-trie behavior. Validate complete
+records, architecture-only and DIET builds, Make/Xcode/MSVC, and real
+PE/ELF output in Capstone and NeverD with source-built LLVM.

@@ -10,7 +10,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-vex32-existing-plan-mixed-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -31,7 +31,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed
   bins={};objects={};libs={};ownedlibs={}
   write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','scan','merge'):
+  for key in ('base','output'):
    variant=r/(key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
@@ -47,22 +47,22 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed
    objdir=b/'CMakeFiles/capstone.dir'
    members=sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines();assert len(set(members))==len(members)
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o') if v.name in members};assert len(objects[key])==len(members)
-   if key=='base':shutil.copyfile(objdir/'arch/X86/X86EvexScan.c.o',t/'baseline-plan.o')
+   if key=='base':shutil.copyfile(objdir/'arch/X86/X86OutputIterator.c.o',t/'baseline-plan.o')
    if key!='base':
-    write(key+'-object-proof',object_proof(key,t/'baseline-plan.o',objdir/'arch/X86/X86EvexScan.c.o',objdir/'arch/X86/X86EvexTransferScan.c.o'))
+    write(key+'-object-proof',object_proof(key,t/'baseline-plan.o',objdir/'arch/X86/X86OutputIterator.c.o'))
     write(key+'-linked-layout',linked_layout(e/'base-symbols.txt',e/(key+'-symbols.txt'),key))
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('scan','merge'):
+  for key in ('output',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
-   assert added==({'arch/X86/X86EvexTransferScan.c.o'} if key=='scan' else set()),added
+   assert added == {'arch/X86/X86Vex32Output.c.o'},added
    assert set(objects['base']) <= set(objects[key])
-   assert set(changed) == {'arch/X86/X86EvexScan.c.o'},changed
+   assert set(changed) == {'arch/X86/X86OutputIterator.c.o'},changed
    active=bool(changed)
-   write('scope',dict(active=active,source_applies=True,policy='Two predeclared canonical EVEX transfer implementations; all unmodified runtime objects and instruction semantics are preserved, while data relocation is recorded and measured; identical lowering is retained as an object and binary identity control'))
+   write('scope',dict(active=active,source_applies=True,policy='Existing-plan VEX32 output; all unmodified runtime objects are preserved and every symbol relocation is recorded for native comparison; identical lowering is retained as an object and binary identity control'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,active=False,identical_binary=True));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Two predeclared canonical EVEX transfer implementations; all unmodified runtime objects and instruction semantics are preserved, while data relocation is recorded and measured; preserve complete records, original images and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Existing-plan VEX32 output; all unmodified runtime objects are preserved and every symbol relocation is recorded for native comparison; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -87,8 +87,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed
    for mode in (0,1,2):
     for launch in launches:
      warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan','merge']
-     for k in range(21):
+     runs=[];reference=None;keys=['base','aa','output']
+     for k in range(32):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
