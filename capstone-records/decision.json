@@ -1,0 +1,70 @@
+{
+  "complete": true,
+  "status": "held-cross-architecture-regressions",
+  "inputs": {
+    "baseline_commit": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "source_parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+    "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "variants": {
+      "signature": {
+        "tree": "86eb7ca2aa29df055b4656fb56c1c3d23051be15",
+        "sha256": "73dc39448d6e35350b71fec3629941d7a3b7bfaf8882391bf3ab656c10de48d1",
+        "experiment": "round1460-vex32-exception-call-signature",
+        "semantic_and_cost_run": {
+          "id": 44241234271,
+          "head_sha": "bcba11e01aa1cc0036e7b4e4f9d9643a65351e58",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44241234271",
+          "run_attempt": 1
+        }
+      },
+      "classbit": {
+        "tree": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
+        "sha256": "0f7b38efaecf91282b24301e0319bbc5d4a939f6213819d8eb460fe0f260b972",
+        "experiment": "round1462-vex32-plan-class-bit",
+        "semantic_and_cost_run": {
+          "id": 44242322055,
+          "head_sha": "4d495ce72b9f5a5748c8c8c68b31f4359e2d8c96",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44242322055",
+          "run_attempt": 1
+        }
+      }
+    }
+  },
+  "comparisons": 360,
+  "losses": {
+    "native": {
+      "signature": 2,
+      "classbit": 0
+    },
+    "mixed": {
+      "signature": 11,
+      "classbit": 11
+    }
+  },
+  "stable_losses": {
+    "native": {
+      "signature": 21,
+      "classbit": 12
+    },
+    "mixed": {
+      "signature": 24,
+      "classbit": 20
+    }
+  },
+  "aa_flags": {
+    "native": 0,
+    "mixed": 0
+  },
+  "cleanup_bytes": 3750267416,
+  "native_workflow_failure": "Both jobs collected all 42 timing panels and all 9 cost records, then failed a stale six-record assertion. Exact terminal assertions were replayed locally after a matrix-coverage correction. The original run remains failed; artifacts are unchanged.",
+  "native_completion_audit": "completion-audit.json",
+  "observation": "Class-bit dispatch improves JPEG32 AVX format by 2.11\u20132.13x and detail by 2.15\u20132.18x in fixed-image controls versus published next, but ARM detail loses about 4.2\u20134.5% on one Intel runner and AArch64 raw loses up to 2.7% on another. Both source candidates remain held, including smaller stable x86/PE losses.",
+  "publication_qualified": false,
+  "overall_goal_complete": false,
+  "followup": "Separate changed-iterator and added-leaf image contributions using frozen object controls, then trace passive architecture work. Current-source fallback census is separate from timed common-iced panels."
+}

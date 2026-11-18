@@ -1,0 +1,39 @@
+{
+  "complete": true,
+  "code_changed": false,
+  "neverd_head": "c7993af267df05689ab9055b4d0dfb72dc1738cc",
+  "iced_local_head": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31",
+  "finding": "NeverD Decoder exposes its Capstone handle through public getHandle(). Public cs_option calls can mutate text/detail/syntax/mnemonics independently of Decoder::setText/setDetail. A sealed-options or initialization-only fast entry cannot be introduced by assuming the handle is immutable.",
+  "sources": [
+    {
+      "file": "include/neverd/decode/Decoder.h",
+      "line": 327,
+      "symbol": "Decoder::getHandle"
+    },
+    {
+      "file": "lib/decode/Decoder.cpp",
+      "line": 184,
+      "symbol": "Decoder::init"
+    },
+    {
+      "file": "lib/decode/Decoder.cpp",
+      "line": 384,
+      "symbol": "Decoder::decodePhysical"
+    },
+    {
+      "file": "lib/decode/Decoder.cpp",
+      "line": 450,
+      "symbol": "Decoder::setDetail / setText"
+    },
+    {
+      "file": "lib/decode/X86/X86Decoder.cpp",
+      "line": 45,
+      "symbol": "SpareX86Handles::take"
+    }
+  ],
+  "implication": "Current dispatch prototypes retain all option and callback checks. Future prepared-context work must handle public mutation boundaries and reused handles explicitly, and compare actual NeverD behavior before changing consumer entry points.",
+  "prior_option_cache_experiment": "../round1183-output-option-cache/hypothesis.json",
+  "publication_qualified": false,
+  "prior_cache_scope": "R1183 already updated public-option eligibility at mutation boundaries while keeping callbacks, doing_mem and global vsnprintf checks live. Repeating initialization caching alone would not address its recorded performance losses.",
+  "qualification": "This is an ownership constraint for future designs, not a new confirmed public API bug or a request to change the current dispatch prototypes."
+}
