@@ -68,7 +68,7 @@ def linked_layout(before, after, label):
             if match and match[3] in kinds:
                 result[match[4]].append((match[3], int(match[1],16), int(match[2],16)))
         return dict(result)
-    result = dict(captured=True, criterion='Exact ordinary iterator text; report all linked symbol positions independently of the object proof.')
+    result = dict(captured=True, criterion='Report linked symbol positions independently of object identity; the exceptional-arm iterator intentionally changes.')
     for category, kinds in (('text','tTwW'),('readonly','rR'),('writable','bBdDgGsSvV')):
         left, right = symbols(before,kinds), symbols(after,kinds)
         common = left.keys() & right.keys()

@@ -1,0 +1,15 @@
+{
+  "parent": "c508d38a4e945445b3dd9a546e35ed29245dad65",
+  "evidence": [
+    "../round1458-vex32-existing-exception-arm/dispatch-attribution.json"
+  ],
+  "hypothesis": "The four-argument VEX32 leaf call changes global register allocation in the already-large ordinary iterator. Giving that leaf the original six-argument vector signature may permit common argument preparation and tail exits, reducing the scalar32 work introduced by Clang14.",
+  "change": "Only restore the two unchanged forwarded vector arguments in the VEX32 private declaration, definition and exceptional-arm call. No new conditions, plan values, rows, output algorithms or layout directives.",
+  "prediction": "Clang14 iterator instruction counts on SSL32 should fall relative to R1458. Assembly must show whether shared exits or fewer copies explain any change; no expectation is treated as established.",
+  "gates": [
+    "Generator reproduction and complete record/cursor/error/protected-extent comparisons",
+    "Only iterator and new VEX32 leaf runtime objects may change; GCC inactive identity",
+    "Same frozen consumer on Clang14/18 and GCC11/13 before native qualification"
+  ],
+  "publication_qualified": false
+}

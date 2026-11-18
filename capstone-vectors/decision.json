@@ -1,0 +1,30 @@
+{
+  "complete": true,
+  "status": "held-clang14-scalar32-instruction-increase",
+  "source_tree": "c508d38a4e945445b3dd9a546e35ed29245dad65",
+  "cost_comparisons": 48,
+  "instruction_increases": [
+    {
+      "host": "vex32-exception-arm-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "ir_change": 1798446,
+      "instruction_reduction": -0.002204208172881028
+    },
+    {
+      "host": "vex32-exception-arm-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": 2,
+      "ir_change": 2024022,
+      "instruction_reduction": -0.0015066898748676838
+    }
+  ],
+  "all_four_compiler_semantics_passed": true,
+  "ten_profiles": "../round1459-vex32-exception-configurations/profiles-review.json",
+  "attribution": "dispatch-attribution.json",
+  "finding": "The common vector selector is gone. Clang14 X86_trySimpleOutput register and control-flow lowering adds work on 32-bit libssl; Clang18 reduces work. These are ELF samples, not a substitute for PE32 timing.",
+  "native_timing": false,
+  "publication_qualified": false,
+  "followup": "../round1460-vex32-exception-call-signature/hypothesis.json",
+  "cleaned_bytes": 7521612462
+}
