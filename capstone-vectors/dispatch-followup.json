@@ -1,0 +1,18 @@
+{
+  "parent": "f060f081c130b49482b8e846f37a53736d6658a2",
+  "evidence": [
+    "../round1445-existing-plan-cost-repair/profile-review.json",
+    "../round1450-vex32-existing-plan-product/decision.json"
+  ],
+  "hypothesis": "Remove the common vector selector by routing only 32-bit C4/C5 through an existing exceptional dispatch arm after the ordinary vector branch. The direct 64-bit vector call may then regain the original work count; compiler lowering and layout still need measurement.",
+  "change": "The internal VEX32 plan aliases the existing PUSH exception plan; opcode C4/C5 disambiguates that arm. Bounds and mode/options remain at their existing owners. Export the already-validated four-argument VEX32 leaf and remove its common six-argument selector. Retain constant isolation, all generated records and archive order from R1457.",
+  "semantic_owner": "The generated table admits this exceptional plan for C4/C5 only in 32-bit mode. The existing mode/option guard precedes dispatch. The leaf retains LDS/LES rejection, prefix/reserved-field checks, bounded memory reads and complete state construction.",
+  "prior": "R1265 added a new distinct plan value and changed switch lowering. This reuses an existing arm; it does not assume unchanged lowering. R1457 section-only validation remains an independent pending experiment.",
+  "gates": [
+    "Canonical generator reproduction",
+    "Complete record/cursor/error and protected-extent comparison",
+    "Only iterator and VEX32 leaf runtime objects may change; original vector and other architecture objects must remain identical",
+    "Four-compiler lowering/cost checks before native qualification"
+  ],
+  "publication_qualified": false
+}
