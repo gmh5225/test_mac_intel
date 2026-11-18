@@ -122,11 +122,16 @@ static void raw_entry_walk(const arm_thread_state64_t *regs) {
   }
   check_raw_caller(&cursor, sp);
 
+  const uintptr_t live_lr = arm_thread_state64_get_lr(*regs);
+  if (live_lr != expected_return)
+    _exit(39);
+  const uintptr_t system_lr = (uintptr_t)ptrauth_sign_unauthenticated(
+      (void *)live_lr, ptrauth_key_return_address, sp);
   unw_context_t local;
   if (unw_getcontext(&local) || unw_init_local(&cursor, &local) ||
       unw_set_reg(&cursor, UNW_REG_SP, sp) ||
       unw_set_reg(&cursor, UNW_ARM64_FP, arm_thread_state64_get_fp(*regs)) ||
-      unw_set_reg(&cursor, UNW_ARM64_LR, arm_thread_state64_get_lr(*regs)))
+      unw_set_reg(&cursor, UNW_ARM64_LR, system_lr))
     _exit(35);
   for (int i = UNW_ARM64_X19; i <= UNW_ARM64_X28; ++i)
     if (unw_set_reg(&cursor, i, regs->__x[i - UNW_ARM64_X0]))
