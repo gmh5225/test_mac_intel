@@ -1,0 +1,89 @@
+{
+  "complete": false,
+  "source": "ce90fd19ef5f39cb393211b083029353c511df16",
+  "comparison_source": "956cd702e9822a013e8162e469edbf6afb1e5964",
+  "observations": [
+    {
+      "host": "vex32-memory-after-pairs-cost-ubuntu-22.04-clang-1",
+      "mode": 1,
+      "decoded": 15528,
+      "baseline_Ir_per_decoded": 837.4553065430191,
+      "memory_Ir_per_decoded": 637.3201957753735,
+      "eliminated_full_decoder_calls": 2388,
+      "full_decoder_calls_before": 3214,
+      "full_decoder_calls_after": 826,
+      "entry_Ir_per_decoded": 148.77794951056157,
+      "register_access_Ir_per_decoded": 0.0
+    },
+    {
+      "host": "vex32-memory-after-pairs-cost-ubuntu-22.04-clang-1",
+      "mode": 2,
+      "decoded": 15528,
+      "baseline_Ir_per_decoded": 1279.7816202988151,
+      "memory_Ir_per_decoded": 1002.535741885626,
+      "eliminated_full_decoder_calls": 2388,
+      "full_decoder_calls_before": 3214,
+      "full_decoder_calls_after": 826,
+      "entry_Ir_per_decoded": 151.86913961875322,
+      "register_access_Ir_per_decoded": 86.18495620814014
+    },
+    {
+      "host": "vex32-memory-after-pairs-cost-ubuntu-24.04-clang-1",
+      "mode": 1,
+      "decoded": 15528,
+      "baseline_Ir_per_decoded": 819.733771251932,
+      "memory_Ir_per_decoded": 615.3111798042246,
+      "eliminated_full_decoder_calls": 2388,
+      "full_decoder_calls_before": 3214,
+      "full_decoder_calls_after": 826,
+      "entry_Ir_per_decoded": 143.3494332818135,
+      "register_access_Ir_per_decoded": 0.0
+    },
+    {
+      "host": "vex32-memory-after-pairs-cost-ubuntu-24.04-clang-1",
+      "mode": 2,
+      "decoded": 15528,
+      "baseline_Ir_per_decoded": 1245.1494719216898,
+      "memory_Ir_per_decoded": 963.9718572900566,
+      "eliminated_full_decoder_calls": 2388,
+      "full_decoder_calls_before": 3214,
+      "full_decoder_calls_after": 826,
+      "entry_Ir_per_decoded": 146.1991241628027,
+      "register_access_Ir_per_decoded": 88.72230808861411
+    }
+  ],
+  "established": [
+    "In the frozen JPEG32 AVX2 trace, canonical memory output removes 2,388 of 3,214 full decoder calls; this is observed call-edge evidence, not a hardware-cycle estimate.",
+    "The existing-plan selector adds instructions to 64-bit vector calls; the prior lowering and Callgrind reports isolate that cost independently of image placement.",
+    "The mixed ARM raw path cannot execute the x86 output writer. Its original objects are identical, while linked symbols and tables move. Source-level x86 work does not directly explain that raw loss.",
+    "R1456 frozen-object control demonstrates a placement-dependent component: on AMD 9V74, AArch64 raw fixed-image ratio rises from 0.97300 to 1.00193. All original text/writable symbols and DecoderTables restore; only __abi_tag differs among original readonly symbols. This does not isolate a cache mechanism or reproduce the earlier 9V45 ARM loss at the same magnitude."
+  ],
+  "pending": [
+    "R1457 tests source-level ELF constant isolation without a diagnostic linker script. Exact layout and unchanged work must be observed before native qualification.",
+    "R1450 builds all variants on one current NeverD head with latest LLVM fork source; old-head timing is not transferable.",
+    "The memory extension has no native throughput qualification yet and inherits a held parent candidate."
+  ],
+  "iced_source": {
+    "revision": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31",
+    "observations": [
+      {
+        "file": "src/rust/iced-x86/src/instruction.rs",
+        "line": 57,
+        "observation": "The decoded Instruction stores a compact result; the adjacent test constant specifies 40 bytes."
+      },
+      {
+        "file": "src/rust/iced-x86/src/formatter/fast.rs",
+        "line": 838,
+        "observation": "The formatter reserves capacity once, looks up mnemonic/flags by decoded code, then appends through a destination pointer."
+      },
+      {
+        "file": "src/rust/iced-x86/src/decoder.rs",
+        "line": 1364,
+        "observation": "The decode entry initializes compact result/state and consumes a handler table; constructor-owned bounds facts are reused."
+      }
+    ],
+    "limitation": "Source architecture only. No instruction-count or throughput ratio is inferred from source line count, struct size, or comments. Frozen benchmark fork identity remains recorded separately."
+  },
+  "publication_qualified": false,
+  "overall_goal_complete": false
+}
