@@ -485,5 +485,8 @@
   "cleanup": {
     "bytes": 125048609,
     "removed": true
-  }
+  },
+  "address_attribution": "address-attribution.json",
+  "findings_at_physical_owner": "The apparent extra ARM immediate-writer work is at instructions after the call returns into X86_trySimpleOutput. The actual immediate writer has identical counts on all four synthetic panels; the full addresses show the added work is in the iterator. Named contexts are not physical symbol ownership.",
+  "scope_correction": "Rows above preserve named Callgrind contexts. Use address-attribution.json for physical scalar/SIMD owner claims. Four MIPS-context addresses are absent from the saved executable disassembly, so physical MIPS/libc attribution remains unresolved; native regressions are not explained by that context-only report."
 }
