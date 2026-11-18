@@ -1,0 +1,106 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 2c6b169d..e1cae865 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -17,10 +17,6 @@
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ 
+-#ifdef __clang__
+-#define X86_writeVectorOutput X86_writeVectorOutputDispatch
+-#endif
+-
+ /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+  * present. Memory admission and bounds checks belong to the address writer. */
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+@@ -88,6 +84,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		unsigned row;
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
++#if defined(__clang__)
++			if ((opcode & 0xfe) == 0xc4)
++				return X86_writeVex32Output(code, size, insn,
++							    insn_size);
++#endif
+ 			const bool imm8 = opcode == 0x6a;
+ 			if (size < (imm8 ? 2u : 5u))
+ 				return false;
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index ca06adfd..23852372 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -90,11 +90,11 @@ X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
+ #endif
+ 
+ #if defined(__clang__)
+-#define X86_PLAN_VEX32 X86_PLAN_VECTOR
+-CAPSTONE_INTERNAL bool
+-X86_writeVectorOutputDispatch(const uint8_t *code, size_t size, cs_insn *insn,
+-			      uint16_t *insn_size,
+-			      const struct X86SimpleRegister *regs, bool wide);
++/* PUSH and VEX32 share the exceptional arm. The opcode distinguishes them
++ * after the ordinary vector arm, keeping its direct call unchanged. */
++#define X86_PLAN_VEX32 X86_PLAN_PUSH_IMMEDIATE
++CAPSTONE_INTERNAL bool X86_writeVex32Output(const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *insn_size);
+ #else
+ #define X86_PLAN_VEX32 0
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 240aba80..6e584416 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -158,12 +158,9 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
+ }
+ 
+ X86_VEX32_OUTPUT_CODE
+-static bool writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
+-			     uint16_t *insn_size,
+-			     const struct X86SimpleRegister *regs, bool wide)
++bool X86_writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
++			  uint16_t *insn_size)
+ {
+-	(void)regs;
+-	(void)wide;
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+ 	/* LDS/LES, extended registers and W=1 retain the
+      * canonical reader. The admitted rows use only XMM/YMM0..7. */
+@@ -185,25 +182,6 @@ static bool writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
+ 
+-/* Options and exact 32/64-bit mode were checked by the original plan entry. */
+-X86_VEX32_OUTPUT_CODE
+-bool X86_writeVectorOutputDispatch(const uint8_t *code, size_t size,
+-				   cs_insn *insn, uint16_t *insn_size,
+-				   const struct X86SimpleRegister *regs,
+-				   bool wide)
+-{
+-	if (wide || (code[0] & 0xfe) != 0xc4) {
+-#if __has_attribute(musttail)
+-		__attribute__((musttail))
+-#endif
+-		return X86_writeVectorOutput(code, size, insn, insn_size, regs,
+-					     wide);
+-	}
+-#if __has_attribute(musttail)
+-	__attribute__((musttail))
+-#endif
+-	return writeVex32Output(code, size, insn, insn_size, regs, wide);
+-}
+ #if defined(__ELF__)
+ #pragma clang section rodata=""
+ #endif
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index 099092f7..478e54b1 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -627,7 +627,7 @@ int main()
+ 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
+ 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
+ 	plans[1][0][0x62] = X86_PLAN_VECTOR;
+-	plans[0][0][0xc4] = plans[0][0][0xc5] = X86_PLAN_VECTOR;
++	plans[0][0][0xc4] = plans[0][0][0xc5] = X86_PLAN_VEX32;
+ 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
+ 	plans[1][0][0xc5] = X86_PLAN_VECTOR;
+ 	for (unsigned wide = 0; wide < 2; ++wide) {
