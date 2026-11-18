@@ -1,0 +1,18 @@
+{
+  "complete": true,
+  "decision": "semantics-passed-native-benefit-unqualified",
+  "run": 44252195363,
+  "source_tree": "168d28e8e91f386e9ed6781fd52869c2cfc04437",
+  "findings": [
+    "Four compiler profiles pass exact current full-record/protected-extent/public record comparisons; original non-iterator objects and original vector core are unchanged.",
+    "Clang14 changes the selected TEST byte register only, preserving iterator size and executed work.",
+    "Clang18 replaces the exceptional-arm stack-memory comparison with a register TEST: one fewer data read per visit, two static bytes smaller, same executed instruction count.",
+    "One GCC11 simulated-count increase occurs in byte-identical executables and only libc strchr/strcmp. It is a launch-state diagnostic, not evidence of candidate code generation."
+  ],
+  "local_records": 214106138,
+  "local_units": 75,
+  "publication_qualified": false,
+  "overall_goal_complete": false,
+  "native_qualification_required": true,
+  "parent_held_reason": "R1461 still has cross-architecture native regressions."
+}
