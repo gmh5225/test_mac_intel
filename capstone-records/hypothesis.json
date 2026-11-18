@@ -1,11 +1,11 @@
 {
-  "reference": "R1471 three PMU-capable Intel hosts",
+  "reference": "R1474 three PMU-capable Intel 6975P-C hosts",
   "source": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
-  "purpose": "Discriminate front-end delivery or instruction-cache effects behind the unchanged-instruction-count AArch64 raw layout regression.",
-  "controls": "Unchanged frozen source, ordinary iterator-only control, added-leaf-only control, full candidate and byte-identical A/A. Preserve fixed and original-image native timings.",
-  "selection": "Four attempts preflight only core PMU capability before source build; all attempts retained. No selection by CPU identity or measured performance.",
+  "observation": "Iterator-only and full candidate reproduce AArch64 raw slowdown with unchanged retired instruction counts, around 2.6x DSB-to-MITE penalty cycles, and increased DSB/MITE uop delivery; added-leaf-only and A/A controls stay close to baseline.",
+  "purpose": "Test whether retired fusion/slot counts change, distinguish issued from retired work, and localize cycle samples by symbol.",
+  "controls": "Same frozen source, consumer and five binary controls as R1474. Core-count availability is the only pre-build selection condition; all four attempts retained.",
   "events_source": "https://perfmon-events.intel.com/platforms/graniterapids/core-events/core/",
-  "event_policy": "Use perf-listed named events, probe each group, record unsupported or unscheduled groups. All supported groups use balanced rotations and reverse order. Zero baselines retain counts/deltas without a ratio.",
-  "limits": "PMU covers unchanged whole process, including initialization and warm-up. Speculative front-end events are not retired instructions and cannot be attributed to an individual instruction. Association is evidence to guide the next intervention, not exact proof of a cache mechanism.",
+  "sampling": "Two balanced forward/reverse rotations, same path/inode/length and disabled ASLR, 400 unchanged traversals, cycles:u sampling period 1000003. Resolve each report before replacing its executable. No sampling-derived throughput claims; non-precise cycle samples can skid.",
+  "limits": "PMU covers the whole process. Event cycle counts can overlap and cannot be added to predict elapsed time. Unsupported events and zero denominators remain explicit.",
   "publication_qualified": false
 }

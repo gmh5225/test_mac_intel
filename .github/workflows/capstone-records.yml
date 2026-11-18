@@ -1,7 +1,7 @@
-name: Diagnose layout effects with supported frontend hardware events
+name: Diagnose retired fusion and cycle hotspots on frozen layout controls
 on:
   push:
-    branches: [codex/capstone-frontend-layout-events]
+    branches: [codex/capstone-layout-fusion-hotspots]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: frontend-layout-host-${{ matrix.slot }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: layout-fusion-host-${{ matrix.slot }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

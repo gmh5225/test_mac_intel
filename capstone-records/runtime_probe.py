@@ -55,10 +55,9 @@ def cost_probe(binaries,cases,temporary,evidence,run):
         if set(counts)!=set(events):return None
         return dict(counts=counts,running_percent=running)
     groups={'core':['cycles:u','instructions:u','branches:u','branch-misses:u'],
-            'delivery':['cycles:u','instructions:u','idq.dsb_uops:u','idq.mite_uops:u'],
-            'frontend_stalls':['cycles:u','instructions:u','dsb2mite_switches.penalty_cycles:u','idq_uops_not_delivered.core:u'],
-            'icache_stalls':['cycles:u','instructions:u','icache_data.stalls:u','icache_tag.stalls:u'],
-            'critical_dsb':['cycles:u','instructions:u','frontend_retired.dsb_miss:up']}
+            'retired_fusion':['cycles:u','instructions:u','inst_retired.macro_fused:u','uops_retired.slots:u'],
+            'issued':['cycles:u','instructions:u','uops_issued.any:u','idq.dsb_uops:u'],
+            'transitions':['cycles:u','instructions:u','dsb2mite_switches.penalty_cycles:u','idq.mite_uops:u']}
     try:
         records=[]
         for group,events in groups.items():
@@ -88,6 +87,36 @@ def cost_probe(binaries,cases,temporary,evidence,run):
                 save('pmu-samples',records)
         audit['supported']=audit['groups']['core']['supported']
         audit['samples']=len(records)
+        # Resolve samples while the exact measured executable is still installed.
+        # Sampling is diagnostic only and never contributes to throughput timing.
+        raw=temporary/'active.perf.data'
+        pre=sp.run([perf,'record','--no-buildid','--no-buildid-cache','-e','cycles:u','-c','1000003','-o',str(raw),'--','/bin/true'],capture_output=True,text=True)
+        sampling=dict(preflight_returncode=pre.returncode,preflight_stderr=pre.stderr,records=[])
+        if pre.returncode==0:
+            case=case_by_name['arm64-ls'];reference=None
+            for cycle in range(2):
+                sequence=variants[cycle:]+variants[:cycle]
+                for position,v in enumerate(sequence+sequence[::-1]):
+                    binary=target(v);key='cycles-sampling-'+str(cycle)+'-'+str(position)+'-'+v
+                    result=sp.run(['setarch',platform.machine(),'-R',perf,'record','--no-buildid','--no-buildid-cache',
+                        '-e','cycles:u','-c','1000003','-o',str(raw),'--',str(binary),str(case['selector']),'0',str(case['path']),'400'],capture_output=True,text=True)
+                    assert result.returncode==0,(result.returncode,result.stderr)
+                    output=json.loads(result.stdout);value=(output['first'],output['result'])
+                    if reference is None:reference=value
+                    else:assert reference==value
+                    report=sp.run([perf,'report','--stdio','--no-children','--show-nr-samples','--percent-limit','0','--sort','symbol',
+                        '--no-demangle','-i',str(raw)],capture_output=True,text=True)
+                    assert report.returncode==0,(report.returncode,report.stderr)
+                    (evidence/(key+'.report.txt')).write_text(report.stdout)
+                    import gzip
+                    with gzip.open(evidence/(key+'.perf.data.gz'),'wb') as stream:stream.write(raw.read_bytes())
+                    sampling['records'].append(dict(variant=v,cycle=cycle,position=position,case='arm64-ls',mode=0,consumer=output,
+                        stderr=result.stderr,report_stderr=report.stderr,report=key+'.report.txt',data=key+'.perf.data.gz',
+                        image_sha256=control['padded_sha256'][v]))
+                    raw.unlink();save('cycle-sampling',sampling)
+        save('cycle-sampling',sampling)
+        raw.unlink(missing_ok=True)
+
     finally:
         if permission.returncode==0:
             restored=sp.run(['sudo','-n','sysctl','-w','kernel.perf_event_paranoid='+original],capture_output=True,text=True)
