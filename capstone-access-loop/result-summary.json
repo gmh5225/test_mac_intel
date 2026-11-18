@@ -1,0 +1,104 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44215662510,
+    "head_sha": "a37d4806670a5db4af74252cb368022fbf02709f",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44215662510",
+    "run_attempt": 1
+  },
+  "gcc": [
+    {
+      "profile": "output-option-inline-ubuntu-22.04-gcc",
+      "variants": {
+        "original": {
+          "iterator_symbol": "0000000000000000 0000000000000ac3 T X86_disasmIter",
+          "helper_inlining": []
+        },
+        "interim": {
+          "iterator_symbol": "0000000000000000 0000000000000bfa T X86_disasmIter",
+          "helper_inlining": [
+            "/tmp/capstone-output-option-inline-02b6mro8/source/arch/X86/X86OutputIterator.c:73:6: missed:   will not early inline: X86_trySimpleOutput/117->X86_outputOptionsReject/111, growth 26 exceeds --param early-inlining-insns",
+            "/tmp/capstone-output-option-inline-02b6mro8/source/arch/X86/X86OutputIterator.c:73:6: optimized:  Inlined X86_outputOptionsReject/111 into X86_trySimpleOutput/117 which now has time 38.387767 and size 369, net change of -10."
+          ]
+        },
+        "corrected": {
+          "iterator_symbol": "0000000000000000 0000000000000bfc T X86_disasmIter",
+          "helper_inlining": [
+            "/tmp/capstone-output-option-inline-02b6mro8/source/arch/X86/X86OutputIterator.c:73:6: optimized:   Inlining X86_outputOptionsReject/111 into X86_trySimpleOutput/117 (always_inline)."
+          ]
+        }
+      },
+      "archive_identity": false,
+      "tests_passed": true
+    },
+    {
+      "profile": "output-option-inline-ubuntu-24.04-gcc",
+      "variants": {
+        "original": {
+          "iterator_symbol": "0000000000000000 0000000000000b02 T X86_disasmIter",
+          "helper_inlining": []
+        },
+        "interim": {
+          "iterator_symbol": "0000000000000000 0000000000000c60 T X86_disasmIter",
+          "helper_inlining": [
+            "/tmp/capstone-output-option-inline-w8y68noo/source/arch/X86/X86OutputIterator.c:73:6: missed:   will not early inline: X86_trySimpleOutput/118->X86_outputOptionsReject/112, growth 26 exceeds --param early-inlining-insns",
+            "/tmp/capstone-output-option-inline-w8y68noo/source/arch/X86/X86OutputIterator.c:73:6: optimized:  Inlined X86_outputOptionsReject/112 into X86_trySimpleOutput/118 which now has time 38.675087 and size 399, net change of -10."
+          ]
+        },
+        "corrected": {
+          "iterator_symbol": "0000000000000000 0000000000000b02 T X86_disasmIter",
+          "helper_inlining": [
+            "/tmp/capstone-output-option-inline-w8y68noo/source/arch/X86/X86OutputIterator.c:73:6: optimized:   Inlining X86_outputOptionsReject/112 into X86_trySimpleOutput/118 (always_inline)."
+          ]
+        }
+      },
+      "archive_identity": true,
+      "tests_passed": true
+    }
+  ],
+  "finding": "Normal helper extraction delays GCC early inlining. always_inline restores GCC13 archive identity, but GCC11 already inlines the predicate early and still changes iterator machine code. The GCC11 residual difference is not an out-of-line function call; preserving early inlining alone is insufficient.",
+  "next_hypothesis": "Use one canonical internal predicate expression so both callers expand the original condition without a boolean-return helper boundary. Require complete archive identity, rather than assuming syntax-only changes compile identically.",
+  "publication_qualified": false,
+  "profiles": [
+    {
+      "profile": "output-option-inline-ubuntu-22.04-clang",
+      "archive_identity": true,
+      "unit_checks": 74,
+      "cleanup": {
+        "bytes": 1524420406,
+        "removed": true
+      }
+    },
+    {
+      "profile": "output-option-inline-ubuntu-22.04-gcc",
+      "archive_identity": false,
+      "unit_checks": 74,
+      "cleanup": {
+        "bytes": 1506914663,
+        "removed": true
+      }
+    },
+    {
+      "profile": "output-option-inline-ubuntu-24.04-clang",
+      "archive_identity": true,
+      "unit_checks": 74,
+      "cleanup": {
+        "bytes": 1470687311,
+        "removed": true
+      }
+    },
+    {
+      "profile": "output-option-inline-ubuntu-24.04-gcc",
+      "archive_identity": true,
+      "unit_checks": 74,
+      "cleanup": {
+        "bytes": 1504169923,
+        "removed": true
+      }
+    }
+  ],
+  "checks": 296,
+  "identical_archives": 3
+}
