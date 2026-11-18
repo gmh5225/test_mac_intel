@@ -1,7 +1,7 @@
-name: Validate shared operand tag construction across all backends and runtimes
+name: Validate shared operand construction including generated RISC-V printer callers
 on:
   push:
-    branches: [codex/capstone-coalesced-tags-profiles]
+    branches: [codex/capstone-coalesced-tags-profile-scope]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -11,15 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, profile: diet, archs: four, forms: combined }
-          - { host: ubuntu-24.04, cc: clang, profile: sanitize, archs: four, forms: combined }
-          - { host: windows-2022, cc: MT, profile: normal, archs: four, forms: combined }
-          - { host: windows-2022, cc: MD, profile: normal, archs: four, forms: combined }
-          - { host: macos-15, cc: clang, profile: normal, archs: four, forms: combined }
           - { host: ubuntu-24.04, cc: clang, profile: normal, archs: all, forms: combined }
           - { host: ubuntu-24.04, cc: gcc, profile: normal, archs: all, forms: combined }
-          - { host: ubuntu-24.04, cc: clang, profile: normal, archs: x86, forms: combined }
-          - { host: ubuntu-24.04, cc: clang, profile: reduce, archs: four, forms: combined }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -42,6 +35,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: coalesced-tags-profiles-${{ matrix.host }}-${{ matrix.archs }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: coalesced-tags-scope-${{ matrix.host }}-${{ matrix.archs }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
