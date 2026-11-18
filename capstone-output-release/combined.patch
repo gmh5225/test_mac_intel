@@ -142,21 +142,28 @@ index c2d5d08d..8699d106 100644
  	ud->group_name = Xtensa_group_name;
  	ud->post_printer = NULL;
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..a17c29f0 100644
+index b883b547..0e3fb0dc 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -49,7 +49,8 @@ static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
- 			     X86_get_insn_id_no_detail(handle, insn, id)))
- 		return;
+@@ -45,10 +45,13 @@ static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
+ #ifdef CAPSTONE_HAS_X86
+ 	/* The LUT contains only generated 16-bit opcodes; source-owned
+ 	 * feature opcodes exceed its bound and keep the normal mapper. */
+-	if (CS_DECODE_LIKELY(handle->arch == CS_ARCH_X86 &&
+-			     X86_get_insn_id_no_detail(handle, insn, id)))
+-		return;
++	if (CS_DECODE_LIKELY(handle->arch == CS_ARCH_X86)) {
++		if (X86_get_insn_id_no_detail(handle, insn, id))
++			return;
++	} else
  #endif
--	handle->insn_id(handle, insn, id);
-+	if (handle->insn_id)
-+		handle->insn_id(handle, insn, id);
++		if (!handle->insn_id)
++		return;
+ 	handle->insn_id(handle, insn, id);
  }
  
- static inline bool use_x86_scan(const cs_struct *handle)
 diff --git a/cs_priv.h b/cs_priv.h
-index 95d36ef5..d286e60c 100644
+index 95d36ef5..c25ee0ba 100644
 --- a/cs_priv.h
 +++ b/cs_priv.h
 @@ -114,7 +114,7 @@ struct cs_struct {
@@ -164,30 +171,31 @@ index 95d36ef5..d286e60c 100644
  	GetName_t insn_name;
  	GetName_t group_name;
 -	GetID_t insn_id;
-+	GetID_t insn_id; // Optional: NULL when the decoder already maps IDs.
++	GetID_t insn_id; // NULL for non-x86 backends that already map IDs.
  	PostPrinter_t post_printer;
  	cs_err errnum;
  	ARM_ITBlock ITBlock; // for Arm only
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index 8daabd98..49a60d4c 100644
+index 8daabd98..7eefb64f 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
-@@ -157,6 +157,10 @@ all cache offsets/hints/base registers, and MT result fields.
+@@ -157,6 +157,11 @@ all cache offsets/hints/base registers, and MT result fields.
  
  ### Component 2 - Mapping logic
  
-+The private `cs_struct.insn_id` callback is optional. Backends that already map
-+public IDs during decoding leave it `NULL`; the core invokes a non-null mapper
-+after successful decoding and before printing, in both iterator and batch APIs.
++The private `cs_struct.insn_id` callback is required for x86. Other backends
++that already map public IDs during decoding leave it `NULL`; the core invokes
++a non-null mapper after successful decoding and before printing, in both
++iterator and batch APIs. The x86 mapping path does not test for an absent mapper.
 +
  The mapping component has three different task:
  
  1. Serving as programmable interface for the Capstone core to the LLVM code.
 diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
-index 7f588c14..f42dacc2 100644
+index 7f588c14..066778c2 100644
 --- a/tests/unit/mapping.c
 +++ b/tests/unit/mapping.c
-@@ -255,6 +255,136 @@ static bool test_full_group_map(void)
+@@ -255,6 +255,147 @@ static bool test_full_group_map(void)
  	return true;
  }
  
@@ -236,6 +244,10 @@ index 7f588c14..f42dacc2 100644
 +		cs_arch arch;
 +		cs_mode mode;
 +	} cases[] = {
++		{ CS_ARCH_X86, CS_MODE_32 },
++		{ CS_ARCH_X86, CS_MODE_64 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV32 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV64 },
 +		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN },
 +		{ CS_ARCH_ARM, CS_MODE_ARM },
 +		{ CS_ARCH_MIPS, CS_MODE_MIPS32 },
@@ -262,7 +274,14 @@ index 7f588c14..f42dacc2 100644
 +		bool ok = true;
 +		/* Reuse the handle while replacing and restoring the callback. */
 +		for (unsigned flags = 0; flags < 32 && ok; ++flags) {
-+			bool custom = flags & 1, text = flags & 2;
++			/* X86 uses its compact reader and ID lookup without detail.
++			 * Exercise its required mapper at the full-decode boundary. */
++			if (cases[i].arch == CS_ARCH_X86 && !(flags & 4))
++				continue;
++			bool custom = (flags & 1) ||
++				      cases[i].arch == CS_ARCH_X86 ||
++				      cases[i].arch == CS_ARCH_RISCV;
++			bool text = flags & 2;
 +			bool detail = flags & 4, batch = flags & 8;
 +			bool valid = !(flags & 16);
 +			uint8_t byte = valid ? 1 : 0;
@@ -324,7 +343,7 @@ index 7f588c14..f42dacc2 100644
  int main(void)
  {
  #ifdef CAPSTONE_USE_ALIAS_TRIE
-@@ -265,7 +395,8 @@ int main(void)
+@@ -265,7 +406,8 @@ int main(void)
  	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
  	    found)
  		return 1;

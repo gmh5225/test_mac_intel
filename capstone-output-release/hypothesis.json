@@ -1,12 +1,9 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "hypothesis": "An optional private mapper removes an indirect call and return per instruction for eleven architectures whose default callbacks have empty bodies; ordinary custom callbacks retain their original boundary and order.",
-  "evidence": "R1477 source audit: AArch64_get_insn_id is an empty one-byte return; full-cycle sampling motivates but does not prove causal timing attribution.",
-  "scope": "Change only the nullable private callback contract, default assignments, documentation and callback tests. Do not combine with R1476 initialization.",
-  "qualification": "Local four-backend byte-for-byte ARM/AArch64 records, current callback behavior on baseline and candidate; compiler counts and native real corpus before broader profiles. All eleven backend fixtures and private custom callbacks required before publication.",
-  "risks": [
-    "One extra null branch for required x86 and RISC-V mappers",
-    "Layout changes may affect unrelated decoder timing",
-    "Local four-backend tests do not qualify the other eight default mapper removals"
-  ]
+  "previous": "round1479-optional-mapping-callback",
+  "evidence": "R1479 removed eleven empty default callbacks but introduced a null check on required x86 full-decode mapping; native PE/detail regressions held publication.",
+  "hypothesis": "Split the existing architecture branch before the optional callback check. x86 keeps its generated lookup and required live callback; only other backends test for a missing mapper. This targets the observed x86 null-check work without changing initialization or output coverage.",
+  "semantics": "All original custom callbacks keep their order and are reread per instruction. Eleven audited empty default callbacks become NULL. x86 remains required as in published next; no new permission to install a NULL x86 callback. RISC-V default mapper remains non-null.",
+  "validation": "Test original callback invariants on baseline and candidate, including added x86 and RISC-V custom callbacks. Compare complete ARM/AArch64 records locally; require complete x86 records, unchanged non-owner objects, four-host native controls and all affected backend fixtures before publication.",
+  "publication_qualified": false
 }

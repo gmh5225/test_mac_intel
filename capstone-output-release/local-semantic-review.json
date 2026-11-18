@@ -2,22 +2,18 @@
   "complete": true,
   "source": {
     "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-    "tree": "b70653462ee1cce391aeaa085fe4a79e96d6d8a8",
-    "sha256": "c4b667b5a0b013356eeab1772c7bb92fe0632707bd09295515f2844d66e48bc4",
+    "tree": "be46f53cb16387430c33085cfe1aee14acc18ba1",
+    "sha256": "e5b7b04b03b1d58c434c43d19f60003cf223bb164234fd8b257b22867e0c7f7d",
     "records": {
       "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
       "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
     }
   },
-  "comparisons": 50331648,
   "unit_executions": 8,
-  "callback_combinations_per_architecture": 32,
-  "callback_architectures_executed": [
-    "ARM",
-    "AARCH64",
-    "MIPS"
-  ],
-  "source_audited_empty_callbacks": 11,
+  "arm_aarch64_record_comparisons": 50331648,
+  "x86_record_comparisons": 2409351,
+  "guard_page_comparisons": 3092,
+  "callback_cases": "Eleven optional-default backends plus custom x86 and RISC-V mappers; available architectures exercised locally, all affected backends require CI.",
   "object_delta": {
     "changed": [
       "cs.c.o",
@@ -35,10 +31,16 @@
     ],
     "total": 40
   },
-  "cleanup": {
-    "bytes": 302923801,
-    "removed": true
-  },
+  "cleanup": [
+    {
+      "bytes": 302915842,
+      "removed": true
+    },
+    {
+      "bytes": 232911181,
+      "removed": true
+    }
+  ],
   "publication_qualified": false,
-  "scope": "The synthetic callback-order test passes on baseline and candidate; full records compare both shared libraries. Remaining eight changed modules require enabled-architecture validation. No timing claim."
+  "scope": "Local complete records, cursors, errors and callback order match. Performance and portable qualification are separate."
 }

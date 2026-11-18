@@ -18,7 +18,7 @@ def run(args,name):
   result=sp.run(list(map(str,args)),cwd=s,stdout=log,stderr=sp.STDOUT)
  if result.returncode:raise RuntimeError((name,(e/(name+'.log')).read_text(errors='replace')[-2500:]))
 def cleanup_error(fn,path,exc):os.chmod(path,0o700);fn(path)
-w=Path(tempfile.mkdtemp(prefix='capstone-optional-mapper-profile-'));s=w/'source';b=w/'build'
+w=Path(tempfile.mkdtemp(prefix='capstone-required-mapper-profile-'));s=w/'source';b=w/'build'
 try:
  assert sp.check_output(['git','rev-parse','HEAD'],cwd=checkout,text=True).strip()==meta['parent']
  sp.run(['git','clone','-q','--shared','--no-checkout','--config','core.autocrlf=false',checkout,s],check=True)
@@ -70,7 +70,8 @@ try:
   assert objects['base'].keys()==objects['candidate'].keys()
   changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
   allowed={'cs.c.o','arch/X86/X86DisassemblerDecoder.c.o',*[f'arch/{folder}/{name}Module.c.o' for folder,name in [('AArch64','AArch64'),('ARM','ARM'),('Mips','Mips'),('ARC','ARC'),('BPF','BPF'),('LoongArch','LoongArch'),('PowerPC','PPC'),('Sparc','Sparc'),('SystemZ','SystemZ'),('TriCore','TriCore'),('Xtensa','Xtensa')]]}
-  assert set(changed)==allowed,changed
+  allowed &= objects['base'].keys()
+  assert set(changed)<=allowed and (allowed-{'arch/X86/X86DisassemblerDecoder.c.o'})<=set(changed),changed
   save('runtime-objects',dict(changed=changed,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
  save('complete',dict(profile=profile,compiler=cc,archs=archs,arm_policy_active=arm_policy_active,architectures=architectures,tested_tree=tree,phases=list(tests),observer_executed=arm_policy_active,observer_arm_owner_filtered=arm_policy_active and profile=='diet',test_summaries={k:[line for line in v.splitlines() if 'tests passed' in line] for k,v in tests.items()}))
 finally:

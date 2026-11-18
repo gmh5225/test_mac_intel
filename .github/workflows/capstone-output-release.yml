@@ -1,7 +1,7 @@
-name: Validate default and custom mapping callbacks across thirteen architectures
+name: Validate required and optional mapping boundaries across thirteen architectures
 on:
   push:
-    branches: [codex/capstone-optional-mapper-profiles]
+    branches: [codex/capstone-required-mapper-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, profile: normal, archs: affected, forms: combined }
           - { host: ubuntu-24.04, cc: clang, profile: diet, archs: affected, forms: combined }
+          - { host: ubuntu-24.04, cc: gcc, profile: normal, archs: affected, forms: combined }
+          - { host: ubuntu-24.04, cc: clang, profile: normal, archs: arm, forms: combined }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -35,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: optional-mapper-profiles-${{ matrix.host }}-${{ matrix.archs }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: required-mapper-profiles-${{ matrix.host }}-${{ matrix.archs }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
