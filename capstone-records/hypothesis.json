@@ -1,11 +1,12 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "prior_source": "035e1d24bf6143bee9159a5618883c37544542d3",
-  "evidence": "../round1468-arm-mixed-initialization/native-review.json",
-  "observation": "R1468 Clang adds 2 executed instructions per ordinary AArch64/full x86 fallback and 3 per MIPS detailed decode. AArch64 host assembly retains a SystemZ dialect comparison inside a branch whose architectural domain is only ARM/MIPS. Native ARM raw improves 7-17%, but passive regressions block publication.",
-  "change": "In the exact four-backend profile after X86 handling, use AArch64 as the only remaining full-initialization case. Project the admitted ARM/MIPS architecture to explicit constants for the shared initializer, retaining the owning helper and future per-architecture dialect decisions.",
-  "invariant": "CMake defines CAPSTONE_ARM_AARCH64_MIPS_X86 only for ARM;AARCH64;MIPS;X86. cs_open rejects architectures without arch_configs[arch].arch_init; the only runtime write to cs_struct.arch is its initial assignment in cs_open. After the existing X86 branch, ARM/AArch64/MIPS are exhaustive. Other profiles retain the original MIPS equality branch.",
-  "prediction": "Eliminate the added common architecture branch and impossible SystemZ check while retaining partial ARM initialization. Verify generated work and native passive controls; do not assume layout neutrality.",
+  "basis": [
+    "R1473 Clang retains one extra MIPS dispatch instruction per decode; R1475 eliminates redundant zeroing of tied operand indices.",
+    "R1473 GCC adds one Ir, Dr and Dw per AArch64 decode inside cs_decode_full_insn. The fallback architecture is known, but MCInst_Init remains an external call with a generic SystemZ dialect test. Inline the existing full-initialization owner and test whether this removes the measured call-boundary cost."
+  ],
+  "change": "Use the existing owning full initializer inline with constant CS_ARCH_AARCH64 in the exact four-backend fallback. Continue complete operand clearing for AArch64. Retain R1475 partial-initializer range splitting.",
+  "invariant": "cs_open rejects unavailable architectures. In exact ARM/AArch64/MIPS/X86 builds, X86 and ARM/MIPS have already selected their initializers; only AArch64 can reach the full fallback.",
+  "validation": "ARM records, poisoned operands and read-before-construction observer; AArch64 full public records/cursors/errors across both byte orders, text/detail/skip options and truncated or malformed words; mcinst complete-byte default checks for all enum values. Then codegen gate and native controls.",
   "publication_qualified": false,
-  "codegen_gate": "Before native timing, fixed-guest counts must not increase for AArch64 raw, MIPS detail, PE32 format or PE64 format. Unsupported ARM-host Callgrind is reported and does not skip native measurement."
+  "codegen_gate": "Before native timing, no increase in fixed-guest Ir for AArch64 raw, MIPS detail, PE32 format or PE64 format. ARM hosts report unavailable Callgrind and retain native timings."
 }

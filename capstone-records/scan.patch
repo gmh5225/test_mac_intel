@@ -1,5 +1,23 @@
+diff --git a/MCInst.h b/MCInst.h
+index 641480ed..109fb678 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -227,8 +227,12 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+ 			offsetof(MCInst, Operands) + sizeof(inst->Operands);
+ 		memset(inst, 0,
+ 		       offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
++		/* The tied operand indices are initialized to -1 below. */
++		const size_t ties_begin = offsetof(MCInst, tied_op_idx);
++		const size_t ties_end = ties_begin + sizeof(inst->tied_op_idx);
+ 		memset((char *)inst + operands_end, 0,
+-		       sizeof(*inst) - operands_end);
++		       ties_begin - operands_end);
++		memset((char *)inst + ties_end, 0, sizeof(*inst) - ties_end);
+ 	}
+ 	/* All zero-valued defaults are established by the clear above. */
+ 	memset(inst->tied_op_idx, -1, sizeof(inst->tied_op_idx));
 diff --git a/cs.c b/cs.c
-index 71fff034..a641a9f0 100644
+index 71fff034..15aadb35 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -1076,11 +1076,20 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
@@ -28,3 +46,13 @@ index 71fff034..a641a9f0 100644
  #endif
  #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
  		/* ARM constructs each operand before reading or inserting it. */
+@@ -1094,6 +1103,9 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	 * performs better on some full-detail workloads with the shared
+ 	 * initializer below. */
+ 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
++#elif defined(CAPSTONE_ARM_AARCH64_MIPS_X86)
++	/* Only AArch64 remains after the X86 and constructed-operand paths. */
++	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, true);
+ #else
+ 	MCInst_Init(&mci, handle->arch);
+ #endif

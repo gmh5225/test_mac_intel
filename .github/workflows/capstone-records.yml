@@ -1,7 +1,7 @@
-name: Verify ARM initializer domain lowering before native comparisons
+name: Verify complete initialization semantics and passive cost before native comparisons
 on:
   push:
-    branches: [codex/capstone-arm-initializer-domain]
+    branches: [codex/capstone-full-init-known-domain]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-initializer-domain-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: full-init-known-domain-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
