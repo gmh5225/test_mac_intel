@@ -23,7 +23,9 @@ jobs:
           ref: 64cc5df0cbe55cbc33a3a013c231382b49789bc5
           path: neverd
           persist-credentials: false
-          sparse-checkout: include/neverd/runtime
+          sparse-checkout: |
+            include/neverd/runtime
+            include/neverd/ir/intrinsics/AArch64
       - name: Sample the original entry using only system tables
         working-directory: neverd-raw-entry
         run: |

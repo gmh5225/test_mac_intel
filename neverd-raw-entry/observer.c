@@ -92,6 +92,7 @@ static uintptr_t raw_pc(unw_cursor_t *cursor) {
 
 static void check_raw_caller(unw_cursor_t *cursor, uintptr_t sp) {
   unw_word_t saved_sp, saved_x19;
+  fprintf(stderr, "walk pc=%lx expected=%lx\n", raw_pc(cursor), expected_return);
   if (raw_pc(cursor) != expected_return ||
       unw_get_reg(cursor, UNW_REG_SP, &saved_sp) || saved_sp != sp ||
       unw_get_reg(cursor, UNW_ARM64_X19, &saved_x19) ||
@@ -130,7 +131,10 @@ static void raw_entry_walk(const arm_thread_state64_t *regs) {
   void *address = ptrauth_sign_unauthenticated((void *)pc,
                                                 ptrauth_key_return_address, sp);
   unw_proc_info_t info;
-  if (unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)address) ||
+  int ipset = unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)address);
+  int lookup = unw_get_proc_info(&cursor, &info);
+  fprintf(stderr, "lookup=%d ipset=%d ip=%lx entry=%lx found=%lx..%lx\n",lookup, ipset, raw_pc(&cursor), pc, (unsigned long)info.start_ip, (unsigned long)info.end_ip);
+  if (ipset ||
       unw_set_reg(&cursor, UNW_REG_SP, sp) || raw_pc(&cursor) != pc ||
       unw_get_proc_info(&cursor, &info) || info.start_ip != pc ||
       info.end_ip <= pc || unw_step(&cursor) <= 0)
