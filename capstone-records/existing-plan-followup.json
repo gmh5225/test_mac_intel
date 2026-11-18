@@ -1,0 +1,11 @@
+{
+  "baseline": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+  "original_native": "../round1436-vex32-output-expression-native/native-review.json",
+  "original_mixed": "../round1436-vex32-output-expression-native/mixed-review.json",
+  "observation": "A zero-plan-miss attempt gives about 40% faster AVX32 formatting but changes the Clang14 iterator lowering and thousands of linked positions. Nine predeclared native/mixed observations lose more than 1%; the candidate is held.",
+  "hypothesis": "Use the existing two 32-bit C4/C5 plan cells and existing vector call. Redirect only that call to a same-signature tail selector, preserving the ordinary iterator and every other original runtime object. Original option/callback checks remain their sole owner. Non-vector and no-plan instructions pay no new attempt.",
+  "scope": "Clang-only prototype on the newly published alias baseline; GCC keeps both plan cells zero and its original call target.",
+  "required": "Canonical regeneration; exact ordinary text and function positions; only two verified plan cells and the vector call relocation may differ; complete records, native and mixed controls still required.",
+  "native_qualification": false,
+  "publication_qualified": false
+}
