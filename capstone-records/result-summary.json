@@ -1,0 +1,1615 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44210245544,
+    "head_sha": "012104f36530f3d6aa785480bdf95dc5bc661ef6",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44210245544",
+    "run_attempt": 1
+  },
+  "protocol": {
+    "inputs": {
+      "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+      "source_parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "variants": {
+        "output": {
+          "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+          "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+          "experiment": "round1417-clang-small-alias",
+          "semantic_run": {
+            "id": 44203984817,
+            "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+            "run_attempt": 1
+          }
+        }
+      }
+    },
+    "original_run": {
+      "id": 44205770136,
+      "head_sha": "7ba34a9c0747e65076cdbdc2d673a9cf8ceab8d9",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44205770136",
+      "run_attempt": 1
+    },
+    "original_loss": {
+      "host": "alias-call-shape-images-four-ubuntu-24.04-clang-44205770136",
+      "case": "arm-cp",
+      "panel": null,
+      "mode": 0,
+      "launch": "images",
+      "aa": 0.9902629799099877,
+      "aa_ci95": [
+        0.9740686653828028,
+        1.0022569465121542
+      ],
+      "variant": "output",
+      "gain": 0.9861372976953441,
+      "ci95": [
+        0.9778193786044265,
+        1.0022328332606363
+      ],
+      "vs_iced": null,
+      "vs_fast": null
+    },
+    "original_losses_preserved": true,
+    "source_and_consumer_unchanged": true,
+    "profiles": [
+      "ubuntu-22.04 clang",
+      "ubuntu-24.04 clang"
+    ],
+    "cycles": 64,
+    "calibration_cpu_ms": 120,
+    "observations_per_profile": 34,
+    "scope": "Repeat every raw mixed control, PE32/PE64 text and detail, and the AArch64/MIPS output gains. Retain both original image and fixed-file launches. For the sole ARM cp raw outlier, also measure separate images with fixed ASLR and same inode with ordinary ASLR.",
+    "controls": "The four ARM cp launches separate the joint image/ASLR control into its two factors. They do not by themselves establish hardware cache causes. No original observation is removed or reclassified as passing.",
+    "publication_qualified": false
+  },
+  "profiles": [
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "cleanup": {
+        "bytes": 226893858,
+        "removed": true
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "cleanup": {
+        "bytes": 218233895,
+        "removed": true
+      }
+    }
+  ],
+  "rows": [
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9993926610946795,
+          "ci95": [
+            0.9969801462199402,
+            1.0015200644197273
+          ]
+        },
+        "output": {
+          "gain": 0.9993157304893963,
+          "ci95": [
+            0.9971012006861063,
+            1.000342276824643
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996589131741036,
+          "ci95": [
+            0.9989272874869535,
+            1.000291537843443
+          ]
+        },
+        "output": {
+          "gain": 0.9997462617397561,
+          "ci95": [
+            0.999192137919547,
+            1.000341524364848
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-sort",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9998297346987797,
+          "ci95": [
+            0.9985557304049184,
+            1.0010011471477736
+          ]
+        },
+        "output": {
+          "gain": 0.9994259241994268,
+          "ci95": [
+            0.9977311401020987,
+            1.0014857662756096
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-sort",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9999222186146007,
+          "ci95": [
+            0.9992042507325946,
+            1.0003704651623364
+          ]
+        },
+        "output": {
+          "gain": 0.9997936165061182,
+          "ci95": [
+            0.9987254287481018,
+            1.0003152373106474
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9999022407534606,
+          "ci95": [
+            0.9986067139777559,
+            1.0017065483652603
+          ]
+        },
+        "output": {
+          "gain": 0.9997687806761866,
+          "ci95": [
+            0.9987947566262635,
+            1.0020031156302207
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0005035578493964,
+          "ci95": [
+            0.9999767243163603,
+            1.0011314763822496
+          ]
+        },
+        "output": {
+          "gain": 0.9999555928602637,
+          "ci95": [
+            0.9993260689178772,
+            1.000945733016314
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0145795564108604,
+          "ci95": [
+            1.0139752472315984,
+            1.0150239286802618
+          ]
+        },
+        "output": {
+          "gain": 1.0005713818691988,
+          "ci95": [
+            0.9997781414954937,
+            1.0016227451997273
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "same-file",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9976271080151874,
+          "ci95": [
+            0.9952828032047973,
+            1.0011352853463467
+          ]
+        },
+        "output": {
+          "gain": 1.0009131186873557,
+          "ci95": [
+            0.9979953889708251,
+            1.0025316366443406
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0008457816401468,
+          "ci95": [
+            0.9992264239961576,
+            1.0017969947252048
+          ]
+        },
+        "output": {
+          "gain": 1.0008899565777227,
+          "ci95": [
+            0.9999446028235515,
+            1.001694764144307
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0000650085549074,
+          "ci95": [
+            0.9994166856547853,
+            1.0005450749116638
+          ]
+        },
+        "output": {
+          "gain": 1.000125905258723,
+          "ci95": [
+            0.9996646278836762,
+            1.0006618653564856
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0007873796806455,
+          "ci95": [
+            0.9992025029139316,
+            1.0019134090229322
+          ]
+        },
+        "output": {
+          "gain": 1.0943153076587735,
+          "ci95": [
+            1.0932434663677153,
+            1.0959867226753899
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.999484179888147,
+          "ci95": [
+            0.9987862490600582,
+            0.9999693135395462
+          ]
+        },
+        "output": {
+          "gain": 1.090886147099023,
+          "ci95": [
+            1.0904078347196136,
+            1.0919013959388713
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.999885437144526,
+          "ci95": [
+            0.9986156764430427,
+            1.0008228908625005
+          ]
+        },
+        "output": {
+          "gain": 1.0850143281210172,
+          "ci95": [
+            1.0839498467941335,
+            1.0859701577804914
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.00011938168584,
+          "ci95": [
+            0.9989602752780762,
+            1.0014098102471614
+          ]
+        },
+        "output": {
+          "gain": 1.0824847364934382,
+          "ci95": [
+            1.0802765059139952,
+            1.0839514388572327
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9992178328956591,
+          "ci95": [
+            0.9979206569581652,
+            1.000547682429415
+          ]
+        },
+        "output": {
+          "gain": 0.9998804914088952,
+          "ci95": [
+            0.9988061827685784,
+            1.0009172010150906
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9998352281363493,
+          "ci95": [
+            0.9992957155312703,
+            1.0004562737642586
+          ]
+        },
+        "output": {
+          "gain": 1.0002575598073902,
+          "ci95": [
+            0.9996790453657031,
+            1.0009463891140564
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0000471144322214,
+          "ci95": [
+            0.9993973112702792,
+            1.0013265593721505
+          ]
+        },
+        "output": {
+          "gain": 0.9999183288908157,
+          "ci95": [
+            0.9989007879053857,
+            1.0011719150156733
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9999733998488884,
+          "ci95": [
+            0.9986104618462408,
+            1.0015784381252255
+          ]
+        },
+        "output": {
+          "gain": 0.9995562615674174,
+          "ci95": [
+            0.9987588569521435,
+            1.0010731327694609
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9997850278421131,
+          "ci95": [
+            0.9984097103669354,
+            1.0015314191289688
+          ]
+        },
+        "output": {
+          "gain": 1.00106169073606,
+          "ci95": [
+            0.9983624814597347,
+            1.0015215737419845
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9997598787606933,
+          "ci95": [
+            0.9991760059593913,
+            1.0007383275421202
+          ]
+        },
+        "output": {
+          "gain": 0.9996117217393765,
+          "ci95": [
+            0.9987186657428817,
+            1.0004880327691064
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0004454330873758,
+          "ci95": [
+            0.999678630193336,
+            1.0014583673478523
+          ]
+        },
+        "output": {
+          "gain": 1.0004856236548316,
+          "ci95": [
+            0.9990538823389317,
+            1.0009770060762921
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000587366004978,
+          "ci95": [
+            1.0001631281453145,
+            1.001121405386008
+          ]
+        },
+        "output": {
+          "gain": 1.000093813940718,
+          "ci95": [
+            0.9995596096836937,
+            1.000713966538294
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0000993767093178,
+          "ci95": [
+            0.999498438118703,
+            1.0006806847800753
+          ]
+        },
+        "output": {
+          "gain": 0.999512338954121,
+          "ci95": [
+            0.9986368713118574,
+            1.0004052185096768
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996602853062586,
+          "ci95": [
+            0.9987833155532828,
+            1.0004131069155855
+          ]
+        },
+        "output": {
+          "gain": 0.9996609309165156,
+          "ci95": [
+            0.9987605654231972,
+            1.0003596880000818
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000122404534054,
+          "ci95": [
+            0.9994374165534237,
+            1.0011442711269203
+          ]
+        },
+        "output": {
+          "gain": 1.0007205203653204,
+          "ci95": [
+            0.9996546687201309,
+            1.0014999477122792
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.999892870621029,
+          "ci95": [
+            0.9991322885707633,
+            1.0007464638281145
+          ]
+        },
+        "output": {
+          "gain": 0.9999803391305401,
+          "ci95": [
+            0.9987739395634451,
+            1.0006729595505073
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "amd64-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000308473651201,
+          "ci95": [
+            0.999394453690125,
+            1.0009538690274677
+          ]
+        },
+        "output": {
+          "gain": 0.9992613836947635,
+          "ci95": [
+            0.9984899853524465,
+            1.0002921077425009
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "amd64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0004701214854386,
+          "ci95": [
+            0.9991120737227761,
+            1.0010112018900297
+          ]
+        },
+        "output": {
+          "gain": 1.0002094478959545,
+          "ci95": [
+            0.9994531534815895,
+            1.0006092708644185
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0005496895615045,
+          "ci95": [
+            0.9977188354011186,
+            1.0028673440431668
+          ]
+        },
+        "output": {
+          "gain": 1.0003547015806438,
+          "ci95": [
+            0.9969112895456063,
+            1.0031200327181808
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9998762599783557,
+          "ci95": [
+            0.9985236120947012,
+            1.0012048391622241
+          ]
+        },
+        "output": {
+          "gain": 0.9999380460403156,
+          "ci95": [
+            0.9988015221903727,
+            1.0009117319817586
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0007091777273684,
+          "ci95": [
+            0.999301130613853,
+            1.0023374617478102
+          ]
+        },
+        "output": {
+          "gain": 1.1711879964625247,
+          "ci95": [
+            1.1698388568864615,
+            1.1721262107833557
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996572652625773,
+          "ci95": [
+            0.9988171192113029,
+            1.0008763589764789
+          ]
+        },
+        "output": {
+          "gain": 1.1689816633256531,
+          "ci95": [
+            1.1677803542478493,
+            1.1699644162697962
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9998713411221458,
+          "ci95": [
+            0.9984797750110908,
+            1.0026713302555255
+          ]
+        },
+        "output": {
+          "gain": 1.1191902931525015,
+          "ci95": [
+            1.1161349408526675,
+            1.120411001444716
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9992871938500256,
+          "ci95": [
+            0.9986829723950387,
+            1.0005103093797625
+          ]
+        },
+        "output": {
+          "gain": 1.1188295196939992,
+          "ci95": [
+            1.117622081848948,
+            1.1198046467653802
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000916265292263,
+          "ci95": [
+            0.9952639719098775,
+            1.0038301831857572
+          ]
+        },
+        "output": {
+          "gain": 1.001892448733296,
+          "ci95": [
+            0.9938238332014357,
+            1.00750536580788
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9997777131899641,
+          "ci95": [
+            0.9991607566485108,
+            1.000379983028152
+          ]
+        },
+        "output": {
+          "gain": 1.0000041539446594,
+          "ci95": [
+            0.9994556232166396,
+            1.000403091755319
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-sort",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0009069102117905,
+          "ci95": [
+            0.997171422829582,
+            1.004093308364542
+          ]
+        },
+        "output": {
+          "gain": 0.999833500062487,
+          "ci95": [
+            0.9972746611671119,
+            1.0027062448726414
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-sort",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9999849795261566,
+          "ci95": [
+            0.9989675251652622,
+            1.000449682652528
+          ]
+        },
+        "output": {
+          "gain": 0.9999378865321409,
+          "ci95": [
+            0.9992731097647014,
+            1.000590313681902
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9992641548288352,
+          "ci95": [
+            0.9930489312109625,
+            1.001487554409838
+          ]
+        },
+        "output": {
+          "gain": 1.000628965001472,
+          "ci95": [
+            0.9967042727897527,
+            1.0052951874661857
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000012640385586,
+          "ci95": [
+            0.9992352716256361,
+            1.000695525864791
+          ]
+        },
+        "output": {
+          "gain": 0.9999283680622666,
+          "ci95": [
+            0.9992877582400087,
+            1.0003997129331463
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9999133715041973,
+          "ci95": [
+            0.9994895466785563,
+            1.0006543037080615
+          ]
+        },
+        "output": {
+          "gain": 1.000119875861221,
+          "ci95": [
+            0.9996506393691282,
+            1.0005936253121832
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "same-file",
+      "comparisons": {
+        "aa": {
+          "gain": 0.998036610681716,
+          "ci95": [
+            0.9903550593592292,
+            1.0024833361647696
+          ]
+        },
+        "output": {
+          "gain": 0.998187338869758,
+          "ci95": [
+            0.9911930948163865,
+            1.0024015179965609
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9989038393382642,
+          "ci95": [
+            0.9969283056401325,
+            0.9999706879946401
+          ]
+        },
+        "output": {
+          "gain": 0.9999979425003761,
+          "ci95": [
+            0.9989357028488413,
+            1.0005653244321444
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.999909776368528,
+          "ci95": [
+            0.9994352949109114,
+            1.000265627766956
+          ]
+        },
+        "output": {
+          "gain": 1.0002908216397923,
+          "ci95": [
+            0.9996288705011092,
+            1.0006891515306944
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9992202637531804,
+          "ci95": [
+            0.9982817940726045,
+            1.0012643960221437
+          ]
+        },
+        "output": {
+          "gain": 1.1156604768797482,
+          "ci95": [
+            1.1151137570542202,
+            1.1161881229505912
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0004537717938913,
+          "ci95": [
+            0.9992804468716076,
+            1.0010847886558443
+          ]
+        },
+        "output": {
+          "gain": 1.1185846023834176,
+          "ci95": [
+            1.1173519442997906,
+            1.119250897244143
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0003404654766541,
+          "ci95": [
+            0.999326457413927,
+            1.000849726313879
+          ]
+        },
+        "output": {
+          "gain": 1.0979160037893085,
+          "ci95": [
+            1.0964411496945945,
+            1.098337649167919
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0004069958155921,
+          "ci95": [
+            0.9994955584537021,
+            1.0015959267843675
+          ]
+        },
+        "output": {
+          "gain": 1.1012653251390117,
+          "ci95": [
+            1.100618317251641,
+            1.1020735609614196
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0012768056402672,
+          "ci95": [
+            1.0001305166878944,
+            1.0028594270148175
+          ]
+        },
+        "output": {
+          "gain": 1.000760611087844,
+          "ci95": [
+            0.9994938572908154,
+            1.001740597115282
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0005131827812608,
+          "ci95": [
+            0.9994541461796531,
+            1.0009909283395977
+          ]
+        },
+        "output": {
+          "gain": 1.0002948980861635,
+          "ci95": [
+            0.9996064871019869,
+            1.0007621359053398
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9996127382672557,
+          "ci95": [
+            0.9991932753906898,
+            1.0002055111501424
+          ]
+        },
+        "output": {
+          "gain": 0.9993997621542998,
+          "ci95": [
+            0.9985138680346705,
+            0.999914838642812
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000564615945548,
+          "ci95": [
+            0.999300483224472,
+            1.001145870606076
+          ]
+        },
+        "output": {
+          "gain": 1.0004564224291004,
+          "ci95": [
+            0.9999957274999466,
+            1.00157594628154
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0003468800596034,
+          "ci95": [
+            0.9994559062385387,
+            1.0017706302959934
+          ]
+        },
+        "output": {
+          "gain": 0.9996085970182069,
+          "ci95": [
+            0.9987382666838113,
+            1.0004541800643088
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0002731190082952,
+          "ci95": [
+            0.9996565476166425,
+            1.0006195009171044
+          ]
+        },
+        "output": {
+          "gain": 0.9997814378678326,
+          "ci95": [
+            0.9992522785397211,
+            1.0001497424025967
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9994226127361793,
+          "ci95": [
+            0.9984755278846194,
+            1.0003252490327759
+          ]
+        },
+        "output": {
+          "gain": 1.0004001442039763,
+          "ci95": [
+            0.9990605743325732,
+            1.0013779106156924
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0000020021705627,
+          "ci95": [
+            0.9994774927947915,
+            1.000369048063327
+          ]
+        },
+        "output": {
+          "gain": 0.9997387096725967,
+          "ci95": [
+            0.9993832345710502,
+            1.0006822559374986
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9998903006795806,
+          "ci95": [
+            0.9989112595264792,
+            1.0004196687788798
+          ]
+        },
+        "output": {
+          "gain": 1.0000567125637594,
+          "ci95": [
+            0.9994153320737468,
+            1.0006118934251849
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9998112158766701,
+          "ci95": [
+            0.9987376329515727,
+            1.0003043125170104
+          ]
+        },
+        "output": {
+          "gain": 0.9999025387997945,
+          "ci95": [
+            0.9994639485065686,
+            1.0002926186934575
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000218626151388,
+          "ci95": [
+            0.9989770058822162,
+            1.0005802228380338
+          ]
+        },
+        "output": {
+          "gain": 1.0001781771803606,
+          "ci95": [
+            0.9991403607401774,
+            1.0009381663113006
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0000058185310277,
+          "ci95": [
+            0.99928336516225,
+            1.0007068274373112
+          ]
+        },
+        "output": {
+          "gain": 0.9997771336256691,
+          "ci95": [
+            0.9993327514305111,
+            1.000222801169544
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "amd64-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0007386549955486,
+          "ci95": [
+            0.9990366437678884,
+            1.0016183700598478
+          ]
+        },
+        "output": {
+          "gain": 0.9992344011741601,
+          "ci95": [
+            0.9977012704429002,
+            1.0017778987431791
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "amd64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0005713521255053,
+          "ci95": [
+            0.9995476815509028,
+            1.0009171494322509
+          ]
+        },
+        "output": {
+          "gain": 1.0003461615797185,
+          "ci95": [
+            0.9998734700419236,
+            1.0010726602817124
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9984549815029172,
+          "ci95": [
+            0.9962599017760312,
+            1.001940970245247
+          ]
+        },
+        "output": {
+          "gain": 1.0026614238037128,
+          "ci95": [
+            1.0004737011993443,
+            1.004949344570094
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0005403157841744,
+          "ci95": [
+            0.9992408755539623,
+            1.0011724464157543
+          ]
+        },
+        "output": {
+          "gain": 1.0001023563621696,
+          "ci95": [
+            0.9995423707536548,
+            1.0006537026825535
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0000195498339406,
+          "ci95": [
+            0.9989899212891579,
+            1.0017833840800348
+          ]
+        },
+        "output": {
+          "gain": 1.2119144669041675,
+          "ci95": [
+            1.210316740039711,
+            1.2132528347888227
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9997892548621932,
+          "ci95": [
+            0.9992453390407146,
+            1.0005001260648345
+          ]
+        },
+        "output": {
+          "gain": 1.2131253374571995,
+          "ci95": [
+            1.2125522087128022,
+            1.2136612863908445
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9991883781096638,
+          "ci95": [
+            0.9980849214518562,
+            1.0005637496657733
+          ]
+        },
+        "output": {
+          "gain": 1.1536710572360676,
+          "ci95": [
+            1.1510803754671233,
+            1.155569862031941
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44210245544",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.000429616855375,
+          "ci95": [
+            0.9998301336992831,
+            1.0011173680134247
+          ]
+        },
+        "output": {
+          "gain": 1.1534664199097202,
+          "ci95": [
+            1.1523466802493807,
+            1.1540609683686704
+          ]
+        }
+      }
+    }
+  ],
+  "losses": [],
+  "aa_outside_one_percent": [
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0145795564108604,
+          "ci95": [
+            1.0139752472315984,
+            1.0150239286802618
+          ]
+        },
+        "output": {
+          "gain": 1.0005713818691988,
+          "ci95": [
+            0.9997781414954937,
+            1.0016227451997273
+          ]
+        }
+      }
+    }
+  ],
+  "publication_qualified": false,
+  "scope": "Every predeclared row and original loss is retained; no outlier removal."
+}
