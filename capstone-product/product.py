@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Clang isolated canonical EVEX memory output; complete output and callback semantics retained'))
+write('scope',dict(active=feature_active,policy='Compact canonical Clang AArch64/MIPS alias lookup; complete output and callback semantics retained'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)

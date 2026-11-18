@@ -1,7 +1,7 @@
-name: Validate published Clang memory output with current NeverD MIPS integration and latest LLVM source
+name: Validate compact Clang alias lookup through current NeverD and latest LLVM source
 on:
   push:
-    branches: [codex/capstone-clang-memory-current-dev]
+    branches: [codex/capstone-small-alias-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: ca33d557398585a4d571be88bd0ec2ef34845089
+          ref: 64cc5df0cbe55cbc33a3a013c231382b49789bc5
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -55,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-clang-memory-current-dev-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-small-alias-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

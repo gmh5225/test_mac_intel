@@ -1,38 +1,59 @@
 {
-  "neverd": "ca33d557398585a4d571be88bd0ec2ef34845089",
-  "capstone": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "neverd": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
+  "capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
   "variants": {
-    "clang-memory-output": {
-      "source": "round1412-clang-memory-current-dev",
-      "patch": "clang-memory-output.patch",
-      "patch_sha256": "17b51fd087698dde8a645c52737271d7d4f060965d06dfa86bdf2b1d4dfea52c",
-      "tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "small-alias-output": {
+      "source": "round1417-clang-small-alias",
+      "patch": "small-alias-output.patch",
+      "patch_sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+      "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
       "changed": [
-        "X86VectorOutput.c.o"
+        "AArch64Mapping.c.o",
+        "MipsMapping.c.o"
       ],
       "added": [
-        "X86EvexMemoryOutput.c.o"
+        "AliasMapping.c.o"
       ]
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Repeat all 96 product observations on current NeverD dev after the MIPS historical-mode merge, using the exact published Capstone source tree and latest LLVM fork source. All original R1399 evidence remains unchanged.",
+  "scope": "Actual current NeverD dev with the published memory optimization and compact Clang alias parser: retain all 96 comparisons and all 15 real/targeted workloads, complete-state records, existing tests, and latest LLVM fork source with prebuilts disabled.",
   "qualification_pending": [
-    "Exact current dev integration and timing"
+    "native/mixed timing",
+    "portable builds",
+    "product validation"
   ],
   "validation_entry": {
-    "qualified_capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
-    "qualification": "/Users/gmh/code/NeverD/build-capstone-speed-20261022/round1399-clang-memory-product/qualification.json",
-    "original_product_run": {
-      "id": 44181762990,
-      "head_sha": "02b2a6e3c9b31b367e33a2a414c8e5c1f6da5151",
+    "source": {
+      "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+      "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+      "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+      "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+      "complete": true,
+      "publication_qualified": false,
+      "mapping_object_unchanged": true
+    },
+    "cost_run": {
+      "id": 44203984817,
+      "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
       "status": "completed",
       "conclusion": "success",
-      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44181762990",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
       "run_attempt": 1
-    }
+    },
+    "alternate_profiles": {
+      "id": 44206940403,
+      "head_sha": "eba0ba561972407d427b6e6bc9d902337ab98421",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44206940403",
+      "run_attempt": 1
+    },
+    "prior_failed_alias_evidence": "../round1410-alias-launch-factors/decision.json",
+    "publication_qualified": false
   },
   "timing_protocol": {
     "cycles": 32,
@@ -41,5 +62,5 @@
     "consumer_unchanged": true,
     "publication_qualified": false
   },
-  "public_state_scope": "Seeded complete-state product probe plus separate four-compiler 69140480 public records, 17825792 private records and 6427654 protected-page checks per compiler."
+  "public_state_scope": "Seeded complete-state product probe plus separate 56,623,104 public records on each of four compilers, 769,142 direct canonical alias decisions on each active Clang compiler, 301 alternate-profile tests and 168 adapter-priority cases."
 }

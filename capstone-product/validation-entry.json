@@ -1,59 +1,117 @@
 {
-  "previous_tested": "3e94887b6e9073601c96ff4bf1f033b1b25b0b83",
-  "current": "ca33d557398585a4d571be88bd0ec2ef34845089",
-  "changed_files": [
-    "docs/mips.md",
-    "docs/testing.md",
-    "include/neverd/ir/intrinsics/MIPS/MIPSHistoricalTiming.h",
-    "include/neverd/ir/intrinsics/MIPS/MIPSScalar.def",
-    "include/neverd/ir/intrinsics/MIPS/MIPSScalar.h",
-    "include/neverd/ir/low/MIPS/MIPSHistoricalSchedule.h",
-    "include/neverd/ir/low/MIPS/MIPSScalarFPExecution.h",
-    "include/neverd/ir/low/MIPS/MIPSSystemContext.h",
-    "include/neverd/lift/MIPS/MIPSLifter.h",
-    "lib/decode/Decoder.cpp",
-    "lib/ir/low/MIPS/NdOpEmulatorMIPS.cpp",
-    "lib/lift/MIPS/MIPSLifter.cpp",
-    "lib/loader/ELF/ELFMIPSProfile.cpp",
-    "unittests/lift/CMakeLists.txt",
-    "unittests/lift/mips/MIPSControlFlowTests.cpp",
-    "unittests/lift/mips/MIPSHistoricalScheduleTests.cpp",
-    "unittests/lift/mips/MIPSHistoricalTests.cpp",
-    "unittests/lift/mips/MIPSLoaderTests.cpp",
-    "unittests/lift/mips/MIPSPipelineTests.cpp"
-  ],
-  "reason": "MIPS historical ISA admission changed in the decoder and loader. Do not label the old product run an exact-head integration test.",
-  "source_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
-  "source_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
-  "unchanged_runtime_proof": {
-    "tested_source": {
-      "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
-      "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
-      "tree": "b3b21b7b2f16cca0a3633f679b521cbd6f29a3b1",
-      "sha256": "0fd44d99e6bca31335e1682754566912e8a3692e18478d6d55762a444c701f55",
-      "files": [
-        "CMakeLists.txt",
-        "Makefile",
-        "arch/X86/X86EvexMemoryOutput.c",
-        "arch/X86/X86GenEvexMemoryOutput.inc",
-        "arch/X86/X86SimpleOutput.h",
-        "arch/X86/X86VectorOutput.c",
-        "arch/X86/X86VectorRegisterWriter.h",
-        "suite/synctools/x86_vector_output.cpp",
-        "tests/unit/x86_simple_output.c",
-        "xcode/Capstone.xcodeproj/project.pbxproj"
-      ]
+  "inputs": {
+    "neverd": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
+    "capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "variants": {
+      "small-alias-output": {
+        "source": "round1417-clang-small-alias",
+        "patch": "small-alias-output.patch",
+        "patch_sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+        "changed": [
+          "AArch64Mapping.c.o",
+          "MipsMapping.c.o"
+        ],
+        "added": [
+          "AliasMapping.c.o"
+        ]
+      }
     },
-    "publication_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
-    "publication_patch_sha256": "17b51fd087698dde8a645c52737271d7d4f060965d06dfa86bdf2b1d4dfea52c",
-    "changed_from_tested_tree": [
-      "docs/ARCHITECTURE.md"
+    "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
+    "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
+    "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
+    "scope": "Actual current NeverD dev with the published memory optimization and compact Clang alias parser: retain all 96 comparisons and all 15 real/targeted workloads, complete-state records, existing tests, and latest LLVM fork source with prebuilts disabled.",
+    "qualification_pending": [
+      "native/mixed timing",
+      "portable builds",
+      "product validation"
     ],
-    "identical_other_tree_entries": 4208,
-    "runtime_and_build_sources_identical": true,
-    "publication_qualified": false
+    "validation_entry": {
+      "source": {
+        "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+        "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+        "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+        "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+        "complete": true,
+        "publication_qualified": false,
+        "mapping_object_unchanged": true
+      },
+      "cost_run": {
+        "id": 44203984817,
+        "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+        "run_attempt": 1
+      },
+      "alternate_profiles": {
+        "id": 44206940403,
+        "head_sha": "eba0ba561972407d427b6e6bc9d902337ab98421",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44206940403",
+        "run_attempt": 1
+      },
+      "prior_failed_alias_evidence": "../round1410-alias-launch-factors/decision.json",
+      "publication_qualified": false
+    },
+    "timing_protocol": {
+      "cycles": 32,
+      "calibration_cpu_ms": 100,
+      "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
+      "consumer_unchanged": true,
+      "publication_qualified": false
+    },
+    "public_state_scope": "Seeded complete-state product probe plus separate 56,623,104 public records on each of four compilers, 769,142 direct canonical alias decisions on each active Clang compiler, 301 alternate-profile tests and 168 adapter-priority cases."
   },
-  "checks": "The same frozen product consumers, 34 tests per variant, seeded complete states, real PE/ELF/AVX32 inputs and all 96 balanced timing observations.",
-  "llvm": "Latest NeverSight main from source; prebuilt OFF; each variant must use identical managed dependency inputs.",
-  "publication_qualified": false
+  "native_run": {
+    "id": 44205691011,
+    "head_sha": "ef6ab0227f5b9cfd45553a60ff313d49687dfec7",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44205691011",
+    "run_attempt": 1
+  },
+  "mixed_run": {
+    "id": 44205770136,
+    "head_sha": "7ba34a9c0747e65076cdbdc2d673a9cf8ceab8d9",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44205770136",
+    "run_attempt": 1
+  },
+  "native_aa": [],
+  "mixed_aa": [],
+  "original_losses_preserved": true,
+  "unresolved_original_loss": {
+    "host": "alias-call-shape-images-four-ubuntu-24.04-clang-44205770136",
+    "case": "arm-cp",
+    "panel": null,
+    "mode": 0,
+    "launch": "images",
+    "aa": 0.9902629799099877,
+    "aa_ci95": [
+      0.9740686653828028,
+      1.0022569465121542
+    ],
+    "variant": "output",
+    "gain": 0.9861372976953441,
+    "ci95": [
+      0.9778193786044265,
+      1.0022328332606363
+    ],
+    "vs_iced": null,
+    "vs_fast": null
+  },
+  "consumer_identity": {
+    "probe.cpp": "347004b8491c4208b0b98bf0934d0f991a623f690ab852bbb835b281ff51f2b4",
+    "original-probe.cpp": "8a8afad3c41436639529c775637b8368ee1d903534ced56ee4a02f1dc93fba5b",
+    "route.cpp": "f3c90fd575ce3dbf18e73c21e90a28ea90bfacd7235968207f3011935ced0a5c",
+    "corpus.py": "6b40cc4dee65b80b46ba16a75009fd528d00ee2c2518987022a2178f4062d4fb",
+    "avx_corpus.py": "ee448a013e8af05ee794ae469c2cab7fd98e33d7921cf33c0a19816fff40895b",
+    "jpeg_archive.py": "df177cf8f99b225ad5b61d768e82354d58cca20dd6c7cda1877171767e654f06"
+  },
+  "publication_qualified": false,
+  "scope": "Independent actual-product evidence while the sole ARM raw image-launch observation is repeated. Its interval includes parity and its fixed-file counterpart is stable, but the original loss is unresolved and blocks publication. This run cannot erase that observation."
 }
