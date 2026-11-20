@@ -70,6 +70,45 @@ def replay(package, root, suite, capabilities):
     return {"tests": results, "host_sha256": suite["host_sha256"]}
 
 
+def compare_prebuilt(package, root, suite, comparison):
+    host = extract(package, root, suite["host"], suite["host_sha256"])
+    host.chmod(0o700)
+    xml = out / comparison["xml"]
+    log = out / comparison["log"]
+    with log.open("w") as stream:
+        run = subprocess.run(command("test", host=host, filter=comparison["filter"], xml=xml),
+                             stdout=stream, stderr=subprocess.STDOUT,
+                             env={**os.environ, **suite["run_env"]})
+    cases = list(ET.parse(xml).iter("testcase"))
+    errors = []
+    failed = []
+    skipped = []
+    diagnosed = []
+    transcript = log.read_text()
+    for case in cases:
+        name = case.get("classname") + "." + case.get("name")
+        if case.find("failure") is not None:
+            failed.append(name)
+            start = comparison["start"].format(name)
+            end = comparison["end"].format(name)
+            section = transcript.partition(start)[2].partition(end)[0]
+            if comparison["diagnostic"] in section:
+                diagnosed.append(name)
+        elif case.find("skipped") is not None:
+            skipped.append(name)
+        elif case.get("result") != "completed" or case.find("error") is not None:
+            errors.append(name)
+    summary = {"discovered": len(cases), "gtest_exit_code": run.returncode,
+               "passed": len(cases) - len(failed) - len(skipped) - len(errors),
+               "failed_tests": sorted(failed), "skipped": skipped, "errors": errors,
+               "implicit_cfi_diagnostic": sorted(diagnosed)}
+    (out / comparison["summary"]).write_text(json.dumps(summary, indent=2))
+    if (len(cases) != comparison["count"] or errors or skipped or run.returncode != 1 or
+            sorted(failed) != comparison["expected_failures"] or sorted(diagnosed) != sorted(failed)):
+        raise ValueError(runtime["errors"]["prebuilt"])
+    return summary
+
+
 def replay_cli_images(package, root, suite):
     source = extract(package, root, suite["source"], suite["source_sha256"])
     driver = root / suite["driver"]
@@ -130,6 +169,8 @@ def main():
             if (capabilities["status"] != runtime["passed"] or
                     capabilities["source_revision"] != policy["revision"]):
                 raise ValueError(runtime["errors"]["baseline"])
+            if "prebuilt_comparison" in policy:
+                report["r6_unfiltered"] = compare_prebuilt(package, root, policy, policy["prebuilt_comparison"])
             report.update(replay(package, root, policy, capabilities))
             report["published_cli_images"] = replay_cli_images(package, root, policy["published_cli_images"])
             if "installation" in policy:
