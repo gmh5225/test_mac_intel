@@ -1,7 +1,7 @@
-name: Validate constraint bounds and public iterator output across build profiles
+name: Isolate MSVC pass-two memory use in the legacy x86 decoder
 on:
   push:
-    branches: [codex/capstone-public-iterator-profiles]
+    branches: [codex/capstone-msvc-terminal-memory]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -11,10 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2025, cc: MD, profile: normal, archs: four, forms: combined }
+          - { host: windows-2025, cc: MD, profile: normal, archs: four, forms: combined, variant: original }
+          - { host: windows-2025, cc: MD, profile: normal, archs: four, forms: combined, variant: readers }
+          - { host: windows-2025, cc: MD, profile: normal, archs: four, forms: combined, variant: terminal }
+          - { host: windows-2022, cc: MD, profile: normal, archs: four, forms: combined, variant: profiles }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
+      VARIANT: ${{ matrix.variant }}
       TOOLCHAIN: ${{ matrix.cc }}
       FORMS: ${{ matrix.forms }}
       PROFILE: ${{ matrix.profile }}
@@ -35,10 +39,13 @@ jobs:
           arch: x64
       - run: Get-CimInstance Win32_OperatingSystem | Select TotalVisibleMemorySize,FreePhysicalMemory,TotalVirtualMemorySize,FreeVirtualMemory | Format-List
         shell: pwsh
-      - run: python capstone-output-release/verify.py
+      - if: matrix.variant == 'profiles'
+        run: python capstone-output-release/verify.py
+      - if: matrix.variant != 'profiles'
+        run: python capstone-output-release/measure.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-iterator-profiles-${{ matrix.host }}-${{ matrix.archs }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: msvc-legacy-${{ matrix.host }}-${{ matrix.variant }}
           path: evidence/
           retention-days: 14
