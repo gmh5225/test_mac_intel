@@ -1,7 +1,7 @@
-name: Time packed 32-bit VEX2 after adapter handling against actual forked iced
+name: Keep 64-bit EVEX off the i386 VEX2 fallback and measure both real SIMD paths
 on:
   push:
-    branches: [codex/capstone-vex32-packed-cold]
+    branches: [codex/capstone-late-vex32-only]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -32,6 +32,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          if [ "$(uname -m)" = x86_64 ]; then sudo apt-get -qq update && sudo apt-get -y install valgrind; fi
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/prepare_baseline.py
@@ -41,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-vex32-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: late-vex32-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
