@@ -54,7 +54,7 @@ def main():
             exe = work/(label+'-'+name+'.exe')
             args = [work/(name+'.obj'),libs[0]]
             if name=='compare':
-                args.extend([work/'cargo-target/release/iced_compare.lib','advapi32.lib','bcrypt.lib','ntdll.lib','userenv.lib','ws2_32.lib'])
+                args.extend([work/'cargo-target/release/iced_compare.lib','advapi32.lib','bcrypt.lib','ntdll.lib','userenv.lib','ws2_32.lib','synchronization.lib'])
             tool.run(['link','/nologo','/incremental:no','/fixed','/dynamicbase:no','/out:'+str(exe),*args], 'link-'+label+'-'+name)
             programs[label][name] = exe
         git(current,'reset','--hard',manifest['capstone'])
