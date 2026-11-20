@@ -1,7 +1,7 @@
-name: Compare public fallback and VEX32 output through real NeverD decoder APIs
+name: Verify the MIPS decoder and x86 public iterator in actual NeverD
 on:
   push:
-    branches: [codex/capstone-public-vex32-product]
+    branches: [codex/capstone-mips-and-vex32-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 98686dd0b7951afce98ca578bc1a032e838aeded
+          ref: 96ee3e5ff426b5ea75e98bab57a37cdcb394fe5a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,10 +44,10 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          git update-index --cacheinfo 160000,78f02050072f4a3778d1339374ec1c31f9b42c1a,third_party/capstone
-          test "$(git write-tree)" = "4053c81547ac7db12a423c40fecc8436160a4e3e"
-          test "$(git hash-object -t commit -w "$GITHUB_WORKSPACE/capstone-product/dev-commit.txt")" = "befe548ba0e18665b08b297c903421eb5f70b03a"
-          git checkout --detach befe548ba0e18665b08b297c903421eb5f70b03a
+          git update-index --cacheinfo 160000,a9d153f4cae6c71eb02309621bbce3c9508312dc,third_party/capstone
+          test "$(git write-tree)" = "10954f7a0edeeef0577760dd80eb020bce7198fa"
+          test "$(git hash-object -t commit -w "$GITHUB_WORKSPACE/capstone-product/dev-commit.txt")" = "658c4f69ddd62ffd6352efacf44b472e26a2da2b"
+          git checkout --detach 658c4f69ddd62ffd6352efacf44b472e26a2da2b
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -60,6 +60,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-vex32-product-${{ matrix.os }}-${{ matrix.cc }}
+          name: mips-vex32-product-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

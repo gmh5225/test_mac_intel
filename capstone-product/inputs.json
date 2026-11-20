@@ -1,30 +1,29 @@
 {
-  "neverd": "befe548ba0e18665b08b297c903421eb5f70b03a",
-  "capstone": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
+  "neverd": "658c4f69ddd62ffd6352efacf44b472e26a2da2b",
+  "capstone": "a9d153f4cae6c71eb02309621bbce3c9508312dc",
   "variants": {
-    "route": {
-      "source": "round1508-public-x86-output-fallback",
-      "patch": "route.patch",
-      "tree": "1f34765d4f543f25799dd0143bf25f5ef20f4e3d",
-      "patch_sha256": "a6d3862ace9b1a27943b9c03dd53fa9255efa9612bc074d0715bc752747907d3",
+    "mips": {
+      "source": "round1519-mips-standard-mode-entry",
+      "patch": "mips.patch",
+      "tree": "f7d0164674595fe10b68d7c9e9cd9678b74e2036",
+      "patch_sha256": "f38b9760cf23a553613064b11f4fbb461a2da1d2601f0eabc745453548572a95",
+      "added": [],
       "changed": [
-        "X86DisassemblerDecoder.c.o",
-        "X86OutputIterator.c.o"
-      ],
-      "added": []
+        "MipsDisassembler.c.o"
+      ]
     },
     "vector": {
-      "source": "round1510-public-vex32-output",
+      "source": "round1521-fork-vex32-public-output",
       "patch": "vector.patch",
-      "tree": "5d109c0305972d8cdcbee3b2aa9cc4af0630e7c0",
-      "patch_sha256": "c0f53586b959e6c56eea6100ca8fa26e6799dfd0fab8dacd19762e13af62f2db",
+      "tree": "7d19865d638ba8e7487712ca4aed98b8c66ec097",
+      "patch_sha256": "944f7014cd6095e7ac78190f12ac61147c63eb3d3145989dcd6e4723fa6f3346",
+      "added": [
+        "X86Vex32Output.c.o"
+      ],
       "changed": [
         "X86DisassemblerDecoder.c.o",
         "X86OutputIterator.c.o",
         "X86VectorOutput.c.o"
-      ],
-      "added": [
-        "X86Vex32Output.c.o"
       ]
     }
   },
@@ -33,5 +32,6 @@
     "cycles": 9,
     "calibration_cpu_ms": 45
   },
-  "scope": "Measure the real NeverD decoder with the public x86 fallback alone and with 32-bit VEX output. Prove exact public states and workload equivalence on the same live fork LLVM build."
+  "scope": "Qualify the MIPS standard mode and nanoMIPS fix, and independently the x86 public writer plus VEX32 fallback, through the actual product and source-linked ISA tests.",
+  "parent": "96ee3e5ff426b5ea75e98bab57a37cdcb394fe5a"
 }
