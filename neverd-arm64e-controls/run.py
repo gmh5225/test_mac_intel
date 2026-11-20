@@ -11,13 +11,14 @@ out.mkdir()
 
 def data_in_code(path):
     data = path.read_bytes()
-    pos = 32
-    for _ in range(struct.unpack_from("<I", data, 16)[0]):
-        cmd, size = struct.unpack_from("<II", data, pos)
-        if cmd == 0x29:
-            offset, length = struct.unpack_from("<II", data, pos + 8)
+    layout = policy["layout"]
+    pos = layout["mach_header_64"]
+    for _ in range(struct.unpack_from(layout["count"], data, layout["ncmds"])[0]):
+        cmd, size = struct.unpack_from(layout["command"], data, pos)
+        if cmd == layout["data_in_code"]:
+            offset, length = struct.unpack_from(layout["command"], data, pos + layout["linkedit_data_fields"])
             return [[width, kind] for _, width, kind in
-                    struct.iter_unpack("<IHH", data[offset:offset + length])]
+                    struct.iter_unpack(layout["entry"], data[offset:offset + length])]
         pos += size
     return []
 
@@ -27,11 +28,11 @@ with tempfile.TemporaryDirectory() as scratch:
     assembly.write_text(policy["assembly"])
     oracle.write_text(policy["oracle"])
     runner = root / policy["driver"]
-    subprocess.run([*policy["caller"], oracle, "-o", runner], check=True)
+    subprocess.run([*policy["caller"], oracle, policy["output_option"], runner], check=True)
     reports = {}
     for name, flags in policy["variants"].items():
         image = out / (name + policy["image_suffix"])
-        subprocess.run([*policy["compile"], *flags, assembly, "-o", image], check=True)
+        subprocess.run([*policy["compile"], *flags, assembly, policy["output_option"], image], check=True)
         subprocess.run([*policy["signature"], image], check=True)
         subprocess.run([*policy["verify"], image], check=True)
         records = data_in_code(image)
