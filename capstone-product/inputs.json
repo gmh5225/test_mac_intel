@@ -1,16 +1,31 @@
 {
-  "neverd": "3426cf375f1471eecd478c27000a6a16cd7a9420",
-  "capstone": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+  "neverd": "befe548ba0e18665b08b297c903421eb5f70b03a",
+  "capstone": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
   "variants": {
-    "bounds": {
-      "source": "round1501-constraint-read-boundary",
-      "patch": "bounds.patch",
-      "patch_sha256": "a840a40b75b06290d7f4a5aecb2447087cc0ff6340fdb097eed3f514c57b9871",
-      "tree": "75622f50ba8ea4e5f5bb1bee69150c7a07f44710",
+    "route": {
+      "source": "round1508-public-x86-output-fallback",
+      "patch": "route.patch",
+      "tree": "1f34765d4f543f25799dd0143bf25f5ef20f4e3d",
+      "patch_sha256": "a6d3862ace9b1a27943b9c03dd53fa9255efa9612bc074d0715bc752747907d3",
       "changed": [
-        "MCInstrDesc.c.o"
+        "X86DisassemblerDecoder.c.o",
+        "X86OutputIterator.c.o"
       ],
       "added": []
+    },
+    "vector": {
+      "source": "round1510-public-vex32-output",
+      "patch": "vector.patch",
+      "tree": "5d109c0305972d8cdcbee3b2aa9cc4af0630e7c0",
+      "patch_sha256": "c0f53586b959e6c56eea6100ca8fa26e6799dfd0fab8dacd19762e13af62f2db",
+      "changed": [
+        "X86DisassemblerDecoder.c.o",
+        "X86OutputIterator.c.o",
+        "X86VectorOutput.c.o"
+      ],
+      "added": [
+        "X86Vex32Output.c.o"
+      ]
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -18,5 +33,5 @@
     "cycles": 9,
     "calibration_cpu_ms": 45
   },
-  "scope": "Validate the operand descriptor bounds fix through actual NeverD Decoder APIs, using 15 frozen workloads, complete public record comparison, actual decoder/lifter tests and paired timings. An optimizing compiler may already emit identical valid-path code."
+  "scope": "Measure the real NeverD decoder with the public x86 fallback alone and with 32-bit VEX output. Prove exact public states and workload equivalence on the same live fork LLVM build."
 }

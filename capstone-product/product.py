@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Check operand descriptor bounds before reading the table'))
+write('scope',dict(active=feature_active,policy='Shared public x86 output plus the canonical 32-bit VEX register and memory writers'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -140,7 +140,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert {Path(k).name for k in new_files}==set(variants[label]['added']),new_files
-    assert {Path(k).name for k in changed}<=set(variants[label]['changed']),changed
+    assert {'X86DisassemblerDecoder.c.o','X86OutputIterator.c.o'}<={Path(k).name for k in changed}<=set(variants[label]['changed']),changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
