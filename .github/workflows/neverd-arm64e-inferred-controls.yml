@@ -1,0 +1,28 @@
+name: NeverD original fragmented arm64e jump tables
+on:
+  push:
+    branches: [codex/neverd-arm64e-bounded-tables-20261120]
+    paths: [neverd-arm64e-controls/**, .github/workflows/neverd-arm64e-inferred-controls.yml]
+permissions:
+  contents: read
+jobs:
+  original:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: neverd-arm64e-controls
+      - run: python3 neverd-arm64e-controls/run.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: original-${{ matrix.runner }}
+          path: native-originals/
+          retention-days: 3
+          if-no-files-found: error
