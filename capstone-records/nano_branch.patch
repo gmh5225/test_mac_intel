@@ -1,0 +1,141 @@
+diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
+index d57235c9..8e660f77 100644
+--- a/arch/Mips/MipsDisassembler.c
++++ b/arch/Mips/MipsDisassembler.c
+@@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
+ 	case Mips_FeatureNanoMips:
+ 		return mode & (CS_MODE_NANOMIPS | CS_MODE_NMS1 | CS_MODE_I7200);
+ 	case Mips_FeatureNMS1:
+-		return mode & CS_MODE_NMS1;
++		return (mode & CS_MODE_NMS1) == CS_MODE_NMS1;
+ 	case Mips_FeatureTLB:
+ 		return mode & CS_MODE_I7200;
+ 	case Mips_FeatureCnMips:
+@@ -3483,6 +3483,8 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
+ 					   uint64_t Address,
+ 					   const void *Decoder)
+ {
++	if (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNMS1))
++		return MCDisassembler_Fail;
+ 	unsigned Rt = fieldFromInstruction_4(Insn, 7, 3);
+ 	unsigned Rs = fieldFromInstruction_4(Insn, 4, 3);
+ 	unsigned Offset = fieldFromInstruction_4(Insn, 0, 4) << 1;
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
+index c94daecb..406d1816 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
++++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
+@@ -1592,7 +1592,7 @@
+     },
+     "DecodeBranchConflictNM": {
+       "apply_type": "OLD",
+-      "old_hash": "4dcfebb897eb2f7e4f98bc962f070a385628c212d2439d6a24cab1f65060907d",
++      "old_hash": "2985bd9cc72a165f2d88089a10cb80e319dc09d014200a74f8838e2b41f776ab",
+       "new_hash": "3ae97ba3f294fcb6fdf7ed3e0c0903a5bdf497f67b74de385a17d60cee6209bd",
+       "edit": ""
+     },
+@@ -2102,7 +2102,7 @@
+     },
+     "Mips_getFeatureBits": {
+       "apply_type": "OLD",
+-      "old_hash": "2b6439bb0b486d29ff80b9d798e14de27cb3e9ef8d5c76c90c2535f1a82dfa0f",
++      "old_hash": "5081d3616c4afa88fb11549dd2acbbf9d1a1e2627ff7e215380d7bb27499de16",
+       "new_hash": "",
+       "edit": ""
+     },
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 92212e8d..03eaeec6 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -27,7 +27,7 @@ if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
+         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/sparc_state_register_names.py" --check)
+ endif()
+ if(CAPSTONE_MIPS_SUPPORT)
+-    list(APPEND UNIT_TEST_SOURCES mips_scan.c mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
++    list(APPEND UNIT_TEST_SOURCES mips_scan.c mips_nanomips_branch.c mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+ endif()
+ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+    OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_TRICORE_SUPPORT
+diff --git a/tests/unit/mips_nanomips_branch.c b/tests/unit/mips_nanomips_branch.c
+new file mode 100644
+index 00000000..ccbbb254
+--- /dev/null
++++ b/tests/unit/mips_nanomips_branch.c
+@@ -0,0 +1,78 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <stdio.h>
++#include <capstone/capstone.h>
++
++/* The 110110 pool encodes JRC/JALRC when u == 0, and BEQC/BNEC
++ * otherwise (nanoMIPS32 ISA, BEQC[16] and BNEC[16]). */
++static int check_pool(cs_mode mode, bool nms, bool big_endian, bool text,
++		      bool detail)
++{
++	csh handle;
++	if (cs_open(CS_ARCH_MIPS, mode, &handle) != CS_ERR_OK)
++		return 1;
++	cs_option(handle, CS_OPT_TEXT, text ? CS_OPT_ON : CS_OPT_OFF);
++	cs_option(handle, CS_OPT_DETAIL, detail ? CS_OPT_ON : CS_OPT_OFF);
++	cs_insn *insn = cs_malloc(handle);
++	if (!insn) {
++		cs_close(&handle);
++		return 1;
++	}
++
++	int failures = 0;
++	for (unsigned bits = 0; bits < 1024; ++bits) {
++		const unsigned word = 0xd800 | bits;
++		uint8_t bytes[2];
++		bytes[big_endian ? 0 : 1] = (uint8_t)(word >> 8);
++		bytes[big_endian ? 1 : 0] = (uint8_t)word;
++		const uint8_t *cursor = bytes;
++		size_t left = sizeof(bytes);
++		uint64_t ip = 0x1000;
++		const bool decoded =
++			cs_disasm_iter(handle, &cursor, &left, &ip, insn);
++		const unsigned offset = bits & 15;
++		const unsigned rs = (bits >> 4) & 7, rt = (bits >> 7) & 7;
++		const bool expected = !offset || !nms;
++		const unsigned id =
++			offset ? (rs < rt ? MIPS_INS_BEQC : MIPS_INS_BNEC) :
++				 (rs & 1 ? MIPS_INS_JALRC : MIPS_INS_JRC);
++		if (decoded != expected || left != (expected ? 0u : 2u) ||
++		    cursor != bytes + (expected ? 2 : 0) ||
++		    ip != (expected ? 0x1002u : 0x1000u) ||
++		    (decoded && (insn->size != 2 || insn->id != id))) {
++			if (!failures)
++				fprintf(stderr,
++					"nanoMIPS mode %x, word %04x, expected %s id %u, got %s id %u\n",
++					(unsigned)mode, word,
++					expected ? "decoded" : "invalid", id,
++					decoded ? "decoded" : "invalid",
++					decoded ? insn->id : 0);
++			++failures;
++		}
++	}
++	cs_free(insn, 1);
++	cs_close(&handle);
++	return failures;
++}
++
++int main(void)
++{
++	const cs_mode modes[] = { CS_MODE_NANOMIPS, CS_MODE_NMS1,
++				  CS_MODE_I7200 };
++	int failures = 0;
++	for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i) {
++		for (unsigned flags = 0; flags < 8; ++flags) {
++			const bool big = (flags & 1) != 0;
++			cs_mode mode =
++				(cs_mode)(modes[i] |
++					  (big ? CS_MODE_BIG_ENDIAN : 0));
++			failures += check_pool(mode, modes[i] == CS_MODE_NMS1,
++					       big, (flags & 2) != 0,
++					       (flags & 4) != 0);
++		}
++	}
++	printf("%d mismatches in 24576 nanoMIPS compact-branch observations\n",
++	       failures);
++	return failures != 0;
++}

@@ -1,7 +1,7 @@
-name: Compare MIPS feature mask lookup on the same six-architecture builds
+name: Check nanoMIPS compact conditional branches against Config5.NMS
 on:
   push:
-    branches: [codex/capstone-mips-feature-mode-masks]
+    branches: [codex/capstone-nanomips-nms1-compact-branch]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-mode-masks-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: nanomips-nms1-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

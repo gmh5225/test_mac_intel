@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV','PPC')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
-        for label,patch in [('base','bounds'),('candidate','mips_masks')]:
+        for label,patch in [('base','bounds'),('candidate','nano_branch')]:
             path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
             git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
         assert changed==['arch/Mips/MipsDisassembler.c.o'],changed
-        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan']
+        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','mips_nanomips_branch']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_writeback_postprocess_(newlines|generator)$'],'generator-tests')
@@ -64,8 +64,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         for arch in ('aarch64','ppc'):run([t/(arch+'-states'),libs['base'],libs['candidate']],'full-'+arch)
         for args in [[],['custom']]:
             run([t/'riscv-states',libs['base'],libs['candidate'],t/'corpus',*args],'full-riscv'+('' if not args else '-custom'))
-        run([cc,'-O2',*common,r/'verify-modes.c','-o',t/'modes'],'modes-build')
-        run([t/'modes'],'modes')
+        unit=next(f for f in b.rglob('mips_nanomips_branch') if f.is_file())
+        run([unit],'compact-pool')
+        diet=t/'diet'
+        run(['cmake','-S',s,'-B',diet,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_DIET=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'diet-configure')
+        run(['cmake','--build',diet,'--parallel','3','--target','mips_nanomips_branch'],'diet-build')
+        run([next(f for f in diet.rglob('mips_nanomips_branch') if f.is_file())],'diet-compact-pool')
         run(['clang++','-O2',*common,r/'verify-mips.cpp','-ldl','-o',t/'mips-states'],'mips-build')
         run([t/'mips-states',libs['base'],libs['candidate']],'full-mips')
         if platform.machine()=='x86_64':
@@ -124,6 +128,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
                         pairs.append(ticks)
                     rows.append(dict(case=c['name'],route=route,mode=m,repeats=n,reference=reference,cycles=pairs))
                     write('timings',rows)
-        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['mips_masks']['tree']))
+        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['nano_branch']['tree']))
     finally:
         n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
