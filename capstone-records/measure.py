@@ -39,8 +39,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
         for label,patch in [('base','bounds'),('candidate','iterator')]:
-            path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
-            git('apply','--index',str(path))
+            if label!='base':
+                path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
+                git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
             run(['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static'],'build-'+label)
             libs[label]=t/(label+'.so');shutil.copy2(b/'libcapstone.so',libs[label])
@@ -62,7 +63,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
         assert regenerated==(s/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
         if platform.machine()=='x86_64':
             metrics=[]
-            for c in [c for c in cases if c['name'] in ('libzstd1-amd64','libssl3t64-i386')]:
+            for c in [c for c in cases if c['name'] in ('putty-32-0.85','putty-64-0.85')]:
                 for label,exe in binaries.items():
                     trace=t/'callgrind'
                     run(['env','CAPSTONE_PUBLIC_ONLY=0','valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),exe,c['selector'],2,c['path'],1],'cost-'+c['name']+'-'+label)
@@ -76,13 +77,18 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                                 if name is not None:names[idx]=name
                                 atom=names[idx]
                             if tag=='cfn':callee=atom
-                        elif line.startswith('calls=') and callee and callee.startswith(('cs_decode_full_insn','X86_trySimpleOutput','X86_writeByteExtensionOutput','X86_getInstruction','X86_Intel_printInst')):
+                        elif line.startswith('calls=') and callee and callee.startswith(('cs_decode_full_insn','X86_trySimpleOutput','X86_writeMemoryOutput','X86_getInstruction','X86_Intel_printInst')):
                             calls[callee]=calls.get(callee,0)+int(line[6:].split()[0])
                         elif line.startswith('summary:'):
                             calls['guest_instructions']=int(line.split()[1])
-                    assert calls['guest_instructions'] and (any(k.startswith('X86_writeByteExtensionOutput') for k in calls) == (label=='candidate'))
+                    assert calls['guest_instructions']
                     metrics.append(dict(case=c['name'],label=label,calls=calls));trace.unlink()
-            write('byte-extension-costs',metrics)
+            write('indirect-call-costs',metrics)
+            for case in ('putty-32-0.85','putty-64-0.85'):
+                calls={v['label']:v['calls'] for v in metrics if v['case']==case}
+                def count(label,prefix):
+                    return sum(v for k,v in calls[label].items() if k.startswith(prefix))
+                assert count('base','X86_getInstruction')>count('candidate','X86_getInstruction'),calls
         for c in cases:
             if c['selector']>=16:
                 run([t/'states',libs['base'],libs['candidate'],c['path'],c['selector']],'records-'+c['name'])
