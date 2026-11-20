@@ -1,7 +1,7 @@
-name: Compare the isolated 32-bit VEX fallback with a pass-through placement control
+name: Measure the canonical VEX2 scan inside the existing generic reader against earlier admission
 on:
   push:
-    branches: [codex/capstone-vex32-generic-call-target]
+    branches: [codex/capstone-vex32-inner-reader]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-generic-target-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex32-inner-reader-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
