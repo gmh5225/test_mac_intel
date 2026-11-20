@@ -1,7 +1,7 @@
-name: Keep 64-bit EVEX off the i386 VEX2 fallback and measure both real SIMD paths
+name: Measure i386 packed scan inside the existing VEX prefix decision
 on:
   push:
-    branches: [codex/capstone-late-vex32-only]
+    branches: [codex/capstone-existing-vex-prefix]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-vex32-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: prefix-vex32-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

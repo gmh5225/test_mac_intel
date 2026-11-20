@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public writer plus packed VEX2 on the shared post-adapter fallback',vector='Same packed reader on the late miss, after EVEX and 64-bit VEX dispatch',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public writer plus packed VEX2 on every late miss',vector='Same packed reader only on the C5 branch of the existing late VEX dispatch',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -145,7 +145,7 @@ def main(w):
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
-            if platform.machine()=='x86_64' and name in ('libssl3t64-amd64','jpeg-avx2-i386'):
+            if platform.machine()=='x86_64' and name in ('libssl3t64-amd64','jpeg-avx2-i386','putty-32-0.85','putty-64-0.85'):
                 import re
                 ir={}
                 for label in ('integer','route','vector'):
@@ -164,7 +164,7 @@ def main(w):
                                 if value is not None:names[ident]=value
                                 atom=names[ident]
                             if tag=='cfn':callee=atom
-                        elif line.startswith('calls=') and callee and callee.startswith(('decodeRemainingScan','decodeScanResult','decodeGenericScan','X86_readVex32PublicPlan','decodeEvexRegisterScan')):
+                        elif line.startswith('calls=') and callee and callee.startswith(('decodeVex32ScanResult','decodeRemainingScan','decodeScanResult','decodeGenericScan','X86_readVex32PublicPlan','decodeEvexRegisterScan')):
                             edges[callee]=edges.get(callee,0)+int(line[6:].split()[0])
                     ir[label]=dict(total_ir=total,calls=edges,records=record[2:]);trace.unlink()
                 assert ir['integer']['records']==ir['vector']['records']==ir['route']['records']

@@ -59,7 +59,7 @@ index ae1554b0..eefb4855 100644
  
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..bd88632b 100644
+index 12428fff..7e616b7c 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -70,13 +70,12 @@ index 12428fff..bd88632b 100644
  #include "X86InstPrinterCommon.h"
  
  #if defined(_MSC_VER)
-@@ -3394,6 +3395,46 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+@@ -3394,6 +3395,44 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
  				       tryExtension);
  }
  
 +#if X86_HAS_VEX2_PUBLIC_PLANS
-+/* Reached after the scalar tables, prefixed instructions, extensions and
-+ * 64-bit VEX have selected their own paths. */
++/* The existing VEX prefix dispatch supplies the bare C5 lead. */
 +#if defined(_MSC_VER)
 +__declspec(noinline)
 +#elif defined(__ELF__) && defined(__GNUC__)
@@ -87,13 +86,12 @@ index 12428fff..bd88632b 100644
 +__attribute__((noinline))
 +#endif
 +static CS_PRESERVE_MOST bool
-+decodeRemainingScan(csh ud, const uint8_t *code, size_t code_len,
++decodeVex32ScanResult(csh ud, const uint8_t *code, size_t code_len,
 +			     cs_insn *insn, X86ScanResult *result,
 +			     uint8_t opcode)
 +{
 +	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
-+	if (handle->mode == CS_MODE_32 && code_len >= 2 &&
-+	    code[0] == 0xc5 && code[1] >= 0xc0
++	if (handle->mode == CS_MODE_32 && code_len >= 2 && code[1] >= 0xc0
 +#ifdef CAPSTONE_X86_SCAN_ADAPTER
 +	    && !handle->x86_scan_adapter
 +#endif
@@ -117,20 +115,29 @@ index 12428fff..bd88632b 100644
  X86_DECODE_INLINE bool completeTerminalScanResult(X86ScanResult *result,
  						  unsigned instructionID,
  						  int status)
-@@ -3721,8 +3762,12 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3717,10 +3756,21 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	if (opcodeOffset && opcodeOffset != SIZE_MAX)
+ 		return decodeLegacyPrefixedResult(ud, code, code_len, insn,
+ 						  result);
++#if X86_HAS_VEX2_PUBLIC_PLANS
++	if (code_len && (code[0] == 0xc4 || code[0] == 0xc5)) {
++		if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
++			return decodeVexTerminalResult(ud, code, code_len, insn,
++						       result, opcode);
++		if (code[0] == 0xc5)
++			return decodeVex32ScanResult(ud, code, code_len, insn,
++						     result, opcode);
++	}
++#else
+ 	if (code_len && (code[0] == 0xc4 || code[0] == 0xc5) &&
  	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
  		return decodeVexTerminalResult(ud, code, code_len, insn, result,
  					       opcode);
-+#if X86_HAS_VEX2_PUBLIC_PLANS
-+	return decodeRemainingScan(ud, code, code_len, insn, result, opcode);
-+#else
++#endif
  	return decodeScanResultFallback(ud, code, code_len, insn, result,
  					opcode, false);
-+#endif
  }
- 
- X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
-@@ -3753,9 +3798,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3753,9 +3803,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  					  cs_insn *insn, uint16_t *insn_size,
  					  bool batch);
  
