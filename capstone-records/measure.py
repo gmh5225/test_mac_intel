@@ -1,7 +1,7 @@
+import re
 from pathlib import Path
-import re, hashlib, itertools, json, os, platform, shutil, statistics, subprocess as sp, tempfile
+import hashlib, itertools, json, os, platform, shutil, statistics, subprocess as sp, tempfile
 import corpus
-from jpeg_fixture import prepare_jpeg
 r = Path(__file__).resolve().parent
 s = r.parent / 'source'
 out = r.parent / 'evidence'
@@ -27,10 +27,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
     t=Path(temp); b=t/'build'
     try:
         cases=corpus.prepare(r,t,out,run)
-        selections=['putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls']
+        selections=['putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls','libzstd1-amd64','libssl3t64-amd64','libzstd1-i386']
         cases=[c for c in cases if c['name'] in selections]
         assert set(c['name'] for c in cases)==set(selections)
-        cases.append(prepare_jpeg(r,t,out,run))
         common=['-I',s,'-I',s/'include']
         run(['clang++','-std=c++17','-O3','-DNDEBUG',*common,'-c',r/'single.cpp','-o',t/'one.o'],'consumer')
         run(['clang++','-std=c++17','-O2',*common,r/'public-records.cpp','-ldl','-o',t/'states'],'public-records-build')
@@ -53,39 +52,37 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        assert set(changed)=={'arch/X86/X86DisassemblerDecoder.c.o'},changed
-        targets=['x86_buffer_bounds','x86_encoding_accuracy','mcinst','x86_simple_output','x86_printer_prechecked','text_option','detail_option','x86_x87_environment_hardware']
+        assert set(changed)=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86MemoryOutput.c.o'},changed
+        targets=['mcinst','x86_simple_output','x86_printer_prechecked','text_option','detail_option','x86_x87_environment_hardware']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
-        run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'generator')
-        run(['clang++','-std=c++17','-O2',*common,r/'vex-compare.cpp','-ldl','-o',t/'vex-compare'],'vex-compare-build')
-        run([t/'vex-compare',libs['base'],libs['candidate']],'vex-records')
-        run(['clang++','-std=c++17','-O2',*common,r/'vex-guard.cpp',b/'libcapstone.a','-lm','-o',t/'vex-guard'],'vex-guard-build')
-        run([t/'vex-guard'],'vex-guard')
+        run(['clang++','-std=c++17','-O2','-I',s/'include',s/'suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',t/'generator'],'generator-build')
+        with (out/'generate.log').open('w') as log:
+            regenerated=sp.check_output([t/'generator'],stderr=log)
+        assert regenerated==(s/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
         if platform.machine()=='x86_64':
-            c=cases[-1];assert c['name']=='jpeg-avx2-i386'
-            edges={}
-            for label,exe in binaries.items():
-                trace=t/(label+'-calls')
-                run(['env','CAPSTONE_PUBLIC_ONLY=1','valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),exe,c['selector'],0,c['path'],1],'cost-'+label)
-                names={};counts={};callee=None
-                for line in trace.read_text().splitlines():
-                    if line.startswith(('fn=','cfn=')):
-                        tag,atom=line.split('=',1)
-                        hit=re.fullmatch(r'\((\d+)\)(?: (.*))?',atom)
-                        if hit:
-                            idx,name=hit.groups()
-                            if name is not None:names[idx]=name
-                            atom=names[idx]
-                        if tag=='cfn':callee=atom
-                    elif line.startswith('calls=') and callee:
-                        if callee.startswith(('decodeGenericScan','decodeScanResultGeneric','readOperandsScan','readModRM','cs_disasm_iter')):
-                            counts[callee]=counts.get(callee,0)+int(line[6:].split()[0])
-                    elif line.startswith('summary:'):
-                        counts['simulated_instructions']=int(line.split()[1])
-                assert counts['simulated_instructions']>0
-                edges[label]=counts;trace.unlink()
-            write('jpeg-edges',edges)
+            metrics=[]
+            for c in [c for c in cases if c['name'] in ('libzstd1-amd64','libssl3t64-i386')]:
+                for label,exe in binaries.items():
+                    trace=t/'callgrind'
+                    run(['env','CAPSTONE_PUBLIC_ONLY=0','valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),exe,c['selector'],2,c['path'],1],'cost-'+c['name']+'-'+label)
+                    names={};calls={};callee=None
+                    for line in trace.read_text().splitlines():
+                        if line.startswith(('fn=','cfn=')):
+                            tag,atom=line.split('=',1)
+                            hit=re.fullmatch(r'\\((\\d+)\\)(?: (.*))?',atom)
+                            if hit:
+                                idx,name=hit.groups()
+                                if name is not None:names[idx]=name
+                                atom=names[idx]
+                            if tag=='cfn':callee=atom
+                        elif line.startswith('calls=') and callee and callee.startswith(('cs_decode_full_insn','X86_trySimpleOutput','X86_writeByteExtensionOutput','X86_getInstruction','X86_Intel_printInst')):
+                            calls[callee]=calls.get(callee,0)+int(line[6:].split()[0])
+                        elif line.startswith('summary:'):
+                            calls['guest_instructions']=int(line.split()[1])
+                    assert calls['guest_instructions'] and (any(k.startswith('X86_writeByteExtensionOutput') for k in calls) == (label=='candidate'))
+                    metrics.append(dict(case=c['name'],label=label,calls=calls));trace.unlink()
+            write('byte-extension-costs',metrics)
         for c in cases:
             if c['selector']>=16:
                 run([t/'states',libs['base'],libs['candidate'],c['path'],c['selector']],'records-'+c['name'])

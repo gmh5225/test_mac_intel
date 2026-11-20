@@ -1,7 +1,7 @@
-name: Check 32-bit VEX2 opcode row reuse at the existing scan fallback
+name: Check MOVZX and MOVSX output on scalar libraries and PE32
 on:
   push:
-    branches: [codex/capstone-vex2-canonical-mode-row]
+    branches: [codex/capstone-scalar-byte-extension-output]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-iterator-leaf-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: scalar-byte-extension-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
