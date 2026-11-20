@@ -40,6 +40,8 @@ jobs:
           [[ $status == 0 || $status == 2 ]]
       - name: Inspect original compact input records
         run: python3 neverd-arm64e-variadic/probe-compact.py
+      - name: Measure a compiler-original compact leaf carrying an LSDA
+        run: python3 neverd-arm64e-variadic/probe-language-entry.py neverd
       - name: Replay the complete source-bound Release publication suite
         env:
           GH_TOKEN: ${{ github.token }}
