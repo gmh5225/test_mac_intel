@@ -17,11 +17,13 @@ def jpeg_avx2(w,host,packages):
   data=zstandard.ZstdDecompressor().stream_reader(data)
  with tarfile.open(fileobj=data,mode='r|*') as ar:
   found=[ar.extractfile(m).read() for m in ar if m.isfile() and Path(m.name).name=='libjpeg.a']
- assert len(found)==1;archive=w/'libjpeg-i386.a';archive.write_bytes(found[0])
- names=[v for v in sp.check_output(['ar','t',archive],text=True).splitlines() if 'avx2' in v.lower()];assert names
+ from gnu_archive import members as gnu_members
+ assert len(found)==1
+ objects=[(name,obj) for name,obj in gnu_members(found[0]) if 'avx2' in name.lower()]
+ names=[name for name,obj in objects];assert names
  out=bytearray();spans=[];members={}
- for name in names:
-  obj=sp.check_output(['ar','p',archive,name]);elf=ELFFile(io.BytesIO(obj));assert elf['e_machine']=='EM_386'
+ for name,obj in objects:
+  elf=ELFFile(io.BytesIO(obj));assert elf['e_machine']=='EM_386'
   sec=elf.get_section_by_name('.text');idx=elf.get_section_index('.text')
   if sec is None or not sec['sh_size']:continue
   code=sec.data();entries=sorted({int(s['st_value']) for sym in elf.iter_sections() if isinstance(sym,SymbolTableSection) for s in sym.iter_symbols() if s['st_shndx']==idx and s['st_info']['bind'] in ('STB_GLOBAL','STB_WEAK') and s['st_info']['type'] in ('STT_FUNC','STT_NOTYPE') and int(s['st_value'])<len(code)})
@@ -30,5 +32,5 @@ def jpeg_avx2(w,host,packages):
   base=len(out);out.extend(code)
   spans.extend((base+a,b-a,0x100000+base+a) for a,b in zip(entries,entries[1:]+[len(code)]))
  assert len(spans)>=3 and len(out)>4096,(names,members)
- f=w/'jpeg-avx2-i386.text';f.write_bytes(out);archive.unlink()
+ f=w/'jpeg-avx2-i386.text';f.write_bytes(out)
  return ('jpeg-avx2-i386',32,f,spans,dict(package=fields['Package'],version=fields['Version'],url=url,package_sha256=fields['SHA256'],text_sha256=sha(out),members=members,selection='ELF .text in AVX2 i386 libjpeg.a objects, extents bounded by external assembly entry symbols within each object'))
