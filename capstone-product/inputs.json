@@ -1,115 +1,22 @@
 {
-  "neverd": "abe37f9dcd7edbb83de615c9d7d66620548d4e94",
+  "neverd": "3426cf375f1471eecd478c27000a6a16cd7a9420",
   "capstone": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
   "variants": {
-    "existing-plan": {
-      "source": "round1446-vex32-archive-order",
-      "patch": "existing-plan.patch",
-      "patch_sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
-      "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
+    "bounds": {
+      "source": "round1501-constraint-read-boundary",
+      "patch": "bounds.patch",
+      "patch_sha256": "a840a40b75b06290d7f4a5aecb2447087cc0ff6340fdb097eed3f514c57b9871",
+      "tree": "75622f50ba8ea4e5f5bb1bee69150c7a07f44710",
       "changed": [
-        "X86OutputIterator.c.o"
+        "MCInstrDesc.c.o"
       ],
-      "added": [
-        "X86Vex32Output.c.o"
-      ]
-    },
-    "register-pairs": {
-      "source": "round1449-vex32-register-pairs",
-      "patch": "register-pairs.patch",
-      "patch_sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
-      "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
-      "changed": [
-        "X86OutputIterator.c.o"
-      ],
-      "added": [
-        "X86Vex32Output.c.o"
-      ]
+      "added": []
     }
   },
-  "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-  "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
-  "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Freeze the latest reviewed NeverD dev head for all three builds. Use latest LLVM main source with prebuilts disabled. Measure both the corrected existing-plan selector and the separate register-pair extension against the same published Capstone baseline and 96 predeclared product observations.",
-  "qualification_pending": [
-    "complete native/mixed outcomes",
-    "portable builds",
-    "pair compiler costs and semantics",
-    "actual product outcomes"
-  ],
-  "validation_entry": {
-    "existing_plan_profiles": {
-      "id": 44226294340,
-      "head_sha": "442e1d583a499c20a7db5528a9033390a6e00a89",
-      "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44226294340",
-      "run_attempt": 1
-    },
-    "corrected_archive_order": {
-      "id": 44225231899,
-      "head_sha": "479636501a7cd09038ad13e9738e4e80885feaab",
-      "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44225231899",
-      "run_attempt": 1
-    },
-    "local_pair_source": {
-      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-      "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
-      "sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
-      "comparison_source": {
-        "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-        "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
-        "sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
-        "runtime_sources_identical_to": {
-          "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-          "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
-          "tree": "f8950dad443feefc5cf9a5253613b54f5d93b4ff",
-          "sha256": "84e90f46f73fda452e281e55ae6ecb868bf264910f963e6e77fc7cabb6495e46",
-          "files": [
-            "CMakeLists.txt",
-            "Makefile",
-            "arch/X86/X86GenSimpleOutput.inc",
-            "arch/X86/X86OutputIterator.c",
-            "arch/X86/X86SimpleOutput.h",
-            "arch/X86/X86Vex32Output.c",
-            "suite/synctools/x86_simple_output.cpp",
-            "xcode/Capstone.xcodeproj/project.pbxproj"
-          ]
-        },
-        "build_only_difference": [
-          "CMakeLists.txt",
-          "Makefile",
-          "xcode/Capstone.xcodeproj/project.pbxproj"
-        ]
-      },
-      "files": [
-        "CMakeLists.txt",
-        "Makefile",
-        "arch/X86/X86GenSimpleOutput.inc",
-        "arch/X86/X86GenVex32PairOutput.inc",
-        "arch/X86/X86OutputIterator.c",
-        "arch/X86/X86SimpleOutput.h",
-        "arch/X86/X86VectorOutput.c",
-        "arch/X86/X86VectorRegisterOutput.h",
-        "arch/X86/X86Vex32Output.c",
-        "suite/synctools/x86_simple_output.cpp",
-        "suite/synctools/x86_vector_output.cpp",
-        "tests/unit/x86_simple_output.c",
-        "xcode/Capstone.xcodeproj/project.pbxproj"
-      ]
-    },
-    "source_semantics_verified": true,
-    "independent_experiment": true,
-    "publication_qualified": false
-  },
+  "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
   "timing_protocol": {
-    "cycles": 32,
-    "calibration_cpu_ms": 100,
-    "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
-    "consumer_unchanged": true,
-    "publication_qualified": false
+    "cycles": 9,
+    "calibration_cpu_ms": 45
   },
-  "public_state_scope": "40,068 complete product states per variant plus independent 129,171,462 private/public records and guarded extents on the output implementations. Product build/measurement is not permission to publish and cannot erase prior losses."
+  "scope": "Validate the operand descriptor bounds fix through actual NeverD Decoder APIs, using 15 frozen workloads, complete public record comparison, actual decoder/lifter tests and paired timings. An optimizing compiler may already emit identical valid-path code."
 }

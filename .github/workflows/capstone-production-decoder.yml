@@ -1,7 +1,7 @@
-name: Verify VEX32 output and register pairs through current NeverD and latest LLVM source
+name: Validate operand descriptor bounds through the current NeverD decoder
 on:
   push:
-    branches: [codex/capstone-existing-plan-pair-product]
+    branches: [codex/capstone-constraint-boundary-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: abe37f9dcd7edbb83de615c9d7d66620548d4e94
+          ref: 3426cf375f1471eecd478c27000a6a16cd7a9420
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -55,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-existing-plan-pairs-${{ matrix.os }}-${{ matrix.cc }}
+          name: constraint-boundary-product-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

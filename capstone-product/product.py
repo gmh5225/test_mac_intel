@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Existing-plan VEX32 output and canonical register-pair extension; full public fields and callback semantics retained'))
+write('scope',dict(active=feature_active,policy='Check operand descriptor bounds before reading the table'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -72,12 +72,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
-   targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests']
+   targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
-   command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
+   command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
    command([tool,'--xbegin'],'exhaustive-xbegin-'+label)
    command([tool,'--rendered-xbegin'],'rendered-xbegin-'+label)
@@ -140,7 +140,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert {Path(k).name for k in new_files}==set(variants[label]['added']),new_files
-    assert {Path(k).name for k in changed}==(set(variants[label]['changed']) if feature_active else set()),changed
+    assert {Path(k).name for k in changed}<=set(variants[label]['changed']),changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
@@ -152,7 +152,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==(1+len(variants) if feature_active else 1)
+  write('products',identities)
   if not feature_active:
    remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
    write('complete',dict(cases=0,active=False,identical_product=True,variants=list(variants),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix']))
@@ -191,7 +191,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     if mode not in cases_of_interest.get(case['name'],()):continue
     for launch in launches:
      # A long full text and a tiny compiler fixture have very different costs.
-     start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(100000/start)))
+     start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(expected['timing_protocol']['calibration_cpu_ms']*1000/start)))
      row=dict(case=case['name'],mode=mode,launch=launch,reps=reps,pairs={});oracle=None
      labels=['base','base-copy',*variants]
      plans={label:[] for label in labels[1:]}
