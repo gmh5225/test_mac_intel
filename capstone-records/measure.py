@@ -48,6 +48,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
             exe=t/label
             run(['clang++',t/'one.o',b/'libcapstone.a','-lm','-o',exe],'link-'+label)
             binaries[label]=exe
+            selected=('scanVex2In32BitMode','decodeScanResultFallback','decodeScanResultGeneric','cs_disasm_iter','cs_decode_full_insn','Mips_LLVM_getInstruction','ARM_LLVM_getInstruction','AArch64_LLVM_getInstruction')
+            listing=sp.check_output(['nm','-S','-n','--defined-only',exe],text=True).splitlines()
+            layout={line.split()[3]:dict(address=line.split()[0],size=line.split()[1]) for line in listing if len(line.split())>=4 and line.split()[3].startswith(selected)}
+            assert 'cs_disasm_iter' in layout and any(k.startswith('scanVex2In32BitMode') for k in layout)==(label=='candidate')
+            write(label+'-layout',layout)
             obj=b/'CMakeFiles/capstone.dir'
             objects[label]={str(f.relative_to(obj)):sha(f) for f in obj.rglob('*.o')}
         assert objects['base'].keys()==objects['candidate'].keys()
@@ -79,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                             atom=names[idx]
                         if tag=='cfn':callee=atom
                     elif line.startswith('calls=') and callee:
-                        if callee.startswith(('decodeGenericScan','decodeScanResultGeneric','readOperandsScan','readModRM','cs_disasm_iter')):
+                        if callee.startswith(('decodeGenericScan','decodeScanResultGeneric','decodeScanResultFallback','scanVex2In32BitMode','readOperandsScan','readModRM','cs_disasm_iter')):
                             counts[callee]=counts.get(callee,0)+int(line[6:].split()[0])
                     elif line.startswith('summary:'):
                         counts['simulated_instructions']=int(line.split()[1])

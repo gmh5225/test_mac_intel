@@ -1,54 +1,79 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index cc67e9c7..8c38098a 100644
+index cc67e9c7..0cd56716 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3283,7 +3283,7 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+@@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
  #endif
  
  X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
 -					 uint8_t prefix, X86ScanResult *result);
-+					 uint8_t prefix, cs_mode mode, X86ScanResult *result);
++					 uint8_t prefix, cs_mode mode,
++					 X86ScanResult *result);
  
  /* Only generic and extension decoding need an MCInst in the core scan path. */
  #if defined(_MSC_VER)
-@@ -3318,11 +3318,21 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 	if (extension == X86_FEATURE_INVALID)
- 		return false;
- 	if (extension != X86_FEATURE_DECODED) {
-+		/* A bare C5 cannot be LDS when the next byte selects
-+		 * register addressing. Its W=0 opcode rows are shared with
-+		 * 64-bit mode, but address and operand sizes follow the handle. */
-+		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
-+		    code[0] == 0xc5 && code[1] >= 0xc0) {
-+			const int status = tryVexTerminalScan(
-+				code, code_len, 0xc5, CS_MODE_32, result);
-+			if (status != X86_SCAN_NOT_HANDLED)
-+				return status == X86_SCAN_COMPLETE;
-+		}
- 		if (tryExtension &&
+@@ -3322,7 +3323,8 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
  		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
  		    code[0] == 0xc4) {
  			const int status = tryVexTerminalScan(code, code_len,
 -							      code[0], result);
-+							      code[0], CS_MODE_64, result);
++							      code[0], CS_MODE_64,
++							      result);
  			if (status != X86_SCAN_NOT_HANDLED)
  				return status == X86_SCAN_COMPLETE;
  		}
-@@ -3378,7 +3388,7 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+@@ -3343,6 +3345,23 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	return true;
+ }
+ 
++/* A bare C5 with mod == 3 selects VEX in 32-bit mode. Keep its
++ * specialized reader outside the generic MCInst frame. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__ELF__) && defined(__GNUC__)
++__attribute__((noinline, section(".cs_x86_vex32_scan")))
++#elif defined(__APPLE__) && defined(__GNUC__)
++__attribute__((noinline, section("__TEXT,__cs_vex32scan")))
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static int scanVex2In32BitMode(const uint8_t *code, size_t code_len,
++			       X86ScanResult *result)
++{
++	return tryVexTerminalScan(code, code_len, 0xc5, CS_MODE_32, result);
++}
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+@@ -3373,12 +3392,18 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 		}
+ 	}
+ #endif
++	if (!tryExtension && code_len >= 2 && code[0] == 0xc5 &&
++	    code[1] >= 0xc0 && handle->mode == CS_MODE_32) {
++		const int status = scanVex2In32BitMode(code, code_len, result);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status == X86_SCAN_COMPLETE;
++	}
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
  			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
  				     X86_VEX_FEATURE_NONE)) {
- 		const int status =
+-		const int status =
 -			tryVexTerminalScan(code, code_len, code[0], result);
-+			tryVexTerminalScan(code, code_len, code[0], CS_MODE_64, result);
++		const int status = tryVexTerminalScan(code, code_len, code[0],
++						      CS_MODE_64, result);
  		if (status != X86_SCAN_NOT_HANDLED)
  			return status == X86_SCAN_COMPLETE;
  		tryExtension = false;
-@@ -3430,10 +3440,10 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3430,10 +3455,11 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  }
  
  X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
 -					 uint8_t prefix, X86ScanResult *result)
-+					 uint8_t prefix, cs_mode mode, X86ScanResult *result)
++					 uint8_t prefix, cs_mode mode,
++					 X86ScanResult *result)
  {
  	InternalInstruction insn = { 0 };
 -	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
@@ -56,7 +81,7 @@ index cc67e9c7..8c38098a 100644
  	insn.readerCursor = 1;
  	if (readVexPrefix(&insn, prefix))
  		return X86_SCAN_INVALID;
-@@ -3500,7 +3510,7 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+@@ -3500,7 +3526,7 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
  			      cs_insn *insn, X86ScanResult *result,
  			      uint8_t prefix)
  {
