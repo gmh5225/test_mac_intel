@@ -8,25 +8,13 @@ with tempfile.TemporaryDirectory() as scratch:
  root=Path(scratch);include=Path("neverd/include").resolve();pkg=P["package"]
  subprocess.run(["gh","release","download",pkg["tag"],"-R",os.environ["GITHUB_REPOSITORY"],"-p",pkg["asset"],"-D",root],check=True)
  asset=root/pkg["asset"];assert digest(asset)==pkg["sha256"]
- host=root/pkg["host"]
- with tarfile.open(asset) as tar,tar.extractfile(host.name) as stream,host.open("wb") as target:shutil.copyfileobj(stream,target)
- host.chmod(0o700);assert digest(host)==pkg["host_sha256"]
- tmp=root/"fixtures";tmp.mkdir()
- env={**os.environ,"TMPDIR":str(tmp)+"/","NEVERD_ARM64E_TEST_INCLUDE_DIR":str(include)};env.pop("NEVERD_ARM64E_LIFTED_NATIVE",None);env.pop("NEVERD_ARM64E_ASYNC_NATIVE",None)
- with (root/"setup.log").open("w") as log:
-  proc=subprocess.Popen([host,"--gtest_filter="+P["host_filter"]],env=env,stdout=log,stderr=subprocess.STDOUT)
-  while proc.poll() is None:
-   for folder in tmp.iterdir():
-    if not folder.is_dir():continue
-    for name in P["dylibs"]:
-     source=folder/name;dest=root/name
-     try:
-      if source.stat().st_size and (not dest.exists() or dest.stat().st_size!=source.stat().st_size):shutil.copyfile(source,dest)
-     except FileNotFoundError:pass
-   time.sleep(0.001)
- assert proc.returncode==0,(root/"setup.log").read_text()
- for name in P["dylibs"]:subprocess.run(["/usr/bin/codesign","--verify","--strict",root/name],check=True)
- receipt={"images":{name:digest(root/name) for name in P["dylibs"]},"setup_host_sha256":digest(host),"variants":{}}
+ with tarfile.open(asset) as tar:
+  for name,info in pkg["images"].items():
+   dest=root/name
+   with tar.extractfile(name) as source,dest.open("wb") as target:shutil.copyfileobj(source,target)
+   assert digest(dest)==info["sha256"]
+   subprocess.run(["/usr/bin/codesign","--verify","--strict",dest],check=True)
+ receipt={"images":{name:digest(root/name) for name in P["dylibs"]},"variants":{}}
  rules=root/"entry.rules";rules.write_text(P["rules"])
  for kind,config in P["versions"].items():
   d=root/kind;d.mkdir()
