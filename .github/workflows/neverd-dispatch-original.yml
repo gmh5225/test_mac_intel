@@ -35,12 +35,14 @@ jobs:
           ref: d1ade51d82a556e5ee16d8e2c629281841b2dc7f
           path: baseline
           persist-credentials: false
-          sparse-checkout: include/neverd/runtime
+          sparse-checkout: |
+            include/neverd/runtime
+            include/neverd/ir/intrinsics/AArch64
       - name: Interrupt the compact-only compiler-original leaf at its first instruction
         working-directory: neverd-dispatch-control
         run: |
           set -eu
-          clang -target arm64e-apple-macos15.0 -dynamiclib stages.S companion.S -o "$RUNNER_TEMP/stages.dylib"
+          clang -target arm64e-apple-macos15.0 -dynamiclib -DNEVERD_TEST_EXPLICIT_RA stages.S companion.S -o "$RUNNER_TEMP/stages.dylib"
           clang -target arm64e-apple-macos15.0 -O2 -Iinclude -I../baseline/include observer.c caller.S -o "$RUNNER_TEMP/observer"
           xcrun llvm-objdump --macho --unwind-info "$RUNNER_TEMP/stages.dylib"
           "$RUNNER_TEMP/observer" "$RUNNER_TEMP/stages.dylib" 0 3 "$RUNNER_TEMP/sample" raw-compact-entry raw-compact-entry

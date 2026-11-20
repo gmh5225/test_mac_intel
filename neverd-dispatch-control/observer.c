@@ -127,7 +127,7 @@ static void raw_entry_walk(const ucontext_t *uc) {
       ndDarwinArm64eInitIndexedEntryCursor(&cursor, uc, owner + NDArm64eInstructionAlignment, &lookup_offset) ||
       !ndDarwinArm64eInitTableEntryCursor(&cursor, uc, owner, mode, &lookup_offset) ||
       raw_pc(&cursor) != owner + lookup_offset)
-    _exit(35);
+    { unw_proc_info_t i = {0}; int u = unw_get_proc_info(&cursor, &i); dprintf(2, "entry lookup u=%d mode=0x%x encoding=0x%x entry=%p start=%p end=%p info=%p size=%u\n",u,mode,i.format,(void *)owner,(void *)i.start_ip,(void *)i.end_ip,(void *)i.unwind_info,(unsigned)i.unwind_info_size); _exit(35); }
   for (unsigned i = 0; i < NDArm64ePreservedDCount; ++i) {
     unw_fpreg_t value;
     if (unw_get_fpreg(&cursor, UNW_ARM64_D8 + i, &value) ||
