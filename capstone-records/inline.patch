@@ -1,34 +1,47 @@
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -167,7 +167,7 @@
- endif()
+diff --git a/MCInstrDesc.c b/MCInstrDesc.c
+index 52e5f79a..05c8e4ea 100644
+--- a/MCInstrDesc.c
++++ b/MCInstrDesc.c
+@@ -1,6 +1,7 @@
+ /* Capstone Disassembly Engine */
+ /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2019 */
  
- if(capstone_enabled_architectures STREQUAL "AARCH64")
--    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
-+    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
- endif()
++#define CS_MCINSTRDESC_DEFINE_INLINE
+ #include "MCInstrDesc.h"
  
- # Dedicated builds of these backends use their generated mnemonic tries.
---- a/Makefile
-+++ b/Makefile
-@@ -128,7 +128,7 @@
- endif
+ /// isPredicate - Set if this is one of the operands that made up of
+@@ -40,12 +41,3 @@ int MCOperandInfo_getOperandConstraint(const MCInstrDesc *InstrDesc,
+ 	}
+ 	return -1;
+ }
+-
+-/// Returns the instruction description for the given MCInst opcode.
+-/// Function should be called like:
+-/// MCInstrDesc_get(MCInst_getOpcode(MI), ARCHInstDesc, ARR_SIZE(ARCHInstDesc));
+-const MCInstrDesc *MCInstrDesc_get(unsigned opcode, const MCInstrDesc *table,
+-				   unsigned tbl_size)
+-{
+-	return &table[tbl_size - 1 - opcode];
+-}
+diff --git a/MCInstrDesc.h b/MCInstrDesc.h
+index c104429d..1ed81d05 100644
+--- a/MCInstrDesc.h
++++ b/MCInstrDesc.h
+@@ -160,7 +160,16 @@ bool MCOperandInfo_isTiedToOp(const MCOperandInfo *m);
+ int MCOperandInfo_getOperandConstraint(const MCInstrDesc *OpInfo,
+ 				       unsigned OpNum,
+ 				       MCOI_OperandConstraint Constraint);
++
++/* Descriptors are stored in reverse opcode order. MCInstrDesc.c emits the
++ * external definition from the same body for existing callers. */
++#ifndef CS_MCINSTRDESC_DEFINE_INLINE
++static inline
++#endif
+ const MCInstrDesc *MCInstrDesc_get(unsigned opcode, const MCInstrDesc *table,
+-				   unsigned tbl_size);
++				   unsigned tbl_size)
++{
++	return &table[tbl_size - 1 - opcode];
++}
  
- ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
--CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES
-+CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS
- endif
- 
- ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
---- a/cs.c
-+++ b/cs.c
-@@ -1059,6 +1059,9 @@
- #ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
- 	/* The RISC-V decoder constructs each operand before reading it. */
- 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
-+#elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
-+	/* The AArch64 decoder constructs each operand before reading it. */
-+	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
- #else
- 		MCInst_Init(&mci, handle->arch);
  #endif
