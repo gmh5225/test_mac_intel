@@ -96,6 +96,8 @@ def compare_prebuilt(package, root, suite, comparison):
                 diagnosed.append(name)
         elif case.find("skipped") is not None:
             skipped.append(name)
+            if comparison["skip_reason"] not in case.find("skipped").get("message", ""):
+                errors.append(name)
         elif case.get("result") != "completed" or case.find("error") is not None:
             errors.append(name)
     summary = {"discovered": len(cases), "gtest_exit_code": run.returncode,
@@ -103,7 +105,8 @@ def compare_prebuilt(package, root, suite, comparison):
                "failed_tests": sorted(failed), "skipped": skipped, "errors": errors,
                "implicit_cfi_diagnostic": sorted(diagnosed)}
     (out / comparison["summary"]).write_text(json.dumps(summary, indent=2))
-    if (len(cases) != comparison["count"] or errors or skipped or run.returncode != 1 or
+    if (len(cases) != comparison["count"] or errors or sorted(skipped) != comparison["expected_skips"] or
+            run.returncode != 1 or
             sorted(failed) != comparison["expected_failures"] or sorted(diagnosed) != sorted(failed)):
         raise ValueError(runtime["errors"]["prebuilt"])
     return summary
@@ -169,9 +172,9 @@ def main():
             if (capabilities["status"] != runtime["passed"] or
                     capabilities["source_revision"] != policy["revision"]):
                 raise ValueError(runtime["errors"]["baseline"])
+            report.update(replay(package, root, policy, capabilities))
             if "prebuilt_comparison" in policy:
                 report["r6_unfiltered"] = compare_prebuilt(package, root, policy, policy["prebuilt_comparison"])
-            report.update(replay(package, root, policy, capabilities))
             report["published_cli_images"] = replay_cli_images(package, root, policy["published_cli_images"])
             if "installation" in policy:
                 report["installation"] = replay_installation(package, root, policy["installation"])
