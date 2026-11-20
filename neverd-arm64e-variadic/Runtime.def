@@ -1,0 +1,80 @@
+{
+  "evidence": "cursor-evidence/native-image",
+  "environment_report": "host.json",
+  "result_report": "qualification.json",
+  "repository_environment": "GITHUB_REPOSITORY",
+  "download": [
+    "gh",
+    "release",
+    "download",
+    "{tag}",
+    "-R",
+    "{repository}",
+    "-p",
+    "{asset}",
+    "-D",
+    "{root}"
+  ],
+  "test": [
+    "{host}",
+    "--gtest_filter={filter}",
+    "--gtest_output=xml:{xml}"
+  ],
+  "configure": [
+    "cmake",
+    "-S",
+    "{project}",
+    "-B",
+    "{build}",
+    "-DNEVERD_REPLAY_HOST={host}"
+  ],
+  "qualify": [
+    "python3",
+    "{driver}",
+    "{mode}",
+    "--build-dir",
+    "{build}",
+    "--probe-report",
+    "{probe}",
+    "--output",
+    "{output}",
+    "--legacy-fixtures",
+    "{legacy}"
+  ],
+  "errors": {
+    "missing_file": "Missing file {0}",
+    "file_digest": "Unexpected file digest {0}",
+    "execution": "Incomplete native execution {0}",
+    "cases": "Missing test cases for {0}",
+    "installation": "Incomplete native installation report for {0}",
+    "archive_digest": "Unexpected archive digest",
+    "baseline": "Native original PAC, compiler call/unwind or cursor controls did not qualify"
+  },
+  "cursor_report": "../x1/probe-cursor/report.json",
+  "x1_report": "../x1/report.json",
+  "baseline_report": "../x1/probe/report.json",
+  "baseline_claims": [
+    "native_pac_qualified",
+    "compiler_original_call_unwind_qualified"
+  ],
+  "passed": "passed",
+  "compile_cli_oracle": [
+    "/usr/bin/clang",
+    "-target",
+    "arm64e-apple-macos13.0",
+    "-O2",
+    "{source}",
+    "-o",
+    "{output}"
+  ],
+  "validate_cli_signature": [
+    "/usr/bin/codesign",
+    "--verify",
+    "--strict",
+    "{image}"
+  ],
+  "execute_cli_oracle": [
+    "{driver}",
+    "{image}"
+  ]
+}

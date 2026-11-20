@@ -1,0 +1,14 @@
+{
+  "fixture": "neverd/unittests/lift/aarch64/AArch64CompactRegisterFixtures.def",
+  "begin": "SAVED_TEXT(kCompactBody, R\"asm(",
+  "end": ")asm\")",
+  "output": "cursor-evidence/compact-input",
+  "source": "compact.S",
+  "commands": {
+    "compile": ["/usr/bin/clang", "-target", "arm64e-apple-macosx15.0", "-O2", "-DTEST_COMPACT_PAIRS=1301", "-DTEST_EXTRA_STACK", "-DTEST_PAUTH_LR=8", "-c", "{source}", "-o", "{out}/compact.o"],
+    "link": ["/usr/bin/clang", "-target", "arm64e-apple-macosx15.0", "-dynamiclib", "-Wl,-headerpad,0", "{out}/compact.o", "-o", "{out}/compact.dylib"],
+    "object": ["/usr/bin/otool", "-s", "__LD", "__compact_unwind", "{out}/compact.o"],
+    "image": ["/usr/bin/otool", "-s", "__TEXT", "__unwind_info", "{out}/compact.dylib"],
+    "symbols": ["/usr/bin/nm", "-a", "-n", "{out}/compact.dylib"]
+  }
+}
