@@ -1,6 +1,7 @@
 from pathlib import Path
 import re, hashlib, itertools, json, os, platform, shutil, statistics, subprocess as sp, tempfile
 import corpus
+import layout
 r = Path(__file__).resolve().parent
 s = r.parent / 'source'
 out = r.parent / 'evidence'
@@ -31,13 +32,13 @@ with tempfile.TemporaryDirectory(prefix='capstone-riscv-implicit-sp-') as temp:
         assert set(c['name'] for c in cases)==set(selections)
         common=['-I',s,'-I',s/'include']
         run(['clang++','-std=c++17','-O3','-DNDEBUG',*common,'-c',r/'single.cpp','-o',t/'one.o'],'consumer')
-        for a in ('arm','riscv','aarch64','ppc'):
+        for a in ():
             run(['clang++','-std=c++17','-O2',*common,r/(a+'-states.cpp'),'-ldl','-o',t/(a+'-states')],a+'-records-build')
         flags='-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'
         run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV','PPC')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
-        libs={}; binaries={}; objects={}
+        libs={}; binaries={}; objects={}; archives={}; riscv_objs={}
         for label,patch in [('base','bounds'),('candidate','implicit_sp')]:
             path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
             git('apply','--index',str(path))
@@ -49,6 +50,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-riscv-implicit-sp-') as temp:
             binaries[label]=exe
             obj=b/'CMakeFiles/capstone.dir'
             objects[label]={str(f.relative_to(obj)):sha(f) for f in obj.rglob('*.o')}
+            available=t/('inputs-'+label);available.mkdir()
+            archives[label]=available/'libcapstone.a';shutil.copy2(b/'libcapstone.a',archives[label])
+            riscv_objs[label]=available/'RISCVDisassembler.c.o';shutil.copy2(obj/'arch/RISCV/RISCVDisassembler.c.o',riscv_objs[label])
+
             symbols=sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines()
             keep={'RISCV_getInstruction','RISCV_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','cs_decode_full_insn','cs_disasm_iter','Mips_getInstruction','Mips_get_insn_id'}
             (out/(label+'-symbols.txt')).write_text('\n'.join(line for line in symbols if line.split()[-1] in keep)+'\n')
@@ -56,14 +61,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-riscv-implicit-sp-') as temp:
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
         assert changed==['arch/RISCV/RISCVDisassembler.c.o'],changed
-        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess']
-        run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
-        run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
-        run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_writeback_postprocess_(newlines|generator)$'],'generator-tests')
-        run([t/'arm-states',libs['base'],libs['candidate']],'full-arm')
-        for arch in ('aarch64','ppc'):run([t/(arch+'-states'),libs['base'],libs['candidate']],'full-'+arch)
-        for args in [[],['custom']]:
-            run([t/'riscv-states',libs['base'],libs['candidate'],t/'corpus',*args],'full-riscv'+('' if not args else '-custom'))
+        binaries['layout'],match=layout.match_text(t,binaries['base'],binaries['candidate'],riscv_objs,archives,t/'one.o',run)
+        write('matched-text',match)
+        active={}
         if platform.machine()=='x86_64':
             costs=[]
             for name,m,route in [('mips64el-ls',0,'public'),('riscv64-ls',0,'public'),('riscv64-cp',0,'public')]:
@@ -88,8 +88,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-riscv-implicit-sp-') as temp:
                         elif line.startswith('summary:'):summary=int(line.split()[1])
                     assert summary is not None and calls
                     costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,first=json.loads(rr.stdout)['first']))
+                    if name=='mips64el-ls' and key=='base':
+                        active=dict(layout.hot(trace).most_common(160))
                     trace.unlink()
             write('call-costs',costs)
+        assert len(active)>10
+        for label,exe in binaries.items():write('layout-'+label,layout.layout(exe,active))
         shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
         payload={k:v.read_bytes() for k,v in binaries.items()}; assert payload['base']==payload['copy']!=payload['candidate']
         size=max(map(len,payload.values())); image=t/'same'; image.write_bytes(bytes(size));image.chmod(0o755);inode=image.stat().st_ino
@@ -97,21 +101,22 @@ with tempfile.TemporaryDirectory(prefix='capstone-riscv-implicit-sp-') as temp:
         fixed=['setarch',platform.machine(),'-R']; sp.run([*fixed,'/bin/true'],check=True)
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         write('controls',dict(images={k:sha(v) for k,v in binaries.items()},inode=inode,aslr_disabled=True,cpu=list(os.sched_getaffinity(0)),
-             cycle_count=9,target_ms=32,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
+             cycle_count=12,target_ms=42,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
         def sample(key,c,m,n,route):
             with image.open('r+b') as stream:assert stream.write(padded[key])==size
             assert image.stat().st_ino==inode and image.stat().st_size==size
             return json.loads(sp.check_output([*fixed,str(image),*map(str,[c['selector'],m,c['path'],n])],text=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public')))))
         rows=[]
         for c in cases:
+            if c['name'] not in ('riscv64-ls','riscv64-cp','mips64el-ls','arm-ls','putty-32-0.85'):continue
             for m in (0,1,2):
                 routes=['private' if m and c['selector']>=16 else 'public']
                 for route in routes:
                     probe=sample('base',c,m,2,route)
-                    n=max(2,min(4000,round(64e6/probe['cpu_ns'])))
+                    n=max(2,min(4000,round(84e6/probe['cpu_ns'])))
                     pairs=[];reference=None
-                    for i in range(9):
-                        names=['base','copy','candidate']; order=names[i%3:]+names[:i%3];ticks={key:[] for key in names}
+                    for i in range(12):
+                        names=['base','copy','candidate','layout']; order=names[i%4:]+names[:i%4];ticks={key:[] for key in names}
                         for key in order+order[::-1]:
                             row=sample(key,c,m,n,route)
                             if reference is None: reference=(row['first'],row['result'])

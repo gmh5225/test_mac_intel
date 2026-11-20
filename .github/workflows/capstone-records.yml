@@ -1,7 +1,7 @@
-name: Measure compressed RISC-V stack-pointer admission on six architectures
+name: Isolate MIPS cost after a RISC-V-only source change
 on:
   push:
-    branches: [codex/capstone-riscv-implicit-sp]
+    branches: [codex/capstone-riscv-passive-layout]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,10 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, archs: four }
           - { host: ubuntu-24.04, cc: clang, archs: four }
           - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -31,7 +29,7 @@ jobs:
           ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
           path: source
           persist-credentials: false
-      - name: Verify implicit SP classes and time six backends
+      - name: Match the RISC-V text size and trace linked MIPS code
         run: |
           if [ "$(uname -m)" = x86_64 ]; then sudo apt-get -qq update && sudo apt-get -y install valgrind; fi
           python3 capstone-records/prepare_baseline.py
@@ -41,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: riscv-implicit-sp-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: riscv-passive-layout-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
