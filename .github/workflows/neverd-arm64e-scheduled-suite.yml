@@ -1,0 +1,41 @@
+name: Complete integrated arm64e publication suite
+on:
+  push:
+    branches: [codex/neverd-arm64e-scheduled-suite-20261120]
+    paths: [neverd-arm64e-full/**, .github/workflows/neverd-arm64e-scheduled-suite.yml]
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: neverd-arm64e-full
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 3ad7af8590518a3b0c3fba65cf26e9cc97848b45
+          path: neverd
+          persist-credentials: false
+          sparse-checkout: include
+      - name: Run every integrated arm64e publication test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          brew list --versions zstd || brew install zstd
+          ulimit -c 0
+          python3 neverd-arm64e-full/run.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: suite-${{ matrix.runner }}
+          path: suite-evidence/
+          retention-days: 7
+          if-no-files-found: error

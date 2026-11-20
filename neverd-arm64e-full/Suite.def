@@ -1,0 +1,39 @@
+{
+  "revision": "3ad7af8590518a3b0c3fba65cf26e9cc97848b45",
+  "tag": "neverd-integrated-arm64e-3ad7af859051",
+  "asset": "integrated-suite.tgz",
+  "archive_sha256": "886a219b473c16802fab396f82702a4289c0b6dfd38384817ae4102ae37e29fd",
+  "bytes": 49158465,
+  "host": "NeverDArm64eLiftedImageTests",
+  "host_sha256": "12ecc08ebe53e469df52fad289ddbd0461303ab9cb60100dd4fd4c3504cdc0b6",
+  "count": 253,
+  "include": "neverd/include",
+  "include_name": "NEVERD_ARM64E_TEST_INCLUDE_DIR",
+  "output": "suite-evidence",
+  "xml": "results.xml",
+  "log": "results.log",
+  "report": "suite.json",
+  "hardware": [
+    "sysctl",
+    "-n",
+    "machdep.cpu.brand_string"
+  ],
+  "environment": {
+    "NEVERD_ARM64E_LIFTED_NATIVE": "1",
+    "NEVERD_ARM64E_ASYNC_NATIVE": "1"
+  },
+  "relevant": {
+    "AArch64LiftedImage.ScheduledRelativeTablesSurviveRelifting": {
+      "executed_native_images": 4,
+      "native_switch_comparisons": 288,
+      "proved_embedded_dispatches": 3,
+      "rejected_fragment_kind_conflicts": 3,
+      "published_data_in_code_records": 40,
+      "recovered_source_data_in_code_records": 3
+    },
+    "AArch64AsyncUnwind.PublishedFrameRecoversCallerAtFiveSignalInterruptions": {
+      "native_automatic_original_table_entry_walks": 12,
+      "native_alternate_stack_table_walks": 6
+    }
+  }
+}
