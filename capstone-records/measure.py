@@ -39,19 +39,32 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
-        for label,patch in [('base','bounds'),('candidate','iterator')]:
-            path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
-            git('apply','--index',str(path))
+        for label,patch in [('base','bounds'),('control','control'),('candidate','iterator')]:
+            if label!='base':
+                git('reset','--hard',meta['bounds']['parent'])
+                path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
+                git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
             run(['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static'],'build-'+label)
             libs[label]=t/(label+'.so');shutil.copy2(b/'libcapstone.so',libs[label])
             exe=t/label
             run(['clang++',t/'one.o',b/'libcapstone.a','-lm','-o',exe],'link-'+label)
             binaries[label]=exe
-            selected=('scanVex2In32BitMode','decodeScanResultFallback','decodeScanResultGeneric','cs_disasm_iter','cs_decode_full_insn','Mips_LLVM_getInstruction','ARM_LLVM_getInstruction','AArch64_LLVM_getInstruction')
+            selected=('decodeScanResultAfterAdapter','decodeScanResultFallback','decodeScanResultGeneric','cs_disasm_iter','cs_decode_full_insn','Mips_LLVM_getInstruction','ARM_LLVM_getInstruction','AArch64_LLVM_getInstruction')
             listing=sp.check_output(['nm','-S','-n','--defined-only',exe],text=True).splitlines()
             layout={line.split()[3]:dict(address=line.split()[0],size=line.split()[1]) for line in listing if len(line.split())>=4 and line.split()[3].startswith(selected)}
-            assert 'cs_disasm_iter' in layout and any(k.startswith('scanVex2In32BitMode') for k in layout)==(label=='candidate')
+            assert 'cs_disasm_iter' in layout and (label!='candidate' or any(k.startswith('decodeScanResultAfterAdapter') for k in layout))
+            import struct
+            raw=exe.read_bytes()
+            assert raw[:6]==b'\x7fELF\x02\x01'
+            off=struct.unpack_from('<Q',raw,32)[0]
+            length,count=struct.unpack_from('<HH',raw,54)
+            segments=[struct.unpack_from('<IIQQQQQQ',raw,off+i*length) for i in range(count)]
+            for item in layout.values():
+                addr=int(item['address'],16);num=int(item['size'],16)
+                entry,=[x for x in segments if x[0]==1 and x[3]<=addr and addr+num<=x[3]+x[5]]
+                pos=entry[2]+addr-entry[3]
+                item['body_sha256']=hashlib.sha256(raw[pos:pos+num]).hexdigest()
             write(label+'-layout',layout)
             obj=b/'CMakeFiles/capstone.dir'
             objects[label]={str(f.relative_to(obj)):sha(f) for f in obj.rglob('*.o')}
@@ -84,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                             atom=names[idx]
                         if tag=='cfn':callee=atom
                     elif line.startswith('calls=') and callee:
-                        if callee.startswith(('decodeGenericScan','decodeScanResultGeneric','decodeScanResultFallback','scanVex2In32BitMode','readOperandsScan','readModRM','cs_disasm_iter')):
+                        if callee.startswith(('decodeGenericScan','decodeScanResultGeneric','decodeScanResultFallback','decodeScanResultAfterAdapter','readOperandsScan','readModRM','cs_disasm_iter')):
                             counts[callee]=counts.get(callee,0)+int(line[6:].split()[0])
                     elif line.startswith('summary:'):
                         counts['simulated_instructions']=int(line.split()[1])
@@ -101,7 +114,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
         fixed=['setarch',platform.machine(),'-R']; sp.run([*fixed,'/bin/true'],check=True)
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         write('controls',dict(images={k:sha(v) for k,v in binaries.items()},inode=inode,aslr_disabled=True,cpu=list(os.sched_getaffinity(0)),
-             cycle_count=9,target_ms=32,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
+             cycle_count=12,target_ms=32,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
         def sample(key,c,m,n,route):
             with image.open('r+b') as stream:assert stream.write(padded[key])==size
             assert image.stat().st_ino==inode and image.stat().st_size==size
@@ -114,8 +127,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                     probe=sample('base',c,m,2,route)
                     n=max(2,min(4000,round(64e6/probe['cpu_ns'])))
                     pairs=[];reference=None
-                    for i in range(9):
-                        names=['base','copy','candidate']; order=names[i%3:]+names[:i%3];ticks={key:[] for key in names}
+                    for i in range(12):
+                        names=['base','copy','control','candidate']; order=names[i%4:]+names[:i%4];ticks={key:[] for key in names}
                         for key in order+order[::-1]:
                             row=sample(key,c,m,n,route)
                             if reference is None: reference=(row['first'],row['result'])

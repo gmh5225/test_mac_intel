@@ -1,7 +1,7 @@
-name: Measure the 32-bit VEX reader before generic instruction construction
+name: Compare the isolated 32-bit VEX fallback with a pass-through placement control
 on:
   push:
-    branches: [codex/capstone-vex32-fallback-entry]
+    branches: [codex/capstone-vex32-generic-call-target]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,19 +28,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
+          ref: a9d153f4cae6c71eb02309621bbce3c9508312dc
           path: source
           persist-credentials: false
       - name: Compare public records and time both API routes with an exact-copy control
         run: |
           if [ "$(uname -m)" = x86_64 ]; then sudo apt-get -qq update && sudo apt-get -y install valgrind; fi
-          python3 capstone-records/prepare_baseline.py
           python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-iterator-leaf-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex32-generic-target-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

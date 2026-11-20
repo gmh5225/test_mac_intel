@@ -1,0 +1,120 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..f3a0c777 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3290,7 +3290,7 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+ #endif
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result);
++					 uint8_t prefix, cs_mode mode, X86ScanResult *result);
+ 
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+ #if defined(_MSC_VER)
+@@ -3329,7 +3329,7 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
+ 		    code[0] == 0xc4) {
+ 			const int status = tryVexTerminalScan(code, code_len,
+-							      code[0], result);
++							      code[0], CS_MODE_64, result);
+ 			if (status != X86_SCAN_NOT_HANDLED)
+ 				return status == X86_SCAN_COMPLETE;
+ 		}
+@@ -3350,6 +3350,25 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	return true;
+ }
+ 
++/* The configured adapter has already had first refusal. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__ELF__) && defined(__GNUC__)
++__attribute__((noinline, section(".cs_x86_vex32_scan")))
++#elif defined(__APPLE__) && defined(__GNUC__)
++__attribute__((noinline, section("__TEXT,__cs_vex32scan")))
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static CS_PRESERVE_MOST bool
++decodeScanResultAfterAdapter(csh ud, const uint8_t *code, size_t code_len,
++			     cs_insn *insn, X86ScanResult *result,
++			     uint8_t opcode, bool tryExtension)
++{
++	return decodeScanResultGeneric(ud, code, code_len, insn, result, opcode,
++				       tryExtension);
++}
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+@@ -3385,12 +3404,12 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+ 				     X86_VEX_FEATURE_NONE)) {
+ 		const int status =
+-			tryVexTerminalScan(code, code_len, code[0], result);
++			tryVexTerminalScan(code, code_len, code[0], CS_MODE_64, result);
+ 		if (status != X86_SCAN_NOT_HANDLED)
+ 			return status == X86_SCAN_COMPLETE;
+ 		tryExtension = false;
+ 	}
+-	return decodeScanResultGeneric(ud, code, code_len, insn, result, opcode,
++	return decodeScanResultAfterAdapter(ud, code, code_len, insn, result, opcode,
+ 				       tryExtension);
+ }
+ 
+@@ -3437,10 +3456,10 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ }
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++					 uint8_t prefix, cs_mode mode, X86ScanResult *result)
+ {
+ 	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
++	initializeInstructionHeader(&insn, code, code_len, mode);
+ 	insn.readerCursor = 1;
+ 	if (readVexPrefix(&insn, prefix))
+ 		return X86_SCAN_INVALID;
+@@ -3507,7 +3526,7 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+ 			      cs_insn *insn, X86ScanResult *result,
+ 			      uint8_t prefix)
+ {
+-	int status = tryVexTerminalScan(code, code_len, prefix, result);
++	int status = tryVexTerminalScan(code, code_len, prefix, CS_MODE_64, result);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, prefix, false);
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index cdc59ba3..4a550d2f 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1204,6 +1204,13 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            if name == names[1] and key < 8:
++                # Bare two-byte VEX has no W bit and uses the 0F map.
++                mode32 = attributes & ~attrs["ATTR_64BIT"]
++                tables.require(
++                    row == indices[contexts.index(context_values[mode32])],
++                    "Review 32-bit VEX2 scan row sharing",
++                )
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
+diff --git a/tests/unit/x86_buffer_bounds.c b/tests/unit/x86_buffer_bounds.c
+index 57ee99b2..f889345f 100644
+--- a/tests/unit/x86_buffer_bounds.c
++++ b/tests/unit/x86_buffer_bounds.c
+@@ -317,6 +317,12 @@ static bool check_escape_boundaries(uint8_t *end)
+ 		  7,
+ 		  X86_INS_INVALID,
+ 		  0 },
++		{ CS_MODE_32, { 0xc5, 0x00 }, 2, X86_INS_LDS, 2 },
++		{ CS_MODE_32, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
++		{ CS_MODE_32, { 0xc5, 0xf0, 0x77 }, 3, X86_INS_INVALID, 0 },
++		{ CS_MODE_32,
++		  { 0xc5, 0xf9, 0x6f, 0x44, 0x24, 0x10 },
++		  6, X86_INS_VMOVDQA, 6 },
+ 		{ CS_MODE_64, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
+ 		{ CS_MODE_64,
+ 		  { 0xc4, 0xe1, 0x74, 0x58, 0xc2 },
