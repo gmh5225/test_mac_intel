@@ -57,13 +57,15 @@ def hot(trace):
     return freq
 def layout(exe,active):
     secs=sections(exe);symbols=output('nm','-n','-S','--defined-only',exe).splitlines();rows=[]
-    text_sec=secs['.text'];code=data(exe,text_sec)
+    images={}
     for line in symbols:
         f=line.split(maxsplit=3)
         if len(f)!=4:continue
         addr,size,kind,n=f;addr=int(addr,16);size=int(size,16)
         if kind in ('t','T') and n in active:
-            at=addr-text_sec['vma'];assert at>=0 and at+size<=len(code)
+            section,=[key for key,sec in secs.items() if sec['vma']<=addr and addr+size<=sec['vma']+sec['size'] and sec['size']>0]
+            if section not in images:images[section]=data(exe,secs[section])
+            code=images[section];at=addr-secs[section]['vma']
             rows.append(dict(name=n,address=addr,size=size,sha256=hashlib.sha256(code[at:at+size]).hexdigest(),simulated_self_ir=active[n]))
         elif kind in 'rRdD' and size>=256 and ('Mips' in n or 'MIPS' in n or 'DecoderTable' in n):
             rows.append(dict(name=n,address=addr,size=size,kind=kind))

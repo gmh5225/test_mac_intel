@@ -69,17 +69,15 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         costs=[]
         for name,mode,route in target_cases:
             c=next(v for v in cases if v['name']==name)
-            active=set()
             for label,exe in binaries.items():
                 trace=t/'trace'
                 obs=sp.run(['valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),str(exe),str(c['selector']),str(mode),c['path'],'1'],text=True,capture_output=True,check=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public'))))
                 lines=trace.read_text().splitlines()
                 total=int(next(x for x in lines if x.startswith('summary:')).split()[1])
                 top=linked.hot(trace).most_common(90)
-                active.update(k for k,_ in top)
+                write('linked-'+name+'-'+label,linked.layout(exe,dict(top)))
                 costs.append(dict(case=name,mode=mode,route=route,label=label,guest_instructions=total,top=top,record=json.loads(obs.stdout)['first']))
                 trace.unlink()
-            for label,exe in binaries.items():write('linked-'+name+'-'+label,linked.layout(exe,active))
         write('costs',costs)
         for name,mode,route in target_cases:
             records=[v['record'] for v in costs if v['case']==name]
