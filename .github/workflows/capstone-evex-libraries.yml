@@ -1,7 +1,7 @@
 name: Measure X86 register-list construction with full PE and ELF controls
 on:
   push:
-    branches: [codex/capstone-register-list-width]
+    branches: [codex/capstone-register-list-ubuntu22]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:

@@ -4,7 +4,11 @@ from pathlib import Path
 import gzip, hashlib, json, re, subprocess as sp
 
 def digest(path):
-    with path.open('rb') as src:return hashlib.file_digest(src,'sha256').hexdigest()
+    hash_=hashlib.sha256()
+    with path.open('rb') as src:
+        for chunk in iter(lambda: src.read(1024*1024),b''):
+            hash_.update(chunk)
+    return hash_.hexdigest()
 def count(trace,asm):
     by_address={}
     for line in asm.splitlines():
