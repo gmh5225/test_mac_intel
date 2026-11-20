@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public text fallback after compact scan',vector='Same routing with canonical VEX32 output',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public path and original Clang-only i386 writer',vector='Same source with GNU ELF i386 output enabled',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -71,10 +71,14 @@ def main(w):
             changed={name for name,value in objects['integer'].items() if objects[label].get(name)!=value}
             added=set(objects[label])-set(objects['integer'])
             expected_changed = {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
-            expected_added = {'arch/X86/X86Vex32Output.c.o'} if label == 'vector' else set()
+            expected_added = {'arch/X86/X86Vex32Output.c.o'}
             assert added == expected_added, (label, added)
-            assert expected_changed <= changed <= expected_changed | ({'arch/X86/X86VectorOutput.c.o'} if label == 'vector' else set()), (label, changed)
+            assert expected_changed <= changed <= expected_changed | {'arch/X86/X86VectorOutput.c.o'}, (label, changed)
             if label == 'vector':
+                diff=sorted(k for k in objects[label] if objects[label][k]!=objects['route'][k])
+                wanted=['arch/X86/X86OutputIterator.c.o','arch/X86/X86Vex32Output.c.o'] if os.environ['CC']=='gcc' else []
+                assert diff==wanted,(diff,wanted)
+                save('compiler-scope.json',dict(changed=diff, total=len(objects[label])))
                 for tool, jobs in [('x86_simple_output', [([], 'X86GenSimpleOutput.inc')]), ('x86_vector_output', [(['--vex32-memory'], 'X86GenVex32MemoryOutput.inc'), (['--vex-pairs32'], 'X86GenVex32PairOutput.inc')])]:
                     run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools'/(tool+'.cpp'),b/'libcapstone.a','-o',w/tool], 'build-generator-'+tool)
                     for options, name in jobs:
@@ -94,6 +98,19 @@ def main(w):
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
+    verify_build=w/'verify-build'
+    run(['cmake','-S',tree,'-B',verify_build,*profile,'-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'verify-configure')
+    for label in ('route','vector'):
+        run(['git','apply',r/(label+'.patch')],'verify-patch-'+label,tree)
+        it=tree/'arch/X86/X86OutputIterator.c'
+        it.write_bytes(it.read_bytes()+(r/'owned-shim.txt').read_bytes())
+        run(['cmake','--build',verify_build,'--target','capstone_shared','--parallel','4'],'verify-lib-'+label)
+        shutil.copyfile(verify_build/'libcapstone.so',w/(label+'.so'))
+        run(['git','reset','--hard',reference],'verify-restore-'+label,tree)
+        run(['git','clean','-fdx'],'verify-prune-'+label,tree)
+    for test in ('verify','private-guard','public-verify'):
+        run(['clang++','-std=c++17','-O2','-DACTIVE_OUTPUT=1','-DPREVIOUS_OUTPUT='+('0' if os.environ['CC']=='gcc' else '1'),'-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
+        run([w/test,w/'route.so',w/'vector.so'],test)
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']

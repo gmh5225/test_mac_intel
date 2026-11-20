@@ -1,7 +1,7 @@
-name: Compare routed 32-bit VEX output on common real-library boundaries
+name: Compare the same 32-bit VEX output under GCC and Clang
 on:
   push:
-    branches: [codex/capstone-public-vex32-factorial]
+    branches: [codex/capstone-gnu-vex32-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: gcc, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 90
     env:
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-vex32-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: gnu-vex32-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
