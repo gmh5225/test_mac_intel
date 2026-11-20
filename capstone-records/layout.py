@@ -22,12 +22,14 @@ def match_text(t,base,candidate,objects,archives,consumer,link):
     small,big=sorted(sizes,key=sizes.get);delta=sizes[big]-sizes[small]
     key='layout';(t/key).mkdir()
     original=objects[small];new=t/key/member
-    src=data(original,sections(original)['.text']);blob=t/'padded-text';blob.write_bytes(src+bytes(delta))
+    src=data(original,sections(original)['.text']);blob=t/'text-tail';blob.write_bytes(bytes(delta))
     if delta:
-        sp.run(['objcopy','--update-section','.text='+str(blob),str(original),str(new)],check=True)
+        section='.text.riscv_padding'
+        sp.run(['objcopy','--add-section',section+'='+str(blob),'--set-section-flags',section+'=alloc,load,readonly,code,contents',str(original),str(new)],check=True)
+        sec=sections(new)[section];assert sec['size']==delta and sec['alignment']=='2**0' and data(new,sec)==bytes(delta)
     else:
         shutil.copy2(original,new)
-    assert data(new,sections(new)['.text'])==src+bytes(delta)
+    assert data(new,sections(new)['.text'])==src
     assert reloc(new)==reloc(original)
     archive=t/key/'libcapstone.a';shutil.copy2(archives[small],archive)
     names=output('ar','t',archive).splitlines();assert names.count(member)==1
@@ -66,3 +68,23 @@ def layout(exe,active):
         elif kind in 'rRdD' and size>=256 and ('Mips' in n or 'MIPS' in n or 'DecoderTable' in n):
             rows.append(dict(name=n,address=addr,size=size,kind=kind))
     return dict(sections={k:v for k,v in secs.items() if k in ('.text','.rodata','.eh_frame','.data.rel.ro','.data','.bss')},symbols=rows)
+
+def address_match(images):
+    refs={}
+    for k,exe in images.items():
+        syms={};duplicates=set()
+        for line in output('nm','-n','-S','--defined-only',exe).splitlines():
+            fields=line.split(maxsplit=3)
+            if len(fields)!=4 or fields[2] not in 'tT':continue
+            addr,size,_,name=fields
+            if name in syms:duplicates.add(name)
+            syms[name]=(int(addr,16),int(size,16))
+        refs[k]={n:v for n,v in syms.items() if n not in duplicates}
+    keys=set.intersection(*(set(s) for s in refs.values()))
+    counts=Counter();examples={}
+    for n in sorted(keys):
+        v=[refs[k][n] for k in ('base','candidate','layout')]
+        key='identical' if v[0]==v[1]==v[2] else 'matched-candidate' if v[1]==v[2] else 'matched-base' if v[0]==v[2] else 'third' if v[0]!=v[1] else 'padding-only'
+        counts[key]+=1
+        if len(examples.setdefault(key,[]))<12:examples[key].append([n,*v])
+    return dict(unique_shared_text_symbols=len(keys),counts=counts,examples=examples)

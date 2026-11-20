@@ -63,6 +63,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-riscv-implicit-sp-') as temp:
         assert changed==['arch/RISCV/RISCVDisassembler.c.o'],changed
         binaries['layout'],match=layout.match_text(t,binaries['base'],binaries['candidate'],riscv_objs,archives,t/'one.o',run)
         write('matched-text',match)
+        write('linked-symbol-match',layout.address_match(binaries))
         active={}
         if platform.machine()=='x86_64':
             costs=[]
