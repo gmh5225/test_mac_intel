@@ -1,0 +1,31 @@
+name: Compiler original arm64e relative dispatch
+on:
+  push:
+    branches: [codex/neverd-arm64e-image-jump-dispatch-20261120]
+    paths: [neverd-dispatch-control/**, .github/workflows/neverd-dispatch-original.yml]
+permissions:
+  contents: read
+jobs:
+  original:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Link and exercise all compiler-original switch cases
+        working-directory: neverd-dispatch-control
+        run: |
+          set -eu
+          clang -target arm64e-apple-macos13.0 -dynamiclib -Wl,-ld_classic,-data_in_code_info dispatch.S -o "$RUNNER_TEMP/dispatch.dylib"
+          clang -target arm64e-apple-macos13.0 dispatch.c -o "$RUNNER_TEMP/oracle"
+          otool -l "$RUNNER_TEMP/dispatch.dylib" | sed -n '/cmd LC_DATA_IN_CODE/,+3p'
+          "$RUNNER_TEMP/oracle" "$RUNNER_TEMP/dispatch.dylib"
+          /usr/sbin/sysctl -n machdep.cpu.brand_string
+          echo 'All 72 original-image comparisons passed'
+          python3 probe-object-formats.py
+          cat object-formats.json
