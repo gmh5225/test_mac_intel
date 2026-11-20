@@ -1,7 +1,7 @@
-name: Enable the existing EVEX plans on AArch64 hosts and measure against forked iced
+name: Verify ARM64-host Capstone EVEX behavior across decoder configurations
 on:
   push:
-    branches: [codex/capstone-elf-arm64-evex]
+    branches: [codex/capstone-arm64-evex-configurations]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,13 +11,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04-arm, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, profile: diet }
+          - { host: ubuntu-24.04-arm, cc: gcc, profile: diet }
+          - { host: ubuntu-24.04-arm, cc: clang, profile: reduced }
+          - { host: ubuntu-24.04-arm, cc: gcc, profile: intel }
+          - { host: ubuntu-24.04-arm, cc: gcc, profile: custom }
+          - { host: ubuntu-24.04-arm, cc: clang, profile: adapter }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
+      CS_PROFILE: ${{ matrix.profile }}
       CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -30,17 +33,13 @@ jobs:
           ref: a9d153f4cae6c71eb02309621bbce3c9508312dc
           path: source
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
-        run: |
-          python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/prepare_baseline.py
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+      - name: Compare all raw records, protected-page extents and configured source objects
+        run: python3 capstone-vectors/configurations.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm64-evex-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm64-evex-${{ matrix.cc }}-${{ matrix.profile }}
           path: evidence/
           retention-days: 14
