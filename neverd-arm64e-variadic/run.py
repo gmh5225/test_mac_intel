@@ -175,6 +175,10 @@ def main():
             report.update(replay(package, root, policy, capabilities))
             if "prebuilt_comparison" in policy:
                 report["r6_unfiltered"] = compare_prebuilt(package, root, policy, policy["prebuilt_comparison"])
+            if "r6_replay" in policy:
+                frozen = policy["r6_replay"]
+                report["prebuilt_r6"] = replay(package, root, frozen, capabilities)
+                report["prebuilt_r6"]["unfiltered"] = compare_prebuilt(package, root, frozen, frozen["prebuilt_comparison"])
             report["published_cli_images"] = replay_cli_images(package, root, policy["published_cli_images"])
             if "installation" in policy:
                 report["installation"] = replay_installation(package, root, policy["installation"])
