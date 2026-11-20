@@ -17,6 +17,7 @@ with tempfile.TemporaryDirectory() as scratch:
   proc=subprocess.Popen([host,"--gtest_filter="+P["host_filter"]],env=env,stdout=log,stderr=subprocess.STDOUT)
   while proc.poll() is None:
    for folder in tmp.iterdir():
+    if not folder.is_dir():continue
     for name in P["dylibs"]:
      source=folder/name;dest=root/name
      try:
