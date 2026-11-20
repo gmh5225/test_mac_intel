@@ -1,7 +1,7 @@
-name: Time public Capstone against the NeverSight compatibility fork on full PE32 and ELF
+name: Attribute actual 64-bit SIMD decoding and rendering work against forked iced
 on:
   push:
-    branches: [codex/capstone-fork-public-vex32-next]
+    branches: [codex/capstone-openSSL-simd-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,10 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -32,6 +30,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          sudo apt-get -qq update && sudo apt-get -y install valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/prepare_baseline.py
@@ -41,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: combined-vex32-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fork-simd-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

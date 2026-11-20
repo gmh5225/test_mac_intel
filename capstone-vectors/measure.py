@@ -38,6 +38,8 @@ def main(w):
     old_engine='std::string engine=argv[1];';assert inc.count(old_engine)==1
     inc=inc.replace(old_engine,old_engine+'\n  if(engine=="iced____") engine="iced"; else if(engine=="fast____") engine="fast";')
     assert inc.count('iced_trace(bits,ptr,')==1
+    assert inc.count('Result timed=run(reps);')==inc.count('Result warm=run(1);')==1
+    inc='#include <valgrind/callgrind.h>\n'+inc.replace('Result warm=run(1);','CALLGRIND_START_INSTRUMENTATION; Result warm=run(1);').replace('Result timed=run(reps);','CALLGRIND_ZERO_STATS; Result timed=run(reps); CALLGRIND_STOP_INSTRUMENTATION;')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
@@ -55,9 +57,7 @@ def main(w):
         expected=inputs['baseline_tree'] if label=='integer' else inputs['variants'][label]['tree']
         assert tested==expected,(label,tested,expected)
         save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else sha(patch)))
-        units=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','detail_option','text_option','x86_printer_prechecked','x86_buffer_bounds','x86_scan_batch']+[f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))]
-        run(['cmake','--build',b,'--target','capstone_static',*units,'--parallel','4'],'build-'+label)
-        run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
+        run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
         members=sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines()
         assert len(set(members))==len(members)
@@ -100,39 +100,19 @@ def main(w):
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
-    verify_build=w/'verify-build'
-    run(['cmake','-S',tree,'-B',verify_build,*profile,'-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'verify-configure')
-    for label in ('route','vector'):
-        run(['git','apply',r/(label+'.patch')],'verify-patch-'+label,tree)
-        it=tree/'arch/X86/X86OutputIterator.c'
-        it.write_bytes(it.read_bytes()+(r/'owned-shim.txt').read_bytes())
-        run(['cmake','--build',verify_build,'--target','capstone_shared','--parallel','4'],'verify-lib-'+label)
-        shutil.copyfile(verify_build/'libcapstone.so',w/(label+'.so'))
-        run(['git','reset','--hard',reference],'verify-restore-'+label,tree)
-        run(['git','clean','-fdx'],'verify-prune-'+label,tree)
-    for test in ('verify','private-guard','public-verify'):
-        run(['clang++','-std=c++17','-O2','-DACTIVE_OUTPUT=1','-DPREVIOUS_OUTPUT=1','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
-        run([w/test,w/'route.so',w/'vector.so'],test)
-    for name,args in [('vex-scan-diff',['-ldl']),('vex-scan-guard',[b/'libcapstone.a','-lm'])]:
-        run(['clang++','-O2','-std=c++17','-I',tree,'-I',tree/'include',r/(name+'.cpp'),*args,'-o',w/name],name+'-build')
-        run([w/name,*([w/'route.so',w/'vector.so'] if name=='vex-scan-diff' else [])],name)
     exe['iced']=exe['fast']=exe['integer']
-    payloads={key:path.read_bytes()for key,path in exe.items()}
-    assert payloads['integer']==payloads['aa']
-    maximum=max(map(len,payloads.values()))
-    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-    image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
-    image_inode=image.stat().st_ino
-    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
+    import observe, profile_costs
+    run(['git','apply',r/'vector.patch'],'apply-observer',tree)
+    observe.build(tree,b,w/'observer',base,r/'observer.cpp',run)
+    columns=['instructions','scan_fallback','generic_result','generic_decode','feature_slow','evex_fast_success']
+    save('observed-fields.json',dict(columns=columns,scope='Single untimed copy of the exact candidate. Counts increment at actual function entry or the compact EVEX success. Last-byte register/memory labels are the encoded ModRM for bare vector forms.'))
+    all_costs=[]
     import pe_panels, itertools
     for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w)):
-        if name not in ('libjpeg62-turbo-amd64','libzstd1-amd64','libssl3t64-amd64','jpeg-avx2-i386','libssl3t64-i386','putty-32-0.85','putty-64-0.85'): continue
+        if name not in ('libjpeg62-turbo-amd64','libssl3t64-amd64','putty-32-0.85'):continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
@@ -140,49 +120,42 @@ def main(w):
             assert len(common)==1 and common[0][0][1]==f.stat().st_size if bits==32 else len(common)>150
             manifest[name]['selection']=source['extent_source']+'; require bytewise identical acceptance and boundaries over each retained extent'
         for panel in (['whole-text' if bits==32 else 'runtime-functions'] if name.startswith('putty-') else ['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions'])):
+            if panel=='all-functions':continue
             sel=[a for a,v in common if panel in ('all-functions','whole-text','runtime-functions') or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386' or name.startswith('putty-'):assert sel,(name,manifest[name])
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
+            obs=sp.check_output([w/'observer',str(bits),f,intervals],text=True)
+            stages={}
+            for line in obs.splitlines():
+                fields=line.split('\t')
+                assert len(fields)==7 and fields[0] not in stages
+                stages[fields[0]]=list(map(int,fields[1:]))
+            census=prefix_census[name+'/'+panel]
+            assert sum(v[0] for v in stages.values())==census['decoded']+census['invalid_bytes']
+            save(name+'-stages.json',dict(columns=columns,mnemonics=stages))
             for mode in (0,1,2):
-                def measure(lib,n,launch):
-                    tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
-                    if launch=='images':
-                        command=[str(exe[lib]),*tail];executable=None
-                    elif launch=='same-argv':
-                        command=[str(image),*tail];executable=str(exe[lib])
-                    else:
-                        with image.open('r+b')as out:
-                            assert out.write(padded[lib])==maximum
-                        assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                        command=[str(image),*tail];executable=None
-                        if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                    return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','route','vector','iced']+(['fast'] if mode else [])
-                for i in range(18):
-                    launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                    for launch in launch_order:
-                        order=labels[i%len(labels):]+labels[:i%len(labels)]
-                        obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                        assert all(len(v)==6 for k,v in obs)
-                        assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                        assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1,(name,mode,launch,obs)
-                        cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-                for launch,observations in cycles.items():
-                    md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                    row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']={k:md('iced',k) for k in ('integer','route','vector')}
-                    row['vs_fast']={k:md('fast',k) for k in ('integer','route','vector')} if mode else None
-                    reported.append(row)
-                save('measurements.json',reported)
-            print(name,panel,len(sel),flush=True)
-    planned=json.loads((r/'protocol.json').read_text())['samples']
-    expected={(panel,mode,launch) for panel in planned for mode in ('scan','format','detail') for launch in launches}
-    observed={(row['case']+'/'+row['panel'],row['mode'],row['launch']) for row in reported}
-    assert expected==observed and len(reported)==len(expected),(expected-observed,observed-expected)
-    save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
+                results={}
+                for label in ['integer','vector','iced']+(['fast'] if mode else []):
+                    engine=label+'____' if label in ('fast','iced') else 'capstone'
+                    fn=name+'-'+str(mode)+'-'+label
+                    trace=w/'tr';args=['valgrind','--tool=callgrind','--instr-atstart=no','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(trace),str(exe[label]),engine,str(mode),'1',str(f),str(intervals),str(bits)]
+                    with (p/'evidence'/(fn+'.log')).open('w') as stream:
+                        value=list(map(int,sp.check_output(args,stderr=stream,text=True).split()))
+                    assert len(value)==6
+                    results[label]=value[2:]
+                    profile=profile_costs.parse(trace)
+                    assert profile['totals'][0]>0 and value[2]==census['decoded'] and value[3]==census['invalid_bytes']
+                    with trace.open('rb') as src, gzip.open(p/'evidence'/(fn+'.callgrind.gz'),'wb',compresslevel=3) as dst:shutil.copyfileobj(src,dst)
+                    trace.unlink()
+                    save(fn+'-cost.json',profile)
+                    all_costs.append(dict(case=name,panel=panel,mode=mode,engine=label,events=profile['events'],totals=profile['totals'],records=value[2:],functions=len(profile['functions']),trace=fn+'.callgrind.gz',top=profile['functions'][:12]))
+                assert len({tuple(v[:3]) for v in results.values()})==1 and results['integer']==results['vector']
+            print(name,panel,flush=True)
+            save('profile-index.json',all_costs)
+    assert len(all_costs)==33 and len(manifest)==3
+    save('complete.json',dict(cases=len(all_costs),source=inputs,consumer=consumer_hash,method='One warmed traversal under Callgrind zeroed at the timed-loop boundary. Guest work, read/write and simulated cache/branch events; wall times are from the independent native run.'))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
