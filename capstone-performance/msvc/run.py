@@ -180,7 +180,7 @@ def snapshot(programs, cases):
                     hashes.append(h.hexdigest())
                 results.append([case['name'], att, text, detail, hashes])
                 write('snapshot.json', results)
-                assert hashes[0] == hashes[1], results[-1]
+                assert len(set(hashes)) == 1, results[-1]
 
 
 def measure(programs, cases):

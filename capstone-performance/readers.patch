@@ -1,0 +1,81 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index cc67e9c7..12428fff 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2951,7 +2951,14 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+ #define X86_COMPACT_PUBLIC_HEADER
+ #endif
+ 
++/* Keep the generated legacy scan switch out of its callers on native MSVC. */
++#if defined(_MSC_VER) && _MSC_VER >= 1952 && !defined(__clang__)
++#define X86_LEGACY_SCAN_INLINE static __declspec(noinline)
++#else
++#define X86_LEGACY_SCAN_INLINE X86_DECODE_INLINE
++#endif
+ #include "X86GenLegacyTerminal.inc"
++#undef X86_LEGACY_SCAN_INLINE
+ #include "X86GenVexScan.inc"
+ 
+ int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index dcaf2508..48f788ac 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -2597,7 +2597,7 @@ static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst
+ 	decodeLegacyFullShape81,
+ };
+ 
+-X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
++X86_LEGACY_SCAN_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 		uint16_t *size, unsigned int handler)
+ {
+ 	switch (handler) {
+@@ -2670,7 +2670,7 @@ X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+-X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
++X86_LEGACY_SCAN_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+ 		uint16_t *size, unsigned int pattern)
+ {
+ 	if ((pattern & 1) && !insn->consumedModRM && readModRMScan(insn))
+@@ -9758,7 +9758,7 @@ static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst
+ 	decodeLegacyFullShape81,
+ };
+ 
+-X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
++X86_LEGACY_SCAN_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 		uint16_t *size, unsigned int handler)
+ {
+ 	switch (handler) {
+@@ -9831,7 +9831,7 @@ X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+-X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
++X86_LEGACY_SCAN_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+ 		uint16_t *size, unsigned int pattern)
+ {
+ 	if ((pattern & 1) && !insn->consumedModRM && readModRMScan(insn))
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..94cb75e9 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -809,7 +809,7 @@ def emit_public_legacy_handlers(groups):
+             patterns[calls] = len(patterns)
+         handlers[handler] = patterns[calls]
+     lines = [
+-        "X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,",
++        "X86_LEGACY_SCAN_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,",
+         "\t\tuint16_t *size, unsigned int handler)",
+         "{",
+         "\tswitch (handler) {",
+@@ -1089,7 +1089,7 @@ def emit_terminal(suffix):
+     handlers += [f"\treadLegacyShape{handler}," for handler in groups.values()]
+     handlers += ["};", ""]
+     public_reader = [
+-        "X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,",
++        "X86_LEGACY_SCAN_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,",
+         "\t\tuint16_t *size, unsigned int pattern)",
+         "{",
+         "\tif ((pattern & 1) && !insn->consumedModRM && readModRMScan(insn))",
