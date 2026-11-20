@@ -1,3 +1,38 @@
+diff --git a/MCInst.c b/MCInst.c
+index cda912d1..984974f3 100644
+--- a/MCInst.c
++++ b/MCInst.c
+@@ -23,6 +23,16 @@ void MCInst_Init(MCInst *inst, cs_arch arch)
+ 	MCInst_InitStorage(inst, arch, true);
+ }
+ 
++#ifdef CAPSTONE_HAS_POWERPC
++void MCInst_InitForDisassembly(MCInst *inst, const cs_struct *handle)
++{
++	/* PowerPC constructs each operand it reads during a scan. */
++	bool scan_ppc = handle->arch == CS_ARCH_PPC && handle->no_text &&
++			!handle->detail_opt;
++	MCInst_InitStorage(inst, handle->arch, !scan_ppc);
++}
++#endif
++
+ // does not free @Op
+ void MCInst_insert0(MCInst *inst, int index, MCOperand *Op)
+ {
+diff --git a/MCInst.h b/MCInst.h
+index 641480ed..31df9fd0 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -262,6 +262,9 @@ static inline void MCInst_InitX86(MCInst *inst)
+ }
+ 
+ void MCInst_Init(MCInst *inst, cs_arch arch);
++#ifdef CAPSTONE_HAS_POWERPC
++void MCInst_InitForDisassembly(MCInst *inst, const cs_struct *handle);
++#endif
+ 
+ CS_MCINST_INLINE void MCInst_clear(MCInst *inst)
+ {
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
 index d57235c9..39262daf 100644
 --- a/arch/Mips/MipsDisassembler.c
@@ -59,22 +94,18 @@ index d57235c9..39262daf 100644
  	unsigned Rs = fieldFromInstruction_4(Insn, 4, 3);
  	unsigned Offset = fieldFromInstruction_4(Insn, 0, 4) << 1;
 diff --git a/cs.c b/cs.c
-index 71fff034..37ddbc8e 100644
+index 71fff034..d4bd4470 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1082,6 +1082,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
- 	else
+@@ -1094,6 +1094,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	 * performs better on some full-detail workloads with the shared
+ 	 * initializer below. */
+ 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
++#elif defined(CAPSTONE_HAS_POWERPC)
++	MCInst_InitForDisassembly(&mci, handle);
+ #else
+ 	MCInst_Init(&mci, handle->arch);
  #endif
-+#ifdef CAPSTONE_HAS_POWERPC
-+	if (handle->arch == CS_ARCH_PPC)
-+		/* The PowerPC decoder constructs operands as it appends them. */
-+		MCInst_InitStorage(&mci, CS_ARCH_PPC, false);
-+	else
-+#endif
- #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
- 		/* ARM constructs each operand before reading or inserting it. */
- 		MCInst_InitStorage(&mci, CS_ARCH_ARM, false);
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 index c94daecb..794edba3 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json

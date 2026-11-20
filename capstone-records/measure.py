@@ -57,8 +57,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        assert changed==['arch/Mips/MipsDisassembler.c.o','cs.c.o'],changed
-        assert [k for k in objects['control'] if objects['control'][k]!=objects['candidate'][k]]==['cs.c.o']
+        assert changed==['MCInst.c.o','arch/Mips/MipsDisassembler.c.o','cs.c.o'],changed
+        assert sorted(k for k in objects['control'] if objects['control'][k]!=objects['candidate'][k])==['MCInst.c.o','cs.c.o']
         targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','mips_nanomips_branch']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
@@ -110,6 +110,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
                     assert summary is not None and calls
                     costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,memset_self_ir=self_ir,memset_callsite_ir=memset_edge_work,first=json.loads(rr.stdout)['first']))
                     trace.unlink()
+            for row in costs:
+                if row['case']=='ppc64el-ls' and row['variant']=='candidate':
+                    assert any('MCInst_InitForDisassembly' in name for name in row['edges'])
             write('call-costs',costs)
         shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
         payload={k:v.read_bytes() for k,v in binaries.items()}; assert payload['base']==payload['copy']!=payload['candidate']

@@ -1,7 +1,7 @@
-name: Measure the real PPC clear site and test constructed PowerPC operands across six ISAs
+name: Test PowerPC scan-only operand preparation on six disassembly targets
 on:
   push:
-    branches: [codex/capstone-ppc-constructed-operands]
+    branches: [codex/capstone-ppc-scan-init]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ppc-constructed-operands-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: ppc-scan-init-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
