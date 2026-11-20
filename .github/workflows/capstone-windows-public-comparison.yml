@@ -1,0 +1,34 @@
+name: Link the official four-decoder comparison on Windows
+on:
+  push:
+    branches: [codex/capstone-windows-public-comparison]
+    paths: [windows-compare/**, .github/workflows/capstone-windows-public-comparison.yml]
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-2022
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: windows-compare
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 51b862e8a70768974d6917eddd319faff6668994
+          path: neverd
+          sparse-checkout: tools/neverd-bench/decoder-comparison
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+      - name: Build every input from source and compare the two link steps
+        run: python windows-compare/measure.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: official-windows-comparison
+          path: evidence/
+          retention-days: 14
