@@ -40,7 +40,8 @@ def pe_text(path):
             size,start=struct.unpack_from('<II',image,o+16)
             return image[start:start+min(size,65536)]
     raise RuntimeError('no code section')
-with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as tmp:
+workspace=tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP'])
+with workspace as tmp:
     t=Path(tmp)
     try:
         for key,item in spec['sources'].items():
@@ -97,5 +98,5 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as tmp:
         write('complete',dict(inputs=spec,raw_baseline_errors=unresolved,smoke=rows))
     finally:
         total=sum(f.stat().st_size for f in t.rglob('*') if f.is_file())
-        shutil.rmtree(t)
+        workspace.cleanup()
         write('cleanup',dict(removed=not t.exists(),bytes=total))
