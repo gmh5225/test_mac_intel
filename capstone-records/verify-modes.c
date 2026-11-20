@@ -305,7 +305,9 @@ bool candidateFeature(unsigned int mode, unsigned int feature)
 		return true;
 	case Mips_FeatureEVA:
 	case Mips_FeatureMT:
-		return !(mode & CS_MODE_NANOMIPS) || (mode & CS_MODE_I7200);
+		if (mode & CS_MODE_NANOMIPS)
+			return mode & CS_MODE_I7200;
+		return true;
 	default:
 		return feature < ARR_SIZE(mode_masks) &&
 		       (mode & mode_masks[feature]);

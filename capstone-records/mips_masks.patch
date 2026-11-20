@@ -1,8 +1,8 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..f9f26da3 100644
+index d57235c9..60406374 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
-@@ -53,178 +53,133 @@
+@@ -53,178 +53,135 @@
  
  bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
  {
@@ -217,11 +217,6 @@ index d57235c9..f9f26da3 100644
 -	case Mips_FeatureVirt: // Mips Virtualization ASE
 -		return true;
 -	case Mips_FeatureGINV: // Mips Global Invalidate ASE
--		return true;
--	case Mips_FeatureMT: { // Mips MT ASE
--		if (mode & CS_MODE_NANOMIPS) {
--			return mode & CS_MODE_I7200;
--		}
 +			CS_MODE_MIPS64R6 | CS_MODE_OCTEON | CS_MODE_OCTEONP,
 +		[Mips_FeatureMips32r2] = CS_MODE_MIPS32R2 | CS_MODE_MIPS32R3 |
 +					 CS_MODE_MIPS32R5 | CS_MODE_MIPS32R6 |
@@ -267,10 +262,15 @@ index d57235c9..f9f26da3 100644
 +	case Mips_FeatureVirt:
 +	case Mips_FeatureGINV:
  		return true;
--	}
+-	case Mips_FeatureMT: { // Mips MT ASE
+-		if (mode & CS_MODE_NANOMIPS) {
 +	case Mips_FeatureEVA:
 +	case Mips_FeatureMT:
-+		return !(mode & CS_MODE_NANOMIPS) || (mode & CS_MODE_I7200);
++		if (mode & CS_MODE_NANOMIPS)
+ 			return mode & CS_MODE_I7200;
+-		}
+ 		return true;
+-	}
  	default:
 -		return false;
 +		return feature < ARR_SIZE(mode_masks) &&
@@ -279,7 +279,7 @@ index d57235c9..f9f26da3 100644
  }
  
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..a4802446 100644
+index c94daecb..701df531 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 @@ -2102,7 +2102,7 @@
@@ -287,7 +287,7 @@ index c94daecb..a4802446 100644
      "Mips_getFeatureBits": {
        "apply_type": "OLD",
 -      "old_hash": "2b6439bb0b486d29ff80b9d798e14de27cb3e9ef8d5c76c90c2535f1a82dfa0f",
-+      "old_hash": "5e8cc67fc11c577da19c49dfe4299277147d6a48704d0f942a290fe734fd9c44",
++      "old_hash": "21d25eb605ccaa19a100ff296fd61762bd9df17b8e550bfb3964d27534d99cbb",
        "new_hash": "",
        "edit": ""
      },
