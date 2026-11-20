@@ -1,5 +1,5 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..8e660f77 100644
+index d57235c9..39262daf 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -11,7 +11,45 @@ index d57235c9..8e660f77 100644
  	case Mips_FeatureTLB:
  		return mode & CS_MODE_I7200;
  	case Mips_FeatureCnMips:
-@@ -3483,6 +3483,8 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
+@@ -1457,8 +1457,10 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 	cs_mode mode = Instr->csh->mode;
+ 	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
+ 	bool IsGP64, IsFP64;
++	bool try_dsp = true;
+ #ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
+ 	uint64_t major;
++#endif
+ 	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
+ 	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64 ||
+ 	    isa == CS_MODE_MIPS32R2 || isa == CS_MODE_MIPS64R2) {
+@@ -1473,7 +1475,6 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		IsFP64 = isa != CS_MODE_MIPS32;
+ 		goto DecodeStandard;
+ 	}
+-#endif
+ 	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
+ 	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
+ 	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
+@@ -1707,16 +1708,14 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
+-#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
+ DecodeStandard:
++#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
+ 	/* A primary-opcode miss in these generated tables reaches Fail before
+ 	 * any predicate, operand reader, or instruction state change. */
+ 	major = UINT64_C(1) << (Insn >> 26);
+ 	IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
+ 	IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
+-	const bool try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
+-#else
+-	const bool try_dsp = true;
++	try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
+ #endif
+ 	if (IsGP64) {
+ 		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
+@@ -3483,6 +3482,8 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
  					   uint64_t Address,
  					   const void *Decoder)
  {
@@ -21,7 +59,7 @@ index d57235c9..8e660f77 100644
  	unsigned Rs = fieldFromInstruction_4(Insn, 4, 3);
  	unsigned Offset = fieldFromInstruction_4(Insn, 0, 4) << 1;
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..406d1816 100644
+index c94daecb..794edba3 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 @@ -1592,7 +1592,7 @@
@@ -40,6 +78,15 @@ index c94daecb..406d1816 100644
 -      "old_hash": "2b6439bb0b486d29ff80b9d798e14de27cb3e9ef8d5c76c90c2535f1a82dfa0f",
 +      "old_hash": "5081d3616c4afa88fb11549dd2acbbf9d1a1e2627ff7e215380d7bb27499de16",
        "new_hash": "",
+       "edit": ""
+     },
+@@ -2120,7 +2120,7 @@
+     },
+     "getInstruction": {
+       "apply_type": "OLD",
+-      "old_hash": "52fc65a707feef93d6bd7c7c6f55851d2c93be45650efe21fe031b8928f2eb4c",
++      "old_hash": "ae78cd720b4d666ee4ec2ccd871cf5be7534875bdb83a7d541ae5433999297ec",
+       "new_hash": "aca77782b4160891075cb2f890401385cde140c255d109d1ed08c693f2cc10ba",
        "edit": ""
      },
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt

@@ -39,8 +39,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
         for label,patch in [('base','bounds'),('candidate','nano_branch')]:
-            path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
-            git('apply','--index',str(path))
+            if label!='base':
+                path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
+                git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
             run(['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static'],'build-'+label)
             libs[label]=t/(label+'.so');shutil.copy2(b/'libcapstone.so',libs[label])
