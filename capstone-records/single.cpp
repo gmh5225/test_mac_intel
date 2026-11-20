@@ -73,6 +73,7 @@ static void text_value(Result &r, const char *s) {
   r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
 }
 
+static bool public_only;
 struct Session {
  const API &api; unsigned bits, mode; csh handle=0; cs_insn *insn=nullptr;
  Session(const API &a, unsigned b, unsigned m): api(a),bits(b),mode(m) {
@@ -100,7 +101,7 @@ static Result run(Session &session,const std::vector<uint8_t>&bytes_,unsigned re
     const uint8_t *cursor = bytes;
     size_t left = count;
     uint64_t ip = 0x100000;
-    auto iterate = session.bits >= 16 && session.mode ? &X86_disasmIter : api.cs_disasm_iter;
+    auto iterate = !public_only && session.bits >= 16 && session.mode ? &X86_disasmIter : api.cs_disasm_iter;
     while (left) {
       size_t offset = cursor - bytes;
       bool ok = iterate(handle, &cursor, &left, &ip, insn);
@@ -176,6 +177,7 @@ int main(int argc, char **argv) {
     const unsigned mode = std::stoul(argv[2]);
     const unsigned repeats = std::stoul(argv[4]);
     if (mode > 2 || !repeats) throw std::runtime_error("mode/repeats");
+    public_only = std::string(std::getenv("CAPSTONE_PUBLIC_ONLY")) == "1";
     API api;
     Session session(api, selector, mode);
     std::ifstream f(argv[3], std::ios::binary);
