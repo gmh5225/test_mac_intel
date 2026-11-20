@@ -58,6 +58,23 @@ index d57235c9..39262daf 100644
  	unsigned Rt = fieldFromInstruction_4(Insn, 7, 3);
  	unsigned Rs = fieldFromInstruction_4(Insn, 4, 3);
  	unsigned Offset = fieldFromInstruction_4(Insn, 0, 4) << 1;
+diff --git a/cs.c b/cs.c
+index 71fff034..37ddbc8e 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1082,6 +1082,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
+ 	else
+ #endif
++#ifdef CAPSTONE_HAS_POWERPC
++	if (handle->arch == CS_ARCH_PPC)
++		/* The PowerPC decoder constructs operands as it appends them. */
++		MCInst_InitStorage(&mci, CS_ARCH_PPC, false);
++	else
++#endif
+ #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
+ 		/* ARM constructs each operand before reading or inserting it. */
+ 		MCInst_InitStorage(&mci, CS_ARCH_ARM, false);
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 index c94daecb..794edba3 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json

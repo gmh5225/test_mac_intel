@@ -38,8 +38,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV','PPC')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
-        for label,patch in [('base','bounds'),('candidate','nano_branch')]:
+        for label,patch in [('base','bounds'),('control','control'),('candidate','nano_branch')]:
             if label!='base':
+                git('reset','--hard',meta['bounds']['parent'])
                 path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
                 git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
@@ -56,7 +57,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        assert changed==['arch/Mips/MipsDisassembler.c.o'],changed
+        assert changed==['arch/Mips/MipsDisassembler.c.o','cs.c.o'],changed
+        assert [k for k in objects['control'] if objects['control'][k]!=objects['candidate'][k]]==['cs.c.o']
         targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','mips_nanomips_branch']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
@@ -74,8 +76,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         run(['clang++','-O2',*common,r/'verify-mips.cpp','-ldl','-o',t/'mips-states'],'mips-build')
         run([t/'mips-states',libs['base'],libs['candidate']],'full-mips')
         if platform.machine()=='x86_64':
+            run(['valgrind','--tool=memcheck','--error-exitcode=87','--track-origins=yes',t/'ppc-states',libs['base'],libs['candidate'],'256'],'ppc-memcheck')
             costs=[]
-            for name,m,route in [('mips64el-ls',m,'public') for m in (0,1,2)]:
+            for name,m,route in [(case,m,'public') for case in ('ppc64el-ls','mips64el-ls') for m in (0,1,2)]:
                 c=next(x for x in cases if x['name']==name)
                 for key,exe in binaries.items():
                     trace=t/'calls.out';tag='trace-'+name+'-'+route+'-'+key
@@ -87,16 +90,25 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
                         n,val=match.groups()
                         if val is not None:names[n]=val
                         return names.get(n,'('+n+')')
-                    summary=None
+                    summary=None;self_ir={};is_call=False;callsite=None;memset_edge_work={}
                     for line in trace.read_text(errors='replace').splitlines():
                         if line.startswith('fn='):caller=resolved(line[3:])
                         elif line.startswith('cfn='):callee=resolved(line[4:])
                         elif line.startswith('calls=') and callee and caller:
-                            if any(k in callee or k in caller for k in ('Mips_getFeatureBits','Mips_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','MCInst_insert0','RISCV_getInstruction','RISCV_LLVM_getInstruction','Mips_getInstruction','cs_disasm_iter','cs_decode_full_insn')):
+                            is_call=True;callsite=(caller,callee)
+                            if any(k in callee or k in caller for k in ('memset','MCInst_Init','PPC_getInstruction','Mips_getFeatureBits','Mips_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','MCInst_insert0','RISCV_getInstruction','RISCV_LLVM_getInstruction','Mips_getInstruction','cs_disasm_iter','cs_decode_full_insn')):
                                 edge=caller+' -> '+callee;calls[edge]=calls.get(edge,0)+int(line[6:].split()[0])
                         elif line.startswith('summary:'):summary=int(line.split()[1])
+                        elif line and line[0] in '0123456789+*-' and caller:
+                            fields=line.split()
+                            if len(fields)==2 and fields[-1].isdigit():
+                                amount=int(fields[-1])
+                                if not is_call and 'memset' in caller:self_ir[caller]=self_ir.get(caller,0)+amount
+                                if is_call and callsite and 'memset' in callsite[1]:
+                                    edge=' -> '.join(callsite);memset_edge_work[edge]=memset_edge_work.get(edge,0)+amount
+                            is_call=False;callsite=None
                     assert summary is not None and calls
-                    costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,first=json.loads(rr.stdout)['first']))
+                    costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,memset_self_ir=self_ir,memset_callsite_ir=memset_edge_work,first=json.loads(rr.stdout)['first']))
                     trace.unlink()
             write('call-costs',costs)
         shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
@@ -106,7 +118,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         fixed=['setarch',platform.machine(),'-R']; sp.run([*fixed,'/bin/true'],check=True)
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         write('controls',dict(images={k:sha(v) for k,v in binaries.items()},inode=inode,aslr_disabled=True,cpu=list(os.sched_getaffinity(0)),
-             cycle_count=9,target_ms=32,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
+             cycle_count=12,target_ms=32,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
         def sample(key,c,m,n,route):
             with image.open('r+b') as stream:assert stream.write(padded[key])==size
             assert image.stat().st_ino==inode and image.stat().st_size==size
@@ -119,8 +131,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
                     probe=sample('base',c,m,2,route)
                     n=max(2,min(4000,round(64e6/probe['cpu_ns'])))
                     pairs=[];reference=None
-                    for i in range(9):
-                        names=['base','copy','candidate']; order=names[i%3:]+names[:i%3];ticks={key:[] for key in names}
+                    for i in range(12):
+                        names=['base','copy','control','candidate']; order=names[i%4:]+names[:i%4];ticks={key:[] for key in names}
                         for key in order+order[::-1]:
                             row=sample(key,c,m,n,route)
                             if reference is None: reference=(row['first'],row['result'])
