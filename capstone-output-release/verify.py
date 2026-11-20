@@ -17,7 +17,7 @@ try:
     opts=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if arch!='all':
         opts+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF']+['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in {'four':('X86','ARM','AARCH64','MIPS'),'x86':('X86',),'arm':('ARM',)}[arch]]
-    if os.name=='nt':opts+=['-A','x64','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if cc=='MT' else 'OFF')]
+    if os.name=='nt':opts+=['-G','Ninja','-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if cc=='MT' else 'OFF')]
     else:
         opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+cc]
         if cc=='gcc':opts+=['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers']
@@ -37,7 +37,7 @@ try:
         if profile not in ('diet','reduce'):wanted+=['x86_simple_output','x86_printer_prechecked']
         targets=[name for name in wanted if 'unit_'+name in registered]
         assert 'mcinst' in targets
-        run(['cmake','--build',b,'--config','Release','--target','capstone_static',*targets,'--parallel','4'],phase+'-build')
+        run(['cmake','--build',b,'--config','Release','--target','capstone_static',*targets,'--parallel','1'],phase+'-build')
         run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(targets)+')$','-j3'],phase+'-tests')
         checks[phase]=targets
     if 'x86_simple_output' in checks['iterator']:
@@ -46,7 +46,7 @@ try:
         libs=[p for p in b.rglob('*') if p.name in ('libcapstone.a','capstone.lib') and p.is_file()]
         assert len(libs)==1,libs
         before=sha(libs[0]);unit.write_text(old.replace(choose,'cs_disasm_iter'))
-        run(['cmake','--build',b,'--config','Release','--target','x86_simple_output','--parallel','4'],'public-only-build')
+        run(['cmake','--build',b,'--config','Release','--target','x86_simple_output','--parallel','1'],'public-only-build')
         assert before==sha(libs[0]);run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_x86_simple_output$'],'public-only-tests')
         checks['public_only_against_custom_mnemonic_fallback']=before
     save('complete',dict(toolchain=cc,profile=profile,architectures=arch,checks=checks,source=meta,configure=opts))
