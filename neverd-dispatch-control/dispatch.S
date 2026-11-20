@@ -33,9 +33,11 @@
  .if \width == 1
  .data_region
  .long 0xd503237f
+ .byte 0x7e
  .end_data_region
  .data_region jt8
 8: .byte (3b-1b)/4, 0, (2b-1b)/4, 0
+ .space 3
  .elseif \width == 2
  .data_region jt16
 8: .short (3b-1b)/4, 0, (2b-1b)/4, 0
