@@ -1,0 +1,1385 @@
+{
+  "revision": "2b77a343713b02d2471b578dab0459d5680100c5",
+  "package": "Release with NeverSight LLVM 09ff60dd1ddb17114892ee2bb32256182dedc76e",
+  "tag": "neverd-bounded-tables-2b77a343713b",
+  "host": "NeverDArm64eLiftedImageTests",
+  "asset": "bounded-tables.tgz",
+  "run_env": {
+    "NEVERD_ARM64E_LIFTED_NATIVE": "1",
+    "NEVERD_ARM64E_ASYNC_NATIVE": "1"
+  },
+  "filter": "*",
+  "tests": {
+    "PublishedFrameRecoversCallerAtFiveSignalInterruptions": {
+      "native_interrupted_frames": 10,
+      "native_authenticated_parent_frames": 10,
+      "native_sigtramp_context_handoffs": 10,
+      "native_system_caller_steps": 10,
+      "native_old_entry_system_steps": 1,
+      "native_old_entry_raw_signal_walk": 1,
+      "native_old_entry_original_fde_step": 1,
+      "native_old_entry_original_compact_step": 1,
+      "native_old_entry_original_compact_lsda_step": 1,
+      "native_alternate_stack_table_walks": 6,
+      "native_automatic_original_table_entry_walks": 12
+    },
+    "OptimizedCalleeWalksTheNativeArgumentArea": 4,
+    "UnoptimizedCalleeHomesItsNativeArgumentCursor": 4,
+    "FramelessStackLoadsSurviveImagePublication": 2,
+    "CompactLeavesElideOnlyTheUnusedStackReservation": 2,
+    "PreIndexedArgumentLoadRestoresTheIncomingSP": 2,
+    "PublishesDarwinTrue": 2,
+    "PublishesDarwinFalse": 2,
+    "VerifiedLeafBodiesUseTheNormalPatchPipeline": 2,
+    "DirectTailTransferPreservesItsInstalledCallee": 2,
+    "EquivalentWAndXZeroingPreservesTheWholeRegister": 2,
+    "OriginalGlobalAndAuthenticatedImportSurvivePublication": 2,
+    "SignedFrameCallsImportBeforeReadingOriginalGlobal": 2,
+    "SwiftErrorReturnsBothTheOldValueAndTheUpdatedRegister": 2,
+    "SwiftErrorCanClearTheRegisterWithoutReadingIt": 2,
+    "TailCallForwardsTheWritableSwiftErrorRegister": 2,
+    "SignedCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "IndexedDwarfCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "AsyncDwarfRestoresTheLinkRegisterBeforeSwiftReturn": 2,
+    "SwiftContextSurvivesNativeLeafPublication": 2,
+    "SwiftAsyncContextSurvivesNativeLeafPublication": 2,
+    "ScalarFPParametersAndResultsSurvivePublication": 2,
+    "SignedLeafUsesTheIncomingSPAtItsNewAddress": 2,
+    "BaseAndDisplacementRetainLoadAndStoreEffects": 2,
+    "UnoptimizedImagePreservesReturnedRegisters": {
+      "executed_native_images": 2,
+      "native_register_entries_compared": 9,
+      "native_register_input_comparisons": 27,
+      "installed_register_entries": 9
+    },
+    "OptimizedImagePreservesReturnedRegisters": {
+      "executed_native_images": 2,
+      "native_register_entries_compared": 9,
+      "native_register_input_comparisons": 27,
+      "installed_register_entries": 9
+    },
+    "DirectCallerConsumesNonVariadicX8AndX9Results": 2,
+    "DirectCallerConsumesTailForwardedX8AndX9Results": 2,
+    "InstructionAddressRecipesUseTheActualSigningPC": {
+      "native_cursor_pacm_profiles": 4
+    },
+    "MultipleEpiloguesKeepFramePointerAndRememberedRows": 2,
+    "CompilerCompactFramesRecoverTheSavedCallerWithoutDwarf": {
+      "native_compact_calls": 3
+    },
+    "CompilerCatchAndCleanupRecoverTheSavedSignedLR": {
+      "native_cxx_exception_paths": 34,
+      "native_cxx_unwinder_pac_traps": 6
+    },
+    "ObjectiveCCatchesAndFinallyPreserveSignedCallers": {
+      "native_objc_exception_paths": 32
+    },
+    "SignalReturnResumesCallerWithRecoveredVectorLanes": {
+      "native_signal_caller_resumptions": 8
+    },
+    "PublishedThreadLocalAccessUsesTheBoundDescriptor": {
+      "native_thread_local_accesses": 32
+    },
+    "SignalExceptionRunsInterruptedAndOuterCleanups": {
+      "native_signal_language_cleanups": 24
+    },
+    "SignalExceptionRunsInterruptedAndOuterObjCCleanups": {
+      "native_objc_signal_cleanups": 24
+    },
+    "PublishesNewThreadLocalDefinitionsAndInitializers": {
+      "native_new_tls_lifecycles": 8
+    },
+    "PublishesMultiplyAccumulateAndVariableShift": 2,
+    "RunsLegacyThreadInitializersWithPerInstancePAC": {
+      "native_thread_resolver_lifecycles": 8
+    },
+    "PublishesByteReversalAndTrailingZeroCount": 2,
+    "PublishesSignedAndUnsignedSelections": 2,
+    "PublishesArchitecturalDivisionAtExceptionalInputs": 2,
+    "PublishesWordDivisionAtExceptionalInputs": 2,
+    "PublishesConditionalReadsAndWrites": 2,
+    "PublishesSignAndZeroExtendingLoads": 2,
+    "DirectCallResultsSurviveForwardAndBackwardBranches": 2,
+    "PublishesLoopsWithPostIndexedMemory": 2,
+    "PublishesScaledAndSignedRegisterOffsets": 2,
+    "PublishesSIMD128SingleAndPairWritebackLoops": 2,
+    "PublishesPostIndexedScalarAndPairMemory": 2,
+    "PublishesPreIndexedScalarAndPairMemory": 2,
+    "BranchWritesKillBothScratchResultsBeforeUse": 0,
+    "PublishesSIMDByteWritebackLoops": 2,
+    "PublishesSIMDHalfWritebackLoops": 2,
+    "PublishesSIMDWordAndPairWritebackLoops": 2,
+    "PublishesSIMDDoubleAndPairWritebackLoops": 2,
+    "SIMDDataPreservesIndexedStackAndRememberedRows": 2,
+    "PublishesSIMD16ByteArithmetic": 2,
+    "PublishesSIMD8ByteArithmetic": 2,
+    "PublishesSIMD8HalfArithmetic": 2,
+    "PublishesSIMD4HalfArithmetic": 2,
+    "PublishesSIMD4WordArithmetic": 2,
+    "PublishesSIMD2WordArithmetic": 2,
+    "PublishesSIMD2DoubleArithmetic": 2,
+    "PublishesSIMDScalarDoubleArithmetic": 2,
+    "PublishesSIMDPermutationsTablesAndLanes": 2,
+    "PublishesSIMDFusedLanesWithFloatingEnvironment": 2,
+    "PublishesSIMDRegisterArgumentsAndResults": 2,
+    "PublishesSIMDWidenNarrowReduceAndSaturationState": 2,
+    "PublishesAllPreservedGPRAndDRegisters": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 52
+    },
+    "PublishesAllPreservedGPRAndQRegisters": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 52
+    },
+    "SignalResumesPublishedGPRAndDRegisters": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 12
+    },
+    "SignalResumesPublishedGPRAndQRegisters": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 12
+    },
+    "PublishesAllPreservedPairs": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "PublishesSparsePreservedPairs": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "PublishesAllPairsWithAdditionalStack": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "PublishesSparsePairsWithAdditionalStack": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "SignalResumesAllPreservedPairs": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 6,
+      "native_system_saved_frame_steps": 6
+    },
+    "SignalResumesSparsePreservedPairs": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 6,
+      "native_system_saved_frame_steps": 6
+    },
+    "SignalResumesAllPairsWithAdditionalStack": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 6,
+      "native_system_saved_frame_steps": 6
+    },
+    "SignalResumesSparsePairsWithAdditionalStack": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 6,
+      "native_system_saved_frame_steps": 6
+    },
+    "PublishesEachPairAndFrameOnly": {
+      "executed_native_images": 20,
+      "native_preserved_register_calls": 260
+    },
+    "PublishesCoalescedAllPairFrames": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 52
+    },
+    "PublishesCoalescedSparseFrames": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 52
+    },
+    "PublishesFramelessAllPairs": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "PublishesFramelessSparsePairs": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "PublishesCoalescedFramelessPairs": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 52
+    },
+    "PublishesEachFramelessPair": {
+      "executed_native_images": 18,
+      "native_preserved_register_calls": 234
+    },
+    "SignalResumesCoalescedAllPairFrames": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 12,
+      "native_system_saved_frame_steps": 12
+    },
+    "SignalResumesCoalescedSparseFrames": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 12,
+      "native_system_saved_frame_steps": 12
+    },
+    "SignalResumesFramelessAllPairs": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 6,
+      "native_system_frameless_steps": 3
+    },
+    "SignalResumesFramelessSparsePairs": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 6,
+      "native_system_frameless_steps": 3
+    },
+    "SignalResumesCoalescedFramelessPairs": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 12,
+      "native_system_frameless_steps": 6
+    },
+    "PublishesPAuthLRAllPairs": {
+      "structural_pauth_lr_images": 2,
+      "executed_native_images": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 2,
+        "unavailable": 0
+      },
+      "native_preserved_register_calls": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 26,
+        "unavailable": 0
+      }
+    },
+    "PublishesPAuthLROffsetAndSparsePairs": {
+      "structural_pauth_lr_images": 2,
+      "executed_native_images": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 2,
+        "unavailable": 0
+      },
+      "native_preserved_register_calls": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 26,
+        "unavailable": 0
+      }
+    },
+    "SystemUnwindsEachFramelessPair": {
+      "executed_native_images": 18,
+      "native_signal_caller_resumptions": 54,
+      "native_system_frameless_steps": 27
+    },
+    "ProtectedNonCallRunsInterruptedAndOuterCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "ProtectedNonCallRunsInterruptedAndOuterObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedNonCallRunsInterruptedAndOuterCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedNonCallRunsInterruptedAndOuterObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "CompactNonCallRunsInterruptedAndOuterCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "CompactNonCallRunsInterruptedAndOuterObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedCompactNonCallRunsInterruptedAndOuterCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedCompactNonCallRunsInterruptedAndOuterObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeExplicitLPStartRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeExplicitLPStartRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeFramelessRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeFramelessRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeExplicitLPStartPreservesTypedActions": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedExplicitLPStartRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedExplicitLPStartRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedFramelessRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedFramelessRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedExplicitLPStartPreservesTypedActions": {
+      "native_noncall_language_cleanups": 8
+    },
+    "PublishesExplicitLPStartWithEntryLandingPad": {
+      "native_noncall_language_cleanups": 0
+    },
+    "PublishesFramelessLanguageFrame": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "PublishesFramelessLanguageSavedPairs": {
+      "executed_native_images": 2,
+      "native_preserved_register_calls": 26
+    },
+    "SystemUnwindsFramelessLanguageSavedPairs": {
+      "executed_native_images": 2,
+      "native_signal_caller_resumptions": 6,
+      "native_system_frameless_steps": 3
+    },
+    "NativeLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeCompactLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeCompactLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeCompactLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeCompactLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedCompactLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedCompactLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedCompactLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedCompactLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeUnsignedLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeUnsignedLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeUnsignedLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeUnsignedLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedUnsignedLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedUnsignedLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedUnsignedLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedUnsignedLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeCompactUnsignedLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeCompactUnsignedLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeCompactUnsignedLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeCompactUnsignedLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedCompactUnsignedLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedCompactUnsignedLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedCompactUnsignedLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedCompactUnsignedLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeCompactIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeCompactIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "NativeCompactIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativeCompactIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedCompactIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedCompactIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8
+    },
+    "LiftedCompactIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "LiftedCompactIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8
+    },
+    "NativePACMIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativePACMIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativePACMIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativePACMIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativePACMIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativePACMIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativePACMIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativePACMIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedPACMIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeCompactPACMIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "LiftedCompactPACMIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": 8,
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": 8
+    },
+    "NativeExplicitIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeExplicitIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeExplicitIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeExplicitIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIALiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIALiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIALiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIALiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeExplicitIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeExplicitIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeExplicitIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeExplicitIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedExplicitIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "NativeCompactExplicitIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIBLiveLRRunsLanguageCleanups": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIBLiveLRCatchesLanguageException": {
+      "native_noncall_language_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIBLiveLRRunsObjCCleanups": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "LiftedCompactExplicitIBLiveLRCatchesObjCException": {
+      "native_noncall_objc_cleanups": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      },
+      "structural_pc_signing_images": 4,
+      "native_pc_recipe_deliveries": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 8,
+        "unavailable": 0
+      }
+    },
+    "SystemUnwindsPAuthLRAllPairs": {
+      "structural_pauth_lr_images": 2,
+      "executed_native_images": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 2,
+        "unavailable": 0
+      },
+      "native_signal_caller_resumptions": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 6,
+        "unavailable": 0
+      },
+      "native_system_pauth_lr_steps": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 6,
+        "unavailable": 0
+      }
+    },
+    "SystemUnwindsPAuthLROffsetAndSparsePairs": {
+      "structural_pauth_lr_images": 2,
+      "executed_native_images": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 2,
+        "unavailable": 0
+      },
+      "native_signal_caller_resumptions": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 6,
+        "unavailable": 0
+      },
+      "native_system_pauth_lr_steps": {
+        "capability": "explicit_pauth_lr_qualified",
+        "enabled": 6,
+        "unavailable": 0
+      }
+    },
+    "CodesignSignedLiftedOutputAllowsRepeatedNativePublication": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3
+    },
+    "AdHocRequirementsRefusePublicationWithoutMutation": {
+      "executed_native_images": 0,
+      "nonempty_requirements_rejected": 1
+    },
+    "AppendedFunctionsSurviveRepeatedAutomaticLifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8
+    },
+    "AppendedMemorySurvivesRepeatedAutomaticLifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8
+    },
+    "AppendedSIMDRegistersSurviveRepeatedAutomaticLifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8
+    },
+    "AppendedGlobalAndImportSurviveRepeatedAutomaticLifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8
+    },
+    "AppendedIndexedFramesSurviveRepeatedAutomaticLifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8
+    },
+    "SeparateInstructionSectionsSurviveAutomaticRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8,
+      "source_regular_instruction_sections": 2,
+      "discontiguous_instruction_sections": 1,
+      "separate_executable_segments": 0
+    },
+    "SeparateExecutableSegmentsSurviveAutomaticRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8,
+      "source_regular_instruction_sections": 2,
+      "discontiguous_instruction_sections": 1,
+      "separate_executable_segments": 1
+    },
+    "EmbeddedLiteralAndJumpTablesSurviveAutomaticRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 4,
+      "relift_defined_functions_1": 8,
+      "published_data_in_code_records": 16,
+      "embedded_records_after_header_growth": 4
+    },
+    "RelativeSwitchDispatchSurvivesAutomaticRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "relift_defined_functions_0": 6,
+      "relift_defined_functions_1": 12,
+      "published_data_in_code_records": 16,
+      "embedded_records_after_header_growth": 4,
+      "native_switch_comparisons": 288,
+      "proved_embedded_dispatches": 3,
+      "rejected_dispatch_variants": 4
+    },
+    "UnmarkedLiteralsAndRelativeSwitchesSurviveRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "native_switch_comparisons": 288,
+      "published_data_in_code_records": 16,
+      "recovered_source_data_in_code_records": 4
+    },
+    "PartialSwitchRecordsPreserveUnalignedStorage": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "native_switch_comparisons": 288,
+      "published_data_in_code_records": 20,
+      "recovered_source_data_in_code_records": 4
+    },
+    "UnmarkedIntegerAndSIMDLiteralPoolsSurviveRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "published_data_in_code_records": 8,
+      "native_literal_width_comparisons": 40
+    },
+    "FragmentedIntegerAndSIMDLiteralsSurviveRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "published_data_in_code_records": 36,
+      "native_literal_width_comparisons": 40
+    },
+    "FragmentedRelativeTablesSurviveRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "native_switch_comparisons": 288,
+      "published_data_in_code_records": 40,
+      "recovered_source_data_in_code_records": 0,
+      "proved_embedded_dispatches": 3,
+      "rejected_fragment_kind_conflicts": 3
+    },
+    "GappedRelativeTablesSurviveRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "native_switch_comparisons": 288,
+      "published_data_in_code_records": 40,
+      "recovered_source_data_in_code_records": 3,
+      "proved_embedded_dispatches": 3,
+      "rejected_fragment_kind_conflicts": 3
+    }
+  },
+  "environment": {
+    "hardware": [
+      "/usr/sbin/sysctl",
+      "-n",
+      "machdep.cpu.brand_string"
+    ],
+    "cpa": [
+      "/usr/sbin/sysctl",
+      "-n",
+      "hw.optional.arm.FEAT_CPA"
+    ],
+    "cpa2": [
+      "/usr/sbin/sysctl",
+      "-n",
+      "hw.optional.arm.FEAT_CPA2"
+    ],
+    "os": [
+      "/usr/bin/sw_vers"
+    ],
+    "compiler": [
+      "/usr/bin/clang",
+      "--version"
+    ]
+  },
+  "archive_sha256": "e6d211d9dface766602c3f7024c6c6a67b45cb42003da403e21d9342d9f674cb",
+  "host_sha256": "720096fb05f5adfdd7f0fee633b23569b2d0d969636f099775e95d6d801ffbbd",
+  "xml": "results.xml",
+  "log": "runtime.log",
+  "image_count": "executed_native_images",
+  "published_cli_images": {
+    "source": "cli-images/oracle.c",
+    "source_sha256": "95e90e8c00a6e95466b593fd184fb9ac7ef94c64d86b98fcb498b891633446bb",
+    "driver": "cli-table-oracle",
+    "comparisons_per_image": 72,
+    "images": {
+      "cli-images/macos-26-fragmented-original.dylib": {
+        "sha256": "8c3c146bfcf0dcc6377f4f287e8015a87bef4f1ddb9ef61abba45c33264c4b30",
+        "bytes": 34976,
+        "data_in_code_records": 10
+      },
+      "cli-images/macos-26-fragmented-default-1.dylib": {
+        "sha256": "d725bd92c59ff9ae6dddfdea95bc5ec4f3ef60231581f65ac193d1258fdded68",
+        "bytes": 70288,
+        "data_in_code_records": 20
+      },
+      "cli-images/macos-26-fragmented-default-2.dylib": {
+        "sha256": "081d7d96eb398ef6b1b639146b6765348f2181fa4073ff70103bc709cccfffea",
+        "bytes": 105904,
+        "data_in_code_records": 30
+      },
+      "cli-images/macos-26-fragmented-default-3.dylib": {
+        "sha256": "b32b0cde0d86951ff115d6eee3ae9c8db69551ad57039cf3772221cee75254c5",
+        "bytes": 141856,
+        "data_in_code_records": 40
+      },
+      "cli-images/macos-26-fragmented-no-opt-1.dylib": {
+        "sha256": "d30862302d60ba92cb68332abf324e775d234a3970fcbf3d3ab67f1b6a1f5164",
+        "bytes": 70288,
+        "data_in_code_records": 20
+      },
+      "cli-images/macos-26-fragmented-no-opt-2.dylib": {
+        "sha256": "d79334ff11f0a892c87273fb75c14e2204cf6aceec9bd0dbe77856dedd31fa49",
+        "bytes": 105904,
+        "data_in_code_records": 30
+      },
+      "cli-images/macos-26-fragmented-no-opt-3.dylib": {
+        "sha256": "44d74bf27525fc684733f70671cb8f28d42b523ad395502953b8d6e87f223aae",
+        "bytes": 141856,
+        "data_in_code_records": 40
+      },
+      "cli-images/macos-26-gapped-original.dylib": {
+        "sha256": "6c1c74b573c58deeaa8bf6aa1dc017910882b8ab9ee3b9d58247162b6a0ad2cd",
+        "bytes": 34944,
+        "data_in_code_records": 7
+      },
+      "cli-images/macos-26-gapped-default-1.dylib": {
+        "sha256": "3f5ea2d4ffe4e11cccc1bbe3341b90810c3ec017e3507244404f5846a19e1898",
+        "bytes": 70256,
+        "data_in_code_records": 20
+      },
+      "cli-images/macos-26-gapped-default-2.dylib": {
+        "sha256": "7e495fcbe497131671e2add3ca8918815ec67742c0b2871e9b2c1db0eeef432a",
+        "bytes": 105872,
+        "data_in_code_records": 30
+      },
+      "cli-images/macos-26-gapped-default-3.dylib": {
+        "sha256": "5a8aad44c235d82eb5eec535a32b1da300af2e6d9567a7d464bcf52788e3e6f8",
+        "bytes": 141824,
+        "data_in_code_records": 40
+      },
+      "cli-images/macos-26-gapped-no-opt-1.dylib": {
+        "sha256": "f3ca015bbfb749ee480cb00ec94e73f349c7eaa242acee6a296bf95ebb96ad7d",
+        "bytes": 70256,
+        "data_in_code_records": 20
+      },
+      "cli-images/macos-26-gapped-no-opt-2.dylib": {
+        "sha256": "e5656ab8cb43c9b0b86ac3bbb7c4a445b8617c901fe639aa4d0365df3348b5c8",
+        "bytes": 105872,
+        "data_in_code_records": 30
+      },
+      "cli-images/macos-26-gapped-no-opt-3.dylib": {
+        "sha256": "bb10800c24a8cce1c92acbc57f1f745986025d9e24955a5e2802f04925e8d11a",
+        "bytes": 141824,
+        "data_in_code_records": 40
+      },
+      "cli-images/xcode-27-fragmented-original.dylib": {
+        "sha256": "b44ffffc36ce2ad7f5058fa072a3b28f77363c6c0a127d9181f7cac9a6ac4e77",
+        "bytes": 16992,
+        "data_in_code_records": 10
+      },
+      "cli-images/xcode-27-fragmented-default-1.dylib": {
+        "sha256": "0ec6251549faf91822a780cd37290d37628a1d628b3c76dfa92cfd9d46b94eab",
+        "bytes": 52112,
+        "data_in_code_records": 20
+      },
+      "cli-images/xcode-27-fragmented-default-2.dylib": {
+        "sha256": "34c231a5dc331a8398a71911c67681a85d73c1c8d37d7a9e8ea5d0a1ff6442b5",
+        "bytes": 87568,
+        "data_in_code_records": 30
+      },
+      "cli-images/xcode-27-fragmented-default-3.dylib": {
+        "sha256": "f838419e28e855b92434ba7646ab90430990986d36767bf33709a6e97bfbe867",
+        "bytes": 123392,
+        "data_in_code_records": 40
+      },
+      "cli-images/xcode-27-fragmented-no-opt-1.dylib": {
+        "sha256": "965b144dbd2824a5a04d1a088dc1b2325243ed7820a2ca419d0582321ea2f5eb",
+        "bytes": 52112,
+        "data_in_code_records": 20
+      },
+      "cli-images/xcode-27-fragmented-no-opt-2.dylib": {
+        "sha256": "f64b4fc4279782e459de766999b5bea31ec8cc6447201495d8422da39e2a90bd",
+        "bytes": 87568,
+        "data_in_code_records": 30
+      },
+      "cli-images/xcode-27-fragmented-no-opt-3.dylib": {
+        "sha256": "b94f5da7092f6c7f5dce90d74071c6d4a9ddc7571201eba9905756148c868dc9",
+        "bytes": 123392,
+        "data_in_code_records": 40
+      },
+      "cli-images/xcode-27-gapped-original.dylib": {
+        "sha256": "2a5dea7810d947db36b6a2408a8b1aadcec11fcdef8bf8eb0450d69281c1a50b",
+        "bytes": 16960,
+        "data_in_code_records": 7
+      },
+      "cli-images/xcode-27-gapped-default-1.dylib": {
+        "sha256": "eeca8db4fb29a608378eddecfd793632c81736be5111ab8743d7cf2bebcd8a16",
+        "bytes": 52080,
+        "data_in_code_records": 20
+      },
+      "cli-images/xcode-27-gapped-default-2.dylib": {
+        "sha256": "f80af9886d7b7f5ce95ef4b1f1c0daef756f68b9bdb2c1fda554b7cece437757",
+        "bytes": 87536,
+        "data_in_code_records": 30
+      },
+      "cli-images/xcode-27-gapped-default-3.dylib": {
+        "sha256": "ad8691f07338c7ac2741a90afd334ee2f0df853cee0b192edecb0201be5b5f48",
+        "bytes": 123360,
+        "data_in_code_records": 40
+      },
+      "cli-images/xcode-27-gapped-no-opt-1.dylib": {
+        "sha256": "f915bd067f227b818ceef5e8011c99a31b301e4997b56a2ce5e5d24ca1bd0335",
+        "bytes": 52080,
+        "data_in_code_records": 20
+      },
+      "cli-images/xcode-27-gapped-no-opt-2.dylib": {
+        "sha256": "f7e59a684d18e03a775b18e5457e16c5fd9f71df62e2383faf6ec2dd8e87f49e",
+        "bytes": 87536,
+        "data_in_code_records": 30
+      },
+      "cli-images/xcode-27-gapped-no-opt-3.dylib": {
+        "sha256": "e26c71b386ea69b41a46e0b84d45905e1b6fafa856917d4482b348593e2dde70",
+        "bytes": 123360,
+        "data_in_code_records": 40
+      }
+    }
+  }
+}
