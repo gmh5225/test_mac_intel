@@ -1,7 +1,7 @@
-name: Time public Capstone against the NeverSight compatibility fork on full PE32 and ELF
+name: Time packed 32-bit VEX2 after adapter handling against actual forked iced
 on:
   push:
-    branches: [codex/capstone-fork-public-vex32-next]
+    branches: [codex/capstone-vex32-packed-cold]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: combined-vex32-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: packed-vex32-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
