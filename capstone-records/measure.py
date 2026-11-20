@@ -1,122 +1,126 @@
 from pathlib import Path
-import gzip,hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
+import re, hashlib, itertools, json, os, platform, shutil, statistics, subprocess as sp, tempfile
 import corpus
-r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
-sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
-def write(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def run(args,label,cwd=None):
- print(label,flush=True)
- with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
- if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
-assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-arm-predicate-pair-') as tmp:
- t=Path(tmp);b=t/'build'
- try:
-  import re
-  mapping=(s/'arch/ARM/ARMGenCSMappingInsn.inc').read_text()
-  rows=re.findall(r'^\s*(ARM_[\w]+) /\* (\d+) \*/, (ARM_INS_[\w]+)',mapping,re.M)
-  enums=dict(re.findall(r'^\s*(ARM_[\w]+)\s*=\s*(\d+)',(s/'arch/ARM/ARMGenInstrInfo.inc').read_text(),re.M))
-  assert [int(row[1]) for row in rows]==list(range(4465)) and all(enums[name]==idx for name,idx,_ in rows)
-  write('mapping',dict(rows=len(rows),sha256=hashlib.sha256(mapping.encode()).hexdigest()))
-  if Path('/proc/cpuinfo').exists():
-   write('cpu',{'model':next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith(('model name','CPU part')))})
-  mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
-  all_inputs=corpus.prepare(r,t,e,run)
-  choices={'arm-ls','arm-sort','arm-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','amd64-ls','scalar32','scalar64','simd64'} if mixed else set())
-  cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
-
-  run(['clang++','-O3','-DNDEBUG','-std=c++17',*(['-DCAPSTONE_PERF_ARM_ONLY'] if not mixed else []),'-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
-  consumer_symbols=sp.check_output(['nm','-u',t/'single.o'],text=True)
-  if not mixed:assert 'X86_disasmIter' not in consumer_symbols
-  write('consumer-scope',dict(arm_only=not mixed,source_sha256=sha(r/'single.cpp'),x86_iterator_reference='X86_disasmIter' in consumer_symbols))
-  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in (['X86','MIPS','AARCH64','PPC','RISCV','LOONGARCH','ARC','TRICORE'] if os.environ['BUILD_ARCHS']=='extra' else ['X86','MIPS','AARCH64'])] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
-  bins={};objects={};libs={};ownedlibs={}
-  active=mixed
-  write('scope',dict(active=active,policy='Paired ARM predicate operand construction',inactive_requirement='All runtime objects and linked consumer must be byte-identical'))
-  libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','scan'):
-   variant=r/('baseline.patch' if key=='base' else key+'.patch')
-   if key!='base':
-    run(['git','apply',variant],'apply-'+key,s)
-    run(['git','add','-A'],'stage-tested-source',s)
-    tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
-    assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
-    write('tested-source',dict(tree=tested,patch_sha256=sha(variant)))
-    run(['git','reset','-q'],'unstage-tested-source',s)
-   run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
-   link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
-   (e/(key+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',f]))
-   (e/(key+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',f]))
-   objdir=b/'CMakeFiles/capstone.dir'
-   objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
-   if active:
-    with gzip.open(e/(key+'-cs-object-assembly.gz'),'wb') as stream:stream.write(sp.check_output(['objdump','-dr',objdir/'cs.c.o']))
-    with gzip.open(e/(key+'-linked-assembly.gz'),'wb') as stream:stream.write(sp.check_output(['objdump','-dr',f]))
-   libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
-   if key!='base':
-    run(['cmake','--build',b,'--target','arm_private_stream','arm_post_index','mapping','mcinst','x86_simple_output','--parallel','4'],'callback-build')
-    run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_(arm_private_stream|arm_post_index|mapping|mcinst|x86_simple_output)$'],'callback-contract')
-    if active:
-     run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-arm.cpp','-ldl','-o',t/'verify-arm'],'records-link')
-     run([t/'verify-arm',libs['base'],libs['scan']],'records')
-     run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-aarch64.cpp','-ldl','-o',t/'verify-aarch64'],'records-aarch64-link')
-     run([t/'verify-aarch64',libs['base'],libs['scan']],'records-aarch64')
-    run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('scan',):
-   changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
-   added=set(objects[key])-set(objects['base'])
-   assert not added,added
-   expected={'arch/ARM/ARMDisassembler.c.o'} if active else set()
-   assert set(changed)==expected,(key,changed,expected)
-   write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
-  if not active:
-   write('complete',dict(cc=cc,host=platform.platform(),cases=0,active=False,identical_binary=True));raise SystemExit(0)
-  payloads={key:path.read_bytes()for key,path in bins.items()}
-  assert payloads['base']==payloads['aa']
-  maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-  image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
-  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-  launches=['images']
-  if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Paired ARM predicate operand construction; preserve complete records, original images and controlled-image timing panels.'))
-  if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps,launch):
-   tail=list(map(str,[x['selector'],mode,x['path'],reps]))
-   if launch=='images':args=[str(bins[key]),*tail]
-   else:
-    with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
-    assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
-   return json.loads(sp.check_output(args,text=True))
-  from mixed_cost import cost_probe
-  cost_probe(bins,cases,t,e,run)
-  protocol=json.loads((e/'cost-protocol.json').read_text())
-  gate=dict(available=protocol['available'],passive_counts_not_increased=None,rows=[])
-  if protocol['available']:
-   costs=json.loads((e/'instruction-costs.json').read_text())
-   for case,mode in sorted({(x['case'],x['mode']) for x in costs if x['case']!='arm-ls'}):
-    pair={x['variant']:x for x in costs if (x['case'],x['mode'])==(case,mode)}
-    gate['rows'].append(dict(case=case,mode=mode,ir_delta=pair['scan']['events']['Ir']-pair['base']['events']['Ir']))
-   gate['passive_counts_not_increased']=all(x['ir_delta']<=0 for x in gate['rows'])
-  write('codegen-gate',gate)
-  gate['native_timing_policy']='Screen all real and synthetic cases; event counts diagnose admission and lowering, native timing decides benefit.'
-  write('codegen-gate',gate)
-  data=[]
-  for x in cases:
-   for mode in (0,1,2):
-    for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*40e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan']
-     for k in range(21):
-      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-      for v in seq+seq[::-1]:
-       vout=sample(v,x,mode,n,launch)
-       if reference is None:reference=(vout['first'],vout['result'])
-       assert reference==(vout['first'],vout['result'])
-       ticks[v].append(vout['cpu_ns'])
-      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-     data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
- finally:
-  n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
+r = Path(__file__).resolve().parent
+s = r.parent / 'source'
+out = r.parent / 'evidence'
+out.mkdir(exist_ok=True)
+cc = os.environ['MEASURE_CC']
+def write(name, value):
+    (out / (name+'.json')).write_text(json.dumps(value, indent=2)+'\n')
+def run(args, name, cwd=None):
+    print(name, flush=True)
+    with (out / (name+'.log')).open('w') as stream:
+        rc = sp.run(list(map(str,args)), cwd=cwd, stdout=stream, stderr=sp.STDOUT).returncode
+    if rc:
+        raise RuntimeError(name+'\n'+(out/(name+'.log')).read_text(errors='replace')[-3000:])
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+def git(*args):
+    return sp.check_output(['git','-C',s,*args],text=True).strip()
+meta=json.loads((r/'lineage.json').read_text())
+assert git('rev-parse','HEAD')==meta['bounds']['parent']
+write('environment',dict(cc=sp.check_output([cc,'--version'],text=True),host=platform.platform(),
+    cpu=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith(('model name','CPU part'))),None)))
+with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
+    t=Path(temp); b=t/'build'
+    try:
+        cases=corpus.prepare(r,t,out,run)
+        selections=['putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls']
+        cases=[c for c in cases if c['name'] in selections]
+        assert set(c['name'] for c in cases)==set(selections)
+        common=['-I',s,'-I',s/'include']
+        run(['clang++','-std=c++17','-O3','-DNDEBUG',*common,'-c',r/'single.cpp','-o',t/'one.o'],'consumer')
+        run(['clang++','-std=c++17','-O2',*common,r/'public-records.cpp','-ldl','-o',t/'states'],'public-records-build')
+        flags='-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'
+        run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,
+             '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86')],
+             '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
+        libs={}; binaries={}; objects={}
+        for label,patch in [('base','bounds'),('leaf','leaf'),('candidate','iterator')]:
+            if label=='candidate':git('apply','--reverse','--index',str(r/'leaf.patch'))
+            path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
+            git('apply','--index',str(path))
+            assert git('write-tree')==meta[patch]['tree']
+            run(['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static'],'build-'+label)
+            libs[label]=t/(label+'.so');shutil.copy2(b/'libcapstone.so',libs[label])
+            exe=t/label
+            run(['clang++',t/'one.o',b/'libcapstone.a','-lm','-o',exe],'link-'+label)
+            binaries[label]=exe
+            hot=['cs_disasm_iter','X86_disasmIter','X86_disasmTextIter','X86_decodeIteratorOutput','X86_trySimpleOutput']
+            table=sp.check_output(['nm','-n','-S','--defined-only',exe],text=True)
+            lines=[v for v in table.splitlines() if v.split()[-1] in hot]
+            (out/(label+'-iterator-symbols.txt')).write_text('\n'.join(lines)+'\n')
+            with (out/(label+'-iterator-assembly.txt')).open('w') as fp:
+                for v in lines:sp.run(['objdump','-dr','--disassemble='+v.split()[-1],str(exe)],check=True,stdout=fp)
+            obj=b/'CMakeFiles/capstone.dir'
+            objects[label]={str(f.relative_to(obj)):sha(f) for f in obj.rglob('*.o')}
+        assert objects['base'].keys()==objects['candidate'].keys()
+        changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
+        write('objects',dict(changed=changed,lineage=meta))
+        assert set(changed)=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'},changed
+        targets=['mcinst','x86_simple_output','x86_printer_prechecked','text_option','detail_option','x86_x87_environment_hardware']
+        run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
+        run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
+        for c in cases:
+            if c['selector']>=16:
+                run([t/'states',libs['base'],libs['candidate'],c['path'],c['selector']],'records-'+c['name'])
+        if platform.machine()=='x86_64':
+            costs=[]
+            for name,m,route in [('mips64el-ls',0,'public'),('arm-ls',0,'public'),('putty-32-0.85',1,'public'),('putty-32-0.85',1,'private')]:
+                c=next(x for x in cases if x['name']==name)
+                for key,exe in binaries.items():
+                    trace=t/'calls.out';tag='trace-'+name+'-'+route+'-'+key
+                    rr=sp.run(['valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),str(exe),str(c['selector']),str(m),c['path'],'1'],capture_output=True,text=True,check=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public'))))
+                    names={};callee=None;caller=None;calls={}
+                    def resolved(atom):
+                        match=re.fullmatch(r'\((\d+)\)(?: (.*))?',atom)
+                        if not match:return atom
+                        n,val=match.groups()
+                        if val is not None:names[n]=val
+                        return names.get(n,'('+n+')')
+                    summary=None
+                    for line in trace.read_text(errors='replace').splitlines():
+                        if line.startswith('fn='):caller=resolved(line[3:])
+                        elif line.startswith('cfn='):callee=resolved(line[4:])
+                        elif line.startswith('calls=') and callee and caller:
+                            if any(k in callee or k in caller for k in ('X86_disasm','X86_trySimpleOutput','X86_decodeIteratorOutput','cs_disasm_iter','cs_decode_full_insn')):
+                                edge=caller+' -> '+callee;calls[edge]=calls.get(edge,0)+int(line[6:].split()[0])
+                        elif line.startswith('summary:'):summary=int(line.split()[1])
+                    assert summary is not None and calls
+                    costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,first=json.loads(rr.stdout)['first']))
+                    trace.unlink()
+            write('call-costs',costs)
+        shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
+        payload={k:v.read_bytes() for k,v in binaries.items()}; assert payload['base']==payload['copy']!=payload['candidate']
+        size=max(map(len,payload.values())); image=t/'same'; image.write_bytes(bytes(size));image.chmod(0o755);inode=image.stat().st_ino
+        padded={k:v+bytes(size-len(v)) for k,v in payload.items()}
+        fixed=['setarch',platform.machine(),'-R']; sp.run([*fixed,'/bin/true'],check=True)
+        os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+        write('controls',dict(images={k:sha(v) for k,v in binaries.items()},inode=inode,aslr_disabled=True,cpu=list(os.sched_getaffinity(0)),
+             cycle_count=12,target_ms=32,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
+        def sample(key,c,m,n,route):
+            with image.open('r+b') as stream:assert stream.write(padded[key])==size
+            assert image.stat().st_ino==inode and image.stat().st_size==size
+            return json.loads(sp.check_output([*fixed,str(image),*map(str,[c['selector'],m,c['path'],n])],text=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public')))))
+        rows=[]
+        for c in cases:
+            for m in (0,1,2):
+                routes=['public','private'] if m and c['selector']>=16 else ['public']
+                for route in routes:
+                    probe=sample('base',c,m,2,route)
+                    n=max(2,min(4000,round(64e6/probe['cpu_ns'])))
+                    pairs=[];reference=None
+                    for i in range(12):
+                        names=['base','copy','leaf','candidate']; order=names[i%4:]+names[:i%4];ticks={key:[] for key in names}
+                        for key in order+order[::-1]:
+                            row=sample(key,c,m,n,route)
+                            if reference is None: reference=(row['first'],row['result'])
+                            assert reference==(row['first'],row['result'])
+                            ticks[key].append([row['cpu_ns'],row['wall_ns']])
+                        pairs.append(ticks)
+                    rows.append(dict(case=c['name'],route=route,mode=m,repeats=n,reference=reference,cycles=pairs))
+                    write('timings',rows)
+        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['iterator']['tree']))
+    finally:
+        n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))

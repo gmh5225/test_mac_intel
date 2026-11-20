@@ -1,0 +1,112 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..ccbf875a 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,14 +20,27 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
+ 
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+-	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
+ #include "../../cs_priv.h"
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
+ #define CAPSTONE_X86_DEDICATED_OUTPUT
+ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
+ 					 size_t size, cs_insn *insn,
+ 					 uint16_t *insn_size);
++#else
++#define CAPSTONE_X86_TEXT_ITERATOR
++static inline bool X86_hasTextIterator(const cs_struct *handle)
++{
++	return handle->arch == CS_ARCH_X86 && !handle->no_text;
++}
++/* Both entry points select this only for an x86 handle requesting text. */
++CAPSTONE_INTERNAL bool X86_disasmTextIter(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn);
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index cc67e9c7..7e49bbce 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3785,6 +3785,11 @@ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+ {
++#ifdef CAPSTONE_X86_TEXT_ITERATOR
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (*size && handle && X86_hasTextIterator(handle))
++		return X86_disasmTextIter(ud, code, size, address, insn);
++#endif
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..f258337b 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -5,11 +5,9 @@
+ #include "../../cs_priv.h"
+ #include "X86ScanAdapter.h"
+ 
+-#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
+ #include "X86Disassembler.h"
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) || \
++	defined(CAPSTONE_X86_TEXT_ITERATOR)
+ #include "X86InstPrinter.h"
+ #include "X86InstPrinterCommon.h"
+ #include "../../utils.h"
+@@ -211,14 +209,23 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ #include "../../cs_disasm_internal.h"
+ 
++#ifdef CAPSTONE_X86_TEXT_ITERATOR
++CAPSTONE_INTERNAL bool X86_disasmTextIter(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
++{
++	return cs_disasm_iter_core(ud, code, size, address, insn);
++}
++#endif
++
+ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ 				      size_t *size, uint64_t *address,
+ 				      cs_insn *insn)
+ {
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
+-		return cs_disasm_iter_core(ud, code, size, address, insn);
++	if (handle && X86_hasTextIterator(handle))
++		return X86_disasmTextIter(ud, code, size, address, insn);
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..2f9675e5 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -176,7 +176,12 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
++#ifdef CS_DECODE_TRY_OUTPUT
++	/* Only the dedicated x86 text iterator binds this writer. */
++	const bool scan = false;
++#else
+ 	const bool scan = use_x86_scan(handle);
++#endif
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
