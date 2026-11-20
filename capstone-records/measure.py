@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                     for line in trace.read_text().splitlines():
                         if line.startswith(('fn=','cfn=')):
                             tag,atom=line.split('=',1)
-                            hit=re.fullmatch(r'\\((\\d+)\\)(?: (.*))?',atom)
+                            hit=re.fullmatch(r'\((\d+)\)(?: (.*))?',atom)
                             if hit:
                                 idx,name=hit.groups()
                                 if name is not None:names[idx]=name
