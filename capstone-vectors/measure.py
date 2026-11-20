@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Ordinary EVEX feature filter available on the AArch64 ELF host',vector='Negative filter plus existing EVEX scan plans on the AArch64 ELF host',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Word-sized register-list construction counters',vector='Word-sized construction counters and membership length',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -55,7 +55,7 @@ def main(w):
         expected=inputs['baseline_tree'] if label=='integer' else inputs['variants'][label]['tree']
         assert tested==expected,(label,tested,expected)
         save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else sha(patch)))
-        units=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','detail_option','text_option','x86_printer_prechecked','x86_buffer_bounds','x86_scan_batch']+[f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))]
+        units=['utils','x86_simple_output','x86_encoding_accuracy','x86_reg_access','detail_option','text_option','x86_printer_prechecked','x86_buffer_bounds','x86_scan_batch']+[f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))]
         run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
@@ -69,10 +69,10 @@ def main(w):
         if label!='integer':
             changed=sorted(name for name,hash_ in objects['integer'].items() if objects[label].get(name)!=hash_)
             assert set(objects['integer'])==set(objects[label])
-            expected=[] if platform.machine()=='x86_64' else ['arch/X86/X86Mapping.c.o']
-            if platform.machine()=='aarch64' and label=='vector':
-                expected+=['arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86EvexScan.c.o']
-            assert changed==sorted(expected),(label,changed,expected)
+            if label=='route':
+                assert set(changed)<={'arch/X86/X86Mapping.c.o'},changed
+            else:
+                assert all(path=='utils.c.o' or path.endswith('Mapping.c.o') for path in changed),changed
             save(label+'-object-isolation.json',dict(changed=changed,added=[],unchanged=len(objects['integer'])-len(changed)))
         save('object-digests.json',objects)
         obj=w/'driver.o'
@@ -85,17 +85,10 @@ def main(w):
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
-    for test in ('evex-records','evex-guard','transfer-records','transfer-guard'):
-        run(['clang++','-std=c++17','-O2','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
-        for label in ('route','vector'):
-            run([w/test,w/'integer.so',w/(label+'.so')],test+'-'+label)
-    run(['git','apply',r/'vector.patch'],'adapter-patch',tree)
-    adapter=w/'adapter-cs';run(['cmake','-S',tree,'-B',adapter,*profile,'-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'adapter-configure')
-    run(['cmake','--build',adapter,'--target','capstone_static','x86_scan_adapter','--parallel','4'],'adapter-build')
-    run(['ctest','--test-dir',adapter,'--no-tests=error','--output-on-failure','-R','^unit_x86_scan_adapter$'],'adapter-unit')
-    run([os.environ['CC'],'-O2','-I',tree/'include','-I',tree/'arch/X86',r/'adapter-precedence.c',adapter/'libcapstone.a','-lm','-o',w/'adapter-precedence'],'adapter-precedence-build')
-    run([w/'adapter-precedence'],'adapter-precedence')
-    run(['git','reset','--hard',reference],'adapter-restore',tree)
+    run(['clang','-std=gnu11','-O2','-I',tree/'include',r/'reg-lists.c','-ldl','-o',w/'reg-lists'],'reg-lists-build')
+    for label in ('route','vector'):
+        run([w/'reg-lists',w/'integer.so',w/(label+'.so')],'reg-lists-'+label)
+    import reg_cost
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
@@ -125,6 +118,8 @@ def main(w):
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
+            if platform.machine()=='x86_64' and (name=='putty-32-0.85' or name=='libssl3t64-amd64' or name=='jpeg-avx2-i386'):
+                reg_cost.run(r,w,exe,f,intervals,name,bits,p/'evidence')
             for mode in (0,1,2):
                 def measure(lib,n,launch):
                     tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]

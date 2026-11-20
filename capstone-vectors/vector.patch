@@ -1,54 +1,77 @@
-diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 4d34d8ac..15ac5a2d 100644
---- a/arch/X86/X86FeatureExtension.h
-+++ b/arch/X86/X86FeatureExtension.h
-@@ -304,14 +304,16 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
- x86_feature_decode_result
- X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
- 			   MCInst *instr, uint16_t *size, uint8_t opcode);
--#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
-+#if defined(__ELF__) && defined(__GNUC__) && \
-+	(defined(__x86_64__) || defined(__aarch64__))
-+#define X86_SEPARATE_FEATURE_ENTRY
- /* Internal full decoder behind the isolated extension entry. */
- CAPSTONE_INTERNAL x86_feature_decode_result
- X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
- 			       size_t code_len, MCInst *instr,
- 			       uint16_t *size, uint8_t opcode);
- #endif
--#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__) && \
-+#if defined(X86_SEPARATE_FEATURE_ENTRY) && \
- 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 5c908d27..8c5f511c 100644
+index 5c908d27..cd3dda2f 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -4816,7 +4816,7 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
- 	       (code[prefix_offset + 1] & 7) <= 4;
- }
+@@ -11984,7 +11984,7 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_write_count)
+ {
+ 	uint8_t i;
+-	uint8_t read_count, write_count;
++	unsigned int read_count, write_count;
+ 	cs_x86 *x86 = &(insn->detail->x86);
  
--#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
-+#ifdef X86_SEPARATE_FEATURE_ENTRY
- /* Complete EVEX opcodes that may belong to a source-owned extension.
-  * Each byte is a map bitset. The original handlers own validation and
-  * precedence; short encodings still enter those handlers unchanged. */
-@@ -4849,7 +4849,7 @@ __declspec(noinline)
- #elif defined(__GNUC__)
- __attribute__((noinline))
- #endif
--#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
-+#ifdef X86_SEPARATE_FEATURE_ENTRY
- CAPSTONE_INTERNAL x86_feature_decode_result
- X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code, size_t code_len,
- 			   MCInst *instr, uint16_t *size, uint8_t opcode)
-@@ -5050,7 +5050,7 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+ 	read_count = insn->detail->regs_read_count;
+@@ -12008,12 +12008,12 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		switch ((int)op->type) {
+ 		case X86_OP_REG:
+ 			if ((op->access & CS_AC_READ) &&
+-			    !arr_exist_inline(regs_read, read_count, op->reg)) {
++			    !arr_contains_register(regs_read, read_count, op->reg)) {
+ 				regs_read[read_count] = op->reg;
+ 				read_count++;
+ 			}
+ 			if ((op->access & CS_AC_WRITE) &&
+-			    !arr_exist_inline(regs_write, write_count,
++			    !arr_contains_register(regs_write, write_count,
+ 					      op->reg)) {
+ 				regs_write[write_count] = op->reg;
+ 				write_count++;
+@@ -12026,13 +12026,13 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 				read_count++;
+ 			}
+ 			if ((op->mem.base != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !arr_contains_register(regs_read, read_count,
+ 					      op->mem.base)) {
+ 				regs_read[read_count] = op->mem.base;
+ 				read_count++;
+ 			}
+ 			if ((op->mem.index != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !arr_contains_register(regs_read, read_count,
+ 					      op->mem.index)) {
+ 				regs_read[read_count] = op->mem.index;
+ 				read_count++;
+diff --git a/utils.h b/utils.h
+index 75cdc0e7..3d12d8bf 100644
+--- a/utils.h
++++ b/utils.h
+@@ -44,12 +44,10 @@ bool arr_exist(uint16_t *arr, unsigned char max, unsigned int id);
+ bool arr_exist_int(int *table, size_t table_size, int id);
+ 
+ // Keep the short membership loop visible to register-list builders.
+-static inline bool arr_exist_inline(uint16_t *arr, unsigned char max,
+-				    unsigned int id)
++static inline bool arr_contains_register(const uint16_t *arr, unsigned int count,
++					 unsigned int id)
+ {
+-	int i;
+-
+-	for (i = 0; i < max; i++) {
++	for (unsigned int i = 0; i < count; i++) {
+ 		if (arr[i] == id)
+ 			return true;
  	}
+@@ -57,6 +55,12 @@ static inline bool arr_exist_inline(uint16_t *arr, unsigned char max,
+ 	return false;
  }
  
--#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
-+#ifdef X86_SEPARATE_FEATURE_ENTRY
- /* Reject ordinary unprefixed EVEX before the extension decoder needs its
-  * full working state. All other inputs retain its original validation order. */
- #if defined(_MSC_VER)
++static inline bool arr_exist_inline(uint16_t *arr, unsigned char max,
++				    unsigned int id)
++{
++	return arr_contains_register(arr, max, id);
++}
++
+ uint16_t readBytes16(MCInst *MI, const uint8_t *Bytes);
+ uint32_t readBytes24(MCInst *MI, const uint8_t *Bytes);
+ uint32_t readBytes32(MCInst *MI, const uint8_t *Bytes);
