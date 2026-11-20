@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public path with the GNU/Clang i386 writer',vector='Same public output plus 32-bit VEX scanning at the generic fallback call',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Ordinary EVEX feature filter available on the AArch64 ELF host',vector='Negative filter plus existing EVEX scan plans on the AArch64 ELF host',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -39,7 +39,7 @@ def main(w):
     inc=inc.replace(old_engine,old_engine+'\n  if(engine=="iced____") engine="iced"; else if(engine=="fast____") engine="fast";')
     assert inc.count('iced_trace(bits,ptr,')==1
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
-    profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
     inputs=json.loads((r/'experiment.json').read_text())
@@ -56,7 +56,7 @@ def main(w):
         assert tested==expected,(label,tested,expected)
         save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else sha(patch)))
         units=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','detail_option','text_option','x86_printer_prechecked','x86_buffer_bounds','x86_scan_batch']+[f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))]
-        run(['cmake','--build',b,'--target','capstone_static',*units,'--parallel','4'],'build-'+label)
+        run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
         members=sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines()
@@ -65,30 +65,15 @@ def main(w):
         assert len(active)==len(members)
         objects[label]={name:sha(path) for name,path in active.items()}
         assert len(objects[label])>30
-        if label=='integer':
-            shutil.copyfile(objroot/'arch/X86/X86OutputIterator.c.o',w/'baseline-plan.o')
-        else:
-            changed={name for name,value in objects['integer'].items() if objects[label].get(name)!=value}
-            added=set(objects[label])-set(objects['integer'])
-            expected_changed = {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
-            expected_added = {'arch/X86/X86Vex32Output.c.o'}
-            assert added == expected_added, (label, added)
-            assert expected_changed <= changed <= expected_changed | {'arch/X86/X86VectorOutput.c.o'}, (label, changed)
-            if label == 'vector':
-                diff=sorted(k for k in objects[label] if objects[label][k]!=objects['route'][k])
-                wanted=['arch/X86/X86DisassemblerDecoder.c.o']
-                assert diff==wanted,(diff,wanted)
-                save('compiler-scope.json',dict(changed=diff, total=len(objects[label])))
-                run(['python3','-B',tree/'suite/synctools/x86_operand_specializations.py','--check'],'vex-scan-rows')
-
-                for tool, jobs in [('x86_simple_output', [([], 'X86GenSimpleOutput.inc')]), ('x86_vector_output', [(['--vex32-memory'], 'X86GenVex32MemoryOutput.inc'), (['--vex-pairs32'], 'X86GenVex32PairOutput.inc')])]:
-                    run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools'/(tool+'.cpp'),b/'libcapstone.a','-o',w/tool], 'build-generator-'+tool)
-                    for options, name in jobs:
-                        with (p/'evidence'/('generate-'+name+'.log')).open('wb') as log:
-                            out = sp.check_output([w/tool,*options],stderr=log)
-                        assert out == (tree/'arch/X86'/name).read_bytes(), name
-                save('generated-tables.json', {name:sha(tree/'arch/X86'/name) for name in ('X86GenSimpleOutput.inc','X86GenVex32MemoryOutput.inc','X86GenVex32PairOutput.inc')})
-            save(label+'-object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
+        shutil.copyfile(b/'libcapstone.so',w/(label+'.so'))
+        if label!='integer':
+            changed=sorted(name for name,hash_ in objects['integer'].items() if objects[label].get(name)!=hash_)
+            assert set(objects['integer'])==set(objects[label])
+            expected=[] if platform.machine()=='x86_64' else ['arch/X86/X86Mapping.c.o']
+            if platform.machine()=='aarch64' and label=='vector':
+                expected+=['arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86EvexScan.c.o']
+            assert changed==sorted(expected),(label,changed,expected)
+            save(label+'-object-isolation.json',dict(changed=changed,added=[],unchanged=len(objects['integer'])-len(changed)))
         save('object-digests.json',objects)
         obj=w/'driver.o'
         unresolved=sp.check_output(['nm','-u',obj],text=True)
@@ -100,22 +85,17 @@ def main(w):
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
-    verify_build=w/'verify-build'
-    run(['cmake','-S',tree,'-B',verify_build,*profile,'-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'verify-configure')
-    for label in ('route','vector'):
-        run(['git','apply',r/(label+'.patch')],'verify-patch-'+label,tree)
-        it=tree/'arch/X86/X86OutputIterator.c'
-        it.write_bytes(it.read_bytes()+(r/'owned-shim.txt').read_bytes())
-        run(['cmake','--build',verify_build,'--target','capstone_shared','--parallel','4'],'verify-lib-'+label)
-        shutil.copyfile(verify_build/'libcapstone.so',w/(label+'.so'))
-        run(['git','reset','--hard',reference],'verify-restore-'+label,tree)
-        run(['git','clean','-fdx'],'verify-prune-'+label,tree)
-    for test in ('verify','private-guard','public-verify'):
-        run(['clang++','-std=c++17','-O2','-DACTIVE_OUTPUT=1','-DPREVIOUS_OUTPUT=1','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
-        run([w/test,w/'route.so',w/'vector.so'],test)
-    for name,args in [('vex-scan-diff',['-ldl']),('vex-scan-guard',[b/'libcapstone.a','-lm'])]:
-        run(['clang++','-O2','-std=c++17','-I',tree,'-I',tree/'include',r/(name+'.cpp'),*args,'-o',w/name],name+'-build')
-        run([w/name,*([w/'route.so',w/'vector.so'] if name=='vex-scan-diff' else [])],name)
+    for test in ('evex-records','evex-guard','transfer-records','transfer-guard'):
+        run(['clang++','-std=c++17','-O2','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
+        for label in ('route','vector'):
+            run([w/test,w/'integer.so',w/(label+'.so')],test+'-'+label)
+    run(['git','apply',r/'vector.patch'],'adapter-patch',tree)
+    adapter=w/'adapter-cs';run(['cmake','-S',tree,'-B',adapter,*profile,'-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'adapter-configure')
+    run(['cmake','--build',adapter,'--target','capstone_static','x86_scan_adapter','--parallel','4'],'adapter-build')
+    run(['ctest','--test-dir',adapter,'--no-tests=error','--output-on-failure','-R','^unit_x86_scan_adapter$'],'adapter-unit')
+    run([os.environ['CC'],'-O2','-I',tree/'include','-I',tree/'arch/X86',r/'adapter-precedence.c',adapter/'libcapstone.a','-lm','-o',w/'adapter-precedence'],'adapter-precedence-build')
+    run([w/'adapter-precedence'],'adapter-precedence')
+    run(['git','reset','--hard',reference],'adapter-restore',tree)
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
