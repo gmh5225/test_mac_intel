@@ -1,7 +1,7 @@
-name: Compare mixed public iterator output and unchanged private callers
+name: Check 32-bit VEX2 opcode row reuse at the existing scan fallback
 on:
   push:
-    branches: [codex/capstone-public-iterator-output]
+    branches: [codex/capstone-vex2-canonical-mode-row]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -33,6 +33,7 @@ jobs:
           persist-credentials: false
       - name: Compare public records and time both API routes with an exact-copy control
         run: |
+          if [ "$(uname -m)" = x86_64 ]; then sudo apt-get -qq update && sudo apt-get -y install valgrind; fi
           python3 capstone-records/prepare_baseline.py
           python3 capstone-records/measure.py
       - if: always()

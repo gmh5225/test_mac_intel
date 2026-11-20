@@ -1,106 +1,102 @@
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..eefb4855 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -20,14 +20,22 @@
- #include "../../MCRegisterInfo.h"
- #include "X86DisassemblerDecoderCommon.h"
- 
--#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
--	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
--	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
- #include "../../cs_priv.h"
-+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
- #define CAPSTONE_X86_DEDICATED_OUTPUT
- CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
- 					 size_t size, cs_insn *insn,
- 					 uint16_t *insn_size);
-+#else
-+#define CAPSTONE_X86_ITERATOR_OUTPUT
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
-+			 cs_insn *insn, uint16_t *insn_size);
-+#endif
- #endif
- 
- bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index cc67e9c7..fdff75bc 100644
+index cc67e9c7..8c38098a 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3746,9 +3746,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch);
- 
-+#ifdef CAPSTONE_X86_ITERATOR_OUTPUT
-+#define CS_DECODE_ITER_OUTPUT X86_decodeIteratorOutput
-+#endif
- #define CS_DECODE_SCAN_IMPL decodeIteratorScan
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_SCAN_IMPL
-+#undef CS_DECODE_ITER_OUTPUT
- 
- /* Keep the admitted terminal's public ID and zero alias adjustment visible
-  * through output completion. Cold helpers can take the fallback result's
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..d7ae466e 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -4,12 +4,10 @@
- #ifdef CAPSTONE_HAS_X86
- #include "../../cs_priv.h"
- #include "X86ScanAdapter.h"
--
--#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
--	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
--	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
--	!defined(_WIN32_WCE)
- #include "X86Disassembler.h"
-+
-+#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) || \
-+	defined(CAPSTONE_X86_ITERATOR_OUTPUT)
- #include "X86InstPrinter.h"
- #include "X86InstPrinterCommon.h"
- #include "../../utils.h"
-@@ -211,6 +209,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -3283,7 +3283,7 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
  #endif
- #include "../../cs_disasm_internal.h"
  
-+#ifdef CAPSTONE_X86_ITERATOR_OUTPUT
-+/* The public iterator has already validated the input and selected full
-+ * output. Use the same x86 writer as the private text iterator. */
-+CS_PRESERVE_MOST bool X86_decodeIteratorOutput(cs_struct *handle,
-+					       const uint8_t *code, size_t size,
-+					       cs_insn *insn,
-+					       uint16_t *insn_size)
-+{
-+	if (handle->arch == CS_ARCH_X86 && !handle->no_text &&
-+	    X86_trySimpleOutput(handle, code, size, insn, insn_size))
-+		return true;
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, false);
-+}
-+#endif
-+
- CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- 				      size_t *size, uint64_t *address,
- 				      cs_insn *insn)
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..2de17f02 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -163,7 +163,11 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
- 		return true;
- #endif
-+#ifdef CS_DECODE_ITER_OUTPUT
-+	return CS_DECODE_ITER_OUTPUT(handle, code, size, insn, insn_size);
-+#else
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+#endif
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result);
++					 uint8_t prefix, cs_mode mode, X86ScanResult *result);
+ 
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+ #if defined(_MSC_VER)
+@@ -3318,11 +3318,21 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	if (extension == X86_FEATURE_INVALID)
+ 		return false;
+ 	if (extension != X86_FEATURE_DECODED) {
++		/* A bare C5 cannot be LDS when the next byte selects
++		 * register addressing. Its W=0 opcode rows are shared with
++		 * 64-bit mode, but address and operand sizes follow the handle. */
++		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
++		    code[0] == 0xc5 && code[1] >= 0xc0) {
++			const int status = tryVexTerminalScan(
++				code, code_len, 0xc5, CS_MODE_32, result);
++			if (status != X86_SCAN_NOT_HANDLED)
++				return status == X86_SCAN_COMPLETE;
++		}
+ 		if (tryExtension &&
+ 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
+ 		    code[0] == 0xc4) {
+ 			const int status = tryVexTerminalScan(code, code_len,
+-							      code[0], result);
++							      code[0], CS_MODE_64, result);
+ 			if (status != X86_SCAN_NOT_HANDLED)
+ 				return status == X86_SCAN_COMPLETE;
+ 		}
+@@ -3378,7 +3388,7 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+ 				     X86_VEX_FEATURE_NONE)) {
+ 		const int status =
+-			tryVexTerminalScan(code, code_len, code[0], result);
++			tryVexTerminalScan(code, code_len, code[0], CS_MODE_64, result);
+ 		if (status != X86_SCAN_NOT_HANDLED)
+ 			return status == X86_SCAN_COMPLETE;
+ 		tryExtension = false;
+@@ -3430,10 +3440,10 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  }
- #undef CS_DECODE_SCAN
  
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++					 uint8_t prefix, cs_mode mode, X86ScanResult *result)
+ {
+ 	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
++	initializeInstructionHeader(&insn, code, code_len, mode);
+ 	insn.readerCursor = 1;
+ 	if (readVexPrefix(&insn, prefix))
+ 		return X86_SCAN_INVALID;
+@@ -3500,7 +3510,7 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+ 			      cs_insn *insn, X86ScanResult *result,
+ 			      uint8_t prefix)
+ {
+-	int status = tryVexTerminalScan(code, code_len, prefix, result);
++	int status = tryVexTerminalScan(code, code_len, prefix, CS_MODE_64, result);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, prefix, false);
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..f1561e64 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1204,6 +1204,13 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            if name == names[1] and key < 8:
++                # Bare two-byte VEX has no W bit and uses the 0F map.
++                mode32 = attributes & ~attrs["ATTR_64BIT"]
++                tables.require(
++                    row == indices[contexts.index(context_values[mode32])],
++                    "Review 32-bit VEX2 scan row sharing",
++                )
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
+diff --git a/tests/unit/x86_buffer_bounds.c b/tests/unit/x86_buffer_bounds.c
+index 57ee99b2..f889345f 100644
+--- a/tests/unit/x86_buffer_bounds.c
++++ b/tests/unit/x86_buffer_bounds.c
+@@ -317,6 +317,12 @@ static bool check_escape_boundaries(uint8_t *end)
+ 		  7,
+ 		  X86_INS_INVALID,
+ 		  0 },
++		{ CS_MODE_32, { 0xc5, 0x00 }, 2, X86_INS_LDS, 2 },
++		{ CS_MODE_32, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
++		{ CS_MODE_32, { 0xc5, 0xf0, 0x77 }, 3, X86_INS_INVALID, 0 },
++		{ CS_MODE_32,
++		  { 0xc5, 0xf9, 0x6f, 0x44, 0x24, 0x10 },
++		  6, X86_INS_VMOVDQA, 6 },
+ 		{ CS_MODE_64, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
+ 		{ CS_MODE_64,
+ 		  { 0xc4, 0xe1, 0x74, 0x58, 0xc2 },
