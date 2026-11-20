@@ -26,7 +26,8 @@
     "libssl3t64-i386",
     "scalar32",
     "scalar64",
-    "simd64"
+    "simd64",
+    "ppc64el-ls"
   ],
   "native_configs": [
     "Ubuntu 22.04 Clang x86-64",
@@ -34,8 +35,8 @@
     "Ubuntu 24.04 GCC x86-64",
     "Ubuntu 24.04 Clang AArch64"
   ],
-  "selection": "All 15 cases, original production-style iterator selection on x86, public on ARM/AArch64/MIPS/RISC-V. Nine balanced six-launch cycles, 32ms baseline calibrated CPU, fixed image/path/ASLR, exact-copy A/A.",
+  "selection": "All 16 cases, original production-style iterator selection on x86, public on ARM/AArch64/MIPS/RISC-V/PPC. Nine balanced six-launch cycles, 32ms baseline calibrated CPU, fixed image/path/ASLR, exact-copy A/A.",
   "consumer_source": "5f35a0ce679ae081c8194bb7c3746b6c33a7d70dced2dbd2657e91487f00c8ab",
   "consumer_variant": "f79a4da3617cb1770d95a503923470084df5e2717158982cbbc7a1ff880437a8",
-  "boundaries": "Compare ARM/Thumb poisoned records plus RISC-V real and truncated inputs with default and custom formatters. Check the out-of-line symbol remains and that both calling objects lose their external references."
+  "boundaries": "Preserve the external symbol. Check all four caller objects lose external references, compare complete ARM/Thumb, AArch64, RISC-V and PPC records and measure six linked backends."
 }

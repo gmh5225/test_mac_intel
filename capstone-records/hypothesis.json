@@ -1,9 +1,6 @@
 {
-  "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "hypothesis": "Append ARM predicate immediate/register operands as a pair to remove a repeated capacity check, count update and operand-index calculation. Keep the existing sequential fallback when fewer than two slots remain.",
-  "semantic_contract": "Both compatibility tags and typed payloads, all untouched private bytes, original partial append and overflow behavior, predicate rejection and soft-failure decisions remain unchanged.",
-  "iced_source": "NeverSight iced 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31: src/rust/iced-x86/src/instruction.rs fixed regs and op_kinds arrays; existing decoder writes known operand positions. No code copied and no Capstone storage/layout contract removed.",
-  "prior_evidence": "R585 x86 memory batching reduced emitted instructions but regressed actual output throughput. This is a different ARM owning boundary; do not infer native benefit from shorter assembly.",
-  "scope": "Only ARM DecodePredicateOperand calls the new internal helper. All other optimized runtime objects must remain identical outside sanitizer source-location metadata.",
-  "publication_qualified": false
+  "source": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
+  "evidence": "The preceding ARM trace removed 56,607 calls across three ls traversals. ARM predicate handling, RISC-V compressed SP operands, PowerPC register printing and the shared MCInst_handleWriteback are direct callers of the reverse-table address calculation. ARM, AArch64 and RISC-V call this shared writeback path.",
+  "test": "Preserve the external symbol. Check all four caller objects lose external references, compare complete ARM/Thumb, AArch64, RISC-V and PPC records and measure six linked backends.",
+  "other_variants": "Independent from either public x86 routing prototype."
 }

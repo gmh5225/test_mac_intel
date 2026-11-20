@@ -26,16 +26,16 @@ with tempfile.TemporaryDirectory(prefix='capstone-descriptor-inline-') as temp:
     t=Path(temp); b=t/'build'
     try:
         cases=corpus.prepare(r,t,out,run)
-        selections=['arm-sort','arm-cp','riscv64-ls','riscv64-cp','putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls']
+        selections=['ppc64el-ls','arm-sort','arm-cp','riscv64-ls','riscv64-cp','putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls']
         cases=[c for c in cases if c['name'] in selections]
         assert set(c['name'] for c in cases)==set(selections)
         common=['-I',s,'-I',s/'include']
         run(['clang++','-std=c++17','-O3','-DNDEBUG',*common,'-c',r/'single.cpp','-o',t/'one.o'],'consumer')
-        for a in ('arm','riscv'):
+        for a in ('arm','riscv','aarch64','ppc'):
             run(['clang++','-std=c++17','-O2',*common,r/(a+'-states.cpp'),'-ldl','-o',t/(a+'-states')],a+'-records-build')
         flags='-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'
         run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,
-             '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV')],
+             '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV','PPC')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
         for label,patch in [('base','bounds'),('candidate','inline')]:
@@ -49,18 +49,19 @@ with tempfile.TemporaryDirectory(prefix='capstone-descriptor-inline-') as temp:
             binaries[label]=exe
             obj=b/'CMakeFiles/capstone.dir'
             objects[label]={str(f.relative_to(obj)):sha(f) for f in obj.rglob('*.o')}
-            for target in ('arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o'):
+            for target in ('MCInst.c.o','arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o','arch/PowerPC/PPCInstPrinter.c.o'):
                 refs=sp.check_output(['nm','-u',obj/target],text=True)
                 assert ('MCInstrDesc_get' in refs)==(label=='base'),(label,target)
             assert ' T MCInstrDesc_get' in sp.check_output(['nm','-g',obj/'MCInstrDesc.c.o'],text=True)
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        assert {'arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o'}<=set(changed)<={'arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o','MCInstrDesc.c.o'},changed
+        assert {'MCInst.c.o','arch/PowerPC/PPCInstPrinter.c.o','arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o'}<=set(changed)<={'MCInst.c.o','arch/PowerPC/PPCInstPrinter.c.o','arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o','MCInstrDesc.c.o'},changed
         targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
         run([t/'arm-states',libs['base'],libs['candidate']],'full-arm')
+        for arch in ('aarch64','ppc'):run([t/(arch+'-states'),libs['base'],libs['candidate']],'full-'+arch)
         for args in [[],['custom']]:
             run([t/'riscv-states',libs['base'],libs['candidate'],t/'corpus',*args],'full-riscv'+('' if not args else '-custom'))
         shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
