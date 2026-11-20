@@ -1,7 +1,7 @@
-name: Compare memory immediate MOV with current forked iced
+name: Compare public x86 iterator against both current iced formatters on matching functions
 on:
   push:
-    branches: [codex/capstone-mov-latest-iced]
+    branches: [codex/capstone-public-text-latest-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mov-latest-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-route-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

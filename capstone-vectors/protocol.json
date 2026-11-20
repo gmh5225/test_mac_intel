@@ -5,15 +5,18 @@
     "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
     "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "variants": {
-      "memory": {
-        "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-        "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
-        "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
-        "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
-        "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
+      "route": {
+        "parent": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
+        "tree": "ab6490d29d2f20cdfc825a63f1cf74d6e15622a7",
+        "sha256": "882f43aef0319d845bd63562f2ebebec1d494b82657b5b45043a00e4c5afc0e4"
       }
     },
-    "iced_revision": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31"
+    "iced_revision": "deae7b7d34cd70ca48b95e6d3977129531aa60c8",
+    "bounds": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "75622f50ba8ea4e5f5bb1bee69150c7a07f44710",
+      "sha256": "a840a40b75b06290d7f4a5aecb2447087cc0ff6340fdb097eed3f514c57b9871"
+    }
   },
   "cycles": 20,
   "target_ms": 40,
@@ -32,8 +35,8 @@
     "images",
     "same-file-fixed"
   ],
-  "consumer_unchanged": true,
-  "purpose": "Measure remaining scalar/SIMD and 32-bit gaps against current forked iced; complementary to the real PE and mixed-ISA screening in R1481.",
+  "consumer_unchanged": false,
+  "purpose": "Measure the public Capstone iterator on equal-boundary 32/64-bit scalar and SIMD library functions against both public iced formatters and its own baseline, using the same observed fields and shared C++ driver object for every Capstone build. Actual private entry performance is measured separately by the route factorial.",
   "publication_qualified": false,
   "controls": "Balanced ABBA rotations, identical A/A image, complete Capstone result checks, common instruction boundaries. Preserve every panel and smaller stable losses. Native benchmark is not current NeverD product qualification."
 }
