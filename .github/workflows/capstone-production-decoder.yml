@@ -1,7 +1,7 @@
-name: Validate operand descriptor bounds through the current NeverD decoder
+name: Validate the operand constraint fix across the default NeverD semantic grid
 on:
   push:
-    branches: [codex/capstone-constraint-boundary-product]
+    branches: [codex/capstone-operand-constraint-grid]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -14,7 +14,7 @@ jobs:
           - os: ubuntu-24.04
             cc: clang
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 235
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 3426cf375f1471eecd478c27000a6a16cd7a9420
+          ref: e85382b1441bdcf84745ec049928797557aae228
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -37,24 +37,43 @@ jobs:
             libc
             third-party
           persist-credentials: false
-      - name: Prepare ELF fixture reader
-        run: |
-          python3 -m venv "$RUNNER_TEMP/capstone-product-venv"
-          "$RUNNER_TEMP/capstone-product-venv/bin/python" -m pip install pyelftools==0.32
       - name: Initialize source dependencies
         working-directory: neverd
-        run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-      - name: Build production decoding from source and time real PE, ELF and targeted SIMD
+        run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway signatures
+      - name: Configure default-route semantic tests with the live LLVM fork
         env:
-          CC: ${{ matrix.cc }}
+          CC: clang
           CXX: clang++
-        run: '"$RUNNER_TEMP/capstone-product-venv/bin/python" capstone-product/product.py'
-      - name: Clean temporary source exports
+        run: |
+          mkdir -p grid-evidence
+          sudo apt-get update -qq
+          sudo apt-get install -y lld ninja-build
+          git -C neverd/third_party/capstone apply --index "$GITHUB_WORKSPACE/capstone-product/bounds.patch"
+          test "$(git -C neverd/third_party/capstone write-tree)" = "75622f50ba8ea4e5f5bb1bee69150c7a07f44710"
+          git -C neverd rev-parse HEAD > grid-evidence/neverd.txt
+          git -C neverd/third_party/llvm-project rev-parse HEAD > grid-evidence/llvm.txt
+          git -C neverd/third_party/capstone write-tree > grid-evidence/capstone-tree.txt
+          cmake -S neverd -B "$RUNNER_TEMP/semantic-grid" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCMAKE_LINKER_TYPE=LLD -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF
+      - name: Build the source-linked semantic suite
+        working-directory: neverd
+        run: |
+          set -o pipefail
+          python3 scripts/build.py "$RUNNER_TEMP/semantic-grid" --target NeverDSemanticTests --parallel 4 2>&1 | tee "$GITHUB_WORKSPACE/grid-evidence/build.log"
+          test "$(git -C third_party/capstone write-tree)" = "75622f50ba8ea4e5f5bb1bee69150c7a07f44710"
+          test "$(git -C third_party/llvm-project rev-parse HEAD)" = "$(cat ../grid-evidence/llvm.txt)"
+          git -C third_party/llvm-project diff --exit-code HEAD
+          sha256sum "$RUNNER_TEMP/semantic-grid/bin/NeverDSemanticTests" > ../grid-evidence/binary.sha256
+      - name: Run the default semantic route across architectures and formats
+        run: |
+          unset NEVERD_SEMANTIC_HIGHC NEVERD_SEMANTIC_LLVMC
+          ctest --test-dir "$RUNNER_TEMP/semantic-grid" -L '^NeverDSemanticTests$' --no-tests=error -j4 --output-on-failure --output-junit "$GITHUB_WORKSPACE/grid-evidence/semantic.xml" > grid-evidence/tests.log || { tail -100 grid-evidence/tests.log; exit 1; }
+          tail -10 grid-evidence/tests.log
+      - name: Remove generated build and checkout
         if: always()
-        run: rm -rf -- "$GITHUB_WORKSPACE/neverd" "$RUNNER_TEMP/capstone-product-venv"
+        run: rm -rf -- "$RUNNER_TEMP/semantic-grid" "$GITHUB_WORKSPACE/neverd"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: constraint-boundary-product-${{ matrix.os }}-${{ matrix.cc }}
-          path: product-evidence/
+          name: operand-constraint-default-route-grid
+          path: grid-evidence/
           retention-days: 14
