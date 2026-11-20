@@ -19,7 +19,7 @@ def module(path):
 def main(w):
     reference=json.loads((r/'experiment.json').read_text())['baseline_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
-    iced='deae7b7d34cd70ca48b95e6d3977129531aa60c8'
+    iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
     run(['git','init','--bare',w/'iced-git'],'iced-repo');run(['git','-C',w/'iced-git','fetch','--depth','1','https://github.com/NeverSight/iced.git',iced],'iced-fetch');run(['git','-C',w/'iced-git','archive','--format=tar','-o',tar,iced,'src/rust/iced-x86'],'iced-archive');run(['tar','-xf',tar,'-C',checkout],'iced-extract');tar.unlink()
     ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public path with the GNU/Clang i386 writer',vector='Same output plus 32-bit VEX scanning after the configured adapter',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public path with the GNU/Clang i386 writer',vector='Same public output plus 32-bit VEX scanning at the generic fallback call',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -159,9 +159,9 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(40e6/max(1,probe[0])))
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
                 cycles={launch:[]for launch in launches};labels=['integer','aa','route','vector','iced']+(['fast'] if mode else [])
-                for i in range(30):
+                for i in range(18):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -178,7 +178,10 @@ def main(w):
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==21*len(launches)
+    planned=json.loads((r/'protocol.json').read_text())['samples']
+    expected={(panel,mode,launch) for panel in planned for mode in ('scan','format','detail') for launch in launches}
+    observed={(row['case']+'/'+row['panel'],row['mode'],row['launch']) for row in reported}
+    assert expected==observed and len(reported)==len(expected),(expected-observed,observed-expected)
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:

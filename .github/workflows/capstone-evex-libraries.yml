@@ -1,7 +1,7 @@
-name: Compare combined 32-bit VEX decoding and formatting with iced on PE and ELF
+name: Time public Capstone against the NeverSight compatibility fork on full PE32 and ELF
 on:
   push:
-    branches: [codex/capstone-combined-scan-format-pe32]
+    branches: [codex/capstone-fork-public-vex32-next]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 78f02050072f4a3778d1339374ec1c31f9b42c1a
+          ref: a9d153f4cae6c71eb02309621bbce3c9508312dc
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries

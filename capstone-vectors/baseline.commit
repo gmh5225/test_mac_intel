@@ -1,8 +1,10 @@
-tree 75622f50ba8ea4e5f5bb1bee69150c7a07f44710
-parent 25da25371c0e19e1cf57b394446e3f705cecd2a9
-author NeverSightAI <neversightai@gmail.com> 1795189829 +0800
-committer NeverSightAI <neversightai@gmail.com> 1795189829 +0800
+tree 4e0b7e3c1b6470a5975d18f661d38af5671a987b
+parent 78f02050072f4a3778d1339374ec1c31f9b42c1a
+author NeverSightAI <neversightai@gmail.com> 1795199007 +0800
+committer NeverSightAI <neversightai@gmail.com> 1795199007 +0800
 
-Check the operand index before reading its constraint
+X86: bound native MSVC inlining of the legacy scan decoder
 
-An absent operand has no constraint. Return -1 before indexing OpInfo so an empty descriptor or an out-of-range query cannot read past the operand table. Cover the empty descriptor, last valid operand and first out-of-range index in unit_mcinst.
+MSVC 19.52 runs out of compiler heap while building the generated legacy
+terminal at /O2 /Ob2. Keep a single copy of that switch on this compiler
+and preserve the existing inline policy on the other supported compilers.
