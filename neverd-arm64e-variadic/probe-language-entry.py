@@ -35,3 +35,9 @@ with tempfile.TemporaryDirectory() as temporary:
     evidence.parent.mkdir(parents=True, exist_ok=True)
     evidence.write_text(json.dumps(results, indent=2) + "\n")
     print(evidence.read_text())
+    if "expected" in policy:
+        expected = policy["expected"]
+        assert expected["encoding"] in results["unwind"]["stdout"]
+        assert results["execute"]["exit"] == expected["exit"]
+        assert len(results["sample"].split()) == expected["sample_fields"]
+        assert int(results["sample"].split()[expected["exact_field"]]) == expected["exact"]
