@@ -37,8 +37,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
-        for label,patch in [('base','bounds'),('leaf','leaf'),('candidate','iterator')]:
-            if label=='candidate':git('apply','--reverse','--index',str(r/'leaf.patch'))
+        for label,patch in [('base','bounds'),('context','context'),('candidate','iterator')]:
+            if label=='candidate':git('apply','--reverse','--index',str(r/'context.patch'))
             path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
             git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
@@ -65,8 +65,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        expected={'cs.c.o','arch/X86/X86OutputIterator.c.o'}
-        assert expected.issubset(changed) and set(changed)<=expected|{'arch/X86/X86DisassemblerDecoder.c.o'},changed
+        expected={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'}
+        assert set(changed)==expected,changed
         targets=['x86_scan_batch','mcinst','x86_simple_output','x86_printer_prechecked','text_option','detail_option','x86_x87_environment_hardware']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
@@ -120,7 +120,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                     n=max(2,min(4000,round(64e6/probe['cpu_ns'])))
                     pairs=[];reference=None
                     for i in range(12):
-                        names=['base','copy','leaf','candidate']; order=names[i%4:]+names[:i%4];ticks={key:[] for key in names}
+                        names=['base','copy','context','candidate']; order=names[i%4:]+names[:i%4];ticks={key:[] for key in names}
                         for key in order+order[::-1]:
                             row=sample(key,c,m,n,route)
                             if reference is None: reference=(row['first'],row['result'])

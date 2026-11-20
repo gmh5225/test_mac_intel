@@ -1,7 +1,7 @@
-name: Compare iterator output inside full decoding on real workloads
+name: Compare public x86 fallback selection with dispatch inside full decoding
 on:
   push:
-    branches: [codex/capstone-full-decoder-context]
+    branches: [codex/capstone-public-x86-output-fallback]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: iterator-full-context-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: public-x86-fallback-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

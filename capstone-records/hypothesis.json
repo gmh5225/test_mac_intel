@@ -1,9 +1,5 @@
 {
-  "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "hypothesis": "Append ARM predicate immediate/register operands as a pair to remove a repeated capacity check, count update and operand-index calculation. Keep the existing sequential fallback when fewer than two slots remain.",
-  "semantic_contract": "Both compatibility tags and typed payloads, all untouched private bytes, original partial append and overflow behavior, predicate rejection and soft-failure decisions remain unchanged.",
-  "iced_source": "NeverSight iced 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31: src/rust/iced-x86/src/instruction.rs fixed regs and op_kinds arrays; existing decoder writes known operand positions. No code copied and no Capstone storage/layout contract removed.",
-  "prior_evidence": "R585 x86 memory batching reduced emitted instructions but regressed actual output throughput. This is a different ARM owning boundary; do not infer native benefit from shorter assembly.",
-  "scope": "Only ARM DecodePredicateOperand calls the new internal helper. All other optimized runtime objects must remain identical outside sanitizer source-location metadata.",
-  "publication_qualified": false
+  "source": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
+  "mechanism": "In the public decode fallback after successful scan routing, direct non-x86 callers to the original full function. Only the x86 text branch calls the existing output writer. Keep the private writer under the original Clang inlining decision and preserve the observed GCC inline lowering. The ordinary batch and core full-decoder source and calling convention are identical to next.",
+  "comparison": "R1505 and original next interleaved. Inspect actual edges and object code, all public and private real cases and complete batch/iterator state. No handle slots, callback caching or ISA-specific output rules added."
 }
