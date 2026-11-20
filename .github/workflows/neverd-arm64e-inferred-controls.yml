@@ -18,7 +18,16 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: neverd-arm64e-controls
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 7c52e63b8cd89dc9b4ece3984b1b1260a55102b5
+          path: neverd
+          persist-credentials: false
+          sparse-checkout: include/neverd/runtime
       - run: python3 neverd-arm64e-controls/run.py
+      - name: Read the registered system signal trampoline rule
+        run: python3 neverd-arm64e-controls/entry.py neverd
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
