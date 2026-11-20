@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['bounds']['tree'],aa='Byte-identical baseline copy',route='Shared x86 text iterator selected at entry',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public text fallback after compact scan',vector='Same routing with canonical VEX32 output',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -43,20 +43,18 @@ def main(w):
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
     inputs=json.loads((r/'experiment.json').read_text())
-    for label in ('integer','aa','route'):
+    for label in ('integer','aa','route','vector'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        assert sha(r/'bounds.patch')==inputs['bounds']['sha256']
-        run(['git','apply',r/'bounds.patch'],'bounds-'+label,tree)
         if label!='integer':
             patch=r/(label+'.patch')
             assert sha(patch)==inputs['variants'][label]['sha256']
             run(['git','apply',patch],'apply-'+label,tree)
         run(['git','add','-A'],'stage-source-'+label,tree)
         tested=sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()
-        expected=inputs['bounds']['tree'] if label=='integer' else inputs['variants'][label]['tree']
+        expected=inputs['baseline_tree'] if label=='integer' else inputs['variants'][label]['tree']
         assert tested==expected,(label,tested,expected)
-        save(label+'-tested-source.json',dict(tree=tested,patch_sha256=inputs['bounds']['sha256'] if label=='integer' else sha(patch)))
+        save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else sha(patch)))
         units=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','detail_option','text_option','x86_printer_prechecked','x86_buffer_bounds','x86_scan_batch']+[f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))]
         run(['cmake','--build',b,'--target','capstone_static',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
@@ -72,8 +70,18 @@ def main(w):
         else:
             changed={name for name,value in objects['integer'].items() if objects[label].get(name)!=value}
             added=set(objects[label])-set(objects['integer'])
-            assert not added,added
-            assert changed=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'},changed
+            expected_changed = {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
+            expected_added = {'arch/X86/X86Vex32Output.c.o'} if label == 'vector' else set()
+            assert added == expected_added, (label, added)
+            assert expected_changed <= changed <= expected_changed | ({'arch/X86/X86VectorOutput.c.o'} if label == 'vector' else set()), (label, changed)
+            if label == 'vector':
+                for tool, jobs in [('x86_simple_output', [([], 'X86GenSimpleOutput.inc')]), ('x86_vector_output', [(['--vex32-memory'], 'X86GenVex32MemoryOutput.inc'), (['--vex-pairs32'], 'X86GenVex32PairOutput.inc')])]:
+                    run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools'/(tool+'.cpp'),b/'libcapstone.a','-o',w/tool], 'build-generator-'+tool)
+                    for options, name in jobs:
+                        with (p/'evidence'/('generate-'+name+'.log')).open('wb') as log:
+                            out = sp.check_output([w/tool,*options],stderr=log)
+                        assert out == (tree/'arch/X86'/name).read_bytes(), name
+                save('generated-tables.json', {name:sha(tree/'arch/X86'/name) for name in ('X86GenSimpleOutput.inc','X86GenVex32MemoryOutput.inc','X86GenVex32PairOutput.inc')})
             save(label+'-object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
         save('object-digests.json',objects)
         obj=w/'driver.o'
@@ -126,8 +134,8 @@ def main(w):
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(40e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','route','iced']+(['fast'] if mode else [])
-                for i in range(20):
+                cycles={launch:[]for launch in launches};labels=['integer','aa','route','vector','iced']+(['fast'] if mode else [])
+                for i in range(30):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -139,14 +147,14 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']={k:md('iced',k) for k in ('integer','route')}
-                    row['vs_fast']={k:md('fast',k) for k in ('integer','route')} if mode else None
+                    row['vs_iced']={k:md('iced',k) for k in ('integer','route','vector')}
+                    row['vs_fast']={k:md('fast',k) for k in ('integer','route','vector')} if mode else None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
     assert len(reported)==21*len(launches)
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-mov-latest-iced-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)

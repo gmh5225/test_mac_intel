@@ -1,7 +1,7 @@
-name: Compare public x86 iterator against both current iced formatters on matching functions
+name: Compare routed 32-bit VEX output on common real-library boundaries
 on:
   push:
-    branches: [codex/capstone-public-text-latest-iced]
+    branches: [codex/capstone-public-vex32-factorial]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
           - { host: ubuntu-24.04, cc: gcc, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 68
+    timeout-minutes: 90
     env:
       CC: ${{ matrix.cc }}
     steps:
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
+          ref: 78f02050072f4a3778d1339374ec1c31f9b42c1a
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-route-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-vex32-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

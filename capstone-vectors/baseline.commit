@@ -1,16 +1,8 @@
-tree d2f2cdc5930b4fbab7d1507085c30f3a5a25068a
-parent 3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62
-author NeverSightAI <neversightai@gmail.com> 1794967017 +0800
-committer NeverSightAI <neversightai@gmail.com> 1794967017 +0800
+tree 75622f50ba8ea4e5f5bb1bee69150c7a07f44710
+parent 25da25371c0e19e1cf57b394446e3f705cecd2a9
+author NeverSightAI <neversightai@gmail.com> 1795189829 +0800
+committer NeverSightAI <neversightai@gmail.com> 1795189829 +0800
 
-Use compact canonical alias lookup in mixed Clang builds
+Check the operand index before reading its constraint
 
-Route AArch64 and non-DIET MIPS alias IDs through their generated tries.
-Share delimiter handling, the existing 15-byte limit and no-alias result
-with the original parser. Keep the private Clang parser compact and its
-ELF code and tables separate from the original hot functions.
-
-Restrict the implementation to configurations with an active caller;
-preserve GCC and existing dedicated-trie behavior. Validate complete
-records, architecture-only and DIET builds, Make/Xcode/MSVC, and real
-PE/ELF output in Capstone and NeverD with source-built LLVM.
+An absent operand has no constraint. Return -1 before indexing OpInfo so an empty descriptor or an out-of-range query cannot read past the operand table. Cover the empty descriptor, last valid operand and first out-of-range index in unit_mcinst.
