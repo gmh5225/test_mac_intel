@@ -7,20 +7,20 @@
     "variants": {
       "route": {
         "parent": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
-        "tree": "5d109c0305972d8cdcbee3b2aa9cc4af0630e7c0",
-        "sha256": "c0f53586b959e6c56eea6100ca8fa26e6799dfd0fab8dacd19762e13af62f2db"
+        "tree": "1e41bfed93a89d989f46ee3053ee95a64f9d7fba",
+        "sha256": "7fb70ad2b680113e69211b62f75b830a0b4ee961e1ed5df17b6bdab1d315ad44"
       },
       "vector": {
         "parent": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
-        "tree": "1e41bfed93a89d989f46ee3053ee95a64f9d7fba",
-        "sha256": "7fb70ad2b680113e69211b62f75b830a0b4ee961e1ed5df17b6bdab1d315ad44"
+        "tree": "9fb31fb749280e093ef7574da2a4bcde9e04d2b9",
+        "sha256": "d2675cb59d215802dc54e0db5b0514cc62d5d6e418fce8091d363d90cf2001b3"
       }
     }
   },
   "cycles": 30,
   "target_ms": 40,
   "profiles": 4,
-  "rows": 168,
+  "rows": 216,
   "samples": [
     "libjpeg62-turbo-amd64/all-functions",
     "libjpeg62-turbo-amd64/simd-functions",
@@ -28,14 +28,16 @@
     "libzstd1-amd64/simd-functions",
     "libssl3t64-amd64/simd-functions",
     "jpeg-avx2-i386/simd-functions",
-    "libssl3t64-i386/all-functions"
+    "libssl3t64-i386/all-functions",
+    "putty-32-0.85/whole-text",
+    "putty-64-0.85/runtime-functions"
   ],
   "launches": [
     "images",
     "same-file-fixed"
   ],
   "consumer_unchanged": false,
-  "purpose": "Isolate the compiler scope of the same private and public VEX32 writer. Compare production, the Clang-only version and the GNU ELF version. A Clang control must produce byte-identical objects for both variants.",
+  "purpose": "Compare source-built current iced on common PE and ELF inputs, isolating 32-bit VEX scanning from the verified GNU and Clang formatter.",
   "publication_qualified": false,
   "controls": "Balanced ABBA rotations, identical A/A image, complete Capstone result checks, common instruction boundaries. Preserve every panel and smaller stable losses. Native benchmark is not current NeverD product qualification."
 }

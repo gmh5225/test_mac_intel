@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public path and original Clang-only i386 writer',vector='Same source with GNU ELF i386 output enabled',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public path with the GNU/Clang i386 writer',vector='Same output plus 32-bit VEX scanning after the configured adapter',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -76,9 +76,11 @@ def main(w):
             assert expected_changed <= changed <= expected_changed | {'arch/X86/X86VectorOutput.c.o'}, (label, changed)
             if label == 'vector':
                 diff=sorted(k for k in objects[label] if objects[label][k]!=objects['route'][k])
-                wanted=['arch/X86/X86OutputIterator.c.o','arch/X86/X86Vex32Output.c.o'] if os.environ['CC']=='gcc' else []
+                wanted=['arch/X86/X86DisassemblerDecoder.c.o']
                 assert diff==wanted,(diff,wanted)
                 save('compiler-scope.json',dict(changed=diff, total=len(objects[label])))
+                run(['python3','-B',tree/'suite/synctools/x86_operand_specializations.py','--check'],'vex-scan-rows')
+
                 for tool, jobs in [('x86_simple_output', [([], 'X86GenSimpleOutput.inc')]), ('x86_vector_output', [(['--vex32-memory'], 'X86GenVex32MemoryOutput.inc'), (['--vex-pairs32'], 'X86GenVex32PairOutput.inc')])]:
                     run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools'/(tool+'.cpp'),b/'libcapstone.a','-o',w/tool], 'build-generator-'+tool)
                     for options, name in jobs:
@@ -109,8 +111,11 @@ def main(w):
         run(['git','reset','--hard',reference],'verify-restore-'+label,tree)
         run(['git','clean','-fdx'],'verify-prune-'+label,tree)
     for test in ('verify','private-guard','public-verify'):
-        run(['clang++','-std=c++17','-O2','-DACTIVE_OUTPUT=1','-DPREVIOUS_OUTPUT='+('0' if os.environ['CC']=='gcc' else '1'),'-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
+        run(['clang++','-std=c++17','-O2','-DACTIVE_OUTPUT=1','-DPREVIOUS_OUTPUT=1','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
         run([w/test,w/'route.so',w/'vector.so'],test)
+    for name,args in [('vex-scan-diff',['-ldl']),('vex-scan-guard',[b/'libcapstone.a','-lm'])]:
+        run(['clang++','-O2','-std=c++17','-I',tree,'-I',tree/'include',r/(name+'.cpp'),*args,'-o',w/name],name+'-build')
+        run([w/name,*([w/'route.so',w/'vector.so'] if name=='vex-scan-diff' else [])],name)
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
@@ -125,14 +130,18 @@ def main(w):
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
-    for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64','libzstd1-amd64','libssl3t64-amd64','jpeg-avx2-i386','libssl3t64-i386'): continue
+    import pe_panels, itertools
+    for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w)):
+        if name not in ('libjpeg62-turbo-amd64','libzstd1-amd64','libssl3t64-amd64','jpeg-avx2-i386','libssl3t64-i386','putty-32-0.85','putty-64-0.85'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions'])):
-            sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
-            if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
+        if name.startswith('putty-'):
+            assert len(common)==1 and common[0][0][1]==f.stat().st_size if bits==32 else len(common)>150
+            manifest[name]['selection']=source['extent_source']+'; require bytewise identical acceptance and boundaries over each retained extent'
+        for panel in (['whole-text' if bits==32 else 'runtime-functions'] if name.startswith('putty-') else ['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions'])):
+            sel=[a for a,v in common if panel in ('all-functions','whole-text','runtime-functions') or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
+            if name=='jpeg-avx2-i386' or name.startswith('putty-'):assert sel,(name,manifest[name])
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))

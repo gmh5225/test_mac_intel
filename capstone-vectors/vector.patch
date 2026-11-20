@@ -53,10 +53,98 @@ index ae1554b0..eefb4855 100644
  
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index cc67e9c7..fdff75bc 100644
+index cc67e9c7..b73a1a99 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3746,9 +3746,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+ #endif
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result);
++					 uint8_t prefix, cs_mode mode,
++					 X86ScanResult *result);
+ 
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+ #if defined(_MSC_VER)
+@@ -3322,7 +3323,8 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
+ 		    code[0] == 0xc4) {
+ 			const int status = tryVexTerminalScan(code, code_len,
+-							      code[0], result);
++							      code[0], CS_MODE_64,
++							      result);
+ 			if (status != X86_SCAN_NOT_HANDLED)
+ 				return status == X86_SCAN_COMPLETE;
+ 		}
+@@ -3343,6 +3345,23 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	return true;
+ }
+ 
++/* A bare C5 with mod == 3 selects VEX in 32-bit mode. Keep its
++ * specialized reader outside the generic MCInst frame. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__ELF__) && defined(__GNUC__)
++__attribute__((noinline, section(".cs_x86_vex32_scan")))
++#elif defined(__APPLE__) && defined(__GNUC__)
++__attribute__((noinline, section("__TEXT,__cs_vex32scan")))
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static int scanVex2In32BitMode(const uint8_t *code, size_t code_len,
++			       X86ScanResult *result)
++{
++	return tryVexTerminalScan(code, code_len, 0xc5, CS_MODE_32, result);
++}
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+@@ -3373,12 +3392,18 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 		}
+ 	}
+ #endif
++	if (!tryExtension && code_len >= 2 && code[0] == 0xc5 &&
++	    code[1] >= 0xc0 && handle->mode == CS_MODE_32) {
++		const int status = scanVex2In32BitMode(code, code_len, result);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status == X86_SCAN_COMPLETE;
++	}
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+ 			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+ 				     X86_VEX_FEATURE_NONE)) {
+-		const int status =
+-			tryVexTerminalScan(code, code_len, code[0], result);
++		const int status = tryVexTerminalScan(code, code_len, code[0],
++						      CS_MODE_64, result);
+ 		if (status != X86_SCAN_NOT_HANDLED)
+ 			return status == X86_SCAN_COMPLETE;
+ 		tryExtension = false;
+@@ -3430,10 +3455,11 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ }
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++					 uint8_t prefix, cs_mode mode,
++					 X86ScanResult *result)
+ {
+ 	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
++	initializeInstructionHeader(&insn, code, code_len, mode);
+ 	insn.readerCursor = 1;
+ 	if (readVexPrefix(&insn, prefix))
+ 		return X86_SCAN_INVALID;
+@@ -3500,7 +3526,7 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+ 			      cs_insn *insn, X86ScanResult *result,
+ 			      uint8_t prefix)
+ {
+-	int status = tryVexTerminalScan(code, code_len, prefix, result);
++	int status = tryVexTerminalScan(code, code_len, prefix, CS_MODE_64, result);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, prefix, false);
+@@ -3746,9 +3772,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  					  cs_insn *insn, uint16_t *insn_size,
  					  bool batch);
  
@@ -1046,6 +1134,24 @@ index b883b547..ab71d7df 100644
  #endif
  	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..f1561e64 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1204,6 +1204,13 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            if name == names[1] and key < 8:
++                # Bare two-byte VEX has no W bit and uses the 0F map.
++                mode32 = attributes & ~attrs["ATTR_64BIT"]
++                tables.require(
++                    row == indices[contexts.index(context_values[mode32])],
++                    "Review 32-bit VEX2 scan row sharing",
++                )
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 index ccc4f0de..478e54b1 100644
 --- a/suite/synctools/x86_simple_output.cpp
@@ -1506,6 +1612,23 @@ index d728cd64..16d14690 100644
  	Decoder decoder;
  	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
  	emit_output(decoder, scan_only);
+diff --git a/tests/unit/x86_buffer_bounds.c b/tests/unit/x86_buffer_bounds.c
+index 57ee99b2..f889345f 100644
+--- a/tests/unit/x86_buffer_bounds.c
++++ b/tests/unit/x86_buffer_bounds.c
+@@ -317,6 +317,12 @@ static bool check_escape_boundaries(uint8_t *end)
+ 		  7,
+ 		  X86_INS_INVALID,
+ 		  0 },
++		{ CS_MODE_32, { 0xc5, 0x00 }, 2, X86_INS_LDS, 2 },
++		{ CS_MODE_32, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
++		{ CS_MODE_32, { 0xc5, 0xf0, 0x77 }, 3, X86_INS_INVALID, 0 },
++		{ CS_MODE_32,
++		  { 0xc5, 0xf9, 0x6f, 0x44, 0x24, 0x10 },
++		  6, X86_INS_VMOVDQA, 6 },
+ 		{ CS_MODE_64, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
+ 		{ CS_MODE_64,
+ 		  { 0xc4, 0xe1, 0x74, 0x58, 0xc2 },
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index a1a212e6..ec20e860 100644
 --- a/tests/unit/x86_simple_output.c

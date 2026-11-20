@@ -582,7 +582,7 @@ index 00000000..d0945cf7
 +	},
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..e709258c 100644
+index 11e8578a..82a5b0d7 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
 @@ -4,12 +4,10 @@
@@ -614,7 +614,7 @@ index 11e8578a..e709258c 100644
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
-+#if defined(__clang__)
++#ifdef X86_HAS_VEX32_OUTPUT
 +			/* This plan admits only PUSH 68/6A or 32-bit VEX C4/C5. */
 +			if (opcode & 0x80)
 +				return X86_writeVex32Output(code, size, insn,
@@ -643,14 +643,15 @@ index 11e8578a..e709258c 100644
 +#endif
  #endif
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index aff17085..23852372 100644
+index aff17085..e8111b45 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -89,6 +89,16 @@ X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
+@@ -89,6 +89,17 @@ X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
  
  #endif
  
-+#if defined(__clang__)
++#if defined(__clang__) || (defined(__GNUC__) && defined(__ELF__))
++#define X86_HAS_VEX32_OUTPUT
 +/* PUSH and VEX32 share the exceptional arm. The opcode distinguishes them
 + * after the ordinary vector arm, keeping its direct call unchanged. */
 +#define X86_PLAN_VEX32 X86_PLAN_PUSH_IMMEDIATE
@@ -833,24 +834,25 @@ index 00000000..7c3af6c9
 +#endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 new file mode 100644
-index 00000000..6e584416
+index 00000000..e5aeb04b
 --- /dev/null
 +++ b/arch/X86/X86Vex32Output.c
-@@ -0,0 +1,190 @@
+@@ -0,0 +1,193 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
-+#if defined(CAPSTONE_HAS_X86) && defined(__clang__)
++#ifdef CAPSTONE_HAS_X86
 +#include "../../cs_priv.h"
 +#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+#if defined(__ELF__)
++#if defined(__clang__) && defined(__ELF__)
 +/* Keep this optional writer's constants outside the ordinary decoder tables. */
 +#pragma clang section rodata=".cs_x86_vex32_rodata"
 +#endif
 +#include "X86SimpleOutput.h"
++#ifdef X86_HAS_VEX32_OUTPUT
 +
 +#if defined(__ELF__)
 +#define X86_VEX32_OUTPUT_CODE \
@@ -1021,7 +1023,9 @@ index 00000000..6e584416
 +	return true;
 +}
 +
-+#if defined(__ELF__)
++#endif /* X86_HAS_VEX32_OUTPUT */
++
++#if defined(__clang__) && defined(__ELF__)
 +#pragma clang section rodata=""
 +#endif
 +
