@@ -1,7 +1,7 @@
-name: Validate the operand constraint fix across the default NeverD semantic grid
+name: Compare the baseline and candidate gitlinks across the same complete semantic grid
 on:
   push:
-    branches: [codex/capstone-operand-constraint-grid]
+    branches: [codex/capstone-constraint-paired-semantic-grid]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: e85382b1441bdcf84745ec049928797557aae228
+          ref: 71bd65bc7218cae8cf5dedc6e9a1845845498361
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -47,10 +47,20 @@ jobs:
         run: |
           mkdir -p grid-evidence
           sudo apt-get update -qq
-          sudo apt-get install -y lld ninja-build
-          git -C neverd/third_party/capstone apply --index "$GITHUB_WORKSPACE/capstone-product/bounds.patch"
-          test "$(git -C neverd/third_party/capstone write-tree)" = "75622f50ba8ea4e5f5bb1bee69150c7a07f44710"
-          git -C neverd rev-parse HEAD > grid-evidence/neverd.txt
+          sudo apt-get install -y lld ninja-build gcc-multilib libc6-dev-arm64-cross libc6-dev-armel-cross libc6-dev-armhf-cross
+          mkdir -p "$RUNNER_TEMP/grid-tools"
+          install -m 0755 capstone-product/grid-clang "$RUNNER_TEMP/grid-tools/clang"
+          for triple in aarch64-linux-gnu arm-linux-gnueabi arm-linux-gnueabihf; do
+            mkdir -p "$RUNNER_TEMP/grid-sysroots/$triple/usr"
+            ln -s "/usr/$triple/include" "$RUNNER_TEMP/grid-sysroots/$triple/usr/include"
+          done
+          for target in i386-linux-gnu aarch64-linux-gnu armv7-linux-gnueabi armv7-linux-gnueabihf; do
+            printf '#include <stdint.h>\n#include <stdlib.h>\n#include <string.h>\n' | "$RUNNER_TEMP/grid-tools/clang" -target "$target" -fsyntax-only -x c -
+          done
+          echo "$RUNNER_TEMP/grid-tools" >> "$GITHUB_PATH"
+          cp capstone-product/paired-inputs.json grid-evidence/inputs.json
+          test "$(git -C neverd/third_party/capstone rev-parse HEAD)" = "25da25371c0e19e1cf57b394446e3f705cecd2a9"
+          git -C neverd/third_party/capstone fetch --depth 1 origin 78f02050072f4a3778d1339374ec1c31f9b42c1a
           git -C neverd/third_party/llvm-project rev-parse HEAD > grid-evidence/llvm.txt
           git -C neverd/third_party/capstone write-tree > grid-evidence/capstone-tree.txt
           cmake -S neverd -B "$RUNNER_TEMP/semantic-grid" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCMAKE_LINKER_TYPE=LLD -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF
@@ -59,21 +69,42 @@ jobs:
         run: |
           set -o pipefail
           python3 scripts/build.py "$RUNNER_TEMP/semantic-grid" --target NeverDSemanticTests --parallel 4 2>&1 | tee "$GITHUB_WORKSPACE/grid-evidence/build.log"
-          test "$(git -C third_party/capstone write-tree)" = "75622f50ba8ea4e5f5bb1bee69150c7a07f44710"
+          test "$(git -C third_party/capstone rev-parse HEAD)" = "25da25371c0e19e1cf57b394446e3f705cecd2a9"
           test "$(git -C third_party/llvm-project rev-parse HEAD)" = "$(cat ../grid-evidence/llvm.txt)"
-          git -C third_party/llvm-project diff --exit-code HEAD
-          sha256sum "$RUNNER_TEMP/semantic-grid/bin/NeverDSemanticTests" > ../grid-evidence/binary.sha256
-      - name: Run the default semantic route across architectures and formats
+          cmake --build "$RUNNER_TEMP/semantic-grid" --parallel 4 --target NeverDX86DecodeDetailTests NeverDX86MpxEncodingTests NeverDX86NoIndexAddressTests
+      - name: Compare both release binaries using the same source code and target headers
         run: |
+          set -euo pipefail
           unset NEVERD_SEMANTIC_HIGHC NEVERD_SEMANTIC_LLVMC
-          ctest --test-dir "$RUNNER_TEMP/semantic-grid" -L '^NeverDSemanticTests$' --no-tests=error -j4 --output-on-failure --output-junit "$GITHUB_WORKSPACE/grid-evidence/semantic.xml" > grid-evidence/tests.log || { tail -100 grid-evidence/tests.log; exit 1; }
-          tail -10 grid-evidence/tests.log
+          base="$RUNNER_TEMP/semantic-grid"
+          for version in baseline candidate; do
+            if [ "$version" = candidate ]; then
+              git -C neverd/third_party/capstone checkout --detach 78f02050072f4a3778d1339374ec1c31f9b42c1a
+              git -C neverd update-index --cacheinfo 160000,78f02050072f4a3778d1339374ec1c31f9b42c1a,third_party/capstone
+              test "$(git -C neverd write-tree)" = "55e4d157434c060fd2efee9c189e856c8b171fd3"
+              test "$(git -C neverd hash-object -t commit -w "$GITHUB_WORKSPACE/capstone-product/neverd-dev-commit.txt")" = "36c20a12ac107cc16df4abb6f9c647d4231911f9"
+              git -C neverd checkout --detach 36c20a12ac107cc16df4abb6f9c647d4231911f9
+              test "$(git -C neverd/third_party/capstone write-tree)" = "75622f50ba8ea4e5f5bb1bee69150c7a07f44710"
+              cmake --build "$base" --parallel 4 --target NeverDSemanticTests NeverDX86DecodeDetailTests NeverDX86MpxEncodingTests NeverDX86NoIndexAddressTests | tee grid-evidence/relink.log
+            fi
+            git -C neverd rev-parse HEAD > "grid-evidence/$version-neverd.txt"
+            git -C neverd/third_party/capstone rev-parse HEAD > "grid-evidence/$version-capstone.txt"
+            git -C neverd/third_party/llvm-project diff --exit-code HEAD
+            test "$(git -C neverd/third_party/llvm-project rev-parse HEAD)" = "$(cat grid-evidence/llvm.txt)"
+            sha256sum "$base/bin/NeverDSemanticTests" > "grid-evidence/$version-binary.sha256"
+            ctest --test-dir "$base" -L '^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests)$' --no-tests=error -j4 --output-on-failure --output-junit "$GITHUB_WORKSPACE/grid-evidence/$version-decoder.xml" > "grid-evidence/$version-decoder.log"
+            rc=0
+            ctest --test-dir "$base" -L '^NeverDSemanticTests$' --no-tests=error -j4 --output-on-failure --output-junit "$GITHUB_WORKSPACE/grid-evidence/$version.xml" > "grid-evidence/$version.log" || rc=$?
+            echo "$rc" > "grid-evidence/$version-exit.txt"
+            test -s "grid-evidence/$version.xml"
+          done
+          python3 capstone-product/grid-compare.py grid-evidence
       - name: Remove generated build and checkout
         if: always()
         run: rm -rf -- "$RUNNER_TEMP/semantic-grid" "$GITHUB_WORKSPACE/neverd"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: operand-constraint-default-route-grid
+          name: paired-capstone-default-grid
           path: grid-evidence/
           retention-days: 14
