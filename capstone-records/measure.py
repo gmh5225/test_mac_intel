@@ -67,7 +67,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
             edges={}
             for label,exe in binaries.items():
                 trace=t/(label+'-calls')
-                run(['valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),exe,c['selector'],0,c['path'],1],'cost-'+label)
+                run(['env','CAPSTONE_PUBLIC_ONLY=1','valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),exe,c['selector'],0,c['path'],1],'cost-'+label)
                 names={};counts={};callee=None
                 for line in trace.read_text().splitlines():
                     if line.startswith(('fn=','cfn=')):
