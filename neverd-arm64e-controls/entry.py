@@ -24,6 +24,8 @@ with tempfile.TemporaryDirectory() as temporary:
         probe = subprocess.run(actual, capture_output=True, text=True)
         results[name] = {"exit": probe.returncode, "stdout": probe.stdout, "stderr": probe.stderr}
         if name != "execute":
+            if probe.returncode:
+                print(probe.stderr, file=sys.stderr)
             probe.check_returncode()
     results["image_sha256"] = hashlib.sha256(Path(args["image"]).read_bytes()).hexdigest()
     if Path(args["samples"]).exists():
