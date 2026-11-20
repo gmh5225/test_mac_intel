@@ -1,9 +1,9 @@
 {
-  "revision": "2b77a343713b02d2471b578dab0459d5680100c5",
-  "package": "Release with NeverSight LLVM 09ff60dd1ddb17114892ee2bb32256182dedc76e",
-  "tag": "neverd-bounded-tables-2b77a343713b",
+  "revision": "7c52e63b8cd89dc9b4ece3984b1b1260a55102b5",
+  "package": "Release using the LLVM source fork",
+  "tag": "neverd-masked-tables-7c52e63b8cd8",
   "host": "NeverDArm64eLiftedImageTests",
-  "asset": "bounded-tables.tgz",
+  "asset": "masked-tables.tgz",
   "run_env": {
     "NEVERD_ARM64E_LIFTED_NATIVE": "1",
     "NEVERD_ARM64E_ASYNC_NATIVE": "1"
@@ -1203,6 +1203,24 @@
       "recovered_source_data_in_code_records": 3,
       "proved_embedded_dispatches": 3,
       "rejected_fragment_kind_conflicts": 3
+    },
+    "MaskedFragmentedRelativeTablesSurviveRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "native_switch_comparisons": 288,
+      "published_data_in_code_records": 40,
+      "recovered_source_data_in_code_records": 0,
+      "proved_embedded_dispatches": 3,
+      "rejected_fragment_kind_conflicts": 3
+    },
+    "MaskedGappedRelativeTablesSurviveRelifting": {
+      "executed_native_images": 4,
+      "resigned_publication_generations": 3,
+      "native_switch_comparisons": 288,
+      "published_data_in_code_records": 40,
+      "recovered_source_data_in_code_records": 3,
+      "proved_embedded_dispatches": 3,
+      "rejected_fragment_kind_conflicts": 3
     }
   },
   "environment": {
@@ -1229,154 +1247,154 @@
       "--version"
     ]
   },
-  "archive_sha256": "e6d211d9dface766602c3f7024c6c6a67b45cb42003da403e21d9342d9f674cb",
-  "host_sha256": "720096fb05f5adfdd7f0fee633b23569b2d0d969636f099775e95d6d801ffbbd",
+  "archive_sha256": "f8e70685b1468b4236451d138a841fc99ea05a948946f2547e72e80d46453c98",
+  "host_sha256": "3f054787d61d84f62d674890d09b50a48bfc69acaa20da858e307edd653dd84e",
   "xml": "results.xml",
   "log": "runtime.log",
   "image_count": "executed_native_images",
   "published_cli_images": {
     "source": "cli-images/oracle.c",
-    "source_sha256": "95e90e8c00a6e95466b593fd184fb9ac7ef94c64d86b98fcb498b891633446bb",
+    "source_sha256": "50d58fbabe0f44ef4e8d6b7e2b0cab8664e396b12e6a6c7f8f68324a5abbbde6",
     "driver": "cli-table-oracle",
     "comparisons_per_image": 72,
     "images": {
       "cli-images/macos-26-fragmented-original.dylib": {
-        "sha256": "8c3c146bfcf0dcc6377f4f287e8015a87bef4f1ddb9ef61abba45c33264c4b30",
+        "sha256": "e21cf1a3d96de4d6a5dee41032e36c15f3fa31a7f9f10679420d04cc8c2bc6c7",
         "bytes": 34976,
         "data_in_code_records": 10
       },
       "cli-images/macos-26-fragmented-default-1.dylib": {
-        "sha256": "d725bd92c59ff9ae6dddfdea95bc5ec4f3ef60231581f65ac193d1258fdded68",
+        "sha256": "5ddb6cfd4f86f0e3a73b72b7fc52781878e9e95cfc6c6a88c9ef19d31a312f11",
         "bytes": 70288,
         "data_in_code_records": 20
       },
       "cli-images/macos-26-fragmented-default-2.dylib": {
-        "sha256": "081d7d96eb398ef6b1b639146b6765348f2181fa4073ff70103bc709cccfffea",
+        "sha256": "e9d47b0ff4043264ac31a529af193553be9c565e9361a86f4d6eabb0154f2515",
         "bytes": 105904,
         "data_in_code_records": 30
       },
       "cli-images/macos-26-fragmented-default-3.dylib": {
-        "sha256": "b32b0cde0d86951ff115d6eee3ae9c8db69551ad57039cf3772221cee75254c5",
+        "sha256": "603b683b990b6c10dc463c712f0680790789cc041d9aa1da244505f5fb9068b6",
         "bytes": 141856,
         "data_in_code_records": 40
       },
       "cli-images/macos-26-fragmented-no-opt-1.dylib": {
-        "sha256": "d30862302d60ba92cb68332abf324e775d234a3970fcbf3d3ab67f1b6a1f5164",
+        "sha256": "f9d3c19632c0e0b163ae9a8e215f12a1953308c551ffd4a8e9a971528628cc3b",
         "bytes": 70288,
         "data_in_code_records": 20
       },
       "cli-images/macos-26-fragmented-no-opt-2.dylib": {
-        "sha256": "d79334ff11f0a892c87273fb75c14e2204cf6aceec9bd0dbe77856dedd31fa49",
+        "sha256": "25c74dd3a35e91422f9aa381355f77ac6df40b02b89b8732ce08cd75e5918c2b",
         "bytes": 105904,
         "data_in_code_records": 30
       },
       "cli-images/macos-26-fragmented-no-opt-3.dylib": {
-        "sha256": "44d74bf27525fc684733f70671cb8f28d42b523ad395502953b8d6e87f223aae",
+        "sha256": "9b795e1b2f7b24139a36ad38c9d10868f5cec1f3010ee2bd7082a9fcf09474c2",
         "bytes": 141856,
         "data_in_code_records": 40
       },
       "cli-images/macos-26-gapped-original.dylib": {
-        "sha256": "6c1c74b573c58deeaa8bf6aa1dc017910882b8ab9ee3b9d58247162b6a0ad2cd",
+        "sha256": "123b711104056b26eac7459d6972e2629f8598b5b3b2209b7c7b86b397404cb7",
         "bytes": 34944,
         "data_in_code_records": 7
       },
       "cli-images/macos-26-gapped-default-1.dylib": {
-        "sha256": "3f5ea2d4ffe4e11cccc1bbe3341b90810c3ec017e3507244404f5846a19e1898",
+        "sha256": "f06b610201fd49d95bc1439de7529bb7a46cd2d4661b8fb0992f7060ae5e410d",
         "bytes": 70256,
         "data_in_code_records": 20
       },
       "cli-images/macos-26-gapped-default-2.dylib": {
-        "sha256": "7e495fcbe497131671e2add3ca8918815ec67742c0b2871e9b2c1db0eeef432a",
+        "sha256": "db8b69de04aa791043ffb63b7d86fc1cc099e593794759eb64f1be2cf2d8654d",
         "bytes": 105872,
         "data_in_code_records": 30
       },
       "cli-images/macos-26-gapped-default-3.dylib": {
-        "sha256": "5a8aad44c235d82eb5eec535a32b1da300af2e6d9567a7d464bcf52788e3e6f8",
+        "sha256": "6051721da20a041816845423122a0eefa58074e43e4f92a4ab32cd19b22a4b32",
         "bytes": 141824,
         "data_in_code_records": 40
       },
       "cli-images/macos-26-gapped-no-opt-1.dylib": {
-        "sha256": "f3ca015bbfb749ee480cb00ec94e73f349c7eaa242acee6a296bf95ebb96ad7d",
+        "sha256": "b9e88439af0ed929c30b837578e72da1a62f8ac7113ce812fe2394316ad4e117",
         "bytes": 70256,
         "data_in_code_records": 20
       },
       "cli-images/macos-26-gapped-no-opt-2.dylib": {
-        "sha256": "e5656ab8cb43c9b0b86ac3bbb7c4a445b8617c901fe639aa4d0365df3348b5c8",
+        "sha256": "ccb9a51f749f154f809a7b393af147be92ad5ede4f309eedbdca84b539763b41",
         "bytes": 105872,
         "data_in_code_records": 30
       },
       "cli-images/macos-26-gapped-no-opt-3.dylib": {
-        "sha256": "bb10800c24a8cce1c92acbc57f1f745986025d9e24955a5e2802f04925e8d11a",
+        "sha256": "ddc64423fd779d116175ba84979b8e4d6024fbfd10f53ab39f3842e116c219fe",
         "bytes": 141824,
         "data_in_code_records": 40
       },
       "cli-images/xcode-27-fragmented-original.dylib": {
-        "sha256": "b44ffffc36ce2ad7f5058fa072a3b28f77363c6c0a127d9181f7cac9a6ac4e77",
+        "sha256": "623bd6f409f6e5a1c067fb602641a1b4389f9a7ddfb2532b21ae779e213cb562",
         "bytes": 16992,
         "data_in_code_records": 10
       },
       "cli-images/xcode-27-fragmented-default-1.dylib": {
-        "sha256": "0ec6251549faf91822a780cd37290d37628a1d628b3c76dfa92cfd9d46b94eab",
+        "sha256": "457e1fcb74e50a8cd98de3b71057ae7703b0b90ba1dd21792f54b912e9afceb3",
         "bytes": 52112,
         "data_in_code_records": 20
       },
       "cli-images/xcode-27-fragmented-default-2.dylib": {
-        "sha256": "34c231a5dc331a8398a71911c67681a85d73c1c8d37d7a9e8ea5d0a1ff6442b5",
+        "sha256": "8d51f436b16c5aa5db9573a86d48affd7da9328d580b94fd92db3d3c6d057d27",
         "bytes": 87568,
         "data_in_code_records": 30
       },
       "cli-images/xcode-27-fragmented-default-3.dylib": {
-        "sha256": "f838419e28e855b92434ba7646ab90430990986d36767bf33709a6e97bfbe867",
+        "sha256": "a3747d58b2b3887838ee608655f3ee5345d3141130961dc2375f66b40612bda9",
         "bytes": 123392,
         "data_in_code_records": 40
       },
       "cli-images/xcode-27-fragmented-no-opt-1.dylib": {
-        "sha256": "965b144dbd2824a5a04d1a088dc1b2325243ed7820a2ca419d0582321ea2f5eb",
+        "sha256": "f71bd017ae28a5a9f89cc37eb5956bf7e1b3292707dbe6c2ccb241f9fb95e404",
         "bytes": 52112,
         "data_in_code_records": 20
       },
       "cli-images/xcode-27-fragmented-no-opt-2.dylib": {
-        "sha256": "f64b4fc4279782e459de766999b5bea31ec8cc6447201495d8422da39e2a90bd",
+        "sha256": "dd88b0edcb70e3262f7817237cbc2ebd1b896b32892875ecc3a2efedb1ddf2a3",
         "bytes": 87568,
         "data_in_code_records": 30
       },
       "cli-images/xcode-27-fragmented-no-opt-3.dylib": {
-        "sha256": "b94f5da7092f6c7f5dce90d74071c6d4a9ddc7571201eba9905756148c868dc9",
+        "sha256": "c0f52809a574e2ebdac9433654e8958162cfce0acce410f78011d59b8265a50c",
         "bytes": 123392,
         "data_in_code_records": 40
       },
       "cli-images/xcode-27-gapped-original.dylib": {
-        "sha256": "2a5dea7810d947db36b6a2408a8b1aadcec11fcdef8bf8eb0450d69281c1a50b",
+        "sha256": "19d2243a99f939a6a4a56cb07fc2cbd7bf0fb32593ce77fc3eba216a04702eb3",
         "bytes": 16960,
         "data_in_code_records": 7
       },
       "cli-images/xcode-27-gapped-default-1.dylib": {
-        "sha256": "eeca8db4fb29a608378eddecfd793632c81736be5111ab8743d7cf2bebcd8a16",
+        "sha256": "7b80fdd9cb042f5bfed33c40ed00b87846da7f971d0bfaa3216ee0d05c6cd5ee",
         "bytes": 52080,
         "data_in_code_records": 20
       },
       "cli-images/xcode-27-gapped-default-2.dylib": {
-        "sha256": "f80af9886d7b7f5ce95ef4b1f1c0daef756f68b9bdb2c1fda554b7cece437757",
+        "sha256": "cd722cde37b9d7a8f2a4193c7c76e52a5e7cf31bd5b15668bc3003adbd3f904f",
         "bytes": 87536,
         "data_in_code_records": 30
       },
       "cli-images/xcode-27-gapped-default-3.dylib": {
-        "sha256": "ad8691f07338c7ac2741a90afd334ee2f0df853cee0b192edecb0201be5b5f48",
+        "sha256": "cd4166938c7d6b74faa23d156d06f3b7dfbcdfbf7123e31c386a6b1c12752631",
         "bytes": 123360,
         "data_in_code_records": 40
       },
       "cli-images/xcode-27-gapped-no-opt-1.dylib": {
-        "sha256": "f915bd067f227b818ceef5e8011c99a31b301e4997b56a2ce5e5d24ca1bd0335",
+        "sha256": "6d0d671710959a6fd12244f6391c90f3d8e5f71b5aa80113eba04d004e1f284b",
         "bytes": 52080,
         "data_in_code_records": 20
       },
       "cli-images/xcode-27-gapped-no-opt-2.dylib": {
-        "sha256": "f7e59a684d18e03a775b18e5457e16c5fd9f71df62e2383faf6ec2dd8e87f49e",
+        "sha256": "e34c5309bbce403a86f165971ff79c0d0761f51d0efd3e4a0a5f04819d27f49a",
         "bytes": 87536,
         "data_in_code_records": 30
       },
       "cli-images/xcode-27-gapped-no-opt-3.dylib": {
-        "sha256": "e26c71b386ea69b41a46e0b84d45905e1b6fafa856917d4482b348593e2dde70",
+        "sha256": "0b85b8e87fd8ea363e11f171ac21b643f300808a605c7fa5aa339af57aeac3a2",
         "bytes": 123360,
         "data_in_code_records": 40
       }

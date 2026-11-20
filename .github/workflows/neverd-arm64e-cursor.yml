@@ -1,4 +1,4 @@
-name: NeverD arm64e bounded switches and original entry tables
+name: NeverD arm64e masked switches and original entry tables
 on:
   push:
     branches: [codex/neverd-arm64e-bounded-tables-20261120]
@@ -12,7 +12,7 @@ jobs:
       matrix:
         runner: [macos-26, xcode-27]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
