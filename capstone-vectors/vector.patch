@@ -1,14 +1,46 @@
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index ccaec06a..ac8bcaa3 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -9,7 +9,8 @@
+ 
+ /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
+  * The ordinary output generator owns the admitted IDs and widths. */
+-__attribute__((noinline, section(".cs_x86_evex_scan_text")))
++__attribute__((noinline)) X86_EVEX_SECTION(".cs_x86_evex_scan_text",
++					    "__cs_evex_scan")
+ static x86_feature_decode_result
+ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
+ 		      MCInst *instr, uint16_t *size, uint8_t opcode)
+@@ -77,7 +78,8 @@ fallback:
+ 
+ /* Keep the non-EVEX and non-64-bit fallback ahead of the register helper's
+  * working state. Its predicate matches the isolated full-decode entry. */
+-__attribute__((noinline, section(".cs_x86_evex_scan_text")))
++__attribute__((noinline)) X86_EVEX_SECTION(".cs_x86_evex_scan_text",
++					    "__cs_evex_scan")
+ CAPSTONE_INTERNAL x86_feature_decode_result
+ X86_decodeScanFeatureExtension(csh ud, const uint8_t *code, size_t code_len,
+ 			       MCInst *instr, uint16_t *size, uint8_t opcode)
 diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 4d34d8ac..15ac5a2d 100644
+index 4d34d8ac..9cbbf74a 100644
 --- a/arch/X86/X86FeatureExtension.h
 +++ b/arch/X86/X86FeatureExtension.h
-@@ -304,14 +304,16 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
+@@ -304,14 +304,24 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
  x86_feature_decode_result
  X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
  			   MCInst *instr, uint16_t *size, uint8_t opcode);
 -#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
-+#if defined(__ELF__) && defined(__GNUC__) && \
-+	(defined(__x86_64__) || defined(__aarch64__))
++#if defined(__GNUC__) && (defined(__x86_64__) || defined(__aarch64__))
++#if defined(__ELF__)
++#define X86_EVEX_SECTION(elf_name, mach_name) __attribute__((section(elf_name)))
++#elif defined(__APPLE__) && defined(__MACH__) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && !defined(KERNEL)
++#define X86_EVEX_SECTION(elf_name, mach_name) \
++	__attribute__((section("__TEXT," mach_name)))
++#endif
++#endif
++#ifdef X86_EVEX_SECTION
 +#define X86_SEPARATE_FEATURE_ENTRY
  /* Internal full decoder behind the isolated extension entry. */
  CAPSTONE_INTERNAL x86_feature_decode_result
@@ -21,11 +53,51 @@ index 4d34d8ac..15ac5a2d 100644
  	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
  	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
  	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
+index 80cda582..8e9278f0 100644
+--- a/arch/X86/X86GenEvexScan.inc
++++ b/arch/X86/X86GenEvexScan.inc
+@@ -5,7 +5,7 @@ struct EvexScanPlan {
+ 	uint16_t ids[2][3];
+ };
+ static const struct EvexScanPlan evex_scan_plans[]
+-	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	X86_EVEX_SECTION(".cs_x86_evex_scan_rodata", "__cs_evex_plan") = {
+ 	{ 0 },
+ 	{ 1, 6, { { X86_INS_VPXORD, X86_INS_VPXORD, X86_INS_VPXORD }, { X86_INS_VPXORQ, X86_INS_VPXORQ, X86_INS_VPXORQ } } },
+ 	{ 1, 6, { { X86_INS_VPADDD, X86_INS_VPADDD, X86_INS_VPADDD }, { 0, 0, 0 } } },
+@@ -22,7 +22,7 @@ static const struct EvexScanPlan evex_scan_plans[]
+ 	{ 3, 7, { { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ } } },
+ };
+ static const uint8_t evex_scan_index[256]
+-	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	X86_EVEX_SECTION(".cs_x86_evex_scan_rodata", "__cs_evex_plan") = {
+ 	3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 129, 9, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -41,7 +41,7 @@ static const uint8_t evex_scan_index[256]
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0,
+ };
+ static const uint16_t evex_transfer_scan_ids[4][2][3]
+-	__attribute__((section(".cs_x86_evex_transfer_rodata"))) = {
++	X86_EVEX_SECTION(".cs_x86_evex_transfer_rodata", "__cs_evex_xfer") = {
+ 	{
+ 		{ 0, X86_INS_VBROADCASTF32X4, X86_INS_VBROADCASTF32X4 },
+ 		{ 0, X86_INS_VBROADCASTF64X2, X86_INS_VBROADCASTF64X2 },
+@@ -60,7 +60,7 @@ static const uint16_t evex_transfer_scan_ids[4][2][3]
+ 	},
+ };
+ static const uint8_t evex_transfer_lengths[32]
+-	__attribute__((section(".cs_x86_evex_transfer_rodata"))) = {
++	X86_EVEX_SECTION(".cs_x86_evex_transfer_rodata", "__cs_evex_xfer") = {
+ 	6, 6, 6, 6, 0, 10, 6, 6,
+ 	7, 7, 7, 7, 8, 7, 7, 7,
+ 	10, 10, 10, 10, 11, 10, 10, 10,
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 5c908d27..8c5f511c 100644
+index 5c908d27..0c55245f 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -4816,7 +4816,7 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
+@@ -4816,13 +4816,11 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
  	       (code[prefix_offset + 1] & 7) <= 4;
  }
  
@@ -34,7 +106,14 @@ index 5c908d27..8c5f511c 100644
  /* Complete EVEX opcodes that may belong to a source-owned extension.
   * Each byte is a map bitset. The original handlers own validation and
   * precedence; short encodings still enter those handlers unchanged. */
-@@ -4849,7 +4849,7 @@ __declspec(noinline)
+-#if defined(__ELF__) && defined(__GNUC__)
+-__attribute__((section(".cs_x86_feature_rodata")))
+-#endif
++X86_EVEX_SECTION(".cs_x86_feature_rodata", "__cs_evex_map")
+ static const uint8_t evex_feature_maps[256] = {
+ 	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -4849,7 +4847,7 @@ __declspec(noinline)
  #elif defined(__GNUC__)
  __attribute__((noinline))
  #endif
@@ -43,7 +122,7 @@ index 5c908d27..8c5f511c 100644
  CAPSTONE_INTERNAL x86_feature_decode_result
  X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code, size_t code_len,
  			   MCInst *instr, uint16_t *size, uint8_t opcode)
-@@ -5050,7 +5050,7 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+@@ -5050,7 +5048,7 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
  	}
  }
  
@@ -52,3 +131,54 @@ index 5c908d27..8c5f511c 100644
  /* Reject ordinary unprefixed EVEX before the extension decoder needs its
   * full working state. All other inputs retain its original validation order. */
  #if defined(_MSC_VER)
+@@ -5058,9 +5056,7 @@ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-#if defined(__ELF__) && defined(__GNUC__)
+-__attribute__((section(".cs_x86_feature_text")))
+-#endif
++X86_EVEX_SECTION(".cs_x86_feature_text", "__cs_evex_filt")
+ x86_feature_decode_result
+ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+ 			   MCInst *instr, uint16_t *size, uint8_t opcode)
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index d728cd64..70c97333 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -919,7 +919,7 @@ void emit_vex_registers(Decoder &decoder)
+ }
+ void emit_evex_transfer_scan(Decoder &decoder)
+ {
+-	std::puts("static const uint16_t evex_transfer_scan_ids[4][2][3]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {");
++	std::puts("static const uint16_t evex_transfer_scan_ids[4][2][3]\n\tX86_EVEX_SECTION(\".cs_x86_evex_transfer_rodata\", \"__cs_evex_xfer\") = {");
+ 	for (unsigned kind = 0; kind < 4; ++kind) {
+ 		std::puts("\t{");
+ 		for (unsigned w = 0; w < 2; ++w) {
+@@ -997,7 +997,7 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 	index[0x1a] = 129;
+ 	std::puts("enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };");
+ 	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
+-	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
++	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\tX86_EVEX_SECTION(\".cs_x86_evex_scan_rodata\", \"__cs_evex_plan\") = {\n\t{ 0 },");
+ 	for (const auto &[key, widths] : ids) {
+ 		const auto &form = descriptions.at(key);
+ 		std::printf("\t{ %u, %u, { ", form.map, 6 + form.immediate);
+@@ -1013,7 +1013,7 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 		}
+ 		std::puts(" } },");
+ 	}
+-	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {");
++	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\tX86_EVEX_SECTION(\".cs_x86_evex_scan_rodata\", \"__cs_evex_plan\") = {");
+ 	for (unsigned i = 0; i < index.size(); i += 16) {
+ 		std::printf("\t");
+ 		for (unsigned j = 0; j < 16; ++j)
+@@ -1022,7 +1022,7 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 	}
+ 	std::puts("};");
+ 	emit_evex_transfer_scan(decoder);
+-	std::puts("static const uint8_t evex_transfer_lengths[32]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {\n\t6, 6, 6, 6, 0, 10, 6, 6,\n\t7, 7, 7, 7, 8, 7, 7, 7,\n\t10, 10, 10, 10, 11, 10, 10, 10,\n\t6, 6, 6, 6, 6, 6, 6, 6,\n};");
++	std::puts("static const uint8_t evex_transfer_lengths[32]\n\tX86_EVEX_SECTION(\".cs_x86_evex_transfer_rodata\", \"__cs_evex_xfer\") = {\n\t6, 6, 6, 6, 0, 10, 6, 6,\n\t7, 7, 7, 7, 8, 7, 7, 7,\n\t10, 10, 10, 10, 11, 10, 10, 10,\n\t6, 6, 6, 6, 6, 6, 6, 6,\n};");
+ }
+ 
+ // Derive the metadata and verify the complete operand record for the

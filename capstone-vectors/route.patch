@@ -1,23 +1,31 @@
 diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 4d34d8ac..4ba4db48 100644
+index 4d34d8ac..9e4b303e 100644
 --- a/arch/X86/X86FeatureExtension.h
 +++ b/arch/X86/X86FeatureExtension.h
-@@ -304,7 +304,9 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
+@@ -304,7 +304,17 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
  x86_feature_decode_result
  X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
  			   MCInst *instr, uint16_t *size, uint8_t opcode);
 -#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__)
-+#if defined(__ELF__) && defined(__GNUC__) && \
-+	(defined(__x86_64__) || defined(__aarch64__))
++#if defined(__GNUC__) && (defined(__x86_64__) || defined(__aarch64__))
++#if defined(__ELF__)
++#define X86_EVEX_SECTION(elf_name, mach_name) __attribute__((section(elf_name)))
++#elif defined(__APPLE__) && defined(__MACH__) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && !defined(KERNEL)
++#define X86_EVEX_SECTION(elf_name, mach_name) \
++	__attribute__((section("__TEXT," mach_name)))
++#endif
++#endif
++#ifdef X86_EVEX_SECTION
 +#define X86_SEPARATE_FEATURE_ENTRY
  /* Internal full decoder behind the isolated extension entry. */
  CAPSTONE_INTERNAL x86_feature_decode_result
  X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 5c908d27..8c5f511c 100644
+index 5c908d27..0c55245f 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -4816,7 +4816,7 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
+@@ -4816,13 +4816,11 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
  	       (code[prefix_offset + 1] & 7) <= 4;
  }
  
@@ -26,7 +34,14 @@ index 5c908d27..8c5f511c 100644
  /* Complete EVEX opcodes that may belong to a source-owned extension.
   * Each byte is a map bitset. The original handlers own validation and
   * precedence; short encodings still enter those handlers unchanged. */
-@@ -4849,7 +4849,7 @@ __declspec(noinline)
+-#if defined(__ELF__) && defined(__GNUC__)
+-__attribute__((section(".cs_x86_feature_rodata")))
+-#endif
++X86_EVEX_SECTION(".cs_x86_feature_rodata", "__cs_evex_map")
+ static const uint8_t evex_feature_maps[256] = {
+ 	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -4849,7 +4847,7 @@ __declspec(noinline)
  #elif defined(__GNUC__)
  __attribute__((noinline))
  #endif
@@ -35,7 +50,7 @@ index 5c908d27..8c5f511c 100644
  CAPSTONE_INTERNAL x86_feature_decode_result
  X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code, size_t code_len,
  			   MCInst *instr, uint16_t *size, uint8_t opcode)
-@@ -5050,7 +5050,7 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+@@ -5050,7 +5048,7 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
  	}
  }
  
@@ -44,3 +59,14 @@ index 5c908d27..8c5f511c 100644
  /* Reject ordinary unprefixed EVEX before the extension decoder needs its
   * full working state. All other inputs retain its original validation order. */
  #if defined(_MSC_VER)
+@@ -5058,9 +5056,7 @@ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-#if defined(__ELF__) && defined(__GNUC__)
+-__attribute__((section(".cs_x86_feature_text")))
+-#endif
++X86_EVEX_SECTION(".cs_x86_feature_text", "__cs_evex_filt")
+ x86_feature_decode_result
+ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+ 			   MCInst *instr, uint16_t *size, uint8_t opcode)

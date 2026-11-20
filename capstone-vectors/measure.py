@@ -1,7 +1,6 @@
 """Compare real ELF library functions at common boundaries with current forked iced."""
 from pathlib import Path
 import gzip, os, shlex, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
-from layout import linked_layout
 r=Path(__file__).resolve().parent
 p=r.parent
 base=p/'source'
@@ -27,8 +26,8 @@ def main(w):
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
-    save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Ordinary EVEX feature filter available on the AArch64 ELF host',vector='Negative filter plus existing EVEX scan plans on the AArch64 ELF host',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('cpu.json',dict(cpu=sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True),machine=platform.machine(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Ordinary EVEX feature filter available on the Darwin host',vector='Negative filter plus existing EVEX scan plans on the Darwin host',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -59,21 +58,31 @@ def main(w):
         run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
-        members=sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines()
+        members=[q for q in sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines() if q.endswith('.o')]
         assert len(set(members))==len(members)
         active={str(path.relative_to(objroot)):path for path in objroot.rglob('*.o') if path.name in members}
         assert len(active)==len(members)
         objects[label]={name:sha(path) for name,path in active.items()}
         assert len(objects[label])>30
-        shutil.copyfile(b/'libcapstone.so',w/(label+'.so'))
+        shutil.copyfile(b/'libcapstone.dylib',w/(label+'.so'))
         if label!='integer':
             changed=sorted(name for name,hash_ in objects['integer'].items() if objects[label].get(name)!=hash_)
             assert set(objects['integer'])==set(objects[label])
-            expected=[] if platform.machine()=='x86_64' else ['arch/X86/X86Mapping.c.o']
-            if platform.machine()=='aarch64' and label=='vector':
+            expected=['arch/X86/X86Mapping.c.o']
+            if label=='vector':
                 expected+=['arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86EvexScan.c.o']
             assert changed==sorted(expected),(label,changed,expected)
             save(label+'-object-isolation.json',dict(changed=changed,added=[],unchanged=len(objects['integer'])-len(changed)))
+        if label=='vector':
+            sect=sp.check_output(['otool','-l',active['arch/X86/X86EvexScan.c.o']],text=True)
+            for name in ('__cs_evex_scan','__cs_evex_plan','__cs_evex_xfer'):assert 'sectname '+name in sect
+            feat=sp.check_output(['otool','-l',active['arch/X86/X86Mapping.c.o']],text=True)
+            for name in ('__cs_evex_map','__cs_evex_filt'):assert 'sectname '+name in feat
+            run(['clang++','-std=c++17','-O2','-I',tree/'include',tree/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'generator'],'generator-build')
+            with (w/'gen.log').open('w') as log:
+                raw=sp.check_output([w/'generator','--evex-scan'],stderr=log)
+            assert raw==(tree/'arch/X86/X86GenEvexScan.inc').read_bytes()
+            save('generated-identity.json',dict(equal=True,sha256=hashlib.sha256(raw).hexdigest()))
         save('object-digests.json',objects)
         obj=w/'driver.o'
         unresolved=sp.check_output(['nm','-u',obj],text=True)
@@ -99,14 +108,9 @@ def main(w):
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
-    maximum=max(map(len,payloads.values()))
-    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-    image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
-    image_inode=image.stat().st_ino
-    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
+    image=w/'common-command'
+    launches=['images','same-argv']
+    save('launch-controls.json',dict(launches=launches,aslr='system default',original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},equal_length_engine_selectors=True))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
@@ -132,12 +136,7 @@ def main(w):
                         command=[str(exe[lib]),*tail];executable=None
                     elif launch=='same-argv':
                         command=[str(image),*tail];executable=str(exe[lib])
-                    else:
-                        with image.open('r+b')as out:
-                            assert out.write(padded[lib])==maximum
-                        assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                        command=[str(image),*tail];executable=None
-                        if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
+                    else:raise ValueError(launch)
                     return list(map(int,sp.check_output(command,executable=executable).split()))
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
                 cycles={launch:[]for launch in launches};labels=['integer','aa','route','vector','iced']+(['fast'] if mode else [])

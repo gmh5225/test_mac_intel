@@ -1,7 +1,7 @@
-name: Enable the existing EVEX plans on AArch64 hosts and measure against forked iced
+name: Compare Darwin EVEX scan plans with source-built forked iced on Intel and Apple silicon
 on:
   push:
-    branches: [codex/capstone-elf-arm64-evex]
+    branches: [codex/capstone-darwin-evex-hosts]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04-arm, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: macos-15, cc: clang, replica: 1 }
+          - { host: macos-15, cc: clang, replica: 2 }
+          - { host: macos-15-intel, cc: clang, replica: 1 }
+          - { host: macos-15-intel, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -33,7 +33,7 @@ jobs:
       - name: Build from source and time only verified common function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
+          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/prepare_baseline.py
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
       - if: always()
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm64-evex-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: darwin-evex-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
