@@ -1,7 +1,7 @@
-name: Validate the operand constraint fix across the default NeverD semantic grid
+name: Verify the actual NeverD dev gitlink commit against source-built LLVM
 on:
   push:
-    branches: [codex/capstone-operand-constraint-grid]
+    branches: [codex/capstone-operand-constraint-dev-grid]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: e85382b1441bdcf84745ec049928797557aae228
+          ref: 11bd0fa883a7508022630bf736b6147fc6414458
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -39,7 +39,12 @@ jobs:
           persist-credentials: false
       - name: Initialize source dependencies
         working-directory: neverd
-        run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway signatures
+        run: |
+          git update-index --cacheinfo 160000,78f02050072f4a3778d1339374ec1c31f9b42c1a,third_party/capstone
+          test "$(git write-tree)" = "48686b9756ab3ee3eedab89fcb23dc7cffb6d61e"
+          test "$(git hash-object -t commit -w "$GITHUB_WORKSPACE/capstone-product/neverd-dev-commit.txt")" = "a07c4e38928a0911284d73320c03f46b058348c1"
+          git checkout --detach a07c4e38928a0911284d73320c03f46b058348c1
+          git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway signatures
       - name: Configure default-route semantic tests with the live LLVM fork
         env:
           CC: clang
@@ -48,7 +53,7 @@ jobs:
           mkdir -p grid-evidence
           sudo apt-get update -qq
           sudo apt-get install -y lld ninja-build
-          git -C neverd/third_party/capstone apply --index "$GITHUB_WORKSPACE/capstone-product/bounds.patch"
+          test "$(git -C neverd/third_party/capstone rev-parse HEAD)" = "78f02050072f4a3778d1339374ec1c31f9b42c1a"
           test "$(git -C neverd/third_party/capstone write-tree)" = "75622f50ba8ea4e5f5bb1bee69150c7a07f44710"
           git -C neverd rev-parse HEAD > grid-evidence/neverd.txt
           git -C neverd/third_party/llvm-project rev-parse HEAD > grid-evidence/llvm.txt
@@ -62,10 +67,12 @@ jobs:
           test "$(git -C third_party/capstone write-tree)" = "75622f50ba8ea4e5f5bb1bee69150c7a07f44710"
           test "$(git -C third_party/llvm-project rev-parse HEAD)" = "$(cat ../grid-evidence/llvm.txt)"
           git -C third_party/llvm-project diff --exit-code HEAD
+          cmake --build "$RUNNER_TEMP/semantic-grid" --parallel 4 --target NeverDX86DecodeDetailTests NeverDX86MpxEncodingTests NeverDX86NoIndexAddressTests
           sha256sum "$RUNNER_TEMP/semantic-grid/bin/NeverDSemanticTests" > ../grid-evidence/binary.sha256
       - name: Run the default semantic route across architectures and formats
         run: |
           unset NEVERD_SEMANTIC_HIGHC NEVERD_SEMANTIC_LLVMC
+          ctest --test-dir "$RUNNER_TEMP/semantic-grid" -L '^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests)$' --no-tests=error -j4 --output-on-failure --output-junit "$GITHUB_WORKSPACE/grid-evidence/decoder.xml" > grid-evidence/decoder-tests.log || { tail -100 grid-evidence/decoder-tests.log; exit 1; }
           ctest --test-dir "$RUNNER_TEMP/semantic-grid" -L '^NeverDSemanticTests$' --no-tests=error -j4 --output-on-failure --output-junit "$GITHUB_WORKSPACE/grid-evidence/semantic.xml" > grid-evidence/tests.log || { tail -100 grid-evidence/tests.log; exit 1; }
           tail -10 grid-evidence/tests.log
       - name: Remove generated build and checkout
@@ -74,6 +81,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: operand-constraint-default-route-grid
+          name: verified-dev-operand-constraint-grid
           path: grid-evidence/
           retention-days: 14
