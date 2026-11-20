@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib, itertools, json, os, platform, shutil, statistics, subprocess as sp, tempfile
+import re, hashlib, itertools, json, os, platform, shutil, statistics, subprocess as sp, tempfile
 import corpus
 r = Path(__file__).resolve().parent
 s = r.parent / 'source'
@@ -22,7 +22,7 @@ meta=json.loads((r/'lineage.json').read_text())
 assert git('rev-parse','HEAD')==meta['bounds']['parent']
 write('environment',dict(cc=sp.check_output([cc,'--version'],text=True),host=platform.platform(),
     cpu=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith(('model name','CPU part'))),None)))
-with tempfile.TemporaryDirectory(prefix='capstone-descriptor-inline-') as temp:
+with tempfile.TemporaryDirectory(prefix='capstone-riscv-implicit-sp-') as temp:
     t=Path(temp); b=t/'build'
     try:
         cases=corpus.prepare(r,t,out,run)
@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-descriptor-inline-') as temp:
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV','PPC')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
-        for label,patch in [('base','bounds'),('candidate','inline')]:
+        for label,patch in [('base','bounds'),('candidate','implicit_sp')]:
             path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
             git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
@@ -49,21 +49,47 @@ with tempfile.TemporaryDirectory(prefix='capstone-descriptor-inline-') as temp:
             binaries[label]=exe
             obj=b/'CMakeFiles/capstone.dir'
             objects[label]={str(f.relative_to(obj)):sha(f) for f in obj.rglob('*.o')}
-            for target in ('MCInst.c.o','arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o','arch/PowerPC/PPCInstPrinter.c.o'):
-                refs=sp.check_output(['nm','-u',obj/target],text=True)
-                assert ('MCInstrDesc_get' in refs)==(label=='base'),(label,target)
-            assert ' T MCInstrDesc_get' in sp.check_output(['nm','-g',obj/'MCInstrDesc.c.o'],text=True)
+            symbols=sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines()
+            keep={'RISCV_getInstruction','RISCV_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','cs_decode_full_insn','cs_disasm_iter','Mips_getInstruction','Mips_get_insn_id'}
+            (out/(label+'-symbols.txt')).write_text('\n'.join(line for line in symbols if line.split()[-1] in keep)+'\n')
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        assert {'MCInst.c.o','arch/PowerPC/PPCInstPrinter.c.o','arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o'}<=set(changed)<={'MCInst.c.o','arch/PowerPC/PPCInstPrinter.c.o','arch/ARM/ARMDisassembler.c.o','arch/RISCV/RISCVDisassembler.c.o','MCInstrDesc.c.o'},changed
-        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option']
+        assert changed==['arch/RISCV/RISCVDisassembler.c.o'],changed
+        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
+        run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_writeback_postprocess_(newlines|generator)$'],'generator-tests')
         run([t/'arm-states',libs['base'],libs['candidate']],'full-arm')
         for arch in ('aarch64','ppc'):run([t/(arch+'-states'),libs['base'],libs['candidate']],'full-'+arch)
         for args in [[],['custom']]:
             run([t/'riscv-states',libs['base'],libs['candidate'],t/'corpus',*args],'full-riscv'+('' if not args else '-custom'))
+        if platform.machine()=='x86_64':
+            costs=[]
+            for name,m,route in [('mips64el-ls',0,'public'),('riscv64-ls',0,'public'),('riscv64-cp',0,'public')]:
+                c=next(x for x in cases if x['name']==name)
+                for key,exe in binaries.items():
+                    trace=t/'calls.out';tag='trace-'+name+'-'+route+'-'+key
+                    rr=sp.run(['valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),str(exe),str(c['selector']),str(m),c['path'],'1'],capture_output=True,text=True,check=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public'))))
+                    names={};callee=None;caller=None;calls={}
+                    def resolved(atom):
+                        match=re.fullmatch(r'\((\d+)\)(?: (.*))?',atom)
+                        if not match:return atom
+                        n,val=match.groups()
+                        if val is not None:names[n]=val
+                        return names.get(n,'('+n+')')
+                    summary=None
+                    for line in trace.read_text(errors='replace').splitlines():
+                        if line.startswith('fn='):caller=resolved(line[3:])
+                        elif line.startswith('cfn='):callee=resolved(line[4:])
+                        elif line.startswith('calls=') and callee and caller:
+                            if any(k in callee or k in caller for k in ('addSPOperands','MCInstrDesc_get','MCInst_insert0','RISCV_getInstruction','RISCV_LLVM_getInstruction','Mips_getInstruction','cs_disasm_iter','cs_decode_full_insn')):
+                                edge=caller+' -> '+callee;calls[edge]=calls.get(edge,0)+int(line[6:].split()[0])
+                        elif line.startswith('summary:'):summary=int(line.split()[1])
+                    assert summary is not None and calls
+                    costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,first=json.loads(rr.stdout)['first']))
+                    trace.unlink()
+            write('call-costs',costs)
         shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
         payload={k:v.read_bytes() for k,v in binaries.items()}; assert payload['base']==payload['copy']!=payload['candidate']
         size=max(map(len,payload.values())); image=t/'same'; image.write_bytes(bytes(size));image.chmod(0o755);inode=image.stat().st_ino
@@ -94,6 +120,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-descriptor-inline-') as temp:
                         pairs.append(ticks)
                     rows.append(dict(case=c['name'],route=route,mode=m,repeats=n,reference=reference,cycles=pairs))
                     write('timings',rows)
-        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['inline']['tree']))
+        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['implicit_sp']['tree']))
     finally:
         n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))

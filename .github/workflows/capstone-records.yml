@@ -1,7 +1,7 @@
-name: Measure inlined instruction descriptors on ARM and RISC-V with cross-ISA controls
+name: Measure compressed RISC-V stack-pointer admission on six architectures
 on:
   push:
-    branches: [codex/capstone-inline-instruction-descriptor]
+    branches: [codex/capstone-riscv-implicit-sp]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -31,8 +31,9 @@ jobs:
           ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
           path: source
           persist-credentials: false
-      - name: Compare complete ARM and RISC-V records and time all five backends
+      - name: Verify implicit SP classes and time six backends
         run: |
+          if [ "$(uname -m)" = x86_64 ]; then sudo apt-get -qq update && sudo apt-get -y install valgrind; fi
           python3 capstone-records/prepare_baseline.py
           python3 capstone-records/measure.py
       - if: always()
@@ -40,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: inline-instrdesc-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: riscv-implicit-sp-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

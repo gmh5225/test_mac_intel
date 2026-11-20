@@ -1,6 +1,7 @@
 {
   "source": "78f02050072f4a3778d1339374ec1c31f9b42c1a",
-  "evidence": "The preceding ARM trace removed 56,607 calls across three ls traversals. ARM predicate handling, RISC-V compressed SP operands, PowerPC register printing and the shared MCInst_handleWriteback are direct callers of the reverse-table address calculation. ARM, AArch64 and RISC-V call this shared writeback path.",
-  "test": "Preserve the external symbol. Check all four caller objects lose external references, compare complete ARM/Thumb, AArch64, RISC-V and PPC records and measure six linked backends.",
-  "other_variants": "Independent from either public x86 routing prototype."
+  "mechanism": "The two compressed decode tables call addSPOperands after every successful decode. Exactly ten of the 13,090 canonical descriptors contain the SP class. Project membership from the same descriptors, skip traversal on the others and preserve the existing insertion sequence on hits. No changes to shared MCInst or other architecture objects.",
+  "evidence": "round1504-inline-instruction-descriptor/native-review.json",
+  "expected_runtime_object": "arch/RISCV/RISCVDisassembler.c.o",
+  "verification": "Native arrays independently validate every derived predicate. Compare old and new public records and callbacks. Time real RISC-V ls/cp and all passive inputs using the same binaries and pinned runner."
 }

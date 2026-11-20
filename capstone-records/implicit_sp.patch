@@ -1,0 +1,123 @@
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 5c59283f..7457b0a1 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -581,6 +581,8 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+ // isn't explicitly encoded in the instruction.
+ void addSPOperands(MCInst *MI)
+ {
++	if (!RISCV_hasImplicitSP(MCInst_getOpcode(MI)))
++		return;
+ 	const MCInstrDesc *MCID = MCInstrDesc_get(MCInst_getOpcode(MI),
+ 						  RISCVDescs.Insts,
+ 						  ARR_SIZE(RISCVDescs.Insts));
+diff --git a/arch/RISCV/RISCVGenWriteback.inc b/arch/RISCV/RISCVGenWriteback.inc
+index 34eec991..138cfe8f 100644
+--- a/arch/RISCV/RISCVGenWriteback.inc
++++ b/arch/RISCV/RISCVGenWriteback.inc
+@@ -415,3 +415,22 @@ static const uint8_t RISCVWritebackFlags[] = {
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0,
+ };
++
++static inline bool RISCV_hasImplicitSP(unsigned opcode)
++{
++	switch (opcode) {
++	case RISCV_C_ADDI16SP:
++	case RISCV_C_ADDI4SPN:
++	case RISCV_C_FLDSP:
++	case RISCV_C_FLWSP:
++	case RISCV_C_FSDSP:
++	case RISCV_C_FSWSP:
++	case RISCV_C_LDSP:
++	case RISCV_C_LWSP:
++	case RISCV_C_SDSP:
++	case RISCV_C_SWSP:
++		return true;
++	default:
++		return false;
++	}
++}
+diff --git a/suite/synctools/operand_writeback.py b/suite/synctools/operand_writeback.py
+index 828785ee..a91ea0bc 100644
+--- a/suite/synctools/operand_writeback.py
++++ b/suite/synctools/operand_writeback.py
+@@ -60,12 +60,16 @@ def generated_flags(arch, source):
+         f"{arch} opcode coverage changed",
+     )
+     flags = [0] * count
+-    for length, offset, uid, _ in descriptors:
++    implicit_sp = []
++    for length, offset, uid, name in descriptors:
+         length, offset, uid = int(length), int(offset), int(uid)
+         require(
+             offset + length <= len(operands), f"{arch} operand extent exceeds table"
+         )
+-        for _, _, _, constraints in operands[offset : offset + length]:
++        op_info = operands[offset : offset + length]
++        if arch == "RISCV" and any(op[0] == "RISCV_SPRegClassID" for op in op_info):
++            implicit_sp.append(name)
++        for _, _, _, constraints in op_info:
+             if re.fullmatch(r"CONSTRAINT_MCOI_TIED_TO\(\d+\)", constraints):
+                 flags[uid] = 1
+             else:
+@@ -84,6 +88,16 @@ def generated_flags(arch, source):
+     for index in range(0, count, 32):
+         lines.append("\t" + ", ".join(map(str, flags[index : index + 32])) + ",")
+     lines += ["};", ""]
++    if arch == "RISCV":
++        lines += [
++            "static inline bool RISCV_hasImplicitSP(unsigned opcode)",
++            "{",
++            "\tswitch (opcode) {",
++        ]
++        lines.extend("\tcase RISCV_" + name + ":" for name in sorted(implicit_sp))
++        if implicit_sp:
++            lines.append("\t\treturn true;")
++        lines += ["\tdefault:", "\t\treturn false;", "\t}", "}", ""]
+     return "\n".join(lines)
+ 
+ 
+@@ -121,6 +135,12 @@ def integrated_source(arch, source):
+             + call[0].replace("\n", "\n\t")
+             + source[call.end() :]
+         )
++    if arch == "RISCV":
++        entry = "void addSPOperands(MCInst *MI)\n{\n"
++        guard = "\tif (!RISCV_hasImplicitSP(MCInst_getOpcode(MI)))\n\t\treturn;\n"
++        require(source.count(entry) == 1, "Review changed implicit SP handling")
++        if entry + guard not in source:
++            source = source.replace(entry, entry + guard)
+     return source
+ 
+ 
+diff --git a/tests/unit/writeback_postprocess.c b/tests/unit/writeback_postprocess.c
+index 1afe180d..52b5b84d 100644
+--- a/tests/unit/writeback_postprocess.c
++++ b/tests/unit/writeback_postprocess.c
+@@ -18,6 +18,7 @@
+ #include "../../arch/RISCV/RISCVMapping.h"
+ #define GET_REGINFO_ENUM
+ #include "../../arch/RISCV/RISCVGenRegisterInfo.inc"
++#define GET_INSTRINFO_ENUM
+ #define GET_INSTRINFO_MC_DESC
+ #include "../../arch/RISCV/RISCVGenInstrInfo.inc"
+ #include "../../arch/RISCV/RISCVGenWriteback.inc"
+@@ -55,6 +56,17 @@ int main(void)
+ 	if (!check(RISCVDescs.Insts, RISCVWritebackFlags,
+ 		   ARR_SIZE(RISCVDescs.Insts), "RISCV"))
+ 		return 1;
++	for (unsigned i = 0; i < ARR_SIZE(RISCVDescs.Insts); ++i) {
++		const MCInstrDesc *desc = MCInstrDesc_get(
++			i, RISCVDescs.Insts, ARR_SIZE(RISCVDescs.Insts));
++		bool implicit_sp = false;
++		for (unsigned j = 0; j < desc->NumOperands; ++j)
++			implicit_sp |= desc->OpInfo[j].RegClass == RISCV_SPRegClassID;
++		if (RISCV_hasImplicitSP(i) != implicit_sp) {
++			fprintf(stderr, "RISCV implicit SP mismatch %u\n", i);
++			return 1;
++		}
++	}
+ #endif
+ 	return 0;
+ }
