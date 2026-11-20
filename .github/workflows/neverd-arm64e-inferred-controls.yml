@@ -12,7 +12,7 @@ jobs:
       matrix:
         runner: [macos-26, xcode-27]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 6
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -28,6 +28,10 @@ jobs:
       - run: python3 neverd-arm64e-controls/run.py
       - name: Read the registered system signal trampoline rule
         run: python3 neverd-arm64e-controls/entry.py neverd
+      - name: Compare old-entry sampling in the same registered images
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 neverd-arm64e-controls/sample.py
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
