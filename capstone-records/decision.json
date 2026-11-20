@@ -1,0 +1,115 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "dd2478965df09f73af30cc39ac2b2474934f8ee9",
+    "sha256": "aa389cfdd2fda37804f23ecdec9406880116297d311ad01e8e957469da41e61d",
+    "records": {
+      "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
+      "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
+    }
+  },
+  "run": {
+    "id": 44310089044,
+    "head_sha": "98f0e8fb09bd940f0cfbd114e2d0197cc5a062b3",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44310089044",
+    "run_attempt": 1
+  },
+  "hypothesis": "paired predicate operands",
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "decision": "Keep the published baseline. Fixed-launch ARM gains are insufficient to offset measured regressions on other paths.",
+  "comparisons": 264,
+  "aa_outside_one_percent": 6,
+  "medians_below_point99": 27,
+  "descriptive_intervals_below_one": 54,
+  "fixed_arm_target_median_gain_range": [
+    0.980145992072105,
+    1.018069498069498
+  ],
+  "slowest": [
+    {
+      "host": "arm-predicate-pair-four-ubuntu-22.04-clang-44310089044",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "aa": {
+        "gain": 0.9950946856668753,
+        "ci95": [
+          0.9868312757201646,
+          1.0020935697500535
+        ]
+      },
+      "gain": 0.9708471291286441,
+      "ci95": [
+        0.9602787081500612,
+        0.986766334440753
+      ]
+    },
+    {
+      "host": "arm-predicate-pair-four-ubuntu-22.04-clang-44310089044",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "aa": {
+        "gain": 1.0007745397712342,
+        "ci95": [
+          0.9926156342980795,
+          1.01838779956427
+        ]
+      },
+      "gain": 0.9721524230291316,
+      "ci95": [
+        0.9619528395881767,
+        0.9822455027913709
+      ]
+    },
+    {
+      "host": "arm-predicate-pair-four-ubuntu-24.04-clang-44310089044",
+      "case": "scalar32",
+      "mode": 1,
+      "launch": "images",
+      "aa": {
+        "gain": 0.9779936677621679,
+        "ci95": [
+          0.9548660256723119,
+          0.9843677526920811
+        ]
+      },
+      "gain": 0.976820612785525,
+      "ci95": [
+        0.9716645663593148,
+        0.9804165526165178
+      ]
+    },
+    {
+      "host": "arm-predicate-pair-four-ubuntu-22.04-clang-44310089044",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "aa": {
+        "gain": 1.005771732403794,
+        "ci95": [
+          0.9937310770235807,
+          1.0081447963800905
+        ]
+      },
+      "gain": 0.9768763497215311,
+      "ci95": [
+        0.971632803795646,
+        0.983158287241315
+      ]
+    }
+  ],
+  "all_rows": "native-review.json",
+  "attribution": "predicate-costs.json",
+  "semantic_review": "semantic-review.json",
+  "public_record_comparisons": 50331648,
+  "private_comparisons": 327680,
+  "cleanup_local_bytes": 335949844,
+  "cleanup_runners_bytes": 1231198421,
+  "statistical_scope": "21 balanced cycles, 40 ms calibration, original and fixed images, exact-copy controls. Intervals are unadjusted. Physical-PC instruction costs were simulated on x86 hosts. No comparison to iced is inferred from these cross-ISA screens."
+}
