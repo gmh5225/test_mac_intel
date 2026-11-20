@@ -22,23 +22,29 @@ meta=json.loads((r/'lineage.json').read_text())
 assert git('rev-parse','HEAD')==meta['bounds']['parent']
 write('environment',dict(cc=sp.check_output([cc,'--version'],text=True),host=platform.platform(),
     cpu=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith(('model name','CPU part'))),None)))
-with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
+with tempfile.TemporaryDirectory(prefix='capstone-ppc-initialization-') as temp:
     t=Path(temp); b=t/'build'
     try:
-        cases=corpus.prepare(r,t,out,run)
-        selections=['ppc64el-ls','arm-sort','arm-cp','riscv64-ls','riscv64-cp','putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls']
-        cases=[c for c in cases if c['name'] in selections]
-        assert set(c['name'] for c in cases)==set(selections)
+        member=next(x for x in json.loads((r/'manifest.json').read_text())['inputs'] if x['name']=='ppc64el-ls')
+        package=t/'coreutils.deb';run(['curl','--fail','--silent','--show-error','--location','--retry','3','--max-time','120',member['url'],'-o',package],'fetch-coreutils')
+        assert sha(package)==member['package_sha256']
+        cases=[]
+        for command in ('ls','cp','sort','cat'):
+            elf=corpus.deb_binary(package,command);text=corpus.elf_text(elf)
+            assert elf[:6]==b'\x7fELF\x02\x01' and int.from_bytes(elf[18:20],'little')==21
+            dest=t/(command+'.text');dest.write_bytes(text)
+            if command=='ls':assert sha(dest)==member['text_sha256']
+            cases.append(dict(name='ppc64el-'+command,path=str(dest),selector=3,bytes=len(text),text_sha256=sha(dest),binary_sha256=corpus.digest(elf),package_sha256=sha(package),url=member['url']))
+        write('corpus',cases)
         common=['-I',s,'-I',s/'include']
-        run(['clang++','-std=c++17','-O3','-DNDEBUG',*common,'-c',r/'single.cpp','-o',t/'one.o'],'consumer')
-        for a in ('arm','riscv','aarch64','ppc'):
-            run(['clang++','-std=c++17','-O2',*common,r/(a+'-states.cpp'),'-ldl','-o',t/(a+'-states')],a+'-records-build')
+        run(['clang++','-std=c++17','-O3','-DNDEBUG',*common,'-c',r/'single.cpp','-o',t/'one.o'],'build-consumer')
+        run(['clang++','-std=c++17','-O2',*common,r/'ppc-states.cpp','-ldl','-o',t/'ppc-states'],'build-ppc-records')
         flags='-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'
         run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,
-             '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV','PPC')],
+             '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_PPC_SUPPORT=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
-        for label,patch in [('base','bounds'),('control','control'),('candidate','nano_branch')]:
+        for label,patch in [('base','bounds'),('control','control'),('candidate','candidate')]:
             if label!='base':
                 git('reset','--hard',meta['bounds']['parent'])
                 path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
@@ -51,69 +57,32 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
             binaries[label]=exe
             obj=b/'CMakeFiles/capstone.dir'
             objects[label]={str(f.relative_to(obj)):sha(f) for f in obj.rglob('*.o')}
-            symbols=sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines()
-            keep={'Mips_getFeatureBits','Mips_LLVM_getInstruction','RISCV_getInstruction','RISCV_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','cs_decode_full_insn','cs_disasm_iter','Mips_getInstruction','Mips_get_insn_id'}
-            (out/(label+'-symbols.txt')).write_text('\n'.join(line for line in symbols if line.split()[-1] in keep)+'\n')
-        assert objects['base'].keys()==objects['candidate'].keys()
-        changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
-        write('objects',dict(changed=changed,lineage=meta))
-        assert changed==['MCInst.c.o','arch/Mips/MipsDisassembler.c.o','cs.c.o'],changed
-        assert sorted(k for k in objects['control'] if objects['control'][k]!=objects['candidate'][k])==['MCInst.c.o','cs.c.o']
-        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','mips_nanomips_branch']
-        run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
-        run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
-        run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_writeback_postprocess_(newlines|generator)$'],'generator-tests')
-        run([t/'arm-states',libs['base'],libs['candidate']],'full-arm')
-        for arch in ('aarch64','ppc'):run([t/(arch+'-states'),libs['base'],libs['candidate']],'full-'+arch)
-        for args in [[],['custom']]:
-            run([t/'riscv-states',libs['base'],libs['candidate'],t/'corpus',*args],'full-riscv'+('' if not args else '-custom'))
-        unit=next(f for f in b.rglob('mips_nanomips_branch') if f.is_file())
-        run([unit],'compact-pool')
-        diet=t/'diet'
-        run(['cmake','-S',s,'-B',diet,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_DIET=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'diet-configure')
-        run(['cmake','--build',diet,'--parallel','3','--target','mips_nanomips_branch'],'diet-build')
-        run([next(f for f in diet.rglob('mips_nanomips_branch') if f.is_file())],'diet-compact-pool')
-        run(['clang++','-O2',*common,r/'verify-mips.cpp','-ldl','-o',t/'mips-states'],'mips-build')
-        run([t/'mips-states',libs['base'],libs['candidate']],'full-mips')
-        if platform.machine()=='x86_64':
-            run(['valgrind','--tool=memcheck','--error-exitcode=87','--track-origins=yes',t/'ppc-states',libs['base'],libs['candidate'],'256'],'ppc-memcheck')
-            costs=[]
-            for name,m,route in [(case,m,'public') for case in ('ppc64el-ls','mips64el-ls') for m in (0,1,2)]:
-                c=next(x for x in cases if x['name']==name)
-                for key,exe in binaries.items():
-                    trace=t/'calls.out';tag='trace-'+name+'-'+route+'-'+key
-                    rr=sp.run(['valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),str(exe),str(c['selector']),str(m),c['path'],'1'],capture_output=True,text=True,check=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public'))))
-                    names={};callee=None;caller=None;calls={}
-                    def resolved(atom):
-                        match=re.fullmatch(r'\((\d+)\)(?: (.*))?',atom)
-                        if not match:return atom
-                        n,val=match.groups()
-                        if val is not None:names[n]=val
-                        return names.get(n,'('+n+')')
-                    summary=None;self_ir={};is_call=False;callsite=None;memset_edge_work={}
-                    for line in trace.read_text(errors='replace').splitlines():
-                        if line.startswith('fn='):caller=resolved(line[3:])
-                        elif line.startswith('cfn='):callee=resolved(line[4:])
-                        elif line.startswith('calls=') and callee and caller:
-                            is_call=True;callsite=(caller,callee)
-                            if any(k in callee or k in caller for k in ('memset','MCInst_Init','PPC_getInstruction','Mips_getFeatureBits','Mips_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','MCInst_insert0','RISCV_getInstruction','RISCV_LLVM_getInstruction','Mips_getInstruction','cs_disasm_iter','cs_decode_full_insn')):
-                                edge=caller+' -> '+callee;calls[edge]=calls.get(edge,0)+int(line[6:].split()[0])
-                        elif line.startswith('summary:'):summary=int(line.split()[1])
-                        elif line and line[0] in '0123456789+*-' and caller:
-                            fields=line.split()
-                            if len(fields)==2 and fields[-1].isdigit():
-                                amount=int(fields[-1])
-                                if not is_call and 'memset' in caller:self_ir[caller]=self_ir.get(caller,0)+amount
-                                if is_call and callsite and 'memset' in callsite[1]:
-                                    edge=' -> '.join(callsite);memset_edge_work[edge]=memset_edge_work.get(edge,0)+amount
-                            is_call=False;callsite=None
-                    assert summary is not None and calls
-                    costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,memset_self_ir=self_ir,memset_callsite_ir=memset_edge_work,first=json.loads(rr.stdout)['first']))
-                    trace.unlink()
-            for row in costs:
-                if row['case']=='ppc64el-ls' and row['variant']=='candidate':
-                    assert any('MCInst_InitForDisassembly' in name for name in row['edges'])
-            write('call-costs',costs)
+            active={q.name for q in obj.rglob('*.o')}
+            assert 'PPCDisassembler.c.o' in active and 'X86DisassemblerDecoder.c.o' not in active
+            assert ('-DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS' in (b/'build.ninja').read_text()) == (label!='base')
+            targets=['mcinst','mapping','instruction_bytes','utils','sstream','feature_mode']
+            run(['cmake','--build',b,'--parallel','4','--target',*targets],'build-tests-'+label)
+            run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$'],'tests-'+label)
+        write('objects',objects)
+        for label in ('control','candidate'):
+            assert sorted(k for k,h in objects[label].items() if objects['base'][k]!=h)==['cs.c.o']
+            run([t/'ppc-states',libs['base'],libs[label]],'states-'+label)
+            if platform.machine()=='x86_64':
+                run(['valgrind','--tool=memcheck','--error-exitcode=87','--track-origins=yes',t/'ppc-states',libs['base'],libs[label],'256'],'memcheck-'+label)
+        git('reset','--hard',meta['bounds']['parent'])
+        mixed=t/'mixed';mixopts=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('PPC','X86','ARM','AARCH64','MIPS','RISCV')],'-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+        run(['cmake','-S',s,'-B',mixed,*mixopts],'mixed-configure')
+        mixed_objects={}
+        for label in ('base','candidate'):
+            if label!='base':git('apply','--index',str(r/'candidate.patch'))
+            run(['cmake','--build',mixed,'--parallel','4','--target','capstone_static'],'mixed-'+label)
+            assert '-DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS' not in (mixed/'build.ninja').read_text()
+            object_root=mixed/'CMakeFiles/capstone.dir'
+            mixed_objects[label]={str(q.relative_to(object_root)):sha(q) for q in object_root.rglob('*.o')}
+            assert len(mixed_objects[label])>45
+        assert mixed_objects['base']==mixed_objects['candidate']
+        write('mixed-isolation',dict(identical=True,objects=mixed_objects))
+        git('reset','--hard',meta['bounds']['parent'])
         shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
         payload={k:v.read_bytes() for k,v in binaries.items()}; assert payload['base']==payload['copy']!=payload['candidate']
         size=max(map(len,payload.values())); image=t/'same'; image.write_bytes(bytes(size));image.chmod(0o755);inode=image.stat().st_ino
@@ -144,6 +113,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
                         pairs.append(ticks)
                     rows.append(dict(case=c['name'],route=route,mode=m,repeats=n,reference=reference,cycles=pairs))
                     write('timings',rows)
-        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['nano_branch']['tree']))
+        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['candidate']['tree']))
     finally:
         n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))

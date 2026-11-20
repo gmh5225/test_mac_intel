@@ -1,0 +1,44 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b1bcaa48..69c494cc 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -178,6 +178,10 @@ if(capstone_enabled_architectures STREQUAL "LOONGARCH")
+     add_compile_definitions(CAPSTONE_LOONGARCH_DEDICATED_MAPPING)
+ endif()
+ 
++if(capstone_enabled_architectures STREQUAL "PPC")
++    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+diff --git a/Makefile b/Makefile
+index a70bcb62..afbaa4aa 100644
+--- a/Makefile
++++ b/Makefile
+@@ -139,6 +139,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),loongarch)
+ CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
+ endif
+ 
++ifeq ($(sort $(CAPSTONE_ARCHS)),powerpc)
++CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+ endif
+diff --git a/cs.c b/cs.c
+index 71fff034..7b069255 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1085,6 +1085,9 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
+ 		/* ARM constructs each operand before reading or inserting it. */
+ 		MCInst_InitStorage(&mci, CS_ARCH_ARM, false);
++#elif defined(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS)
++	/* The PowerPC decoder constructs each operand before reading it. */
++	MCInst_InitStorage(&mci, CS_ARCH_PPC, false);
+ #elif defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+ 	/* The RISC-V decoder constructs each operand before reading it. */
+ 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
