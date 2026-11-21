@@ -1,7 +1,7 @@
-name: Attribute costs of the published Capstone amd64 widening release and iced
+name: Measure register argument loads and stores per decoded real instruction
 on:
   push:
-    branches: [codex/capstone-published-extended-operands-cost]
+    branches: [codex/capstone-vector-register-argument-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: c9a9fcbc9a87f468f8039bbddc3467f21fdc1edf
+          ref: 958b98cbbeb217ab3e8babe1de7175546ec82748
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-argument-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
