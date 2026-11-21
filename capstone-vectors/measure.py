@@ -75,12 +75,13 @@ def main(w):
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
             assert (('X86_disasmIter32' in symbols),('X86_disasmIterText' in symbols))==(selected or label!='baseline',selected or label!='baseline')
+        run(['python3','-B',r/'iterator-code.py',libs[0],target,evidence/('iterator-code-'+label+'.json')],'iterator-code-'+label)
         members={name:hashlib.sha256(sp.check_output(['ar','p',libs[0],name])).hexdigest()for name in sp.check_output(['ar','t',libs[0]],text=True).splitlines()}
         save('members-'+label+'.json',members)
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86DisassemblerDecoder.c.o'},changed
+            assert prior.keys()==members.keys() and changed=={'cs.c.o','X86OutputIterator.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'},changed
             assert sha(ordinary)!=sha(w/'unselected-baseline')
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
