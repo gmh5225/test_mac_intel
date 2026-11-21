@@ -1,26 +1,28 @@
 {
-  "neverd": "0466a656eb88a8edbdf70c142c7c4f7e551e030d",
+  "neverd": "4284d35ef0d773a71eb9522cf0778a71ab1fc06a",
   "capstone": "68120b496a66ebf73a0b88247146a21620d86a63",
   "variants": {
-    "direct32": {
+    "mode32": {
       "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
-      "neverd_tree": "a9f4e7ad1526dd6301c8e0ea68443ccf1c5eb90c",
-      "blobs": {
-        "lib/decode/Decoder.cpp": "3c13b57d4d2c56cab1d6d92b82e9eba132839ddc",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
-      },
-      "patch": "direct32.patch",
-      "patch_sha256": "25e909344af90cc0291252f07619f9f466bab45cfcf4947663922e85fcf3c921"
-    },
-    "by_mode": {
-      "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
-      "neverd_tree": "5e2b8b35ae82e5a67a79f7b95aaddd47453ab20d",
+      "neverd_tree": "590ffa7c53e6c279327a88563985d30e6cc446c5",
       "blobs": {
         "lib/decode/Decoder.cpp": "1db0fb54c5f18f1152b8a4a67243a20223d14a9a",
         "include/neverd/decode/Decoder.h": "dfa9937294b6d299f524c3f910dc3da6a3b10308"
       },
-      "patch": "by_mode.patch",
+      "build_blob": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
+      "patch": "mode32.patch",
       "patch_sha256": "ddeaeffe030a463120f2eea1abcade18b9050eff6e9a12da89327e04f65a4343"
+    },
+    "native_sizes": {
+      "tree": "bbc0e60cbdbeb0628f7a23c25b5abc4f8e5f63a5",
+      "neverd_tree": "d5533c96f866d0e4c7d385cefddd89c7909c3f73",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "362eed19a7466e1def01423c08d6de1ee89836bd",
+        "include/neverd/decode/Decoder.h": "dfa9937294b6d299f524c3f910dc3da6a3b10308"
+      },
+      "build_blob": "eee9079634bc6a1ac5bc4e9f54d69cbcf34e5c73",
+      "patch": "native_sizes.patch",
+      "patch_sha256": "cdd8641bd4e5f696c188710402107723a1e546c4dc257d98f52f9210fd1f78f5"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -28,11 +30,12 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Same released Capstone archive in all variants. Compare a direct text wrapper with selection of the original 64-bit or specialized 32-bit iterator when the NeverD decoder opens.",
-  "parent": "085b9952c98d08d00562a45e6c2ad3f1c00b05d3",
+  "scope": "Compare ordinary C++ decoding, open-time 32-bit formatting, and open-time 32/64-bit formatting including sign-extended REX.W memory stores, in the actual NeverD build.",
+  "parent": "2995cc1e78a2f1340fc905b9b1e0628c6dedbc76",
   "build_blob": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
     "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
-  }
+  },
+  "wide_patch_sha256": "61c21c81841e00ce57e2bae9e99bf986fd2d33f8e810200a2d66bbdb18bb2c7b"
 }
