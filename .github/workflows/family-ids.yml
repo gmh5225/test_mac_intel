@@ -1,7 +1,7 @@
-name: Verify public library identity and compare the i386 iterator across seven configurations
+name: Verify the ELF i386 writer and unchanged shared libraries on seven compiler configurations
 on:
   push:
-    branches: [codex/capstone-i386-chained-option-profiles]
+    branches: [codex/capstone-i386-elf-section-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: chained-i386-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: i386-elf-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
