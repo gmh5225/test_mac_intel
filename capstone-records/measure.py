@@ -45,6 +45,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                 git('apply','--index',str(path))
             assert git('write-tree')==meta[patch]['tree']
             run(['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static'],'build-'+label)
+            run(['clang++','-O2','-std=c++17',*common,r/'targets.cpp',b/'libcapstone.a','-lm','-o',t/'target-strings'],'build-targets-'+label)
+            run([t/'target-strings'],'target-strings-'+label)
             libs[label]=t/(label+'.so');shutil.copy2(b/'libcapstone.so',libs[label])
             exe=t/label
             run(['clang++',t/'one.o',b/'libcapstone.a','-lm','-o',exe],'link-'+label)
@@ -67,8 +69,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        expected={'cs.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'}
-        assert expected <= set(changed),changed
+        assert set(changed)=={'arch/X86/X86OutputIterator.c.o'},changed
         targets=['x86_scan_batch','mcinst','x86_simple_output','x86_printer_prechecked','text_option','detail_option','x86_x87_environment_hardware']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
@@ -77,10 +78,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-public-iter-') as temp:
                 run([t/'states',libs['base'],libs['candidate'],c['path'],c['selector']],'records-'+c['name'])
         if platform.machine()=='x86_64':
             costs=[]
-            for name,m,route in [('mips64el-ls',0,'public'),('arm-ls',0,'public'),('putty-32-0.85',1,'public'),('putty-32-0.85',1,'private')]:
+            for name,m,route in [(name,mode,'private') for name in ('putty-32-0.85','putty-64-0.85','libssl3t64-i386') for mode in (1,2)]:
                 c=next(x for x in cases if x['name']==name)
                 for key,exe in binaries.items():
-                    trace=t/'calls.out';tag='trace-'+name+'-'+route+'-'+key
+                    trace=t/'calls.out';tag='trace-'+name+'-'+str(m)+'-'+route+'-'+key
                     rr=sp.run(['valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),str(exe),str(c['selector']),str(m),c['path'],'1'],capture_output=True,text=True,check=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public'))))
                     names={};callee=None;caller=None;calls={}
                     def resolved(atom):

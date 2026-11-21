@@ -1,7 +1,7 @@
-name: Compare full-iterator dispatch with the same public and private formatting outputs
+name: Compare direct two-digit branch target formatting on real PE and ELF
 on:
   push:
-    branches: [codex/capstone-handle-format-target]
+    branches: [codex/capstone-relative-target-hex-pairs]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: e2266247a3b0f090bcad5bd3a4ead8c3220de367
+          ref: 26ebcf8b672cbfec8536db188aa92c506c915efa
           path: source
           persist-credentials: false
       - name: Compare public records and time both API routes with an exact-copy control
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: handle-format-target-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: relative-target-pairs-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

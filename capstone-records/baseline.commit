@@ -1,8 +1,8 @@
-tree b59b7039832404d2270e7888403d2fd635dc1be6
-parent a9d153f4cae6c71eb02309621bbce3c9508312dc
-author NeverSightAI <neversightai@gmail.com> 1795203973 +0800
-committer NeverSightAI <neversightai@gmail.com> 1795203973 +0800
+tree ac3c489ee7e8a16f534fe810c9b331673418ccdb
+parent e2266247a3b0f090bcad5bd3a4ead8c3220de367
+author NeverSightAI <neversightai@gmail.com> 1795225095 +0800
+committer NeverSightAI <neversightai@gmail.com> 1795225095 +0800
 
-X86: use canonical EVEX scan plans on AArch64 ELF hosts
+PowerPC: initialize operands as the dedicated decoder constructs them
 
-Enable the existing extension prefilter and compact EVEX scan plans when the compiler targets AArch64 ELF. The generated opcode map and the decoder retain ownership of operand legality and adapter precedence.
+Use the existing MCInst storage initializer in PowerPC-only CMake and Makefile builds. The architecture decoder appends each operand before it is consumed. Mixed builds retain their original initialization.
