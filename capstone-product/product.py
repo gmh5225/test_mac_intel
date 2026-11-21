@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     capfix=r/variants[label]['capstone_patch'];assert hashlib.sha256(capfix.read_bytes()).hexdigest()==variants[label]['capstone_sha256']
     command(['git','apply',capfix],'apply-capstone-'+label,cs)
-   if label!='base':
+   if 'patch' in variants.get(label,{}):
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-neverd-'+label,nd)
@@ -182,8 +182,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert inclusions and any('X86OutputIterator.c.o' in v for v in inclusions)
    (out/('capstone-link-map-'+label+'.log')).write_text(chr(10).join(inclusions)+chr(10))
    command_line=sp.check_output(['ninja','-C',build,'-t','commands','capstone-product'],text=True).splitlines()[-1]
-   assert ('--undefined=X86_disasmIter' in command_line)==(label=='retained_vex')
-   write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True))
+   assert '--undefined=X86_disasmIter' in command_line and ('--undefined=X86_disasmIter32' in command_line)==(label=='i386_first')
+   write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True,i386_first=label=='i386_first'))
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    assert rev(cs)==ref
@@ -208,12 +208,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     prior=json.loads((out/'base-objects.json').read_text())
     assert prior.keys()==objects.keys()
     assert {Path(k).name for k in prior if prior[k]!=objects[k]}=={'X86Sse64Output.c.o'}
-    if label=='retained_vex':assert objects==json.loads((out/'vex_packed-objects.json').read_text())
+    if label=='i386_first':assert objects==json.loads((out/'vex-objects.json').read_text())
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)
-   assert any(line.endswith(' X86_disasmIter32') for line in sym)==(label!='base')
-   assert any(line.endswith(' X86_disasmIterText') for line in sym)==(label!='base')
+   assert any(line.endswith(' X86_disasmIter32') for line in sym)
+   assert any(line.endswith(' X86_disasmIterText') for line in sym)
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
@@ -223,7 +223,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert source_tree==variants[label]['tree'],(label,source_tree,variants[label]['tree'])
    command(['git','reset','--hard',ref],'restore-'+label,cs)
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
-   if label!='base':
+   if 'patch' in variants.get(label,{}):
     command(['git','apply','-R',r/variants[label]['patch']],'restore-neverd-'+label,nd)
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
