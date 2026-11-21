@@ -1,0 +1,682 @@
+{
+  "samples": 325,
+  "faults_per_mode": 780,
+  "batch": {
+    "text": "1f2003d5c0035fd61f2003d5c0035fd6",
+    "entries": [
+      0,
+      4
+    ],
+    "offsets": [
+      0,
+      8
+    ],
+    "corrupt_mask": 128
+  },
+  "layouts": [
+    {
+      "name": "signed-byte-ten",
+      "stack": 2,
+      "offsets": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "unsigned-half-ten",
+      "stack": 4,
+      "offsets": [
+        0,
+        2
+      ]
+    },
+    {
+      "name": "pointer-ten",
+      "stack": 16,
+      "offsets": [
+        0,
+        8
+      ]
+    },
+    {
+      "name": "variadic-packed-prefix",
+      "stack": 32,
+      "offsets": [
+        0,
+        1,
+        8,
+        16,
+        24
+      ]
+    },
+    {
+      "name": "variadic-wide",
+      "stack": 16,
+      "offsets": [
+        0,
+        8
+      ]
+    },
+    {
+      "name": "variadic-wide-aligned",
+      "stack": 64,
+      "offsets": [
+        0,
+        16,
+        24,
+        32,
+        48,
+        56
+      ]
+    },
+    {
+      "name": "variadic-wide-prefix",
+      "stack": 24,
+      "offsets": [
+        0,
+        8,
+        16
+      ]
+    },
+    {
+      "name": "variadic-pair-prefix",
+      "stack": 48,
+      "offsets": [
+        0,
+        8,
+        16,
+        32,
+        40
+      ]
+    },
+    {
+      "name": "variadic-hfa-prefix",
+      "stack": 32,
+      "offsets": [
+        0,
+        4,
+        8,
+        16,
+        24
+      ]
+    },
+    {
+      "name": "variadic-value-packed-prefix",
+      "stack": 144,
+      "offsets": [
+        0,
+        8,
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        64,
+        68,
+        72,
+        80,
+        88,
+        92,
+        96,
+        100,
+        104,
+        112,
+        120,
+        128,
+        136
+      ]
+    },
+    {
+      "name": "variadic-hfa-f32-three",
+      "stack": 16,
+      "offsets": [
+        0,
+        4,
+        8
+      ]
+    },
+    {
+      "name": "variadic-hfa-nested",
+      "stack": 16,
+      "offsets": [
+        0,
+        4,
+        8,
+        12
+      ]
+    },
+    {
+      "name": "variadic-hfa-f64-four",
+      "stack": 32,
+      "offsets": [
+        0,
+        8,
+        16,
+        24
+      ]
+    }
+  ],
+  "extensions": [
+    {
+      "kind": "b",
+      "value": "0xaabbccddfecc8180",
+      "register": "0xffffff80",
+      "stack": "0x80"
+    },
+    {
+      "kind": "B",
+      "value": "0xaabbccddfecc8180",
+      "register": "0x80",
+      "stack": "0x80"
+    },
+    {
+      "kind": "h",
+      "value": "0xfedcba9880ff80ff",
+      "register": "0xffff80ff",
+      "stack": "0x80ff"
+    },
+    {
+      "kind": "H",
+      "value": "0xfedcba9880ff80ff",
+      "register": "0x80ff",
+      "stack": "0x80ff"
+    },
+    {
+      "kind": "w",
+      "value": "0xcafebabedeadbeef",
+      "register": "0xdeadbeef",
+      "stack": "0xdeadbeef"
+    },
+    {
+      "kind": "p",
+      "value": "0x00123456789abcde",
+      "register": "0x123456789abcde",
+      "stack": "0x123456789abcde"
+    }
+  ],
+  "composite_layouts": [
+    {
+      "name": "wide-odd",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "offsets": [],
+      "stack": 0
+    },
+    {
+      "name": "wide-whole-spill",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "offsets": [
+        0,
+        8,
+        16
+      ],
+      "stack": 24
+    },
+    {
+      "name": "word-pair-packed",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "offsets": [
+        0,
+        8,
+        16
+      ],
+      "stack": 24
+    },
+    {
+      "name": "hfa-f32-exhausted",
+      "banks": [
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "stack",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "offsets": [
+        0,
+        4,
+        8,
+        12
+      ],
+      "stack": 16
+    },
+    {
+      "name": "hfa-f64-exhausted",
+      "banks": [
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "offsets": [
+        0,
+        8,
+        16
+      ],
+      "stack": 24
+    },
+    {
+      "name": "indirect-three-words",
+      "banks": [
+        "gp"
+      ],
+      "registers": [
+        0
+      ],
+      "offsets": [],
+      "stack": 0
+    },
+    {
+      "name": "indirect-mixed",
+      "banks": [
+        "gp",
+        "gp",
+        "fp"
+      ],
+      "registers": [
+        0,
+        1,
+        0
+      ],
+      "offsets": [],
+      "stack": 0
+    },
+    {
+      "name": "indirect-transform",
+      "banks": [
+        "gp"
+      ],
+      "registers": [
+        0
+      ],
+      "offsets": [],
+      "stack": 0
+    },
+    {
+      "name": "indirect-nested",
+      "banks": [
+        "gp"
+      ],
+      "registers": [
+        0
+      ],
+      "offsets": [],
+      "stack": 0
+    },
+    {
+      "name": "indirect-spill",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "offsets": [
+        0,
+        8
+      ],
+      "stack": 16
+    },
+    {
+      "name": "variadic-indirect",
+      "banks": [
+        "gp",
+        "stack",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0
+      ],
+      "offsets": [
+        0,
+        8,
+        16,
+        24
+      ],
+      "stack": 32
+    },
+    {
+      "name": "variadic-indirect-prefix",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "offsets": [
+        0,
+        8,
+        16
+      ],
+      "stack": 24
+    }
+  ],
+  "native_vector_layouts": [
+    {
+      "name": "vector-ten",
+      "stack": 32,
+      "offsets": [
+        0,
+        8,
+        16,
+        24
+      ],
+      "vector_registers": [
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        3,
+        4,
+        4,
+        5,
+        5,
+        6,
+        6,
+        7,
+        7
+      ]
+    },
+    {
+      "name": "vector-packed-spill",
+      "stack": 49,
+      "offsets": [
+        0,
+        16,
+        24,
+        32,
+        40,
+        48
+      ],
+      "vector_registers": [
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        3,
+        4,
+        4,
+        5,
+        5,
+        6,
+        6,
+        7,
+        7
+      ]
+    },
+    {
+      "name": "vector-hfa-exhausted",
+      "stack": 32,
+      "offsets": [
+        0,
+        8,
+        16,
+        24
+      ],
+      "vector_registers": []
+    }
+  ],
+  "hva_layouts": [
+    {
+      "name": "hva64-last-bank",
+      "stack": 0,
+      "hva_argument": 4,
+      "registers": [
+        4,
+        5
+      ],
+      "lanes": [
+        0,
+        0
+      ],
+      "offsets": []
+    },
+    {
+      "name": "hva128-last-bank",
+      "stack": 0,
+      "hva_argument": 6,
+      "registers": [
+        6,
+        6,
+        7,
+        7
+      ],
+      "lanes": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "offsets": []
+    },
+    {
+      "name": "hva64-exhausted",
+      "stack": 32,
+      "hva_argument": 6,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        0,
+        8,
+        16
+      ]
+    },
+    {
+      "name": "hva128-exhausted",
+      "stack": 48,
+      "hva_argument": 7,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        0,
+        8,
+        16,
+        24
+      ]
+    },
+    {
+      "name": "hva64-packed-spill",
+      "stack": 41,
+      "hva_argument": 15,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        8,
+        16,
+        24
+      ]
+    },
+    {
+      "name": "hva128-packed-spill",
+      "stack": 88,
+      "hva_argument": 17,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        64,
+        72
+      ]
+    },
+    {
+      "name": "hva64-array",
+      "stack": 0,
+      "hva_argument": 0,
+      "registers": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "lanes": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "offsets": []
+    },
+    {
+      "name": "hva128-array",
+      "stack": 0,
+      "hva_argument": 0,
+      "registers": [
+        0,
+        0,
+        1,
+        1,
+        2,
+        2
+      ],
+      "lanes": [
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      "offsets": []
+    }
+  ],
+  "hva_observation_markers": [
+    "Before[2], Value[8], After[2]",
+    "Observed.Value[7] == 0x0102030405060708ULL",
+    "Observed.Before[0]",
+    "Observed.After[1]",
+    "ins v3.d[1],x10",
+    "str x10,[x9,#56]"
+  ],
+  "non_hva_kinds": [
+    "E",
+    "I",
+    "2",
+    "3"
+  ]
+}

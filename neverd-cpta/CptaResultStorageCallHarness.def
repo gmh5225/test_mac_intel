@@ -1,0 +1,32 @@
+//===- CptaResultStorageCallHarness.def - Original x8 oracle ----*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+#include "CptaAuthenticatedCallProbe.def"
+
+typedef uint64_t (*StorageFunction)(uint64_t, uint64_t, uint64_t, uint64_t);
+extern void storage_target(void);
+
+static unsigned __int128 checkStorage(StorageFunction Function) {
+  uint64_t Buffer[] = {0x0123456789abcdefULL, 3, 7, 0,
+                       0xfedcba9876543210ULL};
+  uint64_t Address = (uint64_t)&Buffer[1];
+  uint64_t Result = Function(Pointer, Modifier, Address, Address);
+  return Result == 0 && Buffer[0] == 0x0123456789abcdefULL &&
+         Buffer[1] == 11 && Buffer[2] == 18 && Buffer[3] == Address &&
+         Buffer[4] == 0xfedcba9876543210ULL;
+}
+
+@DECLARATIONS@
+static const struct {
+  ProbeFunction Projected, Original;
+  uint64_t Target;
+  unsigned Key, Zero, Raw;
+} Cases[] = {
+@CASES@
+};
+static uint64_t expectedCall(unsigned C) { (void)C; return 1; }
+
+#include "CptaAuthenticatedCallChecks.def"

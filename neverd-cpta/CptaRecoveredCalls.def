@@ -1,0 +1,279 @@
+{
+  "scope": "Controlled PAC execution for complete recovered NativeAnalysis fixed C prototypes with scalar, 128-bit integer, 64/128-bit short vectors, one-to-four-member nested/array HVA with full guarded return observation, record/HFA and original indirect record address operands. ABI recovery accuracy itself is not established by supplied IR fixtures. All five Mach-O routes require original exception classes. Declared memcpy CALL26 relocations are linked to a tested freestanding runtime; every other input instruction byte is checked unchanged in the final guest. Raw indirect calls are controls. Hidden results are qualified separately. Signed exception unwinding, authenticated whole-image execution, native Apple PAC and exact fault PC/full ESR remain unqualified.",
+  "output_directory": "cpta-recovered-calls",
+  "qualification_key": "darwin_recovered_authenticated_call_abi_qualified",
+  "directory": "recovered-{shape}-{key}-{zero}-{raw}",
+  "shapes": [
+    "f64-one",
+    "f64-ten",
+    "f32-ten",
+    "mixed-ten",
+    "signed-byte-ten",
+    "unsigned-byte-ten",
+    "signed-half-ten",
+    "unsigned-half-ten",
+    "word-ten",
+    "pointer-ten",
+    "mixed-narrow",
+    "wide-one",
+    "wide-odd",
+    "wide-last-pair",
+    "wide-whole-spill",
+    "wide-packed-spill",
+    "word-pair",
+    "word-pair-spill",
+    "word-pair-packed",
+    "narrow-word-pair",
+    "hfa-f32-two",
+    "hfa-f32-three",
+    "hfa-f32-four",
+    "hfa-f64-two",
+    "hfa-f64-three",
+    "hfa-f64-four",
+    "hfa-nested",
+    "hfa-f32-exhausted",
+    "hfa-f64-exhausted",
+    "hfa-packed-spill",
+    "wide-and-hfa",
+    "word-one",
+    "word-pointer-pair",
+    "pointer-pair",
+    "hfa-f32-one",
+    "hfa-f64-one",
+    "indirect-three-words",
+    "indirect-mixed",
+    "indirect-transform",
+    "indirect-nested",
+    "indirect-spill",
+    "vector-one",
+    "vector-ten",
+    "vector-mixed",
+    "vector-packed-spill",
+    "vector-hfa-exhausted",
+    "vector-indirect",
+    "vector64-one",
+    "vector64-ten",
+    "hva64-one",
+    "hva64-two",
+    "hva64-three",
+    "hva64-four",
+    "hva128-one",
+    "hva128-two",
+    "hva128-three",
+    "hva128-four",
+    "hva64-nested",
+    "hva128-nested",
+    "hva64-array",
+    "hva128-array",
+    "hfa-array",
+    "hva64-last-bank",
+    "hva128-last-bank",
+    "hva64-exhausted",
+    "hva128-exhausted",
+    "hva64-packed-spill",
+    "hva128-packed-spill",
+    "hva-mixed-banks",
+    "non-hva-five",
+    "non-hva-mixed",
+    "hva-record-array",
+    "hva-word-record"
+  ],
+  "test_case": "ByShape/AArch64RecoveredAuthenticatedCall.NativeTypesKeepAuthenticationOnTheCall/{name}",
+  "input_error": "Complete recovered-prototype exports and their exact passing test report are required.",
+  "fault_count_prefix": "-DCPA_PAUTH_FAULT_COUNT=",
+  "sample_count_prefix": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT=",
+  "native_shapes": [
+    {
+      "name": "vector-one",
+      "parameters": "V",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-ten",
+      "parameters": "VVVVVVVVVV",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-mixed",
+      "parameters": "iVdVqVfV",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-packed-spill",
+      "parameters": "iiiiiiiibVVVVVVVVVVb",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-hfa-exhausted",
+      "parameters": "dddddddxV",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-indirect",
+      "parameters": "JV",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector64-one",
+      "parameters": "e",
+      "return_kind": "e",
+      "fixed": -1
+    },
+    {
+      "name": "vector64-ten",
+      "parameters": "eeeeeeeeee",
+      "return_kind": "e",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-one",
+      "parameters": "c",
+      "return_kind": "c",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-two",
+      "parameters": "C",
+      "return_kind": "C",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-three",
+      "parameters": "l",
+      "return_kind": "l",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-four",
+      "parameters": "L",
+      "return_kind": "L",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-one",
+      "parameters": "m",
+      "return_kind": "m",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-two",
+      "parameters": "M",
+      "return_kind": "M",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-three",
+      "parameters": "F",
+      "return_kind": "F",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-four",
+      "parameters": "G",
+      "return_kind": "G",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-nested",
+      "parameters": "P",
+      "return_kind": "P",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-nested",
+      "parameters": "R",
+      "return_kind": "R",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-array",
+      "parameters": "U",
+      "return_kind": "U",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-array",
+      "parameters": "Y",
+      "return_kind": "Y",
+      "fixed": -1
+    },
+    {
+      "name": "hfa-array",
+      "parameters": "D",
+      "return_kind": "D",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-last-bank",
+      "parameters": "ddddCee",
+      "return_kind": "C",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-last-bank",
+      "parameters": "ddddddM",
+      "return_kind": "M",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-exhausted",
+      "parameters": "ddddddld",
+      "return_kind": "l",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-exhausted",
+      "parameters": "dddddddMV",
+      "return_kind": "M",
+      "fixed": -1
+    },
+    {
+      "name": "hva64-packed-spill",
+      "parameters": "iiiiiiiibddddddldb",
+      "return_kind": "l",
+      "fixed": -1
+    },
+    {
+      "name": "hva128-packed-spill",
+      "parameters": "iiiiiiiibdddddddbGe",
+      "return_kind": "G",
+      "fixed": -1
+    },
+    {
+      "name": "hva-mixed-banks",
+      "parameters": "qPdRVf",
+      "return_kind": "P",
+      "fixed": -1
+    },
+    {
+      "name": "non-hva-five",
+      "parameters": "EIG",
+      "return_kind": "G",
+      "fixed": -1
+    },
+    {
+      "name": "non-hva-mixed",
+      "parameters": "23R",
+      "return_kind": "R",
+      "fixed": -1
+    },
+    {
+      "name": "hva-record-array",
+      "parameters": "5",
+      "return_kind": "5",
+      "fixed": -1
+    },
+    {
+      "name": "hva-word-record",
+      "parameters": "aCV",
+      "return_kind": "C",
+      "fixed": -1
+    }
+  ]
+}

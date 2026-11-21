@@ -1,0 +1,176 @@
+//===- CptaAuthenticatedCallHarness.def -------------------------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+#include "CptaAuthenticatedCallProbe.def"
+static const uint64_t Arguments[10] = {0x8123456789abcdefULL,
+                                       0xfeedbabe12345678ULL,
+                                       0x7fffffffffffffffULL,
+                                       0x1000000000000001ULL,
+                                       0xfedcba9876543210ULL,
+                                       0,
+                                       1,
+                                       0xffffffffffffffffULL,
+                                       0x0011223344556677ULL,
+                                       0xdeadbeefcafef00dULL};
+__attribute__((noinline)) static uint64_t target1(uint64_t A) {
+  ++Called;
+  return A * 3 + 7;
+}
+__attribute__((noinline)) static uint64_t
+target10(uint64_t A, uint64_t B, uint64_t C, uint64_t D, uint64_t E, uint64_t F,
+         uint64_t G, uint64_t H, uint64_t I, uint64_t J) {
+  ++Called;
+  return A + 3 * B + 5 * C + 7 * D + 11 * E + 13 * F + 17 * G + 19 * H +
+         23 * I + 29 * J;
+}
+extern uint64_t projected_0(uint64_t, uint64_t, uint64_t);
+extern uint64_t original_0(uint64_t, uint64_t, uint64_t);
+static unsigned __int128 projected_outer_0(uint64_t Unused) {
+  (void)Unused;
+  return projected_0(Pointer, Modifier, Arguments[0]);
+}
+static unsigned __int128 original_outer_0(uint64_t Unused) {
+  (void)Unused;
+  return original_0(Pointer, Modifier, Arguments[0]);
+}
+extern uint64_t projected_1(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t, uint64_t);
+extern uint64_t original_1(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t, uint64_t);
+static unsigned __int128 projected_outer_1(uint64_t Unused) {
+  (void)Unused;
+  return projected_1(Pointer, Modifier, Arguments[0], Arguments[1],
+                     Arguments[2], Arguments[3], Arguments[4], Arguments[5],
+                     Arguments[6], Arguments[7], Arguments[8], Arguments[9]);
+}
+static unsigned __int128 original_outer_1(uint64_t Unused) {
+  (void)Unused;
+  return original_1(Pointer, Modifier, Arguments[0], Arguments[1], Arguments[2],
+                    Arguments[3], Arguments[4], Arguments[5], Arguments[6],
+                    Arguments[7], Arguments[8], Arguments[9]);
+}
+extern uint64_t projected_2(uint64_t, uint64_t);
+extern uint64_t original_2(uint64_t, uint64_t);
+static unsigned __int128 projected_outer_2(uint64_t Unused) {
+  (void)Unused;
+  return projected_2(Pointer, Arguments[0]);
+}
+static unsigned __int128 original_outer_2(uint64_t Unused) {
+  (void)Unused;
+  return original_2(Pointer, Arguments[0]);
+}
+extern uint64_t projected_3(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t);
+extern uint64_t original_3(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t);
+static unsigned __int128 projected_outer_3(uint64_t Unused) {
+  (void)Unused;
+  return projected_3(Pointer, Arguments[0], Arguments[1], Arguments[2],
+                     Arguments[3], Arguments[4], Arguments[5], Arguments[6],
+                     Arguments[7], Arguments[8], Arguments[9]);
+}
+static unsigned __int128 original_outer_3(uint64_t Unused) {
+  (void)Unused;
+  return original_3(Pointer, Arguments[0], Arguments[1], Arguments[2],
+                    Arguments[3], Arguments[4], Arguments[5], Arguments[6],
+                    Arguments[7], Arguments[8], Arguments[9]);
+}
+extern uint64_t projected_4(uint64_t, uint64_t, uint64_t);
+extern uint64_t original_4(uint64_t, uint64_t, uint64_t);
+static unsigned __int128 projected_outer_4(uint64_t Unused) {
+  (void)Unused;
+  return projected_4(Pointer, Modifier, Arguments[0]);
+}
+static unsigned __int128 original_outer_4(uint64_t Unused) {
+  (void)Unused;
+  return original_4(Pointer, Modifier, Arguments[0]);
+}
+extern uint64_t projected_5(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t, uint64_t);
+extern uint64_t original_5(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t, uint64_t);
+static unsigned __int128 projected_outer_5(uint64_t Unused) {
+  (void)Unused;
+  return projected_5(Pointer, Modifier, Arguments[0], Arguments[1],
+                     Arguments[2], Arguments[3], Arguments[4], Arguments[5],
+                     Arguments[6], Arguments[7], Arguments[8], Arguments[9]);
+}
+static unsigned __int128 original_outer_5(uint64_t Unused) {
+  (void)Unused;
+  return original_5(Pointer, Modifier, Arguments[0], Arguments[1], Arguments[2],
+                    Arguments[3], Arguments[4], Arguments[5], Arguments[6],
+                    Arguments[7], Arguments[8], Arguments[9]);
+}
+extern uint64_t projected_6(uint64_t, uint64_t);
+extern uint64_t original_6(uint64_t, uint64_t);
+static unsigned __int128 projected_outer_6(uint64_t Unused) {
+  (void)Unused;
+  return projected_6(Pointer, Arguments[0]);
+}
+static unsigned __int128 original_outer_6(uint64_t Unused) {
+  (void)Unused;
+  return original_6(Pointer, Arguments[0]);
+}
+extern uint64_t projected_7(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                            uint64_t);
+extern uint64_t original_7(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t, uint64_t, uint64_t, uint64_t, uint64_t,
+                           uint64_t);
+static unsigned __int128 projected_outer_7(uint64_t Unused) {
+  (void)Unused;
+  return projected_7(Pointer, Arguments[0], Arguments[1], Arguments[2],
+                     Arguments[3], Arguments[4], Arguments[5], Arguments[6],
+                     Arguments[7], Arguments[8], Arguments[9]);
+}
+static unsigned __int128 original_outer_7(uint64_t Unused) {
+  (void)Unused;
+  return original_7(Pointer, Arguments[0], Arguments[1], Arguments[2],
+                    Arguments[3], Arguments[4], Arguments[5], Arguments[6],
+                    Arguments[7], Arguments[8], Arguments[9]);
+}
+extern uint64_t projected_8(uint64_t, uint64_t);
+extern uint64_t original_8(uint64_t, uint64_t);
+static unsigned __int128 projected_outer_8(uint64_t Unused) {
+  (void)Unused;
+  return projected_8(Pointer, Arguments[0]);
+}
+static unsigned __int128 original_outer_8(uint64_t Unused) {
+  (void)Unused;
+  return original_8(Pointer, Arguments[0]);
+}
+static const struct {
+  ProbeFunction Projected, Original;
+  uint64_t Target;
+  unsigned Key, Zero, Raw, Arguments;
+} Cases[] = {
+    {projected_outer_0, original_outer_0, (uint64_t)target1, 0, 0, 0, 1},
+    {projected_outer_1, original_outer_1, (uint64_t)target10, 0, 0, 0, 10},
+    {projected_outer_2, original_outer_2, (uint64_t)target1, 0, 1, 0, 1},
+    {projected_outer_3, original_outer_3, (uint64_t)target10, 0, 1, 0, 10},
+    {projected_outer_4, original_outer_4, (uint64_t)target1, 1, 0, 0, 1},
+    {projected_outer_5, original_outer_5, (uint64_t)target10, 1, 0, 0, 10},
+    {projected_outer_6, original_outer_6, (uint64_t)target1, 1, 1, 0, 1},
+    {projected_outer_7, original_outer_7, (uint64_t)target10, 1, 1, 0, 10},
+    {projected_outer_8, original_outer_8, (uint64_t)target1, 0, 1, 1, 1},
+};
+static uint64_t expectedCall(unsigned C) {
+  return Cases[C].Arguments == 1
+                                  ? Arguments[0] * 3 + 7
+                                  : Arguments[0] + 3 * Arguments[1] +
+                                        5 * Arguments[2] + 7 * Arguments[3] +
+                                        11 * Arguments[4] + 13 * Arguments[5] +
+                                        17 * Arguments[6] + 19 * Arguments[7] +
+                                        23 * Arguments[8] + 29 * Arguments[9];
+}
+
+#include "CptaAuthenticatedCallChecks.def"
