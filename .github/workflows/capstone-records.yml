@@ -1,7 +1,7 @@
-name: Qualify nanoMIPS restricted branches at the conflict-table boundary
+name: Verify nanoMIPS compact-branch legality with a single 16-bit dispatch
 on:
   push:
-    branches: [codex/capstone-nanomips-conflict-table]
+    branches: [codex/capstone-nanomips-one-table]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: nanomips-table-mode-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: nanomips-single-table-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

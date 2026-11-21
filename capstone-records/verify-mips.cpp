@@ -70,6 +70,16 @@ int main(int argc,char **argv) {
    }
   }
  }
+ for (cs_mode profile : {CS_MODE_NANOMIPS, CS_MODE_NMS1, CS_MODE_I7200}) {
+  for (unsigned endian : {0u,unsigned(CS_MODE_BIG_ENDIAN)}) for(unsigned flags=0;flags<8;++flags) {
+   const auto mode=cs_mode(unsigned(profile)|endian);
+   Machine x(a,mode,flags&1,flags&2,flags&4), y(b,mode,flags&1,flags&2,flags&4);
+   for(unsigned value=0;value<=0xffff;++value) {
+    uint8_t bytes[2];bytes[endian?1:0]=uint8_t(value);bytes[endian?0:1]=uint8_t(value>>8);
+    compare(x,y,bytes,2,flags,mode);
+   }
+  }
+ }
  if(!corrected)return 5;
  std::printf("verified %llu expected NMS1 corrections\\n",(unsigned long long)corrected);
  std::printf("verified %llu raw records\n",(unsigned long long)verified);

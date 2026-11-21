@@ -1,5 +1,5 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..2f947fce 100644
+index d57235c9..1711bfa7 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -30,30 +30,39 @@ index d57235c9..2f947fce 100644
  	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
  	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
  	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
-@@ -1530,12 +1531,16 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1520,23 +1521,19 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		Result = readInstruction16(Bytes, BytesLen, Address, Size,
+ 					   &Insn, IsBigEndian);
+ 		if (Result != MCDisassembler_Fail) {
+-			// Calling the auto-generated decoder function for NanoMips
+-			// 16-bit instructions.
+-			Result = decodeInstruction_2(DecoderTableNanoMips16,
+-						     Instr, Insn, Address,
++			/* P16.BRI with a nonzero offset uses the shared BEQC/BNEC
++			 * reader. Offset zero retains the primary JRC/JALRC decode. */
++			const bool compact_branch =
++				(Insn >> 10) == 0x36 && (Insn & 0xf) != 0;
++			const uint8_t *table = compact_branch ?
++				DecoderTableNanoMips_Conflict_Space16 :
++				DecoderTableNanoMips16;
++			Result = decodeInstruction_2(table, Instr, Insn, Address,
+ 						     NULL);
+ 			if (Result != MCDisassembler_Fail) {
+ 				*Size = 2;
  				return Result;
  			}
- 
+-
 -			Result = decodeInstruction_2(
 -				DecoderTableNanoMips_Conflict_Space16, Instr,
 -				Insn, Address, NULL);
 -			if (Result != MCDisassembler_Fail) {
 -				*Size = 2;
 -				return Result;
-+			/* The conflict table contains the compact BEQC/BNEC forms,
-+			 * which are reserved with Config5.NMS set. */
-+			if (!Mips_getFeatureBits(mode, Mips_FeatureNMS1)) {
-+				Result = decodeInstruction_2(
-+					DecoderTableNanoMips_Conflict_Space16, Instr,
-+					Insn, Address, NULL);
-+				if (Result != MCDisassembler_Fail) {
-+					*Size = 2;
-+					return Result;
-+				}
- 			}
+-			}
  		}
  
-@@ -1707,16 +1712,14 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		// This is an invalid instruction. Claim that the Size is 2 bytes. Since
+@@ -1707,16 +1704,14 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
@@ -72,10 +81,28 @@ index d57235c9..2f947fce 100644
  #endif
  	if (IsGP64) {
  		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
+@@ -3483,6 +3478,8 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
+ 					   uint64_t Address,
+ 					   const void *Decoder)
+ {
++	if (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNMS1))
++		return MCDisassembler_Fail;
+ 	unsigned Rt = fieldFromInstruction_4(Insn, 7, 3);
+ 	unsigned Rs = fieldFromInstruction_4(Insn, 4, 3);
+ 	unsigned Offset = fieldFromInstruction_4(Insn, 0, 4) << 1;
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..c16f5b56 100644
+index c94daecb..549c6b54 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
+@@ -1592,7 +1592,7 @@
+     },
+     "DecodeBranchConflictNM": {
+       "apply_type": "OLD",
+-      "old_hash": "4dcfebb897eb2f7e4f98bc962f070a385628c212d2439d6a24cab1f65060907d",
++      "old_hash": "2985bd9cc72a165f2d88089a10cb80e319dc09d014200a74f8838e2b41f776ab",
+       "new_hash": "3ae97ba3f294fcb6fdf7ed3e0c0903a5bdf497f67b74de385a17d60cee6209bd",
+       "edit": ""
+     },
 @@ -2102,7 +2102,7 @@
      },
      "Mips_getFeatureBits": {
@@ -90,7 +117,7 @@ index c94daecb..c16f5b56 100644
      "getInstruction": {
        "apply_type": "OLD",
 -      "old_hash": "52fc65a707feef93d6bd7c7c6f55851d2c93be45650efe21fe031b8928f2eb4c",
-+      "old_hash": "4cba8bf43aff5fd3cf515785337712530fb78fab909da686344dc495f8c5c2bc",
++      "old_hash": "50cdcfa713de81929590f399b845a021d8500173b8b4480f3b780958f7b98e3c",
        "new_hash": "aca77782b4160891075cb2f890401385cde140c255d109d1ed08c693f2cc10ba",
        "edit": ""
      },
