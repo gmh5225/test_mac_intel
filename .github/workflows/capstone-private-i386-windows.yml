@@ -1,7 +1,7 @@
-name: Test native 32-bit and 64-bit MSVC output with the 64-bit host compiler
+name: Verify the exact static i386 source tree on Windows x86 and x64
 on:
   push:
-    branches: [codex/capstone-i386-chained-options-msvc]
+    branches: [codex/capstone-i386-msvc-canonical-tree]
     paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: chained-options-msvc-${{ matrix.arch }}
+          name: canonical-i386-msvc-${{ matrix.arch }}
           path: evidence/
           retention-days: 14

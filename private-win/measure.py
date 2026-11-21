@@ -22,7 +22,7 @@ git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
 raw=sp.check_output(['git','-C',r.parent,'cat-file','blob','HEAD:private-win/candidate.patch'])
 save('input',dict(canonical_sha256=sha(raw),checkout_sha256=sha((r/'candidate.patch').read_bytes()),source=git('rev-parse','HEAD')))
 assert sha(raw)==m['sha256'] and git('rev-parse','HEAD')==m['parent']
-git('config','core.autocrlf','false');git('checkout-index','--force','--all')
+
 t=Path(tempfile.mkdtemp());b=t/'build';checks={}
 try:
     patch=t/'canonical.patch';patch.write_bytes(raw)
@@ -30,7 +30,17 @@ try:
     save('toolchain',dict(compiler=shutil.which('cl'),target=arch))
     for k in ('base','candidate'):
         if k=='candidate':
-            git('apply','--index',str(patch));assert git('write-tree')==m['tree']
+            git('apply','--cached',str(patch));assert git('write-tree')==m['tree']
+            paths=git('diff','--cached','--no-renames','--name-only','HEAD').splitlines()
+            materialized={}
+            for name in paths:
+                dest=s/name
+                raw=sp.check_output(['git','-C',s,'cat-file','blob',':'+name])
+                dest.parent.mkdir(parents=True,exist_ok=True);dest.write_bytes(raw)
+                assert git('hash-object','--no-filters',str(dest))==git('rev-parse',':'+name)
+                materialized[name]=sha(raw)
+            assert 'arch/X86/X86Vex32Output.c' in materialized
+            save('materialized',dict(tree=m['tree'],files=materialized))
         tests=['x86_simple_output','x86_scan_batch','x86_evex_move_access','x86_buffer_bounds','text_option','detail_option']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*tests],'build-'+k)
         lib,=b.rglob('capstone_static.lib');dll,=b.rglob('capstone.dll')
