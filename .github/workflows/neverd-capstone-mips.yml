@@ -1,0 +1,46 @@
+name: MIPS single-instruction decoder
+on:
+  push:
+    branches: [codex/neverd-mips-historical-nov22]
+    paths: ['.github/workflows/neverd-capstone-mips.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  REVISION: ac5261e977276060d54c6247a2f89e4ec8133312
+jobs:
+  capstone:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: ${{ env.REVISION }}
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+      - name: Compare both decoders for each profile and byte order
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCAPSTONE_ARCHITECTURE_DEFAULT=OFF -DCAPSTONE_MIPS_SUPPORT=ON \
+            -DCAPSTONE_BUILD_STATIC_LIBS=ON -DCAPSTONE_BUILD_SHARED_LIBS=OFF \
+            -DCAPSTONE_BUILD_CSTEST=ON
+          cmake --build build --config Release --target mips_single --parallel 4
+          ctest --test-dir build -C Release -R '^unit_mips_single$' --no-tests=error --output-on-failure --output-junit mips.xml
+          git rev-parse HEAD >build/source.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: capstone-mips-${{ runner.os }}-${{ env.REVISION }}
+          path: |
+            build/mips.xml
+            build/source.txt
+          retention-days: 7
