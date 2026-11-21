@@ -1,7 +1,7 @@
-name: Measure first-word PowerPC dispatch on three real ELF programs and verify across seven profiles
+name: Recheck PowerPC dispatch on the integrated x86 release with longer paired trials
 on:
   push:
-    branches: [codex/capstone-powerpc-word-dispatch]
+    branches: [codex/capstone-ppc-repeat-on-x86-release]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: ppc-word-dispatch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: ppc-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

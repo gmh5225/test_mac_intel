@@ -111,8 +111,8 @@ try:
         timing=[]
         for name,bits,path,ip in panels[2:]+other_cases:
             for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(65e6/first[0]));cycles=[]
-                for i in range(11):
+                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(95e6/first[0]));cycles=[]
+                for i in range(15):
                     keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
                         v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
