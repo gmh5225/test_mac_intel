@@ -1,0 +1,49 @@
+diff --git a/include/neverd/decode/Decoder.h b/include/neverd/decode/Decoder.h
+index e89dd0cc31..f9dac1b3ff 100644
+--- a/include/neverd/decode/Decoder.h
++++ b/include/neverd/decode/Decoder.h
+@@ -425,6 +425,7 @@ private:
+   bool MIPSNeedsDecodeGuard = false;
+   bool Strict = true;
+   bool Detail = true;
++  bool TextOrI386Scan = true;
+   bool Text = true;
+ 
+   std::unique_ptr<X86Lifter> X86;
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index 745a3a8ce9..c6cedfdf7a 100644
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -219,6 +219,7 @@ bool Decoder::initWithMIPSRevision(Arch TheArch, InstructionMode Mode,
+   MIPSInvalidAddressBits = mipsInvalidAddressBits(TheArch, Mode);
+   Detail = true;
+   Text = true;
++  TextOrI386Scan = true;
+   X86 = std::move(NewX86);
+   ARM = std::move(NewARM);
+   AArch64 = std::move(NewAArch64);
+@@ -383,7 +384,7 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+   const uint8_t *Code = Bytes;
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+-  if (Text && X86) {
++  if (TextOrI386Scan && X86) {
+     if (X86_disasmIterText(Handle, &Code, &Remaining, &PC, InsnBuf))
+       return true;
+   } else if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf)) {
+@@ -456,6 +457,7 @@ void Decoder::setDetail(bool On) {
+   if (MicroASEHandle)
+     cs_option(MicroASEHandle, CS_OPT_DETAIL, On ? CS_OPT_ON : CS_OPT_OFF);
+   Detail = On;
++  TextOrI386Scan = Text || (TargetArch == Arch::X86 && !Detail);
+ }
+ 
+ void Decoder::setText(bool On) {
+@@ -465,6 +467,7 @@ void Decoder::setText(bool On) {
+   if (MicroASEHandle)
+     cs_option(MicroASEHandle, CS_OPT_TEXT, On ? CS_OPT_ON : CS_OPT_OFF);
+   Text = On;
++  TextOrI386Scan = Text || (TargetArch == Arch::X86 && !Detail);
+ }
+ 
+ void Decoder::liftToLow(const DecodedInsn &Insn, std::vector<LowOp> &Ops,

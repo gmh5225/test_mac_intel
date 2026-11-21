@@ -117,10 +117,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    write(label+'-caller-object',dict(sections=text,iterator_relocations=rel))
    if label!='base':
     baseline=json.loads((out/'base-caller-object.json').read_text())
-    if label=='scan_core':
-     assert text==baseline['sections'] and rel==baseline['iterator_relocations']
-    else:
-     assert any('X86_disasmIterText' in v for v in rel) and any('X86_disasmIter32' in v for v in rel) and text!=baseline['sections']
+    assert any('X86_disasmIterText' in v for v in rel)
+    assert text!=baseline['sections']
+    assert any('X86_disasmIter32' in v for v in rel)==(label=='pointer_scan')
 
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
@@ -208,7 +207,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     prior=json.loads((out/'base-objects.json').read_text())
     assert prior.keys()==objects.keys()
     assert {Path(k).name for k in prior if prior[k]!=objects[k]}=={'X86Vex32Output.c.o'}
-    if label in ('arch_first','byte_first'):assert objects==json.loads((out/'scan_core-objects.json').read_text())
+    if label!='pointer_control':assert objects==json.loads((out/'pointer_control-objects.json').read_text())
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)

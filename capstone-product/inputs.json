@@ -1,49 +1,51 @@
 {
-  "neverd": "ebbb961e75e548dfdfadf6da1d53264c860c8d5a",
+  "neverd": "1de4e60626967be8fc60694411df714d31ac39d7",
   "capstone": "88f64f91be1b3c9de7c5819e93806fa8d79127db",
   "variants": {
-    "scan_core": {
+    "pointer_control": {
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
       "commit": "f8ef7a2ddaa00005b640d98845ae48a495c00f43",
       "tree": "7ecaea32e0b9c4a637f3791de7042d0ebdb6aceb",
+      "neverd_tree": "1259f5b197784dc0e512ca590fbe39b741e0b85f",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "d89bf4405985224317bb4ab0e2d37844a2fa6090",
+        "include/neverd/decode/Decoder.h": "2a8d40308c099b781e17b1bdc60eae33ef0ae3ba",
+        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
+      },
       "capstone_patch": "i386-scan.patch",
       "capstone_sha256": "577f1aceb1d89ed0fb3b1440ee2148d267f890d2749295c033f73e089c4f6b79",
-      "neverd_tree": "c7d4fd7ef751ea4bf715848b9f689dd769f8575f",
-      "blobs": {
-        "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
-        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
-      }
+      "patch": "pointer_control-neverd.patch",
+      "patch_sha256": "3e980486be5c341fc68b81a20094c7da2ba0cea60e23c1ed63f5cef6f13484ac"
     },
-    "arch_first": {
+    "pointer_scan": {
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
       "commit": "f8ef7a2ddaa00005b640d98845ae48a495c00f43",
       "tree": "7ecaea32e0b9c4a637f3791de7042d0ebdb6aceb",
+      "neverd_tree": "c013d9a2a8051a270c19b481e204fc56f1756751",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "1b6d0ac0851c269f54ed502ccfc2b48d14d9e737",
+        "include/neverd/decode/Decoder.h": "2a8d40308c099b781e17b1bdc60eae33ef0ae3ba",
+        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
+      },
       "capstone_patch": "i386-scan.patch",
       "capstone_sha256": "577f1aceb1d89ed0fb3b1440ee2148d267f890d2749295c033f73e089c4f6b79",
-      "patch": "arch_first-neverd.patch",
-      "patch_sha256": "3f597c69f9f7f4a6f56decdbf432d0b60f998726f7029b051c2d9395f840e1dc",
-      "neverd_tree": "a46354a17e9303e4c256406ceeea1eefe07fbefc",
-      "blobs": {
-        "lib/decode/Decoder.cpp": "71d0f20087cc31181bcf8310f9103f900e34da50",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
-        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
-      }
+      "patch": "pointer_scan-neverd.patch",
+      "patch_sha256": "9ebd4ebd75e6610bb3055fd70307ae6d17dbc4c9862e629d5c62c0d7796f20ff"
     },
-    "byte_first": {
+    "flag_scan": {
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
       "commit": "f8ef7a2ddaa00005b640d98845ae48a495c00f43",
       "tree": "7ecaea32e0b9c4a637f3791de7042d0ebdb6aceb",
+      "neverd_tree": "25ca171ee26d692698eb65b76cf79ab38161cb60",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "c6cedfdf7a4b9f9a7b3767d66e89c4b35bb85b90",
+        "include/neverd/decode/Decoder.h": "f9dac1b3ffd6f7af6c99805f1853debe3ace8a89",
+        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
+      },
       "capstone_patch": "i386-scan.patch",
       "capstone_sha256": "577f1aceb1d89ed0fb3b1440ee2148d267f890d2749295c033f73e089c4f6b79",
-      "patch": "byte_first-neverd.patch",
-      "patch_sha256": "9ceed324678ce94e30300d24d0e7a13efcde5ef68581a6cbbb45398fffc5d410",
-      "neverd_tree": "14413e60ff479b5a95b41f1d1d4879dc19463bd9",
-      "blobs": {
-        "lib/decode/Decoder.cpp": "773c0fd0715162a4db424d457a77e818a64a8380",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
-        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
-      }
+      "patch": "flag_scan-neverd.patch",
+      "patch_sha256": "cd34f6da651d9e8612d66896884bbde5d0066cb0a944f6e2f03757f5df7dfe7b"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -51,8 +53,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Compare the actual shipping caller and Capstone to the isolated 32-bit scan member, then two direct placements of the VEX2 gate. Both skip the wrapper for scalar code. No shared text options or hardware-specific tuning change.",
-  "parent": "6d901201b6cee4018f95e78fce8be4d495fd544e",
+  "scope": "Compare the existing C++ routing with an iterator selected on successful initialization and option changes. Isolate the cost of an indirect call before enabling i386 scans, and compare a one-byte flag that preserves the two original hot-path tests.",
+  "parent": "73e7664318610addbb069770dd7c5721f4e01bc0",
   "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
