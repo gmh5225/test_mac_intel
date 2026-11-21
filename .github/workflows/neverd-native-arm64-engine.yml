@@ -8,6 +8,8 @@ on:
       - native-driver-entry/compare.c
       - native-driver-entry/extract.py
       - native-driver-entry/shim.S
+      - native-driver-entry/check_export_entries.py
+      - native-driver-entry/export-entry-inputs.json
 permissions:
   contents: read
 jobs:
@@ -97,6 +99,13 @@ jobs:
           & "$root/check.exe" | Set-Content $observations
           if ((Get-Content $observations | ConvertFrom-Json).observations.Count -ne 15) { throw 'Incomplete native entry replay' }
           [ordered]@{revision=$env:NEVERD_REV; machine=$machine; engine_sha256=(Get-FileHash $exe).Hash.ToLower(); driver_sha256=$imageHash; pdb_sha256=(Get-FileHash "$root/null.pdb").Hash.ToLower(); routes=$rows} | ConvertTo-Json -Depth 6 | Set-Content $proof
+      - name: Compile the exported storage, USB power and tracing driver callbacks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.KernelLibraryCallbacksUseTheTargetWDK'
+          python native-driver-entry/check_export_entries.py --neverd "$env:RUNNER_TEMP/nb/bin/neverd.exe" --work "$env:RUNNER_TEMP/entry-exports" --report native-export-verification.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -104,6 +113,7 @@ jobs:
           path: |
             native-driver-verification.json
             native-entry-observations.json
+            native-export-verification.json
             ${{ runner.temp }}/nb/neverd-build-receipt.json
             ${{ runner.temp }}/nb/neverd-dependency-inputs.json
           if-no-files-found: warn
