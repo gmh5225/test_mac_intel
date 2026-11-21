@@ -1,7 +1,7 @@
-name: Attribute i386 JPEG and remaining PE and 64-bit SIMD output costs against forked iced
+name: Compare typed instruction IDs on real PE, ELF and glibc with forked iced formatters
 on:
   push:
-    branches: [codex/capstone-vector-per-mode-reference]
+    branches: [codex/capstone-typed-compare-fork-throughput]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -30,16 +30,14 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
-          sudo apt-get -qq update && sudo apt-get -y install valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/prepare_baseline.py
+          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-mode-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: compare-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -28,7 +28,6 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Published next',aa='Exact baseline copy',route='Qualified public writer',vector='Qualified writer plus i386 packed C5 scan',iced='Forked iced IntelFormatter',fast='Forked iced FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -38,139 +37,102 @@ def main(w):
     old_engine='std::string engine=argv[1];';assert inc.count(old_engine)==1
     inc=inc.replace(old_engine,old_engine+'\n  if(engine=="iced____") engine="iced"; else if(engine=="fast____") engine="fast";')
     assert inc.count('iced_trace(bits,ptr,')==1
-    assert inc.count('Result timed=run(reps);')==inc.count('Result warm=run(1);')==1
-    inc='#include <valgrind/callgrind.h>\n'+inc.replace('Result warm=run(1);','CALLGRIND_START_INSTRUMENTATION; Result warm=run(1);').replace('Result timed=run(reps);','CALLGRIND_ZERO_STATS; Result timed=run(reps); CALLGRIND_STOP_INSTRUMENTATION;')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
-    tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
-    objects={}
-    inputs=json.loads((r/'experiment.json').read_text())
-    for label in ('integer','aa','route','vector'):
-        if label=='aa':
-            exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        if label!='integer':
-            patch=r/(label+'.patch')
-            assert sha(patch)==inputs['variants'][label]['sha256']
-            run(['git','apply',patch],'apply-'+label,tree)
-        run(['git','add','-A'],'stage-source-'+label,tree)
-        tested=sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()
-        expected=inputs['baseline_tree'] if label=='integer' else inputs['variants'][label]['tree']
-        assert tested==expected,(label,tested,expected)
-        save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else sha(patch)))
-        run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
-        objroot=b/'CMakeFiles/capstone.dir'
-        members=sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines()
-        assert len(set(members))==len(members)
-        active={str(path.relative_to(objroot)):path for path in objroot.rglob('*.o') if path.name in members}
-        assert len(active)==len(members)
-        objects[label]={name:sha(path) for name,path in active.items()}
-        assert len(objects[label])>30
-        if label=='integer':
-            run(['clang++','-O2','-std=c++17','-I',tree/'include',r/'observer.cpp',b/'libcapstone.a','-lm','-o',w/'reference-observer'],'link-reference-observer')
-            shutil.copyfile(objroot/'arch/X86/X86OutputIterator.c.o',w/'baseline-plan.o')
-        else:
-            changed={name for name,value in objects['integer'].items() if objects[label].get(name)!=value}
-            added=set(objects[label])-set(objects['integer'])
-            expected_changed = {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
-            expected_added = {'arch/X86/X86Vex32Output.c.o'}
-            if label=='vector':expected_added.add('arch/X86/X86VexScan.c.o')
-            assert added == expected_added, (label, added)
-            assert expected_changed <= changed <= expected_changed | {'arch/X86/X86VectorOutput.c.o'}, (label, changed)
-            if label == 'vector':
-                diff=sorted(k for k in objects[label] if objects[label][k]!=objects['route'].get(k))
-                wanted=['arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86VexScan.c.o']
-                assert diff==wanted,(diff,wanted)
-                save('compiler-scope.json',dict(changed=diff, total=len(objects[label])))
-                run(['python3','-B',tree/'suite/synctools/x86_operand_specializations.py','--check'],'vex-scan-rows')
-
-                for tool, jobs in [('x86_simple_output', [([], 'X86GenSimpleOutput.inc')]), ('x86_vector_output', [(['--vex32-memory'], 'X86GenVex32MemoryOutput.inc'), (['--vex-pairs32'], 'X86GenVex32PairOutput.inc')])]:
-                    run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools'/(tool+'.cpp'),b/'libcapstone.a','-o',w/tool], 'build-generator-'+tool)
-                    for options, name in jobs:
-                        with (p/'evidence'/('generate-'+name+'.log')).open('wb') as log:
-                            out = sp.check_output([w/tool,*options],stderr=log)
-                        assert out == (tree/'arch/X86'/name).read_bytes(), name
-                save('generated-tables.json', {name:sha(tree/'arch/X86'/name) for name in ('X86GenSimpleOutput.inc','X86GenVex32MemoryOutput.inc','X86GenVex32PairOutput.inc')})
-            save(label+'-object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
-        save('object-digests.json',objects)
-        obj=w/'driver.o'
-        unresolved=sp.check_output(['nm','-u',obj],text=True)
-        assert 'cs_disasm_iter' in unresolved and 'X86_disasmIter' not in unresolved
-        if label=='integer':consumer_hash=sha(obj)
-        else:assert sha(obj)==consumer_hash
-        save('consumer-object.json',dict(sha256=consumer_hash,all_variants_identical=True))
-        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
-        run(['git','reset','--hard',reference],'restore-'+label,tree)
-        run(['git','clean','-fdx'],'remove-generated-'+label,tree)
-        assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
+    data=json.loads((r/'experiment.json').read_text())
+    b=w/'build';exe={}
+    run(['cmake','-S',base,'-B',b,*profile],'configure')
+    obj=w/'driver.o'
+    assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
+    save('consumer-object.json',dict(sha256=sha(obj)))
+    for label,tree in data['trees'].items():
+        if label=='typed':
+            assert sha(r/'typed.patch')==data['patch_sha256']
+            run(['git','-C',base,'apply','--index',r/'typed.patch'],'apply')
+        assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
+        run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
+        run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
+        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label)
+        exe[label]=target
+    save('tested-trees.json',data)
+    exe['aa']=w/'copy';shutil.copy2(exe['integer'],exe['aa'])
     exe['iced']=exe['fast']=exe['integer']
+    payloads={key:path.read_bytes()for key,path in exe.items()}
+    assert payloads['integer']==payloads['aa']
+    maximum=max(map(len,payloads.values()))
+    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
+    image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
+    image_inode=image.stat().st_ino
+    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
+    launches=['images']
+    if probe.returncode==0:launches.append('same-file-fixed')
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
-    run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
-    import observe, profile_costs
-    run(['git','apply',r/'vector.patch'],'apply-observer',tree)
-    observe.build(tree,b,w/'observer',base,r/'observer.cpp',run)
-    columns=['instructions','scan_fallback','generic_result','generic_decode','feature_slow','evex_fast_success','vex2_attempt','vex2_success','public_writer_success','public_writer_fallback']
-    save('observed-fields.json',dict(columns=columns,scope='Single untimed copy of the exact candidate. Counts increment at actual function entry or the compact EVEX success. Last-byte register/memory labels are the encoded ModRM for bare vector forms.'))
-    all_costs=[]
-    import pe_panels, itertools
-    for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w)):
-        if name not in ('libjpeg62-turbo-amd64','libssl3t64-amd64','putty-32-0.85','jpeg-avx2-i386'):continue
-        intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
-        common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
-        manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        if name.startswith('putty-'):
-            assert len(common)==1 and common[0][0][1]==f.stat().st_size if bits==32 else len(common)>150
-            manifest[name]['selection']=source['extent_source']+'; require bytewise identical acceptance and boundaries over each retained extent'
-        for panel in (['whole-text' if bits==32 else 'runtime-functions'] if name.startswith('putty-') else ['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions'])):
-            if panel=='all-functions':continue
-            sel=[a for a,v in common if panel in ('all-functions','whole-text','runtime-functions') or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
-            if name=='jpeg-avx2-i386' or name.startswith('putty-'):assert sel,(name,manifest[name])
-            if not sel:continue
-            intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
-            prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
-            import filecmp
-            rows_by={}
-            for key,program in [('base',w/'reference-observer'),('candidate',w/'observer')]:
-                rows_by[key]=sp.check_output([program,str(bits),f,intervals,w/(key+'.rec'),w/(key+'.diff')],text=True)
-            for suffix in ('rec','diff'):
-                if not filecmp.cmp(w/('base.'+suffix),w/('candidate.'+suffix),shallow=False):
-                    raise RuntimeError(name+' has different same-mode baseline and candidate '+suffix+' results')
-            lines=(w/'base.diff').read_text().splitlines()
-            from collections import Counter
-            count=Counter(tuple(line.split()[2:]) for line in lines)
-            save(name+'-mode-reference.json',dict(bytes=(w/'base.rec').stat().st_size,record_sha256=sha(w/'base.rec'),differences_between_modes=len(lines),categories=[(list(k),v) for k,v in count.most_common()],examples=lines[:15],same_mode_differences=0))
-            for key in rows_by:
-                for suffix in ('rec','diff'):(w/(key+'.'+suffix)).unlink()
-            obs=rows_by['candidate']
-            stages={}
-            for line in obs.splitlines():
-                fields=line.split('\t')
-                assert len(fields)==11 and fields[0] not in stages
-                stages[fields[0]]=list(map(int,fields[1:]))
-            census=prefix_census[name+'/'+panel]
-            assert sum(v[0] for v in stages.values())==census['decoded']+census['invalid_bytes']
-            save(name+'-stages.json',dict(columns=columns,mnemonics=stages))
-            for mode in (0,1,2):
-                results={}
-                for label in ['integer','vector','iced']+(['fast'] if mode else []):
-                    engine=label+'____' if label in ('fast','iced') else 'capstone'
-                    fn=name+'-'+str(mode)+'-'+label
-                    trace=w/'tr';args=['valgrind','--tool=callgrind','--instr-atstart=no','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(trace),str(exe[label]),engine,str(mode),'1',str(f),str(intervals),str(bits)]
-                    with (p/'evidence'/(fn+'.log')).open('w') as stream:
-                        value=list(map(int,sp.check_output(args,stderr=stream,text=True).split()))
-                    assert len(value)==6
-                    results[label]=value[2:]
-                    profile=profile_costs.parse(trace)
-                    assert profile['totals'][0]>0 and value[2]==census['decoded'] and value[3]==census['invalid_bytes']
-                    with trace.open('rb') as src, gzip.open(p/'evidence'/(fn+'.callgrind.gz'),'wb',compresslevel=3) as dst:shutil.copyfileobj(src,dst)
-                    trace.unlink()
-                    save(fn+'-cost.json',profile)
-                    all_costs.append(dict(case=name,panel=panel,mode=mode,engine=label,events=profile['events'],totals=profile['totals'],records=value[2:],functions=len(profile['functions']),trace=fn+'.callgrind.gz',top=profile['functions'][:12]))
-                assert len({tuple(v[:3]) for v in results.values()})==1 and results['integer']==results['vector']
-            print(name,panel,flush=True)
-            save('profile-index.json',all_costs)
-    assert len(all_costs)==44 and len(manifest)==4
-    save('complete.json',dict(cases=len(all_costs),source=inputs,consumer=consumer_hash,method='One warmed traversal under Callgrind zeroed at the timed-loop boundary. Guest work, read/write and simulated cache/branch events; wall times are from the independent native run.'))
+    assert set(launches)=={'images','same-file-fixed'}
+    import pe_panels,itertools
+    shutil.copyfile(r/'libmvec.py',w/'libmvec.py');shutil.copyfile(r/'libmvec.json',w/'libmvec.json')
+    run(['python3','-B',w/'libmvec.py'],'glibc')
+    glibc=json.loads((w/'libmvec.json').read_text())
+    extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
+    for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w),extra):
+        if name not in data['samples']:continue
+        panel=data['samples'][name]
+        intervals=w/(name+'.tsv')
+        intervals.write_text(''.join('%d %d %d\\n'%v for v in spans))
+        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('integer','typed')]
+        assert audit[0]==audit[1]
+        trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
+        views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
+        assert len(views)==len(spans)==len(trace)
+        common=[(a[:3],v) for a,v in zip(trace,views) if a[1]==a[5]]
+        selected=[a for a,v in common if panel!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0])]
+        if panel=='whole-text':assert len(selected)==1 and selected[0][1]==f.stat().st_size,(name,trace[:1])
+        assert selected
+        intervals.write_text(''.join('%d %d %d\\n'%tuple(a) for a in selected))
+        sel=selected
+        manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
+        save('provenance.json',manifest)
+        for mode in (0,1,2):
+            def measure(lib,n,launch):
+                tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
+                if launch=='images':
+                    command=[str(exe[lib]),*tail];executable=None
+                elif launch=='same-argv':
+                    command=[str(image),*tail];executable=str(exe[lib])
+                else:
+                    with image.open('r+b')as out:
+                        assert out.write(padded[lib])==maximum
+                    assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
+                    command=[str(image),*tail];executable=None
+                    if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
+                return list(map(int,sp.check_output(command,executable=executable).split()))
+            probe=measure('integer',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
+            cycles={launch:[]for launch in launches};labels=['integer','aa','typed','iced']+(['fast'] if mode else [])
+            stable={}
+            for i in range(data['cycles']):
+                launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
+                for launch in launch_order:
+                    order=labels[i%len(labels):]+labels[:i%len(labels)]
+                    obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
+                    assert all(len(v)==6 for k,v in obs)
+                    assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
+                    for k,v in obs:
+                        root='integer' if k=='aa' else k
+                        if root not in stable:stable[root]=v[2:]
+                        assert v[2:]==stable[root],(name,mode,k,v,stable[root])
+                    cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
+            for launch,observations in cycles.items():
+                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
+                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
+                row['vs_iced']={k:md('iced',k) for k in ('integer','typed')}
+                row['vs_fast']={k:md('fast',k) for k in ('integer','typed')} if mode else None
+                reported.append(row)
+            save('measurements.json',reported)
+        print(name,panel,len(sel),flush=True)
+    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
+    assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
+    save('complete.json',dict(cases=len(reported),success=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
