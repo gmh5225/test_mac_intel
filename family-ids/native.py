@@ -19,12 +19,29 @@ try:
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
     verified={}
+    generator=s/'suite/synctools/x86_simple_output.cpp'
+    before=sp.run(['g++','-std=c++17','-fsyntax-only','-I'+str(s/'include'),generator],capture_output=True,text=True)
+    (obs/'gcc-before.log').write_text(before.stdout+before.stderr)
+    assert before.returncode and 'changes meaning' in before.stderr and all(name in before.stderr for name in ('insn_map','hppa_ext'))
     for variant in ('base','candidate'):
         if variant=='candidate':
             git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
+    assert sha(libs['base'])==sha(libs['candidate'])
+    frontends={}
+    for cxx in ('g++','clang++'):
+        args=[cxx,'-std=c++17','-O2','-I'+str(s/'include')]
+        run([*args,'-fsyntax-only',generator],'header-'+cxx)
+        if not (diet or reduce):
+            exe=tmp/('generator-'+cxx)
+            run([*args,generator,'-L'+str(b),'-lcapstone','-Wl,-rpath,'+str(b),'-o',exe],'link-'+cxx)
+            z=sp.run([exe],stdout=sp.PIPE,stderr=sp.PIPE,check=True)
+            (obs/('generate-'+cxx+'.log')).write_bytes(z.stderr)
+            assert z.stdout==(s/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
+            frontends[cxx]=hashlib.sha256(z.stdout).hexdigest()
+    write('generator-fix',dict(shared=sha(libs['candidate']),frontends=frontends,red=before.returncode))
     if conf=='full':
         selected=units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
