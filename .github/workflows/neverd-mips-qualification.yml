@@ -1,0 +1,108 @@
+name: NeverD MIPS qualification
+run-name: NeverD MIPS on Linux, macOS and Windows
+on:
+  push:
+    branches: [codex/neverd-mips-historical-nov22]
+    paths: ['.github/workflows/neverd-mips-qualification.yml', 'neverd-mips-qualification/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      revision: ${{ steps.input.outputs.revision }}
+      target: ${{ steps.input.outputs.target }}
+      filter: ${{ steps.input.outputs.filter }}
+      required: ${{ steps.input.outputs.required }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: input
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          config = json.load(open('neverd-mips-qualification/source.json'))
+          assert re.fullmatch(r'[0-9a-f]{40}', config['revision'])
+          assert config['target'] in ('NeverDTypesTests', 'NeverDLiftTests')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              for key in ('revision', 'target', 'filter', 'required'):
+                  value = config[key]
+                  assert value and '\n' not in value and '\r' not in value
+                  print(key + '=' + value, file=out)
+          PY
+  release:
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18}
+          - {os: macos-15, cc: clang, cxx: clang++}
+          - {os: windows-2025-vs2026, cc: clang-cl, cxx: clang-cl}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 160
+    defaults:
+      run:
+        shell: bash
+    env:
+      REVISION: ${{ needs.source.outputs.revision }}
+      TEST_TARGET: ${{ needs.source.outputs.target }}
+      TEST_FILTER: ${{ needs.source.outputs.filter }}
+      REQUIRED_TEST: ${{ needs.source.outputs.required }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ needs.source.outputs.revision }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Identify the source and dependencies
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          git submodule update --init --depth 1 third_party/capstone signatures
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14
+      - if: runner.os == 'macOS'
+        run: brew install cmake ninja lld
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+        with:
+          arch: x64
+      - name: Build the Release test owner
+        run: |
+          args=()
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            args+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14')
+          fi
+          cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF "${args[@]}"
+          python scripts/build.py build-check --config Release --parallel 4 --target "$TEST_TARGET"
+      - name: Run the requested tests and verify the regression executed
+        run: |
+          mkdir -p evidence
+          build-check/bin/"$TEST_TARGET" --gtest_filter="$TEST_FILTER" --gtest_output=xml:evidence/results.xml
+          python - <<'PY'
+          import os, subprocess, xml.etree.ElementTree as ET
+          from pathlib import Path
+          rows = ET.parse('evidence/results.xml').findall('.//testcase')
+          ran = {r.get('classname') + '.' + r.get('name') for r in rows if r.get('result') == 'completed'}
+          assert os.environ['REQUIRED_TEST'] in ran, sorted(ran)
+          assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == os.environ['REVISION']
+          Path('evidence/source.txt').write_text(os.environ['REVISION'] + '\n' + subprocess.check_output(['git','submodule','status','third_party/capstone'],text=True))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: mips-${{ matrix.os }}-${{ needs.source.outputs.revision }}
+          path: evidence/
+          retention-days: 7
