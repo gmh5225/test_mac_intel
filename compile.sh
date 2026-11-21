@@ -4,26 +4,27 @@ set -euo pipefail
 mkdir -p compiler-evidence
 xcodebuild -version > compiler-evidence/toolchain.txt
 xcrun swiftc --version >> compiler-evidence/toolchain.txt
-xcrun --sdk macosx --show-sdk-version >> compiler-evidence/toolchain.txt
+xcrun --sdk iphonesimulator --show-sdk-version >> compiler-evidence/toolchain.txt
 xcrun --sdk iphoneos --show-sdk-version >> compiler-evidence/toolchain.txt
 
-for profile in arm64-catalyst x86_64-catalyst arm64-ios; do
+for profile in arm64-simulator x86_64-simulator arm64-ios; do
     case "$profile" in
-        arm64-catalyst)
-            sdk=macosx
-            target=arm64-apple-ios18.0-macabi
+        arm64-simulator)
+            sdk=iphonesimulator
+            target=arm64-apple-ios17.6-simulator
             ;;
-        x86_64-catalyst)
-            sdk=macosx
-            target=x86_64-apple-ios18.0-macabi
+        x86_64-simulator)
+            sdk=iphonesimulator
+            target=x86_64-apple-ios17.6-simulator
             ;;
         arm64-ios)
             sdk=iphoneos
-            target=arm64-apple-ios18.0
+            target=arm64-apple-ios17.6
             ;;
     esac
     sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
     for optimization in O Onone; do
+        echo "Compiling $profile $optimization"
         base="compiler-evidence/$profile-$optimization"
         args=(-sdk "$sdk_path" -target "$target" "-$optimization"
               -whole-module-optimization -parse-as-library -module-name SDKProbe
