@@ -24,14 +24,12 @@
     "x86_packed_move_access"
   ],
   "samples": {
-    "putty-32-0.85": "whole-text",
     "putty-64-0.85": "runtime-functions",
     "libssl3t64-amd64": "simd-functions",
     "jpeg-avx2-i386": "simd-functions",
-    "libssl3t64-i386": "all-functions",
     "libmvec-amd64": "whole-text"
   },
-  "cycles": 7,
+  "cycles": 11,
   "entrypoints": {
     "public": "cs_disasm_iter",
     "neverd-text": "X86_disasmIter",
@@ -40,5 +38,27 @@
   "iced_branch": "codex/neverd-capstone-compat",
   "candidate": "Compare the selected private 64-bit SSE entry on the i386-qualified tree, using the identical i386 entry on both sides.",
   "i386_patch_sha256": "70fea9b47f56da4a401db7f49b3ef579d59c515f4389c1fbff30d8f62194f020",
-  "baseline_static_commit": "a42242613d349ba3ad18f342c2a3e0a72abba6d6"
+  "baseline_static_commit": "a42242613d349ba3ad18f342c2a3e0a72abba6d6",
+  "controls": {
+    "fixed_miss": {
+      "commit": "1bbdc91b85a11814551027731004ff00d4cc080a",
+      "tree": "e0f7e38d049f18487aefc53df806c5c93095bcf6",
+      "patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "runtime_miss": {
+      "commit": "f4ad5d43c9c28b4f33fec028d94fc4309f902aad",
+      "tree": "8d435c55dfcf66adb2aae7f100739e8ab1b5580d",
+      "patch_sha256": "36fd93b8046f49ca3ed769fb3b59400d7fc813812602526801f23afcf787387c"
+    },
+    "fixed_fallback": {
+      "commit": "785dd62b16edaa6353856cf09dae0a9ece7eb2f0",
+      "tree": "7664889394ec8b270789469875738e71232b2656",
+      "patch_sha256": "7ab54be0eb088feb90c5eb319ce38faf80a44cdd014e3170cfdd64b0e46cac88"
+    },
+    "runtime_fallback": {
+      "commit": "4d5184b37a9115a5b3bf2cdf80712904071096c6",
+      "tree": "80112f29a8f84f460c58b77328b4dbe2552ff683",
+      "patch_sha256": "733136a022315ade709921c9b95f353022d3aa27cf8117ea92f605854a407b1d"
+    }
+  }
 }

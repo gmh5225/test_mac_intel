@@ -1,0 +1,13 @@
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index ccbf28e5..7d1e8916 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -70,7 +70,7 @@ static bool writeSse64RegisterOutput(cs_struct *handle, const uint8_t *code,
+ }
+ 
+ #define X86_FIXED_OUTPUT tryOutput64
+-#define X86_FIXED_WIDE true
++#define X86_FIXED_WIDE (handle->mode == CS_MODE_64)
+ #define X86_OUTPUT_MISS writeSse64RegisterOutput
+ #include "X86SimpleOutputImpl.h"
+ #undef X86_OUTPUT_MISS

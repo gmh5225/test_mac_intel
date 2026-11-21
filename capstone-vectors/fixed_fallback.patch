@@ -1,0 +1,48 @@
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index ccbf28e5..74f76bbc 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -71,13 +71,25 @@ static bool writeSse64RegisterOutput(cs_struct *handle, const uint8_t *code,
+ 
+ #define X86_FIXED_OUTPUT tryOutput64
+ #define X86_FIXED_WIDE true
+-#define X86_OUTPUT_MISS writeSse64RegisterOutput
+ #include "X86SimpleOutputImpl.h"
+-#undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++static CS_PRESERVE_MOST bool
++decodeSse64Fallback(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch);
++#define CS_DECODE_FULL_INSN decodeSse64Fallback
+ #define CS_DECODE_TRY_OUTPUT tryOutput64
+ #include "../../cs_disasm_internal.h"
++#undef CS_DECODE_FULL_INSN
++
++static CS_PRESERVE_MOST bool
++decodeSse64Fallback(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	if (writeSse64RegisterOutput(handle, code, size, insn, insn_size))
++		return true;
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
+ #endif
+ 
+ CAPSTONE_INTERNAL bool X86_disasmIter64(csh ud, const uint8_t **code,
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..14b35391 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -163,7 +163,11 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
++#ifdef CS_DECODE_FULL_INSN
++	return CS_DECODE_FULL_INSN(handle, code, size, insn, insn_size, batch);
++#else
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++#endif
+ }
+ #undef CS_DECODE_SCAN
+ 

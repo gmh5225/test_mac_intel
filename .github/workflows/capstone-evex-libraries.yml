@@ -1,7 +1,7 @@
-name: Compare isolated 64-bit SSE output with iced and verify i386 layout
+name: Isolate scalar mode specialization and SSE fallback placement on real ELF and PE
 on:
   push:
-    branches: [codex/capstone-isolated-amd64-sse-pairs]
+    branches: [codex/capstone-amd64-scalar-fallback-factors]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -30,6 +30,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -38,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-sse-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-scalar-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
