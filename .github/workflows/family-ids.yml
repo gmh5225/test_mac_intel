@@ -1,7 +1,7 @@
-name: Measure architecture delimiter selection on real AArch64, MIPS, RISC-V, PPC and x86
+name: Benchmark MIPS alias string appends and preserve customized formatter callbacks
 on:
   push:
-    branches: [codex/capstone-alias-delimiter-selection]
+    branches: [codex/capstone-mips-paired-alias]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alias-delimiter-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: paired-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

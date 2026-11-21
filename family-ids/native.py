@@ -7,7 +7,9 @@ def run(args,name,cwd=None):
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 meta=json.loads((r/'tree.json').read_text())
 git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
-assert git('rev-parse','HEAD')==meta['parent'] and sha(r/'candidate.patch')==meta['sha256']
+repair=json.loads((r/'repair.json').read_text())
+assert git('rev-parse','HEAD')==repair['parent'] and sha(r/'repair.patch')==repair['sha256'] and sha(r/'candidate.patch')==meta['sha256']
+git('apply','--index',str(r/'repair.patch'));assert git('write-tree')==repair['tree']
 units=['x86_scan_batch','x86_evex_vpcmp_id','x86_evex_vpcmp_mask_size','x86_evex_detail','x86_buffer_bounds','x86_simple_output','text_option','detail_option','x86_kmask_width']
 conf=os.environ.get('FLAVOR','full');cc=os.environ['CC'];diet=conf=='diet';reduce=conf=='reduce';att=conf!='intel'
 tmp=Path(tempfile.mkdtemp());b=tmp/'build';fixed=tmp/'selected';fixed.mkdir()
@@ -35,7 +37,8 @@ try:
         if conf!='full' and variant=='base':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
     assert objects['base'].keys()==objects['candidate'].keys()
     changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
-    assert all(Path(k).name in {'Mapping.c.o','AliasMapping.c.o','RISCVMapping.c.o'} for k in changed)
+    assert all(Path(k).name in {'MipsInstPrinter.c.o'} for k in changed)
+    assert len(changed)==int(conf=='full') and (conf=='full' or sha(libs['base'])==sha(libs['candidate']))
     write('member-changes',dict(changed=changed,total=len(objects['base']),base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
@@ -89,10 +92,17 @@ try:
     if conf=='full':
         import corpus
         raw=corpus.prepare(r,tmp,obs,run)
-        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort','arm64-cp','arm64-sort','libjpeg-arm64'}
-        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105,'arm64-cp':102,'arm64-sort':102,'libjpeg-arm64':102}
+        names={'arm-cp','arm64-ls','mips64el-ls','mips64el-cp','mips64el-sort','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort','arm64-cp','arm64-sort','libjpeg-arm64'}
+        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'mips64el-cp':103,'mips64el-sort':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105,'arm64-cp':102,'arm64-sort':102,'libjpeg-arm64':102}
         other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
         assert len(other_cases)==len(names)
+        run(['c++','-std=c++17','-O2','-I',s/'include',r/'real.cpp','-ldl','-o',tmp/'compare-mips'],'build-real')
+        real={}
+        for name,bits,path,ip in other_cases:
+            if bits!=103:continue
+            real[name]=[list(map(int,sp.check_output([tmp/'compare-mips',libs['base'],libs['candidate'],path,str(custom)],text=True).split())) for custom in (0,1)]
+        assert len(real)==3 and all(v[0][:2]==v[1][:2] and v[1][2]>0 for v in real.values())
+        write('mips-real',real)
         for arch in ('arm','aarch64','ppc','riscv','mips'):
             run(['c++','-O2','-std=c++17','-I',s,'-I',s/'include',r/(arch+'-states.cpp'),'-ldl','-o',tmp/(arch+'-states')],'compile-'+arch)
             arg=[tmp/(arch+'-states'),libs['base'],libs['candidate']]

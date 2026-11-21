@@ -1,68 +1,13 @@
-diff --git a/Mapping.c b/Mapping.c
-index d3bb3e3d..ec5ff099 100644
---- a/Mapping.c
-+++ b/Mapping.c
-@@ -488,9 +488,10 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
- 		++i;
- 	}
- 	const char *alias_mnem = asm_str_buf + i;
-+	const char delimiter = mnemonic_delimiter(MI->csh->arch);
- 	// Retain the existing 15-byte mnemonic limit.
- 	for (; j < 15; ++j, ++i) {
--		if (char_ends_mnem(asm_str_buf[i], MI->csh->arch))
-+		if (char_ends_mnem(asm_str_buf[i], delimiter))
- 			break;
- 	}
- 
-diff --git a/MappingAlias.h b/MappingAlias.h
-index d6575cb9..6920e606 100644
---- a/MappingAlias.h
-+++ b/MappingAlias.h
-@@ -7,19 +7,26 @@
- #include "Mapping.h"
- #include "utils.h"
- 
--static inline bool char_ends_mnem(const char c, cs_arch arch)
-+/* Some assemblers admit punctuation in a mnemonic. Select its additional
-+ * terminator once for all characters in the alias. */
-+static inline char mnemonic_delimiter(cs_arch arch)
+diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
+index 8b70fffc..db969443 100644
+--- a/arch/Mips/MipsInstPrinter.c
++++ b/arch/Mips/MipsInstPrinter.c
+@@ -500,7 +500,7 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
+ static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
+ 		       unsigned OpNo, SStream *OS, bool IsBranch)
  {
- 	switch (arch) {
--	default:
--		return (!c || c == ' ' || c == '\t' || c == '.');
- 	case CS_ARCH_PPC:
- 	case CS_ARCH_RISCV:
--		return (!c || c == ' ' || c == '\t');
-+		return '\0';
- 	case CS_ARCH_SPARC:
--		return (!c || c == ' ' || c == '\t' || c == ',');
-+		return ',';
-+	default:
-+		return '.';
- 	}
- }
- 
-+static inline bool char_ends_mnem(char c, char delimiter)
-+{
-+	return !c || is_blank_char(c) || c == delimiter;
-+}
-+
- #ifdef CAPSTONE_ALIAS_ROLLED_LOOP
- static
- #else
-@@ -34,13 +41,14 @@ static inline
- 		const char *name = O->buffer;
- 		while (is_blank_char(*name))
- 			++name;
-+		const char delimiter = mnemonic_delimiter(MI->csh->arch);
- 		unsigned int state = 1;
- 		/* The public alias parser considers at most 15 bytes. */
- #ifdef CAPSTONE_ALIAS_ROLLED_LOOP
- #pragma clang loop unroll(disable)
- #endif
- 		for (size_t i = 0; i < 15; ++i) {
--			if (char_ends_mnem(name[i], MI->csh->arch))
-+			if (char_ends_mnem(name[i], delimiter))
- 				break;
- 			unsigned int next =
- 				trie[state].offset + (unsigned char)name[i];
+-	SStream_concat(OS, "%s%s", "\t", Str);
++	SStream_concat2(OS, "\t", Str);
+ 	SStream_concat0(OS, "\t");
+ 	if (IsBranch)
+ 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
