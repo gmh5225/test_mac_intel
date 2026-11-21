@@ -1,0 +1,43 @@
+diff --git a/arch/X86/X86VectorRegisterOutput.h b/arch/X86/X86VectorRegisterOutput.h
+index 1f238c20..1c947889 100644
+--- a/arch/X86/X86VectorRegisterOutput.h
++++ b/arch/X86/X86VectorRegisterOutput.h
+@@ -6,6 +6,19 @@
+ 
+ #include "X86VectorRegisterWriter.h"
+ 
++/* The encoded register number is five bits. Each entry includes its
++ * separator and zero padding for a fixed-size copy to op_str. */
++static const char vector_register_text[32][8] = {
++	", xmm0", ", xmm1", ", xmm2", ", xmm3",
++	", xmm4", ", xmm5", ", xmm6", ", xmm7",
++	", xmm8", ", xmm9", ", xmm10", ", xmm11",
++	", xmm12", ", xmm13", ", xmm14", ", xmm15",
++	", xmm16", ", xmm17", ", xmm18", ", xmm19",
++	", xmm20", ", xmm21", ", xmm22", ", xmm23",
++	", xmm24", ", xmm25", ", xmm26", ", xmm27",
++	", xmm28", ", xmm29", ", xmm30", ", xmm31",
++};
++
+ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 				 uint16_t *insn_size,
+ 				 const struct VectorOutputRow *row,
+@@ -20,10 +33,15 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	char *out = writeVectorRegister(insn->op_str, first_ll, regs[0]);
++	const unsigned first = regs[0];
++	memcpy(insn->op_str, vector_register_text[first] + 2, 6);
++	insn->op_str[0] = "xyz"[first_ll];
++	char *out = insn->op_str + 4 + (first >= 10);
+ 	for (unsigned n = 1; n != reg_count; ++n) {
+-		memcpy(out, ", ", 2);
+-		out = writeVectorRegister(out + 2, ll, regs[n]);
++		const unsigned number = regs[n];
++		memcpy(out, vector_register_text[number], 8);
++		out[2] = "xyz"[ll];
++		out += 6 + (number >= 10);
+ 	}
+ 	if (row->immediate) {
+ 		const unsigned value = code[prefix + 2];

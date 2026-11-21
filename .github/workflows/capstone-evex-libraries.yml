@@ -1,7 +1,7 @@
-name: Compare combined i386 and RISC-V next with both iced formatters on the concurrent MIPS change
+name: Time fixed-size register operand copies with both iced formatters on two native compilers
 on:
   push:
-    branches: [codex/capstone-current-next-iced]
+    branches: [codex/capstone-vector-separated-text-native]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 38d0847fb739b95708e6929af78ffdf1ebc806b5
+          ref: e41ed2cc9e8bacfc2e020dcb0deafca1ce1a251b
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: next-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: integrated-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
