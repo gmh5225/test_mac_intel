@@ -1,7 +1,7 @@
-name: Verify nanoMIPS branch correction on the released packed EVEX library
+name: Measure the standard MIPS decoder entry and verify unaffected compiler objects
 on:
   push:
-    branches: [codex/capstone-packed-release-nanomips]
+    branches: [codex/capstone-mips-gcc-standard-entry]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 09ba26d9848f4ad0920ad0ef5feb512899fabe6c
+          ref: 5086dcd111161f146736f23cd2e6e2adede04a55
           path: source
           persist-credentials: false
       - name: Compare mode predicates, MIPS records and all six decoded architectures
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-nanomips-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: gcc-standard-mips-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

@@ -1,5 +1,5 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..1be7a64d 100644
+index d57235c9..e9eb4d83 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -11,6 +11,59 @@ index d57235c9..1be7a64d 100644
  	case Mips_FeatureTLB:
  		return mode & CS_MODE_I7200;
  	case Mips_FeatureCnMips:
+@@ -228,10 +228,13 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
+ 	}
+ }
+ 
+-#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+-	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
++#if defined(__linux__) && defined(__x86_64__) && defined(__GNUC__) && \
++	!defined(__clang__)
++#define CAPSTONE_MIPS_STANDARD_ENTRY
++#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
+ #define CAPSTONE_MIPS_PRIMARY_DISPATCH
+ #endif
++#endif
+ 
+ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 				   const uint8_t *Bytes, size_t BytesLen,
+@@ -1457,8 +1460,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 	cs_mode mode = Instr->csh->mode;
+ 	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
+ 	bool IsGP64, IsFP64;
+-#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
+-	uint64_t major;
++	bool try_dsp = true;
++#ifdef CAPSTONE_MIPS_STANDARD_ENTRY
+ 	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
+ 	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64 ||
+ 	    isa == CS_MODE_MIPS32R2 || isa == CS_MODE_MIPS64R2) {
+@@ -1707,16 +1710,18 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
+-#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
++#ifdef CAPSTONE_MIPS_STANDARD_ENTRY
+ DecodeStandard:
++#endif
++#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
+ 	/* A primary-opcode miss in these generated tables reaches Fail before
+ 	 * any predicate, operand reader, or instruction state change. */
+-	major = UINT64_C(1) << (Insn >> 26);
+-	IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
+-	IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
+-	const bool try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
+-#else
+-	const bool try_dsp = true;
++	{
++		const uint64_t major = UINT64_C(1) << (Insn >> 26);
++		IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
++		IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
++		try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
++	}
+ #endif
+ 	if (IsGP64) {
+ 		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
 diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
 index 4b1738be..4f2e6db2 100644
 --- a/arch/Mips/MipsGenDirectDecoder.inc
