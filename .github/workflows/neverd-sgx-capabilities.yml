@@ -64,7 +64,7 @@ jobs:
   software:
     name: NeverD x86 software semantics / Linux x64
     runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    timeout-minutes: 320
     env:
       SCCACHE_GHA_ENABLED: 'true'
       NEVERD_THREADS: '1'
@@ -85,15 +85,32 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.14'
-      - name: Install the x64 tools and verify the NeverC package
+      - name: Check out the portable x64 NeverC revision under test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverC
+          ref: f3eb95aa50cd6e7d99082d783d2a515ff71cf87c
+          path: NeverC
+          persist-credentials: false
+      - name: Install the x64 build tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install --yes clang lld ninja-build qemu-user
+          sudo apt-get install --yes clang lld ninja-build
           git -C NeverD submodule update --init --depth 1 third_party/capstone third_party/unicorn
-          curl --fail --location --retry 3 --output neverc.zip https://github.com/NeverSight/NeverC/releases/download/v3389.1.4/neverc-linux-x64.zip
-          echo '60d17433b7a8f738e8dd34f4f0c6fc5b956b7ef51b115b8831739568f986fe64  neverc.zip' | sha256sum --check
-          unzip -q neverc.zip -d neverc
-          python neverd-sgx-capabilities/prepare_neverc.py --compiler neverc/bin/neverc --output compiler-check
+      - name: Build current NeverC for the portable x64 host ISA
+        working-directory: NeverC
+        run: |
+          cmake -S llvm -B build-portable -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DNEVERC_NATIVE_ARCH=OFF -DNEVERC_ENABLE_LTO=OFF -DNEVERC_INCLUDE_TESTS=OFF \
+            -DNEVERC_ENABLE_PYTHON_PLUGINS=OFF -DNEVERC_BUNDLE_PYTHON_RUNTIME=OFF \
+            -C neverc/cmake/caches/NeverC.cmake
+          cmake --build build-portable --parallel 4 --target neverc
+      - name: Verify the running x64 compiler and generated code
+        run: |
+          python neverd-sgx-capabilities/prepare_neverc.py --source NeverC --compiler NeverC/build-portable/bin/neverc --output compiler-check
           mkdir -p software-evidence
           cp compiler-check/compiler.json software-evidence/
       - name: Configure with the LLVM release pinned by NeverD
