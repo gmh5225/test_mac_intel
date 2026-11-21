@@ -1,7 +1,7 @@
-name: Verify RISC-V compressed printer admission and time real executables on four hosts
+name: Compare RISC-V printed alias lookup on three real ELF executables
 on:
   push:
-    branches: [codex/capstone-riscv-printer-decoded-width]
+    branches: [codex/capstone-riscv-printed-lookup]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: printer-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: printed-mnemonics-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
