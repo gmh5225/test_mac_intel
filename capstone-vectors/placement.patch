@@ -1,0 +1,15 @@
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 1629a36c..9b963751 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -2,6 +2,10 @@
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+ #ifdef CAPSTONE_HAS_X86
++/* Keep this optional static member out of the ordinary ELF decoder sections. */
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text=".cs_x86_i386_text" rodata=".cs_x86_i386_rodata"
++#endif
+ #include "../../cs_priv.h"
+ #include "X86ScanAdapter.h"
+ #if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \

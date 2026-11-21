@@ -100,36 +100,33 @@ def main(w):
             members=sp.check_output(['ar','t',libs[0]],text=True).splitlines()
             assert members.count(member)==1
             source=w/'object-original';source.write_bytes(sp.check_output(['ar','p',libs[0],member]))
-            folder=w/'sections';folder.mkdir();extra=folder/member
-            run(['objcopy','--rename-section','.text=.cs_x86_i386_text','--rename-section','.rodata=.cs_x86_i386_rodata',source,extra],'separate-sections')
-            alternate=folder/'libcapstone.a';shutil.copyfile(libs[0],alternate)
-            run(['ar','r',alternate,extra],'replace-member');run(['ranlib',alternate],'index-member')
-            assert sp.check_output(['ar','t',alternate],text=True).splitlines()==members
-            for name in members:
-                if name!=member:
-                    assert sp.check_output(['ar','p',libs[0],name])==sp.check_output(['ar','p',alternate,name]),name
-            clone=w/'run-sections';run(['clang++',obj,*opt,alternate,*libs[1:],'-o',clone],'link-sections')
+            def members_of(archive):
+                return {v:hashlib.sha256(sp.check_output(['ar','p',archive,v])).hexdigest()for v in sp.check_output(['ar','t',archive],text=True).splitlines()}
+            library=libs[0]
+            new_hashes=members_of(library)
+            run(['git','apply','-R','--index',r/'placement.patch'],'restore-prior-member',base)
+            assert sp.check_output(['git','write-tree'],cwd=base,text=True).strip()==data['prior_guard_tree']
+            run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-original-member')
+            old_hashes=members_of(library)
+            changed={k for k in new_hashes if new_hashes[k]!=old_hashes.get(k)}
+            assert changed=={member} and new_hashes.keys()==old_hashes.keys()
+            clone=w/'prior-layout';run(['clang++',obj,*opt,*libs,'-o',clone],'link-prior-layout')
             exe['sections']=clone;exe['private_sections']=clone
-            table=sp.check_output(['objdump','-h',clone],text=True)
-            assert all(name in table for name in ('.cs_x86_i386_text','.cs_x86_i386_rodata'))
-            save('section-factor.json',dict(member=member,position=members.index(member),total=len(members),default_member=sha(source),section_member=sha(extra),driver=sha(obj),unchanged_members=len(members)-1))
+            run(['git','apply','--index',r/'placement.patch'],'restore-private-sections',base)
+            assert sp.check_output(['git','write-tree'],cwd=base,text=True).strip()==data['trees']['i386']
+            run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-restored')
+            assert members_of(library)==new_hashes
+            table=sp.check_output(['objdump','-h',target],text=True)
+            for sec in ('.cs_x86_i386_text','.cs_x86_i386_rodata'):
+                assert sec in table and sec not in sp.check_output(['objdump','-h',clone],text=True)
+            base_layout=sections(exe['baseline']); private_layout=sections(target); old_layout=sections(clone)
+            displacements={k:{sym:layout['symbols'][sym]['address']-base_layout['symbols'][sym]['address'] for sym in ('cs_disasm_iter','X86_getInstruction','X86_Intel_printInst')} for k,layout in [('candidate',private_layout),('prior',old_layout)]}
+            save('source-placement.json',dict(displacements=displacements,compiled_new=new_hashes,compiled_old=old_hashes))
+            save('section-factor.json',dict(member=member,position=members.index(member),total=len(members),default_member=new_hashes[member],section_member=old_hashes[member],driver=sha(obj),unchanged_members=len(members)-1))
             save('linked-symbols.json',{k:sections(f)for k,f in [('published',exe['baseline']),('unreferenced',control),('private_member',target),('sections',clone)]})
             save('archive-extraction.json',dict(entry=definitions[0].strip(),linked_sha256=sha(target),unreferenced_sha256=sha(control),original_sha256=sha(exe['baseline']),ordinary_text={v:sha(w/(v+'-text')) for v in ['baseline','unreferenced']}))
 
         exe[label]=target
-    tested_archive=b/'libcapstone.a'
-    def archive_members():
-        return {name:hashlib.sha256(sp.check_output(['ar','p',tested_archive,name])).hexdigest() for name in sp.check_output(['ar','t',tested_archive],text=True).splitlines()}
-    current=archive_members()
-    run(['git','apply','-R','--index',r/'guard.patch'],'switch-to-old-guard',base)
-    assert sp.check_output(['git','write-tree'],text=True,cwd=base).strip()==data['prior_guard_tree']
-    run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'old-guard-objects')
-    old_objects=archive_members()
-    assert set(current)==set(old_objects)
-    save('guard-objects.json',dict(candidate=current,prior=old_objects,changed=[k for k in current if current[k]!=old_objects[k]],trees=[data['trees']['i386'],data['prior_guard_tree']]))
-    run(['git','apply','--index',r/'guard.patch'],'restore-candidate-guard',base)
-    run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'restore-static-objects')
-    assert archive_members()==current
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
     exe['private_base']=exe['baseline'];exe['private_i386']=exe['i386']
