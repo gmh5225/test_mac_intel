@@ -16,6 +16,7 @@ int main(int argc,char **argv){
  std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)),{});
  cs_arch arch=CS_ARCH_X86;cs_mode cm=bits==64?CS_MODE_64:CS_MODE_32;unsigned align=1;
  switch(bits){
+ case 106:arch=CS_ARCH_ARM;cm=CS_MODE_THUMB;align=2;break;
  case 101:arch=CS_ARCH_ARM;cm=CS_MODE_ARM;align=4;break;
  case 102:arch=CS_ARCH_AARCH64;cm=CS_MODE_LITTLE_ENDIAN;align=4;break;
  case 103:arch=CS_ARCH_MIPS;cm=CS_MODE_MIPS64;align=4;break;

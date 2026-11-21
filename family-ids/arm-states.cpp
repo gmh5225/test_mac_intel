@@ -42,6 +42,7 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
  }
  ++verified;
 }
+static const uint8_t mve[][4]={{65,254,2,47},{33,254,3,63},{113,254,130,239},{28,255,84,47}};
 int main(int argc,char**argv) {
  if(argc!=3)return 1;API a(argv[1]),b(argv[2]);
  for (unsigned bits : {0u,(unsigned)CS_MODE_BIG_ENDIAN,(unsigned)CS_MODE_V8,(unsigned)(CS_MODE_V8|CS_MODE_BIG_ENDIAN),(unsigned)CS_MODE_THUMB,(unsigned)(CS_MODE_THUMB|CS_MODE_BIG_ENDIAN),(unsigned)(CS_MODE_THUMB|CS_MODE_V8),(unsigned)(CS_MODE_THUMB|CS_MODE_V8|CS_MODE_BIG_ENDIAN),(unsigned)(CS_MODE_THUMB|CS_MODE_MCLASS),(unsigned)(CS_MODE_THUMB|CS_MODE_MCLASS|CS_MODE_BIG_ENDIAN)}) for(unsigned flags=0; flags<32; ++flags) {
@@ -54,6 +55,23 @@ int main(int argc,char**argv) {
       uint8_t bytes[2]={uint8_t(half),uint8_t(half>>8)};
       if(bits&CS_MODE_BIG_ENDIAN){uint8_t temp=bytes[0];bytes[0]=bytes[1];bytes[1]=temp;}
       compare(x,y,bytes,2,detail);
+      if (half>=0xe800) {
+        uint16_t lower=(uint16_t)(half*37u+11u);
+        uint8_t pair[]={bytes[0],bytes[1],(uint8_t)lower,(uint8_t)(lower>>8)};
+        if(bits&CS_MODE_BIG_ENDIAN){uint8_t tmp=pair[2];pair[2]=pair[3];pair[3]=tmp;}
+        for(unsigned n=3;n<=4;n++)compare(x,y,pair,n,detail);
+      }
+    }
+  }
+  if(bits&CS_MODE_THUMB){
+    const unsigned swap=(bits&CS_MODE_BIG_ENDIAN)?1:0;
+    for(const auto& item:mve){uint8_t sequence[4];for(unsigned j=0;j<4;j++)sequence[j^swap]=item[j];compare(x,y,sequence,4,detail);}
+    for(const auto& item:mve){
+      uint8_t code[4],it[2],mov[2];
+      it[swap]=0x0c;it[1^swap]=0xbf;mov[swap]=0x08;mov[1^swap]=0x46;
+      for(unsigned j=0;j<4;j++)code[j^swap]=item[j];
+      compare(x,y,it,2,detail);compare(x,y,code,4,detail);compare(x,y,mov,2,detail);
+      for(unsigned n=0;n<=4;n++)compare(x,y,code,n,detail);
     }
   }
   for(unsigned i=0;i<65536;++i){
