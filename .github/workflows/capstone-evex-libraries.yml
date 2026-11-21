@@ -1,7 +1,7 @@
-name: Measure direct width-specific public iterator dispatch in static and ordinary links
+name: Measure public text at the full-decode call site and verify scan machine code
 on:
   push:
-    branches: [codex/capstone-public-width-iterators]
+    branches: [codex/capstone-full-site-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: full-site-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
