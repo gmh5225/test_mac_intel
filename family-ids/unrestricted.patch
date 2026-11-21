@@ -1,0 +1,15 @@
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 551c7d06..ef44825e 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -459,6 +459,10 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	}
+ #endif
+ #ifndef CAPSTONE_DIET
++	/* Mips_init_cs_detail cleared the ID before decode. Only the
++	 * alias printer can give this instruction a mnemonic to resolve. */
++	if (!MCInst_isAlias(MI))
++		return;
+ #ifdef CAPSTONE_USE_ALIAS_TRIE
+ 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+ 			ARR_SIZE(insn_alias_mnem_map), alias_trie);

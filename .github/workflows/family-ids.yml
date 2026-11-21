@@ -1,7 +1,7 @@
-name: Check MIPS alias lookup against every initialized slot and real cross-architecture controls
+name: Verify MIPS alias call scoping with measured reference binaries and native targets
 on:
   push:
-    branches: [codex/capstone-mips-printed-alias-profiles]
+    branches: [codex/capstone-isolated-mips-printed-alias]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-printed-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: isolated-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
