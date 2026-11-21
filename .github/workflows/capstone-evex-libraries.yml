@@ -1,7 +1,7 @@
-name: Benchmark public and private AMD64 bare vector clears against published Capstone and iced
+name: Compare corrected x86 register details and bare vector clears to the iced fork
 on:
   push:
-    branches: [codex/capstone-vector-clear-writer-native]
+    branches: [codex/capstone-corrected-vector-native]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-clear-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: corrected-vector-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
