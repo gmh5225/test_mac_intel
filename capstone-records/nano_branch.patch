@@ -1,7 +1,16 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..e9eb4d83 100644
+index d57235c9..13495c2f 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
+@@ -33,7 +33,7 @@
+ #include "../../MathExtras.h"
+ #include "../../MCInstPrinter.h"
+ #include "../../MCDisassembler.h"
+-#include "../../MCRegisterInfo.h"
++#include "MipsDisassembler.h"
+ #include "../../MCFixedLenDisassembler.h"
+ #include "../../cs_priv.h"
+ #include "../../utils.h"
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
  	case Mips_FeatureNanoMips:
  		return mode & (CS_MODE_NANOMIPS | CS_MODE_NMS1 | CS_MODE_I7200);
@@ -11,59 +20,68 @@ index d57235c9..e9eb4d83 100644
  	case Mips_FeatureTLB:
  		return mode & CS_MODE_I7200;
  	case Mips_FeatureCnMips:
-@@ -228,10 +228,13 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
+@@ -1474,20 +1474,19 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		goto DecodeStandard;
  	}
- }
- 
--#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
--	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
-+#if defined(__linux__) && defined(__x86_64__) && defined(__GNUC__) && \
-+	!defined(__clang__)
-+#define CAPSTONE_MIPS_STANDARD_ENTRY
-+#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
- #define CAPSTONE_MIPS_PRIMARY_DISPATCH
  #endif
-+#endif
+-	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
+-	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
+-	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
+-	bool IsMips64r6 = Mips_getFeatureBits(mode, Mips_FeatureMips64r6);
+-	bool IsMips2 = Mips_getFeatureBits(mode, Mips_FeatureMips2);
+-	bool IsMips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
+-	bool IsCnMips = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
+-	bool IsCnMipsP = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
+-	IsFP64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
+-	IsGP64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
+-	bool IsPTR64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
+-	// Only present in MIPS-I and MIPS-II
+-	bool HasCOP3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
+-		       !Mips_getFeatureBits(mode, Mips_FeatureMips3);
++	const MipsDecoderState *state = Instr->csh->getinsn_info;
++	const bool IsMicroMips = state->micro;
++	const bool IsNanoMips = state->nano;
++	const bool IsMips32r6 = state->mips32r6;
++	const bool IsMips64r6 = state->mips64r6;
++	const bool IsMips2 = state->mips2;
++	const bool IsMips16 = state->mips16;
++	const bool IsCnMips = state->octeon;
++	const bool IsCnMipsP = state->octeon_plus;
++	IsFP64 = state->fp64;
++	IsGP64 = state->gp64;
++	const bool IsPTR64 = state->ptr64;
++	const bool HasCOP3 = state->cop3;
  
- static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 				   const uint8_t *Bytes, size_t BytesLen,
-@@ -1457,8 +1460,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 	cs_mode mode = Instr->csh->mode;
- 	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
- 	bool IsGP64, IsFP64;
--#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
--	uint64_t major;
-+	bool try_dsp = true;
-+#ifdef CAPSTONE_MIPS_STANDARD_ENTRY
- 	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
- 	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64 ||
- 	    isa == CS_MODE_MIPS32R2 || isa == CS_MODE_MIPS64R2) {
-@@ -1707,16 +1710,18 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 			return Result;
- 	}
+ 	if (IsNanoMips) {
+ 		uint64_t Insn2;
+diff --git a/arch/Mips/MipsDisassembler.h b/arch/Mips/MipsDisassembler.h
+index 3c9c2c89..b3734ba7 100644
+--- a/arch/Mips/MipsDisassembler.h
++++ b/arch/Mips/MipsDisassembler.h
+@@ -8,6 +8,23 @@
+ #include "../../MCInst.h"
+ #include "../../MCRegisterInfo.h"
  
--#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
-+#ifdef CAPSTONE_MIPS_STANDARD_ENTRY
- DecodeStandard:
-+#endif
-+#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
- 	/* A primary-opcode miss in these generated tables reaches Fail before
- 	 * any predicate, operand reader, or instruction state change. */
--	major = UINT64_C(1) << (Insn >> 26);
--	IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
--	IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
--	const bool try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
--#else
--	const bool try_dsp = true;
-+	{
-+		const uint64_t major = UINT64_C(1) << (Insn >> 26);
-+		IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
-+		IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
-+		try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
-+	}
- #endif
- 	if (IsGP64) {
- 		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
++/* The register metadata is also passed to the instruction printer. */
++typedef struct MipsDecoderState {
++	MCRegisterInfo registers;
++	bool micro;
++	bool nano;
++	bool mips32r6;
++	bool mips64r6;
++	bool mips2;
++	bool mips16;
++	bool octeon;
++	bool octeon_plus;
++	bool fp64;
++	bool gp64;
++	bool ptr64;
++	bool cop3;
++} MipsDecoderState;
++
+ void Mips_init(MCRegisterInfo *MRI);
+ 
+ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature);
 diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
 index 4b1738be..4f2e6db2 100644
 --- a/arch/Mips/MipsGenDirectDecoder.inc
@@ -126,6 +144,68 @@ index d9b11486..57730020 100644
    }
  }
  
+diff --git a/arch/Mips/MipsModule.c b/arch/Mips/MipsModule.c
+index e774efa0..69135b4c 100644
+--- a/arch/Mips/MipsModule.c
++++ b/arch/Mips/MipsModule.c
+@@ -9,19 +9,42 @@
+ #include "../../MCRegisterInfo.h"
+ #include "../../cs_priv.h"
+ #include "MipsMapping.h"
++#include "MipsDisassembler.h"
++#define GET_SUBTARGETINFO_ENUM
++#include "MipsGenSubtargetInfo.inc"
++
++static void setMode(cs_struct *handle, cs_mode mode)
++{
++	MipsDecoderState *state = handle->getinsn_info;
++	handle->mode = mode;
++	state->micro = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
++	state->nano = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
++	state->mips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
++	state->mips64r6 = Mips_getFeatureBits(mode, Mips_FeatureMips64r6);
++	state->mips2 = Mips_getFeatureBits(mode, Mips_FeatureMips2);
++	state->mips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
++	state->octeon = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
++	state->octeon_plus = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
++	state->fp64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
++	state->gp64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
++	state->ptr64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
++	state->cop3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
++		      !Mips_getFeatureBits(mode, Mips_FeatureMips3);
++}
++
+ 
+ cs_err Mips_global_init(cs_struct *ud)
+ {
+-	MCRegisterInfo *mri;
+-	mri = cs_mem_malloc(sizeof(*mri));
+-	if (!mri)
++	MipsDecoderState *state = cs_mem_malloc(sizeof(*state));
++	if (!state)
+ 		return CS_ERR_MEM;
+ 
+-	Mips_init_mri(mri);
++	Mips_init_mri(&state->registers);
+ 
+ 	ud->printer = Mips_printer;
+-	ud->printer_info = mri;
+-	ud->getinsn_info = mri;
++	ud->printer_info = &state->registers;
++	ud->getinsn_info = state;
++	setMode(ud, ud->mode);
+ 	ud->reg_name = Mips_reg_name;
+ 	ud->insn_id = Mips_get_insn_id;
+ 	ud->insn_name = Mips_insn_name;
+@@ -39,7 +62,7 @@ cs_err Mips_option(cs_struct *handle, cs_opt_type type, size_t value)
+ {
+ 	switch (type) {
+ 	case CS_OPT_MODE:
+-		handle->mode = (cs_mode)value;
++		setMode(handle, (cs_mode)value);
+ 		break;
+ 	case CS_OPT_SYNTAX:
+ 		handle->syntax |= (int)value;
 diff --git a/suite/auto-sync/inc_patches/Mips/01_nanomips_branch_predicate.patch b/suite/auto-sync/inc_patches/Mips/01_nanomips_branch_predicate.patch
 new file mode 100644
 index 00000000..697de559
@@ -152,7 +232,7 @@ index 00000000..697de559
 ++    return (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && !Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNMS1));
 +   }
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..96916ef0 100644
+index c94daecb..e9961315 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 @@ -2102,7 +2102,7 @@
@@ -162,6 +242,15 @@ index c94daecb..96916ef0 100644
 -      "old_hash": "2b6439bb0b486d29ff80b9d798e14de27cb3e9ef8d5c76c90c2535f1a82dfa0f",
 +      "old_hash": "5081d3616c4afa88fb11549dd2acbbf9d1a1e2627ff7e215380d7bb27499de16",
        "new_hash": "",
+       "edit": ""
+     },
+@@ -2120,7 +2120,7 @@
+     },
+     "getInstruction": {
+       "apply_type": "OLD",
+-      "old_hash": "52fc65a707feef93d6bd7c7c6f55851d2c93be45650efe21fe031b8928f2eb4c",
++      "old_hash": "36124d64543609e48fd0e7afbc858b14352d3b445e612b77ca10d8583a3ca108",
+       "new_hash": "aca77782b4160891075cb2f890401385cde140c255d109d1ed08c693f2cc10ba",
        "edit": ""
      },
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
@@ -261,3 +350,57 @@ index 00000000..ccbbb254
 +	       failures);
 +	return failures != 0;
 +}
+diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
+index d04a63ce..7bd8d2a4 100644
+--- a/tests/unit/mips_scan.c
++++ b/tests/unit/mips_scan.c
+@@ -157,8 +157,49 @@ done:
+ 	return ok;
+ }
+ 
++static bool check_mode_changes(void)
++{
++	static const cs_mode modes[] = {
++		CS_MODE_MIPS64R6 | CS_MODE_MIPS_PTR64, CS_MODE_MICRO,
++		CS_MODE_NMS1, CS_MODE_MIPS16, CS_MODE_I7200,
++		CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN, CS_MODE_NANOMIPS,
++		CS_MODE_MIPS64R2, CS_MODE_OCTEONP, CS_MODE_MIPS32,
++	};
++	csh handles[2] = { 0 };
++	bool ok = false;
++	if (cs_open(CS_ARCH_MIPS, CS_MODE_MIPS32, &handles[0]))
++		return false;
++	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i) {
++		const cs_mode mode = modes[i];
++		if (cs_option(handles[0], CS_OPT_MODE, mode) ||
++		    cs_open(CS_ARCH_MIPS, mode, &handles[1]))
++			goto done;
++		for (unsigned k = 0; k < 2; ++k)
++			if (cs_option(handles[k], CS_OPT_DETAIL, CS_OPT_ON))
++				goto done;
++		for (unsigned major = 0; major < 64; ++major)
++			for (unsigned reg = 0; reg < 32; ++reg) {
++				const uint32_t word = (major << 26) |
++					(reg << 16) | (reg << 11) | reg;
++				if (!compare(handles, word,
++					     (mode & CS_MODE_BIG_ENDIAN) != 0,
++					     4, false))
++					goto done;
++			}
++		cs_close(&handles[1]);
++	}
++	ok = true;
++done:
++	if (handles[1])
++		cs_close(&handles[1]);
++	cs_close(&handles[0]);
++	return ok;
++}
++
+ int main(void)
+ {
++	if (!check_mode_changes())
++		return 1;
+ 	const cs_mode modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64,
+ 				  CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN,
+ 				  CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN };

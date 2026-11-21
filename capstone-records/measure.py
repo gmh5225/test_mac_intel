@@ -58,23 +58,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
             symbols=sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines()
             keep={'Mips_getFeatureBits','Mips_LLVM_getInstruction','RISCV_getInstruction','RISCV_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','cs_decode_full_insn','cs_disasm_iter','Mips_getInstruction','Mips_get_insn_id'}
             (out/(label+'-symbols.txt')).write_text('\n'.join(line for line in symbols if line.split()[-1] in keep)+'\n')
-        import shlex
-        file=s/'arch/Mips/MipsDisassembler.c';saved=file.read_bytes()
-        entry,=[c for c in json.loads((b/'compile_commands.json').read_text())if c['file']==str(file)]
-        args=shlex.split(entry['command']);out_index=args.index('-o')+1
-        comp={}
-        try:
-            for label,src in [('correction',(r/'corrected-mips.c').read_bytes()),('candidate',saved)]:
-                file.write_bytes(src);dest=t/(label+'.o');args[out_index]=str(dest)
-                run(args,'feature-code-'+label,entry['directory']);comp[label]=sha(dest)
-            if cc=='gcc':assert comp['candidate']!=comp['correction']
-            else:assert comp['candidate']==comp['correction'],comp
-            write('compiler-object-controls',comp)
-        finally:file.write_bytes(saved)
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
-        assert changed==['arch/Mips/MipsDisassembler.c.o'],changed
+        assert {'arch/Mips/MipsModule.c.o','arch/Mips/MipsDisassembler.c.o'}<=set(changed) and all(k.startswith('arch/Mips/') for k in changed),changed
         run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'check-generated-direct')
         targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','mips_nanomips_branch']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
