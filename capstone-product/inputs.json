@@ -1,16 +1,26 @@
 {
-  "neverd": "7736edfaaf5fcd64b094917d99eb9bcf48bf7064",
-  "capstone": "09ba26d9848f4ad0920ad0ef5feb512899fabe6c",
+  "neverd": "0466a656eb88a8edbdf70c142c7c4f7e551e030d",
+  "capstone": "68120b496a66ebf73a0b88247146a21620d86a63",
   "variants": {
-    "iterator32": {
-      "tree": "4abbab27c845ca2752ad3279c185f92a636b2d30",
-      "patch": "iterator32.patch",
-      "patch_sha256": "86dd1498cf4abc00f8adb9210e63ea7d9aac48cbdd680a90720f9bd5b83b7d69"
-    },
-    "immediate32": {
+    "direct32": {
       "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
-      "patch": "immediate32.patch",
-      "patch_sha256": "2435142340000dd2bd55ede226de18705a8cab585e0a4bdd2984de290810993d"
+      "neverd_tree": "a9f4e7ad1526dd6301c8e0ea68443ccf1c5eb90c",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "3c13b57d4d2c56cab1d6d92b82e9eba132839ddc",
+        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
+      },
+      "patch": "direct32.patch",
+      "patch_sha256": "25e909344af90cc0291252f07619f9f466bab45cfcf4947663922e85fcf3c921"
+    },
+    "by_mode": {
+      "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
+      "neverd_tree": "5e2b8b35ae82e5a67a79f7b95aaddd47453ab20d",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "1db0fb54c5f18f1152b8a4a67243a20223d14a9a",
+        "include/neverd/decode/Decoder.h": "dfa9937294b6d299f524c3f910dc3da6a3b10308"
+      },
+      "patch": "by_mode.patch",
+      "patch_sha256": "ddeaeffe030a463120f2eea1abcade18b9050eff6e9a12da89327e04f65a4343"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -18,24 +28,11 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Source-built NeverD on the identical C++ caller. Compare static i386 output with and without ordinary memory-immediate MOV; include the GCC private-header fixes in both variants.",
-  "parent": "a64a279d908030e2c2caa867eda43a572c3433e9",
-  "integration": {
-    "path": "lib/decode/Decoder.cpp",
-    "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
-    "candidate": "54c52cd7985d69ecbfe1063f1c1ebf19c38c55a5",
-    "sha256": "3e03d30385e47a1b02900479ad128f224e5c64f8e3be5ed21525748233e51008"
-  },
-  "build_options": {
-    "path": "CMakeLists.txt",
-    "base": "f7a7b6dccb8f8c4f1faeaeb69432740ea32bce99",
-    "candidate": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
-    "sha256": "6cc96bcfb3f680032be4bf6dd1e146b7e5a913d09045452d17ce0e27f6ab05de"
-  },
-  "branch_integration": {
-    "path": "lib/decode/Decoder.cpp",
-    "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
-    "candidate": "117d607d198648c6bb611276475554da2246f5c9",
-    "sha256": "a6707021fca71b079c1971cbbe9d9c6a02faacc304b646faafa5592c883be526"
+  "scope": "Same released Capstone archive in all variants. Compare a direct text wrapper with selection of the original 64-bit or specialized 32-bit iterator when the NeverD decoder opens.",
+  "parent": "085b9952c98d08d00562a45e6c2ad3f1c00b05d3",
+  "build_blob": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
+  "base_blobs": {
+    "lib/decode/Decoder.cpp": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
+    "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
   }
 }

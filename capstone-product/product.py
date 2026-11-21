@@ -76,22 +76,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
-    command(['git','apply',change],'apply-'+label,cs)
-   info=expected['branch_integration' if label=='caller_branch' else 'integration'];path=nd/info['path']
-   if label!='base':
-    patch=r/('neverd-i386-branch.patch' if label=='caller_branch' else 'neverd-i386.patch')
-    assert hashlib.sha256(patch.read_bytes()).hexdigest()==info['sha256']
-    command(['git','apply',patch],'apply-neverd-'+label,nd)
-    policy=r/'build-options.patch'
-    assert hashlib.sha256(policy.read_bytes()).hexdigest()==expected['build_options']['sha256']
-    command(['git','apply',policy],'policy-'+label,nd)
-   original_cmake=cm.read_text().split('\nadd_executable(capstone-product capstone-product.cpp)',1)[0]
-   policy_oid=sp.check_output(['git','hash-object','--stdin'],input=original_cmake.encode()).decode().strip()
-   assert policy_oid==expected['build_options']['base' if label=='base' else 'candidate']
-   write(label+'-build-policy',dict(blob=policy_oid))
-   live=sp.check_output(['git','hash-object',path],text=True).strip()
-   assert live==info['base' if label=='base' else 'candidate']
-   write(label+'-decoder-source',dict(path=info['path'],blob=live))
+    command(['git','apply',change],'apply-neverd-'+label,nd)
+   policy=cm.read_text().split('\nadd_executable(capstone-product capstone-product.cpp)',1)[0]
+   assert sp.check_output(['git','hash-object','--stdin'],input=policy.encode()).decode().strip()==expected['build_blob']
+   live={p:sp.check_output(['git','hash-object',nd/p],text=True).strip() for p in expected['base_blobs']}
+   assert live==(expected['base_blobs'] if label=='base' else variants[label]['blobs'])
+   write(label+'-decoder-source',dict(blobs=live,blob=live['lib/decode/Decoder.cpp']))
    targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
@@ -104,9 +94,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     entry,=entries
     args=shlex.split(entry['command'])
     policies[name]=[a for a in args if a in ('-fomit-frame-pointer','-O3','-DNDEBUG') or 'discard' in a]
-   assert len(policies)==(1 if label=='base' else 2)
+   assert len(policies)==2
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
-   if label!='base':assert policies['X86Vex32Output.c']==policies['X86OutputIterator.c']
+   assert policies['X86Vex32Output.c']==policies['X86OutputIterator.c']
    write(label+'-compile-policy',policies)
    import struct
    target=build/'lib/decode/CMakeFiles/NeverDDecode.dir/Decoder.cpp.o'
@@ -198,18 +188,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    write(label+'-archive-members',dict(members=members,ignored_orphan_objects=sorted(set(disk)-set(active))))
    objects={key:hashlib.sha256(path.read_bytes()).hexdigest() for key,path in active.items()};write(label+'-objects',objects)
    if label!='base':
-    base_objects=json.loads((out/'base-objects.json').read_text())
-    new_files=sorted(set(objects)-set(base_objects))
-    changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
-    write(label+'-capstone-objects',dict(added=new_files,changed=changed))
-    assert {Path(k).name for k in new_files}=={'X86Vex32Output.c.o'}
-    before=base_objects
-    write(label+'-retained-objects',dict(changed=changed,prior=len(before),additional=new_files))
-    assert set(changed)<=({'arch/Mips/MipsDisassembler.c.o'} if label=='combined' else set())|{k for k in base_objects if k.startswith('arch/X86/')},changed
-    if label=='combined':assert 'arch/Mips/MipsDisassembler.c.o' in changed
-    assert members[-1]=='X86Vex32Output.c.o' and len(new_files)==1
-    sym=(out/('timed-symbols-'+label+'.log')).read_text()
-    assert any(line.endswith(' X86_disasmIter32') for line in sym.splitlines())
+    assert objects==json.loads((out/'base-objects.json').read_text())
+   assert 'X86Vex32Output.c.o' in members
+   sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
+   assert any(line.endswith(' X86_disasmIter') for line in sym)
+   assert any(line.endswith(' X86_disasmIter32') for line in sym)==(label!='base')
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
@@ -220,8 +203,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    command(['git','reset','--hard',ref],'restore-'+label,cs)
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
    if label!='base':
-    command(['git','apply','-R',r/'build-options.patch'],'restore-policy-'+label,nd)
-    command(['git','restore','--',info['path']],'restore-neverd-'+label,nd)
+    command(['git','restore','--',*expected['base_blobs']],'restore-neverd-'+label,nd)
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
   write('products',identities)

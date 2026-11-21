@@ -1,0 +1,52 @@
+diff --git a/include/neverd/decode/Decoder.h b/include/neverd/decode/Decoder.h
+index e89dd0cc31..dfa9937294 100644
+--- a/include/neverd/decode/Decoder.h
++++ b/include/neverd/decode/Decoder.h
+@@ -431,6 +431,7 @@ private:
+   std::unique_ptr<ARMLifter> ARM;
+   std::unique_ptr<AArch64Lifter> AArch64;
+   std::unique_ptr<MIPSLifter> MIPS;
++  decltype(&cs_disasm_iter) X86TextIterator = nullptr;
+ };
+ 
+ } // namespace neverd
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index 8c4e4e839b..1db0fb54c5 100644
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -113,6 +113,7 @@ bool Decoder::initWithMIPSRevision(Arch TheArch, InstructionMode Mode,
+   cs_arch CsArch;
+   cs_mode CsMode;
+   std::unique_ptr<X86Lifter> NewX86;
++  decltype(&cs_disasm_iter) NewX86TextIterator = nullptr;
+   std::unique_ptr<ARMLifter> NewARM;
+   std::unique_ptr<AArch64Lifter> NewAArch64;
+   std::unique_ptr<MIPSLifter> NewMIPS;
+@@ -122,6 +123,8 @@ bool Decoder::initWithMIPSRevision(Arch TheArch, InstructionMode Mode,
+   case Arch::X86:
+     CsArch = CS_ARCH_X86;
+     CsMode = decoder_detail::x86HandleMode(TheArch);
++    NewX86TextIterator =
++        TheArch == Arch::X86 ? X86_disasmIter32 : X86_disasmIter;
+     NewX86 = std::make_unique<X86Lifter>(TheArch);
+     NewX86->setStrict(Strict);
+     break;
+@@ -220,6 +223,7 @@ bool Decoder::initWithMIPSRevision(Arch TheArch, InstructionMode Mode,
+   Detail = true;
+   Text = true;
+   X86 = std::move(NewX86);
++  X86TextIterator = NewX86TextIterator;
+   ARM = std::move(NewARM);
+   AArch64 = std::move(NewAArch64);
+   MIPS = std::move(NewMIPS);
+@@ -383,8 +387,8 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+   const uint8_t *Code = Bytes;
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+-  if (Text && X86) {
+-    if (X86_disasmIter(Handle, &Code, &Remaining, &PC, InsnBuf))
++  if (Text && X86TextIterator) {
++    if (X86TextIterator(Handle, &Code, &Remaining, &PC, InsnBuf))
+       return true;
+   } else if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf)) {
+     return true;
