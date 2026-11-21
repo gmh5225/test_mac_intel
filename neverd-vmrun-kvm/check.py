@@ -74,7 +74,12 @@ def run_guest(directory, guest, runner, kvm_fd):
             diagnostic.append(line)
     observed_rcx = any(event["event"] == "after_vmexit" and event["rcx"] == "0x5678"
                        and event["vmcb_exit"] == "0x81" for event in trace)
-    completed = observed_rcx and run.returncode == 33 and console.splitlines() == guest["expected_console"]
+    mapped_addr32 = (guest["vmcb_input"] == "mapped" and
+                     any(event["event"] == "before_addr32" and
+                         int(event["rax"], 0) == int(guest["vmcb"], 0)
+                         for event in trace))
+    completed = (observed_rcx and run.returncode == 33 and
+                 console.splitlines() == guest["expected_console"] and mapped_addr32)
     tagged_rax = 0xfedcba9800000000 | int(guest["vmcb"], 0)
     tagged_fault = (guest["vmcb_input"] == "tagged" and run.returncode == 1 and
                     (guest["route"] != "original" or observed_rcx) and
@@ -82,6 +87,7 @@ def run_guest(directory, guest, runner, kvm_fd):
                         and event["error"] == "0" and event["bytes"] == "670f01d8"
                         and int(event["rax"], 0) == tagged_rax for event in trace))
     return dict(receipt, return_code=run.returncode, completed=completed,
+                mapped_addr32_observed=mapped_addr32,
                 tagged_addr32_gp=tagged_fault,
                 completed_contexts=guest["contexts"] if completed else 0, console=console,
                 diagnostic="\n".join(diagnostic), trace=trace, observed_original_rcx=observed_rcx)
