@@ -28,7 +28,7 @@ def main(w):
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True),machine=platform.machine(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs')))
-    save('entrypoints.json',dict(integer='X86_disasmIter',route='X86_disasmIter32',vector='X86_disasmIter32',detail='cs_regs_access plus complete text and operand consumption'))
+    save('entrypoints.json',dict(integer='X86_disasmIter',route='X86_disasmIter32',vector='X86_disasmIterText',generic_='X86_disasmIter',narrow__='X86_disasmIter32',wide____='X86_disasmIterText',detail='cs_regs_access plus complete text and operand consumption'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -40,6 +40,10 @@ def main(w):
     inc=inc.replace(key,'extern "C" bool selected(csh, const uint8_t **, size_t *, uint64_t *, cs_insn *);\n'+key)
     key='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert inc.count(key)==1
     inc=inc.replace(key,key.replace('cs_disasm_iter','selected'))
+    decl='extern "C" bool selected('
+    inc=inc.replace(decl,'extern "C" void choose_entry(const char *);'+chr(10)+decl)
+    assert inc.count(old_engine)==1
+    inc=inc.replace(old_engine,old_engine+chr(10)+'  choose_entry(engine.c_str()); if(engine=="generic_" || engine=="narrow__" || engine=="wide____") engine="capstone";')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
@@ -61,7 +65,7 @@ def main(w):
         run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
-        roots=[objroot,objroot.parent/'capstone_x86_iter32.dir']
+        roots=[objroot,objroot.parent/'capstone_x86_iter32.dir',objroot.parent/'capstone_x86_iter64.dir']
         members=[q for q in sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines() if q.endswith('.o')]
         active={f.name:f for root in roots for f in root.rglob('*.o') if f.name in members}
         assert len(set(members))==len(active)==len(members)>30
@@ -69,13 +73,14 @@ def main(w):
         shutil.copyfile(b/'libcapstone.dylib',w/(label+'.so'))
         if label!='integer':
             before=objects['integer'];added=sorted(objects[label].keys()-before.keys())
-            assert added==['X86Vex32Output.c.o']
+            assert added==(['X86Vex32Output.c.o'] if label=='route' else ['X86Sse64Output.c.o','X86Vex32Output.c.o'])
             changed=[k for k in before if before[k]!=objects[label][k]]
             save(label+'-object-isolation.json',dict(changed=changed,added=added,unchanged=len(before)-len(changed),shared_identical=sha(w/'integer.so')==sha(w/(label+'.so'))))
         save('object-digests.json',objects)
-        adapter=w/'select.c';selected='X86_disasmIter' if label=='integer' else 'X86_disasmIter32'
+        adapter=w/'select.c';selected={'integer':'X86_disasmIter','route':'X86_disasmIter32','vector':'X86_disasmIterText'}[label]
         adapter.write_text(chr(10).join((
             '#include <capstone/capstone.h>',
+            'void choose_entry(const char *label){(void)label;}',
             'extern bool '+selected+'(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);',
             'bool selected(csh h,const uint8_t **c,size_t *n,uint64_t *ip,cs_insn *i){return '+selected+'(h,c,n,ip,i);}',
             '')))
@@ -88,6 +93,14 @@ def main(w):
         else:assert sha(obj)==consumer_hash
         save('consumer-object.json',dict(sha256=consumer_hash,all_variants_identical=True))
         target=w/('run-'+label);run(['clang++',obj,w/'select.o',b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        if label=='vector':
+            shared=w/'all-entries.c'
+            shutil.copyfile(r/'all-entries.c',shared)
+            obj2=w/'all-entries.o';run(['clang','-Werror','-O3','-I',tree/'include','-c',shared,'-o',obj2],'shared-select')
+            binary=w/'all-entries'
+            run(['clang++',obj,obj2,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',binary],'shared-link')
+            exe['generic_']=exe['narrow__']=exe['wide____']=binary
+            save('identical-image.json',dict(sha256=sha(binary),selectors=['generic_','narrow__','wide____'],driver=sha(obj),selector=sha(obj2)))
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
@@ -97,7 +110,7 @@ def main(w):
             run([w/test,w/'integer.so',w/(label+'.so')],test+'-'+label)
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
-    assert payloads['integer']==payloads['aa']
+    assert payloads['integer']==payloads['aa'] and payloads['generic_']==payloads['narrow__']==payloads['wide____']
     image=w/'common-command'
     launches=['images','same-argv']
     save('launch-controls.json',dict(launches=launches,aslr='system default',original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},equal_length_engine_selectors=True))
@@ -121,7 +134,7 @@ def main(w):
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
             for mode in (0,1,2):
                 def measure(lib,n,launch):
-                    tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
+                    tail=[lib+'____' if lib in ('iced','fast') else lib if lib in ('wide____','generic_','narrow__') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
                     if launch=='images':
                         command=[str(exe[lib]),*tail];executable=None
                     elif launch=='same-argv':
@@ -129,7 +142,7 @@ def main(w):
                     else:raise ValueError(launch)
                     return list(map(int,sp.check_output(command,executable=executable).split()))
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','route','vector','iced']+(['fast'] if mode else [])
+                cycles={launch:[]for launch in launches};labels=['integer','aa','route','vector','generic_','narrow__','wide____','iced']+(['fast'] if mode else [])
                 for i in range(9):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:

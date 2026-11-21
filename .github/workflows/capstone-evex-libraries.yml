@@ -1,7 +1,7 @@
-name: Measure the NeverD i386 iterator on Intel and Apple silicon against both iced formatters
+name: Isolate x86 text dispatch and SSE formatting with three entries in the same Mac executable
 on:
   push:
-    branches: [codex/capstone-darwin-i386-output]
+    branches: [codex/capstone-darwin-x86-three-entry-image]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: darwin-i386-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: darwin-three-entries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
