@@ -1,7 +1,7 @@
-name: Check the AArch64 vector arrangement parser in seven builds and real PE and multiarch ELF workloads
+name: Recheck unchanged PowerPC code and real AArch64 details using identical shared libraries
 on:
   push:
-    branches: [codex/capstone-aarch64-arrangement-profiles]
+    branches: [codex/capstone-aarch64-ppc-image-control]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: full }
           - { host: ubuntu-24.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: gcc, flavor: full }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
-          - { host: ubuntu-24.04, cc: clang, flavor: intel }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: aarch64-forward-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: arm-ppc-images-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

@@ -79,6 +79,7 @@ try:
         raw=corpus.prepare(r,tmp,obs,run)
         names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}
         maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
+        maps.update({'ppc64el-cp':104,'ppc64el-sort':104,'libjpeg-arm64':102});names.update(('ppc64el-cp','ppc64el-sort','libjpeg-arm64'))
         other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
         assert len(other_cases)==len(names)
         for arch in ('arm','aarch64','ppc','riscv','mips'):
@@ -98,10 +99,17 @@ try:
             with target.open('wb') as o:o.write(inputs[k])
             return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
         timing=[]
-        for name,bits,path,ip in panels[2:]+other_cases:
-            for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
-                for i in range(7):
+        from placement import inspect
+        identities={key:sha(v)for key,v in libs.items()}
+        expected=json.loads((r/'inputs.json').read_text())['sha']
+        expected=expected['24.04-arm-clang-full' if platform.machine()=='aarch64' else '24.04-clang-full']
+        assert identities==expected,(identities,expected)
+        write('placement',dict(identities=identities,routines={k:inspect(path)for k,path in libs.items()}))
+        for name,bits,path,ip in other_cases:
+            if name not in ('ppc64el-ls','ppc64el-cp','ppc64el-sort','arm64-ls','libjpeg-arm64'):continue
+            for mode in ((0,1,2) if name.startswith("ppc64el-") else (2,)):
+                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(70e6/first[0]));cycles=[]
+                for i in range(19):
                     keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
                         v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
