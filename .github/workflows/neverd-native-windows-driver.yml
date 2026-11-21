@@ -1,4 +1,4 @@
-name: NeverD native Windows ARM64 driver validation
+name: NeverD native Windows driver and entry validation
 on:
   push:
     branches: [codex/neverd-windows-native-20261120]
@@ -84,3 +84,50 @@ jobs:
           path: evidence
           if-no-files-found: error
           retention-days: 14
+
+  x64-entry:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: amd64
+      - name: Observe the fourth Windows x64 argument across a CPU-query call
+        shell: pwsh
+        working-directory: entry-x64
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $expected = Get-Content inputs.json | ConvertFrom-Json
+          foreach ($f in @('high.c','llvm.c','consume.c')) {
+            if ((Get-FileHash $f).Hash.ToLower() -ne $expected.source_sha256.$f) { throw "source mismatch $f" }
+          }
+          foreach ($name in @('forward','capture')) {
+            clang --target=x86_64-pc-windows-msvc -c "$name.S" -o "$name.obj"
+            if ($LASTEXITCODE) { throw "assemble $name" }
+          }
+          clang-cl --target=x86_64-pc-windows-msvc /nologo /O2 /c consume.c /Foconsume.obj
+          if ($LASTEXITCODE) { throw 'original callee' }
+          lld-link /subsystem:console /entry:forward_4 /export:forward_4 /export:read_cpu_leaf /export:consume_four /nodefaultlib /out:fixture.exe forward.obj consume.obj
+          if ($LASTEXITCODE) { throw 'original fixture link' }
+          $pe = [IO.File]::ReadAllBytes("$PWD/fixture.exe")
+          $nt = [BitConverter]::ToInt32($pe, 60)
+          $section = $nt + 24 + [BitConverter]::ToUInt16($pe, $nt + 20)
+          $size = [BitConverter]::ToInt32($pe, $section + 8)
+          $offset = [BitConverter]::ToInt32($pe, $section + 20)
+          $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]$pe[$offset..($offset+$size-1)])).ToLower()
+          if ($hash -ne $expected.text_sha256 -or $size -ne $expected.text_bytes) { throw "original machine code mismatch $size $hash" }
+          foreach ($route in @('high','llvm')) {
+            clang-cl --target=x86_64-pc-windows-msvc /nologo /O2 "/Dforward_4=forward_$route" /c "$route.c" "/Fo$route.obj"
+            if ($LASTEXITCODE) { throw "compile $route" }
+          }
+          cl /nologo /O2 /W4 /WX compare.c forward.obj capture.obj consume.obj high.obj llvm.obj /Fe:compare.exe
+          if ($LASTEXITCODE) { throw 'link entry observer' }
+          .\compare.exe | Tee-Object -FilePath observations.json
+          if ($LASTEXITCODE) { throw "entry mismatch $LASTEXITCODE" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-entry
+          path: |
+            entry-x64/observations.json
+            entry-x64/inputs.json
