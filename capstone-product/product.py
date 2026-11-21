@@ -73,8 +73,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert rev(cs)==ref
    assert rev(nd)==expected['neverd']
    write(label+'-neverd-head',rev(nd))
-   if label=='native_sizes':
-    capfix=r/'wide-capstone.patch';assert hashlib.sha256(capfix.read_bytes()).hexdigest()==expected['wide_patch_sha256']
+   if label!='base':
+    capfix=r/variants[label]['capstone_patch'];assert hashlib.sha256(capfix.read_bytes()).hexdigest()==variants[label]['capstone_sha256']
     command(['git','apply',capfix],'apply-wide-capstone',cs)
    if label!='base':
     change=r/variants[label]['patch']
@@ -93,11 +93,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    policies={}
    for name in ('X86OutputIterator.c','X86Vex32Output.c','X86Sse64Output.c'):
     entries=[c for c in compile_database if c['file'].endswith('/arch/X86/'+name)]
-    if name=='X86Sse64Output.c' and label!='native_sizes':assert not entries;continue
+    if name=='X86Sse64Output.c' and label=='base':assert not entries;continue
     entry,=entries
     args=shlex.split(entry['command'])
     policies[name]=[a for a in args if a in ('-fomit-frame-pointer','-O3','-DNDEBUG') or 'discard' in a]
-   assert len(policies)==(3 if label=='native_sizes' else 2)
+   assert len(policies)==(3 if label!='base' else 2)
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
    assert all(v==policies['X86OutputIterator.c'] for v in policies.values())
    write(label+'-compile-policy',policies)
@@ -115,6 +115,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    rel=[line.strip() for line in sp.check_output(['readelf','-Wr',target],text=True).splitlines() if 'X86_disasmIter' in line]
    assert text and rel
    write(label+'-caller-object',dict(sections=text,iterator_relocations=rel))
+   if label!='base':
+    baseline=json.loads((out/'base-caller-object.json').read_text())
+    assert text==baseline['sections']
+    offs=lambda rows:[(v.split()[0],v.split()[-3:]) for v in rows]
+    assert [v[0] for v in offs(rel)]==[v[0] for v in offs(baseline['iterator_relocations'])]
+    assert all('X86_disasmIterText' in v for v in rel) and all(' X86_disasmIter ' in v for v in baseline['iterator_relocations'])
 
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
@@ -170,6 +176,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      assert canonical_signatures[key]==raw,(label,key,canonical_signatures[key],raw)
    write('public-checksums-'+label,dict(raw=signatures))
    command(['nm','-S','-C',prod],'timed-symbols-'+label)
+   command(['readelf','-W','-S','-l',prod],'linked-sections-'+label)
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    assert rev(cs)==ref
@@ -194,12 +201,15 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     prior=json.loads((out/'base-objects.json').read_text())
     assert all(objects[k]==v for k,v in prior.items())
     extra={Path(k).name for k in objects.keys()-prior.keys()}
-    assert extra==({'X86Sse64Output.c.o'} if label=='native_sizes' else set()),extra
+    assert extra==({'X86Sse64Output.c.o'} if label!='base' else set()),extra
+    if label=='direct_modes':
+     chain=json.loads((out/'chain-objects.json').read_text())
+     assert chain.keys()==objects.keys() and {Path(k).name for k,v in chain.items() if objects[k]!=v}=={'X86Sse64Output.c.o'}
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)
    assert any(line.endswith(' X86_disasmIter32') for line in sym)==(label!='base')
-   assert any(line.endswith(' X86_disasmIterText') for line in sym)==(label=='native_sizes')
+   assert any(line.endswith(' X86_disasmIterText') for line in sym)==(label!='base')
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)

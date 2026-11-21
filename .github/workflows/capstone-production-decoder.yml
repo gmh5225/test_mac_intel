@@ -1,7 +1,7 @@
-name: Measure per-mode x86 formatting with 64-bit memory immediates inside the NeverD decoder
+name: Measure direct x86 static dispatch without changing the NeverD caller machine code
 on:
   push:
-    branches: [codex/neverd-mode-selected-amd64-memory-writer]
+    branches: [codex/neverd-direct-static-x86-mode-selection]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4284d35ef0d773a71eb9522cf0778a71ab1fc06a
+          ref: bb07c2fd4ef6dab3519c411ecae5352782e4d2d2
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,8 +44,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "4284d35ef0d773a71eb9522cf0778a71ab1fc06a"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "68120b496a66ebf73a0b88247146a21620d86a63"
+          test "$(git rev-parse HEAD)" = "bb07c2fd4ef6dab3519c411ecae5352782e4d2d2"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "205dcd8bd67fb7561e6eb6c15ea4630e20c85d12"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: selected-mem64-${{ matrix.os }}-${{ matrix.cc }}
+          name: direct-static-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
