@@ -1,0 +1,151 @@
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index de60a62a..a2775bc9 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -202,33 +202,28 @@ void AArch64_add_vas(MCInst *MI, const SStream *OS)
+ 		return;
+ 	}
+ 
+-	// Search for r".[0-9]{1,2}[bhsdq]\W"
+-	// with poor mans regex
++	/* LLVM embeds the vector arrangement in the printed spelling. Commas
++	 * and suffixes are both visited from left to right. */
+ 	const char *vl_ptr = strchr(OS->buffer, '.');
++	if (!vl_ptr)
++		return;
++	const char *comma_ptr = strchr(OS->buffer, ',');
++	unsigned preceding_commas = 0;
+ 	while (vl_ptr) {
+-		// Number after dot?
++		++vl_ptr;
+ 		unsigned num = 0;
+-		if (strchr("1248", vl_ptr[1])) {
+-			num = atoi(vl_ptr + 1);
+-			vl_ptr = num > 9 ? vl_ptr + 3 : vl_ptr + 2;
+-		} else {
+-			vl_ptr++;
+-		}
+-
+-		// Layout letter
+-		char letter = '\0';
+-		if (strchr("bhsdq", vl_ptr[0])) {
+-			letter = vl_ptr[0];
+-		}
+-		if (!letter) {
+-			goto next_dot_continue;
++		if (*vl_ptr == '1' || *vl_ptr == '2' || *vl_ptr == '4' ||
++		    *vl_ptr == '8') {
++			num = (unsigned)(*vl_ptr++ - '0');
++			if (*vl_ptr >= '0' && *vl_ptr <= '9')
++				num = num * 10 + (unsigned)(*vl_ptr++ - '0');
+ 		}
+-
+-		AArch64Layout_VectorLayout vl = AARCH64LAYOUT_INVALID;
+-		switch (letter) {
++		if (!*vl_ptr)
++			break;
++		AArch64Layout_VectorLayout vl;
++		switch (*vl_ptr) {
+ 		default:
+-			CS_ASSERT_RET(0 && "Unhandled vector layout letter.");
+-			return;
++			goto next_dot_continue;
+ 		case 'b':
+ 			vl = AARCH64LAYOUT_VL_B;
+ 			break;
+@@ -247,22 +242,15 @@ void AArch64_add_vas(MCInst *MI, const SStream *OS)
+ 		}
+ 		vl |= (num << 8);
+ 
+-		// Determine op index by searching for trailing commata after op string
+-		uint32_t op_idx = 0;
+-		const char *comma_ptr = strchr(OS->buffer, ',');
+-		;
+ 		while (comma_ptr && comma_ptr < vl_ptr) {
+-			++op_idx;
++			++preceding_commas;
+ 			comma_ptr = strchr(comma_ptr + 1, ',');
+ 		}
+-		if (!comma_ptr) {
+-			// Last op doesn't have a trailing commata.
+-			op_idx = AArch64_get_detail(MI)->op_count - 1;
+-		}
+-		if (op_idx >= AArch64_get_detail(MI)->op_count) {
+-			// A memory operand with a commata in [base, dist]
+-			op_idx = AArch64_get_detail(MI)->op_count - 1;
+-		}
++		/* A comma in a memory operand can outnumber the detail operands. */
++		const unsigned last = AArch64_get_detail(MI)->op_count - 1;
++		const unsigned op_idx = comma_ptr && preceding_commas < last ?
++						preceding_commas :
++						last;
+ 
+ 		// Search for the operand this one belongs to.
+ 		cs_aarch64_op *op = &AArch64_get_detail(MI)->operands[op_idx];
+diff --git a/tests/unit/aarch64_postprocess.c b/tests/unit/aarch64_postprocess.c
+index c5e4ab3c..5d624e67 100644
+--- a/tests/unit/aarch64_postprocess.c
++++ b/tests/unit/aarch64_postprocess.c
+@@ -329,6 +329,52 @@ done:
+ 	return result;
+ }
+ 
++static bool check_vector_suffixes(void)
++{
++	cs_struct handle = { 0 };
++	cs_insn insn = { 0 };
++	cs_detail detail = { 0 };
++	MCInst mi = { 0 };
++	handle.detail_opt = CS_OPT_ON;
++	mi.csh = &handle;
++	mi.flat_insn = &insn;
++	insn.detail = &detail;
++	static const struct {
++		const char *text;
++		unsigned vas[3];
++	} cases[] = {
++		{ "add v0.4s, v1.4s, v2.4s",
++		  { AARCH64LAYOUT_VL_4S, AARCH64LAYOUT_VL_4S,
++		    AARCH64LAYOUT_VL_4S } },
++		{ "t v0.16b, v1.h, v2.d",
++		  { AARCH64LAYOUT_VL_16B, AARCH64LAYOUT_VL_H,
++		    AARCH64LAYOUT_VL_D } },
++		{ "t v0.4s, v1, [x0, x1], v2.2d",
++		  { AARCH64LAYOUT_VL_4S, AARCH64LAYOUT_INVALID,
++		    AARCH64LAYOUT_VL_2D } },
++		{ "t v0, v1, v2.", { 0, 0, 0 } },
++		{ "t v0, v1, v2.16", { 0, 0, 0 } },
++	};
++	for (unsigned i = 0; i < ARR_SIZE(cases); ++i) {
++		SStream ss = { 0 };
++		strcpy(ss.buffer, cases[i].text);
++		memset(&detail, 0, sizeof(detail));
++		detail.aarch64.op_count = 3;
++		for (unsigned n = 0; n < 3; ++n)
++			detail.aarch64.operands[n].type = AARCH64_OP_REG;
++		AArch64_add_vas(&mi, &ss);
++		for (unsigned n = 0; n < 3; ++n)
++			if ((unsigned)detail.aarch64.operands[n].vas !=
++			    cases[i].vas[n]) {
++				fprintf(stderr,
++					"vector layout mismatch for %s operand %u\n",
++					cases[i].text, n);
++				return false;
++			}
++	}
++	return true;
++}
++
+ /* Evaluate the real descriptor objects with native enum/constraint values,
+  * independently of the generator's source parser. */
+ int main(void)
+@@ -360,5 +406,8 @@ int main(void)
+ 	}
+ 	printf("%zu descriptors equal: %u implicit, %u tied\n",
+ 	       ARR_SIZE(AArch64Descs.Insts), implicit, tied);
+-	return check_addressing_details() && check_matrix_details() ? 0 : 1;
++	return check_addressing_details() && check_matrix_details() &&
++			       check_vector_suffixes() ?
++		       0 :
++		       1;
+ }

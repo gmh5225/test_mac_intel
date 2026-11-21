@@ -24,11 +24,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  try:
   write('llvm_source_build',dict(revision=rev(ll),compiler='clang++',prebuilt=False,unmodified_latest_fork=True))
   cases=corpus.prepare(r,t,out,command)
-  cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
-  assert len(cases)==14
+  cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','arm64-cp','libjpeg-arm64','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
+  assert len(cases)==16
   original_cases=list(cases)
   cases.append(avx_corpus.prepare(r,t,out,command))
-  assert len(cases)==15
+  assert len(cases)==17
   shutil.copy(r/'libmvec.py',t);shutil.copy(r/'libmvec.json',t)
   command([sys.executable,t/'libmvec.py'],'glibc-vector-math')
   glibc=json.loads((t/'libmvec.json').read_text())
@@ -260,20 +260,19 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert signature[:2]==[case['expected_instructions']*reps,0],(case['name'],mode,reps,signature)
    return ticks,signature
   results=[]
-  cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
-  batch_cases=('jpeg-avx2-i386','libssl3t64-i386','libzstd1-i386','libssl3t64-amd64','libjpeg62-turbo-i386','putty-32-0.85','putty-64-0.85','amd64-ls')
-  cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'arm-cp':(0,1,2),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'putty-64-0.85':(0,1,2)}
-  batch_cases=('jpeg-avx2-i386','libzstd1-i386','libssl3t64-amd64','putty-32-0.85','putty-64-0.85')
-  cases_of_interest['libmvec-amd64']=(0,1,2)
-  cases_of_interest['libssl3t64-i386']=(0,1,2)
-  batch_cases=(*batch_cases,'libmvec-amd64')
-  for name in batch_cases:cases_of_interest[name]=(*cases_of_interest[name],3)
+  cases_of_interest={k:(0,1,2)for k in ('arm-cp','mips64el-ls','libssl3t64-i386',*expected['extra_arm64_samples'])}
+  for k in ('jpeg-avx2-i386','libzstd1-i386','libssl3t64-amd64','putty-32-0.85','putty-64-0.85','libmvec-amd64'):
+   cases_of_interest[k]=(0,1,2,3)
+  clk=t/'ticks.c';clk.write_text('#include <stdio.h>\n#include <time.h>\nint main(void){printf("%ld\\n",(long)CLOCKS_PER_SEC);return 0;}\n')
+  command(['cc',clk,'-o',t/'clock-scale'],'compile-clock-scale')
+  scale=int(sp.check_output([t/'clock-scale'],text=True));assert scale>0
+  write('clock-scale',dict(ticks_per_second=scale,calibration_cpu_ms=expected['timing_protocol']['calibration_cpu_ms']))
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2,3):
     if mode not in cases_of_interest.get(case['name'],()):continue
     for launch in launches:
      # A long full text and a tiny compiler fixture have very different costs.
-     start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(expected['timing_protocol']['calibration_cpu_ms']*1000/start)))
+     start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(expected['timing_protocol']['calibration_cpu_ms']*scale/1000/start)))
      row=dict(case=case['name'],mode=mode,launch=launch,reps=reps,pairs={});oracle=None
      labels=['base','base-copy',*variants]
      plans={label:[] for label in labels[1:]}
