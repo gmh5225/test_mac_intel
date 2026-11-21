@@ -18,6 +18,7 @@ TESTS = {
         MODE + "VM86InterruptAndReturnUseEveryFrameSelector",
         MODE + "CompatibilityReturnsSelectTheDestinationCodeWidth",
         "X86ModeExecutionTest.CompiledFastCallReturnsToTheOriginalCompatibilityStream",
+        "X86ModeExecutionTest.FarTransfersRetireTheirContinuationAfterDescriptorRepair",
         "X86ModeFastSystemTest.TransfersUseFullMsrsAndSelectDestinationWidth",
         "X86ModeFastSystemTest.SysenterMsrsUseProcessorAddressWidthBeforeTransfer",
         "X86ModeFastSystemTest.FaultsPrecedeFastTransferStateWrites",
