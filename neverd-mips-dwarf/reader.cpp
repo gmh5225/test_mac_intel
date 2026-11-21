@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
   auto library = neverd::types::importDWARFTypes(*dwarf, model);
   if (!library)
     return 4;
-  for (const auto name : {"Packet", "Header", "HeaderBits"}) {
+  for (const auto name : {"Packet", "Header", "HeaderBits", "PackedHeader", "PackedBits"}) {
     const auto *type = (*library)->find(name);
     if (!type || !type->Record)
       return 5;
