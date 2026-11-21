@@ -1,0 +1,37 @@
+name: Verify native Windows process-detach callbacks
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - .github/workflows/neverd-native-dll-detach.yml
+      - loader-notifications/**
+permissions:
+  contents: read
+jobs:
+  detach:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: windows-11-arm
+          - arch: x64
+            os: windows-2022
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: loader-notifications
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Observe process termination and dynamic unloading
+        shell: pwsh
+        run: python loader-notifications/check_detach.py ${{ matrix.arch }} --report native-detach.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-process-detach-${{ matrix.arch }}
+          path: native-detach.json
+          if-no-files-found: error
