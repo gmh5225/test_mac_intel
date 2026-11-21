@@ -11,6 +11,7 @@ on:
       - native-driver-entry/check_export_entries.py
       - native-driver-entry/export-entry-inputs.json
       - native-driver-entry/check_com_callbacks.py
+      - native-driver-entry/process_sdk_smoke.c
 permissions:
   contents: read
 jobs:
@@ -117,6 +118,24 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.COMRegistrationUsesTheTargetUserABI'
           python native-driver-entry/check_com_callbacks.py --neverd "$env:RUNNER_TEMP/nb/bin/neverd.exe" --work "$env:RUNNER_TEMP/com-callbacks" --report native-com-observations.json
+      - name: Run process-status and snapshot imports from the native Windows SDK
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $program = "$env:RUNNER_TEMP/process_sdk_smoke.exe"
+          clang-cl --target=aarch64-pc-windows-msvc /nologo /W4 /WX /O2 /MD native-driver-entry/process_sdk_smoke.c psapi.lib kernel32.lib "/Fe:$program"
+          $pe = [IO.File]::ReadAllBytes($program)
+          $nt = [BitConverter]::ToInt32($pe, 60)
+          $machine = [BitConverter]::ToUInt16($pe, $nt+4)
+          if ($machine -ne 0xaa64) { throw "Invalid process SDK executable machine $machine" }
+          $psapi = (dumpbin /nologo /imports:psapi.dll $program) -join "`n"
+          $kernel = (dumpbin /nologo /imports:kernel32.dll $program) -join "`n"
+          if ($psapi -notmatch '\bEnumProcessModulesEx\b' -or $kernel -notmatch '\bPssCaptureSnapshot\b' -or $kernel -notmatch '\bPssFreeSnapshot\b') { throw 'Unexpected SDK process import table' }
+          $result = (& $program) | ConvertFrom-Json
+          if (!$result.module_found -or $result.capture_status -ne 0 -or $result.release_status -ne 0) { throw 'Native process SDK smoke failed' }
+          [ordered]@{revision=$env:NEVERD_REV; machine=$machine; executable_sha256=(Get-FileHash $program).Hash.ToLower(); psapi_import='EnumProcessModulesEx'; kernel32_imports=@('PssCaptureSnapshot','PssFreeSnapshot'); observation=$result} | ConvertTo-Json -Depth 5 | Set-Content native-process-sdk.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -126,6 +145,7 @@ jobs:
             native-entry-observations.json
             native-export-verification.json
             native-com-observations.json
+            native-process-sdk.json
             ${{ runner.temp }}/nb/neverd-build-receipt.json
             ${{ runner.temp }}/nb/neverd-dependency-inputs.json
           if-no-files-found: warn
