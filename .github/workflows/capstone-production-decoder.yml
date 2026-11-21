@@ -1,7 +1,7 @@
-name: Verify the isolated static i386 iterator in the production NeverD decoder
+name: Verify production ARM and i386 throughput with a single iterator call target
 on:
   push:
-    branches: [codex/neverd-i386-elf-product]
+    branches: [codex/neverd-i386-caller-target]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 6b5fb2588db67cef9d30c4bf9e2cd94ceca2636a
+          ref: 7736edfaaf5fcd64b094917d99eb9bcf48bf7064
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "6b5fb2588db67cef9d30c4bf9e2cd94ceca2636a"
+          test "$(git rev-parse HEAD)" = "7736edfaaf5fcd64b094917d99eb9bcf48bf7064"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "09ba26d9848f4ad0920ad0ef5feb512899fabe6c"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-isolated-integration-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-caller-integration-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

@@ -1,8 +1,13 @@
 {
-  "neverd": "6b5fb2588db67cef9d30c4bf9e2cd94ceca2636a",
+  "neverd": "7736edfaaf5fcd64b094917d99eb9bcf48bf7064",
   "capstone": "09ba26d9848f4ad0920ad0ef5feb512899fabe6c",
   "variants": {
     "iterator32": {
+      "tree": "bb192619f0d24c6a3143a4f5d4d1a19766c25340",
+      "patch": "iterator32.patch",
+      "patch_sha256": "70fea9b47f56da4a401db7f49b3ef579d59c515f4389c1fbff30d8f62194f020"
+    },
+    "caller_branch": {
       "tree": "bb192619f0d24c6a3143a4f5d4d1a19766c25340",
       "patch": "iterator32.patch",
       "patch_sha256": "70fea9b47f56da4a401db7f49b3ef579d59c515f4389c1fbff30d8f62194f020"
@@ -13,18 +18,24 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Test the ordinary NeverD C++ Decoder entry on PE32, PE64, ELF scalar and vector data with and without the i386 text member. Measure scan, text, detail and batch using the production backend.",
-  "parent": "cece411a889370e5b240c620465f28b3922b390e",
+  "scope": "Compare changing only the destination of the existing C++ call with selecting the 32-bit iterator in the caller. Both candidates use identical Capstone source, compilation and LLVM source inputs.",
+  "parent": "f062ec10ca4978b3a7fc433baf067d508a32f328",
   "integration": {
     "path": "lib/decode/Decoder.cpp",
     "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
-    "candidate": "117d607d198648c6bb611276475554da2246f5c9",
-    "sha256": "a6707021fca71b079c1971cbbe9d9c6a02faacc304b646faafa5592c883be526"
+    "candidate": "54c52cd7985d69ecbfe1063f1c1ebf19c38c55a5",
+    "sha256": "3e03d30385e47a1b02900479ad128f224e5c64f8e3be5ed21525748233e51008"
   },
   "build_options": {
     "path": "CMakeLists.txt",
     "base": "f7a7b6dccb8f8c4f1faeaeb69432740ea32bce99",
     "candidate": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
     "sha256": "6cc96bcfb3f680032be4bf6dd1e146b7e5a913d09045452d17ce0e27f6ab05de"
+  },
+  "branch_integration": {
+    "path": "lib/decode/Decoder.cpp",
+    "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
+    "candidate": "117d607d198648c6bb611276475554da2246f5c9",
+    "sha256": "a6707021fca71b079c1971cbbe9d9c6a02faacc304b646faafa5592c883be526"
   }
 }

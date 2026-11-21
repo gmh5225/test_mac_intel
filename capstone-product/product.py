@@ -77,9 +77,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
-   info=expected['integration'];path=nd/info['path']
+   info=expected['branch_integration' if label=='caller_branch' else 'integration'];path=nd/info['path']
    if label!='base':
-    patch=r/'neverd-i386.patch'
+    patch=r/('neverd-i386-branch.patch' if label=='caller_branch' else 'neverd-i386.patch')
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==info['sha256']
     command(['git','apply',patch],'apply-neverd-'+label,nd)
     policy=r/'build-options.patch'
@@ -108,6 +108,21 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
    if label!='base':assert policies['X86Vex32Output.c']==policies['X86OutputIterator.c']
    write(label+'-compile-policy',policies)
+   import struct
+   target=build/'lib/decode/CMakeFiles/NeverDDecode.dir/Decoder.cpp.o'
+   obj=target.read_bytes();header=struct.unpack_from('<16sHHIQQQIHHHHHH',obj)
+   assert obj[:6]==b'\x7fELF\x02\x01'
+   secs=[struct.unpack_from('<IIQQQQIIQQ',obj,header[6]+j*header[11])for j in range(header[12])]
+   st=secs[header[13]];names=obj[st[4]:st[4]+st[5]]
+   text={}
+   for no,ty,flags,addr,offset,size,*_ in secs:
+    if flags&4:
+     name=names[no:names.index(0,no)].decode()
+     text[name]=dict(size=size,sha256=hashlib.sha256(obj[offset:offset+size]).hexdigest())
+   rel=[line.strip() for line in sp.check_output(['readelf','-Wr',target],text=True).splitlines() if 'X86_disasmIter' in line]
+   assert text and rel
+   write(label+'-caller-object',dict(sections=text,iterator_relocations=rel))
+
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
    command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',str(out/('tests-'+label+'.xml')),'-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests)$'],'tests-'+label)
