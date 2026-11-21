@@ -1,0 +1,128 @@
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index fae1259f..cd94ada6 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -45,6 +45,17 @@ bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
+ bool X86_disasmIter32(csh handle, const uint8_t **code, size_t *size,
+ 		      uint64_t *address, cs_insn *insn);
+ 
++/* Text-free i386 sweeps can select the VEX2 reader at the call site.
++ * The ordinary iterator consumes every other leading byte directly. */
++static inline bool X86_disasmIterScan32(csh handle, const uint8_t **code,
++					size_t *size, uint64_t *address,
++					cs_insn *insn)
++{
++	if (handle && *size && (*code)[0] == 0xc5)
++		return X86_disasmIter32(handle, code, size, address, insn);
++	return cs_disasm_iter(handle, code, size, address, insn);
++}
++
+ /* Static text iterator for 32- and 64-bit x86. It uses the handle mode to
+  * select an output writer and preserves the cs_disasm_iter contract. */
+ bool X86_disasmIterText(csh handle, const uint8_t **code, size_t *size,
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index bd9967a9..21e423c1 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -223,31 +223,6 @@ static uint32_t readVex32Plan(const uint8_t *code, size_t size)
+ 	return ((plan >> 3) << 8) | end;
+ }
+ 
+-static bool scanVex32(csh handle, const uint8_t *code, size_t size,
+-		      cs_insn *insn, X86ScanResult *result)
+-{
+-	const uint32_t packed = readVex32Plan(code, size);
+-	if (!packed)
+-		return X86_getInstructionScanResult(handle, code, size, insn,
+-						    result);
+-	result->opcode = 0;
+-	result->opcode_pub = packed >> 8;
+-	result->length = (uint16_t)(packed & 0xff);
+-	result->popcode_adjust = 0;
+-	return true;
+-}
+-
+-/* A bare C5 with Mod=3 cannot be LDS in 32-bit mode. All legacy and
+- * extended encodings keep their ordinary scan entry. */
+-static bool isVex32Scan(const cs_struct *handle, const uint8_t **code,
+-			const size_t *size)
+-{
+-	return !handle->detail_opt && *size >= 2 && (*code)[0] == 0xc5 &&
+-	       ((*code)[1] & 0xc0) == 0xc0 &&
+-	       handle->disasm == X86_getInstruction &&
+-	       handle->insn_id == X86_get_insn_id;
+-}
+-#define CS_DECODE_SCAN scanVex32
+ #endif
+ 
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+@@ -261,13 +236,34 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+ 	if (handle && handle->arch == CS_ARCH_X86 &&
+-	    handle->mode == CS_MODE_32 &&
+-	    (!handle->no_text
++	    handle->mode == CS_MODE_32) {
++		if (!handle->no_text)
++			return cs_disasm_iter_core(ud, code, size, address,
++						   insn);
+ #ifndef CAPSTONE_X86_SCAN_ADAPTER
+-	     || isVex32Scan(handle, code, size)
++		if (!handle->detail_opt && *size >= 3 && (*code)[0] == 0xc5 &&
++		    ((*code)[1] & 0xc0) == 0xc0 &&
++		    handle->disasm == X86_getInstruction &&
++		    handle->insn_id == X86_get_insn_id) {
++			const uint32_t packed = readVex32Plan(*code, *size);
++			if (packed) {
++				/* A known public ID leaves a previously allocated detail record untouched. */
++				const X86ScanResult result = {
++					0, packed >> 8,
++					(uint16_t)(packed & 0xff), 0
++				};
++				handle->errnum = CS_ERR_OK;
++				insn->address = *address;
++				finish_x86_scan(handle, insn, &result, *code,
++						false, true);
++				advance_iter(code, size, address,
++					     result.length);
++				return true;
++			}
++		}
+ #endif
+-		     ))
+-		return cs_disasm_iter_core(ud, code, size, address, insn);
++		return cs_disasm_iter(ud, code, size, address, insn);
++	}
+ #endif
+ 	return X86_disasmIter(ud, code, size, address, insn);
+ }
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..a9c85d73 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -167,6 +167,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ }
+ #undef CS_DECODE_SCAN
+ 
++CS_DECODE_INLINE void advance_iter(const uint8_t **code, size_t *size,
++				   uint64_t *address, uint16_t insn_size)
++{
++	*code += insn_size;
++	*size -= insn_size;
++	*address += insn_size;
++}
++
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+ 					  uint64_t *address, cs_insn *insn)
+@@ -186,9 +194,7 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
+ 	if (CS_DECODE_LIKELY(r)) {
+-		*code += insn_size;
+-		*size -= insn_size;
+-		*address += insn_size;
++		advance_iter(code, size, address, insn_size);
+ 	} else {
+ 		return cs_disasm_iter_skipdata(handle, code, size, address,
+ 					       insn);

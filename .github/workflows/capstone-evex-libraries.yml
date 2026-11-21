@@ -1,7 +1,7 @@
-name: Measure the private i386 VEX2 scan entry against public decoding and iced
+name: Compare inlined i386 scan selection and completed records with the public iterator and iced
 on:
   push:
-    branches: [codex/capstone-private-i386-vex-scan]
+    branches: [codex/capstone-i386-vex-fused-record]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-vex-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-scan-completion-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
