@@ -1,0 +1,54 @@
+name: Verify i386 scan record and callback semantics across native and reduced builds
+on:
+  push:
+    branches: [codex/capstone-scan-abi-and-adapter]
+    paths: [scan-abi/**, .github/workflows/capstone-i386-scan-abi.yml]
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {host: ubuntu-24.04, label: linux-gcc, cc: gcc, profile: full}
+          - {host: ubuntu-24.04-arm, label: linux-arm, cc: clang, profile: full}
+          - {host: ubuntu-24.04, label: diet, cc: clang, profile: diet}
+          - {host: ubuntu-24.04, label: reduce, cc: clang, profile: reduce}
+          - {host: ubuntu-22.04, label: adapter, cc: clang, profile: adapter}
+          - {host: macos-15, label: apple-arm, cc: clang, profile: full}
+          - {host: macos-15-intel, label: apple-intel, cc: clang, profile: full}
+          - {host: windows-2022, label: win32, cc: cl, profile: full, msvc: amd64_x86}
+          - {host: windows-2022, label: win64, cc: cl, profile: full, msvc: amd64}
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: scan-abi
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 88f64f91be1b3c9de7c5819e93806fa8d79127db
+          persist-credentials: false
+          path: source
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.msvc }}
+      - name: Compile and compare public records and callbacks
+        env:
+          CC: ${{ matrix.cc }}
+          PROFILE: ${{ matrix.profile }}
+          CONFIG_NAME: ${{ matrix.label }}
+        run: python scan-abi/qualified.py
+      - if: always()
+        shell: bash
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: scan-abi-${{ matrix.label }}
+          path: evidence/
+          retention-days: 14
