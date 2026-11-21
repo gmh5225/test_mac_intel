@@ -1,7 +1,7 @@
-name: Verify identical shared libraries and the i386 static output across seven profiles
+name: Verify public library identity and compare the i386 iterator across seven configurations
 on:
   push:
-    branches: [codex/capstone-private-i386-static-profiles]
+    branches: [codex/capstone-i386-chained-option-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: private-i386-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: chained-i386-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
