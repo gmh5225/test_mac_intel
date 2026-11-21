@@ -1,7 +1,7 @@
-name: Isolate six backend costs from opcode ownership, layout and common decode completion
+name: Validate bitness dispatch once per batch on real PE32, PE64 and ELF
 on:
   push:
-    branches: [codex/capstone-compare-layout-controls]
+    branches: [codex/capstone-pe32-batch-workers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: compare-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: batch-workers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

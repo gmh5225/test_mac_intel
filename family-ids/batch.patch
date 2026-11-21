@@ -1,0 +1,58 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..a513ff38 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3809,18 +3809,44 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 		return batch;
+ 	cs_insn insn = { 0 };
+ 	handle->errnum = CS_ERR_OK;
+-	while (batch.count < capacity && size) {
++	while (batch.count < capacity && batch.bytes < size) {
+ 		X86ScanResult result;
+-		insn.address = address;
+-		if (!getInstructionScanResult(ud, code, size, &insn, &result,
+-					      false))
+-			break;
+-		finish_x86_scan(handle, &insn, &result, code, false, false);
++		if (handle->mode == CS_MODE_32) {
++			/* Initial legacy terminals have a public ID and no alias
++			 * adjustment. No adapter runs between consecutive hits. */
++			for (;;) {
++				unsigned int id = 0;
++				uint16_t length;
++				int status = tryInitialLegacyScan(
++					code + batch.bytes, size - batch.bytes,
++					CS_MODE_32, false, &id, &length, false);
++				if (status == X86_SCAN_NOT_HANDLED)
++					break;
++				if (status != X86_SCAN_COMPLETE)
++					return batch;
++				insn.id = id;
++				insn.size = length;
++				output[batch.count++] = (id << 8) | length;
++				batch.bytes += length;
++				if (batch.count == capacity || batch.bytes == size)
++					return batch;
++			}
++			insn.address = address + batch.bytes;
++			if (!getInstructionScanResultAfterInitial(
++				    ud, code + batch.bytes, size - batch.bytes,
++				    &insn, &result, false))
++				break;
++		} else {
++			insn.address = address + batch.bytes;
++			if (!getInstructionScanResult(
++				    ud, code + batch.bytes, size - batch.bytes,
++				    &insn, &result, false))
++				break;
++		}
++		finish_x86_scan(handle, &insn, &result, code + batch.bytes,
++				false, false);
+ 		output[batch.count++] = (insn.id << 8) | result.length;
+ 		batch.bytes += result.length;
+-		code += result.length;
+-		size -= result.length;
+-		address += result.length;
+ 	}
+ 	return batch;
+ }

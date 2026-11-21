@@ -1,0 +1,76 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..01551688 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3795,6 +3795,59 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__) || defined(__clang__)
++__attribute__((noinline))
++#endif
++static X86ScanBatchResult scanBatch32(csh ud, const uint8_t *code, size_t size,
++           uint64_t address, uint32_t *output, size_t capacity)
++{
++	X86ScanBatchResult batch = { 0, 0 };
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	cs_insn insn = { 0 };
++	while (batch.count < capacity && batch.bytes < size) {
++		X86ScanResult result;
++		if (handle->mode == CS_MODE_32) {
++			/* An initial legacy terminal needs only its public ID and
++			 * length. A fallback callback may change the handle mode. */
++			for (;;) {
++				unsigned int id = 0;
++				uint16_t length;
++				int status = tryInitialLegacyScan(
++					code + batch.bytes, size - batch.bytes,
++					CS_MODE_32, false, &id, &length, false);
++				if (status == X86_SCAN_NOT_HANDLED)
++					break;
++				if (status != X86_SCAN_COMPLETE)
++					return batch;
++				insn.id = id;
++				insn.size = length;
++				output[batch.count++] = (id << 8) | length;
++				batch.bytes += length;
++				if (batch.count == capacity || batch.bytes == size)
++					return batch;
++			}
++			insn.address = address + batch.bytes;
++			if (!getInstructionScanResultAfterInitial(
++				    ud, code + batch.bytes, size - batch.bytes,
++				    &insn, &result, false))
++				break;
++		} else {
++			insn.address = address + batch.bytes;
++			if (!getInstructionScanResult(
++				    ud, code + batch.bytes, size - batch.bytes,
++				    &insn, &result, false))
++				break;
++		}
++		finish_x86_scan(handle, &insn, &result, code + batch.bytes,
++				false, false);
++		output[batch.count++] = (insn.id << 8) | result.length;
++		batch.bytes += result.length;
++	}
++	return batch;
++}
++
+ X86_DECODE_ALIGN
+ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 						   size_t size,
+@@ -3807,8 +3860,10 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 	if (!handle || !code || !size || !output || !capacity ||
+ 	    !use_x86_scan(handle) || handle->skipdata)
+ 		return batch;
+-	cs_insn insn = { 0 };
+ 	handle->errnum = CS_ERR_OK;
++	if (handle->mode == CS_MODE_32)
++		return scanBatch32(ud, code, size, address, output, capacity);
++	cs_insn insn = { 0 };
+ 	while (batch.count < capacity && size) {
+ 		X86ScanResult result;
+ 		insn.address = address;
