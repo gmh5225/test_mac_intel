@@ -61,6 +61,14 @@ try:
                 assert changes==0
                 rows.append(dict(sample=name,bits=bits,syntax=syntax,flags=flags,calls=calls,success=valid,changes=changes))
             write('records',rows)
+    if conf=='full':
+        run(['c++','-std=c++17','-O2','-I',s/'include',r/'public-records.cpp','-ldl','-o',tmp/'public-states'],'build-public-states')
+        cross={}
+        for label,bits,f in [('real-pe32',32,tmp/'putty-0.85-32.text'),('real-pe64',64,tmp/'putty-0.85-64.text'),('code16',16,tmp/'putty-0.85-32.text'),('simd64',64,tmp/'libmvec.text')]:
+            z=json.loads(sp.check_output([tmp/'public-states',libs['base'],libs['candidate'],f,str(bits)],text=True))
+            assert z['complete_record_comparisons']>0 and z['batch_records']>0
+            cross[label]=z
+        write('public-differential',cross)
     other_cases=[]
     if conf=='full':
         import corpus
