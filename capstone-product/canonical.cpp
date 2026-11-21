@@ -23,7 +23,19 @@ static unsigned family(const uint8_t *data, size_t size) {
     }
     return 0;
 }
+unsigned floating(const uint8_t *data,size_t size) {
+    while(size && (*data==0x26 || *data==0x2e || *data==0x36 || *data==0x3e ||
+                   *data==0x64 || *data==0x65 || *data==0x67)) {++data; --size;}
+    unsigned pp;
+    if(size>=5 && data[0]==0xc5 && data[2]==0xc2) pp=data[1]&3;
+    else if(size>=6 && data[0]==0xc4 && (data[1]&31)==1 && data[3]==0xc2) pp=data[2]&3;
+    else if(size>=7 && data[0]==0x62 && (data[1]&15)==1 && data[4]==0xc2) pp=data[2]&3;
+    else return 0;
+    static constexpr unsigned ids[]={X86_INS_VCMPPS,X86_INS_VCMPPD,X86_INS_VCMPSS,X86_INS_VCMPSD};
+    return ids[pp];
+}
 static unsigned canonical(unsigned id, const uint8_t *code, size_t size) {
+  if(auto fp=floating(code,size)) return fp;
   if (id != X86_INS_VPCMP) return id;
   const unsigned result = family(code,size);
   if (!result) std::abort();

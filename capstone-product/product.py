@@ -29,6 +29,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   original_cases=list(cases)
   cases.append(avx_corpus.prepare(r,t,out,command))
   assert len(cases)==15
+  shutil.copy(r/'libmvec.py',t);shutil.copy(r/'libmvec.json',t)
+  command([sys.executable,t/'libmvec.py'],'glibc-vector-math')
+  glibc=json.loads((t/'libmvec.json').read_text())
+  cases.append(dict(name='libmvec-amd64',selector=64,path=str(t/'libmvec.text'),bytes=glibc['bytes'],text_sha256=glibc['text_sha256']))
+  write('libmvec',glibc)
   shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp');cm=nd/'CMakeLists.txt'
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'canonical.cpp',nd/'capstone-canonical.cpp')
@@ -74,12 +79,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
-   targets=['capstone-canonical','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests','NeverDMIPSTests','NeverDMIPSFlowTests']
+   targets=['capstone-canonical','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests','NeverDMIPSTests','NeverDMIPSFlowTests','NeverDX86EVEXFPCompareTests','NeverDX86EVEXCompareTests','NeverDX86MaskCompareStateTests','NeverDX86FPPackedConvertStateTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
-   command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests|NeverDMIPSTests|NeverDMIPSFlowTests)$'],'tests-'+label)
+   command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests|NeverDMIPSTests|NeverDMIPSFlowTests|NeverDX86EVEXFPCompareTests|NeverDX86EVEXCompareTests|NeverDX86MaskCompareStateTests|NeverDX86FPPackedConvertStateTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
    command([tool,'--xbegin'],'exhaustive-xbegin-'+label)
    command([tool,'--rendered-xbegin'],'rendered-xbegin-'+label)
@@ -159,10 +164,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     new_files=sorted(set(objects)-set(base_objects))
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
-    expected_new={'X86VexScan.c.o','X86Vex32Output.c.o'} if label=='vector_batch' else set()
-    assert {Path(k).name for k in new_files}==expected_new
-    assert changed and all(k.startswith('arch/X86/') for k in changed)
-    assert {'X86Mapping.c.o','X86InstPrinterCommon.c.o'} <= {Path(k).name for k in changed}
+    assert not new_files
+    actual={Path(k).name for k in changed}
+    assert {'cs.c.o','X86Mapping.c.o','X86InstPrinterCommon.c.o','X86DisassemblerDecoder.c.o'}<=actual
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
@@ -210,6 +214,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   batch_cases=('jpeg-avx2-i386','libssl3t64-i386','libzstd1-i386','libssl3t64-amd64','libjpeg62-turbo-i386','putty-32-0.85','putty-64-0.85','amd64-ls')
   cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'arm-cp':(0,1,2),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'putty-64-0.85':(0,1,2)}
   batch_cases=('jpeg-avx2-i386','libzstd1-i386','libssl3t64-amd64','putty-32-0.85','putty-64-0.85')
+  cases_of_interest['libmvec-amd64']=(0,1,2)
+  batch_cases=(*batch_cases,'libmvec-amd64')
   for name in batch_cases:cases_of_interest[name]=(*cases_of_interest[name],3)
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2,3):
@@ -233,6 +239,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       row['pairs'][label]=dict(plans=plans[label],median=statistics.median(q['gain'] for q in plans[label]))
      row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==48*len(launches);write('complete',dict(active=feature_active,launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
+  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==sum(map(len,cases_of_interest.values()))*len(launches);write('complete',dict(active=feature_active,launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))

@@ -1,7 +1,7 @@
-name: Compare corrected EVEX family IDs and PE32 batch decoding in the source-built NeverD product
+name: Validate floating compare families on NeverD lift and actual glibc vector math
 on:
   push:
-    branches: [codex/capstone-typed-pe-batch-product]
+    branches: [codex/capstone-float-family-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: a4b585e24f9d6ae55096c93bb92b9ccc0f8418af
+          ref: edc64f154c2f4a900cde89649eb4336cfa258741
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "a4b585e24f9d6ae55096c93bb92b9ccc0f8418af"
+          test "$(git rev-parse HEAD)" = "edc64f154c2f4a900cde89649eb4336cfa258741"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "26ebcf8b672cbfec8536db188aa92c506c915efa"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: family-batch-product-${{ matrix.os }}-${{ matrix.cc }}
+          name: float-family-product-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
