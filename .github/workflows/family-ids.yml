@@ -1,7 +1,7 @@
-name: Verify every legacy access-table entry and benchmark real x86 instruction information across configurations
+name: Verify opcode-indexed operand access on six backends
 on:
   push:
-    branches: [codex/capstone-x86-access-metadata]
+    branches: [codex/capstone-direct-operand-access]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 26ebcf8b672cbfec8536db188aa92c506c915efa
+          ref: 6fe0fa8c14c6dbae1510a70b3a0ba77514131bf7
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: access-table-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: access-opcode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
