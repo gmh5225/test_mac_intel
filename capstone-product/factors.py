@@ -43,11 +43,16 @@ def measure_layout(r,t,build,nd,cs,out,cases,expected,command,write,rev,llvm_ide
    assert fixed.stat().st_ino==ino
   args=([*bind,str(fixed)]if launch=='fixed'else[str(products[k])])+list(map(str,[f,'mips64el',mode,n]))
   return list(map(int,sp.check_output(args,text=True).split()))
+ clock_probe=t/'clock-scale'
+ sp.run(['cc','-x','c','-','-o',clock_probe],input=b'#include <time.h>\n#include <stdio.h>\nint main(void) { printf("%ld", (long)CLOCKS_PER_SEC); }\n',check=True)
+ ticks_per_sec=int(sp.check_output([clock_probe],text=True));assert ticks_per_sec>0
+ target=ticks_per_sec*55/1000
+ write('timer-scale',dict(ticks_per_second=ticks_per_sec,target_milliseconds=55,target_ticks=target))
  rows=[]
  for sample,f in inputs.items():
   for mode in (0,1,2):
    for launch in (['fixed','images']if sample=='ls' else ['fixed']):
-    one=invoke('base',f,mode,1,launch);reps=max(1,round(55000000/one[0]));ref=invoke('base',f,mode,reps,launch);assert ref[0]>0 and ref[1]>0
+    one=invoke('base',f,mode,1,launch);reps=max(1,min(20000,round(target/one[0])));ref=invoke('base',f,mode,reps,launch);assert ref[0]>0 and ref[1]>0
     keys=list(products);cycles=[]
     for i in range(15):
      order=keys[i%len(keys):]+keys[:i%len(keys)];vals={k:[] for k in keys}
