@@ -6,8 +6,9 @@ def run(args,name,cwd=None):
     with (obs/(name+'.log')).open('w') as f:sp.run(args,cwd=cwd,stdout=f,stderr=sp.STDOUT,check=True)
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 meta=json.loads((r/'tree.json').read_text())
+repair=json.loads((r/'repair.json').read_text());assert sha(r/'repair.patch')==repair['sha256']
 git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
-assert git('rev-parse','HEAD')==meta['parent'] and sha(r/'candidate.patch')==meta['sha256']
+assert git('rev-parse','HEAD')==repair['parent'] and sha(r/'candidate.patch')==meta['sha256']
 units=['x86_scan_batch','x86_evex_vpcmp_id','x86_evex_vpcmp_mask_size','x86_evex_detail','x86_buffer_bounds','x86_simple_output','text_option','detail_option','x86_kmask_width']
 conf=os.environ.get('FLAVOR','full');cc=os.environ['CC'];diet=conf=='diet';reduce=conf=='reduce';att=conf!='intel'
 tmp=Path(tempfile.mkdtemp());b=tmp/'build';fixed=tmp/'selected';fixed.mkdir()
@@ -19,7 +20,9 @@ try:
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
     objects={}
-    for variant in ('base','candidate'):
+    for variant in ('base','correct','candidate'):
+        if variant=='correct':
+            git('apply','--index',str(r/'repair.patch'));assert git('write-tree')==repair['tree']
         if variant=='candidate':
             git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
@@ -32,11 +35,13 @@ try:
         assert host=='Linux'
         matching=[key for key in reference if key.endswith('-'+cc+'-'+conf) and (('24.04-arm' in key)==(platform.machine()=='aarch64')) and (('22.04' in key)==('22.04' in Path('/etc/os-release').read_text()))]
         assert len(matching)==1,matching
-        if conf!='full' and variant=='base':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
+        if variant in ('correct','base'):assert sha(libs[variant])==reference[matching[0]]['candidate' if variant=='correct' else 'base'],(matching,variant,sha(libs[variant]))
     assert objects['base'].keys()==objects['candidate'].keys()
-    changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
-    assert all(Path(k).name in {'X86Mapping.c.o'} for k in changed)
-    write('member-changes',dict(changed=changed,total=len(objects['base']),base=sha(libs['base']),candidate=sha(libs['candidate'])))
+    fix_changes=[k for k,v in objects['base'].items() if objects['correct'][k]!=v]
+    assert all(Path(k).name=='X86Mapping.c.o' for k in fix_changes)
+    changed=[k for k,v in objects['correct'].items() if objects['candidate'][k]!=v]
+    assert all(Path(k).name in {'X86Sse64Output.c.o'} for k in changed)
+    write('member-changes',dict(changed=changed,fix_changes=fix_changes,correct=sha(libs['correct']),total=len(objects['base']),base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
     run([tmp/'check-static'],'static-selected')
@@ -49,7 +54,7 @@ try:
         if diet:selected.append('x86_kmask_width')
     if 'x86_reg_access' not in selected: selected.append('x86_reg_access')
     if conf!='full':
-        write('other-profile-images',dict(base=sha(libs['base']),candidate=sha(libs['candidate'])))
+        write('other-profile-images',{k:sha(v) for k,v in libs.items()})
     run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
@@ -119,9 +124,9 @@ try:
             for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
                 first=invoke('base',bits,mode,path,ip,1);n=max(1,round(65e6/first[0]));cycles=[]
                 for i in range(11):
-                    keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
+                    keys=['base','copy','correct','candidate'];o=keys[i%4:]+keys[:i%4];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
-                        v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2]-(writes.get(name,0) if k=="candidate" and mode==3 else 0);cyc[k].append(v[:2])
+                        v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2]-(writes.get(name,0) if k in ("correct","candidate") and mode==3 else 0);cyc[k].append(v[:2])
                     cycles.append(cyc)
                 timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
                 write('timings',timing)
