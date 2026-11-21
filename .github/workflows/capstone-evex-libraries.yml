@@ -1,7 +1,7 @@
-name: Compare public and 64-entry batch scanning against the same iced decoder
+name: Time i386 vector batches against iced and a same-binary scalar control
 on:
   push:
-    branches: [codex/capstone-batch-scan-vs-iced]
+    branches: [codex/capstone-i386-vector-batches]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: batch-current-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: batch-i386-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

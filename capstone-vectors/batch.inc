@@ -1,10 +1,11 @@
-template <bool Audit>
+extern "C" X86ScanBatchResult X86_scanBatch32(csh, const uint8_t *, size_t, uint64_t, uint32_t *, size_t) __attribute__((weak));
+template <bool Audit, auto Next = X86_scanBatch>
 static Result batch_span(const uint8_t *bytes, size_t size, csh handle, cs_insn *insn, uint64_t start_ip) {
   Result out;
   size_t pos=0;
   while(pos<size) {
     uint32_t packed[64];
-    const auto got=X86_scanBatch(handle,bytes+pos,size-pos,start_ip+pos,packed,64);
+    const auto got=Next(handle,bytes+pos,size-pos,start_ip+pos,packed,64);
     if(got.count) {
       size_t initial=pos;
       if constexpr(Audit) if(got.count>64)throw std::runtime_error("batch capacity");
