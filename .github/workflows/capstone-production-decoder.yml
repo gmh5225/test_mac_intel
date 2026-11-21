@@ -1,7 +1,7 @@
-name: Separate alias code and table placement in a source-built NeverD decoder
+name: Check corrected AVX register effects through the current NeverD decoder built from LLVM main
 on:
   push:
-    branches: [codex/neverd-alias-placement-factorial]
+    branches: [codex/neverd-vector-clear-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -14,9 +14,6 @@ jobs:
           - os: ubuntu-24.04
             cc: clang
             replica: 1
-          - os: ubuntu-24.04
-            cc: clang
-            replica: 2
     runs-on: ${{ matrix.os }}
     timeout-minutes: 235
     steps:
@@ -28,7 +25,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 0893dbab19fb16ec3b78cd40fd73d75ff1cc7fb1
+          ref: 58e64b66288f67e511b7ace201314f451d438d3d
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,8 +45,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "0893dbab19fb16ec3b78cd40fd73d75ff1cc7fb1"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "38d0847fb739b95708e6929af78ffdf1ebc806b5"
+          test "$(git rev-parse HEAD)" = "58e64b66288f67e511b7ace201314f451d438d3d"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "958b98cbbeb217ab3e8babe1de7175546ec82748"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -62,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: alias-placement-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vector-clear-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
