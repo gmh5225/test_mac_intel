@@ -1,0 +1,42 @@
+name: Build the private i386 iterator with x86 and x64 MSVC
+on:
+  push:
+    branches: [codex/capstone-i386-private-windows]
+    paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, x86]
+    runs-on: windows-2022
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: private-win
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 09ba26d9848f4ad0920ad0ef5feb512899fabe6c
+          path: source
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Verify public and private output through the native ABI
+        env:
+          TEST_MACHINE: ${{ matrix.arch }}
+        run: python private-win/measure.py
+      - if: always()
+        shell: bash
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: private-members-msvc-${{ matrix.arch }}
+          path: evidence/
+          retention-days: 14
