@@ -1,10 +1,8 @@
-tree 4e0b7e3c1b6470a5975d18f661d38af5671a987b
-parent 78f02050072f4a3778d1339374ec1c31f9b42c1a
-author NeverSightAI <neversightai@gmail.com> 1795199007 +0800
-committer NeverSightAI <neversightai@gmail.com> 1795199007 +0800
+tree ac3c489ee7e8a16f534fe810c9b331673418ccdb
+parent e2266247a3b0f090bcad5bd3a4ead8c3220de367
+author NeverSightAI <neversightai@gmail.com> 1795225095 +0800
+committer NeverSightAI <neversightai@gmail.com> 1795225095 +0800
 
-X86: bound native MSVC inlining of the legacy scan decoder
+PowerPC: initialize operands as the dedicated decoder constructs them
 
-MSVC 19.52 runs out of compiler heap while building the generated legacy
-terminal at /O2 /Ob2. Keep a single copy of that switch on this compiler
-and preserve the existing inline policy on the other supported compilers.
+Use the existing MCInst storage initializer in PowerPC-only CMake and Makefile builds. The architecture decoder appends each operand before it is consumed. Mixed builds retain their original initialization.

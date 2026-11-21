@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public path with the GNU/Clang i386 writer',vector='Same public output plus 32-bit VEX scanning at the generic fallback call',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Published next',aa='Exact baseline copy',route='Qualified public writer',vector='Qualified writer plus i386 packed C5 scan',iced='Forked iced IntelFormatter',fast='Forked iced FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -72,11 +72,12 @@ def main(w):
             added=set(objects[label])-set(objects['integer'])
             expected_changed = {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
             expected_added = {'arch/X86/X86Vex32Output.c.o'}
+            if label=='vector':expected_added.add('arch/X86/X86VexScan.c.o')
             assert added == expected_added, (label, added)
             assert expected_changed <= changed <= expected_changed | {'arch/X86/X86VectorOutput.c.o'}, (label, changed)
             if label == 'vector':
-                diff=sorted(k for k in objects[label] if objects[label][k]!=objects['route'][k])
-                wanted=['arch/X86/X86DisassemblerDecoder.c.o']
+                diff=sorted(k for k in objects[label] if objects[label][k]!=objects['route'].get(k))
+                wanted=['arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86VexScan.c.o']
                 assert diff==wanted,(diff,wanted)
                 save('compiler-scope.json',dict(changed=diff, total=len(objects[label])))
                 run(['python3','-B',tree/'suite/synctools/x86_operand_specializations.py','--check'],'vex-scan-rows')
@@ -107,12 +108,12 @@ def main(w):
     import observe, profile_costs
     run(['git','apply',r/'vector.patch'],'apply-observer',tree)
     observe.build(tree,b,w/'observer',base,r/'observer.cpp',run)
-    columns=['instructions','scan_fallback','generic_result','generic_decode','feature_slow','evex_fast_success']
+    columns=['instructions','scan_fallback','generic_result','generic_decode','feature_slow','evex_fast_success','vex2_attempt','vex2_success','public_writer_success','public_writer_fallback']
     save('observed-fields.json',dict(columns=columns,scope='Single untimed copy of the exact candidate. Counts increment at actual function entry or the compact EVEX success. Last-byte register/memory labels are the encoded ModRM for bare vector forms.'))
     all_costs=[]
     import pe_panels, itertools
     for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w)):
-        if name not in ('libjpeg62-turbo-amd64','libssl3t64-amd64','putty-32-0.85'):continue
+        if name not in ('libjpeg62-turbo-amd64','libssl3t64-amd64','putty-32-0.85','jpeg-avx2-i386'):continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
@@ -130,7 +131,7 @@ def main(w):
             stages={}
             for line in obs.splitlines():
                 fields=line.split('\t')
-                assert len(fields)==7 and fields[0] not in stages
+                assert len(fields)==11 and fields[0] not in stages
                 stages[fields[0]]=list(map(int,fields[1:]))
             census=prefix_census[name+'/'+panel]
             assert sum(v[0] for v in stages.values())==census['decoded']+census['invalid_bytes']
@@ -154,7 +155,7 @@ def main(w):
                 assert len({tuple(v[:3]) for v in results.values()})==1 and results['integer']==results['vector']
             print(name,panel,flush=True)
             save('profile-index.json',all_costs)
-    assert len(all_costs)==33 and len(manifest)==3
+    assert len(all_costs)==44 and len(manifest)==4
     save('complete.json',dict(cases=len(all_costs),source=inputs,consumer=consumer_hash,method='One warmed traversal under Callgrind zeroed at the timed-loop boundary. Guest work, read/write and simulated cache/branch events; wall times are from the independent native run.'))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:

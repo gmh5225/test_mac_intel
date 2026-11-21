@@ -1,7 +1,7 @@
-name: Attribute actual 64-bit SIMD decoding and rendering work against forked iced
+name: Attribute i386 JPEG and remaining PE and 64-bit SIMD output costs against forked iced
 on:
   push:
-    branches: [codex/capstone-openSSL-simd-profile]
+    branches: [codex/capstone-vex32-work-attribution]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-22.04, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a9d153f4cae6c71eb02309621bbce3c9508312dc
+          ref: 26ebcf8b672cbfec8536db188aa92c506c915efa
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fork-simd-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-simd-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
