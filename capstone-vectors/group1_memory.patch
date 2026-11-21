@@ -1,0 +1,312 @@
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..81b165b8 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -11,7 +11,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
+ 			0, 0, 0, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
+-			0, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
+ 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -85,7 +85,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
+ 			0, 0, 65535, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
+-			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
+ 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -103,7 +103,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -121,7 +121,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 13695450..95e07ac5 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -31,7 +31,11 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
++#ifdef X86_ALU_IMMEDIATE
++	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
++#else
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
++#endif
+ 	const unsigned imm_offset = offset + disp_size;
+ 	const unsigned length = imm_offset + imm_size;
+ #else
+@@ -131,6 +135,11 @@ bool X86_writeMemoryOutput(
+ 		out = X86_writeDisplacement(out, displacement);
+ 	*out++ = ']';
+ #ifdef X86_MEMORY_IMMEDIATE
++#ifdef X86_ALU_IMMEDIATE
++	memcpy(out, ", ", 2);
++	const int64_t value = X86_writeAluImmediate(out + 2, code + imm_offset,
++						    opcode, rex, modrm);
++#else
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+@@ -144,6 +153,7 @@ bool X86_writeMemoryOutput(
+ #endif
+ 	memcpy(out, ", ", 2);
+ 	writeUnsignedImmediate(out + 2, value);
++#endif
+ #else
+ 	if (!load && !push) {
+ 		memcpy(out, ", ", 2);
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index aff17085..e7ce8ed8 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -47,6 +47,11 @@ enum X86SimpleForm {
+ /* This plan gets its ALU row from ModR/M.reg. Its low bits select the
+  * same register-only operand check as a register pair. */
+ #define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
++#ifdef X86_FIXED_ALU_MEMORY
++#define X86_BYTE_GROUP1_PLAN X86_PLAN_GROUP1_IMMEDIATE
++#else
++#define X86_BYTE_GROUP1_PLAN 0
++#endif
+ 
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 03c3739b..f67833e0 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -68,8 +68,25 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const bool single = opcode == 0xff &&
+ 					    (modrm & 0x38) == 0x30;
+ #endif
+-			if (!alu && !test_or_mov && opcode != 0x8d && !single)
++			if (!alu && !test_or_mov && opcode != 0x8d && !single) {
++#ifdef X86_FIXED_ALU_MEMORY
++				if (plan == X86_PLAN_GROUP1_IMMEDIATE &&
++				    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++					const unsigned pair = (modrm & 0x38) |
++							      (opcode & 1);
++					const unsigned row =
++						x86_simple_plans[wide]
++								[prefix_class]
++								[pair] >>
++						2;
++					return X86_FIXED_ALU_MEMORY(
++						code, size, insn, insn_size,
++						&x86_simple_outputs[row],
++						x86_simple_registers);
++				}
++#endif
+ 				return false;
++			}
+ 			base_memory = true;
+ 		} else if (opcode == 0x8d || opcode == 0xff) {
+ 			return false;
+@@ -106,6 +123,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else {
+ 			if (size < (opcode == 0x81 ? 6u : 3u) + has_rex)
+ 				return false;
++#ifdef X86_FIXED_ALU_MEMORY
++			if (opcode == 0x80)
++				return false;
++#endif
+ 			const unsigned group = (modrm >> 3) & 7;
+ 			row = plan == X86_PLAN_SHIFT_IMM8 ?
+ 				      x86_shift_rows[wide][prefix_class][group] :
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 97642338..ee6656c6 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -15,12 +15,18 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+ #define X86_FIXED_VEX2 writeVex2Memory64
++#define X86_FIXED_ALU_MEMORY writeAluMemory64
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorRegisterWriter.h"
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
+ #define X86_IMMEDIATE_WIDE 1
+ #include "X86MemoryOutputImpl.h"
++#undef X86_MEMORY_IMMEDIATE
++#define X86_MEMORY_IMMEDIATE X86_FIXED_ALU_MEMORY
++#define X86_ALU_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_ALU_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
+ #undef X86_MEMORY_IMMEDIATE
+ 
+diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
+index 6f3953cc..91e66458 100644
+--- a/arch/X86/X86UnsignedImmediate.h
++++ b/arch/X86/X86UnsignedImmediate.h
+@@ -23,4 +23,32 @@ static char *writeUnsignedImmediate(char *out, uint64_t value)
+ 	}
+ }
+ 
++/* Intel syntax masks logical immediates to the destination width. Arithmetic
++ * immediates retain their signed value when the encoding sign-extends. */
++static inline int64_t X86_writeAluImmediate(char *out, const uint8_t *bytes,
++					    uint8_t opcode, uint8_t rex,
++					    uint8_t modrm)
++{
++	const bool wide = (rex & 8) != 0;
++	int64_t value;
++	if (opcode == 0x81) {
++		const uint32_t raw = (uint32_t)X86_readDisp32(bytes);
++		value = wide ? (int64_t)(int32_t)raw : (int64_t)raw;
++	} else {
++		value = opcode == 0x83 ? (int64_t)(int8_t)*bytes :
++					 (int64_t)*bytes;
++	}
++	const unsigned group = (modrm >> 3) & 7;
++	const bool logical = opcode != 0xc1 &&
++			     (group == 1 || group == 4 || group == 6);
++	if (logical && !wide)
++		value = (uint32_t)value;
++	const bool negative = value < 0 && !logical;
++	if (negative)
++		*out++ = '-';
++	writeUnsignedImmediate(out,
++			       negative ? (uint64_t)-value : (uint64_t)value);
++	return value;
++}
++
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index dfbe52c0..442c813c 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -13,6 +13,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
++#define X86_FIXED_ALU_MEMORY writeAluMemory32
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorRegisterWriter.h"
+@@ -20,6 +21,11 @@
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
+ #define X86_IMMEDIATE_WIDE 0
+ #include "X86MemoryOutputImpl.h"
++#undef X86_MEMORY_IMMEDIATE
++#define X86_MEMORY_IMMEDIATE X86_FIXED_ALU_MEMORY
++#define X86_ALU_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_ALU_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
+ #undef X86_MEMORY_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index fc4d6817..0fb766f4 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -545,9 +545,17 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 			std::cout << "\t\t{\n";
+ 			for (unsigned j = 0; j < 256; j += 16) {
+ 				std::cout << "\t\t\t";
+-				for (unsigned k = 0; k < 16; ++k)
+-					std::cout << (k ? " " : "")
+-						  << prefix[j + k] << ',';
++				for (unsigned k = 0; k < 16; ++k) {
++					const auto plan = prefix[j + k];
++					std::cout << (k ? " " : "");
++					if (j + k == 0x80 &&
++					    plan == X86_PLAN_GROUP1_IMMEDIATE)
++						std::cout
++							<< "X86_BYTE_GROUP1_PLAN";
++					else
++						std::cout << plan;
++					std::cout << ',';
++				}
+ 				std::cout << '\n';
+ 			}
+ 			std::cout << "\t\t},\n";
+@@ -984,10 +992,12 @@ int main(int argc, char **argv)
+ 	for (unsigned wide = 0; wide < 2; ++wide) {
+ 		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
+ 			for (unsigned alu = 1; alu < 0x40; alu += 8) {
+-				if (!plans[wide][cls][alu])
++				if (!plans[wide][cls][alu] ||
++				    !plans[wide][cls][alu - 1])
+ 					throw std::runtime_error(
+ 						"missing group-1 register row");
+ 			}
++			plans[wide][cls][0x80] = X86_PLAN_GROUP1_IMMEDIATE;
+ 			plans[wide][cls][0x81] = X86_PLAN_GROUP1_IMMEDIATE;
+ 			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMMEDIATE;
+ 		}
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6ca1b43b..503a83d0 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -875,6 +875,40 @@ static bool check_absolute_addresses32(csh handles[2])
+ 	return true;
+ }
+ 
++static bool check_group1_output(csh handles[2], cs_mode mode)
++{
++	const uint8_t opcodes[] = { 0x80, 0x81, 0x83 };
++	const uint8_t edges[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
++	for (unsigned p = 0; p < (mode == CS_MODE_64 ? 17u : 1u); ++p) {
++		for (unsigned op = 0; op < sizeof(opcodes); ++op) {
++			for (unsigned mr = 0; mr <= 255; ++mr) {
++				unsigned count = (mr < 0xc0 && (mr & 7) == 4) ?
++							 256 :
++							 sizeof(edges);
++				for (unsigned n = 0; n < count; ++n) {
++					uint8_t code[12];
++					memset(code, edges[n % sizeof(edges)],
++					       sizeof(code));
++					code[0] = (uint8_t)(0x3f + p);
++					code[1] = opcodes[op];
++					code[2] = (uint8_t)mr;
++					if (count == 256)
++						code[3] = (uint8_t)n;
++					unsigned seed = mr + op + p + n;
++					const uint8_t *start = code + !p;
++					size_t size = sizeof(code) - !p;
++					if (!compare(handles, start, size,
++						     seed) ||
++					    !compare(handles, start,
++						     seed % size, seed))
++						return false;
++				}
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ {
+ 	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
+@@ -1150,7 +1184,8 @@ static bool check_mode(cs_mode mode)
+ 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+ 		     !check_vex2_base_memory(handles)) ||
+ 		    (private_iter != X86_disasmIter &&
+-		     !check_mov_memory_immediates(handles, mode)) ||
++		     (!check_mov_memory_immediates(handles, mode) ||
++		      !check_group1_output(handles, mode))) ||
+ 		    !check_vex_register_forms(handles) ||
+ 		    (mode == CS_MODE_64 &&
+ 		     (!check_evex(handles) || !check_evex_extract(handles) ||
