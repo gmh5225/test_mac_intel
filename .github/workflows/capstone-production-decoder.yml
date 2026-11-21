@@ -1,7 +1,7 @@
-name: Measure VEX2 scanning through the shipping NeverD entry and protect scalar and other architectures
+name: Time the isolated i386 address reader and scan dispatch while retaining the shipping amd64 code
 on:
   push:
-    branches: [codex/neverd-production-i386-scan]
+    branches: [codex/neverd-production-isolated-i386]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: ebbb961e75e548dfdfadf6da1d53264c860c8d5a
+          ref: ac6108fe6caa3e7bede9d8447ebd9d4d46851863
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "ebbb961e75e548dfdfadf6da1d53264c860c8d5a"
+          test "$(git rev-parse HEAD)" = "ac6108fe6caa3e7bede9d8447ebd9d4d46851863"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "88f64f91be1b3c9de7c5819e93806fa8d79127db"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-scan-${{ matrix.os }}-${{ matrix.cc }}
+          name: isolated-i386-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
