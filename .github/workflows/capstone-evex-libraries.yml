@@ -1,7 +1,7 @@
-name: Compare combined i386 and RISC-V next with both iced formatters on the concurrent MIPS change
+name: Measure the published Capstone amd64 widening release against both iced formatters
 on:
   push:
-    branches: [codex/capstone-current-next-iced]
+    branches: [codex/capstone-published-extended-operands-native]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 38d0847fb739b95708e6929af78ffdf1ebc806b5
+          ref: c9a9fcbc9a87f468f8039bbddc3467f21fdc1edf
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: next-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: integrated-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
