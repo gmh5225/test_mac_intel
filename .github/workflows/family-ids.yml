@@ -1,7 +1,7 @@
-name: Verify opcode-indexed operand access on six backends
+name: Check real packed EVEX output, public API and six-backend regressions
 on:
   push:
-    branches: [codex/capstone-direct-operand-access]
+    branches: [codex/capstone-packed-move-six-backends]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: access-opcode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: packed-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

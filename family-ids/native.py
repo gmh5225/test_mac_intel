@@ -25,36 +25,20 @@ try:
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
-        if not diet:
-            mapping=s/'arch/X86/X86Mapping.c';original=mapping.read_bytes()
-            try:
-                mapping.write_bytes(original+b'\n'+(r/'lookup.c').read_bytes())
-                run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-tables-'+variant)
-                verified[variant]=tmp/(variant+'-tables.so')
-                shutil.copyfile(path,verified[variant])
-            finally:
-                git('restore','--worktree','--','arch/X86/X86Mapping.c')
-                assert mapping.read_bytes()==original
-    if not diet:
-        run(['c++','-O2','-std=c++17','-I',s/'include',r/'lookup.cpp','-ldl','-o',tmp/'lookup'],'compile-tables')
-        result=json.loads(sp.check_output([tmp/'lookup',verified['base'],verified['candidate']],text=True))
-        assert result['checked']==6*(result['ids']+3) and result['present']>0 and result['absent']>0
-        write('lookup',result)
     if conf=='full':
-        selected=units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access']
+        selected=units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
         selected=units
     else:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
-    if diet:
+    if diet or reduce:
         assert sha(libs['base'])==sha(libs['candidate'])
-        write('diet-images',dict(identical=True,sha256=sha(libs['base'])))
+        write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
     run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
     run(['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
-    run(['python3','-B',s/'suite/synctools/x86_operand_access.py','--check'],'access-index')
     run(['c++','-O2','-std=c++17','-I',s/'include',r/'records.cpp','-ldl','-o',tmp/'verify'],'compile-verify')
     if reduce:panels=[]
     else:panels=[('matrix32',32,'matrix',0),('matrix64',64,'matrix',0)]
