@@ -1,7 +1,7 @@
-name: Compare isolated PE32 workers and x86 metadata in source-built NeverD
+name: Measure direct operand access and typed compare families in NeverD
 on:
   push:
-    branches: [codex/capstone-pe32-workers-product]
+    branches: [codex/capstone-direct-access-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: edc64f154c2f4a900cde89649eb4336cfa258741
+          ref: 450a47bc595ad56e64235db05873bbad416d0a56
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,8 +44,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "edc64f154c2f4a900cde89649eb4336cfa258741"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "26ebcf8b672cbfec8536db188aa92c506c915efa"
+          test "$(git rev-parse HEAD)" = "450a47bc595ad56e64235db05873bbad416d0a56"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "6fe0fa8c14c6dbae1510a70b3a0ba77514131bf7"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:

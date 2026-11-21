@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang' and platform.machine()=='x86_64'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Measure the EVEX family ID correction, PE32 scalar batches and the combined vector candidate with public and actual NeverD integration'))
+write('scope',dict(active=feature_active,policy='Compare direct operand descriptors, typed compare families and PE32 multiple-request routing on the real NeverD source build.'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -137,7 +137,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      if label=='base':canonical_signatures[key]=norm
      assert canonical_signatures[key]==norm,(label,key,canonical_signatures[key],norm)
      delta[key]=norm[-1]-raw[-1]
-     if label=='mapped':assert delta[key]==0,(key,delta[key])
+     if label=='owner':assert delta[key]==0,(key,delta[key])
      elif label!='base':assert delta[key]==adjustments['base'][key],(label,key,delta[key],adjustments['base'][key])
    adjustments[label]=delta
    write('typed-checksums-'+label,dict(delta=delta,normalized=canonical_signatures))
@@ -167,8 +167,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files
     actual={Path(k).name for k in changed}
-    wanted={'X86Mapping.c.o'} if label=='access' else {'X86DisassemblerDecoder.c.o'}
-    if label=='mapped':wanted={'X86Mapping.c.o','X86InstPrinterCommon.c.o','X86DisassemblerDecoder.c.o'}
+    wanted={'X86Mapping.c.o'} if label=='direct' else {'X86DisassemblerDecoder.c.o'}
+    if label=='owner':wanted={'X86Mapping.c.o','X86InstPrinterCommon.c.o','X86DisassemblerDecoder.c.o'}
     assert actual==wanted,(label,actual,wanted)
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
