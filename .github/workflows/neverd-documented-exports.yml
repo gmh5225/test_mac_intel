@@ -1,0 +1,47 @@
+name: Verify documented module exports through the native ARM64 Windows loader
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths: ['public-sdk-exports/webauthn.json', '.github/workflows/neverd-documented-exports.yml']
+permissions:
+  contents: read
+jobs:
+  exports:
+    runs-on: windows-11-arm
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: public-sdk-exports
+          persist-credentials: false
+      - name: Resolve every documented WebAuthn export in the installed signed system image
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = Get-Content public-sdk-exports/webauthn.json -Raw | ConvertFrom-Json
+          $arch = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
+          if ($arch -ne 'Arm64') { throw "Unexpected host process architecture $arch" }
+          $path = Join-Path ([Environment]::SystemDirectory) $manifest.module
+          $pe = [IO.File]::ReadAllBytes($path)
+          $nt = [BitConverter]::ToInt32($pe, 0x3c)
+          $machine = [BitConverter]::ToUInt16($pe, $nt + 4)
+          if ($machine -ne 0xaa64) { throw "Unexpected PE machine $machine" }
+          $signature = Get-AuthenticodeSignature -LiteralPath $path
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft') { throw 'Unable to authenticate the installed module' }
+          $names = @($manifest.names | Sort-Object -Unique)
+          if ($names.Count -ne 42 -or $names.Count -ne $manifest.names.Count) { throw 'Incomplete metadata inventory' }
+          $module = [Runtime.InteropServices.NativeLibrary]::Load($path)
+          try {
+            foreach ($name in $names) {
+              if ([Runtime.InteropServices.NativeLibrary]::GetExport($module, $name) -eq [IntPtr]::Zero) { throw "The system loader could not resolve $name" }
+            }
+          } finally {
+            [Runtime.InteropServices.NativeLibrary]::Free($module)
+          }
+          @{architecture=$arch; machine=$machine; version=[Environment]::OSVersion.VersionString; module=$manifest.module; image_sha256=(Get-FileHash $path).Hash.ToLower(); file_version=(Get-Item $path).VersionInfo.FileVersion; signer=$signature.SignerCertificate.Subject; metadata_sha256=$manifest.metadata_sha256; resolved=$names} | ConvertTo-Json -Depth 4 | Set-Content documented-exports.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: documented-exports
+          path: documented-exports.json
+          if-no-files-found: error
+          retention-days: 14
