@@ -1,20 +1,18 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d04037ba..956d7a4c 100644
+index 77d1aaa8..8c2907e4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1044,8 +1044,19 @@ target_include_directories(capstone PUBLIC
+@@ -1044,8 +1044,17 @@ target_include_directories(capstone PUBLIC
  )
  set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
  
 -# The i386 iterator is an internal static-link entry used by NeverD.
 -if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
-+# Multiarch user-space iterators select the width-specific text path at entry.
++# Multiarch user-space builds also use the width-specific writers for full x86 output.
 +if(CAPSTONE_X86_SUPPORT AND NOT capstone_enabled_architectures STREQUAL "X86"
 +   AND CAPSTONE_USE_DEFAULT_ALLOC AND NOT CAPSTONE_BUILD_DIET
 +   AND NOT CAPSTONE_X86_REDUCE AND NOT CAPSTONE_OSXKERNEL_SUPPORT)
-+    set(capstone_width_iterators ON)
-+    set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY
-+        COMPILE_DEFINITIONS CAPSTONE_X86_WIDTH_ITERATORS)
++    add_compile_definitions(CAPSTONE_X86_WIDTH_ITERATORS)
 +    target_sources(capstone PRIVATE arch/X86/X86Vex32Output.c arch/X86/X86Sse64Output.c)
 +    if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
 +        set_property(SOURCE arch/X86/X86Sse64Output.c APPEND PROPERTY
@@ -25,7 +23,7 @@ index d04037ba..956d7a4c 100644
      target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
      set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
 diff --git a/Makefile b/Makefile
-index 3d17212d..d5ec3f49 100644
+index b8b582a0..b00035e4 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -436,6 +436,16 @@ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $
@@ -36,7 +34,7 @@ index 3d17212d..d5ec3f49 100644
 +ifneq (,$(filter-out x86,$(CAPSTONE_ARCHS)))
 +ifeq ($(CAPSTONE_USE_SYS_DYN_MEM),yes)
 +ifeq (,$(filter yes,$(CAPSTONE_DIET) $(CAPSTONE_X86_REDUCE) $(CAPSTONE_HAS_OSXKERNEL)))
-+$(OBJDIR)/arch/X86/X86DisassemblerDecoder.o: CFLAGS += -DCAPSTONE_X86_WIDTH_ITERATORS
++CFLAGS += -DCAPSTONE_X86_WIDTH_ITERATORS
 +LIBOBJ_SHARED += $(LIBOBJ_X86_STATIC_OUTPUT)
 +endif
 +endif
@@ -45,26 +43,181 @@ index 3d17212d..d5ec3f49 100644
  
  
  ifeq ($(PKG_EXTRA),)
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..d9973a4b 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,6 +20,25 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
+ 
++#if defined(CAPSTONE_X86_WIDTH_ITERATORS) && !defined(CAPSTONE_DIET) && \
++	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_WIDTH_OUTPUT
++#include "../../cs_priv.h"
++CAPSTONE_INTERNAL bool X86_tryIteratorOutput32(cs_struct *handle,
++					       const uint8_t *code, size_t size,
++					       cs_insn *insn,
++					       uint16_t *insn_size);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size,
++			 unsigned int batch);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeWidthText(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, unsigned int batch);
++#endif
++
+ #if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+ 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..1db4347f 100644
+index 12428fff..0736f3c4 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3792,6 +3792,15 @@ X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
- 				 uint64_t *address, cs_insn *insn)
- {
-+#if defined(CAPSTONE_X86_WIDTH_ITERATORS) && !defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (*size && handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
-+		if (handle->mode == CS_MODE_64)
-+			return X86_disasmIterText(ud, code, size, address, insn);
-+		if (handle->mode == CS_MODE_32)
-+			return X86_disasmIter32(ud, code, size, address, insn);
-+	}
-+#endif
- 	return cs_disasm_iter_core(ud, code, size, address, insn);
- }
+@@ -3753,6 +3753,9 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
  
++#ifdef CAPSTONE_X86_PUBLIC_WIDTH_OUTPUT
++#define CS_DECODE_FULL_IMPL X86_decodeIteratorOutput
++#endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 2bd24bc5..d76dd8c4 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -336,4 +336,23 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_PUBLIC_WIDTH_OUTPUT
++/* The public iterator has already established an x86 text request. */
++CS_PRESERVE_MOST bool X86_decodeWidthText(cs_struct *handle,
++					  const uint8_t *code, size_t size,
++					  cs_insn *insn, uint16_t *insn_size,
++					  unsigned int batch)
++{
++	if (handle->mode == CS_MODE_64) {
++		if (tryOutput64(handle, code, size, insn, insn_size))
++			return true;
++	} else if (handle->mode == CS_MODE_32 &&
++		   X86_tryIteratorOutput32(handle, code, size, insn,
++					   insn_size)) {
++		return true;
++	}
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
++#endif
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 5dcd5dda..c5a3a8ee 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -211,4 +211,34 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_PUBLIC_WIDTH_OUTPUT
++bool X86_tryIteratorOutput32(cs_struct *handle, const uint8_t *code,
++			     size_t size, cs_insn *insn, uint16_t *insn_size)
++{
++	return tryOutput32(handle, code, size, insn, insn_size);
++}
++
++#if defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
++#if __has_attribute(musttail)
++#define X86_OUTPUT_TAIL __attribute__((musttail))
++#endif
++#endif
++#ifndef X86_OUTPUT_TAIL
++#define X86_OUTPUT_TAIL
++#endif
++
++/* Keep the generated x86 writer's register saves out of foreign decodes. */
++CS_PRESERVE_MOST bool
++X86_decodeIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size, unsigned int batch)
++{
++	if (handle->arch == CS_ARCH_X86 && !handle->no_text)
++		X86_OUTPUT_TAIL return X86_decodeWidthText(
++			handle, code, size, insn, insn_size, batch);
++	X86_OUTPUT_TAIL return cs_decode_full_insn(handle, code, size, insn,
++						   insn_size, batch);
++}
++#undef X86_OUTPUT_TAIL
++#endif
+ #endif
+diff --git a/cs.c b/cs.c
+index ab0ca56b..8b9ade07 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1044,9 +1044,10 @@ static __attribute__((noinline)) CS_PRESERVE_MOST bool
+ decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
+ 
+-CS_PRESERVE_MOST bool
+-cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++CS_PRESERVE_MOST bool cs_decode_full_insn(cs_struct *handle,
++					  const uint8_t *code, size_t size,
++					  cs_insn *insn, uint16_t *insn_size,
++					  cs_decode_batch batch)
+ {
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+@@ -1065,7 +1066,7 @@ __attribute__((noinline))
+ #endif
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, cs_decode_batch batch)
+ {
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..c9d9e9d7 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,9 +18,19 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
++/* A word-sized batch flag can be forwarded without zero-extending a
++ * subregister protected by the private preserve_most convention. */
++#ifdef CAPSTONE_X86_PUBLIC_WIDTH_OUTPUT
++typedef unsigned int cs_decode_batch;
++#else
++typedef bool cs_decode_batch;
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size, cs_decode_batch batch);
++#ifndef CS_DECODE_FULL_IMPL
++#define CS_DECODE_FULL_IMPL cs_decode_full_insn
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+ 			size_t *size, uint64_t *address, cs_insn *insn);
+@@ -163,9 +173,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
+-	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	return CS_DECODE_FULL_IMPL(handle, code, size, insn, insn_size, batch);
+ }
+ #undef CS_DECODE_SCAN
++#undef CS_DECODE_FULL_IMPL
+ 
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 7738367c..cf80f27a 100644
 --- a/tests/unit/CMakeLists.txt
@@ -78,3 +231,70 @@ index 7738367c..cf80f27a 100644
      target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
  endif()
  
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 678bc384..5bd89890 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1285,8 +1285,62 @@ done:
+ 	return ok;
+ }
+ 
++static bool check_public_mode_changes(void)
++{
++	static const uint8_t code[][5] = { { 0x48, 0x89, 0xd8 },
++					   { 0xb8, 0x34, 0x12, 0x78, 0x56 } };
++	static const cs_mode modes[] = { CS_MODE_64, CS_MODE_16, CS_MODE_32,
++					 CS_MODE_16, CS_MODE_64, CS_MODE_32 };
++	csh handle;
++	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
++		return false;
++	cs_insn *insn = cs_malloc(handle);
++	bool ok = false;
++	if (!insn)
++		goto done;
++	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i) {
++		if (cs_option(handle, CS_OPT_MODE, modes[i]) != CS_ERR_OK ||
++		    cs_option(handle, CS_OPT_MODE, CS_MODE_BIG_ENDIAN) !=
++			    CS_ERR_OPTION)
++			goto done;
++		for (unsigned text = 0; text < 2; ++text) {
++			if (cs_option(handle, CS_OPT_TEXT,
++				      text ? CS_OPT_ON : CS_OPT_OFF) !=
++			    CS_ERR_OK)
++				goto done;
++			for (unsigned k = 0; k < 2; ++k) {
++				const uint8_t *cursor = code[k];
++				size_t size = sizeof(code[k]);
++				uint64_t address = 0x1000;
++				unsigned length =
++					k ? (modes[i] == CS_MODE_16 ? 3 : 5) :
++					    (modes[i] == CS_MODE_64 ? 3 : 1);
++				unsigned id = k || modes[i] == CS_MODE_64 ?
++						      X86_INS_MOV :
++						      X86_INS_DEC;
++				if (!cs_disasm_iter(handle, &cursor, &size,
++						    &address, insn) ||
++				    insn->id != id || insn->size != length ||
++				    cursor != code[k] + length ||
++				    size != sizeof(code[k]) - length ||
++				    address != 0x1000 + length ||
++				    (insn->mnemonic[0] != '\0') != (text != 0))
++					goto done;
++			}
++		}
++	}
++	ok = true;
++done:
++	if (insn)
++		cs_free(insn, 1);
++	cs_close(&handle);
++	return ok;
++}
++
+ int main(void)
+ {
++	if (!check_public_mode_changes())
++		return 1;
+ 	private_iter = X86_disasmIter32;
+ 	if (!check_mode(CS_MODE_32))
+ 		return 1;
