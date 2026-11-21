@@ -1,7 +1,7 @@
-name: Measure private amd64 indirect targets against both iced formatters on real PE and ELF
+name: Measure private EVEX rounded arithmetic with identical ordinary libraries
 on:
   push:
-    branches: [codex/capstone-amd64-indirect-targets]
+    branches: [codex/capstone-private-evex-rounding64]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: indirect-targets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: private-evex-rounding-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
