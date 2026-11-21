@@ -32,9 +32,22 @@ try:
     else:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
-    if diet or reduce:
-        assert sha(libs['base'])==sha(libs['candidate'])
-        write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
+    exported={}
+    for label,path in libs.items():
+        table=sp.check_output(['nm','-D','--defined-only',path],text=True)
+        exported[label]=sorted(line.split()[-2:]for line in table.splitlines()if line.split())
+    assert exported['base']==exported['candidate'] and exported['base']
+    write('public-abi',dict(symbols=exported['base'],identical=True))
+    objects=sorted((b/'CMakeFiles/capstone.dir').rglob('*.o'))
+    assert any(x.name=='X86Vex32Output.c.o' for x in objects)
+    run([cc,'-O2','-I'+str(s),'-I'+str(s/'include'),r/'fallback.c',*objects,'-lm','-o',tmp/'fallback'],'build-iterator-matrix')
+    run([tmp/'fallback'],'iterator-matrix')
+    if not (diet or reduce):
+        run(['c++','-O2','-std=c++17','-I'+str(s/'include'),s/'suite/synctools/x86_vector_output.cpp',*objects,'-lm','-o',tmp/'vex-projection'],'compile-vex-projection')
+        probe=sp.run([tmp/'vex-projection','--vex32-memory'],check=True,stdout=sp.PIPE,stderr=sp.PIPE)
+        checked=(s/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes()
+        assert checked==probe.stdout
+        write('vex-projection',dict(sha256=hashlib.sha256(checked).hexdigest(),counts=probe.stderr.decode()))
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
     run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
