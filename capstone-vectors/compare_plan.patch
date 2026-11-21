@@ -1,0 +1,296 @@
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index 5b106bf5..a888ee23 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -11,7 +11,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
+ 			0, 0, 0, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
+-			0, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
++			X86_BYTE_COMPARE_OUTPUT_PLAN, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
+ 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -85,7 +85,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
+ 			0, 0, 65535, 0, 0, 0, X86_PACKED_OUTPUT_PLAN, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
+-			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
++			X86_BYTE_COMPARE_OUTPUT_PLAN, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
+ 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -103,7 +103,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
++			X86_BYTE_COMPARE_OUTPUT_PLAN, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -121,7 +121,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
++			X86_BYTE_COMPARE_OUTPUT_PLAN, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index db8e4393..5dd7240d 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -28,7 +28,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-	const unsigned imm_size = (opcode & 1) ? 4 : 1;
++	const unsigned imm_size = (opcode & 1) && opcode != 0x83 ? 4 : 1;
+ 	const unsigned imm_offset = offset + disp_size;
+ 	const unsigned length = imm_offset + imm_size;
+ #else
+@@ -118,16 +118,21 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
++	/* 83 /7 extends imm8 to the operand width. REX.W C7 and 81
++	 * extend imm32. MOV prints its unsigned bit pattern. */
++	int64_t value = encoded;
++	if (opcode == 0x83)
++		value = (int8_t)encoded;
+ #if X86_IMMEDIATE_WIDE
+-	const uint64_t value = row->ops[0].size == 8 ?
+-				       (uint64_t)(int64_t)(int32_t)encoded :
+-				       encoded;
+-#else
+-	const uint32_t value = encoded;
++	else if (imm_size == 4 && row->ops[0].size == 8)
++		value = (int32_t)encoded;
+ #endif
+ 	memcpy(out, ", ", 2);
+-	writeUnsignedImmediate(out + 2, value);
++	out += 2;
++	const bool negative = row->id == X86_INS_CMP && value < 0;
++	if (negative)
++		*out++ = '-';
++	writeUnsignedImmediate(out, (uint64_t)(negative ? -value : value));
+ #else
+ 	if (!load && !push) {
+ 		memcpy(out, ", ", 2);
+@@ -140,7 +145,7 @@ bool X86_writeMemoryOutput(
+ 		cs_x86 *x = &insn->detail->x86;
+ #ifdef X86_MEMORY_IMMEDIATE
+ 		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = (int64_t)value;
++		x->operands[1].imm = value;
+ 		x->operands[1].access = 0;
+ 		x->encoding.imm_offset = (uint8_t)imm_offset;
+ 		x->encoding.imm_size = (uint8_t)imm_size;
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index a9180aa2..6d589fcc 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -51,6 +51,16 @@ enum X86SimpleForm {
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+ #define X86_PLAN_VECTOR UINT16_MAX
++/* A private fixed-mode iterator can handle a byte memory compare after the
++ * opcode lookup. Other iterators leave its entry at the ordinary miss. */
++#define X86_PLAN_BYTE_COMPARE (UINT16_MAX & ~15u)
++#ifdef X86_FIXED_MEMORY_IMMEDIATE
++#define X86_BYTE_COMPARE_OUTPUT_PLAN X86_PLAN_BYTE_COMPARE
++#define X86_FIRST_SPECIAL_PLAN X86_PLAN_BYTE_COMPARE
++#else
++#define X86_BYTE_COMPARE_OUTPUT_PLAN 0
++#define X86_FIRST_SPECIAL_PLAN X86_PLAN_PUSH_IMMEDIATE
++#endif
+ /* The static 64-bit iterator specializes the SSE2 and VEX2 packed-memory plans. */
+ #define X86_PLAN_PACKED ((UINT16_MAX & ~7u) | X86_SIMPLE_RELATIVE)
+ #ifdef X86_FIXED_PACKED
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 0a354369..d96bb6f1 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -65,7 +65,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ #else
+ 			const bool single = opcode == 0xff && group == 6;
+ #endif
+-			if (!alu && !test_or_mov && opcode != 0x8d && !single)
++			if (!alu && !test_or_mov && opcode != 0x8d && !single
++#ifdef X86_FIXED_MEMORY_IMMEDIATE
++			    && plan != X86_PLAN_GROUP1_IMMEDIATE
++#endif
++			)
+ 				return false;
+ 			base_memory = true;
+ 		} else if (opcode == 0x8d || opcode == 0xff) {
+@@ -75,7 +79,24 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+ 		return false;
+ 
+-	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
++	if (plan >= X86_FIRST_SPECIAL_PLAN) {
++#ifdef X86_FIXED_MEMORY_IMMEDIATE
++		if (plan == X86_PLAN_BYTE_COMPARE || base_memory) {
++			if (size < lead + 2)
++				return false;
++			const uint8_t mr = code[lead + 1];
++			if (mr >= 0xc0 || (mr & 0x38) != 0x38)
++				return false;
++			/* CMP r/m, reg has the same flags, memory width and access. */
++			const unsigned row =
++				x86_simple_plans[wide][prefix_class]
++						[0x38 | (opcode & 1)] >>
++				2;
++			return X86_FIXED_MEMORY_IMMEDIATE(
++				code, size, insn, insn_size,
++				&x86_simple_outputs[row], x86_simple_registers);
++		}
++#endif
+ 		if (plan == X86_PLAN_VECTOR)
+ 			return X86_writeVectorOutput(code, size, insn,
+ 						     insn_size,
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 49c8044c..37305212 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -15,6 +15,7 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+ #define X86_FIXED_PACKED writePackedOutput64
++#define X86_FIXED_MEMORY_IMMEDIATE writeMemoryImmediate64
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorRegisterWriter.h"
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 8bb11904..db61b083 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -13,6 +13,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
++#define X86_FIXED_MEMORY_IMMEDIATE writeMemoryImmediate32
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorRegisterWriter.h"
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index 1980fe66..bbb856a8 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -522,7 +522,7 @@ void add_rex_stack(Decoder &decoder, const RegisterTable &regs,
+ 							  uint8_t(rex), 0,
+ 							  nullptr, nullptr));
+ 		}
+-		if (rows.size() + 1 >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++		if (rows.size() + 1 >= (X86_PLAN_BYTE_COMPARE >> 2))
+ 			throw std::runtime_error(
+ 				"too many fixed output records");
+ 		const uint16_t plan =
+@@ -551,7 +551,10 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 				for (unsigned k = 0; k < 16; ++k) {
+ 					std::cout << (k ? " " : "");
+ 					const unsigned plan = prefix[j + k];
+-					if (plan == X86_PLAN_PACKED)
++					if (plan == X86_PLAN_BYTE_COMPARE)
++						std::cout
++							<< "X86_BYTE_COMPARE_OUTPUT_PLAN";
++					else if (plan == X86_PLAN_PACKED)
+ 						std::cout
+ 							<< "X86_PACKED_OUTPUT_PLAN";
+ 					else
+@@ -1007,7 +1010,7 @@ int main(int argc, char **argv)
+ 					rows.begin());
+ 				if (index == rows.size())
+ 					rows.push_back(row.fields);
+-				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++				if (index >= (X86_PLAN_BYTE_COMPARE >> 2))
+ 					return 1;
+ 				plans[wide][cls][op] = static_cast<uint16_t>(
+ 					(index << 2) | form);
+@@ -1031,6 +1034,10 @@ int main(int argc, char **argv)
+ 					throw std::runtime_error(
+ 						"missing group-1 register row");
+ 			}
++			if (!plans[wide][cls][0x38] || !plans[wide][cls][0x39])
++				throw std::runtime_error(
++					"missing byte or wide memory CMP row");
++			plans[wide][cls][0x80] = X86_PLAN_BYTE_COMPARE;
+ 			plans[wide][cls][0x81] = X86_PLAN_GROUP1_IMMEDIATE;
+ 			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMMEDIATE;
+ 		}
+@@ -1058,7 +1065,7 @@ int main(int argc, char **argv)
+ 							 rows.end(),
+ 							 row.fields) -
+ 					       rows.begin();
+-				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++				if (index >= (X86_PLAN_BYTE_COMPARE >> 2))
+ 					return 1;
+ 				if (index == rows.size())
+ 					rows.push_back(row.fields);
+@@ -1073,7 +1080,7 @@ int main(int argc, char **argv)
+ 		for (unsigned index = 0; index < 2; ++index) {
+ 			const unsigned op = index ? 0x6a : 0x68;
+ 			CheckedRow row = check_push_immediate(decoder, op);
+-			if (rows.size() >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++			if (rows.size() >= (X86_PLAN_BYTE_COMPARE >> 2))
+ 				return 1;
+ 			pushes[wide][index] =
+ 				static_cast<uint16_t>(rows.size());
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 46fa2df3..988487b1 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -840,6 +840,39 @@ static bool check_indirect_memory(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_memory_compares(csh handles[2], cs_mode mode)
++{
++	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
++	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
++	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
++	     ++prefix) {
++		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
++			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
++				if ((mr & 0x30) != 0x30)
++					continue;
++				for (unsigned n = 0; n < sizeof(values); ++n) {
++					uint8_t code[12];
++					memset(code, values[n], sizeof(code));
++					code[0] = (uint8_t)(0x3f + prefix);
++					code[1] = (uint8_t)opcode;
++					code[2] = (uint8_t)mr;
++					if ((mr & 7) == 4)
++						code[3] = sibs[n];
++					const uint8_t *start = code + !prefix;
++					for (size_t length = 1;
++					     length <= sizeof(code) - !prefix;
++					     ++length)
++						if (!compare(handles, start,
++							     length,
++							     prefix + mr + n))
++							return false;
++				}
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ {
+ 	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
+@@ -1120,7 +1153,8 @@ static bool check_mode(cs_mode mode)
+ 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+ 		     !check_vex2_base_memory(handles)) ||
+ 		    (private_iter != X86_disasmIter &&
+-		     !check_mov_memory_immediates(handles, mode)) ||
++		     (!check_mov_memory_immediates(handles, mode) ||
++		      !check_memory_compares(handles, mode))) ||
+ 		    !check_vex_register_forms(handles) ||
+ 		    (mode == CS_MODE_64 &&
+ 		     (!check_evex(handles) || !check_evex_extract(handles) ||
