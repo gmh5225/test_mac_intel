@@ -96,7 +96,24 @@ def main(w):
                     off=t['off']+start;defined[z[3]]=dict(address=addr,size=size,sha256=hashlib.sha256(data[off:off+size]).hexdigest())
                 assert any(k.startswith('cs_disasm_iter') for k in defined) and 'X86_disasmIter' in defined
                 return dict(sections=table,symbols=defined)
-            save('linked-symbols.json',{k:sections(f)for k,f in [('published',exe['baseline']),('unreferenced',control),('private_member',target)]})
+            member='X86Vex32Output.c.o'
+            members=sp.check_output(['ar','t',libs[0]],text=True).splitlines()
+            assert members.count(member)==1
+            source=w/'object-original';source.write_bytes(sp.check_output(['ar','p',libs[0],member]))
+            folder=w/'sections';folder.mkdir();extra=folder/member
+            run(['objcopy','--rename-section','.text=.cs_x86_i386_text','--rename-section','.rodata=.cs_x86_i386_rodata',source,extra],'separate-sections')
+            alternate=folder/'libcapstone.a';shutil.copyfile(libs[0],alternate)
+            run(['ar','r',alternate,extra],'replace-member');run(['ranlib',alternate],'index-member')
+            assert sp.check_output(['ar','t',alternate],text=True).splitlines()==members
+            for name in members:
+                if name!=member:
+                    assert sp.check_output(['ar','p',libs[0],name])==sp.check_output(['ar','p',alternate,name]),name
+            clone=w/'run-sections';run(['clang++',obj,*opt,alternate,*libs[1:],'-o',clone],'link-sections')
+            exe['sections']=clone;exe['private_sections']=clone
+            table=sp.check_output(['objdump','-h',clone],text=True)
+            assert all(name in table for name in ('.cs_x86_i386_text','.cs_x86_i386_rodata'))
+            save('section-factor.json',dict(member=member,position=members.index(member),total=len(members),default_member=sha(source),section_member=sha(extra),driver=sha(obj),unchanged_members=len(members)-1))
+            save('linked-symbols.json',{k:sections(f)for k,f in [('published',exe['baseline']),('unreferenced',control),('private_member',target),('sections',clone)]})
             save('archive-extraction.json',dict(entry=definitions[0].strip(),linked_sha256=sha(target),unreferenced_sha256=sha(control),original_sha256=sha(exe['baseline']),ordinary_text={v:sha(w/(v+'-text')) for v in ['baseline','unreferenced']}))
 
         exe[label]=target
@@ -156,7 +173,7 @@ def main(w):
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
             probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','i386','iced']+(['fast','private_base','private_i386'] if mode else [])
+            cycles={launch:[]for launch in launches};labels=['baseline','aa','i386','sections','iced']+(['fast','private_base','private_i386','private_sections'] if mode else [])
             stable={}
             for i in range(data['cycles']):
                 launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
@@ -169,8 +186,8 @@ def main(w):
                         root='baseline' if k=='aa' else k
                         if root not in stable:stable[root]=v[2:]
                         assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['i386']
-                    if mode:assert stable['private_base']==stable['private_i386']==stable['i386'],(name,mode,stable)
+                    assert stable['baseline']==stable['i386']==stable['sections']
+                    if mode:assert stable['private_base']==stable['private_i386']==stable['private_sections']==stable['i386'],(name,mode,stable)
                     cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
             for launch,observations in cycles.items():
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
