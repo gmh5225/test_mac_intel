@@ -1,7 +1,7 @@
-name: Verify 32-bit and 64-bit Windows static text iterators and signed memory immediates
+name: Validate the same merged tree with the Windows x86 and x64 ABI and configurations
 on:
   push:
-    branches: [codex/capstone-msvc-amd64-static-stores]
+    branches: [codex/capstone-msvc-static-consumer-aliased-mips-x86]
     paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: win-c6-c7-${{ matrix.arch }}
+          name: win-qualified-${{ matrix.arch }}
           path: evidence/
           retention-days: 14
