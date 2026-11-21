@@ -30,7 +30,12 @@ try:
     libs={}
     for label in ('base','candidate'):
         if label=='candidate':
-            git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==m['tree']
+            git('apply','--cached',str(r/'candidate.patch'))
+            assert git('write-tree')==m['tree']
+            for name in git('diff','--cached','--name-only',m['parent']).splitlines():
+                data=sp.check_output(['git','-C',s,'cat-file','blob',':'+name])
+                (s/name).write_bytes(data)
+            write('candidate-source',dict(tree=git('write-tree'),changes=git('diff','--cached','--name-only',m['parent']).splitlines()))
         if win:
             run(['cmake','--build',b,'--config','Release','--parallel','4','--target','capstone_shared'],'build-'+label)
             lib,=b.rglob('capstone.dll')
@@ -43,11 +48,11 @@ try:
     if not diet and not reduced:units+=['x86_bound_access','x86_exchange_access','x86_reg_access']
     if win:
         run(['cmake','--build',b,'--config','Release','--parallel','4','--target',*units],'build-units')
-        run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join([*units,'x86_operand_access_generator'])+')$'],'units')
+        run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join([*units,'x86_operand_access_generator'])+')$'],'units',env=dict(os.environ,PATH=str(lib.parent)+os.pathsep+os.environ['PATH']))
     cm=['cmake_minimum_required(VERSION 3.16)','project(probe LANGUAGES CXX)','set(CMAKE_CXX_STANDARD 17)','include_directories("'+(s/'include').as_posix()+'")','add_executable(records records.cpp)','target_link_libraries(records PRIVATE '+('kernel32' if win else 'dl')+')']
     shutil.copyfile(r/'win-records.cpp' if win else r/'records.cpp',driver/'records.cpp')
     if flavor=='full':
-        if win:implib,=b.rglob('capstone.lib')
+        if win:implib=lib.with_suffix('.lib');assert implib.is_file()
         else:implib=lib
         shutil.copyfile(r/('win-time.cpp' if win else 'time.cpp'),driver/'time.cpp')
         cm+=['add_executable(timing time.cpp)','target_link_libraries(timing PRIVATE "'+implib.as_posix()+'")']
