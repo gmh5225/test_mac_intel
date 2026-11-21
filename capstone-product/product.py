@@ -75,6 +75,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert rev(nd)==expected['neverd']
    write(label+'-neverd-head',rev(nd))
    if label!='base':
+    capfix=r/variants[label]['capstone_patch'];assert hashlib.sha256(capfix.read_bytes()).hexdigest()==variants[label]['capstone_sha256']
+    command(['git','apply',capfix],'apply-capstone-'+label,cs)
+   if label!='base':
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-neverd-'+label,nd)
@@ -179,7 +182,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert inclusions and any('X86OutputIterator.c.o' in v for v in inclusions)
    (out/('capstone-link-map-'+label+'.log')).write_text(chr(10).join(inclusions)+chr(10))
    command_line=sp.check_output(['ninja','-C',build,'-t','commands','capstone-product'],text=True).splitlines()[-1]
-   assert ('--undefined=X86_disasmIter' in command_line)==(label=='retained')
+   assert ('--undefined=X86_disasmIter' in command_line)==(label=='early_sse')
    write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True))
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
@@ -203,7 +206,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    objects={key:hashlib.sha256(path.read_bytes()).hexdigest() for key,path in active.items()};write(label+'-objects',objects)
    if label!='base':
     prior=json.loads((out/'base-objects.json').read_text())
-    assert prior==objects
+    assert prior.keys()==objects.keys()
+    assert {Path(k).name for k in prior if prior[k]!=objects[k]}=={'X86Sse64Output.c.o'}
+    if label=='early_sse':assert objects==json.loads((out/'packed_sse-objects.json').read_text())
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)

@@ -1,7 +1,7 @@
-name: Measure ELF fallback extraction in the current source-built NeverD decoder
+name: Compare packed SSE addressing and fallback layout inside real NeverD decoding
 on:
   push:
-    branches: [codex/neverd-static-fallback-archive-order]
+    branches: [codex/neverd-production-packed-sse-addresses]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: retained-fallback-${{ matrix.os }}-${{ matrix.cc }}
+          name: packed-address-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
