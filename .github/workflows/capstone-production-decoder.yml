@@ -1,7 +1,7 @@
-name: Measure direct x86 static dispatch without changing the NeverD caller machine code
+name: Measure ELF fallback extraction in the current source-built NeverD decoder
 on:
   push:
-    branches: [codex/neverd-direct-static-x86-mode-selection]
+    branches: [codex/neverd-static-fallback-archive-order]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: bb07c2fd4ef6dab3519c411ecae5352782e4d2d2
+          ref: 1a9b36d0100bcee2f0c26f1383512c7f519f178e
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,8 +44,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "bb07c2fd4ef6dab3519c411ecae5352782e4d2d2"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "205dcd8bd67fb7561e6eb6c15ea4630e20c85d12"
+          test "$(git rev-parse HEAD)" = "1a9b36d0100bcee2f0c26f1383512c7f519f178e"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "4b473e00e92e53fd931cfeea9e2dae710c44ce8c"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: direct-static-${{ matrix.os }}-${{ matrix.cc }}
+          name: retained-fallback-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

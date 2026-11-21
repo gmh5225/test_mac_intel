@@ -1,0 +1,29 @@
+diff --git a/lib/decode/CMakeLists.txt b/lib/decode/CMakeLists.txt
+index ab2fc00492..f0120e421c 100644
+--- a/lib/decode/CMakeLists.txt
++++ b/lib/decode/CMakeLists.txt
+@@ -25,6 +25,11 @@ add_neverd_component_library(NeverDDecode
+ target_include_directories(NeverDDecode PRIVATE
+   "$<TARGET_PROPERTY:capstone_static,SOURCE_DIR>/arch/X86")
+ 
++# Resolve the ordinary x86 text fallback in the first static archive pass.
++if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
++  target_link_options(NeverDDecode INTERFACE "LINKER:--undefined=X86_disasmIter")
++endif()
++
+ # AArch64/AArch64Decoder.cpp contains the native operand decode hot path. Keep
+ # it explicitly optimized in non-Debug configurations, but let Debug retain the
+ # toolchain's unoptimized flags for reliable stepping, local inspection, and
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index 8c4e4e839b..745a3a8ce9 100644
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -384,7 +384,7 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+   if (Text && X86) {
+-    if (X86_disasmIter(Handle, &Code, &Remaining, &PC, InsnBuf))
++    if (X86_disasmIterText(Handle, &Code, &Remaining, &PC, InsnBuf))
+       return true;
+   } else if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf)) {
+     return true;

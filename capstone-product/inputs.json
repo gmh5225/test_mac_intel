@@ -1,34 +1,32 @@
 {
-  "neverd": "bb07c2fd4ef6dab3519c411ecae5352782e4d2d2",
-  "capstone": "205dcd8bd67fb7561e6eb6c15ea4630e20c85d12",
+  "neverd": "1a9b36d0100bcee2f0c26f1383512c7f519f178e",
+  "capstone": "4b473e00e92e53fd931cfeea9e2dae710c44ce8c",
   "variants": {
-    "chain": {
+    "direct": {
       "commit": "4b473e00e92e53fd931cfeea9e2dae710c44ce8c",
       "tree": "c101eb6776d392aeb84eafc1614c72d0e2247fea",
-      "neverd_tree": "305e70d4b55b1a5615202b17fb84b84cd466f5b2",
+      "neverd_tree": "01b46d5b5be4449803c964025a14185239e7b50f",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
+        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
+        "lib/decode/CMakeLists.txt": "ab2fc004927e4ce4c22c0447294aa584190c9754"
       },
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "patch": "neverd.patch",
-      "patch_sha256": "f20ce1b2259b3f4e5000f26d401bf384d3c2abcfbfc52ceb7a7a00abefd91279",
-      "capstone_patch": "chain-capstone.patch",
-      "capstone_sha256": "61c21c81841e00ce57e2bae9e99bf986fd2d33f8e810200a2d66bbdb18bb2c7b"
+      "patch": "direct.patch",
+      "patch_sha256": "3d87cafb8b8c8f9532b91673b9537e9eca924969382a33d33ebde11cec557f52"
     },
-    "direct_modes": {
-      "commit": "adf49b3528fcdfa1289172e444113b80ad4f65e6",
-      "tree": "6b8f00a26471912285f9df9a8053e1e4f1ecf8a9",
-      "neverd_tree": "305e70d4b55b1a5615202b17fb84b84cd466f5b2",
+    "retained": {
+      "commit": "4b473e00e92e53fd931cfeea9e2dae710c44ce8c",
+      "tree": "c101eb6776d392aeb84eafc1614c72d0e2247fea",
+      "neverd_tree": "6ff326be6a56ae5ac48d844c949a08ba7c7c7613",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
+        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
+        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
       },
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "patch": "neverd.patch",
-      "patch_sha256": "f20ce1b2259b3f4e5000f26d401bf384d3c2abcfbfc52ceb7a7a00abefd91279",
-      "capstone_patch": "direct_modes-capstone.patch",
-      "capstone_sha256": "771b7b28fca5bf7ef13175439d7dd66422a795fef0c194986151528908cf7a25"
+      "patch": "retained.patch",
+      "patch_sha256": "fb0de859b8fb1dee82792e2e9c327154501d0782d49f540e2c65ba548fc9199e"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -36,11 +34,12 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Time the unchanged C++ machine-code sections with one direct call to the 32/64 static iterator. Compare the inherited fallback chain and direct fallback selection under the same linker and compiler using production Decoder entries.",
-  "parent": "d506d009cb03d6810d8876c543489fa718d9f803",
-  "build_blob": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
+  "scope": "Test the existing fallback archive member extraction with identical Capstone archives, identical caller code, and one ELF linker option. Compare actual source-built NeverD entry points and symbol displacements.",
+  "parent": "8c396d94d8ac137ba0ef905b414a3234c95dbbb2",
+  "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
-    "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
+    "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
+    "lib/decode/CMakeLists.txt": "ab2fc004927e4ce4c22c0447294aa584190c9754"
   }
 }

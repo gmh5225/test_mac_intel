@@ -40,6 +40,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   with cm.open('a') as f:f.write('\nadd_executable(capstone-product-legacy capstone-product-legacy.cpp)\ntarget_link_libraries(capstone-product-legacy PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-route capstone-route.cpp)\ntarget_link_libraries(capstone-route PRIVATE NeverDDecode)\n')
+  with cm.open('a') as f:f.write('target_link_options(capstone-product PRIVATE "LINKER:-Map,${CMAKE_BINARY_DIR}/capstone-product.map")'+chr(10))
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   write('compiler',dict(c=sp.check_output([cc,'--version'],text=True).splitlines()[0],cxx=sp.check_output(['clang++','--version'],text=True).splitlines()[0],cpu=Path('/proc/cpuinfo').read_text(),host=platform.machine()))
@@ -74,9 +75,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert rev(nd)==expected['neverd']
    write(label+'-neverd-head',rev(nd))
    if label!='base':
-    capfix=r/variants[label]['capstone_patch'];assert hashlib.sha256(capfix.read_bytes()).hexdigest()==variants[label]['capstone_sha256']
-    command(['git','apply',capfix],'apply-wide-capstone',cs)
-   if label!='base':
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-neverd-'+label,nd)
@@ -93,11 +91,10 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    policies={}
    for name in ('X86OutputIterator.c','X86Vex32Output.c','X86Sse64Output.c'):
     entries=[c for c in compile_database if c['file'].endswith('/arch/X86/'+name)]
-    if name=='X86Sse64Output.c' and label=='base':assert not entries;continue
     entry,=entries
     args=shlex.split(entry['command'])
     policies[name]=[a for a in args if a in ('-fomit-frame-pointer','-O3','-DNDEBUG') or 'discard' in a]
-   assert len(policies)==(3 if label!='base' else 2)
+   assert len(policies)==3
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
    assert all(v==policies['X86OutputIterator.c'] for v in policies.values())
    write(label+'-compile-policy',policies)
@@ -177,6 +174,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    write('public-checksums-'+label,dict(raw=signatures))
    command(['nm','-S','-C',prod],'timed-symbols-'+label)
    command(['readelf','-W','-S','-l',prod],'linked-sections-'+label)
+   lines=(build/'capstone-product.map').read_text().splitlines()
+   inclusions=[v for v in lines if 'libcapstone.a(' in v or ' X86_disasmIter' in v]
+   assert inclusions and any('X86OutputIterator.c.o' in v for v in inclusions)
+   (out/('capstone-link-map-'+label+'.log')).write_text(chr(10).join(inclusions)+chr(10))
+   command_line=sp.check_output(['ninja','-C',build,'-t','commands','capstone-product'],text=True).splitlines()[-1]
+   assert ('--undefined=X86_disasmIter' in command_line)==(label=='retained')
+   write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True))
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    assert rev(cs)==ref
@@ -199,12 +203,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    objects={key:hashlib.sha256(path.read_bytes()).hexdigest() for key,path in active.items()};write(label+'-objects',objects)
    if label!='base':
     prior=json.loads((out/'base-objects.json').read_text())
-    assert all(objects[k]==v for k,v in prior.items())
-    extra={Path(k).name for k in objects.keys()-prior.keys()}
-    assert extra==({'X86Sse64Output.c.o'} if label!='base' else set()),extra
-    if label=='direct_modes':
-     chain=json.loads((out/'chain-objects.json').read_text())
-     assert chain.keys()==objects.keys() and {Path(k).name for k,v in chain.items() if objects[k]!=v}=={'X86Sse64Output.c.o'}
+    assert prior==objects
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)
