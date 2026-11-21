@@ -1,0 +1,32 @@
+diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
+index d57235c9..dcd84ff9 100644
+--- a/arch/Mips/MipsDisassembler.c
++++ b/arch/Mips/MipsDisassembler.c
+@@ -228,8 +228,9 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
+ 	}
+ }
+ 
+-#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+-	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
++#if (defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)) || \
++	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
+ #define CAPSTONE_MIPS_PRIMARY_DISPATCH
+ #endif
+ 
+diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
+index 8b70fffc..1ee21fa0 100644
+--- a/arch/Mips/MipsInstPrinter.c
++++ b/arch/Mips/MipsInstPrinter.c
+@@ -500,7 +500,11 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
+ static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
+ 		       unsigned OpNo, SStream *OS, bool IsBranch)
+ {
++#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
++	SStream_concat2(OS, "\t", Str);
++#else
+ 	SStream_concat(OS, "%s%s", "\t", Str);
++#endif
+ 	SStream_concat0(OS, "\t");
+ 	if (IsBranch)
+ 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
