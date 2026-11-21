@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang' and platform.machine()=='x86_64'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Compare direct operand descriptors, typed compare families and PE32 multiple-request routing on the real NeverD source build.'))
+write('scope',dict(active=feature_active,policy='Compare packed EVEX output alone and together with the corrected nanoMIPS branch predicate in the actual NeverD consumer.'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -167,8 +167,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files
     actual={Path(k).name for k in changed}
-    wanted={'X86Mapping.c.o'} if label=='direct' else {'X86DisassemblerDecoder.c.o'}
-    if label=='owner':wanted={'X86Mapping.c.o','X86InstPrinterCommon.c.o','X86DisassemblerDecoder.c.o'}
+    wanted={'X86EvexMemoryOutput.c.o'}
+    if label=='combined':wanted.add('MipsDisassembler.c.o')
     assert actual==wanted,(label,actual,wanted)
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))

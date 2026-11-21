@@ -1,7 +1,7 @@
-name: Qualify Capstone variants in NeverD with every FP contract shape
+name: Compare packed EVEX transfer output and nanoMIPS fix in the source-built NeverD product
 on:
   push:
-    branches: [codex/capstone-fp-contract-product]
+    branches: [codex/capstone-packed-mips-source-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fp-contract-product-${{ matrix.os }}-${{ matrix.cc }}
+          name: packed-mips-product-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
