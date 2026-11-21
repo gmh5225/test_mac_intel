@@ -1,7 +1,7 @@
-name: Measure constant mode tests and verify nanoMIPS branches with six native backends
+name: Isolate MIPS archive placement and profile the unchanged PPC decoder
 on:
   push:
-    branches: [codex/capstone-mips-local-mode-features]
+    branches: [codex/capstone-mips-object-placement-control]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: local-mips-features-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mips-link-controls-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
