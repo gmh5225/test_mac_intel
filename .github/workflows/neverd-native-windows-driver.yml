@@ -1,0 +1,55 @@
+name: NeverD native Windows ARM64 driver validation
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+permissions:
+  contents: read
+jobs:
+  inbox-driver:
+    runs-on: windows-11-arm
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - name: Observe the running signed kernel driver and issue native I/O
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Path evidence | Out-Null
+          $service = Get-CimInstance Win32_SystemDriver -Filter "Name = 'Null'"
+          if ($service.State -ne 'Running') { throw "Null service state $($service.State)" }
+          $path = $service.PathName -replace '^\\SystemRoot\\',"$env:SystemRoot\"
+          if (-not [IO.Path]::IsPathFullyQualified($path)) { $path = Join-Path $env:SystemRoot $path }
+          $path = (Resolve-Path -LiteralPath $path).Path
+          $sig = Get-AuthenticodeSignature -FilePath $path
+          $os = Get-CimInstance Win32_OperatingSystem
+          [ordered]@{service=$service.Name; state=$service.State; path=$path; os=$os.Caption;
+            version=$os.Version; build=$os.BuildNumber; signature=[string]$sig.Status;
+            issuer=$sig.SignerCertificate.Issuer; signer=$sig.SignerCertificate.Subject;
+            thumbprint=$sig.SignerCertificate.Thumbprint;
+            sha256=(Get-FileHash $path -Algorithm SHA256).Hash.ToLowerInvariant()
+          } | ConvertTo-Json | Set-Content evidence/driver.json
+          if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Microsoft') { throw "Driver signature $($sig.Status)" }
+          cl /nologo /W4 /WX /O2 /Fe:null-arm64.exe null-arm64.c
+          if ($LASTEXITCODE -ne 0) { throw 'Native probe did not compile' }
+          .\null-arm64.exe | Tee-Object -FilePath evidence/io.json
+          if ($LASTEXITCODE -ne 0) { throw "Native I/O failed $LASTEXITCODE" }
+      - name: Inventory Windows driver and DLL exports
+        if: always()
+        shell: pwsh
+        run: |
+          'pefile==2024.8.26 --hash=sha256:76f8b485dcd3b1bb8166f1128d395fa3d87af26360c2358fb75b80019b957c6f' | Set-Content requirements.txt
+          python -m pip install --only-binary=:all: --require-hashes --requirement requirements.txt
+          if ($LASTEXITCODE -ne 0) { throw 'pefile installation failed' }
+          $sys = Join-Path $env:SystemRoot System32
+          python pe-inventory.py --dlls $sys --drivers (Join-Path $sys drivers) --output evidence/exports.json
+          if ($LASTEXITCODE -ne 0) { throw 'Export inventory failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-arm64-inbox-driver
+          path: evidence
+          if-no-files-found: error
+          retention-days: 14
