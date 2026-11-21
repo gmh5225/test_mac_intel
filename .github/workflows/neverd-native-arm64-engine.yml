@@ -5,13 +5,15 @@ on:
     paths:
       - .github/workflows/neverd-native-arm64-engine.yml
       - native-engine-revision.txt
-      - native-driver-entry/**
+      - native-driver-entry/compare.c
+      - native-driver-entry/extract.py
+      - native-driver-entry/shim.S
 permissions:
   contents: read
 jobs:
   native-engine:
     runs-on: windows-11-arm
-    timeout-minutes: 240
+    timeout-minutes: 350
     env:
       SCCACHE_GHA_ENABLED: 'true'
     steps:
@@ -77,11 +79,19 @@ jobs:
             $extra = @()
             if ($route -eq 'llvm') { $extra = @('--llvm') }
             & $exe decompile "$root/null.sys" '--func=GsDriverEntry' -o "$root/$route.c" @extra
+            clang --target=aarch64-pc-windows-msvc -S -emit-llvm -O1 "$root/$route.c" -o "$root/$route.ll"
+            $ir = Get-Content -Raw "$root/$route.ll"
+            $pointerPair = 'ptr\b[^,()\r\n]*,\s*ptr\b[^,()\r\n]*'
+            if ($ir -notmatch "(?m)^define\b[^\r\n]*\bi32 @GsDriverEntry\($pointerPair\)" -or
+                $ir -notmatch "(?m)^declare\b[^\r\n]*\bi32 @DriverEntry\($pointerPair\)" -or
+                $ir -notmatch '(?m)^declare\b[^\r\n]*\bvoid @__security_init_cookie\(\)') {
+              throw "$route does not preserve the driver entry and CRT compiler contracts"
+            }
             clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 /c "/DGsDriverEntry=${route}_shim" /DDriverEntry=neverd_driver_entry /D__security_init_cookie=neverd_cookie "$root/$route.c" "/Fo$root/$route.obj"
             $code = Get-Content "$root/$route.c"
             $call = @($code | Where-Object { $_ -match '\bDriverEntry\s*\(' -and $_ -match '^\s+(?:return\s|\w+\s*=)' })
             if ($call.Count -ne 1 -or $call[0] -notmatch ',') { throw "$route lost a DriverEntry argument" }
-            $rows += [ordered]@{route=$route; emitted_sha256=(Get-FileHash "$root/$route.c").Hash.ToLower(); compiled_arm64=$true; driver_arguments=2}
+            $rows += [ordered]@{route=$route; emitted_sha256=(Get-FileHash "$root/$route.c").Hash.ToLower(); compiled_arm64=$true; driver_arguments=2; entry_result_bits=32; cookie_parameters=0}
           }
           clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 "$fixtures/compare.c" shim.obj high.obj llvm.obj /Fe:check.exe
           & "$root/check.exe" | Set-Content $observations
