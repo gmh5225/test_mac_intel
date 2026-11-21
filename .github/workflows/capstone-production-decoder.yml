@@ -1,7 +1,7 @@
-name: Check register mapping and AMD64 output in three source-built NeverD products
+name: Compare validated i386 VEX scanning through the production NeverD decoder
 on:
   push:
-    branches: [codex/capstone-mode-writes-product-check]
+    branches: [codex/capstone-vex2-real-consumers]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 58e64b66288f67e511b7ace201314f451d438d3d
+          ref: 39e3d9eb1f3d3ed848f9c61bbab38d360a6d782a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,8 +45,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "58e64b66288f67e511b7ace201314f451d438d3d"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "958b98cbbeb217ab3e8babe1de7175546ec82748"
+          test "$(git rev-parse HEAD)" = "39e3d9eb1f3d3ed848f9c61bbab38d360a6d782a"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "0fbbaa9ca1ab4eb9c390d08ff26a42384d052e82"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mode-vector-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex-consumer-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
