@@ -14,7 +14,7 @@ tmp=Path(tempfile.mkdtemp());b=tmp/'build';fixed=tmp/'selected';fixed.mkdir()
 try:
     opts=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers')]
     if conf=='full':opts.extend('-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('ARM','AARCH64','MIPS','RISCV','PPC'))
-    if diet:opts.append('-DCAPSTONE_BUILD_DIET=ON')
+    if diet:opts.extend(['-DCAPSTONE_BUILD_DIET=ON','-DCAPSTONE_RISCV_SUPPORT=ON'])
     if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
@@ -25,6 +25,16 @@ try:
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
+        if conf=='full' or diet:
+            import re,struct
+            obj=next(b.rglob('RISCVMapping.c.o'));data=obj.read_bytes()
+            assert data[:6]==b'\x7fELF\x02\x01'
+            mt=re.search(r'^\s*\d+:\s*([0-9a-f]+)\s+(\d+)\s+OBJECT\s+LOCAL\s+\S+\s+(\d+)\s+insns$',sp.check_output(['readelf','-sW',obj],text=True),re.M);assert mt
+            addr,n,idx=int(mt[1],16),int(mt[2]),int(mt[3]);head=struct.unpack_from('<16sHHIQQQIHHHHHH',data)
+            section=struct.unpack_from('<IIQQQQIIQQ',data,head[6]+idx*head[11]);start=section[4]+addr
+            assert addr+n<=section[5] and n==(52360 if diet else 2146760)
+            value=dict(bytes=n,sha256=hashlib.sha256(data[start:start+n]).hexdigest());write(variant+'-riscv-mapping',value)
+            if variant=='candidate':assert value==json.loads((obs/'base-riscv-mapping.json').read_text())
     if conf=='full':
         selected=['riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
