@@ -1,7 +1,7 @@
-name: Verify opcode-indexed operand access on six backends
+name: Repeat the full Clang 14 operand-access panel on two independent hosts
 on:
   push:
-    branches: [codex/capstone-direct-operand-access]
+    branches: [codex/capstone-access-clang14-replicas]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: gcc, flavor: full }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
-          - { host: ubuntu-24.04, cc: clang, flavor: intel }
+          - { host: ubuntu-22.04, cc: clang, flavor: full, trial: a }
+          - { host: ubuntu-22.04, cc: clang, flavor: full, trial: b }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: access-opcode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: access-repeat-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
