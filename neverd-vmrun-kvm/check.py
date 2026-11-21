@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Discover KVM's guest SVM capability and execute the original RCX example."""
+"""Discover KVM's guest SVM capability and execute the original and exported VMRUN guest images."""
 import argparse
 import fcntl
 import hashlib
@@ -22,7 +22,7 @@ def discover():
                if ":" in line for key, value in [line.split(":", 1)])
     report = {"cpu": cpu.get("model name"), "vendor": cpu.get("vendor_id"),
               "host_svm": "svm" in cpu.get("flags", "").split(),
-              "guest_svm": False, "kvm_api": None, "original_guest_runs": []}
+              "guest_svm": False, "kvm_api": None, "guest_runs": []}
     nested = Path("/sys/module/kvm_amd/parameters/nested")
     report["kvm_amd_nested"] = nested.read_text().strip() if nested.is_file() else None
     try:
@@ -50,6 +50,32 @@ def discover():
     return report
 
 
+def run_guest(directory, guest, logs):
+    image = directory / guest["image"]
+    digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    receipt = {"image": image.name, "route": guest["route"], "optimization": guest["optimization"],
+               "guest_sha256": digest, "acceleration": "kvm", "completed": False,
+               "completed_contexts": 0}
+    if digest != guest["sha256"]:
+        return dict(receipt, diagnostic="Fixture digest does not match the manifest")
+    command = [shutil.which("qemu-system-x86_64"), "-accel", "kvm", "-cpu", "host",
+               "-machine", "pc", "-m", "32M", "-nodefaults", "-display", "none",
+               "-serial", "none", "-monitor", "none", "-no-reboot", "-nic", "none",
+               "-device", "isa-debug-exit,iobase=0xf4,iosize=4", "-kernel", str(image),
+               "-debugcon", "stdio", "-d", "guest_errors,int,cpu_reset",
+               "-D", str(logs / (image.stem + ".log"))]
+    try:
+        run = subprocess.run(command, capture_output=True, timeout=45)
+    except subprocess.TimeoutExpired as error:
+        return dict(receipt, timed_out=True, console=(error.stdout or b"").decode(errors="replace"),
+                    diagnostic=(error.stderr or b"").decode(errors="replace"))
+    console = run.stdout.decode(errors="replace")
+    completed = run.returncode == 33 and console.splitlines() == guest["expected_console"]
+    return dict(receipt, return_code=run.returncode, completed=completed,
+                completed_contexts=guest["contexts"] if completed else 0, console=console,
+                diagnostic=run.stderr.decode(errors="replace"))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True)
@@ -63,21 +89,12 @@ def main():
     if opts.guests:
         if not report["available"]:
             raise RuntimeError("KVM SVM was lost after capability discovery")
-        for level in ("O0", "O2"):
-            image = opts.guests / ("guest-64-" + level + ".multiboot")
-            command = [shutil.which("qemu-system-x86_64"), "-accel", "kvm", "-cpu", "host",
-                       "-machine", "pc", "-m", "32M", "-nodefaults", "-display", "none",
-                       "-serial", "none", "-monitor", "none", "-no-reboot", "-nic", "none",
-                       "-device", "isa-debug-exit,iobase=0xf4,iosize=4", "-kernel", str(image),
-                       "-debugcon", "stdio"]
-            run = subprocess.run(command, capture_output=True, text=True, timeout=45)
-            completed = run.returncode == 33 and run.stdout.strip() == "IDA:5678"
-            report["original_guest_runs"].append({
-                "optimization": level, "acceleration": "kvm", "completed": completed,
-                "return_code": run.returncode, "serial": run.stdout, "diagnostic": run.stderr,
-                "guest_sha256": hashlib.sha256(image.read_bytes()).hexdigest()})
-        report["status"] = ("passed" if all(r["completed"] for r in report["original_guest_runs"])
-                            else "failed")
+        manifest = json.loads((opts.guests / "manifest.json").read_text())
+        for guest in manifest["guests"]:
+            report["guest_runs"].append(run_guest(opts.guests, guest, opts.report.parent))
+        report["status"] = ("passed" if report["guest_runs"] and
+                            all(r["completed"] for r in report["guest_runs"]) else "failed")
+        report["completed_contexts"] = sum(r["completed_contexts"] for r in report["guest_runs"])
     result = json.dumps(report, indent=2)
     opts.report.write_text(result + "\n")
     print(result)

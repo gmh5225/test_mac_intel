@@ -31,30 +31,14 @@ jobs:
             sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           fi
           python3 neverd-vmrun-kvm/check.py --report evidence/kvm-svm.json
-      - name: Check out the original guest fixture
-        if: steps.discovery.outputs.available == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/NeverC
-          ref: f3eb95aa50cd6e7d99082d783d2a515ff71cf87c
-          path: NeverC
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            tests/neverc/X86/verify_vmrun_context.py
-            tests/verify-descriptor-state-qemu.py
-            tests/verify-descriptor-state-completion.py
-            tests/verify-descriptor-query-completion.py
-            tests/fixtures/x86/svm-context/
-          persist-credentials: false
-      - name: Build and execute the original VMRUN stream
+      - name: Execute qualified guest images with KVM
         if: steps.discovery.outputs.available == 'true'
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y clang lld qemu-system-x86 python3-venv
-          python3 -m venv probe-tools
-          probe-tools/bin/pip install --disable-pip-version-check capstone==5.0.7 lief unicorn==2.1.4
-          probe-tools/bin/python NeverC/tests/neverc/X86/verify_vmrun_context.py --baseline --keep compiled
-          python3 neverd-vmrun-kvm/check.py --guests compiled --report evidence/kvm-svm.json
+          if ! command -v qemu-system-x86_64; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends qemu-system-x86 seabios
+          fi
+          python3 neverd-vmrun-kvm/check.py --guests neverd-vmrun-kvm/fixtures --report evidence/kvm-svm.json
       - name: Retain KVM capability and original execution evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
