@@ -1,7 +1,7 @@
-name: Verify default MIPS images and the integrated private x86 iterators on seven configurations
+name: Check the AArch64 vector arrangement parser in seven builds and real PE and multiarch ELF workloads
 on:
   push:
-    branches: [codex/capstone-default-shared-layout-static-callsite]
+    branches: [codex/capstone-aarch64-arrangement-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 88f64f91be1b3c9de7c5819e93806fa8d79127db
+          ref: 2c3d603a35ee40bc82812c223a6fde14d4add1dc
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: default-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: aarch64-forward-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
