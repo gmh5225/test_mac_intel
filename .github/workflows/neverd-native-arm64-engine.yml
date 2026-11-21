@@ -13,6 +13,7 @@ on:
       - native-driver-entry/check_com_callbacks.py
       - native-driver-entry/process_sdk_smoke.c
       - native-driver-entry/check_native_process_profile.py
+      - native-driver-entry/loader/**
 permissions:
   contents: read
 jobs:
@@ -137,6 +138,14 @@ jobs:
           $result = (& $program) | ConvertFrom-Json
           if (!$result.module_found -or $result.capture_status -ne 0 -or $result.release_status -ne 0) { throw 'Native process SDK smoke failed' }
           [ordered]@{revision=$env:NEVERD_REV; machine=$machine; executable_sha256=(Get-FileHash $program).Hash.ToLower(); psapi_import='EnumProcessModulesEx'; kernel32_imports=@('PssCaptureSnapshot','PssFreeSnapshot'); observation=$result} | ConvertTo-Json -Depth 5 | Set-Content native-process-sdk.json
+      - name: Observe actual Windows loader arguments in original and recovered native DLLs
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.ExecutableDLLEntryBindsTheLoaderResultAndArguments'
+          python native-driver-entry/loader/check_dll_loader.py --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --work "$env:RUNNER_TEMP/dll-loader" --report native-dll-loader.json
       - name: Qualify the native engine with the official ARM64 SDK and WDK profile
         if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
         shell: pwsh
@@ -174,6 +183,7 @@ jobs:
             native-com-observations.json
             native-process-sdk.json
             native-sdk-profile.json
+            native-dll-loader.json
             ${{ runner.temp }}/nb/neverd-build-receipt.json
             ${{ runner.temp }}/nb/neverd-dependency-inputs.json
           if-no-files-found: warn
