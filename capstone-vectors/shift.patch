@@ -1,0 +1,302 @@
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..61e7e1b3 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -631,6 +631,61 @@ static const uint8_t vex_shift_plans[3][8][4] = {
+ 		{ 19, 20, 19, 20 },
+ 	},
+ };
++static const struct VectorOutputRow evex_shift_rows[] X86_EVEX_SHIFT_DATA = {
++	{ X86_INS_VPSRLW, "vpsrlw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRAW, "vpsraw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSLLW, "vpsllw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPRORD, "vprord", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPRORQ, "vprorq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPROLD, "vprold", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPROLQ, "vprolq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRLD, "vpsrld", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1 },
++	{ X86_INS_VPSRLD, "vpsrld", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRAD, "vpsrad", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1 },
++	{ X86_INS_VPSRAD, "vpsrad", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRAQ, "vpsraq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRAQ, "vpsraq", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSLLD, "vpslld", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1 },
++	{ X86_INS_VPSLLD, "vpslld", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRLQ, "vpsrlq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRLQ, "vpsrlq", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSRLDQ, "vpsrldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VPSLLQ, "vpsllq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSLLQ, "vpsllq", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPSLLDQ, "vpslldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++};
++static const uint8_t evex_shift_plans[3][8][6] X86_EVEX_SHIFT_DATA = {
++	{
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 1, 1, 1, 1, 1, 1 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 2, 2, 2, 2, 2, 2 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 3, 3, 3, 3, 3, 3 },
++		{ 0, 0, 0, 0, 0, 0 },
++	},
++	{
++		{ 4, 4, 4, 5, 5, 5 },
++		{ 6, 6, 6, 7, 7, 7 },
++		{ 8, 8, 9, 0, 0, 0 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 10, 10, 11, 12, 12, 13 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 14, 14, 15, 0, 0, 0 },
++		{ 0, 0, 0, 0, 0, 0 },
++	},
++	{
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 0, 0, 0, 16, 16, 17 },
++		{ 18, 18, 18, 18, 18, 18 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 0, 0, 0, 0, 0, 0 },
++		{ 0, 0, 0, 19, 19, 20 },
++		{ 21, 21, 21, 21, 21, 21 },
++	},
++};
+ static const struct VectorOutputRow broadcast_rows[2][3] = {
+ 	{
+ 		{ 0 },
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 82166d23..03e856fb 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -20,6 +20,12 @@ struct PaddingOutput {
+ 		index, scale;
+ };
+ 
++#if defined(__ELF__) && defined(__GNUC__)
++#define X86_EVEX_SHIFT_DATA \
++	__attribute__((section(".cs_x86_evex_output_rodata")))
++#else
++#define X86_EVEX_SHIFT_DATA
++#endif
+ #include "X86GenVectorOutput.inc"
+ #include "X86VectorRegisterWriter.h"
+ 
+@@ -92,6 +98,36 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	return true;
+ }
+ 
++/* Group shifts already failed the common EVEX register lookup. The prefix
++ * guarantees pp=66, no masking/broadcast, a valid width and a register r/m. */
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((noinline, section(".cs_x86_evex_output")))
++#elif defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool writeEvexImmediateShift(const uint8_t *code, size_t size,
++				    cs_insn *insn, uint16_t *insn_size)
++{
++	const unsigned opcode = code[4];
++	if (opcode < 0x71 || opcode > 0x73 || size < 7 ||
++	    (code[1] & 0x9f) != 0x91)
++		return false;
++	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
++	const unsigned plan =
++		evex_shift_plans[opcode - 0x71][(code[5] >> 3) & 7][w * 3 + ll];
++	if (!plan)
++		return false;
++	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
++	const unsigned regs[] = { ((~(unsigned)code[2] >> 3) & 15) |
++					  ((~(unsigned)code[3] & 8) << 1),
++				  (code[5] & 7) | ((rxb & 3) << 3) };
++	return writeVectorRegisters(code, insn, insn_size,
++				    &evex_shift_rows[plan - 1], 4, ll,
++				    0x40 | (w << 3) | rxb, ll, regs, 2);
++}
++
+ #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 			       uint16_t *insn_size,
+@@ -121,7 +157,9 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	const unsigned w = code[2] >> 7;
+ 	const unsigned key = ((code[1] & 15) << 8) | code[4];
+ 	const struct VectorOutputRow *row = evexOutputRow(key, w, ll);
+-	if (!row || (row->immediate && size < 7))
++	if (!row)
++		return writeEvexImmediateShift(code, size, insn, insn_size);
++	if (row->immediate && size < 7)
+ 		return false;
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
+ 	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 183605d1..e4ef958a 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -94,13 +94,14 @@ std::string fields(const Bytes4 &array)
+ 	       ", " + std::to_string(array[3]) + " }";
+ }
+ 
+-// EVEX extracts have a narrower r/m destination, a full-width reg source,
+-// and a reserved vvvv field. Reconstruct the entire public record before
+-// admitting a width, including the ignored or effective W bit in REX.
+-std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+-			   unsigned ll)
++// Reconstruct both explicit registers and the immediate from the canonical
++// decoder. Extracts take their destination from r/m. Immediate shifts take
++// it from vvvv/V' and use the ModR/M reg field as an opcode extension.
++std::string pair_immediate_record(Decoder &decoder, const Form &form,
++				  unsigned w, unsigned ll, unsigned group = 0)
+ {
+-	const unsigned dst_width = (form.opcode & 2) ? 1 : 0;
++	const unsigned dst_width = form.extract ? ((form.opcode & 2) ? 1 : 0) :
++						  ll;
+ 	const char *names[] = { "xmm", "ymm", "zmm" };
+ 	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
+ 	std::string row;
+@@ -115,6 +116,13 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+ 				    uint8_t(form.opcode),
+ 				    uint8_t(0xc0 | (src & 7) << 3 | (dst & 7)),
+ 				    uint8_t(value) };
++		if (!form.extract) {
++			ext = (src & 24) << 2;
++			bytes[1] = uint8_t((0xf0 ^ ext) | form.map);
++			bytes[2] = uint8_t(w << 7 | ((~dst & 15) << 3) | 5);
++			bytes[3] = uint8_t(ll << 5 | ((~dst & 16) >> 1));
++			bytes[5] = uint8_t(0xc0 | (group << 3) | (src & 7));
++		}
+ 		unsigned id = decoder.decode(bytes, sizeof(bytes));
+ 		if (!id)
+ 			return {};
+@@ -171,7 +179,7 @@ std::string output_record(Decoder &decoder, const Form &form, unsigned w,
+ 			  unsigned ll)
+ {
+ 	if (form.extract)
+-		return extract_record(decoder, form, w, ll);
++		return pair_immediate_record(decoder, form, w, ll);
+ 	uint8_t bytes[] = { 0x62,
+ 			    uint8_t(0xf0 | form.map),
+ 			    uint8_t(w << 7 | 0x6d),
+@@ -1157,6 +1165,47 @@ void emit_evex_memory(Decoder &decoder)
+ 	std::puts("};");
+ }
+ 
++void emit_evex_shifts(Decoder &decoder)
++{
++	std::vector<std::string> records;
++	unsigned plans[3][8][6] = {};
++	for (unsigned op = 0; op < 3; ++op) {
++		const Form form{ 1, 0x71 + op, true };
++		for (unsigned group = 0; group < 8; ++group) {
++			for (unsigned wl = 0; wl < 6; ++wl) {
++				const auto row = pair_immediate_record(
++					decoder, form, wl / 3, wl % 3, group);
++				if (row.empty())
++					continue;
++				const auto it = std::find(records.begin(),
++							  records.end(), row);
++				plans[op][group][wl] =
++					unsigned(it - records.begin()) + 1;
++				if (it == records.end())
++					records.push_back(row);
++			}
++		}
++	}
++	if (records.size() > UINT8_MAX || !plans[2][3][2] || !plans[2][7][2])
++		throw std::runtime_error(
++			"missing EVEX byte shift or too many shift records");
++	std::puts(
++		"static const struct VectorOutputRow evex_shift_rows[] X86_EVEX_SHIFT_DATA = {");
++	for (const auto &row : records)
++		std::printf("\t%s,\n", row.c_str());
++	std::puts(
++		"};\nstatic const uint8_t evex_shift_plans[3][8][6] X86_EVEX_SHIFT_DATA = {");
++	for (const auto &op : plans) {
++		std::puts("\t{");
++		for (const auto &group : op)
++			std::printf("\t\t{ %u, %u, %u, %u, %u, %u },\n",
++				    group[0], group[1], group[2], group[3],
++				    group[4], group[5]);
++		std::puts("\t},");
++	}
++	std::puts("};");
++}
++
+ void emit_output(Decoder &decoder, bool scan_only)
+ {
+ 	std::vector<std::string> records;
+@@ -1211,6 +1260,7 @@ void emit_output(Decoder &decoder, bool scan_only)
+ 	emit_vex_indexed(decoder);
+ 	emit_vex_registers(decoder);
+ 	emit_vex_shifts(decoder);
++	emit_evex_shifts(decoder);
+ 	emit_broadcast_rows(decoder);
+ 	emit_vex_rip_loads(decoder);
+ 	Decoder padding32(CS_MODE_32);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 982bcc03..b355a446 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -319,6 +319,54 @@ static bool check_group1(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_evex_immediate_shifts(csh handles[2])
++{
++	for (unsigned opcode = 0x71; opcode <= 0x73; ++opcode)
++		for (unsigned group = 0; group < 8; ++group)
++			for (unsigned wl = 0; wl < 8; ++wl)
++				for (unsigned pair = 0; pair < 1024; ++pair) {
++					const unsigned dst = pair & 31,
++						       src = pair >> 5;
++					uint8_t code[] = {
++						0x62,
++						(uint8_t)(0xf1 ^
++							  ((src & 24) << 2)),
++						(uint8_t)((wl >> 2) << 7 |
++							  ((~dst & 15) << 3) |
++							  5),
++						(uint8_t)((wl & 3) << 5 |
++							  ((~dst & 16) >> 1)),
++						(uint8_t)opcode,
++						(uint8_t)(0xc0 | group << 3 |
++							  (src & 7)),
++						(uint8_t)(pair * 37)
++					};
++					if (!compare(handles, code,
++						     sizeof(code), pair))
++						return false;
++					if (pair < 32) {
++						// Include opmask, zeroing, broadcast and extended group encodings.
++						code[3] |=
++							(uint8_t)((pair & 7) |
++								  ((pair & 8)
++								   << 4) |
++								  (pair & 16));
++						code[1] ^= (uint8_t)(((pair & 1)
++								      << 7) |
++								     ((pair & 2)
++								      << 3));
++						if (!compare(handles, code,
++							     sizeof(code),
++							     pair) ||
++						    !compare(handles, code,
++							     pair % sizeof(code),
++							     pair))
++							return false;
++					}
++				}
++	return true;
++}
++
+ static bool check_evex_extract(csh handles[2])
+ {
+ 	static const uint8_t opcodes[] = { 0x19, 0x1b, 0x39, 0x3b };
+@@ -832,6 +880,7 @@ static bool check_mode(cs_mode mode)
+ 		    !check_vex_register_forms(handles) ||
+ 		    (mode == CS_MODE_64 &&
+ 		     (!check_evex(handles) || !check_evex_extract(handles) ||
++		      !check_evex_immediate_shifts(handles) ||
+ 		      !check_vex_indexed(handles))))
+ 			goto done;
+ 		for (unsigned op = 0; op < 256; ++op) {
