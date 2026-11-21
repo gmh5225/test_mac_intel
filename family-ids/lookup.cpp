@@ -31,7 +31,7 @@ int main(int argc,char **argv) {
         for(bool cached:{false,true}){
             for(unsigned n=0;n<=end+2;++n){
                 unsigned id=n==end+2?std::numeric_limits<unsigned>::max():n;
-                std::array<uint8_t,6> x,y;x.fill(0xa5);y=x;
+                std::array<uint8_t,15> x,y;x.fill(0xa5);y=x;
                 uint64_t fx=0x853249170001abcdULL,fy=fx;
                 int ok=a.access(cached?lhs:0,id,&fx,x.data()),ok2=b.access(cached?rhs:0,id,&fy,y.data());
                 if(ok!=ok2 || x!=y || fx!=fy){std::fprintf(stderr,"mode %u cached %d id %u\n",unsigned(mode),int(cached),id);return 5;}

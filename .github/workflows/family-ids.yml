@@ -1,7 +1,7 @@
-name: Verify opcode-indexed operand access on six backends
+name: Qualify syntax-ordered x86 access metadata on six backends
 on:
   push:
-    branches: [codex/capstone-direct-operand-access]
+    branches: [codex/capstone-syntax-ordered-access]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: access-opcode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: ordered-access-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

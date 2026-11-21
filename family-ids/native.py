@@ -28,7 +28,7 @@ try:
         if not diet:
             mapping=s/'arch/X86/X86Mapping.c';original=mapping.read_bytes()
             try:
-                mapping.write_bytes(original+b'\n'+(r/'lookup.c').read_bytes())
+                mapping.write_bytes(original+(b'\n#define CAPSTONE_TEST_ORDERED_ACCESS\n' if variant=='candidate' else b'\n')+(r/'lookup.c').read_bytes())
                 run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-tables-'+variant)
                 verified[variant]=tmp/(variant+'-tables.so')
                 shutil.copyfile(path,verified[variant])
