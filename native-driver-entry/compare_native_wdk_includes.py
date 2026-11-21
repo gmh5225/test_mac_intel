@@ -1,82 +1,70 @@
-"""Check the original RDBSS declarations under explicit Windows header search configurations."""
+"""Reproduce RDBSS shadowing and verify the unchanged WDK ABI on a native retry."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
 import sys
 
 
-def origins(preprocessed, issues):
-    if not preprocessed.is_file():
-        return []
-    lines = preprocessed.read_text(encoding="utf-8").splitlines()
-    focus = {r["line"] for r in issues if isinstance(r, dict) and "line" in r}
-    symbols = ("SET_POWER_SETTING_VALUE", "BATTERY_REPORTING_SCALE", "ACPI_INTERFACE_STANDARD2",
-               "PCI_X_CAPABILITY", "DEBUG_DEVICE_ADDRESS")
-    current = ""
-    stack = []
-    records = []
-    for n, line in enumerate(lines, 1):
-        marker = re.match(r'^#\s+\d+\s+"([^"]+)"(.*)$', line)
-        if marker:
-            current = marker[1].replace("\\\\", "/").replace("\\", "/")
-            flags = marker[2].split()
-            if "1" in flags:
-                stack.append(current)
-            elif "2" in flags and stack:
-                stack.pop()
-        matched = next((s for s in symbols if re.search(r'}\s*'+s+r'\b', line)), "")
-        if n in focus or matched:
-            records.append({"line": n, "record": matched, "origin": current, "include_stack": stack[-5:]})
-    return records
-
-
 def main():
-    ap = argparse.ArgumentParser()
-    for key in ("scripts", "cache", "work", "engine", "report"):
-        ap.add_argument("--"+key, type=Path, required=True)
-    args = ap.parse_args()
+    parser = argparse.ArgumentParser()
+    for field in ("scripts", "cache", "work", "engine", "report"):
+        parser.add_argument("--" + field, type=Path, required=True)
+    parser.add_argument("--expected", choices=("rejected", "qualified"), required=True)
+    args = parser.parse_args()
     sys.path.insert(0, str(args.scripts))
-    import generate_microsoft_windows_types as win
-    original = win.prepare_provider
-    cases = []
+    import generate_microsoft_windows_types as windows
+    original = windows.prepare_provider
+
     class Finished(Exception):
         pass
-    def check(name, source, arguments, directory, *pos, **kwargs):
+
+    def verify(name, source, arguments, directory, *pos, **kwargs):
+        if name == "TDI":
+            return original(name, source, arguments, directory, *pos, **kwargs)
         assert name == "RDBSS"
-        overlay = arguments.index("-ivfsoverlay")
-        flat = arguments[:overlay] + arguments[overlay+2:]
-        for profile, opts in (("current", arguments), ("isolated", arguments[:1]+["-nostdlibinc"]+arguments[1:]),
-                              ("native-filesystem", flat), ("isolated-native-filesystem", flat[:1]+["-nostdlibinc"]+flat[1:])):
-            variant = directory / profile
-            variant.mkdir()
-            try:
-                evidence = original(name, source, opts, variant, *pos, **kwargs)
-                row = {"passed": True, "abis": len(evidence["metadata"]["cpp_header_bridge"]["verified_functions"])}
-            except (ValueError, OSError) as error:
-                row = {"passed": False, "error": str(error)}
-            log = variant / "RDBSS.parse.log"
-            issues = json.loads(log.read_text(encoding="utf-8")) if log.is_file() and log.stat().st_size else []
-            row.update(profile=profile, diagnostics=issues[:12],
-                       origins=origins(variant/"RDBSS.h", issues[:12]))
-            if not row["passed"] and not issues:
-                errors=[(file.name,line.strip()[:240]) for file in variant.glob("*.log")
-                        for line in file.read_text(encoding="utf-8",errors="replace").splitlines()
-                        if re.search(r'\b(?:fatal )?error:', line)]
-                row["compiler_errors"]=errors[:5]
-            cases.append(row)
-            args.report.write_text(json.dumps(cases,indent=2)+"\n", encoding="utf-8")
-            print(profile,row["passed"],row.get("abis"),len(issues), flush=True)
+        abis = []
+        try:
+            unit = original(name, source, arguments, directory, *pos, **kwargs)
+            abis = unit["metadata"]["cpp_header_bridge"]["verified_functions"]
+            header = unit["source"]
+        except ValueError:
+            if args.expected != "rejected":
+                raise
+            header = directory / "RDBSS.h"
+        data = header.read_bytes()
+        content = data.decode("utf-8")
+        diagnostics = directory / "RDBSS.parse.log"
+        errors = json.loads(diagnostics.read_text(encoding="utf-8")) if diagnostics.stat().st_size else []
+        duplicated = len(re.findall(r"}\s*SET_POWER_SETTING_VALUE\b", content))
+        tdi_source = bool(re.search(r'^# \d+ "[^"]*[/\\]TDI\.c"', content, re.M))
+        old_header = args.work / "WindowsKernel-providers" / "TDI.h"
+        assert old_header.is_file()
+        record = dict(expected=args.expected, abis=len(abis), marker_count=duplicated,
+                      read_generated_tdi=tdi_source, problems=errors,
+                      original_source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+                      preprocessed_sha256=hashlib.sha256(data).hexdigest(),
+                      old_tdi_sha256=hashlib.sha256(old_header.read_bytes()).hexdigest())
+        args.report.write_text(json.dumps(record, indent=2)+"\n", encoding="utf-8")
+        if args.expected == "rejected":
+            assert duplicated == 2 and tdi_source and not abis
+            assert any("SET_POWER_SETTING_VALUE" in r["message"] and "already names" in r["message"] for r in errors)
+        else:
+            assert duplicated == 1 and not tdi_source and not errors and len(set(abis)) == 285
+        print(args.expected, len(errors), len(abis), flush=True)
         raise Finished()
-    win.ISOLATED_PROVIDERS["WindowsKernel"] = tuple(v for v in win.ISOLATED_PROVIDERS["WindowsKernel"]
-                                                    if v[0]=="RDBSS")
-    win.prepare_provider = check
+
+    windows.ISOLATED_PROVIDERS["WindowsKernel"] = tuple(p for p in windows.ISOLATED_PROVIDERS["WindowsKernel"]
+                                                        if p.name in ("TDI", "RDBSS"))
+    assert [p.name for p in windows.ISOLATED_PROVIDERS["WindowsKernel"]] == ["TDI", "RDBSS"]
+    windows.prepare_provider = verify
     try:
-        win.generate(args.work, args.cache, str(args.engine), "clang", "arm64")
+        windows.generate(args.work, args.cache, str(args.engine), "clang", "arm64")
     except Finished:
-        pass
-    assert len(cases)==4
+        return
+    raise AssertionError("RDBSS verification did not execute")
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()

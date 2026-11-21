@@ -24,6 +24,13 @@ jobs:
           path: source
           sparse-checkout: scripts
           persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 043da0c8d6fd22761354173a4f62bd2387f4cfb0
+          path: repaired
+          sparse-checkout: scripts
+          persist-credentials: false
       - uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
           path: ${{ runner.temp }}/nb/bin/neverd.exe
@@ -40,10 +47,11 @@ jobs:
           $cache = "$env:RUNNER_TEMP/sdk-packages"
           python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
           Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
-          python native-driver-entry/compare_native_wdk_includes.py --scripts source/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --report wdk-header-search.json
+          python native-driver-entry/compare_native_wdk_includes.py --scripts source/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --expected rejected --report wdk-header-search-original.json
+          python native-driver-entry/compare_native_wdk_includes.py --scripts repaired/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --expected qualified --report wdk-header-search-fixed.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: wdk-header-search
-          path: wdk-header-search.json
+          path: 'wdk-header-search-*.json'
           retention-days: 14
