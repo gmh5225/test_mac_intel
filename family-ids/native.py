@@ -31,8 +31,9 @@ try:
             assert value['bytes']==(52360 if diet else 2146760),value
             write(variant+'-riscv-mapping',value)
             if variant=='candidate':assert value==json.loads((obs/'base-riscv-mapping.json').read_text())
+    if conf!='full':assert sha(libs['base'])==sha(libs['candidate'])
     if conf=='full':
-        selected=['riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
+        selected=['mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
         selected=units
     else:
