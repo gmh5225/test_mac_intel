@@ -1,87 +1,84 @@
-diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index de60a62a..a2775bc9 100644
---- a/arch/AArch64/AArch64Mapping.c
-+++ b/arch/AArch64/AArch64Mapping.c
-@@ -202,33 +202,28 @@ void AArch64_add_vas(MCInst *MI, const SStream *OS)
- 		return;
- 	}
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 5c59283f..4190862e 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -634,6 +634,13 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
  
--	// Search for r".[0-9]{1,2}[bhsdq]\W"
--	// with poor mans regex
-+	/* LLVM embeds the vector arrangement in the printed spelling. Commas
-+	 * and suffixes are both visited from left to right. */
- 	const char *vl_ptr = strchr(OS->buffer, '.');
-+	if (!vl_ptr)
-+		return;
-+	const char *comma_ptr = strchr(OS->buffer, ',');
-+	unsigned preceding_commas = 0;
- 	while (vl_ptr) {
--		// Number after dot?
-+		++vl_ptr;
- 		unsigned num = 0;
--		if (strchr("1248", vl_ptr[1])) {
--			num = atoi(vl_ptr + 1);
--			vl_ptr = num > 9 ? vl_ptr + 3 : vl_ptr + 2;
--		} else {
--			vl_ptr++;
--		}
--
--		// Layout letter
--		char letter = '\0';
--		if (strchr("bhsdq", vl_ptr[0])) {
--			letter = vl_ptr[0];
--		}
--		if (!letter) {
--			goto next_dot_continue;
-+		if (*vl_ptr == '1' || *vl_ptr == '2' || *vl_ptr == '4' ||
-+		    *vl_ptr == '8') {
-+			num = (unsigned)(*vl_ptr++ - '0');
-+			if (*vl_ptr >= '0' && *vl_ptr <= '9')
-+				num = num * 10 + (unsigned)(*vl_ptr++ - '0');
- 		}
--
--		AArch64Layout_VectorLayout vl = AARCH64LAYOUT_INVALID;
--		switch (letter) {
-+		if (!*vl_ptr)
-+			break;
-+		AArch64Layout_VectorLayout vl;
-+		switch (*vl_ptr) {
- 		default:
--			CS_ASSERT_RET(0 && "Unhandled vector layout letter.");
--			return;
-+			goto next_dot_continue;
- 		case 'b':
- 			vl = AARCH64LAYOUT_VL_B;
- 			break;
-@@ -247,22 +242,15 @@ void AArch64_add_vas(MCInst *MI, const SStream *OS)
- 		}
- 		vl |= (num << 8);
+ 		Insn = readBytes32(MI, Bytes);
  
--		// Determine op index by searching for trailing commata after op string
--		uint32_t op_idx = 0;
--		const char *comma_ptr = strchr(OS->buffer, ',');
--		;
- 		while (comma_ptr && comma_ptr < vl_ptr) {
--			++op_idx;
-+			++preceding_commas;
- 			comma_ptr = strchr(comma_ptr + 1, ',');
- 		}
--		if (!comma_ptr) {
--			// Last op doesn't have a trailing commata.
--			op_idx = AArch64_get_detail(MI)->op_count - 1;
--		}
--		if (op_idx >= AArch64_get_detail(MI)->op_count) {
--			// A memory operand with a commata in [base, dist]
--			op_idx = AArch64_get_detail(MI)->op_count - 1;
--		}
-+		/* A comma in a memory operand can outnumber the detail operands. */
-+		const unsigned last = AArch64_get_detail(MI)->op_count - 1;
-+		const unsigned op_idx = comma_ptr && preceding_commas < last ?
-+						preceding_commas :
-+						last;
++		/* No extension table can reach Decode or TryDecode on a major
++		 * opcode outside this generated mask. Keep overlapping extensions
++		 * in the original order. */
++		const unsigned major = (Insn >> 2) & 31;
++		if (!(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << major)))
++			goto base32;
++
+ 		TRY_TO_DECODE(4,
+ 			      RISCV_getFeatureBits(MI->csh->mode,
+ 						   RISCV_FeatureStdExtZdinx) &&
+@@ -728,6 +735,7 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 		TRY_TO_DECODE_FEATURE(
+ 			4, RISCV_FeatureVendorXCVbi, DecoderTableXCVbi32,
+ 			"CORE-V Immediate Branching custom opcode table");
++	base32:
+ 		TRY_TO_DECODE(4, true, DecoderTable32, "RISCV32 table");
  
- 		// Search for the operand this one belongs to.
- 		cs_aarch64_op *op = &AArch64_get_detail(MI)->operands[op_idx];
+ 		return MCDisassembler_Fail;
+diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
+index 5ce47d48..10c7f1f7 100644
+--- a/arch/RISCV/RISCVGenDirectDecoder.inc
++++ b/arch/RISCV/RISCVGenDirectDecoder.inc
+@@ -17210,6 +17210,8 @@ Decode:
+ 	return decodeToMCInst_2(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ }
+ 
++#define RISCV_EXTENSION_MAJORS UINT32_C(0x405f0c04)
++
+ static DecodeStatus directInstruction_2(const uint8_t *Table, MCInst *MI, uint16_t insn, uint64_t Address, const void *Decoder)
+ 
+ {
+diff --git a/arch/X86/X86ExtendRegisterOutput.h b/arch/X86/X86ExtendRegisterOutput.h
+new file mode 100644
+index 00000000..05e799f3
+--- /dev/null
++++ b/arch/X86/X86ExtendRegisterOutput.h
+@@ -0,0 +1,36 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_EXTEND_REGISTER_OUTPUT_H
++#define CS_X86_EXTEND_REGISTER_OUTPUT_H
++
++static inline void writeExtendRegisters(const uint8_t *code, unsigned length,
++					cs_insn *insn, uint16_t *insn_size,
++					const struct X86SimpleOutput *row,
++					const struct X86SimpleRegister *dst,
++					const struct X86SimpleRegister *src,
++					uint8_t rex, uint8_t opcode, uint8_t mr,
++					bool escaped)
++{
++	*insn_size = insn->size = length;
++	insn->id = row->id;
++	memcpy(insn->bytes, code, length);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, dst->name, sizeof(dst->name));
++	char *next = insn->op_str + dst->length;
++	memcpy(next, ", ", 2);
++	memcpy(next + 2, src->name, sizeof(src->name));
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row,
++				      escaped ? 0x0f : opcode, rex, mr,
++				      dst->reg, src->reg);
++		if (escaped)
++			insn->detail->x86.opcode[1] = opcode;
++		if (escaped && rex)
++			insn->detail->x86.encoding.modrm_offset = 3;
++	}
++}
++
++#endif
 diff --git a/arch/X86/X86GenExtend32Output.inc b/arch/X86/X86GenExtend32Output.inc
 new file mode 100644
 index 00000000..ee213de1
@@ -105,24 +102,154 @@ index 00000000..ee213de1
 +	{ 492, "movsx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 2, 0, 0, { { 0, 4, 2 }, { 0, 1, 1 } } },
 +	{ 492, "movsx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 2, 0, 0, { { 0, 4, 2 }, { 0, 2, 1 } } },
 +};
+diff --git a/arch/X86/X86GenExtend64Output.inc b/arch/X86/X86GenExtend64Output.inc
+new file mode 100644
+index 00000000..7f778109
+--- /dev/null
++++ b/arch/X86/X86GenExtend64Output.inc
+@@ -0,0 +1,30 @@
++/* Generated by x86_simple_output.cpp --extend64. */
++static const struct X86SimpleRegister x86_extend64_words[16] = {
++	{ 3, 2, "ax" },
++	{ 12, 2, "cx" },
++	{ 18, 2, "dx" },
++	{ 8, 2, "bx" },
++	{ 47, 2, "sp" },
++	{ 6, 2, "bp" },
++	{ 45, 2, "si" },
++	{ 14, 2, "di" },
++	{ 234, 3, "r8w" },
++	{ 235, 3, "r9w" },
++	{ 236, 4, "r10w" },
++	{ 237, 4, "r11w" },
++	{ 238, 4, "r12w" },
++	{ 239, 4, "r13w" },
++	{ 240, 4, "r14w" },
++	{ 241, 4, "r15w" },
++};
++static const struct X86SimpleOutput x86_extend64[9] = {
++	{ 496, "movzx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 1, 1 } } },
++	{ 496, "movzx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 2, 1 } } },
++	{ 492, "movsx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 1, 1 } } },
++	{ 492, "movsx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 2, 1 } } },
++	{ 496, "movzx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 1, 1 } } },
++	{ 496, "movzx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 2, 1 } } },
++	{ 492, "movsx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 1, 1 } } },
++	{ 492, "movsx", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 2, 1 } } },
++	{ 493, "movsxd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 145, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 4, 1 } } },
++};
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..81b165b8 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -11,7 +11,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
+ 			0, 0, 0, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
+-			0, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
+ 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -85,7 +85,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
+ 			0, 0, 65535, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
+-			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
+ 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -103,7 +103,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+@@ -121,7 +121,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
++			X86_BYTE_GROUP1_PLAN, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index ab00f23f..97ed8065 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -92,21 +92,13 @@ static void writeRegisterImmediate(cs_insn *insn,
+ 	const bool shift = opcode == 0xc1;
+ 	const bool imm32 = opcode == 0x81;
+ 	const unsigned imm_size = imm32 ? 4 : 1;
+-	int64_t immediate;
+-	if (imm32) {
+-		uint32_t raw = (uint32_t)X86_readDisp32(code + offset);
+-		immediate = (rex & 8) ? (int64_t)(int32_t)raw : (int64_t)raw;
+-	} else {
+-		immediate = shift ? code[offset] : (int8_t)code[offset];
+-	}
+-	const unsigned group = (modrm >> 3) & 7;
+-	const bool logical = !shift && (group == 1 || group == 4 || group == 6);
++	const int64_t immediate = X86_readAluImmediate(code + offset, imm32,
++						       (rex & 8) != 0, shift);
++	const bool logical = X86_isLogicalImmediate(shift, modrm);
+ 	const bool wide = (rex & 8) != 0;
+ 	const bool negative = !logical && immediate < 0;
+ 	const uint64_t value =
+-		logical ? (wide ? (uint64_t)(int64_t)immediate :
+-				  (uint32_t)immediate) :
+-			  (uint64_t)(negative ? -immediate : immediate);
++		X86_aluMagnitude(immediate, logical, wide, negative);
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)(offset + imm_size);
+ 	memcpy(insn->bytes, code, insn->size);
+@@ -125,9 +117,8 @@ static void writeRegisterImmediate(cs_insn *insn,
+ 				      reg->reg, 0);
+ 		cs_x86 *x = &insn->detail->x86;
+ 		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = logical && !wide ?
+-					     (int64_t)(uint32_t)immediate :
+-					     immediate;
++		x->operands[1].imm =
++			X86_aluDetailValue(immediate, logical, wide);
+ 		if (!shift)
+ 			x->operands[1].access = 0;
+ 		x->encoding.imm_offset = (uint8_t)offset;
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 13695450..695b4f87 100644
+index 13695450..8e1b3a70 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -7,6 +7,8 @@
+@@ -7,6 +7,10 @@
  #ifdef X86_MEMORY_IMMEDIATE
  #include "X86UnsignedImmediate.h"
  static bool X86_MEMORY_IMMEDIATE(
++#elif defined(X86_EXTEND64_MEMORY)
++static bool X86_EXTEND64_MEMORY(
 +#elif defined(X86_EXTEND32_MEMORY)
 +static bool X86_EXTEND32_MEMORY(
  #elif defined(X86_MEMORY32_OUTPUT)
  static bool X86_MEMORY32_OUTPUT(
  #else
-@@ -24,7 +26,11 @@ bool X86_writeMemoryOutput(
+@@ -18,20 +22,32 @@ bool X86_writeMemoryOutput(
+ {
+ #ifdef X86_MEMORY_IMMEDIATE
+ 	const bool wide = X86_IMMEDIATE_WIDE;
++#elif defined(X86_EXTEND64_MEMORY)
++	const bool wide = true;
+ #elif defined(X86_MEMORY32_OUTPUT)
+ 	const bool wide = false;
+ #else
  	const bool wide = row->address_size == 8;
  #endif
  	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
-+#ifdef X86_EXTEND32_MEMORY
++#ifdef X86_EXTEND64_MEMORY
++	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
++#elif defined(X86_EXTEND32_MEMORY)
 +	const unsigned lead = 1; /* The caller consumed the 0F escape. */
 +#else
  	const unsigned lead = rex != 0;
@@ -130,18 +257,32 @@ index 13695450..695b4f87 100644
  	const uint8_t opcode = code[lead], modrm = code[lead + 1];
  	const unsigned mod = modrm >> 6, rm = modrm & 7;
  	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
-@@ -61,6 +67,10 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
++#ifdef X86_ALU_IMMEDIATE
++	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
++#else
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
++#endif
+ 	const unsigned imm_offset = offset + disp_size;
+ 	const unsigned length = imm_offset + imm_size;
+ #else
+@@ -61,6 +77,13 @@ bool X86_writeMemoryOutput(
  		}
  	}
  
-+#ifdef X86_EXTEND32_MEMORY
++#ifdef X86_EXTEND64_MEMORY
++	const bool push = false, load = true;
++	const unsigned reg_width = rex & 8 ? 3 : 2;
++#elif defined(X86_EXTEND32_MEMORY)
 +	const bool push = false, load = true;
 +	const unsigned reg_width = 2; /* r32 destination */
 +#else
  #ifdef X86_MEMORY_IMMEDIATE
  	const bool lea = false, load = false;
  #else
-@@ -68,6 +78,7 @@ bool X86_writeMemoryOutput(
+@@ -68,6 +91,7 @@ bool X86_writeMemoryOutput(
  	const bool load = !push && (lea || (opcode & 2));
  #endif
  	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) : lead;
@@ -149,18 +290,27 @@ index 13695450..695b4f87 100644
  	const struct X86SimpleRegister *reg =
  		&regs[reg_width][((rex & 4) << 1) | ((modrm >> 3) & 7)];
  	const struct X86SimpleRegister *base =
-@@ -91,6 +102,10 @@ bool X86_writeMemoryOutput(
+@@ -91,6 +115,19 @@ bool X86_writeMemoryOutput(
  		memcpy(out, ", ", 2);
  		out += 2;
  	}
-+#ifdef X86_EXTEND32_MEMORY
-+	memcpy(out, row->ops[1].size == 1 ? "byte ptr [" : "word ptr [", 10);
-+	out += 10;
++#if defined(X86_EXTEND32_MEMORY) || defined(X86_EXTEND64_MEMORY)
++#ifdef X86_EXTEND64_MEMORY
++	if (row->ops[1].size == 4) {
++		memcpy(out, "dword ptr [", 11);
++		out += 11;
++	} else
++#endif
++	{
++		memcpy(out, row->ops[1].size == 1 ? "byte ptr [" : "word ptr [",
++		       10);
++		out += 10;
++	}
 +#else
  	if (lea) {
  		*out++ = '[';
  	} else if (row->ops[0].size == 1) {
-@@ -102,6 +117,7 @@ bool X86_writeMemoryOutput(
+@@ -102,6 +139,7 @@ bool X86_writeMemoryOutput(
  		       11);
  		out += 11;
  	}
@@ -168,22 +318,258 @@ index 13695450..695b4f87 100644
  	if (disp32_only) {
  #ifdef X86_MEMORY32_OUTPUT
  		/* The absolute address is unsigned in Intel text. The encoded
-@@ -154,6 +170,10 @@ bool X86_writeMemoryOutput(
+@@ -131,6 +169,22 @@ bool X86_writeMemoryOutput(
+ 		out = X86_writeDisplacement(out, displacement);
+ 	*out++ = ']';
+ #ifdef X86_MEMORY_IMMEDIATE
++#ifdef X86_ALU_IMMEDIATE
++	memcpy(out, ", ", 2);
++	const bool wide_operand = (rex & 8) != 0;
++	const int64_t immediate = X86_readAluImmediate(
++		code + imm_offset, opcode == 0x81, wide_operand,
++		opcode == 0x80 || opcode == 0xc1);
++	const bool logical = X86_isLogicalImmediate(opcode == 0xc1, modrm);
++	const bool negative = !logical && immediate < 0;
++	const int64_t value =
++		X86_aluDetailValue(immediate, logical, wide_operand);
++	out += 2;
++	if (negative)
++		*out++ = '-';
++	writeUnsignedImmediate(out, X86_aluMagnitude(immediate, logical,
++						     wide_operand, negative));
++#else
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+@@ -144,6 +198,7 @@ bool X86_writeMemoryOutput(
+ #endif
+ 	memcpy(out, ", ", 2);
+ 	writeUnsignedImmediate(out + 2, value);
++#endif
+ #else
+ 	if (!load && !push) {
+ 		memcpy(out, ", ", 2);
+@@ -154,6 +209,16 @@ bool X86_writeMemoryOutput(
  		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
  				      load ? reg->reg : 0, load ? 0 : reg->reg);
  		cs_x86 *x = &insn->detail->x86;
-+#ifdef X86_EXTEND32_MEMORY
++#ifdef X86_EXTEND64_MEMORY
++		if (opcode != 0x63) {
++			x->opcode[0] = 0x0f;
++			x->opcode[1] = opcode;
++		}
++		x->encoding.modrm_offset = (uint8_t)(lead + 1);
++#elif defined(X86_EXTEND32_MEMORY)
 +		x->opcode[0] = 0x0f;
 +		x->opcode[1] = opcode;
 +#endif
  #ifdef X86_MEMORY_IMMEDIATE
  		x->operands[1].type = X86_OP_IMM;
  		x->operands[1].imm = (int64_t)value;
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index aff17085..e7ce8ed8 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -47,6 +47,11 @@ enum X86SimpleForm {
+ /* This plan gets its ALU row from ModR/M.reg. Its low bits select the
+  * same register-only operand check as a register pair. */
+ #define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
++#ifdef X86_FIXED_ALU_MEMORY
++#define X86_BYTE_GROUP1_PLAN X86_PLAN_GROUP1_IMMEDIATE
++#else
++#define X86_BYTE_GROUP1_PLAN 0
++#endif
+ 
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 76c28656..2d2de900 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -77,8 +77,25 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const bool single = opcode == 0xff &&
+ 					    (modrm & 0x38) == 0x30;
+ #endif
+-			if (!alu && !test_or_mov && opcode != 0x8d && !single)
++			if (!alu && !test_or_mov && opcode != 0x8d && !single) {
++#ifdef X86_FIXED_ALU_MEMORY
++				if (plan == X86_PLAN_GROUP1_IMMEDIATE &&
++				    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++					const unsigned pair = (modrm & 0x38) |
++							      (opcode & 1);
++					const unsigned row =
++						x86_simple_plans[wide]
++								[prefix_class]
++								[pair] >>
++						2;
++					return X86_FIXED_ALU_MEMORY(
++						code, size, insn, insn_size,
++						&x86_simple_outputs[row],
++						x86_simple_registers);
++				}
++#endif
+ 				return false;
++			}
+ 			base_memory = true;
+ 		} else if (opcode == 0x8d || opcode == 0xff) {
+ 			return false;
+@@ -115,6 +132,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else {
+ 			if (size < (opcode == 0x81 ? 6u : 3u) + has_rex)
+ 				return false;
++#ifdef X86_FIXED_ALU_MEMORY
++			if (opcode == 0x80)
++				return false;
++#endif
+ 			const unsigned group = (modrm >> 3) & 7;
+ 			row = plan == X86_PLAN_SHIFT_IMM8 ?
+ 				      x86_shift_rows[wide][prefix_class][group] :
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 53bef3f7..f2e56723 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -15,12 +15,18 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+ #define X86_FIXED_VEX2 writeVex2Memory64
++#define X86_FIXED_ALU_MEMORY writeAluMemory64
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorRegisterWriter.h"
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
+ #define X86_IMMEDIATE_WIDE 1
+ #include "X86MemoryOutputImpl.h"
++#undef X86_MEMORY_IMMEDIATE
++#define X86_MEMORY_IMMEDIATE X86_FIXED_ALU_MEMORY
++#define X86_ALU_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_ALU_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
+ #undef X86_MEMORY_IMMEDIATE
+ 
+@@ -32,6 +38,38 @@ struct X86SseRegisterOutput {
+ #include "X86GenSse64RegisterOutput.inc"
+ #include "X86GenVex64PackedMemory.inc"
+ 
++#define X86_EXTEND64_MEMORY writeExtendMemory64
++#include "X86MemoryOutputImpl.h"
++#undef X86_EXTEND64_MEMORY
++#include "X86GenExtend64Output.inc"
++#include "X86ExtendRegisterOutput.h"
++
++static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
++			  uint16_t *insn_size, unsigned length, uint8_t rex,
++			  uint8_t opcode)
++{
++	const bool escaped = opcode != 0x63;
++	const unsigned form = escaped ? ((rex & 8) >> 1) | ((opcode & 8) >> 2) |
++						(opcode & 1) :
++					8;
++	const struct X86SimpleOutput *row = &x86_extend64[form];
++	const uint8_t mr = code[length - 1];
++	if (mr < 0xc0)
++		return writeExtendMemory64(code, size, insn, insn_size, row,
++					   x86_simple_registers);
++	const struct X86SimpleRegister *dst =
++		&x86_simple_registers[(rex & 8) ? 3 : 2]
++				     [((rex & 4) << 1) | ((mr >> 3) & 7)];
++	const struct X86SimpleRegister *src =
++		!escaped     ? x86_simple_registers[2] :
++		(opcode & 1) ? x86_extend64_words :
++			       x86_simple_registers[rex != 0];
++	src += ((rex & 1) << 3) | (mr & 7);
++	writeExtendRegisters(code, length, insn, insn_size, row, dst, src, rex,
++			     opcode, mr, escaped);
++	return true;
++}
++
+ #ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
+ #include "X86GenIndirect64Output.inc"
+ 
+@@ -171,10 +209,20 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 			       size_t size, cs_insn *insn, uint16_t *insn_size)
+ {
+ 	const bool has_rex = (code[0] & 0xf0) == 0x40;
+-	const unsigned length = 3 + has_rex;
+-	if (size < length)
++	if (size < 2u + has_rex)
+ 		return false;
+ 	const uint8_t primary = code[has_rex];
++	const unsigned length = 2 + has_rex + (primary == 0x0f);
++	if (size < length)
++		return false;
++	const uint8_t rex_byte = has_rex ? code[0] : 0;
++	if ((primary == 0x63 && (rex_byte & 8)) ||
++	    (primary == 0x0f && (code[length - 2] & 0xf6) == 0xb6)) {
++		if (X86_OUTPUT_UNSUPPORTED(handle, false))
++			return false;
++		return writeExtend64(code, size, insn, insn_size, length,
++				     rex_byte, code[length - 2]);
++	}
+ 	if (primary != 0x0f) {
+ 		const uint8_t mr = code[has_rex + 1];
+ 		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
+index 6f3953cc..03ab3244 100644
+--- a/arch/X86/X86UnsignedImmediate.h
++++ b/arch/X86/X86UnsignedImmediate.h
+@@ -23,4 +23,34 @@ static char *writeUnsignedImmediate(char *out, uint64_t value)
+ 	}
+ }
+ 
++/* The register and memory paths expose the same immediate sign and width. */
++static inline int64_t X86_readAluImmediate(const uint8_t *bytes, bool imm32,
++					   bool wide, bool unsigned_byte)
++{
++	if (imm32) {
++		uint32_t raw = (uint32_t)X86_readDisp32(bytes);
++		return wide ? (int64_t)(int32_t)raw : (int64_t)raw;
++	}
++	return unsigned_byte ? *bytes : (int8_t)*bytes;
++}
++
++static inline bool X86_isLogicalImmediate(bool shift, uint8_t modrm)
++{
++	const unsigned group = (modrm >> 3) & 7;
++	return !shift && (group == 1 || group == 4 || group == 6);
++}
++
++static inline int64_t X86_aluDetailValue(int64_t immediate, bool logical,
++					 bool wide)
++{
++	return logical && !wide ? (int64_t)(uint32_t)immediate : immediate;
++}
++
++static inline uint64_t X86_aluMagnitude(int64_t immediate, bool logical,
++					bool wide, bool negative)
++{
++	return logical ? (wide ? (uint64_t)immediate : (uint32_t)immediate) :
++			 (uint64_t)(negative ? -immediate : immediate);
++}
++
+ #endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index dfbe52c0..4f95ee4a 100644
+index dfbe52c0..7fbe09cd 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -24,6 +24,11 @@
+@@ -13,6 +13,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
++#define X86_FIXED_ALU_MEMORY writeAluMemory32
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorRegisterWriter.h"
+@@ -20,10 +21,21 @@
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
+ #define X86_IMMEDIATE_WIDE 0
+ #include "X86MemoryOutputImpl.h"
++#undef X86_MEMORY_IMMEDIATE
++#define X86_MEMORY_IMMEDIATE X86_FIXED_ALU_MEMORY
++#define X86_ALU_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_ALU_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
  #undef X86_MEMORY_IMMEDIATE
  #include "X86MemoryOutputImpl.h"
  
@@ -191,11 +577,12 @@ index dfbe52c0..4f95ee4a 100644
 +#include "X86MemoryOutputImpl.h"
 +#undef X86_EXTEND32_MEMORY
 +#include "X86GenExtend32Output.inc"
++#include "X86ExtendRegisterOutput.h"
 +
  #include "X86GenVex32MemoryOutput.inc"
  
  /* Bare VEX2, ordinary 32-bit base and a generated full-width memory record. */
-@@ -121,11 +126,50 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -121,11 +133,37 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
  	return true;
  }
  
@@ -215,21 +602,8 @@ index dfbe52c0..4f95ee4a 100644
 +	const struct X86SimpleRegister *src =
 +		&(opcode & 1 ? x86_extend32_words :
 +			       x86_simple_registers[0])[mr & 7];
-+	*insn_size = insn->size = 3;
-+	insn->id = row->id;
-+	memcpy(insn->bytes, code, 3);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	memcpy(insn->op_str, dst->name, sizeof(dst->name));
-+	char *next = insn->op_str + dst->length;
-+	memcpy(next, ", ", 2);
-+	memcpy(next + 2, src->name, sizeof(src->name));
-+	if (insn->detail) {
-+		X86_writeSimpleDetail(insn->detail, row, 0x0f, 0, mr, dst->reg,
-+				      src->reg);
-+		insn->detail->x86.opcode[1] = opcode;
-+	}
++	writeExtendRegisters(code, 3, insn, insn_size, row, dst, src, 0, opcode,
++			     mr, true);
 +	return true;
 +}
 +
@@ -247,14 +621,226 @@ index dfbe52c0..4f95ee4a 100644
  		return false;
  	if (code[0] & 2) {
  		if (size < 2 || code[1] >= 0xc0 || (code[1] & 0x38))
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index 101beaf9..ebeea2b7 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -146,6 +146,53 @@ def successors(n):
+     return [n.end] + ([] if n.target is None else [n.target])
+ 
+ 
++def observable_prefixes(nodes, bits=7):
++    """Conservatively admit any prefix that could reach an MCInst mutation."""
++    result = set()
++    for prefix in range(1 << bits):
++        pending = [(0, None)]
++        seen = set()
++        while pending:
++            position, field = pending.pop()
++            state = (position, field)
++            if state in seen:
++                continue
++            seen.add(state)
++            node = nodes[position]
++            if node.op in ('Decode', 'TryDecode'):
++                result.add(prefix)
++                break
++            if node.op == 'Fail':
++                continue
++            if node.op == 'ExtractField':
++                pending.append((node.end, node.args))
++                continue
++            if node.op in ('FilterValue', 'CheckField'):
++                if node.op == 'FilterValue':
++                    compared, expected = field, node.args[0]
++                else:
++                    compared, expected = node.args[:2], node.args[2]
++                if compared is None:
++                    match, mismatch = expected == 0, expected != 0
++                else:
++                    start, length = compared
++                    known = max(0, min(length, bits - start))
++                    mask = (1 << known) - 1
++                    match = expected < (1 << length) and (expected & mask) == ((prefix >> start) & mask)
++                    mismatch = not match or known < length
++                if match:
++                    pending.append((node.end, field))
++                if mismatch:
++                    pending.append((node.target, field))
++                continue
++            # Predicates are pure queries; either answer remains possible.
++            assert node.op in ('CheckPredicate', 'SoftFail'), node.op
++            pending.append((node.end, field))
++            if node.target is not None:
++                pending.append((node.target, field))
++    return result
++
++
+ def primary_opcode_mask(nodes):
+     """A top-level miss must reach Fail without modifying the instruction."""
+     root = nodes[0]
+@@ -282,6 +329,7 @@ def main():
+             f"/* Source SHA256: {hashlib.sha256(text.encode('utf-8')).hexdigest()} */",
+         ]
+         counts = []
++        extension_majors = 0
+         for name, body in tables:
+             encoded_width = int(name[-2:])
+             require(encoded_width in inputs, "Unsupported instruction width")
+@@ -292,6 +340,9 @@ def main():
+                 "Review changed decoder input width before regenerating",
+             )
+             nodes = parse(body)
++            if arch == "RISCV" and encoded_width == 32 and name != "DecoderTable32":
++                for opcode_prefix in observable_prefixes(nodes):
++                    extension_majors |= 1 << (opcode_prefix >> 2)
+             if arch == "Mips" and name in (
+                 "DecoderTableMips6432", "DecoderTableMipsFP6432", "DecoderTableMipsDSP32"
+             ):
+@@ -299,6 +350,10 @@ def main():
+                 output.append(f"#define {name}_MAJOR_MASK UINT64_C(0x{mask:016x})")
+             output.append(emit(name, nodes, width, w))
+             counts.append((name, len(nodes)))
++        if arch == "RISCV":
++            output.append(
++                f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
++            )
+         for w, width in sorted(set(inputs.values())):
+             selected = [n for n, _ in tables if inputs[int(n[-2:])] == (w, width)]
+             if not selected:
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index fc4d6817..9a2b9975 100644
+index 64cf5fd6..63501daa 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -885,6 +885,59 @@ void emit_sse64_registers(Decoder &decoder)
+@@ -128,7 +128,8 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
+ 	const auto &x = d.x86;
+ 	X86SimpleOutput row{};
+ 	if (strlen(insn.mnemonic) >= sizeof(row.mnemonic) ||
+-	    strlen(insn.op_str) >= sizeof(row.operands) ||
++	    (!first && !branch && !lea &&
++	     strlen(insn.op_str) >= sizeof(row.operands)) ||
+ 	    strpbrk(insn.mnemonic, "\n\r\t\\\"") ||
+ 	    strpbrk(insn.op_str, "\n\r\t\\\"") || d.regs_read_count > 4 ||
+ 	    d.regs_write_count > 4 || d.groups_count > 4 || x.op_count > 2)
+@@ -545,9 +546,17 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 			std::cout << "\t\t{\n";
+ 			for (unsigned j = 0; j < 256; j += 16) {
+ 				std::cout << "\t\t\t";
+-				for (unsigned k = 0; k < 16; ++k)
+-					std::cout << (k ? " " : "")
+-						  << prefix[j + k] << ',';
++				for (unsigned k = 0; k < 16; ++k) {
++					const auto plan = prefix[j + k];
++					std::cout << (k ? " " : "");
++					if (j + k == 0x80 &&
++					    plan == X86_PLAN_GROUP1_IMMEDIATE)
++						std::cout
++							<< "X86_BYTE_GROUP1_PLAN";
++					else
++						std::cout << plan;
++					std::cout << ',';
++				}
+ 				std::cout << '\n';
+ 			}
+ 			std::cout << "\t\t},\n";
+@@ -885,6 +894,153 @@ void emit_sse64_registers(Decoder &decoder)
  		  << " SSE opcodes verified over every REX and register pair\n";
  }
  
++void emit_extend64(Decoder &decoder, const RegisterTable &regs)
++{
++	X86SimpleRegister words[16]{};
++	std::cout
++		<< "/* Generated by x86_simple_output.cpp --extend64. */\n"
++		<< "static const struct X86SimpleRegister x86_extend64_words[16] = {\n";
++	for (unsigned i = 0; i < 16; ++i) {
++		const uint8_t code[] = { uint8_t(0x40 | (i >> 3)), 0x0f, 0xb7,
++					 uint8_t(0xc0 | (i & 7)) };
++		decoder.decode(code, sizeof(code), sizeof(code), 0);
++		const auto &src = decoder.insn->detail->x86.operands[1];
++		const char *name = cs_reg_name(decoder.handle, src.reg);
++		if (src.type != X86_OP_REG || src.size != 2 || !name ||
++		    strlen(name) >= sizeof(words[i].name))
++			throw std::runtime_error(
++				"invalid canonical word register");
++		words[i].reg = src.reg;
++		words[i].length = uint8_t(strlen(name));
++		strcpy(words[i].name, name);
++		std::cout << "\t{ " << unsigned(src.reg) << ", " << strlen(name)
++			  << ", \"" << name << "\" },\n";
++	}
++	std::cout
++		<< "};\nstatic const struct X86SimpleOutput x86_extend64[9] = {\n";
++	for (unsigned form = 0; form < 9; ++form) {
++		const bool escaped = form != 8;
++		const uint8_t opcode = escaped ? uint8_t(0xb6 + (form & 1) +
++							 ((form & 2) << 2)) :
++						 0x63;
++		CheckedRow row;
++		for (unsigned prefix = 0; prefix <= 16; ++prefix) {
++			const uint8_t rex = prefix ? uint8_t(0x3f + prefix) : 0;
++			if (bool(rex & 8) != (form >= 4))
++				continue;
++			for (unsigned reg = 0; reg < 8; ++reg) {
++				auto observe = [&](uint8_t mr,
++						   const X86SimpleRegister *src) {
++					uint8_t code[4];
++					unsigned n = 0;
++					if (rex)
++						code[n++] = rex;
++					if (escaped)
++						code[n++] = 0x0f;
++					code[n++] = opcode;
++					code[n++] = mr;
++					decoder.decode(code, n, n, 0);
++					const auto *dest =
++						src ? &regs[form >= 4 ? 3 : 2]
++							   [((rex & 4) << 1) |
++							    reg] :
++						      nullptr;
++					auto fields = describe(*decoder.insn,
++							       opcode, rex, mr,
++							       dest, src, false,
++							       !src, escaped);
++					if (fields.empty() ||
++					    (row.encodings &&
++					     fields != row.fields)) {
++						std::cerr
++							<< "unexpected widening record for form "
++							<< form << ", REX "
++							<< unsigned(rex)
++							<< ", ModRM "
++							<< unsigned(mr) << ": "
++							<< decoder.insn->mnemonic
++							<< " "
++							<< decoder.insn->op_str
++							<< " (canonical "
++							<< fields << ", prior "
++							<< row.fields << ")\n";
++					}
++					row.observe(fields);
++				};
++				for (unsigned rm = 0; rm < 8; ++rm) {
++					const unsigned i = ((rex & 1) << 3) |
++							   rm;
++					const auto *src =
++						!escaped     ? regs[2] :
++						(opcode & 1) ? words :
++							       regs[rex != 0];
++					observe(uint8_t(0xc0 | reg << 3 | rm),
++						&src[i]);
++				}
++				observe(uint8_t(reg << 3), nullptr);
++			}
++		}
++		if (row.encodings != (form < 4 ? 9u : 8u) * 72)
++			throw std::runtime_error(
++				"incomplete amd64 widening coverage");
++		std::cout << "\t" << row.fields << ",\n";
++	}
++	std::cout << "};\n";
++}
++
 +void emit_extend32(Decoder &decoder, const RegisterTable &regs)
 +{
 +	X86SimpleRegister words[8]{};
@@ -311,17 +897,24 @@ index fc4d6817..9a2b9975 100644
  void emit_indirect_memory(Decoder &decoder, const RegisterTable &regs)
  {
  	std::cout
-@@ -918,12 +971,18 @@ int main(int argc, char **argv)
+@@ -979,12 +1135,25 @@ int main(int argc, char **argv)
  	}
  	const bool indirect = argc == 2 &&
  			      std::strcmp(argv[1], "--indirect-memory") == 0;
 -	if (argc != 1 && !indirect)
++	if (argc == 2 && std::strcmp(argv[1], "--extend64") == 0) {
++		Decoder x64(CS_MODE_64);
++		RegisterTable regs{};
++		describe_registers(x64, regs);
++		emit_extend64(x64, regs);
++		return 0;
++	}
 +	const bool extend = argc == 2 &&
 +			    std::strcmp(argv[1], "--extend32") == 0;
 +	if (argc != 1 && !indirect && !extend)
  		throw std::runtime_error(
--			"expected no arguments, --sse64-registers, --vex64-packed-memory or --indirect-memory");
-+			"expected no arguments, --sse64-registers, --vex64-packed-memory, --indirect-memory or --extend32");
+-			"expected no arguments, --sse64-registers, --vex64-packed-memory, --indirect-memory or --indirect64");
++			"expected no arguments, --sse64-registers, --vex64-packed-memory, --indirect-memory, --indirect64, --extend32 or --extend64");
  	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
  	RegisterTable regs{};
  	describe_registers(x64, regs);
@@ -332,81 +925,98 @@ index fc4d6817..9a2b9975 100644
  	if (indirect) {
  		emit_indirect_memory(x86, regs);
  		return 0;
-diff --git a/tests/unit/aarch64_postprocess.c b/tests/unit/aarch64_postprocess.c
-index c5e4ab3c..5d624e67 100644
---- a/tests/unit/aarch64_postprocess.c
-+++ b/tests/unit/aarch64_postprocess.c
-@@ -329,6 +329,52 @@ done:
- 	return result;
+@@ -1045,10 +1214,12 @@ int main(int argc, char **argv)
+ 	for (unsigned wide = 0; wide < 2; ++wide) {
+ 		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
+ 			for (unsigned alu = 1; alu < 0x40; alu += 8) {
+-				if (!plans[wide][cls][alu])
++				if (!plans[wide][cls][alu] ||
++				    !plans[wide][cls][alu - 1])
+ 					throw std::runtime_error(
+ 						"missing group-1 register row");
+ 			}
++			plans[wide][cls][0x80] = X86_PLAN_GROUP1_IMMEDIATE;
+ 			plans[wide][cls][0x81] = X86_PLAN_GROUP1_IMMEDIATE;
+ 			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMMEDIATE;
+ 		}
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 8fbd111a..627434c6 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -875,6 +875,40 @@ static bool check_absolute_addresses32(csh handles[2])
+ 	return true;
  }
  
-+static bool check_vector_suffixes(void)
++static bool check_group1_output(csh handles[2], cs_mode mode)
 +{
-+	cs_struct handle = { 0 };
-+	cs_insn insn = { 0 };
-+	cs_detail detail = { 0 };
-+	MCInst mi = { 0 };
-+	handle.detail_opt = CS_OPT_ON;
-+	mi.csh = &handle;
-+	mi.flat_insn = &insn;
-+	insn.detail = &detail;
-+	static const struct {
-+		const char *text;
-+		unsigned vas[3];
-+	} cases[] = {
-+		{ "add v0.4s, v1.4s, v2.4s",
-+		  { AARCH64LAYOUT_VL_4S, AARCH64LAYOUT_VL_4S,
-+		    AARCH64LAYOUT_VL_4S } },
-+		{ "t v0.16b, v1.h, v2.d",
-+		  { AARCH64LAYOUT_VL_16B, AARCH64LAYOUT_VL_H,
-+		    AARCH64LAYOUT_VL_D } },
-+		{ "t v0.4s, v1, [x0, x1], v2.2d",
-+		  { AARCH64LAYOUT_VL_4S, AARCH64LAYOUT_INVALID,
-+		    AARCH64LAYOUT_VL_2D } },
-+		{ "t v0, v1, v2.", { 0, 0, 0 } },
-+		{ "t v0, v1, v2.16", { 0, 0, 0 } },
-+	};
-+	for (unsigned i = 0; i < ARR_SIZE(cases); ++i) {
-+		SStream ss = { 0 };
-+		strcpy(ss.buffer, cases[i].text);
-+		memset(&detail, 0, sizeof(detail));
-+		detail.aarch64.op_count = 3;
-+		for (unsigned n = 0; n < 3; ++n)
-+			detail.aarch64.operands[n].type = AARCH64_OP_REG;
-+		AArch64_add_vas(&mi, &ss);
-+		for (unsigned n = 0; n < 3; ++n)
-+			if ((unsigned)detail.aarch64.operands[n].vas !=
-+			    cases[i].vas[n]) {
-+				fprintf(stderr,
-+					"vector layout mismatch for %s operand %u\n",
-+					cases[i].text, n);
-+				return false;
++	const uint8_t opcodes[] = { 0x80, 0x81, 0x83 };
++	const uint8_t edges[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
++	for (unsigned p = 0; p < (mode == CS_MODE_64 ? 17u : 1u); ++p) {
++		for (unsigned op = 0; op < sizeof(opcodes); ++op) {
++			for (unsigned mr = 0; mr <= 255; ++mr) {
++				unsigned count = (mr < 0xc0 && (mr & 7) == 4) ?
++							 256 :
++							 sizeof(edges);
++				for (unsigned n = 0; n < count; ++n) {
++					uint8_t code[12];
++					memset(code, edges[n % sizeof(edges)],
++					       sizeof(code));
++					code[0] = (uint8_t)(0x3f + p);
++					code[1] = opcodes[op];
++					code[2] = (uint8_t)mr;
++					if (count == 256)
++						code[3] = (uint8_t)n;
++					unsigned seed = mr + op + p + n;
++					const uint8_t *start = code + !p;
++					size_t size = sizeof(code) - !p;
++					if (!compare(handles, start, size,
++						     seed) ||
++					    !compare(handles, start,
++						     seed % size, seed))
++						return false;
++				}
 +			}
++		}
 +	}
 +	return true;
 +}
 +
- /* Evaluate the real descriptor objects with native enum/constraint values,
-  * independently of the generator's source parser. */
- int main(void)
-@@ -360,5 +406,8 @@ int main(void)
- 	}
- 	printf("%zu descriptors equal: %u implicit, %u tied\n",
- 	       ARR_SIZE(AArch64Descs.Insts), implicit, tied);
--	return check_addressing_details() && check_matrix_details() ? 0 : 1;
-+	return check_addressing_details() && check_matrix_details() &&
-+			       check_vector_suffixes() ?
-+		       0 :
-+		       1;
- }
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6ca1b43b..676ea70b 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -908,6 +908,29 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ {
+ 	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
+@@ -908,6 +942,58 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
  	return true;
  }
  
++static bool check_extend64(csh handles[2])
++{
++	static const uint8_t ops[] = { 0x63, 0xb6, 0xb7, 0xbe, 0xbf };
++	for (unsigned prefix = 0; prefix <= 16; ++prefix)
++		for (size_t op = 0; op < sizeof(ops); ++op)
++			for (unsigned mr = 0; mr < 256; ++mr) {
++				uint8_t bytes[10] = { 0 };
++				unsigned n = 0;
++				if (prefix)
++					bytes[n++] = (uint8_t)(0x3f + prefix);
++				if (ops[op] != 0x63)
++					bytes[n++] = 0x0f;
++				bytes[n++] = ops[op];
++				bytes[n++] = (uint8_t)mr;
++				bytes[n++] = (uint8_t)(mr & 8 ? 0x25 : 0xa3);
++				bytes[n++] = 0x80;
++				bytes[n++] = 0xfe;
++				bytes[n++] = 0xff;
++				bytes[n++] = 0xff;
++				const unsigned seed =
++					prefix + mr + (unsigned)op;
++				if (!compare(handles, bytes, n, seed) ||
++				    !compare(handles, bytes, seed % n + 1,
++					     seed))
++					return false;
++			}
++	return true;
++}
++
 +static bool check_extend32(csh handles[2])
 +{
 +	for (unsigned op = 0xb6; op <= 0xbf; ++op) {
@@ -433,13 +1043,25 @@ index 6ca1b43b..676ea70b 100644
  static bool check_vex_packed_memory(csh handles[2])
  {
  	const uint8_t opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x51, 0x6f, 0x7f };
-@@ -1142,7 +1165,8 @@ static bool check_mode(cs_mode mode)
+@@ -1142,7 +1228,10 @@ static bool check_mode(cs_mode mode)
  		    !check_padding(handles) ||
  		    !check_alu_memory(handles, mode) ||
  		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
 -		     !check_absolute_addresses32(handles)) ||
 +		     (!check_absolute_addresses32(handles) ||
 +		      !check_extend32(handles))) ||
- 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
++		    (mode == CS_MODE_64 && private_iter != X86_disasmIter &&
++		     !check_extend64(handles)) ||
+ 		    (private_iter != X86_disasmIter &&
  		     !check_indirect_memory(handles, mode)) ||
  		    !check_alu_immediates(handles, mode) ||
+@@ -1150,7 +1239,8 @@ static bool check_mode(cs_mode mode)
+ 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+ 		     !check_vex2_base_memory(handles)) ||
+ 		    (private_iter != X86_disasmIter &&
+-		     !check_mov_memory_immediates(handles, mode)) ||
++		     (!check_mov_memory_immediates(handles, mode) ||
++		      !check_group1_output(handles, mode))) ||
+ 		    !check_vex_register_forms(handles) ||
+ 		    (mode == CS_MODE_64 &&
+ 		     (!check_evex(handles) || !check_evex_extract(handles) ||
