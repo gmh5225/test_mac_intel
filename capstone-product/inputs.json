@@ -1,40 +1,26 @@
 {
-  "neverd": "fad4c85477e4451f71d9a52f5d6cd1fb8d27bd6b",
-  "capstone": "e2266247a3b0f090bcad5bd3a4ead8c3220de367",
+  "neverd": "a4b585e24f9d6ae55096c93bb92b9ccc0f8418af",
+  "capstone": "26ebcf8b672cbfec8536db188aa92c506c915efa",
   "variants": {
-    "route": {
-      "source": "round1521-fork-vex32-public-output",
-      "patch": "route.patch",
-      "tree": "ef4139cea0c64c310e9f23fe1a27b2fc19e6c5dd",
-      "patch_sha256": "0ebf5e11836614adad6ec1e4610ba66842e5312b88cf0dde9cd1161b06a5a978",
-      "added": [
-        "X86Vex32Output.c.o"
-      ],
-      "changed": [
-        "X86DisassemblerDecoder.c.o",
-        "X86OutputIterator.c.o",
-        "X86VectorOutput.c.o"
-      ]
+    "family": {
+      "tree": "7b78307968fcf8ce96973de0bf61db7cb8eee250",
+      "patch": "family.patch",
+      "patch_sha256": "8f8bf9786050c7334277c035010157240730af2fae267058a7fd11d311f4291e"
     },
-    "vector": {
-      "source": "round1534-vex32-prefix-dispatch",
-      "patch": "vector.patch",
-      "tree": "bb2f705e469753cc70c4e7094a0641a8b6f0aa87",
-      "patch_sha256": "fb662c1197edb72e40f1ea944918073aa5d954e28dfabf34d97c2a59c67c576a",
-      "added": [
-        "X86Vex32Output.c.o",
-        "X86VexScan.c.o"
-      ],
-      "changed": [
-        "X86DisassemblerDecoder.c.o",
-        "X86OutputIterator.c.o",
-        "X86VectorOutput.c.o"
-      ]
+    "batch": {
+      "tree": "d02f78322869b3be3ac6430fbe3220aa5384bc9c",
+      "patch": "batch.patch",
+      "patch_sha256": "cdba4c3ff16ee8e1836151569203e95257cddbcca732d4b7de3cd227827c35b4"
+    },
+    "vector_batch": {
+      "tree": "15630c1af2713cf7aef9a9263d406831c9699986",
+      "patch": "vector_batch.patch",
+      "patch_sha256": "5543543480edeaa0d1aaab03b2fa3f215142eb7a35bb55b047667f4814b8624a"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
   "timing_protocol": {
-    "cycles": 9,
+    "cycles": 7,
     "calibration_cpu_ms": 45
   },
   "scope": "Actual NeverD dev and the source-built live LLVM fork: x86-64 Clang Linux, complete PE32/PE64, scalar and SIMD ELF, controls for ARM, AArch64 and MIPS.",

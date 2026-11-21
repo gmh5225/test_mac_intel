@@ -1,0 +1,2428 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..a513ff38 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3809,18 +3809,44 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 		return batch;
+ 	cs_insn insn = { 0 };
+ 	handle->errnum = CS_ERR_OK;
+-	while (batch.count < capacity && size) {
++	while (batch.count < capacity && batch.bytes < size) {
+ 		X86ScanResult result;
+-		insn.address = address;
+-		if (!getInstructionScanResult(ud, code, size, &insn, &result,
+-					      false))
+-			break;
+-		finish_x86_scan(handle, &insn, &result, code, false, false);
++		if (handle->mode == CS_MODE_32) {
++			/* Initial legacy terminals have a public ID and no alias
++			 * adjustment. No adapter runs between consecutive hits. */
++			for (;;) {
++				unsigned int id = 0;
++				uint16_t length;
++				int status = tryInitialLegacyScan(
++					code + batch.bytes, size - batch.bytes,
++					CS_MODE_32, false, &id, &length, false);
++				if (status == X86_SCAN_NOT_HANDLED)
++					break;
++				if (status != X86_SCAN_COMPLETE)
++					return batch;
++				insn.id = id;
++				insn.size = length;
++				output[batch.count++] = (id << 8) | length;
++				batch.bytes += length;
++				if (batch.count == capacity || batch.bytes == size)
++					return batch;
++			}
++			insn.address = address + batch.bytes;
++			if (!getInstructionScanResultAfterInitial(
++				    ud, code + batch.bytes, size - batch.bytes,
++				    &insn, &result, false))
++				break;
++		} else {
++			insn.address = address + batch.bytes;
++			if (!getInstructionScanResult(
++				    ud, code + batch.bytes, size - batch.bytes,
++				    &insn, &result, false))
++				break;
++		}
++		finish_x86_scan(handle, &insn, &result, code + batch.bytes,
++				false, false);
+ 		output[batch.count++] = (insn.id << 8) | result.length;
+ 		batch.bytes += result.length;
+-		code += result.length;
+-		size -= result.length;
+-		address += result.length;
+ 	}
+ 	return batch;
+ }
+diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
+index 2ee82ef7..bd7078ff 100644
+--- a/arch/X86/X86InstPrinterCommon.c
++++ b/arch/X86/X86InstPrinterCommon.c
+@@ -214,6 +214,17 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+ 		if (MI->flat_insn->detail)
+ 			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
+ 		break;
++	/* Integer compare mnemonics encode the predicate in the spelling.
++	 * Their public IDs identify the element width and signedness. */
++	case X86_INS_VPCMPB:
++	case X86_INS_VPCMPUB:
++	case X86_INS_VPCMPW:
++	case X86_INS_VPCMPUW:
++	case X86_INS_VPCMPD:
++	case X86_INS_VPCMPUD:
++	case X86_INS_VPCMPQ:
++	case X86_INS_VPCMPUQ:
++		break;
+ 	default:
+ 		MI->popcode_adjust = Imm + 1;
+ 		break;
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 8c5f511c..8c5c9e2a 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12543,53 +12543,6 @@ static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
+ 		memory->avx_bcast = broadcast;
+ }
+ 
+-static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
+-{
+-	char mnemonic[CS_MNEMONIC_SIZE] = { 0 };
+-	char operands[2] = { 0 };
+-	size_t length;
+-
+-	if (insn->id != X86_INS_VPCMP)
+-		return;
+-	SStream_extract_mnem_opstr(assembly, mnemonic, sizeof(mnemonic),
+-				   operands, sizeof(operands));
+-	if (strncmp(mnemonic, "vpcmp", 5) != 0)
+-		return;
+-
+-	// The condition printer's pseudo-ID adjustment assumes that every
+-	// predicate spelling has a contiguous public ID. Integer compares expose
+-	// element-family IDs instead, so applying that adjustment can collide with
+-	// an unrelated instruction. Normalize aliases to their family ID here.
+-	mci->popcode_adjust = 0;
+-	length = strlen(mnemonic);
+-	if (mnemonic_has_suffix(mnemonic, "ub"))
+-		insn->id = X86_INS_VPCMPUB;
+-	else if (mnemonic_has_suffix(mnemonic, "uw"))
+-		insn->id = X86_INS_VPCMPUW;
+-	else if (mnemonic_has_suffix(mnemonic, "ud"))
+-		insn->id = X86_INS_VPCMPUD;
+-	else if (mnemonic_has_suffix(mnemonic, "uq"))
+-		insn->id = X86_INS_VPCMPUQ;
+-	else if (length != 0) {
+-		switch (mnemonic[length - 1]) {
+-		case 'b':
+-			insn->id = X86_INS_VPCMPB;
+-			break;
+-		case 'w':
+-			insn->id = X86_INS_VPCMPW;
+-			break;
+-		case 'd':
+-			insn->id = X86_INS_VPCMPD;
+-			break;
+-		case 'q':
+-			insn->id = X86_INS_VPCMPQ;
+-			break;
+-		default:
+-			break;
+-		}
+-	}
+-}
+-
+ static void repair_vector_mask_conversion_access(cs_x86 *x86,
+ 						 unsigned int instruction_id)
+ {
+@@ -12752,9 +12705,9 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 	bool has_mask = false;
+ 	uint8_t i;
+ 
++	(void)mci;
+ 	if (!insn)
+ 		return;
+-	repair_vpcmp_id(insn, mnem, mci);
+ 	if (!insn->detail)
+ 		return;
+ 
+diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
+index 7e5e7f51..ac9bd6f3 100644
+--- a/arch/X86/X86MappingInsn.inc
++++ b/arch/X86/X86MappingInsn.inc
+@@ -62479,7 +62479,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ128rmi, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62493,7 +62493,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ128rmik, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62507,7 +62507,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ128rri, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62521,7 +62521,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ128rrik, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62535,7 +62535,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ256rmi, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62549,7 +62549,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ256rmik, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62563,7 +62563,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ256rri, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62577,7 +62577,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPBZ256rrik, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62591,7 +62591,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPBZrmi, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -62605,7 +62605,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPBZrmik, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -62619,7 +62619,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPBZrri, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -62633,7 +62633,7 @@
+ },
+ 
+ {
+-	X86_VPCMPBZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPBZrrik, X86_INS_VPCMPB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -62647,7 +62647,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ128rmi, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62661,7 +62661,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ128rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ128rmib, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62675,7 +62675,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ128rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ128rmibk, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62689,7 +62689,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ128rmik, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62703,7 +62703,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ128rri, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62717,7 +62717,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ128rrik, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62731,7 +62731,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ256rmi, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62745,7 +62745,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ256rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ256rmib, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62759,7 +62759,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ256rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ256rmibk, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62773,7 +62773,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ256rmik, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62787,7 +62787,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ256rri, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62801,7 +62801,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPDZ256rrik, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -62815,7 +62815,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPDZrmi, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -62829,7 +62829,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZrmib, X86_INS_VPCMP, 0,
++	X86_VPCMPDZrmib, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -62843,7 +62843,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZrmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPDZrmibk, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -62857,7 +62857,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPDZrmik, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -62871,7 +62871,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPDZrri, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -62885,7 +62885,7 @@
+ },
+ 
+ {
+-	X86_VPCMPDZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPDZrrik, X86_INS_VPCMPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64019,7 +64019,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ128rmi, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64033,7 +64033,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ128rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ128rmib, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64047,7 +64047,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ128rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ128rmibk, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64061,7 +64061,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ128rmik, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64075,7 +64075,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ128rri, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64089,7 +64089,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ128rrik, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64103,7 +64103,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ256rmi, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64117,7 +64117,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ256rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ256rmib, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64131,7 +64131,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ256rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ256rmibk, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64145,7 +64145,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ256rmik, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64159,7 +64159,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ256rri, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64173,7 +64173,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPQZ256rrik, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64187,7 +64187,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPQZrmi, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64201,7 +64201,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZrmib, X86_INS_VPCMP, 0,
++	X86_VPCMPQZrmib, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64215,7 +64215,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZrmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPQZrmibk, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64229,7 +64229,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPQZrmik, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64243,7 +64243,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPQZrri, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64257,7 +64257,7 @@
+ },
+ 
+ {
+-	X86_VPCMPQZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPQZrrik, X86_INS_VPCMPQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64271,7 +64271,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ128rmi, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64285,7 +64285,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ128rmik, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64299,7 +64299,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ128rri, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64313,7 +64313,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ128rrik, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64327,7 +64327,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ256rmi, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64341,7 +64341,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ256rmik, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64355,7 +64355,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ256rri, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64369,7 +64369,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZ256rrik, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64383,7 +64383,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZrmi, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -64397,7 +64397,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZrmik, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -64411,7 +64411,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZrri, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -64425,7 +64425,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUBZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUBZrrik, X86_INS_VPCMPUB, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -64439,7 +64439,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ128rmi, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64453,7 +64453,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ128rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ128rmib, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64467,7 +64467,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ128rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ128rmibk, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64481,7 +64481,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ128rmik, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64495,7 +64495,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ128rri, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64509,7 +64509,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ128rrik, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64523,7 +64523,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ256rmi, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64537,7 +64537,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ256rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ256rmib, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64551,7 +64551,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ256rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ256rmibk, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64565,7 +64565,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ256rmik, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64579,7 +64579,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ256rri, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64593,7 +64593,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZ256rrik, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64607,7 +64607,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZrmi, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64621,7 +64621,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZrmib, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZrmib, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64635,7 +64635,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZrmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZrmibk, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64649,7 +64649,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZrmik, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64663,7 +64663,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZrri, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64677,7 +64677,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUDZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUDZrrik, X86_INS_VPCMPUD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64691,7 +64691,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ128rmi, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64705,7 +64705,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ128rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ128rmib, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64719,7 +64719,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ128rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ128rmibk, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64733,7 +64733,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ128rmik, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64747,7 +64747,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ128rri, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64761,7 +64761,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ128rrik, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64775,7 +64775,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ256rmi, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64789,7 +64789,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ256rmib, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ256rmib, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64803,7 +64803,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ256rmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ256rmibk, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64817,7 +64817,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ256rmik, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64831,7 +64831,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ256rri, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64845,7 +64845,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZ256rrik, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64859,7 +64859,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZrmi, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64873,7 +64873,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZrmib, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZrmib, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64887,7 +64887,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZrmibk, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZrmibk, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64901,7 +64901,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZrmik, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64915,7 +64915,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZrri, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64929,7 +64929,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUQZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUQZrrik, X86_INS_VPCMPUQ, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -64943,7 +64943,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ128rmi, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64957,7 +64957,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ128rmik, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64971,7 +64971,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ128rri, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64985,7 +64985,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ128rrik, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -64999,7 +64999,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ256rmi, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65013,7 +65013,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ256rmik, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65027,7 +65027,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ256rri, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65041,7 +65041,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZ256rrik, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65055,7 +65055,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZrmi, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -65069,7 +65069,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZrmik, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -65083,7 +65083,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZrri, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -65097,7 +65097,7 @@
+ },
+ 
+ {
+-	X86_VPCMPUWZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPUWZrrik, X86_INS_VPCMPUW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -65111,7 +65111,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ128rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ128rmi, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65125,7 +65125,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ128rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ128rmik, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65139,7 +65139,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ128rri, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ128rri, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65153,7 +65153,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ128rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ128rrik, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65167,7 +65167,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ256rmi, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ256rmi, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65181,7 +65181,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ256rmik, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ256rmik, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65195,7 +65195,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ256rri, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ256rri, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65209,7 +65209,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZ256rrik, X86_INS_VPCMP, 0,
++	X86_VPCMPWZ256rrik, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, X86_GRP_VLX, 0 }, 0, 0
+ #endif
+@@ -65223,7 +65223,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZrmi, X86_INS_VPCMP, 0,
++	X86_VPCMPWZrmi, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -65237,7 +65237,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZrmik, X86_INS_VPCMP, 0,
++	X86_VPCMPWZrmik, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -65251,7 +65251,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZrri, X86_INS_VPCMP, 0,
++	X86_VPCMPWZrri, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+@@ -65265,7 +65265,7 @@
+ },
+ 
+ {
+-	X86_VPCMPWZrrik, X86_INS_VPCMP, 0,
++	X86_VPCMPWZrrik, X86_INS_VPCMPW, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
+ #endif
+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
+index a082891f..d843795f 100644
+--- a/arch/X86/X86MappingInsnOp.inc
++++ b/arch/X86/X86MappingInsnOp.inc
+@@ -44628,7 +44628,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ128rmi, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44638,7 +44638,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ128rmik, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44648,7 +44648,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ128rri, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44658,7 +44658,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ128rrik, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44668,7 +44668,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ256rmi, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44678,7 +44678,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ256rmik, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44688,7 +44688,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ256rri, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44698,7 +44698,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZ256rrik, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44708,7 +44708,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZrmi, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44718,7 +44718,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZrmik, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44728,7 +44728,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZrri, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44738,7 +44738,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPBZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPBZrrik, X86_INS_VPCMPB: vpcmpb */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44748,7 +44748,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ128rmi, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44758,7 +44758,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ128rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ128rmib, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44768,7 +44768,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ128rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ128rmibk, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44778,7 +44778,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ128rmik, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44788,7 +44788,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ128rri, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44798,7 +44798,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ128rrik, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44808,7 +44808,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ256rmi, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44818,7 +44818,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ256rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ256rmib, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44828,7 +44828,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ256rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ256rmibk, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44838,7 +44838,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ256rmik, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44848,7 +44848,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ256rri, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44858,7 +44858,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZ256rrik, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44868,7 +44868,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZrmi, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44878,7 +44878,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZrmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZrmib, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44888,7 +44888,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZrmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZrmibk, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44898,7 +44898,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZrmik, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44908,7 +44908,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZrri, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -44918,7 +44918,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPDZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPDZrrik, X86_INS_VPCMPD: vpcmpd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45728,7 +45728,7 @@
+ 	{ CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ128rmi, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45738,7 +45738,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ128rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ128rmib, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45748,7 +45748,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ128rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ128rmibk, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45758,7 +45758,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ128rmik, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45768,7 +45768,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ128rri, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45778,7 +45778,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ128rrik, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45788,7 +45788,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ256rmi, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45798,7 +45798,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ256rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ256rmib, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45808,7 +45808,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ256rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ256rmibk, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45818,7 +45818,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ256rmik, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45828,7 +45828,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ256rri, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45838,7 +45838,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZ256rrik, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45848,7 +45848,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZrmi, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45858,7 +45858,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZrmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZrmib, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45868,7 +45868,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZrmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZrmibk, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45878,7 +45878,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZrmik, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45888,7 +45888,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZrri, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45898,7 +45898,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPQZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPQZrrik, X86_INS_VPCMPQ: vpcmpq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45908,7 +45908,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ128rmi, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45918,7 +45918,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ128rmik, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45928,7 +45928,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ128rri, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45938,7 +45938,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ128rrik, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45948,7 +45948,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ256rmi, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45958,7 +45958,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ256rmik, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45968,7 +45968,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ256rri, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45978,7 +45978,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZ256rrik, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45988,7 +45988,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZrmi, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -45998,7 +45998,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZrmik, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46008,7 +46008,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZrri, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46018,7 +46018,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUBZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUBZrrik, X86_INS_VPCMPUB: vpcmpub */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46028,7 +46028,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ128rmi, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46038,7 +46038,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ128rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ128rmib, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46048,7 +46048,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ128rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ128rmibk, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46058,7 +46058,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ128rmik, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46068,7 +46068,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ128rri, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46078,7 +46078,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ128rrik, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46088,7 +46088,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ256rmi, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46098,7 +46098,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ256rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ256rmib, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46108,7 +46108,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ256rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ256rmibk, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46118,7 +46118,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ256rmik, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46128,7 +46128,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ256rri, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46138,7 +46138,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZ256rrik, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46148,7 +46148,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZrmi, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46158,7 +46158,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZrmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZrmib, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46168,7 +46168,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZrmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZrmibk, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46178,7 +46178,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZrmik, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46188,7 +46188,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZrri, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46198,7 +46198,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUDZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUDZrrik, X86_INS_VPCMPUD: vpcmpud */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46208,7 +46208,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ128rmi, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46218,7 +46218,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ128rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ128rmib, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46228,7 +46228,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ128rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ128rmibk, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46238,7 +46238,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ128rmik, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46248,7 +46248,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ128rri, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46258,7 +46258,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ128rrik, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46268,7 +46268,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ256rmi, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46278,7 +46278,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ256rmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ256rmib, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46288,7 +46288,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ256rmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ256rmibk, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46298,7 +46298,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ256rmik, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46308,7 +46308,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ256rri, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46318,7 +46318,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZ256rrik, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46328,7 +46328,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZrmi, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46338,7 +46338,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZrmib, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZrmib, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46348,7 +46348,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZrmibk, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZrmibk, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46358,7 +46358,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZrmik, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46368,7 +46368,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZrri, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46378,7 +46378,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUQZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUQZrrik, X86_INS_VPCMPUQ: vpcmpuq */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46388,7 +46388,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ128rmi, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46398,7 +46398,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ128rmik, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46408,7 +46408,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ128rri, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46418,7 +46418,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ128rrik, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46428,7 +46428,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ256rmi, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46438,7 +46438,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ256rmik, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46448,7 +46448,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ256rri, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46458,7 +46458,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZ256rrik, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46468,7 +46468,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZrmi, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46478,7 +46478,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZrmik, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46488,7 +46488,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZrri, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46498,7 +46498,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPUWZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPUWZrrik, X86_INS_VPCMPUW: vpcmpuw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46508,7 +46508,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ128rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ128rmi, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46518,7 +46518,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ128rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ128rmik, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46528,7 +46528,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ128rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ128rri, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46538,7 +46538,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ128rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ128rrik, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46548,7 +46548,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ256rmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ256rmi, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46558,7 +46558,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ256rmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ256rmik, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46568,7 +46568,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ256rri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ256rri, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46578,7 +46578,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZ256rrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZ256rrik, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46588,7 +46588,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZrmi, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZrmi, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46598,7 +46598,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZrmik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZrmik, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46608,7 +46608,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZrri, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZrri, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -46618,7 +46618,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VPCMPWZrrik, X86_INS_VPCMP: vpcmp */
++{	/* X86_VPCMPWZrrik, X86_INS_VPCMPW: vpcmpw */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 1aebfa2d..ff05bdde 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -780,6 +780,11 @@ custom formatter can observe partial detail or change options, so it retains
+ the earlier assignments as well; kernel and custom-runtime builds retain that
+ path too. AT&T keeps its separate ordering and mask handling.
+ 
++For EVEX integer comparisons, the opcode mapping supplies the public instruction
++ID for the element width and signedness. The predicate changes the printed
++mnemonic or appears as an immediate. Both scan and formatted records carry the
++same instruction ID.
++
+ The x86 postprinter finds the first memory operand and presence of mask
+ registers in one pass. Broadcast and mask-only repairs reuse these facts, while
+ narrowing, x87 and RCL repairs retain their original order and conditions.
+diff --git a/tests/unit/x86_evex_vpcmp_mask_size.c b/tests/unit/x86_evex_vpcmp_mask_size.c
+index 8942d52c..fb5c3fd9 100644
+--- a/tests/unit/x86_evex_vpcmp_mask_size.c
++++ b/tests/unit/x86_evex_vpcmp_mask_size.c
+@@ -151,6 +151,59 @@ static bool test_case(csh handle, const compare_family *family,
+ 	return success;
+ }
+ 
++/* Predicate aliases and explicit immediates have the same family ID in
++ * the allocating API and in iterator records with printing disabled. */
++static bool test_family_ids(csh handle, const compare_family *family)
++{
++	uint8_t code[] = { 0x62, 0xf3, 0x6d, 0x28, 0x1f, 0xcb, 0 };
++	static const uint8_t predicates[] = { 0, 1, 2, 3,  4,  5,
++					      6, 7, 8, 31, 32, 255 };
++	bool success = true;
++	code[2] |= family->w ? 0x80 : 0;
++	code[4] = family->opcode;
++	for (unsigned flags = 0; flags < 4; ++flags) {
++		if (!check(cs_option(handle, CS_OPT_TEXT,
++				     flags & 1 ? CS_OPT_ON : CS_OPT_OFF) ==
++					   CS_ERR_OK &&
++				   cs_option(handle, CS_OPT_DETAIL,
++					     flags & 2 ?
++						     CS_OPT_ON :
++						     CS_OPT_OFF) == CS_ERR_OK,
++			   "select text and detail options"))
++			return false;
++		cs_insn *slot = cs_malloc(handle);
++		if (!check(slot != NULL, "allocate iterator instruction"))
++			return false;
++		for (size_t i = 0; i < sizeof(predicates); ++i) {
++			cs_insn *list = NULL;
++			const uint8_t *next = code;
++			size_t left = sizeof(code);
++			uint64_t pc = 0x1000;
++			code[6] = predicates[i];
++			size_t n = cs_disasm(handle, code, sizeof(code), pc, 1,
++					     &list);
++			success &= check(n == 1 && list[0].id ==
++							   family->instruction,
++					 "allocated integer compare family");
++			cs_free(list, n);
++			success &=
++				check(cs_disasm_iter(handle, &next, &left, &pc,
++						     slot) &&
++					      slot->id == family->instruction &&
++					      left == 0 &&
++					      pc == 0x1000 + sizeof(code),
++				      "iterator integer compare family");
++		}
++		cs_free(slot, 1);
++	}
++	success &= check(
++		cs_option(handle, CS_OPT_TEXT, CS_OPT_ON) == CS_ERR_OK &&
++			cs_option(handle, CS_OPT_DETAIL,
++				  CS_OPT_ON | CS_OPT_DETAIL_REAL) == CS_ERR_OK,
++		"restore formatted detail");
++	return success;
++}
++
+ static bool run_matrix(csh handle, const char *syntax)
+ {
+ 	static const compare_family families[] = {
+@@ -174,6 +227,7 @@ static bool run_matrix(csh handle, const char *syntax)
+ 
+ 	for (family = 0; family < sizeof(families) / sizeof(families[0]);
+ 	     ++family) {
++		success &= test_family_ids(handle, &families[family]);
+ 		for (length = 0; length < sizeof(lengths) / sizeof(lengths[0]);
+ 		     ++length) {
+ 			for (predicate = 0;
+diff --git a/tests/unit/x86_scan_batch.c b/tests/unit/x86_scan_batch.c
+index 771fefb7..34b61f4a 100644
+--- a/tests/unit/x86_scan_batch.c
++++ b/tests/unit/x86_scan_batch.c
+@@ -41,7 +41,7 @@ static bool compare(csh handle, cs_insn *insn, const uint8_t *code, size_t size,
+ static bool check_public_ids(csh handle, cs_insn *insn, size_t mode_index)
+ {
+ 	static const struct {
+-		uint8_t bytes[5];
++		uint8_t bytes[7];
+ 		uint8_t size;
+ 		unsigned ids[3];
+ 	} cases[] = {
+@@ -73,6 +73,9 @@ static bool check_public_ids(csh handle, cs_insn *insn, size_t mode_index)
+ 		  3,
+ 		  { X86_INS_IMUL, X86_INS_IMUL, X86_INS_IMUL } },
+ #ifndef CAPSTONE_X86_REDUCE
++		{ { 0x62, 0xf3, 0xed, 0x28, 0x1e, 0xcb, 0x00 },
++		  7,
++		  { X86_INS_VPCMPUQ, X86_INS_VPCMPUQ, X86_INS_VPCMPUQ } },
+ 		{ { 0x0f, 0x10, 0xc1 },
+ 		  3,
+ 		  { X86_INS_MOVUPS, X86_INS_MOVUPS, X86_INS_MOVUPS } },

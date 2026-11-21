@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang' and platform.machine()=='x86_64'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Time x86-64 Linux Clang public formatting and i386 VEX scan through the production decoder'))
+write('scope',dict(active=feature_active,policy='Measure the EVEX family ID correction, PE32 scalar batches and the combined vector candidate with public and actual NeverD integration'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -31,6 +31,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   assert len(cases)==15
   shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp');cm=nd/'CMakeLists.txt'
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
+  shutil.copyfile(r/'canonical.cpp',nd/'capstone-canonical.cpp')
+  with cm.open('a') as f:f.write('\nadd_executable(capstone-canonical capstone-canonical.cpp)\ntarget_link_libraries(capstone-canonical PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'original-probe.cpp',nd/'capstone-product-legacy.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-product-legacy capstone-product-legacy.cpp)\ntarget_link_libraries(capstone-product-legacy PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
@@ -46,7 +48,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    return dict(revision=rev(ll),tracked_diff_sha256=hashlib.sha256(modified).hexdigest(),untracked=extras)
   llvm_reference=llvm_identity()
   write('llvm-baseline-identity',llvm_reference)
-  products={}
+  products={};adjustments={};canonical_signatures={}
   import struct,collections
   def compare(left,right,label):
    with left.open('rb') as a,right.open('rb')as b:
@@ -72,7 +74,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
-   targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests','NeverDMIPSTests','NeverDMIPSFlowTests']
+   targets=['capstone-canonical','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests','NeverDMIPSTests','NeverDMIPSFlowTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
@@ -115,6 +117,24 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      batch_checks.append(dict(case=case['name'],signature=signatures[3]))
     write('batch-probe-equivalence',dict(checks=batch_checks,unchanged=True,capacity=64,fallback='Decoder::decodeOneLight'))
 
+   canonical,=list(build.rglob('capstone-canonical'))
+   delta={}
+   for case in cases:
+    x86=case['selector'] in (32,64)
+    sel=case['selector'] if x86 else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
+    for mode in range(4 if x86 else 3):
+     tail=list(map(str,[case['path'],sel,mode,1]))
+     if 'intervals' in case:tail.append(case['intervals'])
+     raw=list(map(int,sp.check_output([prod,*tail],text=True).split()))[1:]
+     norm=list(map(int,sp.check_output([canonical,*tail],text=True).split()))[1:]
+     assert raw[:-1]==norm[:-1] and len(raw)==4
+     key=case['name']+'/'+str(mode)
+     if label=='base':canonical_signatures[key]=norm
+     assert canonical_signatures[key]==norm,(label,key,canonical_signatures[key],norm)
+     delta[key]=norm[-1]-raw[-1]
+     if label!='base':assert delta[key]==0,(key,delta[key])
+   adjustments[label]=delta
+   write('typed-checksums-'+label,dict(delta=delta,normalized=canonical_signatures))
    command(['nm','-S','-C',prod],'timed-symbols-'+label)
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
@@ -139,10 +159,10 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     new_files=sorted(set(objects)-set(base_objects))
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
-    assert {Path(k).name for k in new_files}==set(variants[label]['added']),new_files
-    actual_changed={Path(k).name for k in changed}
-    wanted=set(variants[label]['changed'])
-    assert wanted-{'X86VectorOutput.c.o'}<=actual_changed<=wanted,changed
+    expected_new={'X86VexScan.c.o','X86Vex32Output.c.o'} if label=='vector_batch' else set()
+    assert {Path(k).name for k in new_files}==expected_new
+    assert changed and all(k.startswith('arch/X86/') for k in changed)
+    assert {'X86Mapping.c.o','X86InstPrinterCommon.c.o'} <= {Path(k).name for k in changed}
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
@@ -183,10 +203,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert ticks>0 and signature[0]>0
    if 'expected_instructions' in case:
     assert signature[:2]==[case['expected_instructions']*reps,0],(case['name'],mode,reps,signature)
+   signature[-1]+=reps*adjustments['base' if name=='base-copy' else name][case['name']+'/'+str(mode)]
    return ticks,signature
   results=[]
   cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
   batch_cases=('jpeg-avx2-i386','libssl3t64-i386','libzstd1-i386','libssl3t64-amd64','libjpeg62-turbo-i386','putty-32-0.85','putty-64-0.85','amd64-ls')
+  cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'arm-cp':(0,1,2),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'putty-64-0.85':(0,1,2)}
+  batch_cases=('jpeg-avx2-i386','libzstd1-i386','libssl3t64-amd64','putty-32-0.85','putty-64-0.85')
   for name in batch_cases:cases_of_interest[name]=(*cases_of_interest[name],3)
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2,3):
