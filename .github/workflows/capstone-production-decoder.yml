@@ -1,7 +1,7 @@
-name: Compare MIPS trim and amd64 indirect targets on current source-built NeverD
+name: Verify selected static formatters against source-built NeverD and real PE/ELF
 on:
   push:
-    branches: [codex/neverd-trim-indirect-targets-product]
+    branches: [codex/neverd-qualified-static-formatters]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 3de9a3725996bde8d30d4ae064bb72fb26b65cbd
+          ref: 3ed69e2048a8904c71d6b26dbcc2d6bec65fe444
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "3de9a3725996bde8d30d4ae064bb72fb26b65cbd"
+          test "$(git rev-parse HEAD)" = "3ed69e2048a8904c71d6b26dbcc2d6bec65fe444"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "2c3d603a35ee40bc82812c223a6fde14d4add1dc"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: trim-indirect-${{ matrix.os }}-${{ matrix.cc }}
+          name: qualified-static-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

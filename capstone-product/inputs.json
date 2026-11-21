@@ -1,45 +1,51 @@
 {
-  "neverd": "3de9a3725996bde8d30d4ae064bb72fb26b65cbd",
+  "neverd": "3ed69e2048a8904c71d6b26dbcc2d6bec65fe444",
   "capstone": "2c3d603a35ee40bc82812c223a6fde14d4add1dc",
   "variants": {
     "mips_trim": {
-      "commit": "8fb20042cca32a252b9deedc9f9c2614bbab6247",
-      "tree": "26c0f8edd9f03a364396d320aa2105f6928f95d4",
-      "capstone_patch": "mips_trim-capstone.patch",
-      "capstone_sha256": "5bed7240a48a35e13611e2524fd965daeac145213a34e523a1987a0536db3796",
-      "build_blob": "ed98892588e93f4609aaf73e4a996461a5e13ea8",
+      "commit": "9e9475747756ecd8a726e3b2f7bfe7381e46a5f2",
+      "tree": "884a26b20fae9c360a5ac021d286b19a65e4ee19",
+      "capstone_patch": "qualified-capstone.patch",
+      "capstone_sha256": "5ce3f418b3ddbeb5418f5f479b4a2daa98be6ead4fbdb14b7d5ce1da1931769b",
+      "patch": "mips-neverd.patch",
+      "patch_sha256": "aace3de52122ad0da8cb1fee1fcb02d290398bfb39c9e67dfbb3ee443bcaced4",
+      "build_blob": "502ffe974520d6b15752e2c812ebe65eabf7d5f5",
+      "neverd_tree": "0387675de68ab741f176c02ab580e1357b04c9d4",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
         "lib/decode/CMakeLists.txt": "678ea2a40f4aa558bb3a39c44150501e88124fb2"
-      },
-      "neverd_tree": "2fb531eec0e499242c030e6f4916463bff33d0ca"
+      }
     },
     "indirect_targets": {
-      "commit": "8598345ad91da27115e37416ebff7cb27cc2fc49",
-      "tree": "9618bed56d9e24deee0b97c483e918b71b553928",
-      "capstone_patch": "indirect_targets-capstone.patch",
-      "capstone_sha256": "f58a6122041f310ae4f752c8c5d0b5a8b6e2d60089e5b4b198576e411f30a0ec",
-      "build_blob": "ed98892588e93f4609aaf73e4a996461a5e13ea8",
+      "commit": "9e9475747756ecd8a726e3b2f7bfe7381e46a5f2",
+      "tree": "884a26b20fae9c360a5ac021d286b19a65e4ee19",
+      "capstone_patch": "qualified-capstone.patch",
+      "capstone_sha256": "5ce3f418b3ddbeb5418f5f479b4a2daa98be6ead4fbdb14b7d5ce1da1931769b",
+      "patch": "indirect-neverd.patch",
+      "patch_sha256": "37a20ebf4ce420ad4570a37b8805b557aa092790b5f212b9b9d651b4cc8a8f69",
+      "build_blob": "9870a951b6a8c9868bdca6580340fba370802ca6",
+      "neverd_tree": "aca21866332a711d90b28d8e1daffb64d28af015",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
         "lib/decode/CMakeLists.txt": "678ea2a40f4aa558bb3a39c44150501e88124fb2"
-      },
-      "neverd_tree": "2fb531eec0e499242c030e6f4916463bff33d0ca"
+      }
     },
     "combined": {
-      "commit": "54e32e58f2f9ca3d5fab27caa52169b4f427ff0c",
-      "tree": "d3d6de4ba14ee912942e75307657dfa894643d59",
-      "capstone_patch": "combined-capstone.patch",
-      "capstone_sha256": "b9e6c3aa3ae976a30b7d46dd76ae8ab7c727cb3c0859b8628d7c707f5a61c5ce",
-      "build_blob": "ed98892588e93f4609aaf73e4a996461a5e13ea8",
+      "commit": "9e9475747756ecd8a726e3b2f7bfe7381e46a5f2",
+      "tree": "884a26b20fae9c360a5ac021d286b19a65e4ee19",
+      "capstone_patch": "qualified-capstone.patch",
+      "capstone_sha256": "5ce3f418b3ddbeb5418f5f479b4a2daa98be6ead4fbdb14b7d5ce1da1931769b",
+      "patch": "both-neverd.patch",
+      "patch_sha256": "4383b6fb1f1ec32d3ac742431036540da6214db3ac7543e36fe1bddb963d6eec",
+      "build_blob": "8400cf801d37d98088097cb8db4d6f06a64fd8da",
+      "neverd_tree": "d0b5387a1781e68a5731d94fb47e726dddaf2132",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
         "lib/decode/CMakeLists.txt": "678ea2a40f4aa558bb3a39c44150501e88124fb2"
-      },
-      "neverd_tree": "2fb531eec0e499242c030e6f4916463bff33d0ca"
+      }
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -47,8 +53,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Factor the MIPS final whitespace trim and amd64 near indirect targets on the real shipping Decoder.",
-  "parent": "111898e97641a53e86592c0d30ff67daf82ff57f",
+  "scope": "Qualify opt-in MIPS output trimming and the private x86-64 near indirect writer on the currently checked-in static NeverD Decoder.",
+  "parent": "c0662596771f479d105063559586256d767e6637",
   "build_blob": "ed98892588e93f4609aaf73e4a996461a5e13ea8",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",

@@ -100,6 +100,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    mips_command,=[c['command'] for c in compile_database if c['file'].endswith('/arch/Mips/MipsMapping.c')]
    alias_precheck='-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS' in shlex.split(mips_command)
    assert alias_precheck
+   cmds=json.loads((build/'compile_commands.json').read_text())
+   flag_files={key:[Path(cmd['file']).name for cmd in cmds if '-D'+key in shlex.split(cmd['command'])] for key in ('CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
+   assert flag_files['CAPSTONE_MIPS_FINAL_OUTPUT_TRIM']==(['MipsInstPrinter.c'] if label in ('mips_trim','combined') else [])
+   assert flag_files['CAPSTONE_X86_NEAR_INDIRECT_OUTPUT']==(['X86Sse64Output.c'] if label in ('indirect_targets','combined') else [])
+   write(label+'-output-options',flag_files)
    write(label+'-alias-compile-policy',dict(mips_precheck=alias_precheck))
    assert len(policies)==3
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
