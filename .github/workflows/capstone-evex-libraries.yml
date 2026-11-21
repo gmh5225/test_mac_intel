@@ -1,7 +1,7 @@
-name: Compare packed EVEX memory output with both iced formatters on real libraries
+name: Compare EVEX immediate shifts against the packed-move baseline and both iced formatters
 on:
   push:
-    branches: [codex/capstone-packed-evex-move-output]
+    branches: [codex/capstone-evex-immediate-shift-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shift-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
