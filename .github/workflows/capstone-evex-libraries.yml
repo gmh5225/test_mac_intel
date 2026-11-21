@@ -1,7 +1,7 @@
-name: Measure value-based vector register operands against both iced formatters on real PE and ELF
+name: Attribute fallback, register detail and iced FastFormatter work on exact timed binaries
 on:
   push:
-    branches: [codex/capstone-vector-register-operands-by-value]
+    branches: [codex/capstone-inclusive-fallback-and-vector-costs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,7 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -30,6 +29,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          if ! command -v valgrind >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y valgrind; fi
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: value-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fallback-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
