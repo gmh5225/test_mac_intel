@@ -59,6 +59,11 @@ jobs:
           git -c core.longpaths=true submodule update --init --depth 1 third_party/llvm-project third_party/capstone
           cmake -S . -B "$env:RUNNER_TEMP/nb" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_Z3=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF
           python scripts/build.py "$env:RUNNER_TEMP/nb" --target neverd NeverDLocalTypesDebugContextTests --parallel 4
+      - name: Cache the unprofiled native type reader for provider diagnostics
+        uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ${{ runner.temp }}/nb/bin/neverd.exe
+          key: neverd-arm64-type-reader-${{ env.NEVERD_REV }}-1
       - name: Check the physical target, driver ABI and both decompiler outputs
         shell: pwsh
         run: |
@@ -170,7 +175,15 @@ jobs:
             $reader = "$toolbuild/bin/llvm-readobj.exe"
           }
           python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
-          python source/scripts/generate_microsoft_windows_types.py --architecture arm64 --ucrt --ucrt-compatibility --legacy-sdk --output "$types/arm64" --cache $cache --neverd $exe --clang clang --llvm-readobj $reader
+          $originalInclude = $env:INCLUDE
+          try {
+            # The generator supplies the kit paths. Preserve the build environment
+            # after probing because clang-cl needs it to relink the native engine.
+            Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
+            python source/scripts/generate_microsoft_windows_types.py --architecture arm64 --ucrt --ucrt-compatibility --legacy-sdk --output "$types/arm64" --cache $cache --neverd $exe --clang clang --llvm-readobj $reader
+          } finally {
+            $env:INCLUDE = $originalInclude
+          }
           cmake -S source -B $nb "-DNEVERD_WINDOWS_TYPES_DIRECTORY=$types/arm64"
           python source/scripts/build.py $nb --target neverd --parallel 4
           if ((Get-FileHash $exe).Hash -eq $bootstrap) { throw 'The native engine did not embed the official libraries' }
@@ -184,6 +197,15 @@ jobs:
             Get-ChildItem -Recurse -File -Filter '*.log' $root |
               Sort-Object LastWriteTime -Descending | Select-Object -First 10 | ForEach-Object {
                 Write-Host $_.Name
+                if ($_.Name -like '*.parse.log' -and $_.Length -gt 0) {
+                  try {
+                    $issues = Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json
+                    @($issues) | Select-Object -First 10 | ForEach-Object {
+                      $record = $_ | ConvertTo-Json -Compress -Depth 4
+                      Write-Host $record.Substring(0, [Math]::Min(450, $record.Length))
+                    }
+                  } catch { Write-Host 'No structured parser report' }
+                }
                 Select-String -Path $_.FullName -Pattern '(fatal error|error:|exception:|Problems)' |
                   Select-Object -First 5 | ForEach-Object {
                     $message = $_.Line.Trim()
