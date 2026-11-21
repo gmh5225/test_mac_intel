@@ -1,7 +1,7 @@
-name: Verify six architectures and inactive builds after selecting the public fallback at open
+name: Check packed FMA output and all architecture controls
 on:
   push:
-    branches: [codex/capstone-per-handle-fallback-six-backends]
+    branches: [codex/capstone-cold-fma-rounding-backends]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: handle-full-decode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: cold-fma-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
