@@ -85,11 +85,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
                 c=next(x for x in cases if x['name']==name)
                 for tag,exe in binaries.items():
                     trace=t/'cache.out';options=['--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(trace)]
-                    command=['valgrind',*options,str(exe),str(c['selector']),'0',c['path'],'1']
+                    command=['env','CAPSTONE_PUBLIC_ONLY=1','valgrind',*options,str(exe),str(c['selector']),'0',c['path'],'1']
                     run(command,'cache-'+name+'-'+tag)
                     dump=trace.read_text(errors='replace').splitlines()
                     events=next(v[8:].split()for v in dump if v.startswith('events: '))
-                    totals=list(map(int,next(v.split()[1:]for v in dump if v.startswith('summary:'))))
+                    totals=list(map(int,next(v.split()[1:]for v in dump if v.startswith('totals:'))))
+                    totals.extend([0]*(len(events)-len(totals)))
                     assert len(events)==len(totals) and 'I1mr' in events and 'Bim' in events
                     cache.append(dict(case=name,variant=tag,events=dict(zip(events,totals))))
                     trace.unlink()
