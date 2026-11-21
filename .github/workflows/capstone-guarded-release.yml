@@ -1,0 +1,36 @@
+name: Compare complete static x86 records up to a protected page and execute the x87 image tests
+on:
+  push:
+    branches: [codex/capstone-guarded-production-scoped-x86-mips]
+    paths: [guarded/**, .github/workflows/capstone-guarded-release.yml]
+permissions:
+  contents: read
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        kind: [asan, release]
+    env:
+      GUARD_KIND: "${{ matrix.kind }}"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: guarded
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 17f68720b746928d0628f4ed01664d43cb2ea350
+          path: source
+          persist-credentials: false
+      - run: python3 -B guarded/guard-run.py
+      - if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: bounded-iterator-${{ matrix.kind }}
+          path: evidence/
+          retention-days: 14
