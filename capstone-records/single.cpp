@@ -77,8 +77,8 @@ static bool public_only;
 struct Session {
  const API &api; unsigned bits, mode; csh handle=0; cs_insn *insn=nullptr;
  Session(const API &a, unsigned b, unsigned m): api(a),bits(b),mode(m) {
-  const cs_arch archs[] = {CS_ARCH_AARCH64, CS_ARCH_ARM, CS_ARCH_RISCV, CS_ARCH_PPC, CS_ARCH_MIPS, CS_ARCH_SYSTEMZ, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_SPARC, CS_ARCH_LOONGARCH, CS_ARCH_ARC};
-  const cs_mode modes[] = {cs_mode(CS_MODE_LITTLE_ENDIAN), cs_mode(CS_MODE_ARM), cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD | CS_MODE_RISCV_A), cs_mode(CS_MODE_64), cs_mode(CS_MODE_MIPS64), cs_mode(CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_XTENSA_ESP32), cs_mode(CS_MODE_XTENSA_ESP32S2), cs_mode(CS_MODE_XTENSA_ESP32S3), cs_mode(CS_MODE_XTENSA_ESP8266), cs_mode(CS_MODE_V9 | CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_LOONGARCH64), cs_mode(CS_MODE_LITTLE_ENDIAN)};
+  const cs_arch archs[] = {CS_ARCH_AARCH64, CS_ARCH_ARM, CS_ARCH_RISCV, CS_ARCH_PPC, CS_ARCH_MIPS, CS_ARCH_SYSTEMZ, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_SPARC, CS_ARCH_LOONGARCH, CS_ARCH_ARC, CS_ARCH_MIPS};
+  const cs_mode modes[] = {cs_mode(CS_MODE_LITTLE_ENDIAN), cs_mode(CS_MODE_ARM), cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD | CS_MODE_RISCV_A), cs_mode(CS_MODE_64), cs_mode(CS_MODE_MIPS64), cs_mode(CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_XTENSA_ESP32), cs_mode(CS_MODE_XTENSA_ESP32S2), cs_mode(CS_MODE_XTENSA_ESP32S3), cs_mode(CS_MODE_XTENSA_ESP8266), cs_mode(CS_MODE_V9 | CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_LOONGARCH64), cs_mode(CS_MODE_LITTLE_ENDIAN), cs_mode(CS_MODE_I7200)};
   if (bits != 32 && bits != 64 && bits >= sizeof(archs) / sizeof(archs[0])) throw std::runtime_error("architecture selector");
   if (api.cs_open(bits >= 16 ? CS_ARCH_X86 : archs[bits], bits == 64 ? CS_MODE_64 : bits == 32 ? CS_MODE_32 : modes[bits], &handle) != CS_ERR_OK)
     throw std::runtime_error("cs_open");
@@ -100,16 +100,17 @@ static Result run(Session &session,const std::vector<uint8_t>&bytes_,unsigned re
   for (unsigned repeat = 0; repeat < repeats; ++repeat) {
     const uint8_t *cursor = bytes;
     size_t left = count;
-    uint64_t ip = 0x100000;
+    uint64_t ip = session.bits==13 ? 0x80100000u : 0x100000u;
     auto iterate = !public_only && session.bits >= 16 && session.mode ? &X86_disasmIter : api.cs_disasm_iter;
     while (left) {
       size_t offset = cursor - bytes;
       bool ok = iterate(handle, &cursor, &left, &ip, insn);
-      record(result, offset, ok ? insn->size : 1, ok);
+      const size_t rejected_step=session.bits==13 && left>=2 ? 2 : 1;
+      record(result, offset, ok ? insn->size : rejected_step, ok);
       if (!ok) {
-        ++cursor;
-        --left;
-        ++ip;
+        cursor += rejected_step;
+        left -= rejected_step;
+        ip += rejected_step;
         continue;
       }
       if (!insn->size)

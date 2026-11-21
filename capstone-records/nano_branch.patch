@@ -1,5 +1,5 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..1711bfa7 100644
+index d57235c9..d26215c0 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -30,7 +30,39 @@ index d57235c9..1711bfa7 100644
  	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
  	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
  	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
-@@ -1520,23 +1521,19 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1490,58 +1491,44 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		       !Mips_getFeatureBits(mode, Mips_FeatureMips3);
+ 
+ 	if (IsNanoMips) {
+-		uint64_t Insn2;
+-		Result = readInstruction48(Bytes, BytesLen, Address, Size,
+-					   &Insn2, IsBigEndian, IsNanoMips);
+-		if (Result != MCDisassembler_Fail) {
+-			// Calling the auto-generated decoder function.
+-			Result = decodeInstruction_8(DecoderTableNanoMips48,
+-						     Instr, Insn2, Address,
+-						     NULL);
+-			if (Result != MCDisassembler_Fail) {
+-				*Size = 6;
+-				return Result;
+-			}
+-		}
+-
+-		Result = readInstruction32(Bytes, BytesLen, Address, Size,
+-					   &Insn, IsBigEndian, IsNanoMips);
+-		if (Result != MCDisassembler_Fail) {
+-			// Calling the auto-generated decoder function.
+-			Result = decodeInstruction_4(DecoderTableNanoMips32,
+-						     Instr, Insn, Address,
+-						     NULL);
+-			if (Result != MCDisassembler_Fail) {
+-				*Size = 4;
+-				return Result;
+-			}
+-		}
+-
++		/* The first halfword selects 16-bit instructions by bit 12 and
++		 * 48-bit instructions by major opcode 0x18. */
  		Result = readInstruction16(Bytes, BytesLen, Address, Size,
  					   &Insn, IsBigEndian);
  		if (Result != MCDisassembler_Fail) {
@@ -38,16 +70,17 @@ index d57235c9..1711bfa7 100644
 -			// 16-bit instructions.
 -			Result = decodeInstruction_2(DecoderTableNanoMips16,
 -						     Instr, Insn, Address,
-+			/* P16.BRI with a nonzero offset uses the shared BEQC/BNEC
-+			 * reader. Offset zero retains the primary JRC/JALRC decode. */
-+			const bool compact_branch =
-+				(Insn >> 10) == 0x36 && (Insn & 0xf) != 0;
-+			const uint8_t *table = compact_branch ?
-+				DecoderTableNanoMips_Conflict_Space16 :
-+				DecoderTableNanoMips16;
-+			Result = decodeInstruction_2(table, Instr, Insn, Address,
- 						     NULL);
- 			if (Result != MCDisassembler_Fail) {
+-						     NULL);
+-			if (Result != MCDisassembler_Fail) {
++			if (Insn & 0x1000) {
++				/* At offset zero P16.BRI is JRC/JALRC. */
++				const bool branch = (Insn >> 10) == 0x36 &&
++						    (Insn & 0xf) != 0;
++				const uint8_t *table = branch ?
++					DecoderTableNanoMips_Conflict_Space16 :
++					DecoderTableNanoMips16;
++				Result = decodeInstruction_2(table, Instr, Insn,
++							     Address, NULL);
  				*Size = 2;
  				return Result;
  			}
@@ -55,14 +88,37 @@ index d57235c9..1711bfa7 100644
 -			Result = decodeInstruction_2(
 -				DecoderTableNanoMips_Conflict_Space16, Instr,
 -				Insn, Address, NULL);
--			if (Result != MCDisassembler_Fail) {
++			const bool extended = (Insn >> 10) == 0x18;
++			Result = extended ?
++				readInstruction48(Bytes, BytesLen, Address, Size,
++						  &Insn, IsBigEndian, true) :
++				readInstruction32(Bytes, BytesLen, Address, Size,
++						  &Insn, IsBigEndian, true);
+ 			if (Result != MCDisassembler_Fail) {
 -				*Size = 2;
 -				return Result;
--			}
++				Result = extended ?
++					decodeInstruction_8(DecoderTableNanoMips48,
++							    Instr, Insn, Address,
++							    NULL) :
++					decodeInstruction_4(DecoderTableNanoMips32,
++							    Instr, Insn, Address,
++							    NULL);
++				if (Result != MCDisassembler_Fail) {
++					*Size = extended ? 6 : 4;
++					return Result;
++				}
+ 			}
  		}
- 
- 		// This is an invalid instruction. Claim that the Size is 2 bytes. Since
-@@ -1707,16 +1704,14 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+-
+-		// This is an invalid instruction. Claim that the Size is 2 bytes. Since
+-		// nanoMIPS instructions have a minimum alignment of 2, the next 2 bytes
+-		// could form a valid instruction.
++		/* An invalid or truncated instruction has minimum alignment 2. */
+ 		*Size = 2;
+ 		return MCDisassembler_Fail;
+ 	}
+@@ -1707,16 +1694,14 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
@@ -81,7 +137,7 @@ index d57235c9..1711bfa7 100644
  #endif
  	if (IsGP64) {
  		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
-@@ -3483,6 +3478,8 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
+@@ -3483,6 +3468,8 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
  					   uint64_t Address,
  					   const void *Decoder)
  {
@@ -91,7 +147,7 @@ index d57235c9..1711bfa7 100644
  	unsigned Rs = fieldFromInstruction_4(Insn, 4, 3);
  	unsigned Offset = fieldFromInstruction_4(Insn, 0, 4) << 1;
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..549c6b54 100644
+index c94daecb..f593d3c8 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 @@ -1592,7 +1592,7 @@
@@ -117,7 +173,7 @@ index c94daecb..549c6b54 100644
      "getInstruction": {
        "apply_type": "OLD",
 -      "old_hash": "52fc65a707feef93d6bd7c7c6f55851d2c93be45650efe21fe031b8928f2eb4c",
-+      "old_hash": "50cdcfa713de81929590f399b845a021d8500173b8b4480f3b780958f7b98e3c",
++      "old_hash": "f90b4867b96f105d697d83a7341b4af818d599934001601a77ecf073c8afd12c",
        "new_hash": "aca77782b4160891075cb2f890401385cde140c255d109d1ed08c693f2cc10ba",
        "edit": ""
      },

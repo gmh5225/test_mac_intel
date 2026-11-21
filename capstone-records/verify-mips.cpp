@@ -77,6 +77,8 @@ int main(int argc,char **argv) {
    for(unsigned value=0;value<=0xffff;++value) {
     uint8_t bytes[2];bytes[endian?1:0]=uint8_t(value);bytes[endian?0:1]=uint8_t(value>>8);
     compare(x,y,bytes,2,flags,mode);
+    uint8_t wide[6]={bytes[0],bytes[1],uint8_t(value>>3),uint8_t(value>>7),uint8_t(~value),uint8_t(value>>5)};
+    for(unsigned extent=3;extent<=6;++extent) compare(x,y,wide,extent,flags,mode);
    }
   }
  }

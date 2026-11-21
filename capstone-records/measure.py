@@ -26,7 +26,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
     t=Path(temp); b=t/'build'
     try:
         cases=corpus.prepare(r,t,out,run)
-        selections=['ppc64el-ls','arm-sort','arm-cp','riscv64-ls','riscv64-cp','putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls']
+        import kernel
+        image,provenance=kernel.prepare(t)
+        assert provenance==json.loads((r/'kernel.json').read_text())
+        k=t/'malta-i7200.text';k.write_bytes(image);write('kernel',provenance)
+        cases.append(dict(name='malta-nanomips-kernel',selector=13,path=str(k)))
+        selections=['malta-nanomips-kernel','ppc64el-ls','arm-sort','arm-cp','riscv64-ls','riscv64-cp','putty-32-0.85','putty-64-0.85','amd64-ls','libssl3t64-i386','libjpeg62-turbo-i386','scalar32','scalar64','simd64','arm-ls','arm64-ls','mips64el-ls']
         cases=[c for c in cases if c['name'] in selections]
         assert set(c['name'] for c in cases)==set(selections)
         common=['-I',s,'-I',s/'include']
