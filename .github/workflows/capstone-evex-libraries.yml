@@ -1,7 +1,7 @@
-name: Time SSE register and base-relative memory projection on real PE and ELF binaries
+name: Measure SSE2 packed memory and unchanged VEX and scalar output on real binaries
 on:
   push:
-    branches: [codex/capstone-sse-memory-address-projection]
+    branches: [codex/capstone-sse2-packed-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: sse-address-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: sse2-packed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
