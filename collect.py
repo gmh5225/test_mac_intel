@@ -1,5 +1,6 @@
 from bisect import bisect_left
 from collections import deque
+from contextlib import contextmanager
 from pathlib import Path
 import hashlib
 import json
@@ -8,6 +9,7 @@ import plistlib
 import re
 import struct
 import subprocess
+import tempfile
 
 OUTPUT = Path("static-evidence")
 BUILD = "23F77"
@@ -28,34 +30,81 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def runtime():
-    relative = Path("iOS 26.5.simruntime/Contents/Resources/RuntimeRoot")
-    subpath = Path("Library/Developer/CoreSimulator/Profiles/Runtimes")
-    developer = Path(os.environ["DEVELOPER_DIR"])
-    host = Path("/Library/Developer/CoreSimulator")
-    mounts = host / "Volumes"
-    candidates = sorted({
-        Path("/") / subpath / relative,
-        mounts / ("iOS_" + BUILD) / subpath / relative,
-        developer / "Platforms/iPhoneSimulator.platform" / subpath / relative,
-        *(p / subpath / relative for p in mounts.glob("iOS_*")),
-    })
-    matched = set()
-    versions = []
-    for candidate in candidates:
-        version_file = candidate / "System/Library/CoreServices/SystemVersion.plist"
-        if not version_file.is_file():
+def runtime_roots(paths):
+    seen = set()
+    for path in paths:
+        if not path.is_dir():
             continue
-        version = plistlib.loads(version_file.read_bytes())
-        versions.append((str(candidate), version))
-        if (version.get("ProductVersion"), version.get("ProductBuildVersion")) == (VERSION, BUILD):
-            matched.add(candidate.resolve())
-    save("runtime-search.json", dict(candidates=list(map(str, candidates)),
-         matching_versions=versions, volumes=sorted(p.name for p in mounts.glob("iOS_*")),
-         simulator_commands_used=False))
-    if len(matched) != 1:
-        raise RuntimeError("Expected one mounted iOS runtime matching 26.5 (23F77)")
-    return matched.pop()
+        for folder, names, _ in os.walk(path):
+            root = Path(folder)
+            if len(root.relative_to(path).parts) >= 7:
+                names.clear()
+            if root.name == "RuntimeRoot":
+                names.clear()
+                version_file = root / "System/Library/CoreServices/SystemVersion.plist"
+                if version_file.is_file():
+                    version = plistlib.loads(version_file.read_bytes())
+                    if (version.get("ProductVersion"), version.get("ProductBuildVersion")) == (VERSION, BUILD):
+                        seen.add(root.resolve())
+    return seen
+
+
+@contextmanager
+def runtime():
+    host = Path("/Library/Developer/CoreSimulator")
+    developer = Path(os.environ["DEVELOPER_DIR"])
+    candidates = [
+        host / "Volumes" / ("iOS_" + BUILD),
+        host / "Profiles/Runtimes",
+        host / "Cryptex/Images/bundle",
+        developer / "Platforms/iPhoneSimulator.platform/Library/Developer/CoreSimulator/Profiles/Runtimes",
+    ]
+    matched = runtime_roots(candidates)
+    save("runtime-search.json", dict(paths=list(map(str, candidates)),
+         version_matches=sorted(map(str, matched)), simulator_commands_used=False))
+    if len(matched) == 1:
+        yield matched.pop()
+        return
+    if matched:
+        raise RuntimeError("Multiple runtime roots match the pinned iOS release")
+
+    with tempfile.TemporaryDirectory(prefix="inspect-apple-ios-runtime-") as scratch:
+        scratch = Path(scratch).resolve()
+        export = scratch / "export"
+        export.mkdir()
+        download = ["xcrun", "xcodebuild", "-downloadPlatform", "iOS",
+                    "-buildVersion", VERSION, "-architectureVariant", "universal",
+                    "-exportPath", str(export)]
+        with (OUTPUT / "download.log").open("wb") as log:
+            subprocess.run(download, check=True, stdout=log, stderr=subprocess.STDOUT, timeout=660)
+        images = [p for p in export.glob("**/*.dmg") if p.is_file()]
+        save("exported-images.json", dict(names=sorted(str(p.relative_to(export)) for p in images),
+             downloaded_only=True))
+        if len(images) != 1:
+            raise RuntimeError("Expected one disk image in the Apple export")
+        point = scratch / "disk"
+        point.mkdir()
+        attach = ["/usr/bin/hdiutil", "attach", "-readonly", "-nobrowse", "-noautoopen",
+                  "-mountpoint", str(point), "-plist", str(images[0])]
+        result = subprocess.check_output(attach, timeout=150)
+        attached = plistlib.loads(result)["system-entities"]
+        entities = [item for item in attached if item.get("mount-point") == str(point)]
+        save("readonly-mount.json", dict(image=images[0].name, entities=attached,
+                                         original_provider_executed=False, simulator_commands_used=False))
+        try:
+            if len(entities) != 1:
+                raise RuntimeError("Expected the read-only image at the work directory mount point")
+            matched = runtime_roots([point])
+            if len(matched) != 1:
+                raise RuntimeError("Apple export does not contain exactly iOS 26.5 (23F77)")
+            yield matched.pop()
+        finally:
+            whole_devices = [item["dev-entry"] for item in attached
+                             if re.fullmatch(r"/dev/disk[0-9]+", item["dev-entry"])]
+            if len(whole_devices) == 1:
+                subprocess.run(["/usr/bin/hdiutil", "detach", whole_devices[0]], check=True, timeout=120)
+            elif len(entities) == 1:
+                subprocess.run(["/usr/bin/hdiutil", "detach", entities[0]["dev-entry"]], check=True, timeout=120)
 
 
 def arm64_slice(data):
@@ -159,8 +208,7 @@ class Image:
                 yield pc, target, "bl" if word >> 31 else "b"
 
 
-def collect():
-    root = runtime()
+def collect(root):
     path = root / "usr/lib/swift/libswiftCore.dylib"
     actual = path.read_bytes()
     selected = arm64_slice(actual)
@@ -225,4 +273,5 @@ def collect():
 
 if __name__ == "__main__":
     OUTPUT.mkdir()
-    collect()
+    with runtime() as root:
+        collect(root)
