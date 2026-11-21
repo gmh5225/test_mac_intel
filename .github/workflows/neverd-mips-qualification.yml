@@ -18,6 +18,7 @@ jobs:
       filter: ${{ steps.input.outputs.filter }}
       required: ${{ steps.input.outputs.required }}
       runners: ${{ steps.input.outputs.runners }}
+      reference: ${{ steps.input.outputs.reference }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -28,7 +29,7 @@ jobs:
           import json, os, re
           config = json.load(open('neverd-mips-qualification/source.json'))
           assert re.fullmatch(r'[0-9a-f]{40}', config['revision'])
-          assert config['target'] in ('NeverDTypesTests', 'NeverDLiftTests')
+          assert config['target'] in ('NeverDTypesTests', 'NeverDLiftTests', 'NeverDMIPSIntegerTests', 'NeverDMIPSFlowTests')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               runners = {
                   'linux': {'os': 'ubuntu-24.04', 'cc': 'clang-18', 'cxx': 'clang++-18'},
@@ -38,6 +39,7 @@ jobs:
               matrix = [runners[name] for name in config.get('platforms', runners)]
               assert matrix
               print('runners=' + json.dumps({'include': matrix}), file=out)
+              print('reference=' + str(config.get('r4000_reference', False)).lower(), file=out)
               for key in ('revision', 'target', 'filter', 'required'):
                   value = config[key]
                   assert value and '\n' not in value and '\r' not in value
@@ -71,6 +73,9 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "$REVISION"
           git submodule update --init --depth 1 third_party/capstone signatures
+          if [[ "$TEST_TARGET" == NeverDMIPSIntegerTests ]]; then
+            git submodule update --init --depth 1 third_party/unicorn
+          fi
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
@@ -88,6 +93,8 @@ jobs:
       - name: Build the Release test owner
         run: |
           args=()
+          semantic=OFF
+          if [[ "$TEST_TARGET" == NeverDMIPSIntegerTests ]]; then semantic=ON; fi
           ${{ matrix.cxx }} --version
           if [[ "$RUNNER_OS" == Linux ]]; then
             args+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14')
@@ -95,7 +102,7 @@ jobs:
           cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
-            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF "${args[@]}"
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS="$semantic" "${args[@]}"
           python scripts/build.py build-check --config Release --parallel 4 --target "$TEST_TARGET"
       - name: Run the requested tests and verify the regression executed
         run: |
@@ -121,5 +128,29 @@ jobs:
         if: always()
         with:
           name: mips-${{ matrix.os }}-${{ needs.source.outputs.revision }}
+          path: evidence/
+          retention-days: 7
+
+  r4000:
+    needs: source
+    if: needs.source.outputs.reference == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ needs.source.outputs.revision }}
+          persist-credentials: false
+      - name: Run big- and little-endian R4000 boot ROMs in QEMU
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends qemu-system-mips
+          mkdir evidence
+          python3 unittests/lift/mips/historical-r4000-exceptions.py --output evidence/r4000.json
+          git rev-parse HEAD > evidence/source.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r4000-system-reference-${{ needs.source.outputs.revision }}
           path: evidence/
           retention-days: 7
