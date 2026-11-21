@@ -1,7 +1,7 @@
-name: Time per-mode Intel formatting and amd64 memory immediate stores on two native Macs
+name: Verify direct packed VEX memory output on Intel and Apple Silicon
 on:
   push:
-    branches: [codex/capstone-darwin-per-mode-amd64-stores]
+    branches: [codex/capstone-darwin-direct-packed-vex]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mode-c6-c7-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: darwin-vex-address-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
