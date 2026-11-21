@@ -18,7 +18,7 @@ with zipfile.ZipFile(path) as f:
     assert all(not Path(x).is_absolute() and '..' not in Path(x).parts for x in f.namelist())
     f.extractall(dest)
 write(dest/'download.json',info)
-log=sp.check_output(['gh','api',repo+'jobs/136705498638/logs'],text=True)
+log=sp.check_output(['gh','api','--allow-escape-sequences',repo+'jobs/136705498638/logs'],text=True)
 a=log.rindex('Traceback (most recent call last)');z=log.index('##[error]',a)
 (r/'failure-step.log').write_text(log[a:z])
 sp.run(['python3','-B',r/'review-product.py'],check=True)
