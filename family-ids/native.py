@@ -26,14 +26,10 @@ try:
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
         if conf=='full' or diet:
-            import re,struct
-            obj=next(b.rglob('RISCVMapping.c.o'));data=obj.read_bytes()
-            assert data[:6]==b'\x7fELF\x02\x01'
-            mt=re.search(r'^\s*\d+:\s*([0-9a-f]+)\s+(\d+)\s+OBJECT\s+LOCAL\s+\S+\s+(\d+)\s+insns$',sp.check_output(['readelf','-sW',obj],text=True),re.M);assert mt
-            addr,n,idx=int(mt[1],16),int(mt[2]),int(mt[3]);head=struct.unpack_from('<16sHHIQQQIHHHHHH',data)
-            section=struct.unpack_from('<IIQQQQIIQQ',data,head[6]+idx*head[11]);start=section[4]+addr
-            assert addr+n<=section[5] and n==(52360 if diet else 2146760)
-            value=dict(bytes=n,sha256=hashlib.sha256(data[start:start+n]).hexdigest());write(variant+'-riscv-mapping',value)
+            from mapping_bytes import mapping_bytes
+            value=mapping_bytes(next(b.rglob('RISCVMapping.c.o')))
+            assert value['bytes']==(52360 if diet else 2146760),value
+            write(variant+'-riscv-mapping',value)
             if variant=='candidate':assert value==json.loads((obs/'base-riscv-mapping.json').read_text())
     if conf=='full':
         selected=['riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
