@@ -1,7 +1,7 @@
-name: Time i386 vector batches against iced and a same-binary scalar control
+name: Rebuild paired shipping revisions with the Capstone target options from NeverD dev
 on:
   push:
-    branches: [codex/capstone-i386-vector-batches]
+    branches: [codex/capstone-neverd-shipping-archive-identities]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,16 +28,13 @@ jobs:
           ref: 958b98cbbeb217ab3e8babe1de7175546ec82748
           path: source
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
-        run: |
-          python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+      - name: Compare all object bytes and linked programs for each revision pair
+        run: python3 -B capstone-vectors/check.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: batch-i386-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: archive-pairs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
