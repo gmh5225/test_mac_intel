@@ -74,9 +74,9 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Sse64Output.c.o'},changed
+            assert prior.keys()==members.keys() and changed=={'X86Sse64Output.c.o','X86Vex32Output.c.o'},changed
             assert sha(ordinary)==sha(w/'unselected-baseline')
-            save('isolation.json',dict(unchanged=len(prior)-1,changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
+            save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
