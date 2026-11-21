@@ -9,7 +9,7 @@ static Iterator entry;
 void choose_entry(const char *label, unsigned bits)
 {
     switch (label[0]) {
-    case 'w': entry = bits == 32 ? X86_disasmIter32 : X86_disasmIterText; break;
+    case 'w': entry = X86_disasmIterText; break;
     case 'n': entry = bits == 32 ? X86_disasmIter32 : X86_disasmIter; break;
     default: entry = X86_disasmIter; break;
     }
