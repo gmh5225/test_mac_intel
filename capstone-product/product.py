@@ -233,6 +233,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       row['pairs'][label]=dict(plans=plans[label],median=statistics.median(q['gain'] for q in plans[label]))
      row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==48*len(launches);write('complete',dict(active=feature_active,launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
+  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==sum(map(len,cases_of_interest.values()))*len(launches);write('complete',dict(active=feature_active,launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))

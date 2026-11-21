@@ -1,0 +1,25 @@
+name: Audit all source-built NeverD PE32 batch observations
+on:
+  push:
+    branches: [codex/capstone-typed-pe-batch-audit]
+    paths: [capstone-audit/**, .github/workflows/capstone-batch-audit.yml]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-audit
+          persist-credentials: false
+      - run: python3 -B capstone-audit/run.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audited-neverd-batch-52
+          path: capstone-audit/product-review.json
+          retention-days: 14
