@@ -1,5 +1,5 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..d26215c0 100644
+index d57235c9..1be7a64d 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -11,154 +11,66 @@ index d57235c9..d26215c0 100644
  	case Mips_FeatureTLB:
  		return mode & CS_MODE_I7200;
  	case Mips_FeatureCnMips:
-@@ -1457,8 +1457,10 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 	cs_mode mode = Instr->csh->mode;
- 	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
- 	bool IsGP64, IsFP64;
-+	bool try_dsp = true;
- #ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
- 	uint64_t major;
-+#endif
- 	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
- 	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64 ||
- 	    isa == CS_MODE_MIPS32R2 || isa == CS_MODE_MIPS64R2) {
-@@ -1473,7 +1475,6 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 		IsFP64 = isa != CS_MODE_MIPS32;
- 		goto DecodeStandard;
- 	}
--#endif
- 	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
- 	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
- 	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
-@@ -1490,58 +1491,44 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 		       !Mips_getFeatureBits(mode, Mips_FeatureMips3);
+diff --git a/arch/Mips/MipsGenDisassemblerTables.inc b/arch/Mips/MipsGenDisassemblerTables.inc
+index d9b11486..57730020 100644
+--- a/arch/Mips/MipsGenDisassemblerTables.inc
++++ b/arch/Mips/MipsGenDisassemblerTables.inc
+@@ -7581,7 +7581,7 @@ static const uint8_t DecoderTableNanoMips16[] = {
+ /* 746 */     MCD_OPC_CheckPredicate, 112, 12, 0, 0, // Skip to: 763
+ /* 751 */     MCD_OPC_CheckField, 0, 4, 0, 5, 0, 0, // Skip to: 763
+ /* 758 */     MCD_OPC_Decode, 240, 14, 172, 3, // Opcode: JALRC16_NM
+-/* 763 */     MCD_OPC_CheckPredicate, 112, 50, 0, 0, // Skip to: 818
++/* 763 */     MCD_OPC_CheckPredicate, 117, 50, 0, 0, // Skip to: 818
+ /* 768 */     MCD_OPC_Decode, 191, 7, 173, 3, // Opcode: BEQC16_NM
+ /* 773 */     MCD_OPC_FilterValue, 60, 10, 0, 0, // Skip to: 788
+ /* 778 */     MCD_OPC_CheckPredicate, 112, 35, 0, 0, // Skip to: 818
+@@ -8295,7 +8295,7 @@ static const uint8_t DecoderTableNanoMips48[] = {
+ };
  
- 	if (IsNanoMips) {
--		uint64_t Insn2;
--		Result = readInstruction48(Bytes, BytesLen, Address, Size,
--					   &Insn2, IsBigEndian, IsNanoMips);
--		if (Result != MCDisassembler_Fail) {
--			// Calling the auto-generated decoder function.
--			Result = decodeInstruction_8(DecoderTableNanoMips48,
--						     Instr, Insn2, Address,
--						     NULL);
--			if (Result != MCDisassembler_Fail) {
--				*Size = 6;
--				return Result;
--			}
--		}
--
--		Result = readInstruction32(Bytes, BytesLen, Address, Size,
--					   &Insn, IsBigEndian, IsNanoMips);
--		if (Result != MCDisassembler_Fail) {
--			// Calling the auto-generated decoder function.
--			Result = decodeInstruction_4(DecoderTableNanoMips32,
--						     Instr, Insn, Address,
--						     NULL);
--			if (Result != MCDisassembler_Fail) {
--				*Size = 4;
--				return Result;
--			}
--		}
--
-+		/* The first halfword selects 16-bit instructions by bit 12 and
-+		 * 48-bit instructions by major opcode 0x18. */
- 		Result = readInstruction16(Bytes, BytesLen, Address, Size,
- 					   &Insn, IsBigEndian);
- 		if (Result != MCDisassembler_Fail) {
--			// Calling the auto-generated decoder function for NanoMips
--			// 16-bit instructions.
--			Result = decodeInstruction_2(DecoderTableNanoMips16,
--						     Instr, Insn, Address,
--						     NULL);
--			if (Result != MCDisassembler_Fail) {
-+			if (Insn & 0x1000) {
-+				/* At offset zero P16.BRI is JRC/JALRC. */
-+				const bool branch = (Insn >> 10) == 0x36 &&
-+						    (Insn & 0xf) != 0;
-+				const uint8_t *table = branch ?
-+					DecoderTableNanoMips_Conflict_Space16 :
-+					DecoderTableNanoMips16;
-+				Result = decodeInstruction_2(table, Instr, Insn,
-+							     Address, NULL);
- 				*Size = 2;
- 				return Result;
- 			}
--
--			Result = decodeInstruction_2(
--				DecoderTableNanoMips_Conflict_Space16, Instr,
--				Insn, Address, NULL);
-+			const bool extended = (Insn >> 10) == 0x18;
-+			Result = extended ?
-+				readInstruction48(Bytes, BytesLen, Address, Size,
-+						  &Insn, IsBigEndian, true) :
-+				readInstruction32(Bytes, BytesLen, Address, Size,
-+						  &Insn, IsBigEndian, true);
- 			if (Result != MCDisassembler_Fail) {
--				*Size = 2;
--				return Result;
-+				Result = extended ?
-+					decodeInstruction_8(DecoderTableNanoMips48,
-+							    Instr, Insn, Address,
-+							    NULL) :
-+					decodeInstruction_4(DecoderTableNanoMips32,
-+							    Instr, Insn, Address,
-+							    NULL);
-+				if (Result != MCDisassembler_Fail) {
-+					*Size = extended ? 6 : 4;
-+					return Result;
-+				}
- 			}
- 		}
--
--		// This is an invalid instruction. Claim that the Size is 2 bytes. Since
--		// nanoMIPS instructions have a minimum alignment of 2, the next 2 bytes
--		// could form a valid instruction.
-+		/* An invalid or truncated instruction has minimum alignment 2. */
- 		*Size = 2;
- 		return MCDisassembler_Fail;
- 	}
-@@ -1707,16 +1694,14 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 			return Result;
- 	}
+ static const uint8_t DecoderTableNanoMips_Conflict_Space16[] = {
+-/* 0 */       MCD_OPC_CheckPredicate, 112, 12, 0, 0, // Skip to: 17
++/* 0 */       MCD_OPC_CheckPredicate, 117, 12, 0, 0, // Skip to: 17
+ /* 5 */       MCD_OPC_CheckField, 10, 6, 54, 5, 0, 0, // Skip to: 17
+ /* 12 */      MCD_OPC_Decode, 173, 8, 173, 3, // Opcode: BNEC16_NM
+ /* 17 */      MCD_OPC_Fail,
+@@ -8539,6 +8539,8 @@ static bool checkDecoderPredicate(MCInst *Inst, unsigned Idx) {
+     return (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureTLB));
+   case 116:
+     return (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureGINV));
++  case 117:
++    return (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && !Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNMS1));
+   }
+ }
  
--#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
- DecodeStandard:
-+#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
- 	/* A primary-opcode miss in these generated tables reaches Fail before
- 	 * any predicate, operand reader, or instruction state change. */
- 	major = UINT64_C(1) << (Insn >> 26);
- 	IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
- 	IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
--	const bool try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
--#else
--	const bool try_dsp = true;
-+	try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
- #endif
- 	if (IsGP64) {
- 		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
-@@ -3483,6 +3468,8 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
- 					   uint64_t Address,
- 					   const void *Decoder)
- {
-+	if (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNMS1))
-+		return MCDisassembler_Fail;
- 	unsigned Rt = fieldFromInstruction_4(Insn, 7, 3);
- 	unsigned Rs = fieldFromInstruction_4(Insn, 4, 3);
- 	unsigned Offset = fieldFromInstruction_4(Insn, 0, 4) << 1;
+diff --git a/suite/auto-sync/inc_patches/Mips/01_nanomips_branch_predicate.patch b/suite/auto-sync/inc_patches/Mips/01_nanomips_branch_predicate.patch
+new file mode 100644
+index 00000000..697de559
+--- /dev/null
++++ b/suite/auto-sync/inc_patches/Mips/01_nanomips_branch_predicate.patch
+@@ -0,0 +1,19 @@
++diff --git a/arch/Mips/MipsGenDisassemblerTables.inc b/arch/Mips/MipsGenDisassemblerTables.inc
++index d9b11486..57730020 100644
++--- a/arch/Mips/MipsGenDisassemblerTables.inc
+++++ b/arch/Mips/MipsGenDisassemblerTables.inc
++@@ -7583,3 +7583,3 @@ static const uint8_t DecoderTableNanoMips16[] = {
++ /* 758 */     MCD_OPC_Decode, 240, 14, 172, 3, // Opcode: JALRC16_NM
++-/* 763 */     MCD_OPC_CheckPredicate, 112, 50, 0, 0, // Skip to: 818
+++/* 763 */     MCD_OPC_CheckPredicate, 117, 50, 0, 0, // Skip to: 818
++ /* 768 */     MCD_OPC_Decode, 191, 7, 173, 3, // Opcode: BEQC16_NM
++@@ -8297,3 +8297,3 @@ static const uint8_t DecoderTableNanoMips48[] = {
++ static const uint8_t DecoderTableNanoMips_Conflict_Space16[] = {
++-/* 0 */       MCD_OPC_CheckPredicate, 112, 12, 0, 0, // Skip to: 17
+++/* 0 */       MCD_OPC_CheckPredicate, 117, 12, 0, 0, // Skip to: 17
++ /* 5 */       MCD_OPC_CheckField, 10, 6, 54, 5, 0, 0, // Skip to: 17
++@@ -8541,2 +8541,4 @@ static bool checkDecoderPredicate(MCInst *Inst, unsigned Idx) {
++     return (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureGINV));
+++  case 117:
+++    return (Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNanoMips) && !Mips_getFeatureBits(Inst->csh->mode, Mips_FeatureNMS1));
++   }
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..f593d3c8 100644
+index c94daecb..96916ef0 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-@@ -1592,7 +1592,7 @@
-     },
-     "DecodeBranchConflictNM": {
-       "apply_type": "OLD",
--      "old_hash": "4dcfebb897eb2f7e4f98bc962f070a385628c212d2439d6a24cab1f65060907d",
-+      "old_hash": "2985bd9cc72a165f2d88089a10cb80e319dc09d014200a74f8838e2b41f776ab",
-       "new_hash": "3ae97ba3f294fcb6fdf7ed3e0c0903a5bdf497f67b74de385a17d60cee6209bd",
-       "edit": ""
-     },
 @@ -2102,7 +2102,7 @@
      },
      "Mips_getFeatureBits": {
@@ -166,15 +78,6 @@ index c94daecb..f593d3c8 100644
 -      "old_hash": "2b6439bb0b486d29ff80b9d798e14de27cb3e9ef8d5c76c90c2535f1a82dfa0f",
 +      "old_hash": "5081d3616c4afa88fb11549dd2acbbf9d1a1e2627ff7e215380d7bb27499de16",
        "new_hash": "",
-       "edit": ""
-     },
-@@ -2120,7 +2120,7 @@
-     },
-     "getInstruction": {
-       "apply_type": "OLD",
--      "old_hash": "52fc65a707feef93d6bd7c7c6f55851d2c93be45650efe21fe031b8928f2eb4c",
-+      "old_hash": "f90b4867b96f105d697d83a7341b4af818d599934001601a77ecf073c8afd12c",
-       "new_hash": "aca77782b4160891075cb2f890401385cde140c255d109d1ed08c693f2cc10ba",
        "edit": ""
      },
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt

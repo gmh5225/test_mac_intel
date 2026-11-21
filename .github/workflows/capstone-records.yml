@@ -1,7 +1,7 @@
-name: Check first-halfword nanoMIPS decode on the full QEMU Malta I7200 Linux kernel
+name: Qualify the NMS1 predicate on both compact branches and on the Malta kernel
 on:
   push:
-    branches: [codex/capstone-nanomips-width]
+    branches: [codex/capstone-nanomips-branch-predicates]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 26ebcf8b672cbfec8536db188aa92c506c915efa
+          ref: 6fe0fa8c14c6dbae1510a70b3a0ba77514131bf7
           path: source
           persist-credentials: false
       - name: Compare mode predicates, MIPS records and all six decoded architectures
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: nanomips-width-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: nanomips-branch-predicate-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
