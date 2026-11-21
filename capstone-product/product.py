@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
-    command(['git','apply',change],'apply-neverd-'+label,nd)
+    command(['git','apply',change],'apply-capstone-'+label,cs)
    policy=cm.read_text().split('\nadd_executable(capstone-product capstone-product.cpp)',1)[0]
    assert sp.check_output(['git','hash-object','--stdin'],input=policy.encode()).decode().strip()==expected['build_blob']
    live={p:sp.check_output(['git','hash-object',nd/p],text=True).strip() for p in expected['base_blobs']}
@@ -188,11 +188,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    write(label+'-archive-members',dict(members=members,ignored_orphan_objects=sorted(set(disk)-set(active))))
    objects={key:hashlib.sha256(path.read_bytes()).hexdigest() for key,path in active.items()};write(label+'-objects',objects)
    if label!='base':
-    assert objects==json.loads((out/'base-objects.json').read_text())
+    prior=json.loads((out/'base-objects.json').read_text())
+    assert objects.keys()==prior.keys() and {Path(k).name for k,v in prior.items() if objects[k]!=v}=={'X86VectorOutput.c.o'}
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)
-   assert any(line.endswith(' X86_disasmIter32') for line in sym)==(label!='base')
+   assert not any(line.endswith(' X86_disasmIter32') for line in sym)
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)

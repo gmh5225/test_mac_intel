@@ -1,26 +1,26 @@
 {
-  "neverd": "0466a656eb88a8edbdf70c142c7c4f7e551e030d",
-  "capstone": "68120b496a66ebf73a0b88247146a21620d86a63",
+  "neverd": "f1a5c1049a6026dee41435bcab7be88e2419605a",
+  "capstone": "205dcd8bd67fb7561e6eb6c15ea4630e20c85d12",
   "variants": {
-    "direct32": {
-      "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
-      "neverd_tree": "a9f4e7ad1526dd6301c8e0ea68443ccf1c5eb90c",
+    "inline_fma": {
+      "tree": "39af05c7a6e74f8e78751ad85bb58983df48c9c5",
+      "commit": "dcf9f003aa22335e5ee9a3bfd9667c442c87a1c0",
       "blobs": {
-        "lib/decode/Decoder.cpp": "3c13b57d4d2c56cab1d6d92b82e9eba132839ddc",
+        "lib/decode/Decoder.cpp": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
       },
-      "patch": "direct32.patch",
-      "patch_sha256": "25e909344af90cc0291252f07619f9f466bab45cfcf4947663922e85fcf3c921"
+      "patch": "inline_fma.patch",
+      "patch_sha256": "8cf3ee2f13fbc5c64a818b2b8f2451e7da351c2b18bd9b84eab7e618ae414f99"
     },
-    "by_mode": {
-      "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
-      "neverd_tree": "5e2b8b35ae82e5a67a79f7b95aaddd47453ab20d",
+    "miss_fma": {
+      "tree": "e8db58ecf620dcc4a14cd803bcbc13c7c473a977",
+      "commit": "362f861266e484bd6aed88d3e9c2af12f21299c5",
       "blobs": {
-        "lib/decode/Decoder.cpp": "1db0fb54c5f18f1152b8a4a67243a20223d14a9a",
-        "include/neverd/decode/Decoder.h": "dfa9937294b6d299f524c3f910dc3da6a3b10308"
+        "lib/decode/Decoder.cpp": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
+        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc"
       },
-      "patch": "by_mode.patch",
-      "patch_sha256": "ddeaeffe030a463120f2eea1abcade18b9050eff6e9a12da89327e04f65a4343"
+      "patch": "miss_fma.patch",
+      "patch_sha256": "fc550fa3cf2c5e24e48dba527b7aacebab9287b5b8618120cc15db750d587285"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -28,8 +28,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Same released Capstone archive in all variants. Compare a direct text wrapper with selection of the original 64-bit or specialized 32-bit iterator when the NeverD decoder opens.",
-  "parent": "085b9952c98d08d00562a45e6c2ad3f1c00b05d3",
+  "scope": "Compare two placements of packed FMA embedded rounding in the ordinary NeverD C++ decoder and the current source-built LLVM fork. The caller source and static compiler options are identical across all three builds.",
+  "parent": "2995cc1e78a2f1340fc905b9b1e0628c6dedbc76",
   "build_blob": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
