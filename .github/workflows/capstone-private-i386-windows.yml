@@ -1,7 +1,7 @@
-name: Verify the exact static i386 source tree on Windows x86 and x64
+name: Compile and compare the static i386 memory-immediate iterator on native MSVC x86 and x64
 on:
   push:
-    branches: [codex/capstone-i386-msvc-canonical-tree]
+    branches: [codex/capstone-i386-memory-immediate-msvc]
     paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-i386-msvc-${{ matrix.arch }}
+          name: i386-mem32-${{ matrix.arch }}
           path: evidence/
           retention-days: 14
