@@ -1,7 +1,7 @@
-name: Compare packed EVEX memory output with both iced formatters on real libraries
+name: Compare public and private i386 output while verifying unreferenced executable text
 on:
   push:
-    branches: [codex/capstone-packed-evex-move-output]
+    branches: [codex/capstone-i386-scalar-instantiation]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6fe0fa8c14c6dbae1510a70b3a0ba77514131bf7
+          ref: 09ba26d9848f4ad0920ad0ef5feb512899fabe6c
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-scalar-template-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

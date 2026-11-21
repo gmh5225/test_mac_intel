@@ -29,7 +29,7 @@ def main(w):
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
-    save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Public iterator benchmark plus the private static-link text entry called by NeverD; both consume the same output fields'))
+    save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Private 32-bit iterator selected per input mode for this integration prototype. The published consumer currently uses X86_disasmIter.'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -44,6 +44,11 @@ def main(w):
     inc=inc.replace(branch,'if(engine=="capstone") row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        else if(engine=="x86_iter") row=cs_span<X86_disasmIter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);')
     inc=inc.replace('engine!="capstone" &&','engine!="capstone" && engine!="x86_iter" &&')
     assert inc.count('iced_trace(bits,ptr,')==1
+    weak = 'extern "C" bool X86_disasmIter32(csh, const uint8_t **, size_t *, uint64_t *, cs_insn *) __attribute__((weak));'
+    inc=inc.replace('#include "arch/X86/X86ScanAdapter.h"', '#include "arch/X86/X86ScanAdapter.h"\n'+weak)
+    call='else if(engine=="x86_iter") row=cs_span<X86_disasmIter>'
+    assert inc.count(call)==1
+    inc=inc.replace(call,'else if(engine=="x86_iter" && bits==32 && X86_disasmIter32) row=cs_span<X86_disasmIter32>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        '+call)
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
@@ -53,17 +58,51 @@ def main(w):
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
     for label,tree in data['trees'].items():
-        if label=='packed':
-            assert sha(r/'packed.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'packed.patch'],'apply')
+        if label=='i386':
+            assert sha(r/'i386.patch')==data['patch_sha256']
+            run(['git','-C',base,'apply','--index',r/'i386.patch'],'apply')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
-        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label)
+        target=w/('run-'+label);libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
+        opt=['-Wl,--undefined=X86_disasmIter32'] if label=='i386' else []
+        run(['clang++',obj,*opt,*libs,'-o',target],'link-'+label)
+        names=sp.check_output(['nm',target],text=True)
+        definitions=[v for v in names.splitlines() if v.endswith(' X86_disasmIter32')]
+        assert len(definitions)==1 and ((len(definitions[0].split())==3)==bool(opt)),(label,definitions)
+        if opt:
+            control=w/'unreferenced';run(['clang++',obj,*libs,'-o',control],'link-unreferenced')
+            untouched=sp.check_output(['nm',control],text=True)
+            assert any(len(v.split())==2 and v.endswith(' X86_disasmIter32') for v in untouched.splitlines())
+            for binname,source in [('baseline',exe['baseline']),('unreferenced',control)]:
+                run(['objcopy','-O','binary','--only-section=.text',source,w/(binname+'-text')],'text-'+binname)
+            def sections(path):
+                header=sp.check_output(['objdump','-h',path],text=True).splitlines()
+                table={};data=path.read_bytes()
+                for line in header:
+                    z=line.split()
+                    if len(z)<6 or not z[0].isdigit():continue
+                    name=z[1];size,addr,off=int(z[2],16),int(z[3],16),int(z[5],16)
+                    if not size or off+size>len(data) or name not in ('.text','.rodata','.data.rel.ro'):continue
+                    table[name]=dict(addr=addr,off=off,size=size,sha256=hashlib.sha256(data[off:off+size]).hexdigest())
+                assert '.text' in table and '.rodata' in table
+                defined={}
+                names=sp.check_output(['nm','-S','-n','--defined-only',path],text=True)
+                for line in names.splitlines():
+                    z=line.split()
+                    if len(z)!=4 or z[2].lower()!='t' or not z[3].startswith(('cs_decode','cs_disasm_iter','X86_','tryOutput32','writeVex32','trySimpleOutputMode','direct_DecoderTable')):continue
+                    addr,size=int(z[0],16),int(z[1],16);t=table['.text'];start=addr-t['addr']
+                    if start<0 or start+size>t['size']:continue
+                    off=t['off']+start;defined[z[3]]=dict(address=addr,size=size,sha256=hashlib.sha256(data[off:off+size]).hexdigest())
+                assert any(k.startswith('cs_disasm_iter') for k in defined) and 'X86_disasmIter' in defined
+                return dict(sections=table,symbols=defined)
+            save('linked-symbols.json',{k:sections(f)for k,f in [('published',exe['baseline']),('unreferenced',control),('private_member',target)]})
+            save('archive-extraction.json',dict(entry=definitions[0].strip(),linked_sha256=sha(target),unreferenced_sha256=sha(control),original_sha256=sha(exe['baseline']),ordinary_text={v:sha(w/(v+'-text')) for v in ['baseline','unreferenced']}))
+
         exe[label]=target
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
-    exe['private_base']=exe['baseline'];exe['private_packed']=exe['packed']
+    exe['private_base']=exe['baseline'];exe['private_i386']=exe['i386']
     exe['iced']=exe['fast']=exe['baseline']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['baseline']==payloads['aa']
@@ -88,7 +127,7 @@ def main(w):
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','packed')]
+        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','i386')]
         assert audit[0]==audit[1]
         trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
         views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
@@ -117,7 +156,7 @@ def main(w):
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
             probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','packed','iced']+(['fast','private_base','private_packed'] if mode else [])
+            cycles={launch:[]for launch in launches};labels=['baseline','aa','i386','iced']+(['fast','private_base','private_i386'] if mode else [])
             stable={}
             for i in range(data['cycles']):
                 launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
@@ -130,14 +169,14 @@ def main(w):
                         root='baseline' if k=='aa' else k
                         if root not in stable:stable[root]=v[2:]
                         assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['packed']
-                    if mode:assert stable['private_base']==stable['private_packed']==stable['packed'],(name,mode,stable)
+                    assert stable['baseline']==stable['i386']
+                    if mode:assert stable['private_base']==stable['private_i386']==stable['i386'],(name,mode,stable)
                     cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
             for launch,observations in cycles.items():
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                 row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','packed')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','packed')} if mode else None
+                row['vs_iced']={k:md('iced',k) for k in ('baseline','i386')}
+                row['vs_fast']={k:md('fast',k) for k in ('baseline','i386')} if mode else None
                 reported.append(row)
             save('measurements.json',reported)
         print(name,panel,len(sel),flush=True)
