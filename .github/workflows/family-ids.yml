@@ -1,7 +1,7 @@
-name: Verify the ELF i386 writer and unchanged shared libraries on seven compiler configurations
+name: Compare records and shared libraries after the static i386 MOV change across seven builds
 on:
   push:
-    branches: [codex/capstone-i386-elf-section-profiles]
+    branches: [codex/capstone-i386-memory-immediate-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: i386-elf-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: i386-mem32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
