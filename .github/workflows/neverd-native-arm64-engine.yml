@@ -58,7 +58,12 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           git -c core.longpaths=true submodule update --init --depth 1 third_party/llvm-project third_party/capstone
           cmake -S . -B "$env:RUNNER_TEMP/nb" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_Z3=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF
-          python scripts/build.py "$env:RUNNER_TEMP/nb" --target neverd NeverDLocalTypesDebugContextTests --parallel 4
+          python scripts/build.py "$env:RUNNER_TEMP/nb" --target neverd NeverDLocalTypesDebugContextTests NeverDPEHeaderMappingTests --parallel 4
+      - name: Check full and restricted PE linker group ownership on Windows ARM64
+        shell: pwsh
+        run: |
+          & "$env:RUNNER_TEMP/nb/bin/NeverDPEHeaderMappingTests.exe" '--gtest_filter=PEHeaderMapping.LinkerGroupsClassifyMergedDataRelocations'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Cache the unprofiled native type reader for provider diagnostics
         uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
