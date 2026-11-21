@@ -1,7 +1,7 @@
-name: Compare isolated 64-bit SSE output with iced and verify i386 layout
+name: Measure canonical RIP-relative SSE operands against iced on real PE and ELF
 on:
   push:
-    branches: [codex/capstone-isolated-amd64-sse-pairs]
+    branches: [codex/capstone-amd64-sse-rip-displacement]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-sse-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rip-sse-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
