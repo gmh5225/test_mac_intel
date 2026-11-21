@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/neverd-native-arm64-engine.yml
       - native-engine-revision.txt
+      - native-driver-entry/**
 permissions:
   contents: read
 jobs:
@@ -16,7 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          sparse-checkout: native-engine-revision.txt
+          sparse-checkout: |
+            /native-engine-revision.txt
+            /native-driver-entry/
           sparse-checkout-cone-mode: false
       - name: Read the tested source revision
         shell: pwsh
@@ -43,14 +46,14 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
           git -c core.longpaths=true submodule update --init --depth 1 third_party/llvm-project third_party/capstone
-          cmake -S . -B D:/nb -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_Z3=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF
-          python scripts/build.py D:/nb --target neverd NeverDLocalTypesDebugContextTests --parallel 4
+          cmake -S . -B "$env:RUNNER_TEMP/nb" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_Z3=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF
+          python scripts/build.py "$env:RUNNER_TEMP/nb" --target neverd NeverDLocalTypesDebugContextTests --parallel 4
       - name: Check the physical target, driver ABI and both decompiler outputs
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          $exe = 'D:/nb/bin/neverd.exe'
+          $exe = "$env:RUNNER_TEMP/nb/bin/neverd.exe"
           $pe = [IO.File]::ReadAllBytes($exe)
           $nt = [BitConverter]::ToInt32($pe, 60)
           $machine = [BitConverter]::ToUInt16($pe, $nt+4)
@@ -62,26 +65,36 @@ jobs:
           $signature = Get-AuthenticodeSignature "$root/null.sys"
           if ($signature.Status -ne 'Valid' -or $imageHash -ne '4d79cea45771d9ee36aa599add5528b6f969e874f150d031a942a3b44c0b20cd') { throw "Unexpected inbox image $imageHash $($signature.Status)" }
           Invoke-WebRequest 'https://msdl.microsoft.com/download/symbols/null.pdb/EB6E1428846168A1564CCEE4944580C31/null.pdb' -OutFile "$root/null.pdb"
-          & 'D:/nb/bin/NeverDLocalTypesDebugContextTests.exe' '--gtest_filter=LocalTypesDebugContext.DriverContractBindsOnlyProvenEntries:LocalTypesDebugContext.AddressBoundDeclarationsFollowEditsInNamesOnlyCode'
+          & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.DriverContractBindsOnlyProvenEntries:LocalTypesDebugContext.AddressBoundDeclarationsFollowEditsInNamesOnlyCode'
+          $fixtures = "$env:GITHUB_WORKSPACE/native-driver-entry"
+          $proof = "$env:GITHUB_WORKSPACE/native-driver-verification.json"
+          $observations = "$env:GITHUB_WORKSPACE/native-entry-observations.json"
+          Set-Location $root
+          python "$fixtures/extract.py" "$root/null.sys" init-shim.bin
+          clang --target=aarch64-pc-windows-msvc -c "$fixtures/shim.S" -o shim.obj
           $rows = @()
           foreach ($route in @('high','llvm')) {
             $extra = @()
             if ($route -eq 'llvm') { $extra = @('--llvm') }
             & $exe decompile "$root/null.sys" '--func=GsDriverEntry' -o "$root/$route.c" @extra
-            clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 /c "$root/$route.c" "/Fo$root/$route.obj"
+            clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 /c "/DGsDriverEntry=${route}_shim" /DDriverEntry=neverd_driver_entry /D__security_init_cookie=neverd_cookie "$root/$route.c" "/Fo$root/$route.obj"
             $code = Get-Content "$root/$route.c"
             $call = @($code | Where-Object { $_ -match '\bDriverEntry\s*\(' -and $_ -match '^\s+(?:return\s|\w+\s*=)' })
             if ($call.Count -ne 1 -or $call[0] -notmatch ',') { throw "$route lost a DriverEntry argument" }
             $rows += [ordered]@{route=$route; emitted_sha256=(Get-FileHash "$root/$route.c").Hash.ToLower(); compiled_arm64=$true; driver_arguments=2}
           }
-          [ordered]@{revision=$env:NEVERD_REV; machine=$machine; engine_sha256=(Get-FileHash $exe).Hash.ToLower(); driver_sha256=$imageHash; pdb_sha256=(Get-FileHash "$root/null.pdb").Hash.ToLower(); routes=$rows} | ConvertTo-Json -Depth 6 | Set-Content native-driver-verification.json
+          clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 "$fixtures/compare.c" shim.obj high.obj llvm.obj /Fe:check.exe
+          & "$root/check.exe" | Set-Content $observations
+          if ((Get-Content $observations | ConvertFrom-Json).observations.Count -ne 15) { throw 'Incomplete native entry replay' }
+          [ordered]@{revision=$env:NEVERD_REV; machine=$machine; engine_sha256=(Get-FileHash $exe).Hash.ToLower(); driver_sha256=$imageHash; pdb_sha256=(Get-FileHash "$root/null.pdb").Hash.ToLower(); routes=$rows} | ConvertTo-Json -Depth 6 | Set-Content $proof
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: native-windows-arm64-engine
           path: |
             native-driver-verification.json
-            D:/nb/neverd-build-receipt.json
-            D:/nb/neverd-dependency-inputs.json
+            native-entry-observations.json
+            ${{ runner.temp }}/nb/neverd-build-receipt.json
+            ${{ runner.temp }}/nb/neverd-dependency-inputs.json
           if-no-files-found: warn
           retention-days: 14
