@@ -12,8 +12,8 @@ assert git('rev-parse','HEAD')==m['capstone']
 (nd/'cmake').mkdir(exist_ok=True);shutil.copyfile(r/'NeverDCapstoneCompilerOptions.inc',nd/'cmake/NeverDCapstoneCompilerOptions.inc')
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']));b=t/'build'
 try:
- for label in ['base','mips_scoped','x86_and_mips']:
-  entry=m['variants'].get(label,{});expected=ref['objects'][label]
+ for label in ['base', 'default', 'mips_trim', 'indirect_targets', 'combined']:
+  entry=m['variants'].get(label,{});expected=ref['objects']['base' if label=='default' else label]
   policy=(r/(label+'-root.cmake')).read_text()
   h=sp.check_output(['git','hash-object','--stdin'],input=policy.encode()).decode().strip()
   assert h==entry.get('build_blob',m['build_blob'])
@@ -26,7 +26,11 @@ try:
   run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-'+label)
   cmds=json.loads((b/'compile_commands.json').read_text())
   hits=[Path(c['file']).name for c in cmds if '-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS' in shlex.split(c['command'])]
-  assert hits==([] if label=='base' else ['MipsMapping.c']),hits
+  assert hits==['MipsMapping.c']
+  defs={k:[Path(c['file']).name for c in cmds if '-D'+k in shlex.split(c['command'])] for k in ('CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
+  assert defs['CAPSTONE_MIPS_FINAL_OUTPUT_TRIM']==(['MipsInstPrinter.c'] if label in ('mips_trim','combined') else [])
+  assert defs['CAPSTONE_X86_NEAR_INDIRECT_OUTPUT']==(['X86Sse64Output.c'] if label in ('indirect_targets','combined') else [])
+  save(label+'-options',defs)
   lib,=b.rglob('libcapstone.a');members=sp.check_output(['ar','t',lib],text=True).splitlines()
   assert len(members)==len(set(members))==42
   hashes={n:sha(sp.check_output(['ar','p',lib,n])) for n in members}
@@ -35,7 +39,7 @@ try:
   save(label,dict(source=git('write-tree'),root=h,objects=hashes,different=different,flag=hits))
   assert not different,(label,list(different))
   if label!='base':git('reset','--hard',m['capstone'])
- save('complete',dict(complete=True,source=m['neverd'],release=m['variants']['x86_and_mips']['commit'],baseline=m['capstone'],members=42,compared=3,reference_run=ref['run']['id'],llvm_compiler=sp.check_output(['clang','--version'],text=True).splitlines()[0]))
+ save('complete',dict(complete=True,source=m['neverd'],release=m['variants']['combined']['commit'],baseline=m['capstone'],members=42,compared=5,reference_run=ref['run']['id'],llvm_compiler=sp.check_output(['clang','--version'],text=True).splitlines()[0]))
 finally:
  size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(t)
  save('cleanup',dict(removed=not t.exists(),bytes=size))

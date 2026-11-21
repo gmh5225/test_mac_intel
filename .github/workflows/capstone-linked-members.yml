@@ -1,7 +1,7 @@
-name: Reproduce production archive member hashes for the qualified static decoder
+name: Check every Capstone archive member against the measured static C++ consumers
 on:
   push:
-    branches: [codex/capstone-production-static-members]
+    branches: [codex/capstone-qualified-output-members]
     paths: [members/**, .github/workflows/capstone-linked-members.yml]
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 17f68720b746928d0628f4ed01664d43cb2ea350
+          ref: 2c3d603a35ee40bc82812c223a6fde14d4add1dc
           path: neverd/third_party/capstone
           persist-credentials: false
       - run: python3 -B members/check.py
