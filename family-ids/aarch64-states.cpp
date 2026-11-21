@@ -1,6 +1,9 @@
 #include <capstone/capstone.h>
 #include <dlfcn.h>
 #include <array>
+#include <fstream>
+#include <iterator>
+#include <vector>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -43,7 +46,7 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
  ++verified;
 }
 int main(int argc,char**argv) {
- if(argc!=3)return 1;API a(argv[1]),b(argv[2]);
+ if(argc<4)return 1;API a(argv[1]),b(argv[2]);
  for (unsigned bits : {0u,(unsigned)CS_MODE_BIG_ENDIAN}) for(unsigned flags=0; flags<8; ++flags) {
   cs_mode mode=(cs_mode)bits;
   bool text=flags&1,detail=flags&2,skip=flags&4;
@@ -57,4 +60,20 @@ int main(int argc,char**argv) {
   }
  }
  std::printf("equal AArch64 public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
+ for (int i=3;i<argc;i++) {
+   std::ifstream input(argv[i],std::ios::binary);if(!input)return 4;
+   std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(input)),{});
+   if(bytes.empty()||bytes.size()%4)return 5;
+   uint64_t start=verified;
+   for(unsigned flags=0;flags<8;++flags) {
+     bool text=flags&1,detail=flags&2,skip=flags&4;
+     Machine left(a,CS_MODE_LITTLE_ENDIAN,text,detail,skip,CS_OPT_SYNTAX_DEFAULT,false);
+     Machine right(b,CS_MODE_LITTLE_ENDIAN,text,detail,skip,CS_OPT_SYNTAX_DEFAULT,false);
+     for(size_t pc=0;pc<bytes.size();pc+=4) {
+       random_word();
+       compare(left,right,bytes.data()+pc,4,detail);
+     }
+   }
+   std::printf("equal real AArch64 records for %llu inputs from %s\n",(unsigned long long)(verified-start),argv[i]);
+ }
 }
