@@ -248,7 +248,7 @@ index dfbe52c0..4f95ee4a 100644
  	if (code[0] & 2) {
  		if (size < 2 || code[1] >= 0xc0 || (code[1] & 0x38))
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index fc4d6817..9a2b9975 100644
+index 64cf5fd6..67f9f8fd 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
 @@ -885,6 +885,59 @@ void emit_sse64_registers(Decoder &decoder)
@@ -311,7 +311,7 @@ index fc4d6817..9a2b9975 100644
  void emit_indirect_memory(Decoder &decoder, const RegisterTable &regs)
  {
  	std::cout
-@@ -918,12 +971,18 @@ int main(int argc, char **argv)
+@@ -979,12 +1032,18 @@ int main(int argc, char **argv)
  	}
  	const bool indirect = argc == 2 &&
  			      std::strcmp(argv[1], "--indirect-memory") == 0;
@@ -320,8 +320,8 @@ index fc4d6817..9a2b9975 100644
 +			    std::strcmp(argv[1], "--extend32") == 0;
 +	if (argc != 1 && !indirect && !extend)
  		throw std::runtime_error(
--			"expected no arguments, --sse64-registers, --vex64-packed-memory or --indirect-memory");
-+			"expected no arguments, --sse64-registers, --vex64-packed-memory, --indirect-memory or --extend32");
+-			"expected no arguments, --sse64-registers, --vex64-packed-memory, --indirect-memory or --indirect64");
++			"expected no arguments, --sse64-registers, --vex64-packed-memory, --indirect-memory, --indirect64 or --extend32");
  	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
  	RegisterTable regs{};
  	describe_registers(x64, regs);
@@ -400,7 +400,7 @@ index c5e4ab3c..5d624e67 100644
 +		       1;
  }
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6ca1b43b..676ea70b 100644
+index 8fbd111a..0e4a0ba1 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -908,6 +908,29 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
@@ -440,6 +440,6 @@ index 6ca1b43b..676ea70b 100644
 -		     !check_absolute_addresses32(handles)) ||
 +		     (!check_absolute_addresses32(handles) ||
 +		      !check_extend32(handles))) ||
- 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+ 		    (private_iter != X86_disasmIter &&
  		     !check_indirect_memory(handles, mode)) ||
  		    !check_alu_immediates(handles, mode) ||
