@@ -67,6 +67,27 @@ int main(void)
         }
         cs_close(&h[0]);cs_close(&h[1]);
     }
+    unsigned foreign = 0;
+    const cs_arch archs[] = {CS_ARCH_ARM, CS_ARCH_AARCH64, CS_ARCH_MIPS, CS_ARCH_RISCV, CS_ARCH_PPC};
+    const cs_mode configs[] = {CS_MODE_ARM, CS_MODE_LITTLE_ENDIAN, CS_MODE_MIPS64, CS_MODE_RISCV64, CS_MODE_64};
+    for (unsigned a = 0; a < sizeof(archs) / sizeof(archs[0]); ++a) {
+        if (!cs_support(archs[a])) continue;
+        for (unsigned f = 0; f < 4; ++f) {
+            csh h[2] = {0};
+            for (unsigned k = 0; k < 2; ++k) {
+                if (cs_open(archs[a],configs[a],&h[k]) != CS_ERR_OK) return 4;
+                cs_option(h[k],CS_OPT_DETAIL,(f&1)?CS_OPT_ON:CS_OPT_OFF);
+                cs_option(h[k],CS_OPT_TEXT,(f&2)?CS_OPT_OFF:CS_OPT_ON);
+            }
+            for (unsigned j = 0; j < sizeof(cases)/sizeof(cases[0]); ++j)
+                for (unsigned len = 0; len <= sizeof(cases[0]); ++len) {
+                    if (!check(h, cases[j], len, f, j + len)) return 5;
+                    ++foreign;
+                }
+            cs_close(&h[0]);cs_close(&h[1]);
+        }
+    }
+    printf("%u foreign iterator comparisons\n",foreign);
     printf("%u raw iterator comparisons\n",n);
     return 0;
 }
