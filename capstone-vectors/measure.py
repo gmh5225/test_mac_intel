@@ -116,7 +116,7 @@ def main(w):
                     command=[str(image),*tail];executable=None
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
-            probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
+            probe=measure('baseline',1,'images');rep=max(1,math.ceil(105e6/max(1,probe[0])))
             cycles={launch:[]for launch in launches};labels=['baseline','aa','shift','iced']+(['fast','private_base','private_shift'] if mode else [])
             stable={}
             for i in range(data['cycles']):
