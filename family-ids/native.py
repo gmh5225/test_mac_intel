@@ -32,7 +32,8 @@ try:
     else:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
-    if diet or reduce:
+    selected.append("mapping")
+    if diet:
         assert sha(libs['base'])==sha(libs['candidate'])
         write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')

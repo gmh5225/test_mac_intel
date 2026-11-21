@@ -1,7 +1,7 @@
-name: Compare RISC-V printed alias lookup on three real ELF executables
+name: Verify the last slot of each implicit register list on seven configurations
 on:
   push:
-    branches: [codex/capstone-riscv-printed-lookup]
+    branches: [codex/capstone-finish-full-implicit-registers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 68120b496a66ebf73a0b88247146a21620d86a63
+          ref: 205dcd8bd67fb7561e6eb6c15ea4630e20c85d12
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: printed-mnemonics-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: last-register-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
