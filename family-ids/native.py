@@ -35,7 +35,7 @@ try:
     else:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
-    if conf!='full':
+    if libs:
         assert sha(libs['base'])==sha(libs['candidate'])
         write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
@@ -87,27 +87,6 @@ try:
             if arch=='riscv':
                 for opt in ([],['custom']):run([*arg,tmp/'corpus',*opt],'states-riscv'+('custom' if opt else ''))
             else:run(arg,'states-'+arch)
-        target=fixed/'libcapstone.so.6'
-        target.write_bytes(libs['base'].read_bytes());(fixed/'libcapstone.so').symlink_to(target.name)
-        run(['c++','-O3','-std=c++17','-I',s/'include',r/'time.cpp','-L',fixed,'-Wl,-rpath,'+str(fixed),'-lcapstone','-o',tmp/'time'],'compile-time')
-        bind=['setarch',platform.machine(),'-R'];sp.run([*bind,'/bin/true'],check=True)
-        os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-        inputs={k:v.read_bytes() for k,v in libs.items()};inputs['copy']=inputs['base']
-        size=max(map(len,inputs.values()));inputs={k:v+bytes(size-len(v)) for k,v in inputs.items()}
-        def invoke(k,bits,mode,path,ip,reps):
-            with target.open('wb') as o:o.write(inputs[k])
-            return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
-        timing=[]
-        for name,bits,path,ip in panels[2:]+other_cases:
-            for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
-                for i in range(7):
-                    keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
-                    for k in o+o[::-1]:
-                        v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
-                    cycles.append(cyc)
-                timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
-                write('timings',timing)
     write('complete',dict(tree=meta['tree'],config=conf,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],platform=platform.machine(),os=platform.platform(),tests=selected,records=sum(x['calls'] for x in rows),libs={k:sha(v) for k,v in libs.items()}))
 finally:
     size=sum(f.stat().st_size for f in tmp.rglob('*') if f.is_file());shutil.rmtree(tmp);write('cleanup',dict(bytes=size,removed=not tmp.exists()))
