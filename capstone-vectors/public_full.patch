@@ -1,0 +1,153 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..e81bfce1 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,14 +20,22 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
+ 
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+-	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
+ #include "../../cs_priv.h"
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
+ #define CAPSTONE_X86_DEDICATED_OUTPUT
+ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
+ 					 size_t size, cs_insn *insn,
+ 					 uint16_t *insn_size);
++#else
++#define CAPSTONE_X86_PUBLIC_ITERATOR_OUTPUT
++CAPSTONE_INTERNAL bool
++X86_tryIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
++		      cs_insn *insn, uint16_t *insn_size);
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..6c3d7f3a 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -15,6 +15,17 @@
+ 
+ #include "X86SimpleOutputImpl.h"
+ 
++#ifdef CAPSTONE_X86_PUBLIC_ITERATOR_OUTPUT
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_public_output")))
++#endif
++bool X86_tryIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			   cs_insn *insn, uint16_t *insn_size)
++{
++	return X86_trySimpleOutput(handle, code, size, insn, insn_size);
++}
++#endif
++
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+ #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
+ #endif
+diff --git a/cs.c b/cs.c
+index 7b069255..9f97d23f 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1039,20 +1039,20 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+ static __attribute__((noinline)) CS_PRESERVE_MOST bool
+ decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size, enum cs_decode_source source);
+ 
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, enum cs_decode_source source)
+ {
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+-	return decode_full_insn_body(handle, code, size, insn, insn_size, batch);
++	return decode_full_insn_body(handle, code, size, insn, insn_size, source);
+ }
+ 
+ static __attribute__((noinline)) CS_PRESERVE_MOST bool
+ decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, enum cs_decode_source source)
+ {
+ #else
+ #if defined(_MSC_VER)
+@@ -1062,7 +1062,7 @@ __attribute__((noinline))
+ #endif
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, enum cs_decode_source source)
+ {
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+@@ -1071,9 +1071,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#ifdef CAPSTONE_X86_PUBLIC_ITERATOR_OUTPUT
++		if (source == CS_DECODE_ITERATOR && size && !handle->no_text &&
++		    X86_tryIteratorOutput(handle, code, size, insn, insn_size))
++			return true;
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+@@ -1143,7 +1148,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				  code, false);
+ 		}
+ 	}
+-	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
++	if (handle->arch == CS_ARCH_X86 &&
++	    (source != CS_DECODE_BATCH || insn->id != X86_INS_VCMP))
+ 		insn->id += mci.popcode_adjust;
+ 	return true;
+ }
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..3640ee46 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,9 +18,15 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
++enum cs_decode_source {
++	CS_DECODE_ITERATOR,
++	CS_DECODE_BATCH,
++	CS_DECODE_AFTER_OUTPUT,
++};
++
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size, enum cs_decode_source source);
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+ 			size_t *size, uint64_t *address, cs_insn *insn);
+@@ -162,8 +168,13 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
++	/* A private text iterator already tried the generated output record. */
++	return cs_decode_full_insn(handle, code, size, insn, insn_size,
++				   batch ? CS_DECODE_BATCH : CS_DECODE_AFTER_OUTPUT);
++#else
++	return cs_decode_full_insn(handle, code, size, insn, insn_size,
++				   batch ? CS_DECODE_BATCH : CS_DECODE_ITERATOR);
+ #endif
+-	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
+ #undef CS_DECODE_SCAN
+ 
