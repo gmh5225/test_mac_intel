@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang' and platform.machine()=='x86_64'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Compare packed EVEX output alone and together with the corrected nanoMIPS branch predicate in the actual NeverD consumer.'))
+write('scope',dict(active=feature_active,policy='Test the ordinary NeverD C++ Decoder entry on PE32, PE64, ELF scalar and vector data with and without the i386 text member. Measure scan, text, detail and batch using the production backend.'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -79,12 +79,20 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
-   targets=['capstone-canonical','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests','NeverDMIPSTests','NeverDMIPSFlowTests','NeverDX86EVEXFPCompareTests','NeverDX86EVEXCompareTests','NeverDX86MaskCompareStateTests','NeverDX86FPPackedConvertStateTests']
+   info=expected['integration'];path=nd/info['path']
+   if label!='base':
+    patch=r/'neverd-i386.patch'
+    assert hashlib.sha256(patch.read_bytes()).hexdigest()==info['sha256']
+    command(['git','apply',patch],'apply-neverd-'+label,nd)
+   live=sp.check_output(['git','hash-object',path],text=True).strip()
+   assert live==info['base' if label=='base' else 'candidate']
+   write(label+'-decoder-source',dict(path=info['path'],blob=live))
+   targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
-   command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',str(out/('tests-'+label+'.xml')),'-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests|NeverDMIPSTests|NeverDMIPSFlowTests|NeverDX86EVEXFPCompareTests|NeverDX86EVEXCompareTests|NeverDX86MaskCompareStateTests|NeverDX86FPPackedConvertStateTests)$'],'tests-'+label)
+   command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',str(out/('tests-'+label+'.xml')),'-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
    command([tool,'--xbegin'],'exhaustive-xbegin-'+label)
    command([tool,'--rendered-xbegin'],'rendered-xbegin-'+label)
@@ -122,8 +130,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      batch_checks.append(dict(case=case['name'],signature=signatures[3]))
     write('batch-probe-equivalence',dict(checks=batch_checks,unchanged=True,capacity=64,fallback='Decoder::decodeOneLight'))
 
-   canonical,=list(build.rglob('capstone-canonical'))
-   delta={}
+   signatures={}
    for case in cases:
     x86=case['selector'] in (32,64)
     sel=case['selector'] if x86 else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
@@ -131,16 +138,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      tail=list(map(str,[case['path'],sel,mode,1]))
      if 'intervals' in case:tail.append(case['intervals'])
      raw=list(map(int,sp.check_output([prod,*tail],text=True).split()))[1:]
-     norm=list(map(int,sp.check_output([canonical,*tail],text=True).split()))[1:]
-     assert raw[:-1]==norm[:-1] and len(raw)==4
      key=case['name']+'/'+str(mode)
-     if label=='base':canonical_signatures[key]=norm
-     assert canonical_signatures[key]==norm,(label,key,canonical_signatures[key],norm)
-     delta[key]=norm[-1]-raw[-1]
-     if label=='owner':assert delta[key]==0,(key,delta[key])
-     elif label!='base':assert delta[key]==adjustments['base'][key],(label,key,delta[key],adjustments['base'][key])
-   adjustments[label]=delta
-   write('typed-checksums-'+label,dict(delta=delta,normalized=canonical_signatures))
+     signatures[key]=raw
+     if label=='base':canonical_signatures[key]=raw
+     assert canonical_signatures[key]==raw,(label,key,canonical_signatures[key],raw)
+   write('public-checksums-'+label,dict(raw=signatures))
    command(['nm','-S','-C',prod],'timed-symbols-'+label)
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
@@ -165,11 +167,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     new_files=sorted(set(objects)-set(base_objects))
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
-    assert not new_files
+    assert {Path(k).name for k in new_files}=={'X86Vex32Output.c.o'}
     actual={Path(k).name for k in changed}
-    wanted={'X86EvexMemoryOutput.c.o'}
-    if label=='combined':wanted.add('MipsDisassembler.c.o')
-    assert actual==wanted,(label,actual,wanted)
+    allowed={'X86OutputIterator.c.o','X86ImmediateOutput.c.o','X86MemoryOutput.c.o'}
+    assert actual<=allowed,(label,actual,allowed)
+    sym=(out/('timed-symbols-'+label+'.log')).read_text()
+    assert any(line.endswith(' X86_disasmIter32') for line in sym.splitlines())
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
@@ -179,6 +182,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert source_tree==variants[label]['tree'],(label,source_tree,variants[label]['tree'])
    command(['git','reset','--hard',ref],'restore-'+label,cs)
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
+   if label!='base':command(['git','restore','--',info['path']],'restore-neverd-'+label,nd)
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
   write('products',identities)
@@ -218,6 +222,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'arm-cp':(0,1,2),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'putty-64-0.85':(0,1,2)}
   batch_cases=('jpeg-avx2-i386','libzstd1-i386','libssl3t64-amd64','putty-32-0.85','putty-64-0.85')
   cases_of_interest['libmvec-amd64']=(0,1,2)
+  cases_of_interest['libssl3t64-i386']=(0,1,2)
   batch_cases=(*batch_cases,'libmvec-amd64')
   for name in batch_cases:cases_of_interest[name]=(*cases_of_interest[name],3)
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):

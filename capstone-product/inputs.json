@@ -1,16 +1,16 @@
 {
-  "neverd": "95d5d9bc754471b796e197e6ae023a6beeb48e9a",
-  "capstone": "6fe0fa8c14c6dbae1510a70b3a0ba77514131bf7",
+  "neverd": "35cd78ace0cc1fbf79cf90b9a8706a127fd80ead",
+  "capstone": "09ba26d9848f4ad0920ad0ef5feb512899fabe6c",
   "variants": {
-    "packed": {
-      "tree": "30ba2b247b9ba246ed05e07e836c00ef8b273c2d",
-      "patch": "packed.patch",
-      "patch_sha256": "3c125089b92903b11a629e86b7005204cc29236d21ee94fa83795b1dac0e9dfc"
+    "scalar_first": {
+      "tree": "31e2a9b1ae221ed5b5445ed7d7a32a86d9f6d292",
+      "patch": "scalar_first.patch",
+      "patch_sha256": "d581233aaf116bfde08c474edc56b232b0ba7597f656302072ca30da11c9b82a"
     },
-    "combined": {
-      "tree": "c51546d59fa4309ec03983557a79ed6c785a8ff3",
-      "patch": "combined.patch",
-      "patch_sha256": "39abf8c0f45af2a1055ad09e6144e7b094219c076d790f26dbe5a0b1005615dc"
+    "mem_imm": {
+      "tree": "6ddaa52fd8b3301150cca60ebe7fae67b94adbd0",
+      "patch": "mem_imm.patch",
+      "patch_sha256": "2b526c5a739c52ec1d37ca5941b6c011b9707ad597d742a9c476cbb2c6dc3558"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -18,6 +18,12 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Compare packed EVEX output alone and together with the corrected nanoMIPS branch predicate in the actual NeverD consumer.",
-  "parent": "7c755b63907ce4939128ef9f5884f9b24379f610"
+  "scope": "Test the ordinary NeverD C++ Decoder entry on PE32, PE64, ELF scalar and vector data with and without the i386 text member. Measure scan, text, detail and batch using the production backend.",
+  "parent": "1810166d8e83d91e28abd9fabadf0378cb6cc090",
+  "integration": {
+    "path": "lib/decode/Decoder.cpp",
+    "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
+    "candidate": "612b5a08d2866526236d4a93b64d7f1e699c49ea",
+    "sha256": "d2612fb34a80dd69496054e416510e2c71524ee4c186cfa918ab3dde4776f46a"
+  }
 }
