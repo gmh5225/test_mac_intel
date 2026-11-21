@@ -19,13 +19,23 @@ try:
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
     verified={}
-    for variant in ('base','candidate'):
+    for variant in ('base','placed_base','candidate','placed_fixed'):
+        mapping=s/'Mapping.c'
         if variant=='candidate':
+            git('restore','--worktree','Mapping.c')
             git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
+        if variant.startswith('placed_'):
+            body=mapping.read_text()
+            for sym in ('map_implicit_reads','map_implicit_writes'):
+                decl='void '+sym+'('
+                assert body.count(decl)==1
+                body=body.replace(decl,'__attribute__((section(".cs_implicit_regs"))) '+decl)
+            mapping.write_text(body)
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
         run(['nm','-n','-S','--defined-only',libs[variant]],'symbols-'+variant)
+    git('restore','--worktree','Mapping.c')
     if conf=='full':
         selected=['riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
@@ -98,10 +108,11 @@ try:
             return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
         timing=[]
         for name,bits,path,ip in panels[2:]+other_cases:
-            for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
-                for i in range(7):
-                    keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
+            if name not in {'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-sort','openssl'}:continue
+            for mode in ((0,) if name=='openssl' else (2,) if name=='riscv64-sort' else (1,2)):
+                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(85e6/first[0]));cycles=[]
+                for i in range(15):
+                    keys=['base','copy','candidate','placed_base','placed_fixed'];o=keys[i%len(keys):]+keys[:i%len(keys)];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
                         v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
                     cycles.append(cyc)
