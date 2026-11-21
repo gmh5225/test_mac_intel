@@ -1,0 +1,49 @@
+name: Check original WDK header search on native Windows ARM64
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - .github/workflows/neverd-wdk-includes.yml
+      - native-driver-entry/compare_native_wdk_includes.py
+permissions:
+  contents: read
+jobs:
+  includes:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: native-driver-entry
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ef54583450403651546c28f9fca4b60f80379e71
+          path: source
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ${{ runner.temp }}/nb/bin/neverd.exe
+          key: neverd-arm64-type-reader-d035e9bb8941f8f33a96560c8eb020496df499e2-1
+          fail-on-cache-miss: true
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - name: Compare original RDBSS compiler and reader evidence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $cache = "$env:RUNNER_TEMP/sdk-packages"
+          python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
+          Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
+          python native-driver-entry/compare_native_wdk_includes.py --scripts source/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --report wdk-header-search.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: wdk-header-search
+          path: wdk-header-search.json
+          retention-days: 14
