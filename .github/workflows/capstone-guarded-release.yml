@@ -1,7 +1,7 @@
-name: Check enabled static indirect calls and jumps on guarded x86 instruction extents
+name: Bound VEX registers and i386 MOVSX and MOVZX at every possible decoder input length
 on:
   push:
-    branches: [codex/capstone-protected-near-indirect]
+    branches: [codex/capstone-guarded-vex-i386-widening]
     paths: [guarded/**, .github/workflows/capstone-guarded-release.yml]
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 2c3d603a35ee40bc82812c223a6fde14d4add1dc
+          ref: 9e9475747756ecd8a726e3b2f7bfe7381e46a5f2
           path: source
           persist-credentials: false
       - run: python3 -B guarded/guard-run.py
@@ -31,6 +31,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: protected-indirect-${{ matrix.kind }}
+          name: guarded-vex-extend-${{ matrix.kind }}
           path: evidence/
           retention-days: 14

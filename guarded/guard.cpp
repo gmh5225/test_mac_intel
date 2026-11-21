@@ -49,7 +49,19 @@ int main() {
   for(unsigned n=0;n<8192;++n){
    uint8_t bytes[15];for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;
    const unsigned op[]={0xef,0xfe,0xd4,0x44,0x25,0x00,0x19,0x1b,0x39,0x3b,0x71,0x72,0x73};
-   if(n%8==7){unsigned pos=0;if(mode==CS_MODE_64 && (n&8))bytes[pos++]=(uint8_t)(0x40|((n>>4)&15));bytes[pos++]=0xff;bytes[pos++]=(uint8_t)((n>>3)&0xff);}
+   if(n%8==3){
+       const bool short_prefix=(n&8)!=0;
+       const unsigned prefix=short_prefix?2:3;
+       bytes[0]=short_prefix?0xc5:0xc4;bytes[1]=(uint8_t)((bytes[1]&0xe0)|1);
+       const unsigned pp=(n>>4)&3;
+       bytes[prefix-1]=(uint8_t)((bytes[prefix-1]&0xfc)|pp);
+       const uint8_t frequent[]={0x58,0x59,0x5c,0x5d,0x5e,0x5f,0x54,0x56};
+       bytes[prefix]=n&0x100?(uint8_t)(n>>5):frequent[(n>>6)&7];
+       bytes[prefix+1]|=0xc0;
+   }else if(n%8==5){
+       const uint8_t ext[]={0xb6,0xb7,0xbe,0xbf};
+       bytes[0]=0x0f;bytes[1]=ext[(n>>3)&3];bytes[2]=(uint8_t)(n>>5);
+   }else if(n%8==7){unsigned pos=0;if(mode==CS_MODE_64 && (n&8))bytes[pos++]=(uint8_t)(0x40|((n>>4)&15));bytes[pos++]=0xff;bytes[pos++]=(uint8_t)((n>>3)&0xff);}
    else if(n%4==3){const uint8_t lead[]={0xc6,0xc7,0x0f,0xff,0x66,0x48,0x83,0x8d};bytes[0]=lead[(n>>2)&7];}else if(n%4==0){bytes[0]=0x62;bytes[1]=(n&0xf0)|(1+(n/3)%3);bytes[2]=((n>>4)&0xf8)|5;
     bytes[3]=((n>>2)&0x60)|8;bytes[4]=op[(n>>8)%13];bytes[5]=(uint8_t)(n>>1);
    }else if(n%4==1){bytes[0]=0xc5;bytes[1]=(uint8_t)(n>>4);bytes[2]=op[(n>>8)%13];bytes[3]=(uint8_t)(n>>1);}
