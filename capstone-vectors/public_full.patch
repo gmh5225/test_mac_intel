@@ -1,0 +1,99 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..fdbe76c0 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,14 +20,22 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
+ 
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+-	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
+ #include "../../cs_priv.h"
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
+ #define CAPSTONE_X86_DEDICATED_OUTPUT
+ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
+ 					 size_t size, cs_insn *insn,
+ 					 uint16_t *insn_size);
++#else
++#define CAPSTONE_X86_PUBLIC_ITERATOR_OUTPUT
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..c02096b4 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,9 +3753,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
++#ifdef CAPSTONE_X86_PUBLIC_ITERATOR_OUTPUT
++#define CS_DECODE_X86_OUTPUT X86_decodeIteratorOutput
++#endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
++#undef CS_DECODE_X86_OUTPUT
+ 
+ /* Keep the admitted terminal's public ID and zero alias adjustment visible
+  * through output completion. Cold helpers can take the fallback result's
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..41ec45e5 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -21,6 +21,8 @@
+  * present. Memory admission and bounds checks belong to the address writer. */
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ CAPSTONE_INTERNAL
++#elif defined(__GNUC__) && !defined(__clang__)
++static inline __attribute__((always_inline))
+ #else
+ static
+ #endif
+@@ -222,4 +224,21 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++#ifdef CAPSTONE_X86_PUBLIC_ITERATOR_OUTPUT
++/* Called from the ordinary iterator after it has checked the input length.
++ * Keep the full decoder's calling convention and argument list at that site. */
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_public_output")))
++#endif
++CS_PRESERVE_MOST bool X86_decodeIteratorOutput(cs_struct *handle,
++					      const uint8_t *code, size_t size,
++					      cs_insn *insn,
++					      uint16_t *insn_size, bool batch)
++{
++	if (X86_trySimpleOutput(handle, code, size, insn, insn_size))
++		return true;
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
++#endif
++
+ #endif
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..5c233918 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -162,6 +162,11 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
++#endif
++#ifdef CS_DECODE_X86_OUTPUT
++	if (handle->arch == CS_ARCH_X86 && !handle->no_text)
++		return CS_DECODE_X86_OUTPUT(handle, code, size, insn, insn_size,
++					    batch);
+ #endif
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
