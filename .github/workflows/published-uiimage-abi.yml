@@ -1,0 +1,28 @@
+name: Published UIImage ABI
+
+on:
+  push:
+    branches:
+      - codex/private-published-abi-static
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: macos-15
+    timeout-minutes: 12
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Collect compiler output
+        run: bash compile.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: published-uiimage-abi
+          path: compiler-evidence
+          if-no-files-found: error
+          retention-days: 7
