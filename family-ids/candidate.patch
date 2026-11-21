@@ -15,22 +15,18 @@ index 2c0da2cd..e4fb38f1 100644
  	0x00032303u, 0x00000000u, 0x00032303u, 0x00000000u, 0x00032305u, 0x00032303u, 0x00032306u, 0x00032303u,
  	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..7f8e49e0 100644
+index 2ee82ef7..a76de9b4 100644
 --- a/arch/X86/X86InstPrinterCommon.c
 +++ b/arch/X86/X86InstPrinterCommon.c
-@@ -214,6 +214,12 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+@@ -214,7 +214,7 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
  		if (MI->flat_insn->detail)
  			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
  		break;
-+	case X86_INS_VCMPPS:
-+	case X86_INS_VCMPPD:
-+	case X86_INS_VCMPSS:
-+	case X86_INS_VCMPSD:
-+		// The opcode mapping already identifies the floating-point family.
-+		break;
- 	default:
+-	default:
++	case X86_INS_VPCMP:
  		MI->popcode_adjust = Imm + 1;
  		break;
+ 	}
 diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
 index 7e5e7f51..8eca0cbb 100644
 --- a/arch/X86/X86MappingInsn.inc

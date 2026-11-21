@@ -1,7 +1,7 @@
-name: Verify floating compare IDs and every unaffected byte across six backends
+name: Check integer-only predicate adjustment and time the floating compare identity repair
 on:
   push:
-    branches: [codex/capstone-floating-compare-public-id]
+    branches: [codex/capstone-integer-only-predicate-adjustment]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: floating-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: integer-predicate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

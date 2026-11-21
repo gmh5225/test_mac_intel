@@ -37,9 +37,10 @@ unsigned family(const uint8_t *data, size_t size) {
     }
     return 0;
 }
-unsigned floating(const uint8_t *data,size_t size) {
+unsigned floating(const uint8_t *data,size_t size,bool long_mode) {
     while(size && (*data==0x26 || *data==0x2e || *data==0x36 || *data==0x3e ||
                    *data==0x64 || *data==0x65 || *data==0x67)) {++data; --size;}
+    if(size<2 || (!long_mode && (data[1]&0xc0)!=0xc0)) return 0;
     unsigned pp;
     if(size>=5 && data[0]==0xc5 && data[2]==0xc2) pp=data[1]&3;
     else if(size>=6 && data[0]==0xc4 && (data[1]&31)==1 && data[3]==0xc2) pp=data[2]&3;
@@ -79,7 +80,7 @@ struct Pair {
         if(required) same &= ok && y.id==required && y.size==n;
         same &= x.detail==(detail?&xd:nullptr) && y.detail==(detail?&yd:nullptr);
         unsigned before=x.id;
-        const unsigned fp=ok && x.size<=n ? floating(start,x.size) : 0;
+        const unsigned fp=ok && x.size<=n ? floating(start,x.size,bits==64) : 0;
         bool float_alias=false;
         if(fp && y.id==fp){
             uint8_t p=start[x.size-1]&31;
@@ -127,7 +128,7 @@ void float_matrix(Pair &p) {
           if(prefix==3)s={0xc4,0xe1,uint8_t(0x68 | (l<<2) | pp)};
           if(prefix==4)s={0x62,0xf1,uint8_t(0x6c | ((pp&1)<<7) | pp),uint8_t(8 | (l<<5) | (mask?3:0))};
           s.push_back(0xc2);s.insert(s.end(),m.begin(),m.end());s.push_back(0);
-          for(unsigned i=0;i<256;++i){s.back()=i;p.decode(s.data(),s.size(),0x1000,floating(s.data(),s.size()));}
+          for(unsigned i=0;i<256;++i){s.back()=i;p.decode(s.data(),s.size(),0x1000,floating(s.data(),s.size(),p.bits==64));}
           for(size_t n=0;n<s.size();++n)p.decode(s.data(),n,0x1000);
         }
 }
