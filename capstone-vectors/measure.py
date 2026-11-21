@@ -86,7 +86,7 @@ def main(w):
         if label=='baseline':
             old_archive=w/'baseline.a';shutil.copyfile(libs[0],old_archive)
         else:
-            from layout import locate
+            from factor_layout import locate
             selected={'common':['X86ImmediateOutput.c.o'],'common32':['X86ImmediateOutput.c.o','X86Vex32Output.c.o'],'common64':['X86ImmediateOutput.c.o','X86Sse64Output.c.o']}
             for k,which in selected.items():
                 ar=w/(k+'.a');shutil.copyfile(old_archive,ar)
@@ -118,7 +118,7 @@ def main(w):
     if probe.returncode==0:launches.append('same-file-fixed')
     save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
     from costs import collect
-    from layout import paired,hardware
+    from factor_layout import paired,hardware
     comparisons=[];perf={}
     prev=json.loads((r/'cost-inputs.json').read_text())
     images={k:sha(exe[k])for k in ('baseline','alu_immediates')}
