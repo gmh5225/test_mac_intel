@@ -1,7 +1,7 @@
-name: Validate i386 private output, public ABI and six backends in seven configurations
+name: Verify identical shared libraries and the i386 static output across seven profiles
 on:
   push:
-    branches: [codex/capstone-i386-member-six-backends]
+    branches: [codex/capstone-private-i386-static-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: i386-iterator-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: private-i386-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

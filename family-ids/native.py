@@ -39,7 +39,12 @@ try:
     assert exported['base']==exported['candidate'] and exported['base']
     write('public-abi',dict(symbols=exported['base'],identical=True))
     objects=sorted((b/'CMakeFiles/capstone.dir').rglob('*.o'))
-    assert any(x.name=='X86Vex32Output.c.o' for x in objects)
+    assert sha(libs['base'])==sha(libs['candidate'])
+    assert not any(x.name=='X86Vex32Output.c.o' for x in objects)
+    run(['cmake','--build',b,'--target','capstone_x86_iter32','--parallel','4'],'private-object')
+    member,=(b/'CMakeFiles/capstone_x86_iter32.dir').rglob('X86Vex32Output.c.o')
+    objects.append(member)
+    write('shared-identity',dict(sha256=sha(libs['base']),identical=True,private_member=str(member.relative_to(b))))
     run([cc,'-O2','-I'+str(s),'-I'+str(s/'include'),r/'fallback.c',*objects,'-lm','-o',tmp/'fallback'],'build-iterator-matrix')
     run([tmp/'fallback'],'iterator-matrix')
     if not (diet or reduce):
