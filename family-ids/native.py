@@ -31,6 +31,7 @@ try:
         matching=[key for key in reference if key.endswith('-'+cc+'-'+conf) and (('24.04-arm' in key)==(platform.machine()=='aarch64')) and (('22.04' in key)==('22.04' in Path('/etc/os-release').read_text()))]
         assert len(matching)==1,matching
         if conf!='full':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
+    if cc=='gcc':assert sha(libs['base'])==sha(libs['candidate'])
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
     run([tmp/'check-static'],'static-selected')
@@ -84,8 +85,8 @@ try:
     if conf=='full':
         import corpus
         raw=corpus.prepare(r,tmp,obs,run)
-        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}
-        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
+        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort','arm64-cp','arm64-sort','libjpeg-arm64'}
+        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105,'arm64-cp':102,'arm64-sort':102,'libjpeg-arm64':102}
         other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
         assert len(other_cases)==len(names)
         for arch in ('arm','aarch64','ppc','riscv','mips'):
