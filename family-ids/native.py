@@ -10,7 +10,7 @@ def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 meta=json.loads((r/'lineage.json').read_text());cc=os.environ['CC'];assert git('rev-parse','HEAD')==meta['base']['commit']
 t=Path(tempfile.mkdtemp())
 try:
-    b=t/'build';labels=['base','batch','worker','leaf']
+    b=t/'build';labels=['base','batch','multiple','runs']
     opts=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SCAN_ADAPTER=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers')]
     opts.extend('-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('X86','ARM','AARCH64','MIPS','PPC','RISCV'))
     run(['cmake','-S',s,'-B',b,*opts],'configure')
@@ -32,7 +32,7 @@ try:
         run([cc,'-std=c11',*flags,r/'adapter.c',library,'-lm','-o',t/'adapter'],'link-adapter-'+label);run([t/'adapter'],'mode-switch-'+label)
         objs[label]={str(v.relative_to(b)):sha(v) for v in b.rglob('*.o')if 'CMakeFiles/capstone.dir' in str(v)};assert len(objs[label])>45
         if label!='base':assert [Path(k).name for k in objs[label]if objs[label][k]!=objs['base'][k]]==['X86DisassemblerDecoder.c.o']
-        sym[label]=[line.strip() for line in sp.check_output(['nm','-Sn',exe['batch',label]],text=True).splitlines() if any(x in line for x in (' X86_scanBatch',' scanBatch32',' scanBatchOtherModes',' cs_disasm_iter'))]
+        sym[label]=[line.strip() for line in sp.check_output(['nm','-Sn',exe['batch',label]],text=True).splitlines() if any(x in line for x in (' X86_scanBatch',' scanBatch32',' scanLegacyRun32',' cs_disasm_iter'))]
         run(['objdump','-d','--disassemble=X86_scanBatch',exe['batch',label]],'disassembly-'+label)
     save('objects',objs);save('symbols',sym);cases=corpus.prepare(r,t,out,lambda a,n,cwd=None:run(a,n))
     samples={x['name']:x for x in cases}
@@ -62,7 +62,7 @@ try:
     def call(tool,label,args,reps):
         fixed.write_bytes(blobs[tool,label]);assert fixed.stat().st_ino==inode
         return list(map(int,sp.check_output([*bind,fixed,*map(str,args),str(reps)],text=True).split()))
-    ordered=['base','copy','batch','worker','leaf']
+    ordered=['base','copy','batch','multiple','runs']
     for tool,name,mode,args in cases:
         v=call(tool,'base',args,1);n=max(1,round(32e6/v[0]));sig=v[2:];cycles=[]
         for i in range(7):

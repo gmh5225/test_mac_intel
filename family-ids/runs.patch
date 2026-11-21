@@ -1,0 +1,56 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..cd744704 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3795,6 +3795,26 @@ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 
++/* Consume consecutive scalar terminals without entering the full scanner.
++ * The general scanner handles the first unconsumed instruction, including
++ * an invalid terminal, with the current handle and private instruction. */
++static X86ScanBatchResult scanLegacyRun32(const uint8_t *code, size_t size,
++					 uint32_t *output, size_t capacity)
++{
++	X86ScanBatchResult run = { 0, 0 };
++	while (run.count < capacity && run.bytes < size) {
++		unsigned int id = 0;
++		uint16_t length;
++		if (tryInitialLegacyScan(code + run.bytes, size - run.bytes,
++					 CS_MODE_32, false, &id, &length,
++					 false) != X86_SCAN_COMPLETE)
++			break;
++		output[run.count++] = (id << 8) | length;
++		run.bytes += length;
++	}
++	return run;
++}
++
+ X86_DECODE_ALIGN
+ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 						   size_t size,
+@@ -3821,6 +3841,24 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 		code += result.length;
+ 		size -= result.length;
+ 		address += result.length;
++		if (batch.count == capacity || !size)
++			break;
++		if (handle->mode == CS_MODE_32) {
++			X86ScanBatchResult run = scanLegacyRun32(
++				code, size, output + batch.count,
++				capacity - batch.count);
++			if (run.count) {
++				batch.count += run.count;
++				batch.bytes += run.bytes;
++				code += run.bytes;
++				size -= run.bytes;
++				address += run.bytes;
++				/* A subsequent fallback reuses this instruction. */
++				uint32_t last = output[batch.count - 1];
++				insn.id = last >> 8;
++				insn.size = (uint16_t)(last & 0xff);
++			}
++		}
+ 	}
+ 	return batch;
+ }
