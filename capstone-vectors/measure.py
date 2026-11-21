@@ -117,6 +117,19 @@ def main(w):
             save('archive-extraction.json',dict(entry=definitions[0].strip(),linked_sha256=sha(target),unreferenced_sha256=sha(control),original_sha256=sha(exe['baseline']),ordinary_text={v:sha(w/(v+'-text')) for v in ['baseline','unreferenced']}))
 
         exe[label]=target
+    tested_archive=b/'libcapstone.a'
+    def archive_members():
+        return {name:hashlib.sha256(sp.check_output(['ar','p',tested_archive,name])).hexdigest() for name in sp.check_output(['ar','t',tested_archive],text=True).splitlines()}
+    current=archive_members()
+    run(['git','apply','-R','--index',r/'guard.patch'],'switch-to-old-guard',base)
+    assert sp.check_output(['git','write-tree'],text=True,cwd=base).strip()==data['prior_guard_tree']
+    run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'old-guard-objects')
+    old_objects=archive_members()
+    assert set(current)==set(old_objects)
+    save('guard-objects.json',dict(candidate=current,prior=old_objects,changed=[k for k in current if current[k]!=old_objects[k]],trees=[data['trees']['i386'],data['prior_guard_tree']]))
+    run(['git','apply','--index',r/'guard.patch'],'restore-candidate-guard',base)
+    run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'restore-static-objects')
+    assert archive_members()==current
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
     exe['private_base']=exe['baseline'];exe['private_i386']=exe['i386']

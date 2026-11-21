@@ -1,0 +1,61 @@
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index d431cbf9..2a81d96f 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -11,17 +11,17 @@
+ #include "X86InstPrinterCommon.h"
+ #include "X86Mapping.h"
+ 
+-static inline bool X86_hasCustomOutput(const cs_struct *handle)
+-{
+-	return handle->no_text || handle->imm_unsigned || handle->mnem_list ||
+-	       handle->doing_mem ||
+-	       (handle->syntax != CS_OPT_SYNTAX_INTEL &&
+-		handle->syntax != CS_OPT_SYNTAX_DEFAULT) ||
+-	       handle->disasm != X86_getInstruction ||
+-	       handle->insn_id != X86_get_insn_id ||
+-	       handle->printer != X86_Intel_printInst ||
+-	       handle->post_printer != X86_postprinter ||
+-	       cs_vsnprintf != cs_default_vsnprintf;
+-}
++/* Keep the mode, option and callback checks in a single short-circuit chain
++ * in both instantiations of the scalar writer. */
++#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
++	 (handle)->mnem_list || (handle)->doing_mem || \
++	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
++	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
++	 (handle)->disasm != X86_getInstruction || \
++	 (handle)->insn_id != X86_get_insn_id || \
++	 (handle)->printer != X86_Intel_printInst || \
++	 (handle)->post_printer != X86_postprinter || \
++	 cs_vsnprintf != cs_default_vsnprintf)
+ 
+ #endif
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 25dde355..94f1c45d 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -65,8 +65,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		}
+ 	}
+-	if ((!wide && handle->mode != CS_MODE_32) ||
+-	    X86_hasCustomOutput(handle))
++	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+ 		return false;
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 4be278ae..1629a36c 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -113,7 +113,7 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
+ static bool writeVex32Output(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size)
+ {
+-	if ((code[0] & 0xfe) != 0xc4 || X86_hasCustomOutput(handle))
++	if ((code[0] & 0xfe) != 0xc4 || X86_OUTPUT_UNSUPPORTED(handle, false))
+ 		return false;
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+ 	/* LDS/LES, extended registers and W=1 retain the

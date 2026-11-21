@@ -1,7 +1,7 @@
-name: Measure public and private output after isolating the i386 archive member
+name: Measure the specialized i386 static iterator with the original public option checks
 on:
   push:
-    branches: [codex/capstone-i386-static-link-placement]
+    branches: [codex/capstone-i386-chained-options]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-static-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-chained-options-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
