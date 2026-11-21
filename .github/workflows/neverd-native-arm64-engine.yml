@@ -12,6 +12,7 @@ on:
       - native-driver-entry/export-entry-inputs.json
       - native-driver-entry/check_com_callbacks.py
       - native-driver-entry/process_sdk_smoke.c
+      - native-driver-entry/prefetch_profile.py
       - native-driver-entry/check_native_process_profile.py
       - native-driver-entry/loader/**
 permissions:
@@ -22,6 +23,7 @@ jobs:
     timeout-minutes: 350
     env:
       SCCACHE_GHA_ENABLED: 'true'
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -167,11 +169,28 @@ jobs:
             cmake --build $toolbuild --target llvm-readobj --parallel 4
             $reader = "$toolbuild/bin/llvm-readobj.exe"
           }
+          python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
           python source/scripts/generate_microsoft_windows_types.py --architecture arm64 --ucrt --ucrt-compatibility --legacy-sdk --output "$types/arm64" --cache $cache --neverd $exe --clang clang --llvm-readobj $reader
           cmake -S source -B $nb "-DNEVERD_WINDOWS_TYPES_DIRECTORY=$types/arm64"
           python source/scripts/build.py $nb --target neverd --parallel 4
           if ((Get-FileHash $exe).Hash -eq $bootstrap) { throw 'The native engine did not embed the official libraries' }
           python native-driver-entry/check_native_process_profile.py --source source --types $types --cache $cache --engine $exe --output "$env:RUNNER_TEMP/sdk-qual" --report native-sdk-profile.json
+      - name: Report SDK tool diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          $root = "$env:RUNNER_TEMP/sdk-types"
+          if (Test-Path $root) {
+            Get-ChildItem -Recurse -File -Filter '*.log' $root |
+              Sort-Object LastWriteTime -Descending | Select-Object -First 10 | ForEach-Object {
+                Write-Host $_.Name
+                Select-String -Path $_.FullName -Pattern '(fatal error|error:|exception:|Problems)' |
+                  Select-Object -First 5 | ForEach-Object {
+                    $message = $_.Line.Trim()
+                    Write-Host $message.Substring(0, [Math]::Min(220, $message.Length))
+                  }
+              }
+          }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
