@@ -79,12 +79,6 @@ struct Pair {
         if(required) same &= ok && y.id==required && y.size==n;
         same &= x.detail==(detail?&xd:nullptr) && y.detail==(detail?&yd:nullptr);
         unsigned before=x.id;
-        // The published DIET formatter increments generic VPCMP by the
-        // alias predicate index. Without mnemonic text its old fixup has no suffix.
-        const bool evex_family=ok && x.size<=n && family(start,x.size)==y.id && y.id;
-        const uint8_t imm=evex_family ? start[x.size-1] : 255;
-        const bool diet_alias=diet && (flags&1) && imm<8 && imm!=3 && imm!=7 &&
-                              x.id==unsigned(X86_INS_VPCMP)+imm+1;
         const unsigned fp=ok && x.size<=n ? floating(start,x.size) : 0;
         bool float_alias=false;
         if(fp && y.id==fp){
@@ -93,7 +87,7 @@ struct Pair {
                         ((flags&1) &&
                          (x.id==unsigned(X86_INS_VCMP)+1+p || x.id==fp+1+p));
         }
-        if(x.id!=y.id && ((evex_family && (x.id==X86_INS_VPCMP || diet_alias)) || float_alias)) {
+        if(x.id!=y.id && float_alias) {
             ++c.corrected; x.id=y.id;
         }
         x.detail=nullptr;y.detail=nullptr;
@@ -118,7 +112,7 @@ void matrix(Pair &p) {
           std::vector<uint8_t> s={0x62,0xf3,uint8_t(0x6d|w),uint8_t(ll|mask|bc),op};
           s.insert(s.end(),m.begin(),m.end());s.push_back(0);
           for(unsigned imm=0;imm<256;++imm) {
-              s.back()=imm;p.decode(s.data(),s.size(),0x1000,family(s.data(),s.size()));
+              s.back()=imm;if(p.decode(s.data(),s.size(),0x1000)!=s.size())std::exit(1);
           }
           for(size_t n=0;n<s.size();++n)p.decode(s.data(),n,0x1000);
         }
