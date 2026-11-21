@@ -1,0 +1,173 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..fd9c9982 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,14 +20,21 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
+ 
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+-	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
+ #include "../../cs_priv.h"
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
+ #define CAPSTONE_X86_DEDICATED_OUTPUT
+ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
+ 					 size_t size, cs_insn *insn,
+ 					 uint16_t *insn_size);
++#else
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..46eaee71 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,9 +3753,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
++#ifdef CAPSTONE_X86_ITERATOR_OUTPUT
++#define CS_DECODE_ITER_OUTPUT
++#endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
++#undef CS_DECODE_ITER_OUTPUT
+ 
+ /* Keep the admitted terminal's public ID and zero alias adjustment visible
+  * through output completion. Cold helpers can take the fallback result's
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..a592f0d5 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -4,12 +4,10 @@
+ #ifdef CAPSTONE_HAS_X86
+ #include "../../cs_priv.h"
+ #include "X86ScanAdapter.h"
+-
+-#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
+ #include "X86Disassembler.h"
++
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) || \
++	defined(CAPSTONE_X86_ITERATOR_OUTPUT)
+ #include "X86InstPrinter.h"
+ #include "X86InstPrinterCommon.h"
+ #include "../../utils.h"
+@@ -21,6 +19,8 @@
+  * present. Memory admission and bounds checks belong to the address writer. */
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ CAPSTONE_INTERNAL
++#elif defined(__GNUC__) && !defined(__clang__)
++static inline __attribute__((always_inline))
+ #else
+ static
+ #endif
+@@ -222,4 +222,18 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_ITERATOR_OUTPUT
++/* The public iterator has selected this x86 handle's full-output path.
++ * The writer checks the current options and callbacks on every attempt. */
++CS_PRESERVE_MOST bool X86_decodeIteratorOutput(cs_struct *handle,
++					       const uint8_t *code, size_t size,
++					       cs_insn *insn,
++					       uint16_t *insn_size, bool batch)
++{
++	if (X86_trySimpleOutput(handle, code, size, insn, insn_size))
++		return true;
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
++#endif
+ #endif
+diff --git a/cs.c b/cs.c
+index 71fff034..9add4cbe 100644
+--- a/cs.c
++++ b/cs.c
+@@ -848,6 +848,10 @@ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
+ 	ud->errnum = CS_ERR_OK;
+ 	ud->arch = arch;
+ 	ud->mode = mode;
++#ifdef CAPSTONE_X86_ITERATOR_OUTPUT
++	ud->decode_iterator_full = arch == CS_ARCH_X86 ? X86_decodeIteratorOutput :
++							 cs_decode_full_insn;
++#endif
+ 	// by default, do not break instruction into details
+ 	ud->detail_opt = CS_OPT_OFF;
+ 	ud->PrintBranchImmAsAddress = true;
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..9f8b501c 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -19,9 +19,6 @@
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+-cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
+-CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+ 			size_t *size, uint64_t *address, cs_insn *insn);
+ #ifndef CAPSTONE_DIET
+@@ -163,7 +160,12 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
++#ifdef CS_DECODE_ITER_OUTPUT
++	return handle->decode_iterator_full(handle, code, size, insn,
++					    insn_size, batch);
++#else
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++#endif
+ }
+ #undef CS_DECODE_SCAN
+ 
+diff --git a/cs_priv.h b/cs_priv.h
+index 95d36ef5..8c42e614 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -34,6 +34,19 @@
+ #include "arch/X86/X86ScanAdapter.h"
+ #endif
+ 
++#if defined(CAPSTONE_HAS_X86) && \
++	!(defined(CAPSTONE_X86_ONLY) && defined(__linux__)) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CAPSTONE_X86_ITERATOR_OUTPUT
++#endif
++
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch);
++
+ typedef void (*Printer_t)(MCInst *MI, SStream *OS, void *info);
+ 
+ // function to be called after Printer_t
+@@ -151,6 +164,11 @@ struct cs_struct {
+ 	void *x86_scan_adapter_data;
+ 	cs_mode x86_scan_adapter_mode;
+ #endif
++#ifdef CAPSTONE_X86_ITERATOR_OUTPUT
++	CS_PRESERVE_MOST bool (*decode_iterator_full)(cs_struct *, const uint8_t *,
++						      size_t, cs_insn *,
++						      uint16_t *, bool);
++#endif
+ };
+ 
+ #define MAX_ARCH CS_ARCH_MAX

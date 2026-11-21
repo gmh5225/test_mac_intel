@@ -1,7 +1,7 @@
-name: Compare public x86 fallback selection with dispatch inside full decoding
+name: Compare full-iterator dispatch with the same public and private formatting outputs
 on:
   push:
-    branches: [codex/capstone-public-x86-output-fallback]
+    branches: [codex/capstone-handle-format-target]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
+          ref: e2266247a3b0f090bcad5bd3a4ead8c3220de367
           path: source
           persist-credentials: false
       - name: Compare public records and time both API routes with an exact-copy control
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-x86-fallback-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: handle-format-target-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
