@@ -1,7 +1,7 @@
-name: Validate vector-clearing records and speed in three linked NeverD builds from source
+name: Check register mapping and AMD64 output in three source-built NeverD products
 on:
   push:
-    branches: [codex/neverd-corrected-vector-shipping]
+    branches: [codex/capstone-mode-writes-product-check]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipping-vector-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: mode-vector-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
