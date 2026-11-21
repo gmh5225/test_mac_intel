@@ -36,6 +36,37 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Native probe did not compile' }
           .\null-arm64.exe | Tee-Object -FilePath evidence/io.json
           if ($LASTEXITCODE -ne 0) { throw "Native I/O failed $LASTEXITCODE" }
+      - name: Compare both C routes with captured native ARM64 entry registers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Push-Location entry-capture
+          clang --target=aarch64-pc-windows-msvc -c original.S -o original.obj
+          if ($LASTEXITCODE) { throw 'original assembly' }
+          lld-link /driver /subsystem:native /entry:observe_entry /nodefaultlib /out:fixture.sys original.obj
+          if ($LASTEXITCODE) { throw 'fixture link' }
+          $pe = [IO.File]::ReadAllBytes("$PWD/fixture.sys")
+          $nt = [BitConverter]::ToInt32($pe, 60)
+          $section = $nt + 24 + [BitConverter]::ToUInt16($pe, $nt + 20)
+          $size = [BitConverter]::ToInt32($pe, $section + 8)
+          $offset = [BitConverter]::ToInt32($pe, $section + 20)
+          $hash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]$pe[$offset..($offset+$size-1)])).ToLower()
+          $expected = Get-Content inputs.json | ConvertFrom-Json
+          if ($hash -ne $expected.text_sha256 -or $size -ne $expected.text_bytes) { throw 'original machine code mismatch' }
+          clang --target=aarch64-pc-windows-msvc -c capture.S -o capture.obj
+          if ($LASTEXITCODE) { throw 'capture assembly' }
+          foreach ($variant in @('high','llvm')) {
+            $sourceHash = (Get-FileHash "$variant.c").Hash.ToLower()
+            if ($sourceHash -ne $expected.source_sha256.$variant) { throw "$variant source mismatch" }
+            clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 "/Dobserve_entry=observe_$variant" /c "$variant.c" "/Fo$variant.obj"
+            if ($LASTEXITCODE) { throw "$variant compilation" }
+          }
+          cl /nologo /O2 /W4 /WX compare.c capture.obj original.obj high.obj llvm.obj /Fe:compare.exe
+          if ($LASTEXITCODE) { throw 'native oracle link' }
+          .\compare.exe | Tee-Object -FilePath ../evidence/entry-capture.json
+          if ($LASTEXITCODE) { throw "native entry state differs $LASTEXITCODE" }
+          Copy-Item inputs.json ../evidence/entry-capture-inputs.json
+          Pop-Location
       - name: Inventory Windows driver and DLL exports
         if: always()
         shell: pwsh

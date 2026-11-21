@@ -40,10 +40,10 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     rows, errors = [], []
-    for root, pattern in [(args.drivers, "*.sys"), (args.dlls, "*.dll")]:
-        paths = sorted(root.glob(pattern))
+    for root, suffix in [(args.drivers, ".sys"), (args.dlls, ".dll")]:
+        paths = sorted(p for p in root.iterdir() if p.is_file() and p.suffix.lower() == suffix)
         if not paths:
-            raise ValueError(f"No {pattern} files under {root}")
+            raise ValueError(f"No {suffix} files under {root}")
         for path in paths:
             try:
                 rows.append(image_row(path))
