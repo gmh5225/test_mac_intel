@@ -53,6 +53,7 @@ def run_guest(directory, guest, runner, kvm_fd):
     image = directory / guest["image"]
     digest = hashlib.sha256(image.read_bytes()).hexdigest()
     receipt = {"image": image.name, "route": guest["route"], "optimization": guest["optimization"],
+               "vmcb_input": guest["vmcb_input"],
                "guest_sha256": digest, "acceleration": "kvm", "completed": False,
                "completed_contexts": 0}
     if digest != guest["sha256"]:
@@ -74,7 +75,14 @@ def run_guest(directory, guest, runner, kvm_fd):
     observed_rcx = any(event["event"] == "after_vmexit" and event["rcx"] == "0x5678"
                        and event["vmcb_exit"] == "0x81" for event in trace)
     completed = observed_rcx and run.returncode == 33 and console.splitlines() == guest["expected_console"]
+    tagged_rax = 0xfedcba9800000000 | int(guest["vmcb"], 0)
+    tagged_fault = (guest["vmcb_input"] == "tagged" and run.returncode == 1 and
+                    (guest["route"] != "original" or observed_rcx) and
+                    any(event["event"] == "exception" and event["vector"] == 13
+                        and event["error"] == "0" and event["bytes"] == "670f01d8"
+                        and int(event["rax"], 0) == tagged_rax for event in trace))
     return dict(receipt, return_code=run.returncode, completed=completed,
+                tagged_addr32_gp=tagged_fault,
                 completed_contexts=guest["contexts"] if completed else 0, console=console,
                 diagnostic="\n".join(diagnostic), trace=trace, observed_original_rcx=observed_rcx)
 
@@ -102,8 +110,24 @@ def main():
                 report["guest_runs"].append(run_guest(opts.guests, guest, opts.runner, kvm_fd))
         finally:
             os.close(kvm_fd)
-        report["status"] = ("passed" if report["guest_runs"] and
-                            all(r["completed"] for r in report["guest_runs"]) else "failed")
+        mapped = [r for r in report["guest_runs"] if r["vmcb_input"] == "mapped"]
+        tagged = [r for r in report["guest_runs"] if r["vmcb_input"] == "tagged"]
+        report["mapped_guest_runs_completed"] = sum(r["completed"] for r in mapped)
+        report["tagged_guest_runs_completed"] = sum(r["completed"] for r in tagged)
+        report["tagged_addr32_gp_observed"] = sum(r.get("tagged_addr32_gp", False) for r in tagged)
+        # Compare each generated profile to the original on the same CPU.
+        comparisons = {}
+        for level in ("O0", "O2"):
+            peers = [r for r in tagged if r["optimization"] == level]
+            outcomes = {"completed" if r["completed"] else "#GP(0)" if
+                        r.get("tagged_addr32_gp") else "unexpected" for r in peers}
+            comparisons[level] = (outcomes.pop() if len(outcomes) == 1 and
+                                  {r["route"] for r in peers} == {"original", "high", "llvm"}
+                                  else "disagreement")
+        report["tagged_addr32_comparison"] = comparisons
+        complete = (len(mapped) == 6 and all(r["completed"] for r in mapped) and
+                    all(outcome in ("completed", "#GP(0)") for outcome in comparisons.values()))
+        report["status"] = "passed" if complete else "failed"
         report["completed_contexts"] = sum(r["completed_contexts"] for r in report["guest_runs"])
     result = json.dumps(report, indent=2)
     opts.report.write_text(result + "\n")

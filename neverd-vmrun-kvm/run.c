@@ -12,7 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-enum { RamBytes = 32 * 1024 * 1024, CpuidEntries = 512 };
+enum { RamBytes = 32 * 1024 * 1024, CpuidEntries = 512, FaultIDT = 0x20000,
+       GPHandler = 0x21000 };
 
 static void fail(const char *message) {
   perror(message);
@@ -118,6 +119,14 @@ int main(int argc, char **argv) {
     fail("map vCPU");
   struct kvm_sregs s;
   KVM(cpu, KVM_GET_SREGS, &s);
+  // The fixture owns no IDT. Observe long-mode #GP in the reserved test RAM.
+  // The processor, including its saved exception frame, owns this transition.
+  const uint64_t gate = GPHandler % 65536 | (8ULL << 16) | (0x8eULL << 40) |
+                        ((uint64_t)(GPHandler >> 16) << 48);
+  memcpy(ram + FaultIDT + 13 * 16, &gate, sizeof(gate));
+  memcpy(ram + GPHandler, "\xe6\xe8\xf4", 3);
+  s.idt.base = FaultIDT;
+  s.idt.limit = 256 * 16 - 1;
   s.cr0 = 0x31;
   s.cs = (struct kvm_segment){.limit = UINT32_MAX, .selector = 8, .type = 11,
                               .present = 1, .db = 1, .s = 1, .g = 1};
@@ -155,6 +164,24 @@ int main(int argc, char **argv) {
       fwrite(bytes, 1, run->io.count, stdout);
       fflush(stdout);
       continue;
+    }
+    if (run->io.port == 0xe8 && run->io.size == 1 && run->io.count == 1) {
+      struct kvm_regs fault;
+      KVM(cpu, KVM_GET_REGS, &fault);
+      if ((fault.rip != GPHandler && fault.rip != GPHandler + 2) ||
+          fault.rsp > RamBytes - 16)
+        break;
+      uint64_t error, pc;
+      memcpy(&error, ram + fault.rsp, sizeof(error));
+      memcpy(&pc, ram + fault.rsp + 8, sizeof(pc));
+      if (pc > RamBytes - 4)
+        break;
+      fprintf(stderr,
+              "{\"event\":\"exception\",\"vector\":13,\"pc\":\"%#llx\","
+              "\"error\":\"%#llx\",\"rax\":\"%#llx\",\"bytes\":\"%02x%02x%02x%02x\"}\n",
+              (unsigned long long)pc, (unsigned long long)error, fault.rax,
+              ram[pc], ram[pc + 1], ram[pc + 2], ram[pc + 3]);
+      return 1;
     }
     if (run->io.port == 0xf4 && run->io.size == 4 && run->io.count == 1) {
       uint32_t value;
