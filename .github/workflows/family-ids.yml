@@ -1,7 +1,7 @@
-name: Repeat PE32 detail and RISC-V scan on byte-identical libraries and four runners
+name: Profile mode-dependent x86 register writes and repeat PE32 on four runners
 on:
   push:
-    branches: [codex/capstone-pe32-register-details]
+    branches: [codex/capstone-projected-legacy-writes]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,9 +28,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 958b98cbbeb217ab3e8babe1de7175546ec82748
+          ref: 0fbbaa9ca1ab4eb9c390d08ff26a42384d052e82
           path: source
           persist-credentials: false
+      - if: matrix.flavor == 'first'
+        run: command -v valgrind || (sudo apt-get -qq update && sudo apt-get -qq install -y valgrind)
       - run: python3 -B family-ids/native.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
@@ -38,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: pe32-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: write-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

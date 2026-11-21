@@ -9,17 +9,18 @@ def cmd(n,a,cwd=None):
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 meta=load(d/'revisions.json');ref=load(d/'reference.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['first']['parent']==meta['mode']['parent']
+t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['projected']['parent']==meta['mode']['parent']
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
     imgs={};ids={}
-    for k in ('base','first','mode'):
+    for k in ('base','mode','projected'):
         if k!='base':
-            if k=='mode':g('restore','--source',orig,'--staged','--worktree','--','.')
+            if k=='projected':g('restore','--source',orig,'--staged','--worktree','--','.')
             assert sha(d/(k+'.patch'))==meta[k]['sha256'];g('apply','--index',str(d/(k+'.patch')));assert g('write-tree')==meta[k]['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        ids[k]=sha(so);assert ids[k]==ref[osrel][k],(k,ids[k],ref[osrel])
+        ids[k]=sha(so)
+        if k!='projected':assert ids[k]==ref[osrel][k],(k,ids[k],ref[osrel])
         imgs[k]=so.read_bytes()
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
@@ -41,10 +42,22 @@ try:
                 order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
                 for k in order+order[::-1]:
                     v=invoke(k,arch,mode,path,ip,n)
-                    expect=one[2]-(ref['pe32-score'] if name=='putty32'and mode==3 and k in ('first','mode') else 0)
+                    expect=one[2]-(ref['pe32-score'] if name=='putty32'and mode==3 and k in ('mode','projected') else 0)
                     assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
                 rows_.append(cyc)
             rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
+    if os.environ['FLAVOR']=='first':
+        stats={}
+        for k in ('base','mode','projected'):
+            target.write_bytes(imgs[k]);f=t/'callgrind.out'
+            args=['valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(f),t/'time','32','2',t/'putty-0.85-32.text',str(0x401000),'1']
+            cmd('profile-'+k,args)
+            docs=f.read_text(errors='replace').splitlines();events=next(x for x in docs if x.startswith('events:')).split()[1:];totals=next(x for x in docs if x.startswith('totals:')).split()[1:]
+            assert len(totals)==len(events) and 'Ir' in events
+            stats[k]=dict(zip(events,map(int,totals)))
+            cmd('functions-'+k,['callgrind_annotate','--show=Ir,Bc,Bcm,D1mr,D1mw','--auto=no','--threshold=99.95',f])
+            f.unlink()
+        save('profile',stats)
     save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
 finally:
     count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
