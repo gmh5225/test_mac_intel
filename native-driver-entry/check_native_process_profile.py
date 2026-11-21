@@ -98,7 +98,8 @@ def main():
     machine, = struct.unpack_from("<H", data, nt + 4)
     assert machine == 0xaa64
     report = dict(revision=os.environ["NEVERD_REV"], machine=machine,
-                  engine_sha256=digest(args.engine), provider_abis=counts,
+                  engine_sha256=digest(args.engine.with_name("neverd.dll")),
+                  cli_sha256=digest(args.engine), provider_abis=counts,
                   system_provider_abis=system_providers,
                   system_runtime=execute_system_calls(system_calls / "arm64"),
                   system_linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}

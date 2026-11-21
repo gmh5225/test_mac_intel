@@ -87,7 +87,8 @@ STDAPI DllUnregisterServer(void) { return (HRESULT)UNREGISTER_RESULT; }
                                          machine=machine, image_sha256=sha256(image),
                                          source_sha256=hashes.get(name, sha256(source))))
     args.report.write_text(json.dumps(dict(revision=os.environ["NEVERD_REV"],
-                                           engine_sha256=sha256(args.neverd), rows=observations), indent=2))
+                                           engine_sha256=sha256(args.neverd.with_name("neverd.dll")),
+                  cli_sha256=sha256(args.neverd), rows=observations), indent=2))
     print(f"{len(observations)} native callback observations matched the SDK")
 
 

@@ -139,7 +139,8 @@ def run(args):
             records.append(dict(route=route, image_sha256=digest(image), source_sha256=digest(source),
                                 **observed))
     args.report.write_text(json.dumps(dict(machine=0xaa64, revision=os.environ["NEVERD_REV"],
-                                           engine_sha256=digest(args.engine), rows=records), indent=2)+"\n")
+                                           engine_sha256=digest(args.engine.with_name("neverd.dll")),
+                  cli_sha256=digest(args.engine), rows=records), indent=2)+"\n")
     print("18 native Windows loader notifications matched their original DLL")
 
 

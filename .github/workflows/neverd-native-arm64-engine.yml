@@ -72,7 +72,9 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $bundle = "$env:RUNNER_TEMP/neverd-provider-tools"
           New-Item -Type Directory $bundle
-          Copy-Item "$env:RUNNER_TEMP/nb/bin/neverd.exe","$env:RUNNER_TEMP/nb/bin/neverd.dll" -Destination $bundle
+          Copy-Item "$env:RUNNER_TEMP/nb/bin/neverd.exe" -Destination $bundle
+          Get-ChildItem -File "$env:RUNNER_TEMP/nb/bin/*.dll" | Copy-Item -Destination $bundle
+          if (!(Test-Path "$bundle/neverd.dll")) { throw 'Native SDK engine DLL was not staged' }
           $deps = (dumpbin /nologo /dependents "$bundle/neverd.exe") -join "`n"
           if ($deps -notmatch '(?im)^\s*neverd\.dll\s*$') { throw 'Unexpected native CLI dependency list' }
           Push-Location $bundle
@@ -81,7 +83,7 @@ jobs:
         uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
           path: ${{ runner.temp }}/neverd-provider-tools
-          key: neverd-arm64-provider-tools-${{ env.NEVERD_REV }}-v2
+          key: neverd-arm64-provider-tools-${{ env.NEVERD_REV }}-v3
       - name: Check the physical target, driver ABI and both decompiler outputs
         shell: pwsh
         run: |
@@ -129,7 +131,7 @@ jobs:
           clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 "$fixtures/compare.c" shim.obj high.obj llvm.obj /Fe:check.exe
           & "$root/check.exe" | Set-Content $observations
           if ((Get-Content $observations | ConvertFrom-Json).observations.Count -ne 15) { throw 'Incomplete native entry replay' }
-          [ordered]@{revision=$env:NEVERD_REV; machine=$machine; engine_sha256=(Get-FileHash $exe).Hash.ToLower(); driver_sha256=$imageHash; pdb_sha256=(Get-FileHash "$root/null.pdb").Hash.ToLower(); routes=$rows} | ConvertTo-Json -Depth 6 | Set-Content $proof
+          [ordered]@{revision=$env:NEVERD_REV; machine=$machine; engine_sha256=(Get-FileHash "$env:RUNNER_TEMP/nb/bin/neverd.dll").Hash.ToLower(); cli_sha256=(Get-FileHash $exe).Hash.ToLower(); driver_sha256=$imageHash; pdb_sha256=(Get-FileHash "$root/null.pdb").Hash.ToLower(); routes=$rows} | ConvertTo-Json -Depth 6 | Set-Content $proof
       - name: Compile the exported storage, USB power and tracing driver callbacks
         shell: pwsh
         run: |
@@ -202,7 +204,8 @@ jobs:
           $exe = "$nb/bin/neverd.exe"
           $types = "$env:RUNNER_TEMP/sdk-types"
           $cache = "$env:RUNNER_TEMP/sdk-packages"
-          $bootstrap = (Get-FileHash $exe).Hash
+          $core = "$nb/bin/neverd.dll"
+          $bootstrap = (Get-FileHash $core).Hash
           $readobj = Get-Command llvm-readobj -ErrorAction SilentlyContinue
           $probe = Get-ChildItem "$env:WindowsSdkDir/Lib/*/um/arm64/psapi.lib" | Sort-Object FullName | Select-Object -Last 1
           if (!$probe) { throw 'Native SDK PSAPI import library missing' }
@@ -225,7 +228,7 @@ jobs:
           }
           cmake -S source -B $nb "-DNEVERD_WINDOWS_TYPES_DIRECTORY=$types/arm64"
           python source/scripts/build.py $nb --target neverd --parallel 4
-          if ((Get-FileHash $exe).Hash -eq $bootstrap) { throw 'The native engine did not embed the official libraries' }
+          if ((Get-FileHash $core).Hash -eq $bootstrap) { throw 'The native engine did not embed the official libraries' }
           python native-driver-entry/check_native_process_profile.py --source source --types $types --cache $cache --engine $exe --output "$env:RUNNER_TEMP/sdk-qual" --report native-sdk-profile.json
       - name: Report SDK tool diagnostics on failure
         if: failure()
