@@ -166,6 +166,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert {Path(k).name for k in new_files}=={'X86Vex32Output.c.o'}
+    before=base_objects
+    write(label+'-retained-objects',dict(changed=changed,prior=len(before),additional=new_files))
     assert all('/arch/X86/' in '/'+k for k in changed),changed
     sym=(out/('timed-symbols-'+label+'.log')).read_text()
     assert any(line.endswith(' X86_disasmIter32') for line in sym.splitlines())
