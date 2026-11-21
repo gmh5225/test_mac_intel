@@ -14,11 +14,11 @@ def build(tree,b,out,base,driver,run):
             s=s.replace(tag,'++profile_stages[4];\n\t\t\t'+tag)
         if file=='X86VexScan.c':
             tag='return ((plan >> 3) << 8) | end;';assert s.count(tag)==1
-            s=s.replace(tag,'++profile_stages[6];\\n\\t'+tag)
+            s=s.replace(tag,'++profile_stages[6];\n\t'+tag)
         if file=='X86OutputIterator.c':
-            tag='if (X86_trySimpleOutput(handle, code, size, insn, insn_size))\\n\\t\\treturn true;'
+            tag='if (X86_trySimpleOutput(handle, code, size, insn, insn_size))\n\t\treturn true;'
             assert s.count(tag)==1
-            s=s.replace(tag,'if (X86_trySimpleOutput(handle, code, size, insn, insn_size)) {\\n\\t\\t++profile_stages[7];\\n\\t\\treturn true;\\n\\t}\\n\\t++profile_stages[8];')
+            s=s.replace(tag,'if (X86_trySimpleOutput(handle, code, size, insn, insn_size)) {\n\t\t++profile_stages[7];\n\t\treturn true;\n\t}\n\t++profile_stages[8];')
         f.write_text(s)
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-observed')
     run(['clang++','-O2','-std=c++17','-I',tree/'include',driver,b/'libcapstone.a','-lm','-o',out],'link-observer')

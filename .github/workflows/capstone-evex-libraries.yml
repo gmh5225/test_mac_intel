@@ -1,7 +1,7 @@
 name: Attribute i386 JPEG and remaining PE and 64-bit SIMD output costs against forked iced
 on:
   push:
-    branches: [codex/capstone-vex32-work-attribution]
+    branches: [codex/capstone-vex32-stage-counters]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-simd-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-stage-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
