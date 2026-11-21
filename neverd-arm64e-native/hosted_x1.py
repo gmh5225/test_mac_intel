@@ -25,7 +25,7 @@ def summarize(policy, report, revision, exit_code, hardware):
     status = report["status"]
     passed = status == policy["passed"]
     if (
-        status not in (policy["passed"], policy["unavailable"])
+        status not in (policy["passed"], policy["unavailable"], policy["failed"])
         or policy["exit_codes"][status] != exit_code
         or report["source_revision"] != revision
         or report[policy["x1_qualification"]["qualified_key"]] is not passed
@@ -55,6 +55,8 @@ def measure(source, output):
     )
     with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as out:
         print(summary, file=out)
+    if report["status"] == policy["failed"]:
+        raise SystemExit(result.returncode)
 
 
 if __name__ == "__main__":
