@@ -1,7 +1,7 @@
-name: Compare the amd64 memory immediate writer against iced on native PE and ELF code
+name: Measure per-mode indirect memory branches against iced on native PE and ELF code
 on:
   push:
-    branches: [codex/capstone-amd64-memory-immediate-output]
+    branches: [codex/capstone-per-mode-near-indirect-branches]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: amd64-imm-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: indirect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
