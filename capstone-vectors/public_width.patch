@@ -1,0 +1,80 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d04037ba..956d7a4c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1044,8 +1044,19 @@ target_include_directories(capstone PUBLIC
+ )
+ set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+-# The i386 iterator is an internal static-link entry used by NeverD.
+-if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
++# Multiarch user-space iterators select the width-specific text path at entry.
++if(CAPSTONE_X86_SUPPORT AND NOT capstone_enabled_architectures STREQUAL "X86"
++   AND CAPSTONE_USE_DEFAULT_ALLOC AND NOT CAPSTONE_BUILD_DIET
++   AND NOT CAPSTONE_X86_REDUCE AND NOT CAPSTONE_OSXKERNEL_SUPPORT)
++    set(capstone_width_iterators ON)
++    set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY
++        COMPILE_DEFINITIONS CAPSTONE_X86_WIDTH_ITERATORS)
++    target_sources(capstone PRIVATE arch/X86/X86Vex32Output.c arch/X86/X86Sse64Output.c)
++    if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
++        set_property(SOURCE arch/X86/X86Sse64Output.c APPEND PROPERTY
++            COMPILE_DEFINITIONS CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
++    endif()
++elseif(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+     target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+diff --git a/Makefile b/Makefile
+index 3d17212d..d5ec3f49 100644
+--- a/Makefile
++++ b/Makefile
+@@ -436,6 +436,16 @@ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $
+ LIBOBJ += $(LIBOBJ_X86_NUMBERS)
+ LIBOBJ_SHARED := $(LIBOBJ)
+ LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT)
++ifneq (,$(LIBOBJ_X86_STATIC_OUTPUT))
++ifneq (,$(filter-out x86,$(CAPSTONE_ARCHS)))
++ifeq ($(CAPSTONE_USE_SYS_DYN_MEM),yes)
++ifeq (,$(filter yes,$(CAPSTONE_DIET) $(CAPSTONE_X86_REDUCE) $(CAPSTONE_HAS_OSXKERNEL)))
++$(OBJDIR)/arch/X86/X86DisassemblerDecoder.o: CFLAGS += -DCAPSTONE_X86_WIDTH_ITERATORS
++LIBOBJ_SHARED += $(LIBOBJ_X86_STATIC_OUTPUT)
++endif
++endif
++endif
++endif
+ 
+ 
+ ifeq ($(PKG_EXTRA),)
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..1db4347f 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3792,6 +3792,15 @@ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+ {
++#if defined(CAPSTONE_X86_WIDTH_ITERATORS) && !defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (*size && handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
++		if (handle->mode == CS_MODE_64)
++			return X86_disasmIterText(ud, code, size, address, insn);
++		if (handle->mode == CS_MODE_32)
++			return X86_disasmIter32(ud, code, size, address, insn);
++	}
++#endif
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 7738367c..cf80f27a 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -208,7 +208,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
+     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
+ endforeach()
+ 
+-if(TARGET x86_simple_output)
++if(TARGET x86_simple_output AND TARGET capstone_x86_iter32)
+     target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+ endif()
+ 

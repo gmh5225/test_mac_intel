@@ -1,7 +1,7 @@
-name: Compare combined i386 and RISC-V next with both iced formatters on the concurrent MIPS change
+name: Measure direct width-specific public iterator dispatch in static and ordinary links
 on:
   push:
-    branches: [codex/capstone-current-next-iced]
+    branches: [codex/capstone-public-width-iterators]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: next-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
