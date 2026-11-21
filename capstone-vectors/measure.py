@@ -19,8 +19,6 @@ def module(path):
 def main(w):
     reference=json.loads((r/'experiment.json').read_text())['baseline_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
-    assert sha(r/'i386.patch')==json.loads((r/'experiment.json').read_text())['i386_patch_sha256']
-    run(['git','-C',base,'apply','--index',r/'i386.patch'],'baseline-i386')
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
     run(['git','init','--bare',w/'iced-git'],'iced-repo');run(['git','-C',w/'iced-git','fetch','--depth','1','https://github.com/NeverSight/iced.git',iced],'iced-fetch');run(['git','-C',w/'iced-git','archive','--format=tar','-o',tar,iced,'src/rust/iced-x86'],'iced-archive');run(['tar','-xf',tar,'-C',checkout],'iced-extract');tar.unlink()
@@ -55,20 +53,18 @@ def main(w):
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
-    profile+=['-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'];b=w/'build';exe={}
+    profile += ['-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'];b=w/'build';exe={}
     run(['cmake','-S',base,'-B',b,*profile],'configure')
     obj=w/'driver.o'
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
     for label,tree in data['trees'].items():
-        if label=='qualified':
-            assert sha(r/'qualified.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'qualified.patch'],'apply')
-            run(['cmake','-S',base,'-B',b,*profile,'-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON'],'configure-qualified')
+        if label=='extend32':
+            assert sha(r/'extend32.patch')==data['patch_sha256']
+            run(['git','-C',base,'apply','--index',r/'extend32.patch'],'apply')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
-        cmds=json.loads((b/'compile_commands.json').read_text())
-        flags={f:sorted({Path(x['file']).name for x in cmds if '-D'+f in x['command'].split() or '-D'+f+'=1' in x['command'].split()}) for f in ('CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS','CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
-        assert flags=={'CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS':['MipsMapping.c'],'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':['MipsInstPrinter.c'] if label=='qualified' else [],'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':['X86Sse64Output.c'] if label=='qualified' else []},flags
+        flags={f:sorted({Path(v['file']).name for v in json.loads((b/'compile_commands.json').read_text())if '-D'+f in v['command'].split() or '-D'+f+'=1' in v['command'].split()}) for f in ('CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS','CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
+        assert flags=={'CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS':['MipsMapping.c'],'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':['MipsInstPrinter.c'],'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':['X86Sse64Output.c']}
         save('flags-'+label+'.json',flags)
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
@@ -80,16 +76,17 @@ def main(w):
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
             assert (('X86_disasmIter32' in symbols),('X86_disasmIterText' in symbols))==(selected,selected)
         members={name:hashlib.sha256(sp.check_output(['ar','p',libs[0],name])).hexdigest()for name in sp.check_output(['ar','t',libs[0]],text=True).splitlines()}
+        save('members-'+label+'.json',members)
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Sse64Output.c.o','MipsInstPrinter.c.o'},changed
-            # The ordinary static link includes the changed MIPS printer.
+            assert prior.keys()==members.keys() and changed=={'X86Vex32Output.c.o'},changed
+            assert sha(ordinary)==sha(w/'unselected-baseline')
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
-    exe['private_base']=exe['baseline'];exe['private_qualified']=exe['qualified']
+    exe['private_base']=exe['baseline'];exe['private_extend32']=exe['extend32']
     exe['iced']=exe['fast']=exe['baseline']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['baseline']==payloads['aa']
@@ -114,7 +111,7 @@ def main(w):
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','qualified')]
+        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','extend32')]
         assert audit[0]==audit[1]
         trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
         views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
@@ -143,7 +140,7 @@ def main(w):
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
             probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','qualified','iced']+(['fast','private_base','private_qualified'] if mode else [])
+            cycles={launch:[]for launch in launches};labels=['baseline','aa','extend32','iced']+(['fast','private_base','private_extend32'] if mode else [])
             stable={}
             for i in range(data['cycles']):
                 launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
@@ -156,14 +153,14 @@ def main(w):
                         root='baseline' if k=='aa' else k
                         if root not in stable:stable[root]=v[2:]
                         assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['qualified']
-                    if mode:assert stable['private_base']==stable['private_qualified']==stable['qualified'],(name,mode,stable)
+                    assert stable['baseline']==stable['extend32']
+                    if mode:assert stable['private_base']==stable['private_extend32']==stable['extend32'],(name,mode,stable)
                     cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
             for launch,observations in cycles.items():
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                 row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','qualified')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','qualified')} if mode else None
+                row['vs_iced']={k:md('iced',k) for k in ('baseline','extend32')}
+                row['vs_fast']={k:md('fast',k) for k in ('baseline','extend32')} if mode else None
                 reported.append(row)
             save('measurements.json',reported)
         print(name,panel,len(sel),flush=True)
