@@ -1,0 +1,17 @@
+diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
+index 84e22867..f9c3625f 100644
+--- a/arch/Mips/MipsInstPrinter.c
++++ b/arch/Mips/MipsInstPrinter.c
+@@ -151,9 +151,11 @@ static void patch_cs_printer(MCInst *MI, SStream *O)
+ {
+ 	// replace '# 16 bit inst' to empty.
+ 	SStream_replc(O, '#', 0);
+-	SStream_trimls(O);
+ 
++	/* Alias lookup skips leading whitespace, and fill_insn trims the stream
++	 * before the post-printer. Keep the original ordering when editing '$'. */
+ 	if (MI->csh->syntax & CS_OPT_SYNTAX_NO_DOLLAR) {
++		SStream_trimls(O);
+ 		char *dollar = strchr(O->buffer, '$');
+ 		if (!dollar) {
+ 			return;

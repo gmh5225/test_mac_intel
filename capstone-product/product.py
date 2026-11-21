@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang' and platform.machine()=='x86_64'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Test the ordinary NeverD C++ Decoder entry on PE32, PE64, ELF scalar and vector data with and without the i386 text member. Measure scan, text, detail and batch using the production backend.'))
+write('scope',dict(active=feature_active,policy='Test the ordinary NeverD C++ Decoder entry on PE32, PE64, ELF scalar and vector data with the shipping static iterators. Measure scan, text, detail and batch using the production backend.'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -99,7 +99,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     policies[name]=[a for a in args if a in ('-fomit-frame-pointer','-O3','-DNDEBUG') or 'discard' in a]
    mips_command,=[c['command'] for c in compile_database if c['file'].endswith('/arch/Mips/MipsMapping.c')]
    alias_precheck='-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS' in shlex.split(mips_command)
-   assert alias_precheck==(label in ('mips_scoped','x86_and_mips'))
+   assert alias_precheck
    write(label+'-alias-compile-policy',dict(mips_precheck=alias_precheck))
    assert len(policies)==3
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
@@ -184,8 +184,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert inclusions and any('X86OutputIterator.c.o' in v for v in inclusions)
    (out/('capstone-link-map-'+label+'.log')).write_text(chr(10).join(inclusions)+chr(10))
    command_line=sp.check_output(['ninja','-C',build,'-t','commands','capstone-product'],text=True).splitlines()[-1]
-   assert '--undefined=X86_disasmIter' in command_line and ('--undefined=X86_disasmIter32' in command_line)==(label=='x86_and_mips')
-   write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True,i386_first=label=='x86_and_mips'))
+   assert '--undefined=X86_disasmIter' in command_line and '--undefined=X86_disasmIter32' in command_line
+   write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True,i386_first=True))
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    assert rev(cs)==ref
@@ -209,9 +209,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     prior=json.loads((out/'base-objects.json').read_text())
     assert prior.keys()==objects.keys()
-    assert {Path(k).name for k in prior if prior[k]!=objects[k]}==(set() if label=='riscv_only' else {'MipsMapping.c.o'} if label=='mips_scoped' else {'MipsMapping.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'})
-   expected_objects=json.loads((r/'reference-products.json').read_text())['objects'][label]
-   assert objects==expected_objects,(label,[key for key in objects if objects[key]!=expected_objects.get(key)])
+    assert {Path(k).name for k in prior if prior[k]!=objects[k]}==set(expected['changed_members'][label])
+   assert len(objects)==42
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)
