@@ -16,7 +16,12 @@ def measure_layout(r,t,build,nd,cs,out,cases,expected,command,write,rev,llvm_ide
    for section,flags,size in [('.cs_x86_i386_text','ax',tx),('.cs_x86_i386_rodata','a',ro)]:
     if size:lines.extend(['.section '+section+',"'+flags+'",@progbits','.zero '+str(size)])
    lines.append('.section .note.GNU-stack,"",@progbits');f.write_text('\n'.join(lines)+'\n')
-   command(['clang','-c',f,'-o',o],name+'-assemble');cmd.append(str(o))
+   command(['clang','-c',f,'-o',o],name+'-assemble')
+   # Clang emits an empty, four-byte aligned .text for an assembly input.
+   # It changed the end of the ordinary text by a byte in the first control.
+   command(['objcopy','--remove-section=.text','--remove-section=.data','--remove-section=.bss',o],name+'-remove-empty-inputs')
+   inventory=sp.check_output(['readelf','-SW',o],text=True)
+   assert not any(re.search(r'\]\s+\.(text|data|bss)\s',line)for line in inventory.splitlines());cmd.append(str(o))
   command(cmd,name+'-relink',build);products[name]=target
   if name=='base':assert digest(target.read_bytes())==digest(original.read_bytes())
   sections=sp.check_output(['readelf','-SW',target],text=True);symbols=sp.check_output(['nm','-S',target],text=True)

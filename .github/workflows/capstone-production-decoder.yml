@@ -1,7 +1,7 @@
-name: Measure unchanged MIPS machine code with controlled private x86 text and read-only extents
+name: Re-link private sections without an empty input .text changing ordinary text alignment
 on:
   push:
-    branches: [codex/neverd-production-mips-layout-factors]
+    branches: [codex/neverd-mips-layout-only-private-sections]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: layout-factors-${{ matrix.os }}-${{ matrix.cc }}
+          name: private-padding-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
