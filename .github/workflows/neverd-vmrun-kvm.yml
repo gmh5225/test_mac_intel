@@ -35,7 +35,7 @@ jobs:
         if: steps.discovery.outputs.available == 'true'
         run: |
           cc -std=c11 -D_DEFAULT_SOURCE -O2 -Wall -Wextra -Werror neverd-vmrun-kvm/run.c -o "$RUNNER_TEMP/neverd-vmrun-kvm"
-          sudo -u "$(id -un)" -g "$(stat -c %G /dev/kvm)" -- python3 neverd-vmrun-kvm/check.py \
+          python3 neverd-vmrun-kvm/check.py \
             --guests neverd-vmrun-kvm/fixtures --runner "$RUNNER_TEMP/neverd-vmrun-kvm" --report evidence/kvm-svm.json
       - name: Retain KVM capability and original execution evidence
         if: always()
