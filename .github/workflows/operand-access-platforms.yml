@@ -1,0 +1,34 @@
+name: Check direct operand descriptors on MSVC and GNU Make
+on:
+  push:
+    branches: [codex/capstone-access-msvc-and-make]
+    paths: [family-ids/**, .github/workflows/operand-access-platforms.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-24.04]
+        arch: [x64, Win32]
+        flavor: [full, reduce, diet]
+        exclude:
+          - {os: ubuntu-24.04, arch: Win32}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      TARGET: ${{ matrix.arch }}
+      FLAVOR: ${{ matrix.flavor }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {sparse-checkout: family-ids, persist-credentials: false}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {repository: NeverSight/capstone, path: source, ref: 6fe0fa8c14c6dbae1510a70b3a0ba77514131bf7, persist-credentials: false}
+      - run: python family-ids/check.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: access-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.flavor }}
+          path: evidence/
+          retention-days: 14
