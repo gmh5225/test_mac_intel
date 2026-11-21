@@ -10,9 +10,11 @@
 #include <string>
 #include <vector>
 
-static unsigned family(const uint8_t *data, size_t size) {
+static unsigned family(const uint8_t *data, size_t size, bool long_mode) {
     while(size && (*data==0x26 || *data==0x2e || *data==0x36 || *data==0x3e ||
                   *data==0x64 || *data==0x65 || *data==0x67)) {++data; --size;}
+    // In legacy modes these escapes share opcodes with LES, LDS and BOUND.
+    if (size < 2 || (!long_mode && (data[1] & 0xc0) != 0xc0)) return 0;
     if(size<7 || data[0]!=0x62 || (data[1]&0xf)!=3 || (data[2]&7)!=5) return 0;
     bool wide=data[2]&128;
     switch(data[4]) {
@@ -23,9 +25,11 @@ static unsigned family(const uint8_t *data, size_t size) {
     }
     return 0;
 }
-unsigned floating(const uint8_t *data,size_t size) {
+static unsigned floating(const uint8_t *data,size_t size, bool long_mode) {
     while(size && (*data==0x26 || *data==0x2e || *data==0x36 || *data==0x3e ||
                    *data==0x64 || *data==0x65 || *data==0x67)) {++data; --size;}
+    // In legacy modes these escapes share opcodes with LES, LDS and BOUND.
+    if (size < 2 || (!long_mode && (data[1] & 0xc0) != 0xc0)) return 0;
     unsigned pp;
     if(size>=5 && data[0]==0xc5 && data[2]==0xc2) pp=data[1]&3;
     else if(size>=6 && data[0]==0xc4 && (data[1]&31)==1 && data[3]==0xc2) pp=data[2]&3;
@@ -34,10 +38,10 @@ unsigned floating(const uint8_t *data,size_t size) {
     static constexpr unsigned ids[]={X86_INS_VCMPPS,X86_INS_VCMPPD,X86_INS_VCMPSS,X86_INS_VCMPSD};
     return ids[pp];
 }
-static unsigned canonical(unsigned id, const uint8_t *code, size_t size) {
-  if(auto fp=floating(code,size)) return fp;
+static unsigned canonical(unsigned id, const uint8_t *code, size_t size, bool long_mode) {
+  if(auto fp=floating(code,size,long_mode)) return fp;
   if (id != X86_INS_VPCMP) return id;
-  const unsigned result = family(code,size);
+  const unsigned result = family(code,size,long_mode);
   if (!result) std::abort();
   return result;
 }
@@ -93,7 +97,7 @@ int main(int argc, char **argv) {
           if (!length || length > left || !(instructions[i] >> 8)) return 4;
           ++accepted;
           boundary = (boundary ^ ((off << 5) | length)) * 1099511628211ull;
-          value += canonical(instructions[i] >> 8, bytes.data() + off, length);
+          value += canonical(instructions[i] >> 8, bytes.data() + off, length, target == "64");
           off += length;
           left -= length;
         }
@@ -111,7 +115,7 @@ int main(int argc, char **argv) {
       if (size_t(count) > left || !insn.Raw) return 4;
       ++accepted;
       boundary = (boundary ^ ((off << 5) | unsigned(count))) * 1099511628211ull;
-      value += (arm || a32 || mips) ? insn.Id : canonical(insn.Id, code, count);
+      value += (arm || a32 || mips) ? insn.Id : canonical(insn.Id, code, count, target == "64");
       if (mode == 1 || mode == 2) {
         value += std::strlen(insn.Raw->mnemonic) + std::strlen(insn.Raw->op_str);
       }
