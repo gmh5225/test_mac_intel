@@ -3,13 +3,14 @@
 import argparse
 import hashlib
 import json
+import mmap
 import os
 from pathlib import Path
 import re
 import struct
 import subprocess
 
-FIELDS = {"ObservedModule": 8, "ObservedReason": 4, "ObservedReserved": 8}
+FIELDS = {"ObservedModule": 8, "ObservedReason": 4, "ObservedReserved": 8, "ObservedDetachRecord": 8}
 TARGET = "aarch64-pc-windows-msvc"
 
 
@@ -58,10 +59,10 @@ def storage(root, source, base, exports, compile_asm):
     # Link the recovered translation unit to its declared original PE data.
     # The observers use data-export RVAs independently read from the input.
     backing = re.search(r"/\* neverd\.image: (0x[0-9a-fA-F]+) \(original loaded image storage\) \*/\s*"
-                        r"_Alignas\((\d+)\) extern uint8_t (\w+)\[(\d+)\];", source)
+                        r"(?:_Alignas\((\d+)\)\s+)?extern uint8_t (\w+)\[(\d+)\];", source)
     if backing:
         anchor, alignment, name, total = backing.groups()
-        anchor, alignment, total = int(anchor, 16), int(alignment), int(total)
+        anchor, alignment, total = int(anchor, 16), int(alignment or 1), int(total)
         asm = [".bss", f".balign {alignment}", f".globl {name}", f"{name}:"]
         used = 0
         for public in sorted(FIELDS, key=exports.get):
@@ -128,9 +129,22 @@ def run(args):
             args_cc = ["/DLINK_AT_STARTUP", implib] if mode == "process-start" else []
             call(["clang-cl","--target="+TARGET,"/nologo","/O1","/MD",
                   files/"observe.c", *args_cc, "/Fe:"+str(program)],cwd=directory)
-            observed = json.loads(call([program], cwd=directory, capture_output=True,text=True).stdout)
+            record = directory / (mode + "-detach.bin")
+            size = struct.calcsize("<QQQ")
+            with record.open("w+b") as stream:
+                stream.write(b"\xff" * size)
+                stream.flush()
+                with mmap.mmap(stream.fileno(), size, access=mmap.ACCESS_WRITE) as view:
+                    output = call([program, record], cwd=directory, capture_output=True, text=True)
+                    observed = json.loads(output.stdout)
+                    module, reason, reserved = struct.unpack("<QQQ", view[:])
+            if module != int(observed.pop("image_handle"), 16) or reason != 0:
+                raise ValueError(f"{route}/{mode} did not observe this module's process detach")
+            observed["reasons"].append(reason)
+            observed["reserved_nonnull"].append(bool(reserved))
             if (observed["mode"] != mode or not observed["module_handles_match"] or
-                observed["reasons"] != [1,2,3] or observed["reserved_nonnull"][0] != (mode=="process-start")):
+                observed["reasons"] != [1,2,3,0] or
+                any(observed["reserved_nonnull"][i] != (mode == "process-start") for i in (0, 3))):
                 raise ValueError(f"invalid native loader observations: {observed}")
             if route == "original":
                 control[mode] = observed
@@ -140,8 +154,8 @@ def run(args):
                                 **observed))
     args.report.write_text(json.dumps(dict(machine=0xaa64, revision=os.environ["NEVERD_REV"],
                                            engine_sha256=digest(args.engine.with_name("neverd.dll")),
-                  cli_sha256=digest(args.engine), rows=records), indent=2)+"\n")
-    print("18 native Windows loader notifications matched their original DLL")
+                                           cli_sha256=digest(args.engine), rows=records), indent=2)+"\n")
+    print("24 native Windows loader notifications matched their original DLL")
 
 
 if __name__ == "__main__":

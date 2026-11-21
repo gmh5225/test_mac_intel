@@ -1,6 +1,6 @@
-#include <windows.h>
+#include "detach_record.h"
 #include <stdio.h>
-#include <string.h>
+
 
 #ifdef LINK_AT_STARTUP
 __declspec(dllimport) extern DWORD ObservedReason;
@@ -24,7 +24,25 @@ static DWORD WINAPI observe_thread(void *context) {
     return matches(state, DLL_THREAD_ATTACH) ? 0 : 1;
 }
 
-int main(void) {
+static struct detach_record *open_record(const char *path) {
+    HANDLE file = CreateFileA(path, GENERIC_READ | GENERIC_WRITE,
+                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+        return NULL;
+    HANDLE mapping = CreateFileMappingW(file, NULL, PAGE_READWRITE, 0, 0, NULL);
+    CloseHandle(file);
+    if (!mapping)
+        return NULL;
+    struct detach_record *view = MapViewOfFile(mapping, FILE_MAP_WRITE, 0, 0,
+                                              sizeof(struct detach_record));
+    CloseHandle(mapping);
+    return view;
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2)
+        return 9;
     struct observations state = {0};
     int startup;
 #ifdef LINK_AT_STARTUP
@@ -55,13 +73,24 @@ int main(void) {
         return 15;
     if (!matches(&state, DLL_THREAD_DETACH))
         return 16;
-    printf("{\"mode\":\"%s\",\"module_handles_match\":true,\"reasons\":[1,2,3],"
+    struct detach_record *volatile *slot = (struct detach_record *volatile *)
+        GetProcAddress(state.image, "ObservedDetachRecord");
+    struct detach_record *view = open_record(argv[1]);
+    if (!slot || !view)
+        return 17;
+    *slot = view;
+    printf("{\"mode\":\"%s\",\"image_handle\":\"%p\",\"module_handles_match\":true,\"reasons\":[1,2,3],"
            "\"reserved_nonnull\":[%s,%s,%s]}\n",
-           startup ? "process-start" : "dynamic",
+           startup ? "process-start" : "dynamic", (void *)state.image,
            initial_reserved_nonnull ? "true" : "false",
            state.thread_reserved_nonnull ? "true" : "false",
            *state.reserved ? "true" : "false");
-    if (!startup && !FreeLibrary(state.image))
-        return 17;
+    if (!startup) {
+        if (!FreeLibrary(state.image))
+            return 18;
+        if (!UnmapViewOfFile(view))
+            return 19;
+    }
+    // On process exit Windows keeps the mapped view until DLL detach has run.
     return 0;
 }
