@@ -1,49 +1,47 @@
 {
-  "neverd": "ac6108fe6caa3e7bede9d8447ebd9d4d46851863",
+  "neverd": "4dbcd06b7e7140277943230ba4cd30b438a4f908",
   "capstone": "88f64f91be1b3c9de7c5819e93806fa8d79127db",
   "variants": {
-    "mips_only": {
+    "riscv_only": {
+      "commit": "17f68720b746928d0628f4ed01664d43cb2ea350",
+      "tree": "04df8d206ac08ffaefd0d3e498dd6a198e27aa45",
+      "capstone_patch": "riscv_only-capstone.patch",
+      "capstone_sha256": "5f767951e14ff581d3361072bddc4c5cbfb7c8974175d321e40aa85594147a5e",
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "commit": "04b727c382e0bd595513274f5dbee78c8744094e",
-      "tree": "82dfbf98d01fa58d24c5440b9a73225eca39aeab",
-      "neverd_tree": "86fa77230672fe4964adb661a8f97c0133f0ab7f",
+      "neverd_tree": "b20c2cb7fbbd8876520d31bd44cadc7f6da4ca22",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
         "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
-      },
-      "capstone_patch": "mips_only-capstone.patch",
-      "capstone_sha256": "f32d79a724ccb80a943f37a71d32f95f2dd75f0c8178f15cbeda702b4b489141"
+      }
     },
-    "x86_only": {
+    "mips_scoped": {
+      "commit": "e463bc86a78780611462a0edc0c0c624ab46439f",
+      "tree": "256b033460fd027a8136f9c9f0d0bacb9b2df64d",
+      "capstone_patch": "mips_scoped-capstone.patch",
+      "capstone_sha256": "fb6d2fac6d3f320fe2f9db7b2d395d966fc01d71ef16ed26ac6ead56f28349ab",
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "patch": "x86_only-neverd.patch",
+      "neverd_tree": "b20c2cb7fbbd8876520d31bd44cadc7f6da4ca22",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
+        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
+        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
+      }
+    },
+    "x86_and_mips": {
+      "commit": "caef5ea7db7632b5282d9c293f87705349d97268",
+      "tree": "5bbe00a357889ccf75d5815c1cff9af1aebe4293",
+      "capstone_patch": "x86_and_mips-capstone.patch",
+      "capstone_sha256": "21df0898b9058ca6ded6c154c3a8d2adbd81abfb7ec85670e304e586e5e9cf1a",
+      "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
+      "patch": "x86_and_mips-neverd.patch",
       "patch_sha256": "4ad3da8f85e81b5911e8fa627dd2d8a557852f5a7f0563f9f812fec48695ad28",
-      "commit": "2d76851669423838603ba389ea6d53dc0dcb64fc",
-      "tree": "02241f2cfa233fdec1b5d1be464184b6b950a179",
-      "neverd_tree": "7bd9b9d3ae1c0c9aea210c0ed1acf79a31805b82",
+      "neverd_tree": "8d41ea862dba04fef598bdb69652329a56a8fa99",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
         "lib/decode/CMakeLists.txt": "678ea2a40f4aa558bb3a39c44150501e88124fb2"
-      },
-      "capstone_patch": "x86_only-capstone.patch",
-      "capstone_sha256": "7c3bed95c44204bf4a729dcddd7d64dd1f1cb8f87221dc90b9edc255fefdaa82"
-    },
-    "combined": {
-      "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "patch": "combined-neverd.patch",
-      "patch_sha256": "4ad3da8f85e81b5911e8fa627dd2d8a557852f5a7f0563f9f812fec48695ad28",
-      "commit": "bb70dfd13bfa42bab9e0e0088d032f842ecb4fe4",
-      "tree": "8b4594a0ab086185d09dd6046d0a1bc33a582396",
-      "neverd_tree": "7bd9b9d3ae1c0c9aea210c0ed1acf79a31805b82",
-      "blobs": {
-        "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
-        "lib/decode/CMakeLists.txt": "678ea2a40f4aa558bb3a39c44150501e88124fb2"
-      },
-      "capstone_patch": "combined-capstone.patch",
-      "capstone_sha256": "269008eca30ec65b47b4f28c6bd9831ff948579793aac0fb3a7329b125579a14"
+      }
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -51,8 +49,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Independent MIPS printer alias decision, packed x86 only, and both in the full source-built product.",
-  "parent": "c8b998e12328945814324b0d0b776682d4809e3e",
+  "scope": "Verify the exact fast-forward release sequence with both production launches, the shipping source-built LLVM, and every linked archive member.",
+  "parent": "c9ba794f890bbbc52f6869726dac8c9289fa48a1",
   "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
