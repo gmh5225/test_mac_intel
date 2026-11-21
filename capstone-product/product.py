@@ -155,7 +155,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    archives=list(build.rglob('libcapstone.a'));assert len(archives)==1,archives
    members=[name for name in sp.check_output(['ar','t',archives[0]],text=True).splitlines() if name not in ('__.SYMDEF','__.SYMDEF SORTED')]
    assert len(set(members))==len(members),members
-   disk={str(f.relative_to(roots[0])):f for f in roots[0].rglob('*.o')}
+   object_roots=[roots[0],roots[0].parent/'capstone_x86_iter32.dir']
+   disk={str(f.relative_to(parent)):f for parent in object_roots for f in parent.rglob('*.o')}
+   assert sum(len(list(parent.rglob('*.o'))) for parent in object_roots)==len(disk)
    active={key:path for key,path in disk.items() if path.name in members}
    assert len(active)==len(members) and {path.name for path in active.values()}==set(members),(members,list(active))
    write(label+'-archive-members',dict(members=members,ignored_orphan_objects=sorted(set(disk)-set(active))))
@@ -168,7 +170,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert {Path(k).name for k in new_files}=={'X86Vex32Output.c.o'}
     before=base_objects
     write(label+'-retained-objects',dict(changed=changed,prior=len(before),additional=new_files))
-    assert all('/arch/X86/' in '/'+k for k in changed),changed
+    assert set(changed)<=({'arch/Mips/MipsDisassembler.c.o'} if label=='combined' else set())|{k for k in base_objects if k.startswith('arch/X86/')},changed
+    if label=='combined':assert 'arch/Mips/MipsDisassembler.c.o' in changed
+    assert members[-1]=='X86Vex32Output.c.o' and len(new_files)==1
     sym=(out/('timed-symbols-'+label+'.log')).read_text()
     assert any(line.endswith(' X86_disasmIter32') for line in sym.splitlines())
    source_receipt=build/'neverd-dependency-inputs.json'
