@@ -1,7 +1,7 @@
-name: Validate the static i386 iterator and MIPS feature tests in the real NeverD decoder
+name: Verify the qualified i386 guard and production build policy with the full NeverD decoder
 on:
   push:
-    branches: [codex/neverd-private-i386-and-mips-product]
+    branches: [codex/neverd-i386-shared-build-options]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 7fabb172e1f27074bd000d30ccbcd01ab1afd63f
+          ref: b580a542d1dff68bab15737af0d35783dfb5d3dd
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "7fabb172e1f27074bd000d30ccbcd01ab1afd63f"
+          test "$(git rev-parse HEAD)" = "b580a542d1dff68bab15737af0d35783dfb5d3dd"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "09ba26d9848f4ad0920ad0ef5feb512899fabe6c"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: static-i386-mips-integration-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-policy-integration-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

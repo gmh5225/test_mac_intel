@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   with cm.open('a') as f:f.write('\nadd_executable(capstone-product-legacy capstone-product-legacy.cpp)\ntarget_link_libraries(capstone-product-legacy PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-route capstone-route.cpp)\ntarget_link_libraries(capstone-route PRIVATE NeverDDecode)\n')
-  command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
+  command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   write('compiler',dict(c=sp.check_output([cc,'--version'],text=True).splitlines()[0],cxx=sp.check_output(['clang++','--version'],text=True).splitlines()[0],cpu=Path('/proc/cpuinfo').read_text(),host=platform.machine()))
   command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','--parallel','4'],'swift-demangle-from-source',nd)
@@ -82,12 +82,32 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     patch=r/'neverd-i386.patch'
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==info['sha256']
     command(['git','apply',patch],'apply-neverd-'+label,nd)
+    policy=r/'build-options.patch'
+    assert hashlib.sha256(policy.read_bytes()).hexdigest()==expected['build_options']['sha256']
+    command(['git','apply',policy],'policy-'+label,nd)
+   original_cmake=cm.read_text().split('\nadd_executable(capstone-product capstone-product.cpp)',1)[0]
+   policy_oid=sp.check_output(['git','hash-object','--stdin'],input=original_cmake.encode()).decode().strip()
+   assert policy_oid==expected['build_options']['base' if label=='base' else 'candidate']
+   write(label+'-build-policy',dict(blob=policy_oid))
    live=sp.check_output(['git','hash-object',path],text=True).strip()
    assert live==info['base' if label=='base' else 'candidate']
    write(label+'-decoder-source',dict(path=info['path'],blob=live))
    targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
+   import shlex
+   compile_database=json.loads((build/'compile_commands.json').read_text())
+   policies={}
+   for name in ('X86OutputIterator.c','X86Vex32Output.c'):
+    entries=[c for c in compile_database if c['file'].endswith('/arch/X86/'+name)]
+    if len(entries)==0 and label=='base' and name=='X86Vex32Output.c':continue
+    entry,=entries
+    args=shlex.split(entry['command'])
+    policies[name]=[a for a in args if a in ('-fomit-frame-pointer','-O3','-DNDEBUG') or 'discard' in a]
+   assert len(policies)==(1 if label=='base' else 2)
+   for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
+   if label!='base':assert policies['X86Vex32Output.c']==policies['X86OutputIterator.c']
+   write(label+'-compile-policy',policies)
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
    command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',str(out/('tests-'+label+'.xml')),'-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests)$'],'tests-'+label)
@@ -184,7 +204,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert source_tree==variants[label]['tree'],(label,source_tree,variants[label]['tree'])
    command(['git','reset','--hard',ref],'restore-'+label,cs)
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
-   if label!='base':command(['git','restore','--',info['path']],'restore-neverd-'+label,nd)
+   if label!='base':
+    command(['git','apply','-R',r/'build-options.patch'],'restore-policy-'+label,nd)
+    command(['git','restore','--',info['path']],'restore-neverd-'+label,nd)
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
   write('products',identities)
