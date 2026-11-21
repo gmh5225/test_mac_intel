@@ -1,7 +1,7 @@
-name: Check the AArch64 vector arrangement parser in seven builds and real PE and multiarch ELF workloads
+name: Measure generated disjoint extension skip on real RISC-V coreutils and other architecture controls
 on:
   push:
-    branches: [codex/capstone-aarch64-arrangement-profiles]
+    branches: [codex/capstone-riscv-disjoint-extensions]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 2c3d603a35ee40bc82812c223a6fde14d4add1dc
+          ref: 9e9475747756ecd8a726e3b2f7bfe7381e46a5f2
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: aarch64-forward-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: disjoint-majors-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

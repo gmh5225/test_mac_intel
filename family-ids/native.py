@@ -38,6 +38,7 @@ try:
     if conf!='full':
         assert sha(libs['base'])==sha(libs['candidate'])
         write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
+    run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
