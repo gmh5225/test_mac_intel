@@ -2,10 +2,30 @@
   "neverd": "edc64f154c2f4a900cde89649eb4336cfa258741",
   "capstone": "26ebcf8b672cbfec8536db188aa92c506c915efa",
   "variants": {
-    "compare": {
-      "tree": "beecf45267bbdc010f434665ffeb05c55c16fe60",
-      "patch": "compare.patch",
-      "patch_sha256": "9ccab1ec1d12a9e213d1e40c253c6ca5f1b32c6d7ac6538a248706dcabf9e462"
+    "inline": {
+      "tree": "c55266fcb002c69a70f9c16dac5405336c31ca20",
+      "patch": "inline.patch",
+      "patch_sha256": "25a897e747a2418baa1bb6e802d5e61517e184cc0b30585ea3ab8e3248d5399f"
+    },
+    "worker": {
+      "tree": "1c0f1b200b4d45b90920036333a8a0a0089ffd61",
+      "patch": "worker.patch",
+      "patch_sha256": "b4d406eea74cc019afdea9a04f8ed1ebf80fc08d6331f3141461f9c3377c2d7f"
+    },
+    "leaf": {
+      "tree": "05fba139441e9d6960444b3033e19073865acbf6",
+      "patch": "leaf.patch",
+      "patch_sha256": "af1cc0b74cb5b4abfb5b91a135b272082fc22dc630716912f8ffa88a76526e07"
+    },
+    "access": {
+      "tree": "d35f5cf6c6ca4e89e877f5e03354e66beee3752f",
+      "patch": "access.patch",
+      "patch_sha256": "706e9fc78bc88836a4e242f9482b152ceeebf68ee2412d2b35f3e634864c31be"
+    },
+    "mapped": {
+      "tree": "a5c712c0c4130029b0d6994676cf138327def3fe",
+      "patch": "mapped.patch",
+      "patch_sha256": "a67de8660576466bd16818973ee2fabb30e782f9189e0a8e49bc6de6b7904da4"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -13,6 +33,6 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Source-built NeverD dev and latest LLVM main, with glibc libmvec, integer and FP lift tests and cross-architecture controls.",
+  "scope": "Source-built NeverD: reproduce the inline PE32 terminal gain and PE64 loss, isolate two batch workers and independently qualify x86 table-owned detail and predicate IDs.",
   "parent": "a4b585e24f9d6ae55096c93bb92b9ccc0f8418af"
 }

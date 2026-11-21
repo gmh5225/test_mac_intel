@@ -137,7 +137,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      if label=='base':canonical_signatures[key]=norm
      assert canonical_signatures[key]==norm,(label,key,canonical_signatures[key],norm)
      delta[key]=norm[-1]-raw[-1]
-     if label!='base':assert delta[key]==0,(key,delta[key])
+     if label=='mapped':assert delta[key]==0,(key,delta[key])
+     elif label!='base':assert delta[key]==adjustments['base'][key],(label,key,delta[key],adjustments['base'][key])
    adjustments[label]=delta
    write('typed-checksums-'+label,dict(delta=delta,normalized=canonical_signatures))
    command(['nm','-S','-C',prod],'timed-symbols-'+label)
@@ -166,7 +167,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files
     actual={Path(k).name for k in changed}
-    assert {'cs.c.o','X86Mapping.c.o','X86InstPrinterCommon.c.o','X86DisassemblerDecoder.c.o'}<=actual
+    wanted={'X86Mapping.c.o'} if label=='access' else {'X86DisassemblerDecoder.c.o'}
+    if label=='mapped':wanted={'X86Mapping.c.o','X86InstPrinterCommon.c.o','X86DisassemblerDecoder.c.o'}
+    assert actual==wanted,(label,actual,wanted)
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
