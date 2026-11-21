@@ -1,7 +1,7 @@
-name: Repeat vector register correction and isolate the AMD64 writer across seven configurations
+name: Check register mapping and AMD64 output in seven Capstone configurations
 on:
   push:
-    branches: [codex/capstone-corrected-vector-profiles]
+    branches: [codex/capstone-mode-writes-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: corrected-vector-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mode-vector-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

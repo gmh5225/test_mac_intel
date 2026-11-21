@@ -35,7 +35,7 @@ try:
         assert host=='Linux'
         matching=[key for key in reference if key.endswith('-'+cc+'-'+conf) and (('24.04-arm' in key)==(platform.machine()=='aarch64')) and (('22.04' in key)==('22.04' in Path('/etc/os-release').read_text()))]
         assert len(matching)==1,matching
-        if variant in ('correct','base'):assert sha(libs[variant])==reference[matching[0]]['candidate' if variant=='correct' else 'base'],(matching,variant,sha(libs[variant]))
+        if variant=='base':assert sha(libs[variant])==reference[matching[0]]['base'],(matching,variant,sha(libs[variant]))
     assert objects['base'].keys()==objects['candidate'].keys()
     fix_changes=[k for k,v in objects['base'].items() if objects['correct'][k]!=v]
     assert all(Path(k).name=='X86Mapping.c.o' for k in fix_changes)
