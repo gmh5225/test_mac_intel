@@ -89,7 +89,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install --yes clang lld ninja-build
-          git -C NeverD submodule update --init --depth 1 third_party/capstone
+          git -C NeverD submodule update --init --depth 1 third_party/capstone third_party/unicorn
           curl --fail --location --retry 3 --output neverc.zip https://github.com/NeverSight/NeverC/releases/download/v3389.1.4/neverc-linux-x64.zip
           echo '60d17433b7a8f738e8dd34f4f0c6fc5b956b7ef51b115b8831739568f986fe64  neverc.zip' | sha256sum --check
           unzip -q neverc.zip -d neverc
