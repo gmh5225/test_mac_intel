@@ -1,7 +1,7 @@
-name: Verify opcode_gate across seven Capstone configurations
+name: Verify default MIPS images and the integrated private x86 iterators on seven configurations
 on:
   push:
-    branches: [codex/capstone-checked-opcode-gate-shared-and-static]
+    branches: [codex/capstone-default-shared-layout-static-callsite]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: checked-opcode-gate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: default-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
