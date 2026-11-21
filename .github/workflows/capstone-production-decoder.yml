@@ -1,7 +1,7 @@
-name: Verify production ARM and i386 throughput with a single iterator call target
+name: Test the exact i386 memory-immediate changes in the source-built NeverD decoder
 on:
   push:
-    branches: [codex/neverd-i386-caller-target]
+    branches: [codex/neverd-i386-memory-immediate-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-caller-integration-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-mem32-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

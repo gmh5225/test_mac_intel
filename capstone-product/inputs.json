@@ -3,14 +3,14 @@
   "capstone": "09ba26d9848f4ad0920ad0ef5feb512899fabe6c",
   "variants": {
     "iterator32": {
-      "tree": "bb192619f0d24c6a3143a4f5d4d1a19766c25340",
+      "tree": "4abbab27c845ca2752ad3279c185f92a636b2d30",
       "patch": "iterator32.patch",
-      "patch_sha256": "70fea9b47f56da4a401db7f49b3ef579d59c515f4389c1fbff30d8f62194f020"
+      "patch_sha256": "86dd1498cf4abc00f8adb9210e63ea7d9aac48cbdd680a90720f9bd5b83b7d69"
     },
-    "caller_branch": {
-      "tree": "bb192619f0d24c6a3143a4f5d4d1a19766c25340",
-      "patch": "iterator32.patch",
-      "patch_sha256": "70fea9b47f56da4a401db7f49b3ef579d59c515f4389c1fbff30d8f62194f020"
+    "immediate32": {
+      "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
+      "patch": "immediate32.patch",
+      "patch_sha256": "2435142340000dd2bd55ede226de18705a8cab585e0a4bdd2984de290810993d"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -18,8 +18,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Compare changing only the destination of the existing C++ call with selecting the 32-bit iterator in the caller. Both candidates use identical Capstone source, compilation and LLVM source inputs.",
-  "parent": "f062ec10ca4978b3a7fc433baf067d508a32f328",
+  "scope": "Source-built NeverD on the identical C++ caller. Compare static i386 output with and without ordinary memory-immediate MOV; include the GCC private-header fixes in both variants.",
+  "parent": "a64a279d908030e2c2caa867eda43a572c3433e9",
   "integration": {
     "path": "lib/decode/Decoder.cpp",
     "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
