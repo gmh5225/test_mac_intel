@@ -1,0 +1,87 @@
+name: Build and run NeverD on native Windows ARM64
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - .github/workflows/neverd-native-arm64-engine.yml
+      - native-engine-revision.txt
+permissions:
+  contents: read
+jobs:
+  native-engine:
+    runs-on: windows-11-arm
+    timeout-minutes: 240
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: native-engine-revision.txt
+          sparse-checkout-cone-mode: false
+      - name: Read the tested source revision
+        shell: pwsh
+        run: |
+          $rev = (Get-Content native-engine-revision.txt).Trim()
+          if ($rev -notmatch '^[0-9a-f]{40}$') { throw 'invalid source revision' }
+          "NEVERD_REV=$rev" >> $env:GITHUB_ENV
+          git config --global core.longpaths true
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.NEVERD_REV }}
+          path: source
+          submodules: false
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+      - name: Build the Windows ARM64 engine from source
+        shell: pwsh
+        working-directory: source
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          git -c core.longpaths=true submodule update --init --depth 1 third_party/llvm-project third_party/capstone
+          cmake -S . -B D:/nb -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_CXX_COMPILER_TARGET=aarch64-pc-windows-msvc -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_Z3=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF
+          python scripts/build.py D:/nb --target neverd NeverDLocalTypesDebugContextTests --parallel 4
+      - name: Check the physical target, driver ABI and both decompiler outputs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $exe = 'D:/nb/bin/neverd.exe'
+          $pe = [IO.File]::ReadAllBytes($exe)
+          $nt = [BitConverter]::ToInt32($pe, 60)
+          $machine = [BitConverter]::ToUInt16($pe, $nt+4)
+          if ($machine -ne 0xaa64) { throw "Expected ARM64 executable, got $machine" }
+          $root = "$env:RUNNER_TEMP/driver-evidence"
+          New-Item -ItemType Directory -Path $root
+          Copy-Item "$env:SystemRoot/System32/drivers/null.sys" "$root/null.sys"
+          $imageHash = (Get-FileHash "$root/null.sys").Hash.ToLower()
+          $signature = Get-AuthenticodeSignature "$root/null.sys"
+          if ($signature.Status -ne 'Valid' -or $imageHash -ne '4d79cea45771d9ee36aa599add5528b6f969e874f150d031a942a3b44c0b20cd') { throw "Unexpected inbox image $imageHash $($signature.Status)" }
+          Invoke-WebRequest 'https://msdl.microsoft.com/download/symbols/null.pdb/EB6E1428846168A1564CCEE4944580C31/null.pdb' -OutFile "$root/null.pdb"
+          & 'D:/nb/bin/NeverDLocalTypesDebugContextTests.exe' '--gtest_filter=LocalTypesDebugContext.DriverContractBindsOnlyProvenEntries:LocalTypesDebugContext.AddressBoundDeclarationsFollowEditsInNamesOnlyCode'
+          $rows = @()
+          foreach ($route in @('high','llvm')) {
+            $extra = @()
+            if ($route -eq 'llvm') { $extra = @('--llvm') }
+            & $exe decompile "$root/null.sys" '--func=GsDriverEntry' -o "$root/$route.c" @extra
+            clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 /c "$root/$route.c" "/Fo$root/$route.obj"
+            $code = Get-Content "$root/$route.c"
+            $call = @($code | Where-Object { $_ -match '\bDriverEntry\s*\(' -and $_ -match '^\s+(?:return\s|\w+\s*=)' })
+            if ($call.Count -ne 1 -or $call[0] -notmatch ',') { throw "$route lost a DriverEntry argument" }
+            $rows += [ordered]@{route=$route; emitted_sha256=(Get-FileHash "$root/$route.c").Hash.ToLower(); compiled_arm64=$true; driver_arguments=2}
+          }
+          [ordered]@{revision=$env:NEVERD_REV; machine=$machine; engine_sha256=(Get-FileHash $exe).Hash.ToLower(); driver_sha256=$imageHash; pdb_sha256=(Get-FileHash "$root/null.pdb").Hash.ToLower(); routes=$rows} | ConvertTo-Json -Depth 6 | Set-Content native-driver-verification.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: native-windows-arm64-engine
+          path: |
+            native-driver-verification.json
+            D:/nb/neverd-build-receipt.json
+            D:/nb/neverd-dependency-inputs.json
+          if-no-files-found: warn
+          retention-days: 14
