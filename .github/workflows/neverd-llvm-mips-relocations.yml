@@ -1,0 +1,57 @@
+name: LLVM MIPS DWARF relocation qualification
+on:
+  push:
+    branches: [codex/neverd-mips-historical-nov22]
+    paths: ['.github/workflows/neverd-llvm-mips-relocations.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  REVISION: 13c844a46d405bada2576a1e2d45224595466a29
+jobs:
+  dwarfdump:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/llvm-project
+          ref: ${{ env.REVISION }}
+          persist-credentials: false
+          sparse-checkout: |
+            llvm
+            cmake
+            third-party
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+      - name: Build the exact LLVM assembler and DWARF reader
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          cmake -S llvm -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=Mips \
+            -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF
+          cmake --build build --target llvm-mc llvm-dwarfdump FileCheck --parallel 4
+      - name: Read o32 and n32 debug strings in both byte orders
+        run: |
+          mkdir evidence
+          input=llvm/test/DebugInfo/Mips/n32-debug-str-relocations.s
+          for triple in mips-linux-gnu mipsel-linux-gnu mips64-linux-gnuabin32 mips64el-linux-gnuabin32; do
+            abi=o32
+            if [[ "$triple" == *n32 ]]; then abi=n32; fi
+            build/bin/llvm-mc -triple="$triple" -target-abi="$abi" -filetype=obj "$input" -o case.o
+            build/bin/llvm-dwarfdump --debug-info case.o > "evidence/$triple.txt"
+            build/bin/FileCheck "$input" < "evidence/$triple.txt"
+          done
+          git rev-parse HEAD > evidence/source.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: llvm-dwarf-mips-${{ runner.os }}-${{ env.REVISION }}
+          path: evidence/
+          retention-days: 7
