@@ -1,7 +1,7 @@
-name: Measure public x86 width dispatch and check all foreign-ISA records and real workloads
+name: Check multiarch formatting with frameless public x86 forwarding
 on:
   push:
-    branches: [codex/capstone-public-width-profiles]
+    branches: [codex/capstone-tail-iter-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 38d0847fb739b95708e6929af78ffdf1ebc806b5
+          ref: 958b98cbbeb217ab3e8babe1de7175546ec82748
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-width-entry-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: tail-iter-profiles-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
