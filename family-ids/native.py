@@ -1,120 +1,219 @@
+"""Separate a full-decoder call target from executable placement in GCC's public scan."""
+from collections import Counter
 from pathlib import Path
-import hashlib,json,os,platform,shutil,statistics,subprocess as sp,tempfile
-r=Path(__file__).resolve().parent;root=r.parent;s=root/'source';obs=root/'evidence';obs.mkdir(exist_ok=True)
-def write(f,x):(obs/(f+'.json')).write_text(json.dumps(x,indent=2)+'\n')
-def run(args,name,cwd=None):
-    with (obs/(name+'.log')).open('w') as f:sp.run(args,cwd=cwd,stdout=f,stderr=sp.STDOUT,check=True)
-def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-meta=json.loads((r/'tree.json').read_text())
-git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
-assert git('rev-parse','HEAD')==meta['parent'] and sha(r/'candidate.patch')==meta['sha256']
-units=['x86_scan_batch','x86_evex_vpcmp_id','x86_evex_vpcmp_mask_size','x86_evex_detail','x86_buffer_bounds','x86_simple_output','text_option','detail_option','x86_kmask_width']
-conf=os.environ.get('FLAVOR','full');cc=os.environ['CC'];diet=conf=='diet';reduce=conf=='reduce';att=conf!='intel'
-tmp=Path(tempfile.mkdtemp());b=tmp/'build';fixed=tmp/'selected';fixed.mkdir()
+import hashlib
+import json
+import os
+import platform
+import random
+import re
+import shlex
+import shutil
+import statistics
+import subprocess as sp
+import tempfile
+
+here = Path(__file__).resolve().parent
+root = here.parent
+source = root / 'source'
+evidence = root / 'evidence'
+evidence.mkdir(exist_ok=True)
+
+def read(path):
+    return json.loads(path.read_text())
+
+def save(name, value):
+    (evidence / (name+'.json')).write_text(json.dumps(value, indent=2)+'\n')
+
+def output(args, cwd=None):
+    return sp.check_output(args, cwd=cwd, text=True).strip()
+
+def run(args, log, cwd=None):
+    with (evidence / (log+'.log')).open('w') as stream:
+        sp.run(args, cwd=cwd, stdout=stream, stderr=sp.STDOUT, check=True)
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def symbols(path):
+    rows = []
+    for line in output(['nm','-S','--defined-only',path]).splitlines():
+        p = line.split()
+        if len(p)==4 and re.fullmatch('[0-9a-f]+',p[0]) and re.fullmatch('[0-9a-f]+',p[1]):
+            rows.append((p[-1], p[2], int(p[0],16), int(p[1],16)))
+    return rows
+
+def sections(path):
+    rows = {}
+    for line in output(['readelf','-SW',path]).splitlines():
+        m = re.match(r'\s*\[\s*\d+\]\s+(\.\S+)\s+\S+\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+\S+\s+(\S+)\s+\d+\s+\d+\s+(\d+)',line)
+        if m and 'A' in m[5]:
+            rows[m[1]] = [int(m[2],16), int(m[3],16), int(m[4],16),m[5],int(m[6])]
+    return rows
+
+def scanner(path):
+    start,size = [(a,s) for n,t,a,s in symbols(path) if n=='cs_disasm_iter'][0]
+    sec = sections(path)['.text']
+    blob = path.read_bytes()[sec[1]+start:sec[1]+start+size]
+    assert len(blob)==size and size>0
+    refs=[]
+    for ln in output(['objdump','-r','-j','.text',path]).splitlines():
+        p=ln.split()
+        if len(p)==3 and re.fullmatch('[0-9a-f]+',p[0]) and start<=int(p[0],16)<start+size:
+            refs.append([int(p[0],16)-start,p[1],p[2]])
+    return dict(bytes=size, text=hashlib.sha256(blob).hexdigest(), section_align=sec[-1], relocations=refs)
+
+meta=read(here/'tree.json')
+reference=read(here/'gcc-reference.json')
+assert output(['git','-C',source,'rev-parse','HEAD'])==meta['parent'] and sha(here/'candidate.patch')==meta['sha256']
+tmp=Path(tempfile.mkdtemp())
 try:
-    opts=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers')]
-    if conf=='full':opts.extend('-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('ARM','AARCH64','MIPS','RISCV','PPC'))
-    if diet:opts.append('-DCAPSTONE_BUILD_DIET=ON')
-    if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
-    if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
-    run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
-    verified={}
-    for variant in ('base','candidate'):
-        if variant=='candidate':
-            git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
-        run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
-        path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
-        libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
-        host=os.environ['RUNNER_OS'] # CMake always runs on Linux in this profile.
-        reference=json.loads((r/'reference.json').read_text())
-        assert host=='Linux'
-        matching=[key for key in reference if key.endswith('-'+cc+'-'+conf) and (('24.04-arm' in key)==(platform.machine()=='aarch64')) and (('22.04' in key)==('22.04' in Path('/etc/os-release').read_text()))]
-        assert len(matching)==1,matching
-        if conf!='full':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
-    run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
-    run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
-    run([tmp/'check-static'],'static-selected')
-    if conf=='full':
-        selected=['mips_single','mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
-    elif conf=='intel':
-        selected=units
-    else:
-        selected=['x86_scan_batch','text_option','detail_option']
-        if diet:selected.append('x86_kmask_width')
-    if conf!='full':
-        assert sha(libs['base'])==sha(libs['candidate'])
-        write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
-    run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
-    run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
-    run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
-    run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
-    run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
-    run(['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
-    run(['c++','-O2','-std=c++17','-I',s/'include',r/'records.cpp','-ldl','-o',tmp/'verify'],'compile-verify')
-    if reduce:panels=[]
-    else:panels=[('matrix32',32,'matrix',0),('matrix64',64,'matrix',0)]
-    if conf=='full':
-        shutil.copy(r/'extract.py',tmp);shutil.copy(r/'fetch.py',tmp)
-        run(['python3','-B',tmp/'extract.py'],'debian');run(['python3','-B',tmp/'fetch.py'],'putty')
-        for n in (32,64):
-            panels.append(('putty'+str(n),n,tmp/('putty-0.85-'+str(n)+'.text'),0x401000 if n==32 else 0x140001000))
-        panels.append(('openssl',64,tmp/'libcrypto.text',json.loads((tmp/'openssl.json').read_text())['address']))
-    if conf=='full':
-        shutil.copy(r/'libmvec.py',tmp);shutil.copy(r/'libmvec.json',tmp)
-        run(['python3','-B',tmp/'libmvec.py'],'glibc-libmvec')
-        libm=json.loads((tmp/'libmvec.json').read_text());panels.append(('libmvec',64,tmp/'libmvec.text',libm['address']))
-    rows=[]
-    for name,bits,path,ip in panels:
-        for syntax in range(1 if diet or not att else 2):
-            z=sp.check_output([tmp/'verify',libs['base'],libs['candidate'],str(bits),path,str(ip),str(syntax),str(int(diet))],text=True)
-            for line in z.splitlines():
-                ib,flags,sy,calls,valid,changes=map(int,line.split());assert ib==bits and sy==syntax and calls>=valid>=changes
-                assert changes==0
-                rows.append(dict(sample=name,bits=bits,syntax=syntax,flags=flags,calls=calls,success=valid,changes=changes))
-            write('records',rows)
-    if conf=='full':
-        run(['c++','-std=c++17','-O2','-I',s/'include',r/'public-records.cpp','-ldl','-o',tmp/'public-states'],'build-public-states')
-        cross={}
-        for label,bits,f in [('real-pe32',32,tmp/'putty-0.85-32.text'),('real-pe64',64,tmp/'putty-0.85-64.text'),('code16',16,tmp/'putty-0.85-32.text'),('simd64',64,tmp/'libmvec.text')]:
-            z=json.loads(sp.check_output([tmp/'public-states',libs['base'],libs['candidate'],f,str(bits)],text=True))
-            assert z['complete_record_comparisons']>0 and z['batch_records']>0
-            cross[label]=z
-        write('public-differential',cross)
-    other_cases=[]
-    if conf=='full':
-        import corpus
-        raw=corpus.prepare(r,tmp,obs,run)
-        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}
-        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
-        other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
-        assert len(other_cases)==len(names)
-        for arch in ('arm','aarch64','ppc','riscv','mips'):
-            run(['c++','-O2','-std=c++17','-I',s,'-I',s/'include',r/(arch+'-states.cpp'),'-ldl','-o',tmp/(arch+'-states')],'compile-'+arch)
-            arg=[tmp/(arch+'-states'),libs['base'],libs['candidate']]
-            if arch=='riscv':
-                for opt in ([],['custom']):run([*arg,tmp/'corpus',*opt],'states-riscv'+('custom' if opt else ''))
-            else:run(arg,'states-'+arch)
-        target=fixed/'libcapstone.so.6'
-        target.write_bytes(libs['base'].read_bytes());(fixed/'libcapstone.so').symlink_to(target.name)
-        run(['c++','-O3','-std=c++17','-I',s/'include',r/'time.cpp','-L',fixed,'-Wl,-rpath,'+str(fixed),'-lcapstone','-o',tmp/'time'],'compile-time')
-        bind=['setarch',platform.machine(),'-R'];sp.run([*bind,'/bin/true'],check=True)
-        os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-        inputs={k:v.read_bytes() for k,v in libs.items()};inputs['copy']=inputs['base']
-        size=max(map(len,inputs.values()));inputs={k:v+bytes(size-len(v)) for k,v in inputs.items()}
-        def invoke(k,bits,mode,path,ip,reps):
-            with target.open('wb') as o:o.write(inputs[k])
-            return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
-        timing=[]
-        for name,bits,path,ip in panels[2:]+other_cases:
-            for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(65e6/first[0]));cycles=[]
-                for i in range(11):
-                    keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
-                    for k in o+o[::-1]:
-                        v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
-                    cycles.append(cyc)
-                timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
-                write('timings',timing)
-    write('complete',dict(tree=meta['tree'],config=conf,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],platform=platform.machine(),os=platform.platform(),tests=selected,records=sum(x['calls'] for x in rows),libs={k:sha(v) for k,v in libs.items()}))
+    build=tmp/'build'
+    flags=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=gcc','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers']
+    flags.extend('-DCAPSTONE_'+n+'_SUPPORT=ON' for n in ('ARM','AARCH64','MIPS','RISCV','PPC'))
+    run(['cmake','-S',source,'-B',build,*flags],'configure')
+    libs={};objects={};commands={};scan_objects={};checks={}
+    for label in ('base','candidate'):
+        if label=='candidate':
+            run(['git','-C',source,'apply','--index',here/'candidate.patch'],'apply')
+            assert output(['git','-C',source,'write-tree'])==meta['tree']
+        run(['cmake','--build',build,'--parallel','4','--target','capstone_shared'],'build-'+label)
+        original,=[x for x in build.glob('libcapstone.so.*') if not x.is_symlink()]
+        libs[label]=tmp/(label+'.so')
+        shutil.copy2(original,libs[label])
+        link=next(x for x in output(['ninja','-C',build,'-t','commands','capstone_shared']).splitlines() if ' -shared ' in x and ' -o ' in x and 'libcapstone.so' in x)
+        args=shlex.split(link)
+        while args[0] in (':','&&'):args.pop(0)
+        if '&&' in args:args=args[:args.index('&&')]
+        obj=[v for v in args if v.endswith('.o')]
+        assert obj and '-o' in args
+        folder=tmp/(label+'-objects');folder.mkdir()
+        objects[label]={}
+        for i,v in enumerate(obj):
+            saved=folder/(str(i)+'-'+Path(v).name)
+            shutil.copy2(build/v,saved)
+            objects[label][v]=saved
+        commands[label]=args
+        key,=[v for v in obj if v.endswith('/X86DisassemblerDecoder.c.o')]
+        scan_objects[label]=key
+        checks[label]=scanner(objects[label][key])
+    extra_writers=[v for v in objects['candidate'] if v not in objects['base']]
+    assert {Path(v).name for v in extra_writers}=={'X86Sse64Output.c.o','X86Vex32Output.c.o'}
+    assert commands['base']==[v for v in commands['candidate'] if v not in extra_writers] and scan_objects['base']==scan_objects['candidate']
+    key=scan_objects['base']
+    old_name='cs_decode_full_insn'
+    new_name='cs_decode_public_full_insn'
+    lib_sha={k:sha(p) for k,p in libs.items()}
+    save('originals',dict(expected=reference['libs'],actual=lib_sha,matched=lib_sha==reference['libs'],gcc=output(['gcc','--version']).splitlines()[0],cpu=output(['lscpu']),source=meta))
+    save('scanner',checks)
+    def link(label,variant,replace=None,before=(),after=(),extra=()):
+        args=[]
+        for token in commands[label]:
+            if token==key:
+                args.extend(before)
+                args.append(replace or objects[label][key])
+                args.extend(after)
+            else:
+                args.append(objects[label].get(token,token))
+        args[args.index('-o')+1]=tmp/(variant+'.so')
+        args.extend(extra)
+        run(args,'link-'+variant,build)
+        libs[variant]=tmp/(variant+'.so')
+    for label in ('base','candidate'):
+        link(label,label+'-relink')
+        assert sha(libs[label+'-relink'])==sha(libs[label])
+    normalized=tmp/'normalized-scanner.o'
+    run(['objcopy','--redefine-sym',new_name+'='+old_name,objects['candidate'][key],normalized],'canonical-call')
+    link('candidate','canonical-call',replace=normalized)
+    link('base','candidate-scanner',replace=normalized)
+    link('base','writers-only', extra=[objects['candidate'][v] for v in extra_writers])
+    def anchors(path):
+        wanted={'cs_disasm_iter','X86_scanBatch','cs_decode_full_insn','cs_decode_public_full_insn','X86_disasmIter32','X86_disasmIterText','X86_getInstruction','ARM_getInstruction','AArch64_getInstruction'}
+        return {n:[a,s] for n,t,a,s in symbols(path) if n in wanted}
+    addrs={k:anchors(v)for k,v in libs.items()}
+    offsets={k:addrs[k]['cs_disasm_iter'][0] for k in ('base','candidate')}
+    align=max(checks[k]['section_align'] for k in ('base','candidate'))
+    span=abs(offsets['candidate']-offsets['base']) or align
+    span=((span+align-1)//align)*align
+    assert 0<span<1_048_576
+    assembly=tmp/'padding.s'
+    assembly.write_text('.text\n.fill '+str(span)+',1,0x90\n.section .note.GNU-stack,"",@progbits\n')
+    pad=tmp/'padding.o'
+    run(['as','--64',assembly,'-o',pad],'padding')
+    interventions={}
+    for label in ('base','candidate'):
+        link(label,label+'-front',before=[pad])
+        link(label,label+'-back',after=[pad])
+        a=libs[label+'-front'];b=libs[label+'-back']
+        sa,sb=symbols(a),symbols(b)
+        da=list((Counter(sa)-Counter(sb)).elements())
+        db=list((Counter(sb)-Counter(sa)).elements())
+        input_names={n for n,t,addr,size in symbols(objects[label][key]) if t.lower()=='t'}
+        front=anchors(a);back=anchors(b)
+        ac=sections(a);bc=sections(b)
+        interventions[label]=dict(front=front,back=back,changed_symbols_front=da,changed_symbols_back=db,unexpected_symbol_names=sorted({v[0] for v in da+db}-input_names),section_changes={s:[ac.get(s),bc.get(s)] for s in ac.keys()|bc.keys() if ac.get(s)!=bc.get(s)},observed_displacement=front['cs_disasm_iter'][0]-back['cs_disasm_iter'][0])
+    ren=checks['candidate']['relocations']
+    ren=[[p,t,n.replace(new_name,old_name)]for p,t,n in ren]
+    save('layout',dict(span=span,align=align,original_addresses=addrs,interventions=interventions,original_scan_same=checks['base']['text']==checks['candidate']['text'],relocations_equal_after_rename=checks['base']['relocations']==ren,hybrid_scan_on_baseline_sha_matches=sha(libs['candidate-scanner'])==sha(libs['base']),originals_relinked_identical=True,normalized=scanner(normalized)))
+    # Instrument only the scanner's single output-call relocation, with an enabled-text positive control.
+    for label,callee in [('base',old_name),('candidate',new_name)]:
+        assert sum(callee in v[2] for v in checks[label]['relocations'])==1
+        hook=tmp/(label+'-hook.c')
+        hook.write_text('#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n#include <stdio.h>\nstruct cs_struct; struct cs_insn;\n#define ARGS struct cs_struct *h,const uint8_t *p,size_t n,struct cs_insn *i,uint16_t *z,bool batch\nextern bool '+callee+'(ARGS);\nstatic unsigned long long calls;\n__attribute__((visibility("hidden"))) bool probe_output(ARGS){++calls;return '+callee+'(h,p,n,i,z,batch);}\n__attribute__((destructor)) static void report(void){fprintf(stderr,"output_calls=%llu\\n",calls);}\n')
+        wrapper=tmp/(label+'-hook.o')
+        run(['gcc','-O2','-fPIC','-c',hook,'-o',wrapper],'hook-'+label)
+        renamed=tmp/(label+'-scanner.o')
+        run(['objcopy','--redefine-sym',callee+'=probe_output',objects[label][key],renamed],'hook-symbol-'+label)
+        link(label,label+'-probe',replace=renamed,extra=[wrapper])
+    shutil.copy2(here/'fetch.py',tmp/'fetch.py')
+    run(['python3','-B',tmp/'fetch.py'],'putty')
+    save('samples',read(tmp/'corpus.json'))
+    fixed=tmp/'selected';fixed.mkdir()
+    selected=fixed/'libcapstone.so.6'
+    selected.write_bytes(libs['base'].read_bytes())
+    (fixed/'libcapstone.so').symlink_to(selected.name)
+    run(['c++','-O3','-std=c++17','-I',source/'include',here/'time.cpp','-L',fixed,'-Wl,-rpath,'+str(fixed),'-lcapstone','-o',tmp/'time'],'time')
+    bind=['setarch',platform.machine(),'-R']
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    payloads={k:v.read_bytes()for k,v in libs.items()}
+    payloads['copy']=payloads['base']
+    length=max(map(len,payloads.values()))
+    payloads={k:v+bytes(length-len(v))for k,v in payloads.items()}
+    inode=selected.stat().st_ino
+    def invoke(label,bits,mode,reps):
+        selected.write_bytes(payloads[label])
+        assert selected.stat().st_ino==inode
+        z=sp.run([*bind,tmp/'time',str(bits),str(mode),tmp/('putty-0.85-'+str(bits)+'.text'),str(0x401000 if bits==32 else 0x140001000),str(reps)],text=True,capture_output=True,check=True)
+        return list(map(int,z.stdout.split())),z.stderr.strip()
+    counters=[]
+    for bits in (32,64):
+        for mode in (0,1):
+            base,_=invoke('base',bits,mode,1)
+            for label in ('base','candidate'):
+                values,msg=invoke(label+'-probe',bits,mode,1)
+                assert base[2]==values[2]
+                count=int(re.fullmatch('output_calls=([0-9]+)',msg)[1])
+                counters.append(dict(bits=bits,mode=mode,variant=label,total_calls_including_warm=count,result=values[2]))
+    save('calls',counters)
+    panels=[]
+    for bits,mode in ((32,0),(64,0),(32,1)):
+        variants=['base','copy','candidate','canonical-call','candidate-scanner']
+        if mode==0:variants+=['writers-only']+['base-front','base-back','candidate-front','candidate-back']
+        one,_=invoke('base',bits,mode,1)
+        reps=max(1,round(75e6/one[0]))
+        cycles=[];rng=random.Random(100*bits+mode)
+        for i in range(15):
+            order=variants.copy();rng.shuffle(order)
+            ticks={v:[]for v in variants}
+            for v in order+order[::-1]:
+                result,msg=invoke(v,bits,mode,reps)
+                assert not msg and result[2]==one[2]
+                ticks[v].append(result[:2])
+            cycles.append(ticks)
+        panels.append(dict(bits=bits,mode=mode,signature=one[2],reps=reps,cycles=cycles))
+        save('panels',panels)
+    save('complete',dict(success=True,panels=len(panels),inode=inode,affinity=list(os.sched_getaffinity(0)),original_hashes=lib_sha))
 finally:
-    size=sum(f.stat().st_size for f in tmp.rglob('*') if f.is_file());shutil.rmtree(tmp);write('cleanup',dict(bytes=size,removed=not tmp.exists()))
+    size=sum(f.stat().st_size for f in tmp.rglob('*') if f.is_file())
+    shutil.rmtree(tmp)
+    save('cleanup',dict(bytes=size,removed=not tmp.exists()))
