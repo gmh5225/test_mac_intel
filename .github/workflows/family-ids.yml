@@ -1,7 +1,7 @@
-name: Check real packed EVEX output, public API and six-backend regressions
+name: Retest MIPS, PowerPC and PE32 throughput on two native AArch64 machines
 on:
   push:
-    branches: [codex/capstone-packed-move-six-backends]
+    branches: [codex/capstone-packed-move-arm-replicas]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: gcc, flavor: full }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
-          - { host: ubuntu-24.04, cc: clang, flavor: intel }
+          - { host: ubuntu-24.04-arm, cc: clang, flavor: full, trial: a }
+          - { host: ubuntu-24.04-arm, cc: clang, flavor: full, trial: b }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: packed-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: packed-arm-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
