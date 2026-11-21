@@ -30,7 +30,7 @@ jobs:
           import json, os, re
           config = json.load(open('neverd-mips-qualification/source.json'))
           assert re.fullmatch(r'[0-9a-f]{40}', config['revision'])
-          assert config['target'] in ('NeverDTypesTests', 'NeverDLiftTests', 'NeverDMIPSIntegerTests', 'NeverDMIPSFlowTests', 'NeverDSourceEntryBindingTests', 'NeverDFPParameterMaskTests')
+          assert config['target'] in ('NeverDTypesTests', 'NeverDLiftTests', 'NeverDMIPSIntegerTests', 'NeverDMIPSFlowTests', 'NeverDSourceEntryBindingTests', 'NeverDFPParameterMaskTests', 'NeverDMIPSPipelineTests')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
               runners = {
                   'linux': {'os': 'ubuntu-24.04', 'cc': 'clang-18', 'cxx': 'clang++-18'},
