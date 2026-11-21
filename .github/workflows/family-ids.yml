@@ -1,7 +1,7 @@
-name: Qualify canonical x86 compare IDs without mnemonic reparsing
+name: Attribute x86 detail and AArch64 scan costs to actual machine code
 on:
   push:
-    branches: [codex/capstone-typed-compare-owner]
+    branches: [codex/capstone-compare-detail-attribution]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -12,12 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: full }
           - { host: ubuntu-24.04, cc: gcc, flavor: full }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
-          - { host: ubuntu-24.04, cc: clang, flavor: intel }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -34,12 +29,14 @@ jobs:
           ref: 6fe0fa8c14c6dbae1510a70b3a0ba77514131bf7
           path: source
           persist-credentials: false
-      - run: python3 -B family-ids/native.py
+      - name: Prepare deterministic instruction, cache and branch simulation
+        run: command -v valgrind >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq valgrind)
+      - run: python3 -B family-ids/profile.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: compare-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: compare-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
