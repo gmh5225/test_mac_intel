@@ -112,20 +112,21 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         fixed=['setarch',platform.machine(),'-R']; sp.run([*fixed,'/bin/true'],check=True)
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         write('controls',dict(images={k:sha(v) for k,v in binaries.items()},inode=inode,aslr_disabled=True,cpu=list(os.sched_getaffinity(0)),
-             cycle_count=9,target_ms=32,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
+             cycle_count=13,target_ms=105,fixed_bytes=size,consumer_sha256=sha(r/'single.cpp')))
         def sample(key,c,m,n,route):
             with image.open('r+b') as stream:assert stream.write(padded[key])==size
             assert image.stat().st_ino==inode and image.stat().st_size==size
             return json.loads(sp.check_output([*fixed,str(image),*map(str,[c['selector'],m,c['path'],n])],text=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public')))))
         rows=[]
         for c in cases:
+            if c['name'] not in ('mips64el-ls','ppc64el-ls','malta-nanomips-kernel','amd64-ls'):continue
             for m in (0,1,2):
                 routes=['private' if m and c['selector']>=16 else 'public']
                 for route in routes:
                     probe=sample('base',c,m,2,route)
-                    n=max(2,min(4000,round(64e6/probe['cpu_ns'])))
+                    n=max(2,min(4000,round(210e6/probe['cpu_ns'])))
                     pairs=[];reference=None
-                    for i in range(9):
+                    for i in range(13):
                         names=['base','copy','candidate']; order=names[i%3:]+names[:i%3];ticks={key:[] for key in names}
                         for key in order+order[::-1]:
                             row=sample(key,c,m,n,route)
