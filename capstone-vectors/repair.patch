@@ -1,39 +1,203 @@
-diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
-index ea9309f4..5444947a 100644
---- a/arch/X86/X86GenMappingCounts.inc
-+++ b/arch/X86/X86GenMappingCounts.inc
-@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
- 	0, // X86_VXORPSZrrkz
- 	2048, // X86_VXORPSrm
- 	2048, // X86_VXORPSrr
--	1536, // X86_VZEROALL
--	1536, // X86_VZEROUPPER
-+	17920, // X86_VZEROALL
-+	17920, // X86_VZEROUPPER
- 	1024, // X86_WAIT
- 	1024, // X86_WBINVD
- 	0, // X86_WBNOINVD
+diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
+index d57235c9..dcd84ff9 100644
+--- a/arch/Mips/MipsDisassembler.c
++++ b/arch/Mips/MipsDisassembler.c
+@@ -228,8 +228,9 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
+ 	}
+ }
+ 
+-#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+-	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
++#if (defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)) || \
++	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
+ #define CAPSTONE_MIPS_PRIMARY_DISPATCH
+ #endif
+ 
+diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
+index 8b70fffc..1ee21fa0 100644
+--- a/arch/Mips/MipsInstPrinter.c
++++ b/arch/Mips/MipsInstPrinter.c
+@@ -500,7 +500,11 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
+ static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
+ 		       unsigned OpNo, SStream *OS, bool IsBranch)
+ {
++#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
++	SStream_concat2(OS, "\t", Str);
++#else
+ 	SStream_concat(OS, "%s%s", "\t", Str);
++#endif
+ 	SStream_concat0(OS, "\t");
+ 	if (IsBranch)
+ 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 8c5f511c..646c4344 100644
+index 8c5f511c..67fc4f65 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10374,6 +10374,16 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 			switch (insn->id) {
- 			default:
- 				break;
-+			case X86_INS_VZEROALL:
-+			case X86_INS_VZEROUPPER:
-+				/* The AVX register file has eight entries outside 64-bit mode. */
-+				if (mode != CS_MODE_64) {
-+					cs_detail *d = insn->detail;
-+					d->regs_write_count = 8;
-+					memset(d->regs_write + 8, 0,
-+					       8 * sizeof(d->regs_write[0]));
-+				}
-+				break;
- 			case X86_INS_XADD:
- 				insn->detail->regs_write[0] = X86_REG_EFLAGS;
- 				insn->detail->regs_write_count = 1;
+@@ -10296,6 +10296,45 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ 
+ #ifndef CAPSTONE_DIET
+ #include "X86GenMappingCounts.inc"
++
++/* Legacy modes expose a different implicit write set for these opcodes.
++ * Keep the unmodified table copy on the common 64-bit path. */
++static inline void set_mode_implicit_writes(cs_detail *detail, unsigned int i,
++					    unsigned int id, cs_mode mode)
++{
++	if (mode != CS_MODE_64) {
++		switch (id) {
++		case X86_RDTSC:
++			detail->regs_write[0] = X86_REG_EAX;
++			detail->regs_write[1] = X86_REG_EDX;
++			detail->regs_write_count = 2;
++			return;
++		case X86_RDTSCP:
++			detail->regs_write[0] = X86_REG_EAX;
++			detail->regs_write[1] = X86_REG_ECX;
++			detail->regs_write[2] = X86_REG_EDX;
++			detail->regs_write_count = 3;
++			return;
++#ifndef CAPSTONE_X86_REDUCE
++		case X86_VZEROALL:
++		case X86_VZEROUPPER: {
++			/* Only YMM0..7 are accessible outside 64-bit mode. */
++			const size_t bytes = 8 * sizeof(detail->regs_write[0]);
++			memcpy(detail->regs_write, insns[i].regs_mod, bytes);
++			memset(detail->regs_write + 8, 0,
++			       sizeof(insns[i].regs_mod) - bytes);
++			detail->regs_write_count = 8;
++			return;
++		}
++#endif
++		default:
++			break;
++		}
++	}
++	memcpy(detail->regs_write, insns[i].regs_mod,
++	       sizeof(insns[i].regs_mod));
++	detail->regs_write_count = (x86_mapping_counts[i] >> 5) & 31;
++}
+ #endif
+ 
+ // given internal insn id, return public instruction info
+@@ -10322,50 +10361,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			insn->detail->regs_read_count =
+ 				(x86_mapping_counts[i] & 31);
+ 
+-			// special cases when regs_write[] depends on arch
+-			switch (id) {
+-			default:
+-				memcpy(insn->detail->regs_write,
+-				       insns[i].regs_mod,
+-				       sizeof(insns[i].regs_mod));
+-				insn->detail->regs_write_count =
+-					((x86_mapping_counts[i] >> 5) & 31);
+-				break;
+-			case X86_RDTSC:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 2;
+-				}
+-				break;
+-			case X86_RDTSCP:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_ECX;
+-					insn->detail->regs_write[2] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 3;
+-				}
+-				break;
+-			}
++			set_mode_implicit_writes(insn->detail, i, id, mode);
+ 			/* The generator derives eligibility from the switches below. */
+ 			if (!(x86_mapping_counts[i] &
+ 			      X86_MAPPING_IMPLICIT_REPAIR))
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 8968a732..21414e7a 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -118,7 +118,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		if (plan == X86_PLAN_VECTOR) {
+ #ifdef X86_FIXED_VEX2
+ 			if (code[0] == 0xc5)
+-				return X86_FIXED_VEX2(code, size, insn,
++				return X86_FIXED_VEX2(handle, code, size, insn,
+ 						      insn_size);
+ #endif
+ #ifdef X86_FIXED_ROUNDED
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 2bd24bc5..337e9879 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -14,7 +14,9 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+-#define X86_FIXED_VEX2 writeVex2Memory64
++#define GET_INSTRINFO_ENUM
++#include "X86GenInstrInfo.inc"
++#define X86_FIXED_VEX2 writeVex2Output64
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorRegisterOutput.h"
+@@ -181,9 +183,35 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+ 
+ /* Only the bare VEX2 opcode plan enters here. Packed base-relative
+  * loads and stores share their address and detail construction with SSE. */
+-static bool writeVex2Memory64(const uint8_t *code, size_t size, cs_insn *insn,
+-			      uint16_t *insn_size)
++static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size)
+ {
++	/* The bare vector clear instructions have no ModR/M or operands. */
++	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
++		const bool all = (code[1] & 4) != 0;
++		insn->size = *insn_size = 3;
++		memcpy(insn->bytes, code, 3);
++		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++		if (all)
++			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
++		else
++			memcpy(insn->mnemonic, "vzeroupper",
++			       sizeof("vzeroupper"));
++		memset(insn->op_str, 0, sizeof(insn->op_str));
++		if (insn->detail) {
++			cs_detail *detail = insn->detail;
++			memset(detail, 0,
++			       offsetof(cs_detail, x86) + sizeof(cs_x86));
++			detail->x86.addr_size = 8;
++			detail->x86.rex = 0x40;
++			memcpy(detail->x86.opcode, code, 2);
++			X86_get_insn_id(handle, insn,
++					all ? X86_VZEROALL : X86_VZEROUPPER);
++		} else {
++			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
++		}
++		return true;
++	}
+ 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
+ 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
+ 		const uint8_t rex =
 diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
 index d9dd18e2..dad5096f 100644
 --- a/tests/unit/x86_reg_access.c
@@ -108,3 +272,35 @@ index d9dd18e2..dad5096f 100644
  	cs_close(&handle);
  	return success ? 0 : 1;
  }
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 678bc384..7781ca39 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -570,6 +570,17 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_vex_clear(csh handles[2])
++{
++	for (unsigned flags = 0; flags < 256; ++flags) {
++		uint8_t bytes[] = { 0xc5, (uint8_t)flags, 0x77, 0xc0 };
++		for (size_t length = 1; length <= sizeof(bytes); ++length)
++			if (!compare(handles, bytes, length, flags))
++				return false;
++	}
++	return true;
++}
++
+ static bool check_vex_rip_loads(csh handles[2])
+ {
+ 	const uint32_t edges[] = {
+@@ -1230,7 +1241,8 @@ static bool check_mode(cs_mode mode)
+ 		     (!check_vex_rip_loads(handles) ||
+ 		      !check_sse_rip_memory(handles) ||
+ 		      (private_iter == X86_disasmIterText &&
+-		       (!check_sse_base_memory(handles) ||
++		       (!check_vex_clear(handles) ||
++			!check_sse_base_memory(handles) ||
+ 			!check_vex_packed_memory(handles))))) ||
+ 		    !check_rex_stack(handles) ||
+ 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
