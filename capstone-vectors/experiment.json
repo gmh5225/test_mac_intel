@@ -1,12 +1,12 @@
 {
   "baseline_commit": "205dcd8bd67fb7561e6eb6c15ea4630e20c85d12",
-  "baseline_tree": "c101eb6776d392aeb84eafc1614c72d0e2247fea",
+  "baseline_tree": "7b2e010a2a1e48c49ec2b58711986a26821e7661",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "trees": {
-    "baseline": "c101eb6776d392aeb84eafc1614c72d0e2247fea",
-    "sse_address": "5ecdf0474f32b88011351ea405a671437b4d9a56"
+    "baseline": "7b2e010a2a1e48c49ec2b58711986a26821e7661",
+    "vex_scan": "b7979205de6e935342f79153886e063872ca8075"
   },
-  "patch_sha256": "87352580501baac75ca8213f8e10ced1deec2ffd279087526565350220c2281b",
+  "patch_sha256": "b8d43c88ac85ae7c82b113cd884b1023ebb89f8e81402c832385620cffee17d5",
   "tests": [
     "x86_evex_vpcmp_id",
     "x86_evex_vpcmp_mask_size",
@@ -34,11 +34,11 @@
   "cycles": 7,
   "entrypoints": {
     "public": "cs_disasm_iter",
-    "neverd-text": "X86_disasmIter",
-    "neverd-no-text": "cs_disasm_iter"
+    "private_32": "X86_disasmIter32",
+    "private_64": "X86_disasmIterText"
   },
   "iced_branch": "codex/neverd-capstone-compat",
-  "candidate": "The ordinary MOV decoder verifies SSE base, stack and RIP-relative addressing. Compare against the published Capstone core and both iced formatters.",
-  "i386_patch_sha256": "61c21c81841e00ce57e2bae9e99bf986fd2d33f8e810200a2d66bbdb18bb2c7b",
-  "baseline_static_commit": "4b473e00e92e53fd931cfeea9e2dae710c44ce8c"
+  "candidate": "Time public and mode-specific scan independently. The private i386 candidate consumes canonical VEX2 size and instruction-ID plans. Check real scalar and SIMD PE/ELF, full records, extent traces, correctly bounded page ends and unselected images.",
+  "i386_patch_sha256": "0013f99867a39c8a923285c26c8759aab2870809b33719255ea7c70b17c243cc",
+  "baseline_static_commit": "8c58b21f037d3368ec9e9a74f684b82fe54ebaa1"
 }

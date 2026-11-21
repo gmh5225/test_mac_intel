@@ -31,7 +31,7 @@ def main(w):
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
-    save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Public iterator benchmark plus the private static-link text entry called by NeverD; both consume the same output fields'))
+    save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Public and selected static-link iterators are timed for all three modes and consume the same output fields.'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -61,9 +61,9 @@ def main(w):
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
     for label,tree in data['trees'].items():
-        if label=='sse_address':
-            assert sha(r/'sse_address.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'sse_address.patch'],'apply')
+        if label=='vex_scan':
+            assert sha(r/'vex_scan.patch')==data['patch_sha256']
+            run(['git','-C',base,'apply','--index',r/'vex_scan.patch'],'apply')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
@@ -78,13 +78,13 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Sse64Output.c.o'},changed
+            assert prior.keys()==members.keys() and changed=={'X86Vex32Output.c.o'},changed
             assert sha(ordinary)==sha(w/'unselected-baseline')
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
-    exe['private_base']=exe['baseline'];exe['private_sse_address']=exe['sse_address']
+    exe['private_base']=exe['baseline'];exe['private_vex_scan']=exe['vex_scan']
     exe['iced']=exe['fast']=exe['baseline']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['baseline']==payloads['aa']
@@ -109,7 +109,7 @@ def main(w):
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','sse_address')]
+        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','vex_scan')]
         assert audit[0]==audit[1]
         trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
         views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
@@ -138,7 +138,7 @@ def main(w):
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
             probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','sse_address','iced']+(['fast','private_base','private_sse_address'] if mode else [])
+            cycles={launch:[]for launch in launches};labels=['baseline','aa','vex_scan','iced']+['private_base','private_vex_scan']+(['fast'] if mode else [])
             stable={}
             for i in range(data['cycles']):
                 launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
@@ -151,14 +151,14 @@ def main(w):
                         root='baseline' if k=='aa' else k
                         if root not in stable:stable[root]=v[2:]
                         assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['sse_address']
-                    if mode:assert stable['private_base']==stable['private_sse_address']==stable['sse_address'],(name,mode,stable)
+                    assert stable['baseline']==stable['vex_scan']
+                    assert stable['private_base']==stable['private_vex_scan']==stable['vex_scan'],(name,mode,stable)
                     cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
             for launch,observations in cycles.items():
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                 row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','sse_address')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','sse_address')} if mode else None
+                row['vs_iced']={k:md('iced',k) for k in ('baseline','vex_scan')}
+                row['vs_fast']={k:md('fast',k) for k in ('baseline','vex_scan')} if mode else None
                 reported.append(row)
             save('measurements.json',reported)
         print(name,panel,len(sel),flush=True)
