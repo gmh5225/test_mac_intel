@@ -1,7 +1,7 @@
-name: Compile and compare the static i386 memory-immediate iterator on native MSVC x86 and x64
+name: Verify 32-bit and 64-bit Windows static text iterators and signed memory immediates
 on:
   push:
-    branches: [codex/capstone-i386-memory-immediate-msvc]
+    branches: [codex/capstone-msvc-amd64-static-stores]
     paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-mem32-${{ matrix.arch }}
+          name: win-c6-c7-${{ matrix.arch }}
           path: evidence/
           retention-days: 14
