@@ -25,6 +25,12 @@ def main(w):
     ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
     src=src.replace('InstructionInfoFactory, IntelFormatter,','InstructionInfoFactory, IntelFormatter, FastFormatter,').replace('    formatter: IntelFormatter,','    formatter: IntelFormatter,\n    fast: FastFormatter,\n    fast_enabled: bool,').replace('        mode,','        mode: mode & 3,\n        fast_enabled: mode & 8 != 0,\n        fast: FastFormatter::new(),')
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
+    src=src.replace('mode: mode & 3,','mode: mode & 7,')
+    src='extern "C" { fn observed_text(a:*const u8,b:*const u8)->u64; fn observed_detail(a:*const std::ffi::c_void,b:*const std::ffi::c_void); }\n'+src
+    a=src.index('                result.values = result.values.wrapping_add(\n                    state.text.len()')
+    b=src.index('            }\n            if state.mode == 2',a)
+    src=src[:a]+'                if state.mode >= 5 {\n                    let text = if state.text.is_empty() { b"\\0".as_ptr() } else { state.text.as_ptr() };\n                    result.values = result.values.wrapping_add(observed_text(text,text));\n                } else {\n'+src[a:b]+'                }\n'+src[b:]
+    src=src.replace('            if state.mode == 2 {','            if state.mode == 6 {\n                let info = state.factory.info(&instruction);\n                observed_detail((info as *const iced_x86::InstructionInfo).cast(), (&instruction as *const iced_x86::Instruction).cast());\n            } else if state.mode == 2 {')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
@@ -44,6 +50,22 @@ def main(w):
     inc=inc.replace(branch,'if(engine=="capstone") row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        else if(engine=="x86_iter") row=cs_span<X86_disasmIter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);')
     inc=inc.replace('engine!="capstone" &&','engine!="capstone" && engine!="x86_iter" &&')
     assert inc.count('iced_trace(bits,ptr,')==1
+    sinks='''extern "C" __attribute__((noinline)) uint64_t observed_text(const unsigned char *a,const unsigned char *b) {
+        __asm__ volatile("" : : "r"(a),"r"(b) : "memory");
+        return a[0];
+    }
+    extern "C" __attribute__((noinline)) void observed_detail(const void *a,const void *b) {
+        __asm__ volatile("" : : "r"(a),"r"(b) : "memory");
+    }
+'''
+    inc=inc.replace('struct Result {',sinks+'\nstruct Result {').replace('mode>4','mode>6').replace('mode>=2 ? CS_OPT_ON','(mode==2 || mode==6) ? CS_OPT_ON')
+    site='      if (mode) {\n        text_value(result, insn->mnemonic);'
+    assert inc.count(site)==1
+    inc=inc.replace(site,'''      if (mode >= 5) {
+        result.values += observed_text(reinterpret_cast<const unsigned char *>(insn->mnemonic),reinterpret_cast<const unsigned char *>(insn->op_str));
+        if (mode==6) observed_detail(insn,insn->detail);
+      } else if (mode) {
+        text_value(result, insn->mnemonic);''')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
@@ -52,32 +74,13 @@ def main(w):
     obj=w/'driver.o'
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
-    for label,tree in data['trees'].items():
-        if label=='packed':
-            assert sha(r/'packed.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'packed.patch'],'apply')
-        assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
-        run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
-        run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
-        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label)
-        exe[label]=target
-    save('tested-trees.json',data)
-    exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
-    exe['private_base']=exe['baseline'];exe['private_packed']=exe['packed']
-    exe['iced']=exe['fast']=exe['baseline']
-    payloads={key:path.read_bytes()for key,path in exe.items()}
-    assert payloads['baseline']==payloads['aa']
-    maximum=max(map(len,payloads.values()))
-    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-    image=w/'same-image';image.write_bytes(padded['baseline']);image.chmod(0o755)
-    image_inode=image.stat().st_ino
-    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
+    assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==data['baseline_tree']
+    run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build')
+    target=w/'engines';run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link')
+    bind=['setarch',platform.machine(),'-R'];sp.run([*bind,'/bin/true'],check=True)
+    image_sha=sha(target);save('image.json',dict(sha256=image_sha,tree=data['baseline_tree'],affinity=sorted(os.sched_getaffinity(0)),fixed_aslr=True))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
-    assert set(launches)=={'images','same-file-fixed'}
     import pe_panels,itertools
     shutil.copyfile(r/'libmvec.py',w/'libmvec.py');shutil.copyfile(r/'libmvec.json',w/'libmvec.json')
     run(['python3','-B',w/'libmvec.py'],'glibc')
@@ -88,9 +91,8 @@ def main(w):
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','packed')]
-        assert audit[0]==audit[1]
-        trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
+        audit=sp.check_output([target,'audit','0','1',f,intervals,str(bits)],text=True)
+        trace=[list(map(int,z.split())) for z in audit.splitlines()]
         views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
         assert len(views)==len(spans)==len(trace)
         common=[(a[:3],v) for a,v in zip(trace,views) if a[1]==a[5]]
@@ -101,49 +103,25 @@ def main(w):
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
-        for mode in (0,1,2):
-            def measure(lib,n,launch):
-                engine=lib+'____' if lib in ('iced','fast') else 'x86_iter' if lib.startswith('private_') else 'capstone'
-                tail=[engine,str(mode),str(n),str(f),str(intervals),str(bits)]
-                if launch=='images':
-                    command=[str(exe[lib]),*tail];executable=None
-                elif launch=='same-argv':
-                    command=[str(image),*tail];executable=str(exe[lib])
-                else:
-                    with image.open('r+b')as out:
-                        assert out.write(padded[lib])==maximum
-                    assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                    command=[str(image),*tail];executable=None
-                    if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                return list(map(int,sp.check_output(command,executable=executable).split()))
-            probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','packed','iced']+(['fast','private_base','private_packed'] if mode else [])
-            stable={}
+        for label,full,opaque in [('format',1,5),('detail',2,6)]:
+            work={e+'/'+m:(e,k) for e in ['capstone','x86_iter','iced____','fast____']for m,k in [('fields',full),('opaque',opaque)]}
+            work['private-copy']=('x86_iter',full);work['fast-copy']=('fast____',full)
+            def measure(e,k,reps):return list(map(int,sp.check_output([*bind,target,e,str(k),str(reps),f,intervals,str(bits)]).split()))
+            cal=measure('x86_iter',full,1);reps=max(1,math.ceil(35e6/max(1,cal[0])))
+            circles=[];sigs={}
             for i in range(data['cycles']):
-                launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                for launch in launch_order:
-                    order=labels[i%len(labels):]+labels[:i%len(labels)]
-                    obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                    assert all(len(v)==6 for k,v in obs)
-                    assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                    for k,v in obs:
-                        root='baseline' if k=='aa' else k
-                        if root not in stable:stable[root]=v[2:]
-                        assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['packed']
-                    if mode:assert stable['private_base']==stable['private_packed']==stable['packed'],(name,mode,stable)
-                    cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-            for launch,observations in cycles.items():
-                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','packed')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','packed')} if mode else None
-                reported.append(row)
+                keys=list(work);keys=keys[i%len(keys):]+keys[:i%len(keys)];v={k:[]for k in work}
+                for k in keys+keys[::-1]:
+                    q=measure(*work[k],reps);assert len(q)==6 and q[0]>0
+                    v[k].append(q);sigs.setdefault(k,q[2:]);assert q[2:]==sigs[k]
+                assert len({tuple(q[:3])for q in sigs.values()})==1
+                for typ in ('fields','opaque'):assert sigs['capstone/'+typ]==sigs['x86_iter/'+typ]
+                assert sigs['private-copy']==sigs['x86_iter/fields'] and sigs['fast-copy']==sigs['fast____/fields']
+                circles.append(v)
+            reported.append(dict(case=name,mode=label,functions=len(sel),bytes=sum(z[1]for z in sel),reps=reps,rows=sigs,cycles=circles))
             save('measurements.json',reported)
-        print(name,panel,len(sel),flush=True)
-    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
-    assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
-    save('complete.json',dict(cases=len(reported),success=True,launches=launches))
+    assert len(reported)==2*len(data['samples']) and sha(target)==image_sha
+    save('complete.json',dict(cases=len(reported),success=True,image=image_sha,source_tree=data['baseline_tree']))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
