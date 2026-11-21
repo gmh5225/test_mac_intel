@@ -37,6 +37,75 @@ index 2ee82ef7..f061af53 100644
  		break;
  	}
  }
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 8c5f511c..8c5c9e2a 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12543,53 +12543,6 @@ static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
+ 		memory->avx_bcast = broadcast;
+ }
+ 
+-static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
+-{
+-	char mnemonic[CS_MNEMONIC_SIZE] = { 0 };
+-	char operands[2] = { 0 };
+-	size_t length;
+-
+-	if (insn->id != X86_INS_VPCMP)
+-		return;
+-	SStream_extract_mnem_opstr(assembly, mnemonic, sizeof(mnemonic),
+-				   operands, sizeof(operands));
+-	if (strncmp(mnemonic, "vpcmp", 5) != 0)
+-		return;
+-
+-	// The condition printer's pseudo-ID adjustment assumes that every
+-	// predicate spelling has a contiguous public ID. Integer compares expose
+-	// element-family IDs instead, so applying that adjustment can collide with
+-	// an unrelated instruction. Normalize aliases to their family ID here.
+-	mci->popcode_adjust = 0;
+-	length = strlen(mnemonic);
+-	if (mnemonic_has_suffix(mnemonic, "ub"))
+-		insn->id = X86_INS_VPCMPUB;
+-	else if (mnemonic_has_suffix(mnemonic, "uw"))
+-		insn->id = X86_INS_VPCMPUW;
+-	else if (mnemonic_has_suffix(mnemonic, "ud"))
+-		insn->id = X86_INS_VPCMPUD;
+-	else if (mnemonic_has_suffix(mnemonic, "uq"))
+-		insn->id = X86_INS_VPCMPUQ;
+-	else if (length != 0) {
+-		switch (mnemonic[length - 1]) {
+-		case 'b':
+-			insn->id = X86_INS_VPCMPB;
+-			break;
+-		case 'w':
+-			insn->id = X86_INS_VPCMPW;
+-			break;
+-		case 'd':
+-			insn->id = X86_INS_VPCMPD;
+-			break;
+-		case 'q':
+-			insn->id = X86_INS_VPCMPQ;
+-			break;
+-		default:
+-			break;
+-		}
+-	}
+-}
+-
+ static void repair_vector_mask_conversion_access(cs_x86 *x86,
+ 						 unsigned int instruction_id)
+ {
+@@ -12752,9 +12705,9 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 	bool has_mask = false;
+ 	uint8_t i;
+ 
++	(void)mci;
+ 	if (!insn)
+ 		return;
+-	repair_vpcmp_id(insn, mnem, mci);
+ 	if (!insn->detail)
+ 		return;
+ 
 diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
 index 7e5e7f51..55068b6a 100644
 --- a/arch/X86/X86MappingInsn.inc

@@ -24,7 +24,7 @@ try:
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
-    selected=['x86_scan_batch'] if reduce or diet else units
+    selected=['x86_scan_batch'] if reduce else ['x86_scan_batch','x86_kmask_width'] if diet else units
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
     run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
