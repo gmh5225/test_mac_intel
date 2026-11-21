@@ -1,7 +1,7 @@
-name: Measure public x86 width dispatch and check all foreign-ISA records and real workloads
+name: Compare public full-decode dispatch across real foreign ISAs and compilers
 on:
   push:
-    branches: [codex/capstone-public-width-profiles]
+    branches: [codex/capstone-full-site-profiles]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-width-entry-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: full-site-profiles-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
