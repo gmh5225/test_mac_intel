@@ -20,6 +20,10 @@ def main(w):
     reference=json.loads((r/'experiment.json').read_text())['baseline_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
+    spec=json.loads((r/'experiment.json').read_text())
+    assert sha(r/'bootstrap.patch')==spec['bootstrap_sha256']
+    run(['git','-C',base,'apply','--index',r/'bootstrap.patch'],'apply-reference')
+    assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==spec['baseline_tree']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
     run(['git','init','--bare',w/'iced-git'],'iced-repo');run(['git','-C',w/'iced-git','fetch','--depth','1','https://github.com/NeverSight/iced.git',iced],'iced-fetch');run(['git','-C',w/'iced-git','archive','--format=tar','-o',tar,iced,'src/rust/iced-x86'],'iced-archive');run(['tar','-xf',tar,'-C',checkout],'iced-extract');tar.unlink()
     ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
@@ -84,6 +88,28 @@ def main(w):
             assert sha(ordinary)!=sha(w/'unselected-baseline')
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
+        if label=='baseline':
+            old_archive=w/'baseline.a';shutil.copyfile(libs[0],old_archive)
+        else:
+            from factor_layout import locate
+            members=['X86ImmediateOutput.c.o','X86Vex32Output.c.o','X86Sse64Output.c.o']
+            selected={str(mask):[m for i,m in enumerate(members) if mask&(1<<i)]for mask in range(1,7)}
+            for k,which in selected.items():
+                ar=w/(k+'.a');shutil.copyfile(old_archive,ar)
+                objs=[]
+                for member in which:
+                    item=w/member;item.write_bytes(sp.check_output(['ar','p',libs[0],member]));objs.append(item)
+                run(['ar','r',ar,*objs],'compose-'+k)
+                names=sp.check_output(['ar','t',ar],text=True).splitlines()
+                assert names==sp.check_output(['ar','t',old_archive],text=True).splitlines()
+                altered={name for name in names if hashlib.sha256(sp.check_output(['ar','p',ar,name])).hexdigest()!=prior[name]}
+                assert altered==set(which)
+                dest=w/(k+'-run')
+                run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',ar,*libs[1:],'-o',dest],'link-'+k)
+                exe[k]=dest
+            save('member-sets.json',selected)
+            save('factor-layout.json',{k:locate(exe[k])for k in ('baseline',*selected,'integrated')})
+
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
     exe['private_base']=exe['baseline'];exe['private_integrated']=exe['integrated']
@@ -124,49 +150,13 @@ def main(w):
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
-        for mode in (0,1,2):
-            def measure(lib,n,launch):
-                engine=lib+'____' if lib in ('iced','fast') else 'x86_iter' if lib.startswith('private_') else 'capstone'
-                tail=[engine,str(mode),str(n),str(f),str(intervals),str(bits)]
-                if launch=='images':
-                    command=[str(exe[lib]),*tail];executable=None
-                elif launch=='same-argv':
-                    command=[str(image),*tail];executable=str(exe[lib])
-                else:
-                    with image.open('r+b')as out:
-                        assert out.write(padded[lib])==maximum
-                    assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                    command=[str(image),*tail];executable=None
-                    if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                return list(map(int,sp.check_output(command,executable=executable).split()))
-            probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','integrated','iced']+(['fast','private_base','private_integrated'] if mode else [])
-            stable={}
-            for i in range(data['cycles']):
-                launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                for launch in launch_order:
-                    order=labels[i%len(labels):]+labels[:i%len(labels)]
-                    obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                    assert all(len(v)==6 for k,v in obs)
-                    assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                    for k,v in obs:
-                        root='baseline' if k=='aa' else k
-                        if root not in stable:stable[root]=v[2:]
-                        assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['integrated']
-                    if mode:assert stable['private_base']==stable['private_integrated']==stable['integrated'],(name,mode,stable)
-                    cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-            for launch,observations in cycles.items():
-                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','integrated')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','integrated')} if mode else None
-                reported.append(row)
-            save('measurements.json',reported)
-        print(name,panel,len(sel),flush=True)
-    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
-    assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
-    save('complete.json',dict(cases=len(reported),success=True,launches=launches))
+        from factor_layout import paired
+        for mode in (1,2):
+            reported.append(paired(w,image,padded,name,bits,f,intervals,mode))
+            save('factor-times.json',reported)
+    assert len(reported)==2*len(data['samples'])
+    save('complete.json',dict(cases=len(reported),success=True))
+
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})

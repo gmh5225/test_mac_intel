@@ -1,7 +1,7 @@
-name: Compare the integrated scalar and vector output writers against both source-built iced formatters
+name: Isolate register, i386 and amd64 Group 1 operand costs in eight real linked images
 on:
   push:
-    branches: [codex/capstone-current-integrated-native]
+    branches: [codex/capstone-group1-three-member-effects]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 2bdc2fc940d9c2275728c89e76b50bf838434658
+          ref: e41ed2cc9e8bacfc2e020dcb0deafca1ce1a251b
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: immediate-members-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
