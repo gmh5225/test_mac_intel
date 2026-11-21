@@ -96,6 +96,10 @@ def main(w):
     launches=['images']
     if probe.returncode==0:launches.append('same-file-fixed')
     save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
+    from counters import placements,collect
+    previous=json.loads((r/'counter-inputs.json').read_text())['previous']
+    save('placed.json',placements({k:exe[k]for k in ('baseline','escaped_pairs')},w))
+    save('identity.json',{k:dict(current=sha(exe[k]),previous=previous[k])for k in ('baseline','escaped_pairs')})
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     assert set(launches)=={'images','same-file-fixed'}
@@ -105,7 +109,7 @@ def main(w):
     glibc=json.loads((w/'libmvec.json').read_text())
     extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
     for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w),extra):
-        if name not in data['samples']:continue
+        if name not in ('putty-32-0.85','putty-64-0.85','jpeg-avx2-i386'):continue
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
@@ -122,50 +126,12 @@ def main(w):
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
-        for mode in (0,1,2):
-            def measure(lib,n,launch):
-                engine=lib+'____' if lib in ('iced','fast') else 'x86_iter' if lib.startswith('private_') else 'capstone'
-                tail=[engine,str(mode),str(n),str(f),str(intervals),str(bits)]
-                if launch=='images':
-                    command=[str(exe[lib]),*tail];executable=None
-                elif launch=='same-argv':
-                    command=[str(image),*tail];executable=str(exe[lib])
-                else:
-                    with image.open('r+b')as out:
-                        assert out.write(padded[lib])==maximum
-                    assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                    command=[str(image),*tail];executable=None
-                    if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                return list(map(int,sp.check_output(command,executable=executable).split()))
-            probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','escaped_pairs','iced']+(['fast','private_base','private_escaped_pairs'] if mode else [])
-            stable={}
-            for i in range(data['cycles']):
-                launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                for launch in launch_order:
-                    order=labels[i%len(labels):]+labels[:i%len(labels)]
-                    obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                    assert all(len(v)==6 for k,v in obs)
-                    assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                    for k,v in obs:
-                        root='baseline' if k=='aa' else k
-                        if root not in stable:stable[root]=v[2:]
-                        assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['escaped_pairs']
-                    if mode:assert stable['private_base']==stable['private_escaped_pairs']==stable['escaped_pairs'],(name,mode,stable)
-                    cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-            for launch,observations in cycles.items():
-                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','escaped_pairs')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','escaped_pairs')} if mode else None
-                reported.append(row)
-            save('measurements.json',reported)
-        print(name,panel,len(sel),flush=True)
-    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
-    assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
-    save('complete.json',dict(cases=len(reported),success=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
+        result=collect(w,name,1 if name=='jpeg-avx2-i386'else 2,bits,f,intervals,image,padded,evidence)
+        reported.append(result);save('counters.json',reported)
+    assert len(reported)==3
+    save('complete.json',dict(success=True,cases=3))
+
+w=Path(json.loads((r/'counter-inputs.json').read_text())['build_root']);w.mkdir()
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)
