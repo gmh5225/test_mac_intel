@@ -1,7 +1,7 @@
-name: Verify nanoMIPS compact-branch legality with a single 16-bit dispatch
+name: Verify mixed-architecture and Makefile performance on the current release trees
 on:
   push:
-    branches: [codex/capstone-nanomips-one-table]
+    branches: [codex/capstone-clang-output-six-backends]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
           ref: 26ebcf8b672cbfec8536db188aa92c506c915efa
           path: source
           persist-credentials: false
-      - name: Compare mode predicates, MIPS records and all six decoded architectures
+      - name: Check public and private PE output, CMake, Make and real ELF controls for all six backends
         run: |
           if [ "$(uname -m)" = x86_64 ]; then sudo apt-get -qq update && sudo apt-get -y install valgrind; fi
           python3 capstone-records/measure.py
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: nanomips-single-table-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: clang-six-output-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

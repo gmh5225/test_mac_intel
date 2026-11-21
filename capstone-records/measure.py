@@ -22,7 +22,7 @@ meta=json.loads((r/'lineage.json').read_text())
 assert git('rev-parse','HEAD')==meta['bounds']['parent']
 write('environment',dict(cc=sp.check_output([cc,'--version'],text=True),host=platform.platform(),
     cpu=next((line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith(('model name','CPU part'))),None)))
-with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
+with tempfile.TemporaryDirectory(prefix='capstone-mixed-x86-output-') as temp:
     t=Path(temp); b=t/'build'
     try:
         cases=corpus.prepare(r,t,out,run)
@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','X86','RISCV','PPC')],
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'configure')
         libs={}; binaries={}; objects={}
-        for label,patch in [('base','bounds'),('candidate','nano_branch')]:
+        for label,patch in [('base','bounds'),('candidate','output')]:
             if label!='base':
                 path=r/(patch+'.patch'); assert sha(path)==meta[patch]['sha256']
                 git('apply','--index',str(path))
@@ -53,11 +53,25 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
             symbols=sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines()
             keep={'Mips_getFeatureBits','Mips_LLVM_getInstruction','RISCV_getInstruction','RISCV_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','cs_decode_full_insn','cs_disasm_iter','Mips_getInstruction','Mips_get_insn_id'}
             (out/(label+'-symbols.txt')).write_text('\n'.join(line for line in symbols if line.split()[-1] in keep)+'\n')
-        assert objects['base'].keys()==objects['candidate'].keys()
+        active=cc=='clang' and platform.machine()=='x86_64' and int(re.search(r'clang version (\d+)',sp.check_output([cc,'--version'],text=True))[1]) >=18
+        added=sorted(set(objects['candidate'])-set(objects['base']))
+        assert added==['arch/X86/X86Vex32Output.c.o','arch/X86/X86VexScan.c.o'],added
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
-        write('objects',dict(changed=changed,lineage=meta))
-        assert changed==['arch/Mips/MipsDisassembler.c.o'],changed
-        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','mips_nanomips_branch']
+        write('objects',dict(changed=changed,lineage=meta,active=active,added=added))
+        expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
+        if active:assert expected<=set(changed)<=expected|{'arch/X86/X86VectorOutput.c.o'},changed
+        else:
+            assert not changed,changed
+            sections={}
+            for label,exe in binaries.items():
+                sections[label]={}
+                for sec in ('.text','.rodata'):
+                    image=t/'sec'
+                    run(['objcopy','--dump-section',sec+'='+str(image),exe,t/'objcopy.tmp'],'section-'+label+sec)
+                    sections[label][sec]=sha(image)
+            assert sections['base']==sections['candidate'],sections
+            write('passive-sections',sections)
+        targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','x86_buffer_bounds','x86_simple_output','x86_scan_batch']
         run(['cmake','--build',b,'--target',*targets,'--parallel','4'],'build-tests')
         run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(targets)+')$','-j3'],'tests')
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_writeback_postprocess_(newlines|generator)$'],'generator-tests')
@@ -65,42 +79,22 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         for arch in ('aarch64','ppc'):run([t/(arch+'-states'),libs['base'],libs['candidate']],'full-'+arch)
         for args in [[],['custom']]:
             run([t/'riscv-states',libs['base'],libs['candidate'],t/'corpus',*args],'full-riscv'+('' if not args else '-custom'))
-        unit=next(f for f in b.rglob('mips_nanomips_branch') if f.is_file())
-        run([unit],'compact-pool')
-        diet=t/'diet'
-        run(['cmake','-S',s,'-B',diet,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_DIET=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'diet-configure')
-        run(['cmake','--build',diet,'--parallel','3','--target','mips_nanomips_branch'],'diet-build')
-        run([next(f for f in diet.rglob('mips_nanomips_branch') if f.is_file())],'diet-compact-pool')
-        run(['clang++','-O2',*common,r/'verify-mips.cpp','-ldl','-o',t/'mips-states'],'mips-build')
-        run([t/'mips-states',libs['base'],libs['candidate']],'full-mips')
-        if platform.machine()=='x86_64':
-            costs=[]
-            for name,m,route in [('mips64el-ls',m,'public') for m in (0,1,2)]:
-                c=next(x for x in cases if x['name']==name)
-                for key,exe in binaries.items():
-                    trace=t/'calls.out';tag='trace-'+name+'-'+route+'-'+key
-                    rr=sp.run(['valgrind','--tool=callgrind','--callgrind-out-file='+str(trace),str(exe),str(c['selector']),str(m),c['path'],'1'],capture_output=True,text=True,check=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY=str(int(route=='public'))))
-                    names={};callee=None;caller=None;calls={}
-                    def resolved(atom):
-                        match=re.fullmatch(r'\((\d+)\)(?: (.*))?',atom)
-                        if not match:return atom
-                        n,val=match.groups()
-                        if val is not None:names[n]=val
-                        return names.get(n,'('+n+')')
-                    summary=None
-                    for line in trace.read_text(errors='replace').splitlines():
-                        if line.startswith('fn='):caller=resolved(line[3:])
-                        elif line.startswith('cfn='):callee=resolved(line[4:])
-                        elif line.startswith('calls=') and callee and caller:
-                            if any(k in callee or k in caller for k in ('Mips_getFeatureBits','Mips_LLVM_getInstruction','addSPOperands','MCInstrDesc_get','MCInst_insert0','RISCV_getInstruction','RISCV_LLVM_getInstruction','Mips_getInstruction','cs_disasm_iter','cs_decode_full_insn')):
-                                edge=caller+' -> '+callee;calls[edge]=calls.get(edge,0)+int(line[6:].split()[0])
-                        elif line.startswith('summary:'):summary=int(line.split()[1])
-                    assert summary is not None and calls
-                    costs.append(dict(variant=key,case=name,route=route,mode=m,total_ir=summary,edges=calls,first=json.loads(rr.stdout)['first']))
-                    trace.unlink()
-            write('call-costs',costs)
+        if cc=='clang' and platform.machine()=='x86_64':
+            mk=t/'make';mk.mkdir()
+            archive=mk/'libcapstone.a'
+            run(['make','-j4','BUILDDIR='+str(mk),'CAPSTONE_ARCHS=x86 arm aarch64 mips powerpc riscv','CC='+cc,'CAPSTONE_SHARED=no',str(archive)],'make-library',s)
+            run(['clang++',t/'one.o',archive,'-lm','-o',t/'make-benchmark'],'make-link')
+            for c in cases:
+                if c['name'] not in ('putty-32-0.85','ppc64el-ls','arm-ls','mips64el-ls'):continue
+                for mode in range(3):
+                    outputs=[]
+                    for engine in (binaries['candidate'],t/'make-benchmark'):
+                        z=json.loads(sp.check_output([engine,str(c['selector']),str(mode),c['path'],'1'],text=True,env=dict(os.environ,CAPSTONE_PUBLIC_ONLY='1')))
+                        outputs.append([z['first'],z['result']])
+                    assert outputs[0]==outputs[1],(c['name'],mode)
+            write('make',dict(verified_cases=12,source=meta['output']['tree']))
         shutil.copy2(binaries['base'],t/'copy');binaries['copy']=t/'copy'
-        payload={k:v.read_bytes() for k,v in binaries.items()}; assert payload['base']==payload['copy']!=payload['candidate']
+        payload={k:v.read_bytes() for k,v in binaries.items()}; assert payload['base']==payload['copy']
         size=max(map(len,payload.values())); image=t/'same'; image.write_bytes(bytes(size));image.chmod(0o755);inode=image.stat().st_ino
         padded={k:v+bytes(size-len(v)) for k,v in payload.items()}
         fixed=['setarch',platform.machine(),'-R']; sp.run([*fixed,'/bin/true'],check=True)
@@ -114,7 +108,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         rows=[]
         for c in cases:
             for m in (0,1,2):
-                routes=['private' if m and c['selector']>=16 else 'public']
+                routes=(['public','private'] if m and c['name'] in ('putty-32-0.85','putty-64-0.85') else ['private' if m and c['selector']>=16 else 'public'])
                 for route in routes:
                     probe=sample('base',c,m,2,route)
                     n=max(2,min(4000,round(64e6/probe['cpu_ns'])))
@@ -129,6 +123,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
                         pairs.append(ticks)
                     rows.append(dict(case=c['name'],route=route,mode=m,repeats=n,reference=reference,cycles=pairs))
                     write('timings',rows)
-        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['nano_branch']['tree']))
+        write('complete',dict(rows=len(rows),tested_base_tree=meta['bounds']['tree'],tested_candidate_tree=meta['output']['tree']))
     finally:
         n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
