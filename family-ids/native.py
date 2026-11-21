@@ -41,7 +41,7 @@ try:
             write(variant+'-riscv-mapping',value)
             if variant=='candidate':assert value==json.loads((obs/'base-riscv-mapping.json').read_text())
     before,after=archive_objects['base'],archive_objects['candidate'];assert before.keys()==after.keys()
-    changed=[k for k,v in before.items()if v!=after[k]];assert len(changed)==1 and changed[0].endswith('/AliasMapping.c.o')
+    changed=[k for k,v in before.items()if v!=after[k]];assert len(changed)==1 and changed[0].endswith('/MipsInstPrinter.c.o')
     assert text_sections['base']['.cs_alias_lookup_rodata']==text_sections['candidate']['.cs_alias_lookup_rodata']
     write('placement',dict(members=len(before),changed=changed,sections=text_sections))
     if conf=='full':

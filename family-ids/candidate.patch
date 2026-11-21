@@ -1,14 +1,17 @@
-diff --git a/AliasMapping.c b/AliasMapping.c
-index 77e2395c..52e82dff 100644
---- a/AliasMapping.c
-+++ b/AliasMapping.c
-@@ -52,6 +52,9 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
+diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
+index 84e22867..f9c3625f 100644
+--- a/arch/Mips/MipsInstPrinter.c
++++ b/arch/Mips/MipsInstPrinter.c
+@@ -151,9 +151,11 @@ static void patch_cs_printer(MCInst *MI, SStream *O)
  {
- 	(void)map;
- 	(void)map_size;
-+	/* Mips_init_cs_detail has already reset the alias ID for ordinary mnemonics. */
-+	if (!MCInst_isAlias(MI))
-+		return;
- 	map_set_alias_id_trie_impl(MI, O, mips_alias_trie,
- 				   ARR_SIZE(mips_alias_trie));
- }
+ 	// replace '# 16 bit inst' to empty.
+ 	SStream_replc(O, '#', 0);
+-	SStream_trimls(O);
+ 
++	/* Alias lookup skips leading whitespace, and fill_insn trims the stream
++	 * before the post-printer. Keep the original ordering when editing '$'. */
+ 	if (MI->csh->syntax & CS_OPT_SYNTAX_NO_DOLLAR) {
++		SStream_trimls(O);
+ 		char *dollar = strchr(O->buffer, '$');
+ 		if (!dollar) {
+ 			return;
