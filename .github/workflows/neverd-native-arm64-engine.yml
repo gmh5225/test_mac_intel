@@ -10,6 +10,7 @@ on:
       - native-driver-entry/shim.S
       - native-driver-entry/check_export_entries.py
       - native-driver-entry/export-entry-inputs.json
+      - native-driver-entry/check_com_callbacks.py
 permissions:
   contents: read
 jobs:
@@ -106,6 +107,13 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.KernelLibraryCallbacksUseTheTargetWDK'
           python native-driver-entry/check_export_entries.py --neverd "$env:RUNNER_TEMP/nb/bin/neverd.exe" --work "$env:RUNNER_TEMP/entry-exports" --report native-export-verification.json
+      - name: Execute original SDK COM callbacks and both recovered views on ARM64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.COMRegistrationUsesTheTargetUserABI'
+          python native-driver-entry/check_com_callbacks.py --neverd "$env:RUNNER_TEMP/nb/bin/neverd.exe" --work "$env:RUNNER_TEMP/com-callbacks" --report native-com-observations.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
@@ -114,6 +122,7 @@ jobs:
             native-driver-verification.json
             native-entry-observations.json
             native-export-verification.json
+            native-com-observations.json
             ${{ runner.temp }}/nb/neverd-build-receipt.json
             ${{ runner.temp }}/nb/neverd-dependency-inputs.json
           if-no-files-found: warn

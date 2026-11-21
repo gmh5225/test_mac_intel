@@ -25,6 +25,8 @@ def image_row(path):
                                 symbol.forwarder.decode("ascii", "backslashreplace")
                                 if symbol.forwarder else None])
         return {"module": path.name, "machine": pe.FILE_HEADER.Machine,
+                "characteristics": pe.FILE_HEADER.Characteristics,
+                "subsystem": pe.OPTIONAL_HEADER.Subsystem,
                 "timestamp": pe.FILE_HEADER.TimeDateStamp,
                 "image_size": pe.OPTIONAL_HEADER.SizeOfImage,
                 "entry_rva": pe.OPTIONAL_HEADER.AddressOfEntryPoint,
