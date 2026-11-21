@@ -1,14 +1,14 @@
 {
-  "neverd": "4dbcd06b7e7140277943230ba4cd30b438a4f908",
-  "capstone": "88f64f91be1b3c9de7c5819e93806fa8d79127db",
+  "neverd": "44902d1101f1ea551b4b1e09b0af4d1ae9045e39",
+  "capstone": "17f68720b746928d0628f4ed01664d43cb2ea350",
   "variants": {
     "riscv_only": {
       "commit": "17f68720b746928d0628f4ed01664d43cb2ea350",
       "tree": "04df8d206ac08ffaefd0d3e498dd6a198e27aa45",
       "capstone_patch": "riscv_only-capstone.patch",
-      "capstone_sha256": "5f767951e14ff581d3361072bddc4c5cbfb7c8974175d321e40aa85594147a5e",
+      "capstone_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "neverd_tree": "50182c69a13593e68069696558c082113a7f2a0d",
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "neverd_tree": "b20c2cb7fbbd8876520d31bd44cadc7f6da4ca22",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
@@ -16,12 +16,14 @@
       }
     },
     "mips_scoped": {
-      "commit": "e463bc86a78780611462a0edc0c0c624ab46439f",
-      "tree": "256b033460fd027a8136f9c9f0d0bacb9b2df64d",
+      "commit": "845267966b6385d7e91b81277f20af2a65af4832",
+      "tree": "e39f91c6e5a2b2fab75dfd2edbf488da18d068de",
       "capstone_patch": "mips_scoped-capstone.patch",
-      "capstone_sha256": "fb6d2fac6d3f320fe2f9db7b2d395d966fc01d71ef16ed26ac6ead56f28349ab",
-      "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "neverd_tree": "b20c2cb7fbbd8876520d31bd44cadc7f6da4ca22",
+      "capstone_sha256": "9af23415bb8a0593c9f71b37d0448705557518cae8ca989be2c878b9c9e42765",
+      "patch": "mips_scoped-neverd.patch",
+      "patch_sha256": "d00cb5427d094cba57178e9085b89457c35284f70f844e95a7b07beb86a30c4f",
+      "neverd_tree": "065b559b6d36aac52dd82890fa88a4ba9a2f1022",
+      "build_blob": "ed98892588e93f4609aaf73e4a996461a5e13ea8",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
@@ -29,14 +31,14 @@
       }
     },
     "x86_and_mips": {
-      "commit": "caef5ea7db7632b5282d9c293f87705349d97268",
-      "tree": "5bbe00a357889ccf75d5815c1cff9af1aebe4293",
+      "commit": "2c3d603a35ee40bc82812c223a6fde14d4add1dc",
+      "tree": "b05dbe10a07a640ee41356a6f7730af1b2af0f2d",
       "capstone_patch": "x86_and_mips-capstone.patch",
-      "capstone_sha256": "21df0898b9058ca6ded6c154c3a8d2adbd81abfb7ec85670e304e586e5e9cf1a",
-      "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
+      "capstone_sha256": "d98c6a979557f0342a790dbf71e60dabe102edfd42da689afe327fe5b3f080f3",
       "patch": "x86_and_mips-neverd.patch",
-      "patch_sha256": "4ad3da8f85e81b5911e8fa627dd2d8a557852f5a7f0563f9f812fec48695ad28",
-      "neverd_tree": "8d41ea862dba04fef598bdb69652329a56a8fa99",
+      "patch_sha256": "7a280bf9ee8a3826d2e68f6082cc02efd27a3a26435738f56c1ede8360db3486",
+      "neverd_tree": "84d53277b0e67dd9658b8050f063ccba38fa4269",
+      "build_blob": "ed98892588e93f4609aaf73e4a996461a5e13ea8",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
@@ -49,8 +51,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Verify the exact fast-forward release sequence with both production launches, the shipping source-built LLVM, and every linked archive member.",
-  "parent": "c9ba794f890bbbc52f6869726dac8c9289fa48a1",
+  "scope": "Rebuild current NeverD dev with current LLVM source. Compare the released decoder, an independent repeat, MIPS call-site selection in the qualified static profile, and the combined x86 release.",
+  "parent": "15b7e4beb56dc3d9f410c5bd092b8808ece79c76",
   "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",

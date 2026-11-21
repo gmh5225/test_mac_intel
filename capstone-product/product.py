@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    write(label+'-neverd-head',rev(nd))
    if label!='base':
     capfix=r/variants[label]['capstone_patch'];assert hashlib.sha256(capfix.read_bytes()).hexdigest()==variants[label]['capstone_sha256']
-    command(['git','apply',capfix],'apply-capstone-'+label,cs)
+    if capfix.stat().st_size:command(['git','apply',capfix],'apply-capstone-'+label,cs)
    if 'patch' in variants.get(label,{}):
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
@@ -97,6 +97,10 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     entry,=entries
     args=shlex.split(entry['command'])
     policies[name]=[a for a in args if a in ('-fomit-frame-pointer','-O3','-DNDEBUG') or 'discard' in a]
+   mips_command,=[c['command'] for c in compile_database if c['file'].endswith('/arch/Mips/MipsMapping.c')]
+   alias_precheck='-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS' in shlex.split(mips_command)
+   assert alias_precheck==(label in ('mips_scoped','x86_and_mips'))
+   write(label+'-alias-compile-policy',dict(mips_precheck=alias_precheck))
    assert len(policies)==3
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
    assert all(v==policies['X86OutputIterator.c'] for v in policies.values())
@@ -206,6 +210,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     prior=json.loads((out/'base-objects.json').read_text())
     assert prior.keys()==objects.keys()
     assert {Path(k).name for k in prior if prior[k]!=objects[k]}==(set() if label=='riscv_only' else {'MipsMapping.c.o'} if label=='mips_scoped' else {'MipsMapping.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'})
+   expected_objects=json.loads((r/'reference-products.json').read_text())['objects'][label]
+   assert objects==expected_objects,(label,[key for key in objects if objects[key]!=expected_objects.get(key)])
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)

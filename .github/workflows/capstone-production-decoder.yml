@@ -1,7 +1,7 @@
-name: Validate the exact cumulative RISC-V MIPS and x86 revisions in production
+name: Verify shipping MIPS callsite selection and both x86 iterators on current NeverD dev
 on:
   push:
-    branches: [codex/neverd-release-scoped-x86-mips-riscv]
+    branches: [codex/neverd-static-mips-callsite-amd64-i386-release]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4dbcd06b7e7140277943230ba4cd30b438a4f908
+          ref: 44902d1101f1ea551b4b1e09b0af4d1ae9045e39
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,8 +44,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "4dbcd06b7e7140277943230ba4cd30b438a4f908"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "88f64f91be1b3c9de7c5819e93806fa8d79127db"
+          test "$(git rev-parse HEAD)" = "44902d1101f1ea551b4b1e09b0af4d1ae9045e39"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "17f68720b746928d0628f4ed01664d43cb2ea350"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: qualified-decoder-${{ matrix.os }}-${{ matrix.cc }}
+          name: production-scope-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

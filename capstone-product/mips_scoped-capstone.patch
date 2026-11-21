@@ -1,143 +1,40 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d0c42ac9..990d371e 100644
+index 990d371e..c9e10ff5 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -184,6 +184,11 @@ endif()
- 
- if(capstone_enabled_architectures STREQUAL "RISCV")
-     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
-+    # Fixed-width implicit counts improve detailed decoding in this configuration.
-+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-+       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-+        add_compile_definitions(CAPSTONE_RISCV_SHORT_IMPLICIT_LISTS)
-+    endif()
+@@ -212,6 +212,7 @@ if(use_alias_trie)
+     add_compile_definitions(CAPSTONE_USE_ALIAS_TRIE)
  endif()
  
- if(capstone_enabled_architectures STREQUAL "SPARC")
++option(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS "Check the MIPS printer alias flag before calling the isolated mnemonic lookup" OFF)
+ option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
+ option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
+ option(CAPSTONE_X86_SCAN_ADAPTER "Build the private x86 scan adapter hook" OFF)
+@@ -397,6 +398,10 @@ endif()
+ 
+ if(CAPSTONE_MIPS_SUPPORT)
+     add_definitions(-DCAPSTONE_HAS_MIPS)
++    if(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS)
++        set_property(SOURCE arch/Mips/MipsMapping.c APPEND PROPERTY
++            COMPILE_DEFINITIONS CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS)
++    endif()
+     set(CSTOOL_SRC
+         ${CSTOOL_SRC}
+         cstool/cstool_mips.c)
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 551c7d06..ec39ffd9 100644
+index 551c7d06..76269c55 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
-@@ -463,6 +463,10 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -463,6 +463,12 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
  			ARR_SIZE(insn_alias_mnem_map), alias_trie);
  #elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
++#ifdef CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS
 +	/* Mips_init_cs_detail cleared the ID before decode. Only the
 +	 * alias printer can give this instruction a mnemonic to resolve. */
 +	if (!MCInst_isAlias(MI))
 +		return;
++#endif
  	map_set_mips_alias_id(MI, O, insn_alias_mnem_map,
  			      ARR_SIZE(insn_alias_mnem_map));
  #else
-diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
-index 71e461d7..45d62be6 100644
---- a/arch/RISCV/RISCVMapping.c
-+++ b/arch/RISCV/RISCVMapping.c
-@@ -364,6 +364,29 @@ void RISCV_compact_operands(MCInst *MI)
- 	       (NUM_RISCV_OPS - write_pos) * sizeof(cs_riscv_op));
- }
- 
-+#if defined(CAPSTONE_RISCV_SHORT_IMPLICIT_LISTS) && !defined(CAPSTONE_DIET)
-+/* Generated lists are contiguous and zero-padded. Current RISC-V rows
-+ * have up to two implicit reads/writes and four groups. Longer lists
-+ * retain the ordinary count. */
-+static uint8_t implicit_reg_count(const uint16_t *regs)
-+{
-+	if (regs[2])
-+		return (uint8_t)count_positive(regs);
-+	return (uint8_t)((regs[0] != 0) + (regs[1] != 0));
-+}
-+
-+static uint8_t implicit_group_count(const uint8_t *groups)
-+{
-+	if (groups[4])
-+		return (uint8_t)count_positive8(groups);
-+	return (uint8_t)((groups[0] != 0) + (groups[1] != 0) +
-+			 (groups[2] != 0) + (groups[3] != 0));
-+}
-+#else
-+#define implicit_reg_count count_positive
-+#define implicit_group_count count_positive8
-+#endif
-+
- // given internal insn id, return public instruction info
- void RISCV_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- {
-@@ -379,17 +402,17 @@ void RISCV_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 			memcpy(insn->detail->regs_read, insn_map->regs_use,
- 			       sizeof(insn_map->regs_use));
- 			insn->detail->regs_read_count =
--				(uint8_t)count_positive(insn_map->regs_use);
-+				(uint8_t)implicit_reg_count(insn_map->regs_use);
- 
- 			memcpy(insn->detail->regs_write, insn_map->regs_mod,
- 			       sizeof(insn_map->regs_mod));
- 			insn->detail->regs_write_count =
--				(uint8_t)count_positive(insn_map->regs_mod);
-+				(uint8_t)implicit_reg_count(insn_map->regs_mod);
- 
- 			memcpy(insn->detail->groups, insn_map->groups,
- 			       sizeof(insn_map->groups));
- 			insn->detail->groups_count =
--				(uint8_t)count_positive8(insn_map->groups);
-+				(uint8_t)implicit_group_count(insn_map->groups);
- 
- 			if (insn_map->branch || insn_map->indirect_branch) {
- 				// this insn also belongs to JUMP group. add JUMP group
-diff --git a/tests/unit/riscv_mapping_index.c b/tests/unit/riscv_mapping_index.c
-index 6cb9feac..846f7086 100644
---- a/tests/unit/riscv_mapping_index.c
-+++ b/tests/unit/riscv_mapping_index.c
-@@ -5,9 +5,52 @@
- #include "../../utils.h"
- #include "../../arch/RISCV/RISCVMapping.h"
- 
-+#ifndef CAPSTONE_DIET
-+static bool check_implicit_effects(cs_struct *handle, unsigned id,
-+				   const insn_map *row)
-+{
-+	cs_detail actual;
-+	memset(&actual, 0xa5, sizeof(actual));
-+	cs_detail expected;
-+	memcpy(&expected, &actual, sizeof(expected));
-+	cs_insn insn = { 0 };
-+	insn.id = UINT_MAX;
-+	insn.detail = &actual;
-+	if (row) {
-+		memcpy(expected.regs_read, row->regs_use,
-+		       sizeof(row->regs_use));
-+		memcpy(expected.regs_write, row->regs_mod,
-+		       sizeof(row->regs_mod));
-+		memcpy(expected.groups, row->groups, sizeof(row->groups));
-+		expected.regs_read_count =
-+			(uint8_t)count_positive(row->regs_use);
-+		expected.regs_write_count =
-+			(uint8_t)count_positive(row->regs_mod);
-+		expected.groups_count = (uint8_t)count_positive8(row->groups);
-+		if (row->branch || row->indirect_branch)
-+			expected.groups[expected.groups_count++] =
-+				RISCV_GRP_JUMP;
-+	}
-+	const bool was_enabled = handle->detail_opt;
-+	handle->detail_opt = true;
-+	RISCV_get_insn_id(handle, &insn, id);
-+	handle->detail_opt = was_enabled;
-+	return insn.id == (row ? row->mapid : UINT_MAX) &&
-+	       !memcmp(&actual, &expected, sizeof(actual));
-+}
-+#endif
-+
- static bool check_id(cs_struct *handle, unsigned id)
- {
- 	const insn_map *expected = lookup_insn_map(handle, id);
-+#ifndef CAPSTONE_DIET
-+	if (!check_implicit_effects(handle, id, expected)) {
-+		fprintf(stderr,
-+			"RISC-V implicit register or group mismatch for input ID %u\n",
-+			id);
-+		return false;
-+	}
-+#endif
- 	cs_insn insn = { 0 };
- 	insn.id = UINT_MAX;
- 	RISCV_get_insn_id(handle, &insn, id);
