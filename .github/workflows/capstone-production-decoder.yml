@@ -1,7 +1,7 @@
-name: Measure embedded rounding and packed target text alongside the new MIPS entry in NeverD
+name: Isolate the impact of a one-page data-address change in the shipping decoder
 on:
   push:
-    branches: [codex/neverd-shipping-embedded-rounding]
+    branches: [codex/neverd-readonly-page-control]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -13,6 +13,10 @@ jobs:
         include:
           - os: ubuntu-24.04
             cc: clang
+            replica: 1
+          - os: ubuntu-24.04
+            cc: clang
+            replica: 2
     runs-on: ${{ matrix.os }}
     timeout-minutes: 235
     steps:
@@ -58,6 +62,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipping-rounding-${{ matrix.os }}-${{ matrix.cc }}
+          name: release-pages-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
