@@ -11,7 +11,8 @@ def command(args,label,cwd=None):
 def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).strip()
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 meta=json.loads((r/'tree.json').read_text());dev=(r/'dev.txt').read_text().strip()
-assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==meta['parent']
+repair=json.loads((r/'repair.json').read_text());assert sha(r/'repair.patch')==repair['sha256']
+assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==repair['parent']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(neverd=dev,capstone=meta,llvm=llvm,main_at_start=remote,prebuilt=False))
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
@@ -28,13 +29,14 @@ try:
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
-    for variant in ('base','candidate'):
+    for variant in ('base','correct','candidate'):
+        if variant=='correct':command(['git','apply','--index',r/'repair.patch'],'apply-repair',cs)
         if variant=='candidate':
             assert sha(r/'candidate.patch')==meta['sha256']
             command(['git','apply','--index',r/'candidate.patch'],'apply',cs)
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
-        assert git(cs,'write-tree')==(meta['tree'] if variant=='candidate' else git(cs,'rev-parse',meta['parent']+'^{tree}'))
+        assert git(cs,'write-tree')==(meta['tree'] if variant=='candidate' else repair['tree'] if variant=='correct' else git(cs,'rev-parse',repair['parent']+'^{tree}'))
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         archive,=build.rglob('libcapstone.a')
@@ -64,11 +66,11 @@ try:
             expected=execute('base',c,mode,n)[1:];cycles=[]
             delta=3*n*per if c['name']=='putty-32-0.85'and mode==2 else 0
             for rep in range(11):
-                keys=['base','copy','candidate'];rng.shuffle(keys);ticks={v:[] for v in keys}
+                keys=['base','copy','correct','candidate'];rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k=='candidate':wanted[-1]-=delta
+                    if k in ('correct','candidate'):wanted[-1]-=delta
                     assert wanted==sample[1:],(c['name'],mode,k,expected,delta,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)

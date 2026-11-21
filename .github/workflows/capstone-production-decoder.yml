@@ -1,7 +1,7 @@
-name: Check corrected AVX register effects through the current NeverD decoder built from LLVM main
+name: Validate vector-clearing records and speed in three linked NeverD builds from source
 on:
   push:
-    branches: [codex/neverd-vector-clear-product]
+    branches: [codex/neverd-corrected-vector-shipping]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-clear-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: shipping-vector-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
