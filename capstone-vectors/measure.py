@@ -74,8 +74,15 @@ def main(w):
             save(label+'-object-isolation.json',dict(changed=changed,added=added,unchanged=len(before)-len(changed),shared_identical=sha(w/'integer.so')==sha(w/(label+'.so'))))
         save('object-digests.json',objects)
         adapter=w/'select.c';selected='X86_disasmIter' if label=='integer' else 'X86_disasmIter32'
-        adapter.write_text('#include <capstone/capstone.h>\\nextern bool '+selected+'(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);\\nbool selected(csh h,const uint8_t **c,size_t *n,uint64_t *ip,cs_insn *i){return '+selected+'(h,c,n,ip,i); }\\n')
-        run(['clang','-O3','-I',tree/'include','-c',adapter,'-o',w/'select.o'],'select-'+label)
+        adapter.write_text(chr(10).join((
+            '#include <capstone/capstone.h>',
+            'extern bool '+selected+'(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);',
+            'bool selected(csh h,const uint8_t **c,size_t *n,uint64_t *ip,cs_insn *i){return '+selected+'(h,c,n,ip,i);}',
+            '')))
+        run(['clang','-Werror','-O3','-I',tree/'include','-c',adapter,'-o',w/'select.o'],'select-'+label)
+        symbols=sp.check_output(['nm','-g',w/'select.o'],text=True).splitlines()
+        assert any(line.split()[-2:]==['T','_selected'] for line in symbols)
+        assert any(line.split()[-2:]==['U','_'+selected] for line in symbols)
         obj=w/'driver.o'
         if label=='integer':consumer_hash=sha(obj)
         else:assert sha(obj)==consumer_hash
