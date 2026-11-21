@@ -1,7 +1,7 @@
-name: Check VEX and i386 widening across seven compilers and decoder configurations
+name: Exercise the enabled VEX register writer in the Intel-syntax-only build
 on:
   push:
-    branches: [codex/capstone-vex-widening-profiles]
+    branches: [codex/capstone-vex-intel-syntax-profile]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,12 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: gcc, flavor: full }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
           - { host: ubuntu-24.04, cc: clang, flavor: intel }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
