@@ -1,7 +1,7 @@
-name: Compare corrected x86 register details and bare vector clears to the iced fork
+name: Compare public and 64-entry batch scanning against the same iced decoder
 on:
   push:
-    branches: [codex/capstone-corrected-vector-native]
+    branches: [codex/capstone-batch-scan-vs-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: corrected-vector-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: batch-current-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

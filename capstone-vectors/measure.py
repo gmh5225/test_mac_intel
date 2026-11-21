@@ -54,6 +54,13 @@ def main(w):
     assert inc.count(key)==1
     inc=inc.replace('#include "arch/X86/X86ScanAdapter.h"', '#include "arch/X86/X86ScanAdapter.h"\n'+weak)
     inc=inc.replace(key,'else if(engine=="x86_iter" && bits==32 && X86_disasmIter32) row=cs_span<X86_disasmIter32>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        else if(engine=="x86_iter" && X86_disasmIterText) row=cs_span<X86_disasmIterText>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        '+key)
+    head='static Result cs_span('
+    anchor='extern "C" size_t iced_trace'
+    assert inc.count(anchor)==1;inc=inc.replace(anchor,(r/'batch.inc').read_text()+'\n'+anchor)
+    inc=inc.replace('if(engine!="capstone" &&','if(engine!="batch___" && engine!="capstone" &&')
+    inc=inc.replace('else iced_run(iced,','else if(engine=="batch___") row=batch_span<false>(bytes.data()+f.offset,f.size,handle,insn,f.ip);\n        else iced_run(iced,')
+    line='auto ptr=bytes.data()+f.offset;'
+    assert inc.count(line)==1;inc=inc.replace(line,line+'\n      (void)batch_span<true>(ptr,f.size,handle,insn,f.ip);')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
@@ -91,7 +98,8 @@ def main(w):
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
     exe['private_base']=exe['baseline'];exe['private_integrated']=exe['integrated']
-    exe['iced']=exe['fast']=exe['baseline']
+    exe['iced']=exe['baseline']
+    exe['batch_base']=exe['baseline'];exe['batch_test']=exe['integrated']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['baseline']==payloads['aa']
     maximum=max(map(len,payloads.values()))
@@ -128,9 +136,9 @@ def main(w):
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
-        for mode in (0,1,2):
+        for mode in (0,):
             def measure(lib,n,launch):
-                engine=lib+'____' if lib in ('iced','fast') else 'x86_iter' if lib.startswith('private_') else 'capstone'
+                engine=lib+'____' if lib in ('iced','fast') else 'batch___' if lib.startswith('batch_') else 'x86_iter' if lib.startswith('private_') else 'capstone'
                 tail=[engine,str(mode),str(n),str(f),str(intervals),str(bits)]
                 if launch=='images':
                     command=[str(exe[lib]),*tail];executable=None
@@ -143,8 +151,8 @@ def main(w):
                     command=[str(image),*tail];executable=None
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
-            probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','integrated','iced']+(['fast','private_base','private_integrated'] if mode else [])
+            probe=measure('baseline',1,'images');rep=max(1,math.ceil(50e6/max(1,probe[0])))
+            cycles={launch:[]for launch in launches};labels=['baseline','aa','integrated','iced','batch_base','batch_test']
             stable={}
             for i in range(data['cycles']):
                 launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
@@ -157,7 +165,7 @@ def main(w):
                         root='baseline' if k=='aa' else k
                         if root not in stable:stable[root]=v[2:]
                         assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['integrated']
+                    assert stable['batch_base']==stable['batch_test']==stable['baseline']==stable['integrated']
                     if mode:assert stable['private_base']==stable['private_integrated']==stable['integrated'],(name,mode,stable)
                     cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
             for launch,observations in cycles.items():
@@ -168,7 +176,7 @@ def main(w):
                 reported.append(row)
             save('measurements.json',reported)
         print(name,panel,len(sel),flush=True)
-    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
+    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan',) for launch in launches}
     assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
     save('complete.json',dict(cases=len(reported),success=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
