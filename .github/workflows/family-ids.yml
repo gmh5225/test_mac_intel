@@ -1,0 +1,45 @@
+name: Verify EVEX integer compare families and time OpenSSL and PuTTY
+on:
+  push:
+    branches: [codex/capstone-vpcmp-family-ids]
+    paths: [family-ids/**, .github/workflows/family-ids.yml]
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: ubuntu-22.04, cc: clang, flavor: full }
+          - { host: ubuntu-24.04, cc: clang, flavor: full }
+          - { host: ubuntu-24.04, cc: gcc, flavor: full }
+          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
+          - { host: ubuntu-24.04, cc: clang, flavor: diet }
+          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
+          - { host: ubuntu-24.04, cc: clang, flavor: intel }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 55
+    env:
+      CC: ${{ matrix.cc }}
+      FLAVOR: ${{ matrix.flavor }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: family-ids
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 26ebcf8b672cbfec8536db188aa92c506c915efa
+          path: source
+          persist-credentials: false
+      - run: python3 -B family-ids/native.py
+      - if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          path: evidence/
+          name: family-ids-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          retention-days: 14
