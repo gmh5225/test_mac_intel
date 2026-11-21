@@ -1,7 +1,7 @@
-name: Time the isolated i386 address reader and scan dispatch while retaining the shipping amd64 code
+name: Measure unchanged MIPS machine code with controlled private x86 text and read-only extents
 on:
   push:
-    branches: [codex/neverd-production-isolated-i386]
+    branches: [codex/neverd-production-mips-layout-factors]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-i386-${{ matrix.os }}-${{ matrix.cc }}
+          name: layout-factors-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
