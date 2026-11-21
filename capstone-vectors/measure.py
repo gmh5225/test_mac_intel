@@ -106,7 +106,7 @@ def main(w):
     launches=['images']
     if probe.returncode==0:launches.append('same-file-fixed')
     save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
-    from layout import locate,paired
+    from linker_placement import locate,paired
     inventory={key:locate(exe[key])for key in ('baseline','extend32','baseline-swap','extend32-swap','baseline-ordered','extend32-ordered')}
     save('inventory.json',inventory)
     for key in ('baseline-ordered','extend32-ordered'):
