@@ -1,7 +1,7 @@
-name: Compare combined i386 and RISC-V next with both iced formatters on the concurrent MIPS change
+name: Attribute costs of the published Capstone amd64 widening release and iced
 on:
   push:
-    branches: [codex/capstone-current-next-iced]
+    branches: [codex/capstone-published-extended-operands-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,7 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -25,11 +24,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 38d0847fb739b95708e6929af78ffdf1ebc806b5
+          ref: c9a9fcbc9a87f468f8039bbddc3467f21fdc1edf
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: next-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: integrated-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
