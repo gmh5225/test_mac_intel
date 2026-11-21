@@ -89,6 +89,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
+   command([cc,'-O2','-I',cs,'-I',cs/'include',cs/'tests/unit/mips_single.c',next(build.rglob('libcapstone.a')),'-lm','-o',t/'check-mips-entry'],'build-mips-single-'+label)
+   command([t/'check-mips-entry'],'mips-single-'+label)
    import shlex
    compile_database=json.loads((build/'compile_commands.json').read_text())
    policies={}
@@ -100,6 +102,10 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    mips_command,=[c['command'] for c in compile_database if c['file'].endswith('/arch/Mips/MipsMapping.c')]
    alias_precheck='-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS' in shlex.split(mips_command)
    assert alias_precheck
+   selected={'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':'MipsInstPrinter.c','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':'X86Sse64Output.c'}
+   flags={flag:[Path(c['file']).name for c in compile_database if '-D'+flag in shlex.split(c['command'])]for flag in selected}
+   assert all(flags[k]==[v]for k,v in selected.items()),flags
+   write(label+'-retained-options',flags)
    write(label+'-alias-compile-policy',dict(mips_precheck=alias_precheck))
    assert len(policies)==3
    for opts in policies.values():assert '-O3' in opts and '-DNDEBUG' in opts and '-fomit-frame-pointer' in opts
@@ -230,6 +236,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
   write('products',identities)
+  assert identities['riscv']==identities['base'] and identities['combined']==identities['extend32'],identities
   if not feature_active:
    remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
    write('complete',dict(cases=0,active=False,identical_product=True,variants=list(variants),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix']))
