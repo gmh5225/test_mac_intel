@@ -57,7 +57,7 @@ jobs:
           if ($LASTEXITCODE) { throw 'capture assembly' }
           foreach ($variant in @('high','llvm')) {
             $sourceHash = (Get-FileHash "$variant.c").Hash.ToLower()
-            if ($sourceHash -ne $expected.source_sha256.$variant) { throw "$variant source mismatch" }
+            if ($sourceHash -ne $expected.source_sha256."$variant.c") { throw "$variant source mismatch $sourceHash" }
             clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 "/Dobserve_entry=observe_$variant" /c "$variant.c" "/Fo$variant.obj"
             if ($LASTEXITCODE) { throw "$variant compilation" }
           }
