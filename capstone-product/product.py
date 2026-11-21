@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib,json,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
+import re
 import corpus
 import avx_corpus
 r=Path(__file__).resolve().parent;root=r.parent;nd=root/'neverd';out=root/'product-evidence';out.mkdir(exist_ok=True)
