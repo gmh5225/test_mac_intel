@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
-   command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests|NeverDMIPSTests|NeverDMIPSFlowTests|NeverDX86EVEXFPCompareTests|NeverDX86EVEXCompareTests|NeverDX86MaskCompareStateTests|NeverDX86FPPackedConvertStateTests)$'],'tests-'+label)
+   command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',str(out/('tests-'+label+'.xml')),'-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests|NeverDX86NoIndexAddressTests|NeverDMIPSTests|NeverDMIPSFlowTests|NeverDX86EVEXFPCompareTests|NeverDX86EVEXCompareTests|NeverDX86MaskCompareStateTests|NeverDX86FPPackedConvertStateTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
    command([tool,'--xbegin'],'exhaustive-xbegin-'+label)
    command([tool,'--rendered-xbegin'],'rendered-xbegin-'+label)
