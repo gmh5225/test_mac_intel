@@ -1,15 +1,14 @@
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 551c7d06..ec39ffd9 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -463,6 +463,10 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
- 			ARR_SIZE(insn_alias_mnem_map), alias_trie);
- #elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
-+	/* Mips_init_cs_detail cleared the ID before decode. Only the
-+	 * alias printer can give this instruction a mnemonic to resolve. */
+diff --git a/AliasMapping.c b/AliasMapping.c
+index 77e2395c..52e82dff 100644
+--- a/AliasMapping.c
++++ b/AliasMapping.c
+@@ -52,6 +52,9 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
+ {
+ 	(void)map;
+ 	(void)map_size;
++	/* Mips_init_cs_detail has already reset the alias ID for ordinary mnemonics. */
 +	if (!MCInst_isAlias(MI))
 +		return;
- 	map_set_mips_alias_id(MI, O, insn_alias_mnem_map,
- 			      ARR_SIZE(insn_alias_mnem_map));
- #else
+ 	map_set_alias_id_trie_impl(MI, O, mips_alias_trie,
+ 				   ARR_SIZE(mips_alias_trie));
+ }

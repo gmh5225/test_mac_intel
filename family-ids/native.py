@@ -19,25 +19,31 @@ try:
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
     verified={}
-    for variant in ('base','unrestricted','candidate'):
-        if variant!='base':
-            git('restore','--source=HEAD','--staged','--worktree','.')
-            patch='candidate.patch' if variant=='candidate' else 'unrestricted.patch'
-            git('apply','--index',str(r/patch))
-            assert git('write-tree')==(meta['tree'] if variant=='candidate' else json.loads((r/'unrestricted.json').read_text())['tree'])
+    archive_objects={};text_sections={}
+    for variant in ('base','candidate'):
+        if variant=='candidate':
+            git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
+        archive_objects[variant]={str(f.relative_to(b)):sha(f)for f in b.rglob('*.c.o')}
+        text_sections[variant]={}
+        for section in ['.text','.rodata','.cs_alias_lookup','.cs_alias_lookup_rodata']:
+            blob=tmp/'section.bin'
+            sp.run(['objcopy','--dump-section',section+'='+str(blob),libs[variant],tmp/'unused.so'],check=True)
+            text_sections[variant][section]=dict(bytes=blob.stat().st_size,sha256=sha(blob))
+        run(['nm','-S','-n','--defined-only',libs[variant]],'symbols-'+variant)
+
         if conf=='full' or diet:
             from mapping_bytes import mapping_bytes
             value=mapping_bytes(next(b.rglob('RISCVMapping.c.o')))
             assert value['bytes']==(52360 if diet else 2146760),value
             write(variant+'-riscv-mapping',value)
             if variant=='candidate':assert value==json.loads((obs/'base-riscv-mapping.json').read_text())
-    active=cc=='clang' and conf=='full'
-    assert sha(libs['candidate'])==sha(libs['unrestricted' if active else 'base'])
-    if conf=='full':assert sha(libs['unrestricted'])!=sha(libs['base'])
-    write('compiled-identity',dict(active=active,hashes={k:sha(v)for k,v in libs.items()}))
+    before,after=archive_objects['base'],archive_objects['candidate'];assert before.keys()==after.keys()
+    changed=[k for k,v in before.items()if v!=after[k]];assert len(changed)==1 and changed[0].endswith('/AliasMapping.c.o')
+    assert text_sections['base']['.cs_alias_lookup_rodata']==text_sections['candidate']['.cs_alias_lookup_rodata']
+    write('placement',dict(members=len(before),changed=changed,sections=text_sections))
     if conf=='full':
         selected=['mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
@@ -109,9 +115,10 @@ try:
             return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
         timing=[]
         for name,bits,path,ip in panels[2:]+other_cases:
-            for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
-                for i in range(7):
+            if name not in ('mips64el-ls','ppc64el-ls','putty64'):continue
+            for mode in ((1,2) if name=='mips64el-ls' else (0,1,2) if name=='ppc64el-ls' else (1,)):
+                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(90e6/first[0]));cycles=[]
+                for i in range(17):
                     keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
                         v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])

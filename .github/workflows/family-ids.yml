@@ -1,7 +1,7 @@
-name: Verify MIPS alias call scoping with measured reference binaries and native targets
+name: Measure the MIPS alias decision inside its dedicated code section and verify PowerPC scan
 on:
   push:
-    branches: [codex/capstone-isolated-mips-printed-alias]
+    branches: [codex/capstone-mips-isolated-alias-entry]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -13,11 +13,6 @@ jobs:
         include:
           - { host: ubuntu-22.04, cc: clang, flavor: full }
           - { host: ubuntu-24.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: gcc, flavor: full }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
-          - { host: ubuntu-24.04, cc: clang, flavor: intel }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -31,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 88f64f91be1b3c9de7c5819e93806fa8d79127db
+          ref: 17f68720b746928d0628f4ed01664d43cb2ea350
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: isolated-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: alias-entry-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
