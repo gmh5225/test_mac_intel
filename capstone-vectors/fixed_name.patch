@@ -1,0 +1,14 @@
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 9e41aa2b..5b613c42 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -75,7 +75,8 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+ 		memcpy(out, "rip", 3);
+ 		out += 3;
+ 	} else {
+-		memcpy(out, base->name, base->length);
++		/* Register names are zero-padded in the generated table. */
++		memcpy(out, base->name, sizeof(base->name));
+ 		out += base->length;
+ 	}
+ 	out = X86_writeDisplacement(out, disp);
