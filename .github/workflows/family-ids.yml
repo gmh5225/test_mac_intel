@@ -1,7 +1,7 @@
-name: Measure the MIPS alias decision inside its dedicated code section and verify PowerPC scan
+name: Compare leading-space cleanup in the MIPS printer on real ELF with PowerPC and PE controls
 on:
   push:
-    branches: [codex/capstone-mips-isolated-alias-entry]
+    branches: [codex/capstone-mips-printer-leading-space]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -36,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alias-entry-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: printed-leading-space-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
