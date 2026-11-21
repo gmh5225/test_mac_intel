@@ -1,7 +1,7 @@
-name: Bound VEX registers and i386 MOVSX and MOVZX at every possible decoder input length
+name: Check input bounds and complete register details for i386 MOVZX and MOVSX
 on:
   push:
-    branches: [codex/capstone-guarded-vex-i386-widening]
+    branches: [codex/capstone-widen32-guarded-inputs]
     paths: [guarded/**, .github/workflows/capstone-guarded-release.yml]
 permissions:
   contents: read
@@ -31,6 +31,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: guarded-vex-extend-${{ matrix.kind }}
+          name: guarded-i386-widen-${{ matrix.kind }}
           path: evidence/
           retention-days: 14
