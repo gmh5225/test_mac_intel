@@ -1,7 +1,7 @@
-name: Measure ELF fallback extraction in the current source-built NeverD decoder
+name: Compare VEX packed loads and stores in real NeverD on ELF and PE
 on:
   push:
-    branches: [codex/neverd-static-fallback-archive-order]
+    branches: [codex/neverd-production-vex-packed-addresses]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 1a9b36d0100bcee2f0c26f1383512c7f519f178e
+          ref: 314528f12d3ee287de37512b5046481907ca9929
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "1a9b36d0100bcee2f0c26f1383512c7f519f178e"
+          test "$(git rev-parse HEAD)" = "314528f12d3ee287de37512b5046481907ca9929"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "4b473e00e92e53fd931cfeea9e2dae710c44ce8c"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: retained-fallback-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex-address-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

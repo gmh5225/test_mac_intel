@@ -1,11 +1,11 @@
 {
-  "neverd": "1a9b36d0100bcee2f0c26f1383512c7f519f178e",
+  "neverd": "314528f12d3ee287de37512b5046481907ca9929",
   "capstone": "4b473e00e92e53fd931cfeea9e2dae710c44ce8c",
   "variants": {
-    "direct": {
-      "commit": "4b473e00e92e53fd931cfeea9e2dae710c44ce8c",
-      "tree": "c101eb6776d392aeb84eafc1614c72d0e2247fea",
-      "neverd_tree": "01b46d5b5be4449803c964025a14185239e7b50f",
+    "sse_base": {
+      "commit": "8c58b21f037d3368ec9e9a74f684b82fe54ebaa1",
+      "tree": "7b2e010a2a1e48c49ec2b58711986a26821e7661",
+      "neverd_tree": "4bddae5bdedf85d6ce1f0b8102069d9444069f65",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
@@ -13,12 +13,29 @@
       },
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
       "patch": "direct.patch",
-      "patch_sha256": "3d87cafb8b8c8f9532b91673b9537e9eca924969382a33d33ebde11cec557f52"
+      "patch_sha256": "3d87cafb8b8c8f9532b91673b9537e9eca924969382a33d33ebde11cec557f52",
+      "capstone_patch": "sse_base-capstone.patch",
+      "capstone_sha256": "7d9b756084192a790f9138ae46ec1faf3eba79b0ece8d4fb42d8f740dff4cd8a"
     },
-    "retained": {
-      "commit": "4b473e00e92e53fd931cfeea9e2dae710c44ce8c",
-      "tree": "c101eb6776d392aeb84eafc1614c72d0e2247fea",
-      "neverd_tree": "6ff326be6a56ae5ac48d844c949a08ba7c7c7613",
+    "vex_packed": {
+      "commit": "c0c096ab81a63e522fac4f858dc5109e45d2ffa8",
+      "tree": "02e147796451c6bd416bac76a7b6e4b50c42579c",
+      "neverd_tree": "4bddae5bdedf85d6ce1f0b8102069d9444069f65",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
+        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
+        "lib/decode/CMakeLists.txt": "ab2fc004927e4ce4c22c0447294aa584190c9754"
+      },
+      "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
+      "patch": "direct.patch",
+      "patch_sha256": "3d87cafb8b8c8f9532b91673b9537e9eca924969382a33d33ebde11cec557f52",
+      "capstone_patch": "vex_packed-capstone.patch",
+      "capstone_sha256": "738bad2994546c465a5cb97101b709859eb12dbdbbb2e137bc086a3766adc68b"
+    },
+    "retained_vex": {
+      "commit": "c0c096ab81a63e522fac4f858dc5109e45d2ffa8",
+      "tree": "02e147796451c6bd416bac76a7b6e4b50c42579c",
+      "neverd_tree": "c69d4c8f5efee80f10135659a73ddf8754f4b03f",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
@@ -26,7 +43,9 @@
       },
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
       "patch": "retained.patch",
-      "patch_sha256": "fb0de859b8fb1dee82792e2e9c327154501d0782d49f540e2c65ba548fc9199e"
+      "patch_sha256": "fb0de859b8fb1dee82792e2e9c327154501d0782d49f540e2c65ba548fc9199e",
+      "capstone_patch": "retained_vex-capstone.patch",
+      "capstone_sha256": "738bad2994546c465a5cb97101b709859eb12dbdbbb2e137bc086a3766adc68b"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -34,8 +53,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Test the existing fallback archive member extraction with identical Capstone archives, identical caller code, and one ELF linker option. Compare actual source-built NeverD entry points and symbol displacements.",
-  "parent": "8c396d94d8ac137ba0ef905b414a3234c95dbbb2",
+  "scope": "Compare the direct SSE baseline and packed VEX memory widths inside the default product. Compare Linux archive extraction order using identical candidate objects, full public states and real PE, ELF and SIMD inputs.",
+  "parent": "d8d9e5a22f10391779e482e5fbe1128fdec9bc58",
   "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
