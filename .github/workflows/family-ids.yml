@@ -1,7 +1,7 @@
-name: Measure RISC-V single-table implicit counts with byte-identical original mapping data
+name: Verify unchanged mixed images and RISC-V-only implicit detail counts on four compilers and hosts
 on:
   push:
-    branches: [codex/capstone-riscv-short-implicit-lists]
+    branches: [codex/capstone-dedicated-riscv-short-lists]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: implicit-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

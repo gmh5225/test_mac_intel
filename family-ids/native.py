@@ -31,6 +31,7 @@ try:
             assert value['bytes']==(52360 if diet else 2146760),value
             write(variant+'-riscv-mapping',value)
             if variant=='candidate':assert value==json.loads((obs/'base-riscv-mapping.json').read_text())
+    assert sha(libs['base'])==sha(libs['candidate']),('mixed image differs',cc,conf)
     if conf=='full':
         selected=['riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
@@ -111,6 +112,9 @@ try:
                     cycles.append(cyc)
                 timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
                 write('timings',timing)
+    if conf=='full':
+        from single_backend import measure
+        measure(r,s,tmp,obs,cc,meta,other_cases,fixed,run,write,git)
     write('complete',dict(tree=meta['tree'],config=conf,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],platform=platform.machine(),os=platform.platform(),tests=selected,records=sum(x['calls'] for x in rows),libs={k:sha(v) for k,v in libs.items()}))
 finally:
     size=sum(f.stat().st_size for f in tmp.rglob('*') if f.is_file());shutil.rmtree(tmp);write('cleanup',dict(bytes=size,removed=not tmp.exists()))
