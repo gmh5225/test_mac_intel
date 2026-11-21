@@ -1,8 +1,39 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 59de6da5..d0c42ac9 100644
+index 59de6da5..c9e10ff5 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1033,12 +1033,15 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+@@ -184,6 +184,11 @@ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++    # Fixed-width implicit counts improve detailed decoding in this configuration.
++    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
++        add_compile_definitions(CAPSTONE_RISCV_SHORT_IMPLICIT_LISTS)
++    endif()
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "SPARC")
+@@ -207,6 +212,7 @@ if(use_alias_trie)
+     add_compile_definitions(CAPSTONE_USE_ALIAS_TRIE)
+ endif()
+ 
++option(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS "Check the MIPS printer alias flag before calling the isolated mnemonic lookup" OFF)
+ option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
+ option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
+ option(CAPSTONE_X86_SCAN_ADAPTER "Build the private x86 scan adapter hook" OFF)
+@@ -392,6 +398,10 @@ endif()
+ 
+ if(CAPSTONE_MIPS_SUPPORT)
+     add_definitions(-DCAPSTONE_HAS_MIPS)
++    if(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS)
++        set_property(SOURCE arch/Mips/MipsMapping.c APPEND PROPERTY
++            COMPILE_DEFINITIONS CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS)
++    endif()
+     set(CSTOOL_SRC
+         ${CSTOOL_SRC}
+         cstool/cstool_mips.c)
+@@ -1033,12 +1043,15 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
      add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
      target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
      set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
@@ -50,137 +81,101 @@ index 30dcf191..3d17212d 100644
  $(LIBOBJ_XCORE): $(DEP_XCORE)
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..5b106bf5 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -83,13 +83,13 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			545, 549, 546, 550, 0, 0, 0, 0, 553, 557, 554, 558, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
--			0, 0, 65535, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
-+			0, 0, 65535, 0, 0, 0, X86_PACKED_OUTPUT_PLAN, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
- 			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
- 			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
- 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 772, 65535, 65535, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
-+			0, 65533, 0, 772, 65535, X86_PACKED_OUTPUT_PLAN, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
- 			0, 0, 0, 0, 0, 0, 0, 792, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 799, 803, 0, 807, 808, 812, 816, 820,
- 			0, 0, 0, 65535, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 857,
-diff --git a/arch/X86/X86GenSse2PackedMemory.inc b/arch/X86/X86GenSse2PackedMemory.inc
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 551c7d06..76269c55 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -463,6 +463,12 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+ 			ARR_SIZE(insn_alias_mnem_map), alias_trie);
+ #elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
++#ifdef CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS
++	/* Mips_init_cs_detail cleared the ID before decode. Only the
++	 * alias printer can give this instruction a mnemonic to resolve. */
++	if (!MCInst_isAlias(MI))
++		return;
++#endif
+ 	map_set_mips_alias_id(MI, O, insn_alias_mnem_map,
+ 			      ARR_SIZE(insn_alias_mnem_map));
+ #else
+diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
+index 91a64de4..45d62be6 100644
+--- a/arch/RISCV/RISCVMapping.c
++++ b/arch/RISCV/RISCVMapping.c
+@@ -141,9 +141,10 @@ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
+ 		return;
+ 	}
+ 	cs_riscv_op *op = RISCV_get_detail_op_at(MI, OpNum);
+-	op->type = (riscv_op_type)map_get_op_type(MI, OpNum);
++	const cs_op_type type = map_get_op_type(MI, OpNum);
++	op->type = (riscv_op_type)type;
+ 	op->access = (cs_ac_type)map_get_op_access(MI, OpNum);
+-	switch (map_get_op_type(MI, OpNum)) {
++	switch (type) {
+ 	case CS_OP_REG:
+ 		op->reg = MCInst_getOperand(MI, OpNum)->RegVal;
+ 		break;
+@@ -363,6 +364,29 @@ void RISCV_compact_operands(MCInst *MI)
+ 	       (NUM_RISCV_OPS - write_pos) * sizeof(cs_riscv_op));
+ }
+ 
++#if defined(CAPSTONE_RISCV_SHORT_IMPLICIT_LISTS) && !defined(CAPSTONE_DIET)
++/* Generated lists are contiguous and zero-padded. Current RISC-V rows
++ * have up to two implicit reads/writes and four groups. Longer lists
++ * retain the ordinary count. */
++static uint8_t implicit_reg_count(const uint16_t *regs)
++{
++	if (regs[2])
++		return (uint8_t)count_positive(regs);
++	return (uint8_t)((regs[0] != 0) + (regs[1] != 0));
++}
++
++static uint8_t implicit_group_count(const uint8_t *groups)
++{
++	if (groups[4])
++		return (uint8_t)count_positive8(groups);
++	return (uint8_t)((groups[0] != 0) + (groups[1] != 0) +
++			 (groups[2] != 0) + (groups[3] != 0));
++}
++#else
++#define implicit_reg_count count_positive
++#define implicit_group_count count_positive8
++#endif
++
+ // given internal insn id, return public instruction info
+ void RISCV_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ {
+@@ -378,17 +402,17 @@ void RISCV_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			memcpy(insn->detail->regs_read, insn_map->regs_use,
+ 			       sizeof(insn_map->regs_use));
+ 			insn->detail->regs_read_count =
+-				(uint8_t)count_positive(insn_map->regs_use);
++				(uint8_t)implicit_reg_count(insn_map->regs_use);
+ 
+ 			memcpy(insn->detail->regs_write, insn_map->regs_mod,
+ 			       sizeof(insn_map->regs_mod));
+ 			insn->detail->regs_write_count =
+-				(uint8_t)count_positive(insn_map->regs_mod);
++				(uint8_t)implicit_reg_count(insn_map->regs_mod);
+ 
+ 			memcpy(insn->detail->groups, insn_map->groups,
+ 			       sizeof(insn_map->groups));
+ 			insn->detail->groups_count =
+-				(uint8_t)count_positive8(insn_map->groups);
++				(uint8_t)implicit_group_count(insn_map->groups);
+ 
+ 			if (insn_map->branch || insn_map->indirect_branch) {
+ 				// this insn also belongs to JUMP group. add JUMP group
+diff --git a/arch/X86/X86GenIndirectMemory.inc b/arch/X86/X86GenIndirectMemory.inc
 new file mode 100644
-index 00000000..2a91db67
+index 00000000..bd0f0a65
 --- /dev/null
-+++ b/arch/X86/X86GenSse2PackedMemory.inc
-@@ -0,0 +1,106 @@
-+/* Generated by x86_simple_output.cpp --sse2-packed-memory. */
-+static const struct X86SseRegisterOutput sse2_packed_rows[] = {
-+	{ { 0 }, false, false },
-+	{ { 494, "movupd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-+	{ { 494, "movupd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, true, true },
-+	{ { 753, "unpcklpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 751, "unpckhpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 462, "movapd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-+	{ { 462, "movapd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, true, true },
-+	{ { 697, "sqrtpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-+	{ { 28, "andpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 26, "andnpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 513, "orpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 1504, "xorpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 9, "addpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 499, "mulpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 129, "cvtpd2ps", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-+	{ { 130, "cvtps2dq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-+	{ { 716, "subpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 365, "minpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 149, "divpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 360, "maxpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 453, "punpcklbw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 455, "punpcklwd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 454, "punpckldq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 386, "packsswb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 404, "pcmpgtb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 406, "pcmpgtw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 405, "pcmpgtd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 387, "packuswb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 450, "punpckhbw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 452, "punpckhwd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 451, "punpckhdq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 385, "packssdw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 608, "punpcklqdq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 607, "punpckhqdq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 468, "movdqa", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-+	{ { 401, "pcmpeqb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 403, "pcmpeqw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 402, "pcmpeqd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 221, "haddpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 150, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 224, "hsubpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 150, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 468, "movdqa", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, true, true },
-+	{ { 13, "addsubpd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 150, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 441, "psrlw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 439, "psrld", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 440, "psrlq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 390, "paddq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 425, "pmullw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 447, "psubusb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 448, "psubusw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 420, "pminub", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 398, "pand", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 393, "paddusb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 394, "paddusw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 418, "pmaxub", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 397, "pandn", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 399, "pavgb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 438, "psraw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 437, "psrad", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 400, "pavgw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 423, "pmulhuw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 424, "pmulhw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 138, "cvttpd2dq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-+	{ { 445, "psubsb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 446, "psubsw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 419, "pminsw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 427, "por", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 391, "paddsb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 392, "paddsw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 417, "pmaxsw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 456, "pxor", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 436, "psllw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 434, "pslld", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 435, "psllq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 426, "pmuludq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 416, "pmaddwd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 428, "psadbw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 442, "psubb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 449, "psubw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 443, "psubd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 444, "psubq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 388, "paddb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 395, "paddw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+	{ { 389, "paddd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
-+};
-+static const uint8_t sse2_packed_plans[1][256] = {
-+	{
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		1, 2, 0, 0, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 5, 6, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 7, 0, 0, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-+		20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 0, 34,
-+		0, 0, 0, 0, 35, 36, 37, 0, 0, 0, 0, 0, 38, 39, 0, 40,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		41, 42, 43, 44, 45, 46, 0, 0, 47, 48, 49, 50, 51, 52, 53, 54,
-+		55, 56, 57, 58, 59, 60, 61, 0, 62, 63, 64, 65, 66, 67, 68, 69,
-+		0, 70, 71, 72, 73, 74, 75, 0, 76, 77, 78, 79, 80, 81, 82, 0,
-+	},
++++ b/arch/X86/X86GenIndirectMemory.inc
+@@ -0,0 +1,5 @@
++/* Generated by x86_simple_output.cpp --indirect-memory. */
++static const struct X86SimpleOutput x86_indirect_memory[2] = {
++	{ 62, "call", "", UINT64_C(0), { 30, 26, 0, 0 }, { 30, 26, 0, 0 }, { 2, 161, 0, 0 }, 2, 2, 2, 1, 4, 1, 0, 0, { { 0, 4, 1 }, { 0, 0, 0 } } },
++	{ 172, "jmp", "", UINT64_C(0), { 0, 0, 0, 0 }, { 26, 0, 0, 0 }, { 161, 1, 0, 0 }, 0, 1, 2, 1, 4, 1, 0, 0, { { 0, 4, 1 }, { 0, 0, 0 } } },
 +};
 diff --git a/arch/X86/X86GenSse64RegisterOutput.inc b/arch/X86/X86GenSse64RegisterOutput.inc
 new file mode 100644
@@ -475,11 +470,16 @@ index 00000000..3af97180
 +	},
 +};
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 7fb50ee9..db8e4393 100644
+index 7fb50ee9..13695450 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -5,9 +5,9 @@
- #define CS_X86_MEMORY_OUTPUT_IMPL_H
+@@ -1,13 +1,14 @@
+ /* Capstone Disassembly Engine */
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+-#ifndef CS_X86_MEMORY_OUTPUT_IMPL_H
+-#define CS_X86_MEMORY_OUTPUT_IMPL_H
++/* Instantiated for the ordinary address writer and the private mode-specific writers. */
  
  /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
 -#ifdef X86_MEMORY_IMMEDIATE32
@@ -487,30 +487,49 @@ index 7fb50ee9..db8e4393 100644
  #include "X86UnsignedImmediate.h"
 -static bool writeMemoryImmediate32(
 +static bool X86_MEMORY_IMMEDIATE(
++#elif defined(X86_MEMORY32_OUTPUT)
++static bool X86_MEMORY32_OUTPUT(
  #else
  bool X86_writeMemoryOutput(
  #endif
-@@ -15,8 +15,8 @@ bool X86_writeMemoryOutput(
+@@ -15,7 +16,9 @@ bool X86_writeMemoryOutput(
  	const struct X86SimpleOutput *row,
  	const struct X86SimpleRegister regs[4][16])
  {
 -#ifdef X86_MEMORY_IMMEDIATE32
--	const bool wide = false;
 +#ifdef X86_MEMORY_IMMEDIATE
 +	const bool wide = X86_IMMEDIATE_WIDE;
++#elif defined(X86_MEMORY32_OUTPUT)
+ 	const bool wide = false;
  #else
  	const bool wide = row->address_size == 8;
- #endif
-@@ -27,7 +27,7 @@ bool X86_writeMemoryOutput(
- 	const bool sib = rm == 4, rip = !mod && rm == 5;
+@@ -24,17 +27,21 @@ bool X86_writeMemoryOutput(
+ 	const unsigned lead = rex != 0;
+ 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
+ 	const unsigned mod = modrm >> 6, rm = modrm & 7;
+-	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
  	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
+-	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
 -#ifdef X86_MEMORY_IMMEDIATE32
++	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
 +#ifdef X86_MEMORY_IMMEDIATE
  	const unsigned imm_size = (opcode & 1) ? 4 : 1;
  	const unsigned imm_offset = offset + disp_size;
  	const unsigned length = imm_offset + imm_size;
-@@ -54,7 +54,7 @@ bool X86_writeMemoryOutput(
+ #else
+ 	const unsigned length = offset + disp_size;
+ #endif
+-	if (size < length || (rip && !wide))
++#ifdef X86_MEMORY32_OUTPUT
++	if (size < length)
++#else
++	if (size < length || (disp32_only && !wide))
++#endif
+ 		return false;
+ 
+ 	unsigned base_reg = rm;
+@@ -54,7 +61,7 @@ bool X86_writeMemoryOutput(
  		}
  	}
  
@@ -519,9 +538,32 @@ index 7fb50ee9..db8e4393 100644
  	const bool lea = false, load = false;
  #else
  	const bool push = opcode == 0xff, lea = opcode == 0x8d;
-@@ -114,10 +114,18 @@ bool X86_writeMemoryOutput(
+@@ -95,9 +102,15 @@ bool X86_writeMemoryOutput(
+ 		       11);
+ 		out += 11;
  	}
- 	out = X86_writeDisplacement(out, displacement);
+-	if (rip) {
++	if (disp32_only) {
++#ifdef X86_MEMORY32_OUTPUT
++		/* The absolute address is unsigned in Intel text. The encoded
++         * displacement is signed in both public detail fields. */
++		out = writeUnsignedImmediate(out, (uint32_t)displacement);
++#else
+ 		memcpy(out, "rip", 3);
+ 		out += 3;
++#endif
+ 	} else {
+ 		memcpy(out, base->name, sizeof(base->name));
+ 		out += base->length;
+@@ -112,12 +125,23 @@ bool X86_writeMemoryOutput(
+ 			*out++ = (char)('0' + (1u << scale_bits));
+ 		}
+ 	}
+-	out = X86_writeDisplacement(out, displacement);
++#ifdef X86_MEMORY32_OUTPUT
++	if (!disp32_only)
++#endif
++		out = X86_writeDisplacement(out, displacement);
  	*out++ = ']';
 -#ifdef X86_MEMORY_IMMEDIATE32
 -	const uint32_t value =
@@ -540,7 +582,7 @@ index 7fb50ee9..db8e4393 100644
  	memcpy(out, ", ", 2);
  	writeUnsignedImmediate(out + 2, value);
  #else
-@@ -130,7 +138,7 @@ bool X86_writeMemoryOutput(
+@@ -130,7 +154,7 @@ bool X86_writeMemoryOutput(
  		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
  				      load ? reg->reg : 0, load ? 0 : reg->reg);
  		cs_x86 *x = &insn->detail->x86;
@@ -549,6 +591,26 @@ index 7fb50ee9..db8e4393 100644
  		x->operands[1].type = X86_OP_IMM;
  		x->operands[1].imm = (int64_t)value;
  		x->operands[1].access = 0;
+@@ -139,7 +163,12 @@ bool X86_writeMemoryOutput(
+ #endif
+ 		cs_x86_op *mem = &x->operands[load ? 1 : 0];
+ 		mem->type = X86_OP_MEM;
+-		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
++#ifdef X86_MEMORY32_OUTPUT
++		mem->mem.base = disp32_only ? X86_REG_INVALID :
++					      (x86_reg)base->reg;
++#else
++		mem->mem.base = disp32_only ? X86_REG_RIP : (x86_reg)base->reg;
++#endif
+ 		mem->mem.scale = 1 << scale_bits;
+ 		if (index)
+ 			mem->mem.index = (x86_reg)index->reg;
+@@ -157,5 +186,3 @@ bool X86_writeMemoryOutput(
+ 	}
+ 	return true;
+ }
+-
+-#endif
 diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
 index 82b42b5b..a1423650 100644
 --- a/arch/X86/X86ScanAdapter.h
@@ -565,42 +627,27 @@ index 82b42b5b..a1423650 100644
  /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
   * an installed cs_* API. The callback
   * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index aff17085..a9180aa2 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -51,6 +51,13 @@ enum X86SimpleForm {
- /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
- #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
- #define X86_PLAN_VECTOR UINT16_MAX
-+/* The static 64-bit iterator specializes the SSE2 and VEX2 packed-memory plans. */
-+#define X86_PLAN_PACKED ((UINT16_MAX & ~7u) | X86_SIMPLE_RELATIVE)
-+#ifdef X86_FIXED_PACKED
-+#define X86_PACKED_OUTPUT_PLAN X86_PLAN_PACKED
-+#else
-+#define X86_PACKED_OUTPUT_PLAN X86_PLAN_VECTOR
-+#endif
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
- 
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 94f1c45d..9cb07e3b 100644
+index 94f1c45d..03c3739b 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -6,9 +6,9 @@
+@@ -6,9 +6,12 @@
  
  /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
   * present. Memory admission and bounds checks belong to the address writer. */
 -#ifdef X86_EXTRA_OUTPUT32
 -static bool tryOutput32(cs_struct *handle, const uint8_t *code, size_t size,
 -			cs_insn *insn, uint16_t *insn_size)
++#ifdef X86_MEMORY32_OUTPUT
++#include "X86GenIndirectMemory.inc"
++#endif
 +#ifdef X86_FIXED_OUTPUT
 +static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
 +			     size_t size, cs_insn *insn, uint16_t *insn_size)
  #else
  #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
  CAPSTONE_INTERNAL
-@@ -19,8 +19,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -19,8 +22,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			 cs_insn *insn, uint16_t *insn_size)
  #endif
  {
@@ -611,7 +658,7 @@ index 94f1c45d..9cb07e3b 100644
  #else
  	const bool wide = handle->mode == CS_MODE_64;
  #endif
-@@ -36,8 +36,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -36,8 +39,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  						0;
  	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
  	if (!plan) {
@@ -622,23 +669,70 @@ index 94f1c45d..9cb07e3b 100644
  #else
  		return false;
  #endif
-@@ -74,6 +74,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -56,9 +59,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const bool alu = opcode < 0x40;
+ 			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
+ 						 (opcode & 0xfc) == 0x88;
+-			const bool push = opcode == 0xff &&
+-					  (modrm & 0x38) == 0x30;
+-			if (!alu && !test_or_mov && opcode != 0x8d && !push)
++#ifdef X86_MEMORY32_OUTPUT
++			const unsigned group = (modrm >> 3) & 7;
++			const bool single =
++				opcode == 0xff &&
++				(group == 2 || group == 4 || group == 6);
++#else
++			const bool single = opcode == 0xff &&
++					    (modrm & 0x38) == 0x30;
++#endif
++			if (!alu && !test_or_mov && opcode != 0x8d && !single)
+ 				return false;
+ 			base_memory = true;
+ 		} else if (opcode == 0x8d || opcode == 0xff) {
+@@ -69,11 +79,17 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return false;
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+-		if (plan == X86_PLAN_VECTOR)
++		if (plan == X86_PLAN_VECTOR) {
++#ifdef X86_FIXED_VEX2
++			if (code[0] == 0xc5)
++				return X86_FIXED_VEX2(code, size, insn,
++						      insn_size);
++#endif
+ 			return X86_writeVectorOutput(code, size, insn,
  						     insn_size,
  						     x86_simple_registers[3],
  						     wide);
-+#ifdef X86_FIXED_PACKED
-+		if (plan == X86_PLAN_PACKED)
-+			return X86_FIXED_PACKED(code, size, insn, insn_size);
-+#endif
++		}
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+@@ -105,9 +121,17 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return true;
+ 	}
+ 	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
+-	if (base_memory)
++	if (base_memory) {
++#ifdef X86_MEMORY32_OUTPUT
++		if (opcode == 0xff && (modrm & 0x38) != 0x30)
++			row = &x86_indirect_memory[(modrm & 0x20) != 0];
++		return X86_MEMORY32_OUTPUT(code, size, insn, insn_size, row,
++					   x86_simple_registers);
++#else
+ 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+ 					     x86_simple_registers);
++#endif
++	}
+ 	const bool relative = form == X86_SIMPLE_RELATIVE;
+ 	if (relative && size < (size_t)row->imm_offset + row->imm_size)
+ 		return false;
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
 new file mode 100644
-index 00000000..49c8044c
+index 00000000..97642338
 --- /dev/null
 +++ b/arch/X86/X86Sse64Output.c
-@@ -0,0 +1,247 @@
+@@ -0,0 +1,224 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -655,7 +749,7 @@ index 00000000..49c8044c
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
 +#include "X86OutputOptions.h"
-+#define X86_FIXED_PACKED writePackedOutput64
++#define X86_FIXED_VEX2 writeVex2Memory64
 +#include "X86SimpleOutput.h"
 +#include "X86GenSimpleOutput.inc"
 +#include "X86VectorRegisterWriter.h"
@@ -672,7 +766,6 @@ index 00000000..49c8044c
 +};
 +#include "X86GenSse64RegisterOutput.inc"
 +#include "X86GenVex64PackedMemory.inc"
-+#include "X86GenSse2PackedMemory.inc"
 +
 +static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
 +			      uint16_t *insn_size,
@@ -737,8 +830,6 @@ index 00000000..49c8044c
 +			memcpy(x->opcode, code, 2);
 +		} else {
 +			x->opcode[1] = opcode;
-+			if (code[0] == 0x66)
-+				x->prefix[2] = 0x66;
 +		}
 +		x->encoding.modrm_offset = (uint8_t)(offset - 1);
 +		if (disp_size) {
@@ -760,28 +851,12 @@ index 00000000..49c8044c
 +	return true;
 +}
 +
-+/* The static packed plans enter with a bare C5 or 66; other leading
-+ * prefixes and register-only encodings keep the ordinary vector writer. */
-+static bool writePackedOutput64(const uint8_t *code, size_t size, cs_insn *insn,
-+				uint16_t *insn_size)
++/* Only the bare VEX2 opcode plan enters here. Packed base-relative
++ * loads and stores share their address and detail construction with SSE. */
++static bool writeVex2Memory64(const uint8_t *code, size_t size, cs_insn *insn,
++			      uint16_t *insn_size)
 +{
-+	if (code[0] == 0x66) {
-+		if (size >= 4) {
-+			const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] :
-+								       0;
-+			const unsigned offset = 4 + (rex != 0);
-+			if (size >= offset && code[offset - 3] == 0x0f &&
-+			    code[offset - 1] < 0xc0) {
-+				const unsigned plan =
-+					sse2_packed_plans[0][code[offset - 2]];
-+				if (plan &&
-+				    writePackedMemory(code, insn, insn_size,
-+						      &sse2_packed_rows[plan],
-+						      rex, offset, size, false))
-+					return true;
-+			}
-+		}
-+	} else if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
++	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
 +		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
 +		const uint8_t rex =
 +			(uint8_t)(0x40 | ((~(unsigned)code[1] >> 5) & 4));
@@ -875,36 +950,59 @@ index 00000000..49c8044c
 +{
 +#ifdef CS_DECODE_TRY_OUTPUT
 +	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
-+		if (handle->mode == CS_MODE_64)
-+			return cs_disasm_iter_core(ud, code, size, address,
-+						   insn);
-+		if (handle->mode == CS_MODE_32)
-+			return X86_disasmIter32(ud, code, size, address, insn);
-+	}
++	if (handle && handle->arch == CS_ARCH_X86 &&
++	    handle->mode == CS_MODE_64 && !handle->no_text)
++		return cs_disasm_iter_core(ud, code, size, address, insn);
 +#endif
-+	return X86_disasmIter(ud, code, size, address, insn);
++	return X86_disasmIter32(ud, code, size, address, insn);
 +}
 +#endif
+diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
+index 435b8fa4..6f3953cc 100644
+--- a/arch/X86/X86UnsignedImmediate.h
++++ b/arch/X86/X86UnsignedImmediate.h
+@@ -4,10 +4,11 @@
+ #ifndef CS_X86_UNSIGNED_IMMEDIATE_H
+ #define CS_X86_UNSIGNED_IMMEDIATE_H
+ 
+-static void writeUnsignedImmediate(char *out, uint64_t value)
++static char *writeUnsignedImmediate(char *out, uint64_t value)
+ {
+ 	if (value <= HEX_THRESHOLD) {
+ 		*out = (char)('0' + value);
++		return out + 1;
+ 	} else {
+ 		static const char digits[] = "0123456789abcdef";
+ 		char temp[16], *end = temp + sizeof(temp), *start = end;
+@@ -18,6 +19,7 @@ static void writeUnsignedImmediate(char *out, uint64_t value)
+ 		} while (n);
+ 		memcpy(out, "0x", 2);
+ 		memcpy(out + 2, start, end - start);
++		return out + 2 + (end - start);
+ 	}
+ }
+ 
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index ee7663db..8bb11904 100644
+index ee7663db..dfbe52c0 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -16,9 +16,11 @@
+@@ -16,9 +16,13 @@
  #include "X86SimpleOutput.h"
  #include "X86GenSimpleOutput.inc"
  #include "X86VectorRegisterWriter.h"
 -#define X86_MEMORY_IMMEDIATE32
++#define X86_MEMORY32_OUTPUT writeMemory32
 +#define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
 +#define X86_IMMEDIATE_WIDE 0
- #include "X86MemoryOutputImpl.h"
--#undef X86_MEMORY_IMMEDIATE32
++#include "X86MemoryOutputImpl.h"
 +#undef X86_IMMEDIATE_WIDE
 +#undef X86_MEMORY_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
+-#undef X86_MEMORY_IMMEDIATE32
  
  #include "X86GenVex32MemoryOutput.inc"
  
-@@ -152,9 +154,13 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+@@ -152,9 +156,13 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
  	return true;
  }
  
@@ -921,7 +1019,7 @@ index ee7663db..8bb11904 100644
  #include "../../cs_disasm_internal.h"
  #endif
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..818f1331 100644
+index ccc4f0de..fc4d6817 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
 @@ -12,6 +12,7 @@
@@ -938,7 +1036,7 @@ index ccc4f0de..818f1331 100644
  		     const X86SimpleRegister *second, bool branch = false,
 -		     bool lea = false)
 +		     bool lea = false, bool escaped_pair = false,
-+		     uint8_t vex_flags = 0, bool sse2 = false)
++		     uint8_t vex_flags = 0)
  {
  	const auto &d = *insn.detail;
  	const auto &x = d.x86;
@@ -951,42 +1049,61 @@ index ccc4f0de..818f1331 100644
  	row.imm_offset = x.encoding.imm_offset;
  	row.imm_size = x.encoding.imm_size;
  	std::copy_n(d.regs_read, row.read_count, row.reads);
-@@ -173,6 +175,14 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
+@@ -173,6 +175,11 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
  			      first ? first->reg : row.ops[0].reg,
  			      second ? second->reg : row.ops[1].reg);
  
 +	if (escaped_pair) {
 +		rebuilt.x86.opcode[0] = vex_flags ? 0xc5 : 0x0f;
 +		rebuilt.x86.opcode[1] = vex_flags ? vex_flags : opcode;
-+		rebuilt.x86.encoding.modrm_offset =
-+			uint8_t(2 + (rex != 0) + sse2);
-+		if (sse2)
-+			rebuilt.x86.prefix[2] = 0x66;
++		rebuilt.x86.encoding.modrm_offset = uint8_t(2 + (rex != 0));
 +	}
  	if (lea) {
  		if (x.op_count != 2 || x.operands[0].type != X86_OP_REG)
  			return {};
-@@ -538,9 +548,16 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
- 			std::cout << "\t\t{\n";
- 			for (unsigned j = 0; j < 256; j += 16) {
- 				std::cout << "\t\t\t";
--				for (unsigned k = 0; k < 16; ++k)
--					std::cout << (k ? " " : "")
--						  << prefix[j + k] << ',';
-+				for (unsigned k = 0; k < 16; ++k) {
-+					std::cout << (k ? " " : "");
-+					const unsigned plan = prefix[j + k];
-+					if (plan == X86_PLAN_PACKED)
-+						std::cout
-+							<< "X86_PACKED_OUTPUT_PLAN";
-+					else
-+						std::cout << plan;
-+					std::cout << ',';
-+				}
- 				std::cout << '\n';
- 			}
- 			std::cout << "\t\t},\n";
-@@ -563,10 +580,360 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+@@ -361,10 +368,10 @@ CheckedRow check_push_immediate(Decoder &d, unsigned op)
+ 	return row;
+ }
+ 
+-// Project the explicit memory operand out of the ordinary PUSH record. The
+-// stack effects, operand size, access and encoding offsets belong to its row.
+-CheckedRow check_push_memory(Decoder &d, unsigned cls,
+-			     const RegisterTable &regs, bool wide)
++// Project the explicit memory operand out of a single-operand FF /digit
++// instruction. The canonical row retains its implicit effects and offsets.
++CheckedRow check_ff_memory(Decoder &d, unsigned cls, const RegisterTable &regs,
++			   bool wide, unsigned group, unsigned id)
+ {
+ 	CheckedRow row;
+ 	const unsigned first = !cls ? 0 : cls == 1 ? 0x40 : 0x48;
+@@ -372,7 +379,7 @@ CheckedRow check_push_memory(Decoder &d, unsigned cls,
+ 		for (unsigned rm = 0; rm < 8; ++rm) {
+ 			if (rm == 4 || rm == 5)
+ 				continue;
+-			uint8_t modrm = uint8_t(0x30 | rm);
++			uint8_t modrm = uint8_t((group << 3) | rm);
+ 			decode_pair(d, rex, 0xff, modrm);
+ 			cs_insn projected = *d.insn;
+ 			cs_detail detail = *projected.detail;
+@@ -380,14 +387,14 @@ CheckedRow check_push_memory(Decoder &d, unsigned cls,
+ 			auto &op = detail.x86.operands[0];
+ 			const auto &base =
+ 				regs[wide ? 3 : 2][((rex & 1) << 3) | rm];
+-			if (projected.id != X86_INS_PUSH ||
+-			    detail.x86.op_count != 1 || op.type != X86_OP_MEM ||
++			if (projected.id != id || detail.x86.op_count != 1 ||
++			    op.type != X86_OP_MEM ||
+ 			    op.mem.base != (x86_reg)base.reg ||
+ 			    std::string(wide ? "qword ptr [" : "dword ptr [") +
+ 					    base.name + "]" !=
+ 				    projected.op_str)
+ 				throw std::runtime_error(
+-					"unexpected push address or operand size");
++					"unexpected FF memory address or operand size");
+ 			projected.op_str[0] = 0;
+ 			auto access = op.access;
+ 			auto size = op.size;
+@@ -563,13 +570,364 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
  	}
  	std::cout << "};\n";
  }
@@ -1021,9 +1138,7 @@ index ccc4f0de..818f1331 100644
 +
 +// The ordinary MOV decoder supplies the address for the same ModR/M and SIB.
 +bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
-+			    int selector = -1,
-+			    std::string *memory_row = nullptr,
-+			    bool sse2 = false)
++			    int selector = -1, std::string *vex_row = nullptr)
 +{
 +	const bool vex = selector >= 0;
 +	const unsigned width_bytes = vex && (selector & 4) ? 32 : 16;
@@ -1046,15 +1161,7 @@ index ccc4f0de..818f1331 100644
 +						  selector);
 +			}
 +			const unsigned start = !rex, header = 4 - start;
-+			auto decode_packed = [&](unsigned length) {
-+				if (!sse2)
-+					return decode_sse(decoder, code + start,
-+							  length);
-+				uint8_t encoded[1 + sizeof(code)] = { 0x66 };
-+				std::memcpy(encoded + 1, code + start, length);
-+				return decode_sse(decoder, encoded, length + 1);
-+			};
-+			if (!decode_packed(header))
++			if (!decode_sse(decoder, code + start, header))
 +				return false;
 +			const cs_insn &insn = *decoder.insn;
 +			const auto id = insn.id;
@@ -1069,14 +1176,13 @@ index ccc4f0de..818f1331 100644
 +			    rm_op.size != width_bytes ||
 +			    reg_op.type != X86_OP_REG)
 +				return false;
-+			if (memory_row) {
++			if (vex) {
 +				const unsigned first = width_bytes == 32 ?
 +							       X86_REG_YMM0 :
 +							       X86_REG_XMM0;
 +				if (unsigned(reg_op.reg) !=
-+					    first + ((rex & 4) << 1) + field ||
-+				    unsigned(rm_op.reg) !=
-+					    first + ((rex & 1) << 3) ||
++					    first + (prefix << 3) + field ||
++				    unsigned(rm_op.reg) != first ||
 +				    reg_op.size != width_bytes)
 +					return false;
 +			}
@@ -1123,13 +1229,14 @@ index ccc4f0de..818f1331 100644
 +					const std::string text =
 +						reverse ? mem + ", " + reg :
 +							  reg + ", " + mem;
-+					if (!decode_packed(length) ||
++					if (!decode_sse(decoder, code + start,
++							length) ||
 +					    insn.id != id ||
 +					    mnemonic != insn.mnemonic ||
 +					    text != insn.op_str)
 +						return false;
 +					cs_detail expected = reg_detail;
-+					if (memory_row) {
++					if (vex) {
 +						/* The memory encoding can have different group membership and
 +						 * operand access from the same opcode's register encoding. */
 +						std::memcpy(&expected,
@@ -1166,13 +1273,12 @@ index ccc4f0de..818f1331 100644
 +							reg_detail.x86.modrm,
 +							&regs[0], &regs[1],
 +							false, false, true,
-+							vex ? code[1] : 0,
-+							sse2);
++							code[1]);
 +						if (fields.empty() ||
-+						    (!memory_row->empty() &&
-+						     *memory_row != fields))
++						    (!vex_row->empty() &&
++						     *vex_row != fields))
 +							return false;
-+						*memory_row = fields;
++						*vex_row = fields;
 +					}
 +					auto &x = expected.x86;
 +					auto &op = x.operands[reverse ? 0 : 1];
@@ -1188,7 +1294,7 @@ index ccc4f0de..818f1331 100644
 +						addr.encoding.disp_size;
 +					x.encoding.disp_offset =
 +						width ? addr.encoding.disp_offset +
-+								1 + sse2 :
++								1 :
 +							0;
 +					if (std::memcmp(&expected, insn.detail,
 +							offsetof(cs_detail,
@@ -1202,18 +1308,17 @@ index ccc4f0de..818f1331 100644
 +	return true;
 +}
 +
-+void emit_packed_memory(Decoder &decoder, bool sse2)
++void emit_vex64_packed(Decoder &decoder)
 +{
 +	std::vector<std::string> rows{ "{ { 0 }, false, false }" };
 +	unsigned plans[8][256]{};
-+	const unsigned blocks = sse2 ? 1 : 8;
-+	for (unsigned flags = 0; flags < blocks; ++flags) {
++	for (unsigned flags = 0; flags < 8; ++flags) {
 +		for (unsigned opcode = 0; opcode < 256; ++opcode) {
 +			for (bool reverse : { false, true }) {
 +				std::string row;
-+				if (!supports_packed_memory(
-+					    decoder, opcode, reverse,
-+					    sse2 ? -1 : int(flags), &row, sse2))
++				if (!supports_packed_memory(decoder, opcode,
++							    reverse, int(flags),
++							    &row))
 +					continue;
 +				row = "{ " + row +
 +				      (reverse ? ", true, true }" :
@@ -1228,21 +1333,17 @@ index ccc4f0de..818f1331 100644
 +			}
 +		}
 +	}
-+	if (rows.size() > 256 ||
-+	    (sse2 ? !plans[0][0x58] || !plans[0][0x6f] :
-+		    !plans[0][0x10] || !plans[4][0x29] || !plans[5][0x6f]))
-+		throw std::runtime_error("unexpected packed memory rows");
-+	const char *name = sse2 ? "sse2" : "vex64";
-+	std::cout << "/* Generated by x86_simple_output.cpp --" << name
-+		  << "-packed-memory. */\n"
-+		  << "static const struct X86SseRegisterOutput " << name
-+		  << "_packed_rows[] = {\n";
++	if (rows.size() > 256 || !plans[0][0x10] || !plans[4][0x29] ||
++	    !plans[5][0x6f])
++		throw std::runtime_error("unexpected packed VEX memory rows");
++	std::cout
++		<< "/* Generated by x86_simple_output.cpp --vex64-packed-memory. */\n"
++		<< "static const struct X86SseRegisterOutput vex64_packed_rows[] = {\n";
 +	for (const auto &row : rows)
 +		std::cout << '\t' << row << ",\n";
-+	std::cout << "};\nstatic const uint8_t " << name << "_packed_plans["
-+		  << blocks << "][256] = {\n";
-+	for (unsigned f = 0; f < blocks; ++f) {
-+		const auto &block = plans[f];
++	std::cout
++		<< "};\nstatic const uint8_t vex64_packed_plans[8][256] = {\n";
++	for (const auto &block : plans) {
 +		std::cout << "\t{\n";
 +		for (unsigned i = 0; i < 256; i += 16) {
 +			std::cout << "\t\t";
@@ -1254,8 +1355,7 @@ index ccc4f0de..818f1331 100644
 +		std::cout << "\t},\n";
 +	}
 +	std::cout << "};\n";
-+	std::cerr << rows.size() - 1 << " packed 64-bit " << name
-+		  << " memory rows\n";
++	std::cerr << rows.size() - 1 << " packed 64-bit VEX memory rows\n";
 +}
 +
 +void emit_sse64_registers(Decoder &decoder)
@@ -1322,6 +1422,23 @@ index ccc4f0de..818f1331 100644
 +		  << " SSE opcodes verified over every REX and register pair\n";
 +}
 +
++void emit_indirect_memory(Decoder &decoder, const RegisterTable &regs)
++{
++	std::cout
++		<< "/* Generated by x86_simple_output.cpp --indirect-memory. */\n"
++		   "static const struct X86SimpleOutput x86_indirect_memory[2] = {\n";
++	for (unsigned group : { 2u, 4u }) {
++		const auto id = group == 2 ? X86_INS_CALL : X86_INS_JMP;
++		const auto row =
++			check_ff_memory(decoder, 0, regs, false, group, id);
++		if (!row.encodings)
++			throw std::runtime_error(
++				"missing i386 indirect branch operands");
++		std::cout << "\t" << row.fields << ",\n";
++	}
++	std::cout << "};\n";
++}
++
  } // namespace
  
 -int main()
@@ -1329,12 +1446,7 @@ index ccc4f0de..818f1331 100644
  {
 +	if (argc == 2 && std::strcmp(argv[1], "--vex64-packed-memory") == 0) {
 +		Decoder decoder(CS_MODE_64);
-+		emit_packed_memory(decoder, false);
-+		return 0;
-+	}
-+	if (argc == 2 && std::strcmp(argv[1], "--sse2-packed-memory") == 0) {
-+		Decoder decoder(CS_MODE_64);
-+		emit_packed_memory(decoder, true);
++		emit_vex64_packed(decoder);
 +		return 0;
 +	}
 +	if (argc == 2 && std::strcmp(argv[1], "--sse64-registers") == 0) {
@@ -1342,28 +1454,33 @@ index ccc4f0de..818f1331 100644
 +		emit_sse64_registers(decoder);
 +		return 0;
 +	}
-+	if (argc != 1)
++	const bool indirect = argc == 2 &&
++			      std::strcmp(argv[1], "--indirect-memory") == 0;
++	if (argc != 1 && !indirect)
 +		throw std::runtime_error(
-+			"expected no arguments, --sse64-registers, --sse2-packed-memory or --vex64-packed-memory");
++			"expected no arguments, --sse64-registers, --vex64-packed-memory or --indirect-memory");
  	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
  	RegisterTable regs{};
  	describe_registers(x64, regs);
-@@ -616,12 +983,13 @@ int main()
- 		}
- 	}
- 	// Reserve unprefixed EVEX for its own verified vector output records.
--	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
-+	plans[0][0][0x66] = X86_PLAN_VECTOR;
-+	plans[1][0][0x66] = X86_PLAN_PACKED;
- 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
- 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
- 	plans[1][0][0x62] = X86_PLAN_VECTOR;
- 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
--	plans[1][0][0xc5] = X86_PLAN_VECTOR;
-+	plans[1][0][0xc5] = X86_PLAN_PACKED;
- 	for (unsigned wide = 0; wide < 2; ++wide) {
- 		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
- 			for (unsigned alu = 1; alu < 0x40; alu += 8) {
++	if (indirect) {
++		emit_indirect_memory(x86, regs);
++		return 0;
++	}
+ 	PlanTable plans{};
+ 	std::vector<std::string> rows{ initializer(X86SimpleOutput{}) };
+ 	unsigned checked = 0, admitted = 0;
+@@ -589,8 +947,9 @@ int main()
+ 							     op);
+ 				} else if (cls != 3 && op == 0xff) {
+ 					form = X86_SIMPLE_RM_REG;
+-					row = check_push_memory(decoder, cls,
+-								regs, wide);
++					row = check_ff_memory(decoder, cls,
++							      regs, wide, 6,
++							      X86_INS_PUSH);
+ 				} else if (cls != 3 && op == 0x8d) {
+ 					form = X86_SIMPLE_REG_RM;
+ 					row = check_lea(decoder, cls, regs,
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index f5a7ee1b..ee084661 100644
 --- a/tests/unit/CMakeLists.txt
@@ -1377,8 +1494,65 @@ index f5a7ee1b..ee084661 100644
  endif()
  
  if(CAPSTONE_X86_SUPPORT)
+diff --git a/tests/unit/riscv_mapping_index.c b/tests/unit/riscv_mapping_index.c
+index 6cb9feac..846f7086 100644
+--- a/tests/unit/riscv_mapping_index.c
++++ b/tests/unit/riscv_mapping_index.c
+@@ -5,9 +5,52 @@
+ #include "../../utils.h"
+ #include "../../arch/RISCV/RISCVMapping.h"
+ 
++#ifndef CAPSTONE_DIET
++static bool check_implicit_effects(cs_struct *handle, unsigned id,
++				   const insn_map *row)
++{
++	cs_detail actual;
++	memset(&actual, 0xa5, sizeof(actual));
++	cs_detail expected;
++	memcpy(&expected, &actual, sizeof(expected));
++	cs_insn insn = { 0 };
++	insn.id = UINT_MAX;
++	insn.detail = &actual;
++	if (row) {
++		memcpy(expected.regs_read, row->regs_use,
++		       sizeof(row->regs_use));
++		memcpy(expected.regs_write, row->regs_mod,
++		       sizeof(row->regs_mod));
++		memcpy(expected.groups, row->groups, sizeof(row->groups));
++		expected.regs_read_count =
++			(uint8_t)count_positive(row->regs_use);
++		expected.regs_write_count =
++			(uint8_t)count_positive(row->regs_mod);
++		expected.groups_count = (uint8_t)count_positive8(row->groups);
++		if (row->branch || row->indirect_branch)
++			expected.groups[expected.groups_count++] =
++				RISCV_GRP_JUMP;
++	}
++	const bool was_enabled = handle->detail_opt;
++	handle->detail_opt = true;
++	RISCV_get_insn_id(handle, &insn, id);
++	handle->detail_opt = was_enabled;
++	return insn.id == (row ? row->mapid : UINT_MAX) &&
++	       !memcmp(&actual, &expected, sizeof(actual));
++}
++#endif
++
+ static bool check_id(cs_struct *handle, unsigned id)
+ {
+ 	const insn_map *expected = lookup_insn_map(handle, id);
++#ifndef CAPSTONE_DIET
++	if (!check_implicit_effects(handle, id, expected)) {
++		fprintf(stderr,
++			"RISC-V implicit register or group mismatch for input ID %u\n",
++			id);
++		return false;
++	}
++#endif
+ 	cs_insn insn = { 0 };
+ 	insn.id = UINT_MAX;
+ 	RISCV_get_insn_id(handle, &insn, id);
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 4ec7561b..e3136b1e 100644
+index 4ec7561b..6ca1b43b 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -455,6 +455,14 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
@@ -1396,7 +1570,77 @@ index 4ec7561b..e3136b1e 100644
  				if (!compare(handles, start, size,
  					     mr ^ opcode) ||
  				    !compare(handles, start,
-@@ -837,6 +845,124 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+@@ -804,6 +812,69 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_indirect_memory(csh handles[2], cs_mode mode)
++{
++	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
++	     ++prefix) {
++		for (unsigned mr = 0; mr < 256; ++mr) {
++			const unsigned variants =
++				mr < 0xc0 && (mr & 7) == 4 ? 256u : 1u;
++			for (unsigned sib = 0; sib < variants; ++sib) {
++				uint8_t code[] = { (uint8_t)(0x3f + prefix),
++						   0xff,
++						   (uint8_t)mr,
++						   (uint8_t)sib,
++						   0xff,
++						   0xff,
++						   0xff,
++						   0x80 };
++				const uint8_t *start = code + !prefix;
++				const size_t length = sizeof(code) - !prefix;
++				for (size_t n = 1; n <= length; ++n)
++					if (!compare(handles, start, n,
++						     mr + sib + prefix))
++						return false;
++			}
++		}
++	}
++	return true;
++}
++
++static bool check_absolute_addresses32(csh handles[2])
++{
++	static const uint32_t addresses[] = {
++		0, 9, 10, 0x502dc4, 0x7fffffff, 0x80000000u, UINT32_MAX
++	};
++	static const uint8_t opcodes[] = { 0x00, 0x03, 0x38, 0x3b, 0x84, 0x89,
++					   0x8b, 0x8d, 0xc6, 0xc7, 0xff };
++	for (unsigned op = 0; op < sizeof(opcodes); ++op) {
++		for (unsigned group = 0; group < 8; ++group) {
++			for (unsigned i = 0;
++			     i < sizeof(addresses) / sizeof(addresses[0]);
++			     ++i) {
++				const uint32_t address = addresses[i];
++				const uint8_t code[] = {
++					opcodes[op],
++					(uint8_t)((group << 3) | 5),
++					(uint8_t)address,
++					(uint8_t)(address >> 8),
++					(uint8_t)(address >> 16),
++					(uint8_t)(address >> 24),
++					0xff,
++					0xfe,
++					0xfd,
++					0xfc
++				};
++				for (size_t len = 1; len <= sizeof(code); ++len)
++					if (!compare(handles, code, len,
++						     group + i + op))
++						return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ {
+ 	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
+@@ -837,6 +908,118 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -1432,7 +1676,7 @@ index 4ec7561b..e3136b1e 100644
 +	return true;
 +}
 +
-+static bool check_sse_base_memory(csh handles[2], bool sse2)
++static bool check_sse_base_memory(csh handles[2])
 +{
 +	const uint8_t opcodes[] = { 0x10, 0x11, 0x12, 0x16,
 +				    0x28, 0x29, 0x58, 0x59 };
@@ -1444,29 +1688,23 @@ index 4ec7561b..e3136b1e 100644
 +				const bool sib = (mr & 7) == 4;
 +				for (unsigned j = 0;
 +				     j < (sib ? sizeof(sibs) : 1); ++j) {
-+					uint8_t code[] = {
-+						0x66,
-+						(uint8_t)(0x3f + prefix),
-+						0x0f,
-+						opcodes[i],
-+						(uint8_t)mr,
-+						0xff,
-+						0xff,
-+						0xff,
-+						0x80,
-+						0x80
-+					};
++					uint8_t code[] = { (uint8_t)(0x3f +
++								     prefix),
++							   0x0f,
++							   opcodes[i],
++							   (uint8_t)mr,
++							   0xff,
++							   0xff,
++							   0xff,
++							   0x80,
++							   0x80 };
 +					if (sib)
-+						code[5] = sibs[j];
-+					if (sse2 && skip)
-+						code[1] = 0x66;
++						code[4] = sibs[j];
 +					for (unsigned len = 1;
-+					     len <= sizeof(code) - skip - !sse2;
-+					     ++len)
++					     len <= sizeof(code) - skip; ++len)
 +						if (!compare(handles,
-+							     code + skip +
-+								     !sse2,
-+							     len, mr + j + len))
++							     code + skip, len,
++							     mr + j + len))
 +							return false;
 +				}
 +			}
@@ -1521,7 +1759,7 @@ index 4ec7561b..e3136b1e 100644
  static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
  {
  	static const uint32_t values[] = { 0,	       1,	  9,
-@@ -947,7 +1073,13 @@ static bool check_mode(cs_mode mode)
+@@ -947,17 +1130,27 @@ static bool check_mode(cs_mode mode)
  		    !check_sib_base_mov(handles, mode) ||
  		    !check_indexed_memory(handles, mode) ||
  		    !check_push_memory(handles, mode) ||
@@ -1530,14 +1768,17 @@ index 4ec7561b..e3136b1e 100644
 +		     (!check_vex_rip_loads(handles) ||
 +		      !check_sse_rip_memory(handles) ||
 +		      (private_iter == X86_disasmIterText &&
-+		       (!check_sse_base_memory(handles, false) ||
-+			!check_sse_base_memory(handles, true) ||
++		       (!check_sse_base_memory(handles) ||
 +			!check_vex_packed_memory(handles))))) ||
  		    !check_rex_stack(handles) ||
  		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
  		    !check_evex_memory_moves(handles) ||
-@@ -955,9 +1087,10 @@ static bool check_mode(cs_mode mode)
+ 		    !check_padding(handles) ||
  		    !check_alu_memory(handles, mode) ||
++		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
++		     !check_absolute_addresses32(handles)) ||
++		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
++		     !check_indirect_memory(handles, mode)) ||
  		    !check_alu_immediates(handles, mode) ||
  		    !check_legacy_vectors(handles, mode) ||
 -		    (private_iter == X86_disasmIter32 &&
@@ -1550,7 +1791,7 @@ index 4ec7561b..e3136b1e 100644
  		    !check_vex_register_forms(handles) ||
  		    (mode == CS_MODE_64 &&
  		     (!check_evex(handles) || !check_evex_extract(handles) ||
-@@ -998,6 +1131,9 @@ int main(void)
+@@ -998,6 +1191,9 @@ int main(void)
  	private_iter = X86_disasmIter32;
  	if (!check_mode(CS_MODE_32))
  		return 1;
