@@ -1,0 +1,170 @@
+diff --git a/arch/PowerPC/PPCDisassembler.c b/arch/PowerPC/PPCDisassembler.c
+index fbc9f525..78db5053 100644
+--- a/arch/PowerPC/PPCDisassembler.c
++++ b/arch/PowerPC/PPCDisassembler.c
+@@ -398,37 +398,30 @@ DecodeStatus getInstruction(csh ud, const uint8_t *Bytes, size_t BytesLen,
+ 			    MCInst *MI, uint16_t *Size, uint64_t Address,
+ 			    void *Info)
+ {
+-	// If this is an 8-byte prefixed instruction, handle it here.
+-	// Note: prefixed instructions aren't technically 8-byte entities - the
+-	// prefix
+-	//       appears in memory at an address 4 bytes prior to that of the base
+-	//       instruction regardless of endianness. So we read the two pieces and
+-	//       rebuild the 8-byte instruction.
+-	// TODO: In this function we call decodeInstruction several times with
+-	//       different decoder tables. It may be possible to only call once by
+-	//       looking at the top 6 bits of the instruction.
+-	if (PPC_getFeatureBits(MI->csh->mode, PPC_FeaturePrefixInstrs) &&
+-	    BytesLen >= 8) {
+-		uint32_t Prefix = readBytes32(MI, Bytes);
+-		uint32_t BaseInst = readBytes32(MI, Bytes + 4);
+-		uint64_t Inst = BaseInst | (uint64_t)Prefix << 32;
++	if (BytesLen < 4) {
++		*Size = 0;
++		return MCDisassembler_Fail;
++	}
++
++	const uint32_t Inst = readBytes32(MI, Bytes);
++	const unsigned major = Inst >> 26;
++	/* The first word is the prefix, including in little-endian mode. */
++	if (major == PPC_PREFIX_MAJOR && BytesLen >= 8 &&
++	    PPC_getFeatureBits(MI->csh->mode, PPC_FeaturePrefixInstrs)) {
++		const uint64_t pair =
++			((uint64_t)Inst << 32) | readBytes32(MI, Bytes + 4);
+ 		DecodeStatus result = decodeInstruction_4(DecoderTable64, MI,
+-							  Inst, Address, NULL);
++							  pair, Address, NULL);
+ 		if (result != MCDisassembler_Fail) {
+ 			*Size = 8;
+ 			return result;
+ 		}
+ 	}
+ 
+-	// Get the four bytes of the instruction.
+ 	*Size = 4;
+-	if (BytesLen < 4) {
+-		*Size = 0;
+-		return MCDisassembler_Fail;
+-	}
+-
+-	// Read the instruction in the proper endianness.
+-	uint64_t Inst = readBytes32(MI, Bytes);
++	/* Preserve the QPX, SPE, PS priority when multiple mode bits are set. */
++	if (!(PPC_EXTENSION_MAJORS & (UINT64_C(1) << major)))
++		goto base32;
+ 
+ 	if (PPC_getFeatureBits(MI->csh->mode, PPC_FeatureQPX)) {
+ 		DecodeStatus result = decodeInstruction_4(DecoderTableQPX32, MI,
+@@ -447,6 +440,7 @@ DecodeStatus getInstruction(csh ud, const uint8_t *Bytes, size_t BytesLen,
+ 			return result;
+ 	}
+ 
++base32:
+ 	return decodeInstruction_4(DecoderTable32, MI, Inst, Address, NULL);
+ }
+ 
+diff --git a/arch/PowerPC/PPCGenDirectDecoder.inc b/arch/PowerPC/PPCGenDirectDecoder.inc
+index 92881b1b..d0db0df5 100644
+--- a/arch/PowerPC/PPCGenDirectDecoder.inc
++++ b/arch/PowerPC/PPCGenDirectDecoder.inc
+@@ -11843,6 +11843,8 @@ Decode:
+ 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ }
+ 
++#define PPC_PREFIX_MAJOR 1u
++
+ static DecodeStatus direct_DecoderTable64(MCInst *MI, uint64_t insn, uint64_t Address, const void *Decoder)
+ {
+ 	uint64_t CurFieldValue = 0;
+@@ -17793,6 +17795,8 @@ Decode:
+ 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ }
+ 
++#define PPC_EXTENSION_MAJORS UINT64_C(0x3300000080000011)
++
+ static DecodeStatus directInstruction_4(const uint8_t *Table, MCInst *MI, uint64_t insn, uint64_t Address, const void *Decoder)
+ 
+ {
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index ebeea2b7..ab09030b 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -146,10 +146,11 @@ def successors(n):
+     return [n.end] + ([] if n.target is None else [n.target])
+ 
+ 
+-def observable_prefixes(nodes, bits=7):
+-    """Conservatively admit any prefix that could reach an MCInst mutation."""
++def observable_field_values(nodes, offset, bits):
++    """Admit every value of the selected bits that could reach an MCInst mutation."""
+     result = set()
+-    for prefix in range(1 << bits):
++    selected = ((1 << bits) - 1) << offset
++    for value in range(1 << bits):
+         pending = [(0, None)]
+         seen = set()
+         while pending:
+@@ -160,7 +161,7 @@ def observable_prefixes(nodes, bits=7):
+             seen.add(state)
+             node = nodes[position]
+             if node.op in ('Decode', 'TryDecode'):
+-                result.add(prefix)
++                result.add(value)
+                 break
+             if node.op == 'Fail':
+                 continue
+@@ -176,10 +177,11 @@ def observable_prefixes(nodes, bits=7):
+                     match, mismatch = expected == 0, expected != 0
+                 else:
+                     start, length = compared
+-                    known = max(0, min(length, bits - start))
+-                    mask = (1 << known) - 1
+-                    match = expected < (1 << length) and (expected & mask) == ((prefix >> start) & mask)
+-                    mismatch = not match or known < length
++                    field_mask = (1 << length) - 1
++                    known = (selected >> start) & field_mask
++                    observed = ((value << offset) >> start) & known
++                    match = expected <= field_mask and (expected & known) == observed
++                    mismatch = not match or known != field_mask
+                 if match:
+                     pending.append((node.end, field))
+                 if mismatch:
+@@ -330,6 +332,7 @@ def main():
+         ]
+         counts = []
+         extension_majors = 0
++        ppc_extension_majors = 0
+         for name, body in tables:
+             encoded_width = int(name[-2:])
+             require(encoded_width in inputs, "Unsupported instruction width")
+@@ -341,8 +344,17 @@ def main():
+             )
+             nodes = parse(body)
+             if arch == "RISCV" and encoded_width == 32 and name != "DecoderTable32":
+-                for opcode_prefix in observable_prefixes(nodes):
++                for opcode_prefix in observable_field_values(nodes, 0, 7):
+                     extension_majors |= 1 << (opcode_prefix >> 2)
++            if arch == "PowerPC" and name != "DecoderTable32":
++                if encoded_width == 64:
++                    # The first word in memory occupies bits 63:32, for either endianness.
++                    majors = observable_field_values(nodes, 58, 6)
++                    require(len(majors) == 1, "Review the prefixed PowerPC primary opcodes")
++                    output.append(f"#define PPC_PREFIX_MAJOR {next(iter(majors))}u")
++                else:
++                    for major in observable_field_values(nodes, 26, 6):
++                        ppc_extension_majors |= 1 << major
+             if arch == "Mips" and name in (
+                 "DecoderTableMips6432", "DecoderTableMipsFP6432", "DecoderTableMipsDSP32"
+             ):
+@@ -354,6 +366,10 @@ def main():
+             output.append(
+                 f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
+             )
++        if arch == "PowerPC":
++            output.append(
++                f"#define PPC_EXTENSION_MAJORS UINT64_C(0x{ppc_extension_majors:016x})"
++            )
+         for w, width in sorted(set(inputs.values())):
+             selected = [n for n, _ in tables if inputs[int(n[-2:])] == (w, width)]
+             if not selected:
