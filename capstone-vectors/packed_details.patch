@@ -1,0 +1,72 @@
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 883b628a..88889acb 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -141,11 +141,10 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+ 	return out + length;
+ }
+ 
+-static inline void X86_writeSimpleDetail(cs_detail *detail,
+-					 const struct X86SimpleOutput *row,
+-					 uint8_t opcode, uint8_t rex,
+-					 uint8_t modrm, uint16_t first,
+-					 uint16_t second)
++static inline cs_x86 *X86_initSimpleDetail(cs_detail *detail,
++					   const struct X86SimpleOutput *row,
++					   uint8_t opcode, uint8_t rex,
++					   uint8_t modrm)
+ {
+ 	memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 	memcpy(detail->regs_read, row->reads, sizeof(row->reads));
+@@ -164,6 +163,16 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	x86->encoding.imm_offset = row->imm_offset;
+ 	x86->encoding.imm_size = row->imm_size;
+ 	x86->op_count = row->operand_count;
++	return x86;
++}
++
++static inline void X86_writeSimpleDetail(cs_detail *detail,
++					 const struct X86SimpleOutput *row,
++					 uint8_t opcode, uint8_t rex,
++					 uint8_t modrm, uint16_t first,
++					 uint16_t second)
++{
++	cs_x86 *x86 = X86_initSimpleDetail(detail, row, opcode, rex, modrm);
+ 	for (unsigned i = 0; i < x86->op_count; ++i) {
+ 		cs_x86_op *op = &x86->operands[i];
+ 		op->type = X86_OP_REG;
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 97642338..52688b9d 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -87,10 +87,15 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+ 	if (insn->detail) {
+ 		const uint16_t reg =
+ 			(uint16_t)((ll ? X86_REG_YMM0 : X86_REG_XMM0) + number);
+-		X86_writeSimpleDetail(insn->detail, row, 0x0f, rex, mr,
+-				      entry->reverse ? 0 : reg,
+-				      entry->reverse ? reg : 0);
+-		cs_x86 *x = &insn->detail->x86;
++		cs_x86 *x =
++			X86_initSimpleDetail(insn->detail, row, 0x0f, rex, mr);
++		const unsigned mem_index = entry->reverse ? 0 : 1;
++		const unsigned reg_index = mem_index ^ 1u;
++		cs_x86_op *reg_op = &x->operands[reg_index];
++		reg_op->type = X86_OP_REG;
++		reg_op->reg = (x86_reg)reg;
++		reg_op->size = row->ops[reg_index].size;
++		reg_op->access = (cs_ac_type)row->ops[reg_index].access;
+ 		if (vex) {
+ 			memcpy(x->opcode, code, 2);
+ 		} else {
+@@ -107,7 +112,9 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+ 			x->sib_scale = 1;
+ 		}
+ 		x->disp = disp;
+-		cs_x86_op *op = &x->operands[entry->reverse ? 0 : 1];
++		cs_x86_op *op = &x->operands[mem_index];
++		op->size = row->ops[mem_index].size;
++		op->access = (cs_ac_type)row->ops[mem_index].access;
+ 		op->type = X86_OP_MEM;
+ 		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
+ 		op->mem.scale = 1;
