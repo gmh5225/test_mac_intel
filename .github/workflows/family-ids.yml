@@ -1,7 +1,7 @@
-name: Verify the integrated static x86 iterators on the current Capstone next across seven configurations
+name: Verify packed SSE memory and direct static dispatch in seven configurations
 on:
   push:
-    branches: [codex/capstone-integrated-riscv-x86-static]
+    branches: [codex/capstone-packed-sse-direct-matrix]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 205dcd8bd67fb7561e6eb6c15ea4630e20c85d12
+          ref: 4b473e00e92e53fd931cfeea9e2dae710c44ce8c
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: integrated-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: packed-sse-direct-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
