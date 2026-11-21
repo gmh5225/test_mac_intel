@@ -61,9 +61,9 @@ def main(w):
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
     for label,tree in data['trees'].items():
-        if label=='near_mem':
-            assert sha(r/'near_mem.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'near_mem.patch'],'apply')
+        if label=='memory_cmp':
+            assert sha(r/'memory_cmp.patch')==data['patch_sha256']
+            run(['git','-C',base,'apply','--index',r/'memory_cmp.patch'],'apply')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
@@ -84,7 +84,7 @@ def main(w):
         exe[label]=target
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
-    exe['private_base']=exe['baseline'];exe['private_near_mem']=exe['near_mem']
+    exe['private_base']=exe['baseline'];exe['private_memory_cmp']=exe['memory_cmp']
     exe['iced']=exe['fast']=exe['baseline']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['baseline']==payloads['aa']
@@ -109,7 +109,7 @@ def main(w):
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','near_mem')]
+        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','memory_cmp')]
         assert audit[0]==audit[1]
         trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
         views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
@@ -138,7 +138,7 @@ def main(w):
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
             probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','near_mem','iced']+(['fast','private_base','private_near_mem'] if mode else [])
+            cycles={launch:[]for launch in launches};labels=['baseline','aa','memory_cmp','iced']+(['fast','private_base','private_memory_cmp'] if mode else [])
             stable={}
             for i in range(data['cycles']):
                 launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
@@ -151,14 +151,14 @@ def main(w):
                         root='baseline' if k=='aa' else k
                         if root not in stable:stable[root]=v[2:]
                         assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['near_mem']
-                    if mode:assert stable['private_base']==stable['private_near_mem']==stable['near_mem'],(name,mode,stable)
+                    assert stable['baseline']==stable['memory_cmp']
+                    if mode:assert stable['private_base']==stable['private_memory_cmp']==stable['memory_cmp'],(name,mode,stable)
                     cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
             for launch,observations in cycles.items():
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                 row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','near_mem')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','near_mem')} if mode else None
+                row['vs_iced']={k:md('iced',k) for k in ('baseline','memory_cmp')}
+                row['vs_fast']={k:md('fast',k) for k in ('baseline','memory_cmp')} if mode else None
                 reported.append(row)
             save('measurements.json',reported)
         print(name,panel,len(sel),flush=True)

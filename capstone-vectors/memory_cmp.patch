@@ -1,0 +1,206 @@
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index db8e4393..5dd7240d 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -28,7 +28,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-	const unsigned imm_size = (opcode & 1) ? 4 : 1;
++	const unsigned imm_size = (opcode & 1) && opcode != 0x83 ? 4 : 1;
+ 	const unsigned imm_offset = offset + disp_size;
+ 	const unsigned length = imm_offset + imm_size;
+ #else
+@@ -118,16 +118,21 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
++	/* 83 /7 extends imm8 to the operand width. REX.W C7 and 81
++	 * extend imm32. MOV prints its unsigned bit pattern. */
++	int64_t value = encoded;
++	if (opcode == 0x83)
++		value = (int8_t)encoded;
+ #if X86_IMMEDIATE_WIDE
+-	const uint64_t value = row->ops[0].size == 8 ?
+-				       (uint64_t)(int64_t)(int32_t)encoded :
+-				       encoded;
+-#else
+-	const uint32_t value = encoded;
++	else if (imm_size == 4 && row->ops[0].size == 8)
++		value = (int32_t)encoded;
+ #endif
+ 	memcpy(out, ", ", 2);
+-	writeUnsignedImmediate(out + 2, value);
++	out += 2;
++	const bool negative = row->id == X86_INS_CMP && value < 0;
++	if (negative)
++		*out++ = '-';
++	writeUnsignedImmediate(out, (uint64_t)(negative ? -value : value));
+ #else
+ 	if (!load && !push) {
+ 		memcpy(out, ", ", 2);
+@@ -140,7 +145,7 @@ bool X86_writeMemoryOutput(
+ 		cs_x86 *x = &insn->detail->x86;
+ #ifdef X86_MEMORY_IMMEDIATE
+ 		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = (int64_t)value;
++		x->operands[1].imm = value;
+ 		x->operands[1].access = 0;
+ 		x->encoding.imm_offset = (uint8_t)imm_offset;
+ 		x->encoding.imm_size = (uint8_t)imm_size;
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 30cec08f..efe90c9b 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -4,6 +4,26 @@
+ #ifndef CS_X86_SIMPLE_OUTPUT_IMPL_H
+ #define CS_X86_SIMPLE_OUTPUT_IMPL_H
+ 
++#ifdef X86_COMPARE_MEMORY
++static bool writeCompareMemory(cs_struct *handle, const uint8_t *code,
++			       size_t size, cs_insn *insn, uint16_t *insn_size,
++			       unsigned prefix_class)
++{
++	const unsigned lead = prefix_class != 0;
++	if (size < lead + 2 || code[lead + 1] >= 0xc0 ||
++	    (code[lead + 1] & 0x38) != 0x38 ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	/* CMP r/m, reg supplies the same flags, operand widths and memory access. */
++	const unsigned row = x86_simple_plans[X86_FIXED_WIDE][prefix_class]
++					     [0x38 | (code[lead] & 1)] >>
++			     2;
++	return X86_COMPARE_MEMORY(code, size, insn, insn_size,
++				  &x86_simple_outputs[row],
++				  x86_simple_registers);
++}
++#endif
++
+ /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+  * present. Memory admission and bounds checks belong to the address writer. */
+ #ifdef X86_FIXED_OUTPUT
+@@ -36,6 +56,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 						0;
+ 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
+ 	if (!plan) {
++#ifdef X86_COMPARE_MEMORY
++		if (opcode == 0x80 && !escaped)
++			return writeCompareMemory(handle, code, size, insn,
++						  insn_size, prefix_class);
++#endif
+ #ifdef X86_OUTPUT_MISS
+ 		return X86_OUTPUT_MISS(handle, code, size, insn, insn_size);
+ #else
+@@ -58,8 +83,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 						 (opcode & 0xfc) == 0x88;
+ 			const bool push = opcode == 0xff &&
+ 					  (modrm & 0x38) == 0x30;
+-			if (!alu && !test_or_mov && opcode != 0x8d && !push)
++			if (!alu && !test_or_mov && opcode != 0x8d && !push) {
++#ifdef X86_COMPARE_MEMORY
++				if (plan == X86_PLAN_GROUP1_IMMEDIATE)
++					return writeCompareMemory(handle, code,
++								  size, insn,
++								  insn_size,
++								  prefix_class);
++#endif
+ 				return false;
++			}
+ 			base_memory = true;
+ 		} else if (opcode == 0x8d || opcode == 0xff) {
+ 			return false;
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index c18016c4..7daa2966 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -144,6 +144,7 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
++#define X86_COMPARE_MEMORY writeMemoryImmediate64
+ #define X86_FIXED_OUTPUT tryOutput64
+ #define X86_FIXED_WIDE true
+ #define X86_OUTPUT_MISS writeExtraOutput64
+@@ -151,6 +152,7 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#undef X86_COMPARE_MEMORY
+ #define CS_DECODE_TRY_OUTPUT tryOutput64
+ #include "../../cs_disasm_internal.h"
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 8bb11904..83760d8c 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -154,6 +154,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
++#define X86_COMPARE_MEMORY writeMemoryImmediate32
+ #define X86_FIXED_OUTPUT tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32
+@@ -161,6 +162,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#undef X86_COMPARE_MEMORY
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+ #include "../../cs_disasm_internal.h"
+ #endif
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 1b5facf3..2aaf16cc 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -812,6 +812,39 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_memory_compares(csh handles[2], cs_mode mode)
++{
++	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
++	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
++	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
++	     ++prefix) {
++		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
++			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
++				if ((mr & 0x30) != 0x30)
++					continue;
++				for (unsigned n = 0; n < sizeof(values); ++n) {
++					uint8_t code[12];
++					memset(code, values[n], sizeof(code));
++					code[0] = (uint8_t)(0x3f + prefix);
++					code[1] = (uint8_t)opcode;
++					code[2] = (uint8_t)mr;
++					if ((mr & 7) == 4)
++						code[3] = sibs[n];
++					const uint8_t *start = code + !prefix;
++					for (size_t length = 1;
++					     length <= sizeof(code) - !prefix;
++					     ++length)
++						if (!compare(handles, start,
++							     length,
++							     prefix + mr + n))
++							return false;
++				}
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ {
+ 	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
+@@ -1010,7 +1043,8 @@ static bool check_mode(cs_mode mode)
+ 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+ 		     !check_vex2_base_memory(handles)) ||
+ 		    (private_iter != X86_disasmIter &&
+-		     !check_mov_memory_immediates(handles, mode)) ||
++		     (!check_mov_memory_immediates(handles, mode) ||
++		      !check_memory_compares(handles, mode))) ||
+ 		    !check_vex_register_forms(handles) ||
+ 		    (mode == CS_MODE_64 &&
+ 		     (!check_evex(handles) || !check_evex_extract(handles) ||
