@@ -18,6 +18,7 @@ resource.setrlimit(resource.RLIMIT_CORE,(0,0))
 w=Path(tempfile.mkdtemp());b=w/'build'
 try:
     if s is None:
+        root = r.parent.parent if r.name=='verified' else r.parent
         s=w/'source';run(['git','clone','--shared','--no-checkout',root/'round579-custom-formatter-coverage/source',s],'clone')
         run(['git','-C',s,'checkout','--detach',m['parent']],'checkout')
     cc=os.environ.get('CC','cc');flavor=os.environ.get('FLAVOR','diet');diet=flavor=='diet';att=flavor!='intel'
@@ -31,7 +32,7 @@ try:
             assert sha(r/'candidate.patch')==m['sha256']
             sp.run(['git','-C',s,'apply','--index',r/'candidate.patch'],check=True)
             assert sp.check_output(['git','-C',s,'write-tree'],text=True).strip()==m['tree']
-        run(['cmake','--build',b,'--parallel','4','--target',target],'build-'+k)
+        run(['cmake','--build',b,'--parallel','4','--target','capstone_static',target],'build-'+k)
         # The runtime is the same archive, using the exact code linked into the unit.
         library=next(b.rglob('libcapstone.a'));hashes.append(sha(library))
         rv=run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_x86_kmask_width$'],'result-'+k,False)
