@@ -118,9 +118,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     baseline=json.loads((out/'base-caller-object.json').read_text())
     assert text==baseline['sections']
-    offs=lambda rows:[(v.split()[0],v.split()[-3:]) for v in rows]
-    assert [v[0] for v in offs(rel)]==[v[0] for v in offs(baseline['iterator_relocations'])]
-    assert all('X86_disasmIterText' in v for v in rel) and all(' X86_disasmIter ' in v for v in baseline['iterator_relocations'])
+    assert rel==baseline['iterator_relocations'] and all('X86_disasmIterText' in v for v in rel)
 
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
