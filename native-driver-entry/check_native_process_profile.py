@@ -15,6 +15,29 @@ def digest(file):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def execute_system_calls(directory):
+    objects = [directory / "calls.obj"]
+    compiler = ["clang-cl", "--target=aarch64-pc-windows-msvc", "/nologo", "/O2", "/MD"]
+    for route in ("highc", "llvmc"):
+        for name in ("UseIcmpHandle", "UseSnmpRelease", "UsePlatformAuthenticator"):
+            stem = directory / (name + "-" + route)
+            output = stem.with_suffix(".obj")
+            subprocess.run([*compiler, "/c", f"/D{name}={route}_{name}",
+                            f"/Dneverd_ucrt_abi_0={route}_{name}_declaration",
+                            stem.with_suffix(".c"), "/Fo" + str(output)], check=True)
+            objects.append(output)
+    program = directory / "native-system-calls.exe"
+    main_source = Path(__file__).with_name("native_system_smoke.c")
+    libraries = [directory / name for name in ("iphlpapi.lib", "ktmw32.lib", "SensorsUtils.lib",
+                                               "SnmpAPI.Lib", "webauthn.lib")]
+    subprocess.run([*compiler, main_source, *objects, *libraries, "/Fe" + str(program)], check=True)
+    rows = json.loads(subprocess.check_output([program], text=True, timeout=60))
+    assert [r["route"] for r in rows] == ["original", "highc", "llvmc"]
+    assert all(r["icmp_closed"] and r["snmp_release_returned"] for r in rows)
+    assert len({(r["webauthn_status"], r["available"]) for r in rows}) == 1
+    return {"executable_sha256": digest(program), "observations": rows}
+
+
 def main():
     parser = argparse.ArgumentParser()
     for name in ("source", "types", "cache", "engine", "output", "report"):
@@ -50,17 +73,41 @@ def main():
     required = {(api, route) for api in ("EnumProcessModulesEx", "PssFreeSnapshot")
                 for route in ("highc", "llvmc")}
     assert required <= {(r["api"], r["route"]) for r in rows}
+    system_providers = {"InternetControlMessage": 9, "TransactionManager": 39,
+                        "SNMPUtilities": 26, "WebAuthentication": 13, "SensorUtilities": 40}
+    system_abi = args.output / "system-abis"
+    system_calls = args.output / "system-calls"
+    provider_options = [arg for name in system_providers for arg in ("--provider", name)]
+    invoke("check_microsoft_provider_abis.py", [*provider_options, "--output", system_abi])
+    invoke("check_windows_provider_calls.py",
+           ["--sdk-system", "--linker", "lld-link", "--cache", args.cache, "--output", system_calls])
+    new_abis = json.loads((system_abi / "report.json").read_text(encoding="utf-8"))
+    new_calls = json.loads((system_calls / "report.json").read_text(encoding="utf-8"))
+    assert new_abis["passed"] and {r["provider"]: len(r["functions"]) for r in new_abis["cases"]} == system_providers
+    system_apis = {"IcmpCloseHandle", "GetCurrentClockTransactionManager", "GetTransactionManagerId",
+                   "CollectionsListAllocateBufferAndSerialize", "SnmpUtilMemFree",
+                   "WebAuthNIsUserVerifyingPlatformAuthenticatorAvailable"}
+    system_rows = new_calls["cases"]
+    assert new_calls["passed"] and len(system_rows) == 2 * len(system_apis)
+    assert {(r["api"], r["route"]) for r in system_rows} == {
+        (api, route) for api in system_apis for route in ("highc", "llvmc")}
+    assert all(r["architecture"] == "arm64" and r["passed"] and r["retains_call"]
+               for r in system_rows)
     data = args.engine.read_bytes()
     nt, = struct.unpack_from("<I", data, 60)
     machine, = struct.unpack_from("<H", data, nt + 4)
     assert machine == 0xaa64
     report = dict(revision=os.environ["NEVERD_REV"], machine=machine,
                   engine_sha256=digest(args.engine), provider_abis=counts,
+                  system_provider_abis=system_providers,
+                  system_runtime=execute_system_calls(system_calls / "arm64"),
+                  system_linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}
+                                              for r in system_rows],
                   catalog={lib["name"]: lib["sha256"] for lib in manifest["libraries"]},
                   linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}
                                        for r in rows])
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print("Native engine compiled both source routes of ten linked SDK callers")
+    print("Native ARM64 engine compiled HighC and LLVMC for sixteen linked Microsoft SDK callers")
 
 
 if __name__ == "__main__":
