@@ -13,7 +13,7 @@ cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
 assert cc == 'clang' and platform.machine()=='x86_64'
 feature_active = True
-write('scope',dict(active=feature_active,policy='Test the ordinary NeverD C++ Decoder entry on PE32, PE64, ELF scalar and vector data with and without the i386 text member. Measure scan, text, detail and batch using the production backend.'))
+write('scope',dict(active=feature_active,policy='Test the i386 VEX2 scan reader through decodeOneLight and decodeOne, including scalar PE, ELF, other architectures and batch behavior.'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -117,8 +117,10 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    write(label+'-caller-object',dict(sections=text,iterator_relocations=rel))
    if label!='base':
     baseline=json.loads((out/'base-caller-object.json').read_text())
-    assert text==baseline['sections']
-    assert rel==baseline['iterator_relocations'] and all('X86_disasmIterText' in v for v in rel)
+    if label=='scan_core':
+     assert text==baseline['sections'] and rel==baseline['iterator_relocations']
+    else:
+     assert any('X86_disasmIterText' in v for v in rel) and any('X86_disasmIter32' in v for v in rel) and text!=baseline['sections']
 
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
@@ -205,8 +207,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     prior=json.loads((out/'base-objects.json').read_text())
     assert prior.keys()==objects.keys()
-    assert {Path(k).name for k in prior if prior[k]!=objects[k]}=={'X86Sse64Output.c.o'}
-    if label=='i386_first':assert objects==json.loads((out/'vex-objects.json').read_text())
+    assert {Path(k).name for k in prior if prior[k]!=objects[k]}=={'X86Vex32Output.c.o'}
+    if label in ('arch_first','byte_first'):assert objects==json.loads((out/'scan_core-objects.json').read_text())
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)

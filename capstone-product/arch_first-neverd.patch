@@ -1,0 +1,14 @@
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index 745a3a8ce9..71d0f20087 100644
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -386,6 +386,9 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+   if (Text && X86) {
+     if (X86_disasmIterText(Handle, &Code, &Remaining, &PC, InsnBuf))
+       return true;
++  } else if (TargetArch == Arch::X86 && !Detail) {
++    if (X86_disasmIterScan32(Handle, &Code, &Remaining, &PC, InsnBuf))
++      return true;
+   } else if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf)) {
+     return true;
+   }
