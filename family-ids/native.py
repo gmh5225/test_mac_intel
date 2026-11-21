@@ -35,7 +35,7 @@ try:
         if conf!='full' and variant=='base':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
     assert objects['base'].keys()==objects['candidate'].keys()
     changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
-    assert all(Path(k).name in {'Mapping.c.o','AliasMapping.c.o','RISCVMapping.c.o'} for k in changed)
+    assert all(Path(k).name in {'X86Mapping.c.o'} for k in changed)
     write('member-changes',dict(changed=changed,total=len(objects['base']),base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
@@ -47,6 +47,7 @@ try:
     else:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
+    if 'x86_reg_access' not in selected: selected.append('x86_reg_access')
     if conf!='full':
         write('other-profile-images',dict(base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
@@ -74,7 +75,7 @@ try:
             z=sp.check_output([tmp/'verify',libs['base'],libs['candidate'],str(bits),path,str(ip),str(syntax),str(int(diet))],text=True)
             for line in z.splitlines():
                 ib,flags,sy,calls,valid,changes=map(int,line.split());assert ib==bits and sy==syntax and calls>=valid>=changes
-                assert changes==0
+                assert changes==0 or (bits==32 and flags&2 and not diet)
                 rows.append(dict(sample=name,bits=bits,syntax=syntax,flags=flags,calls=calls,success=valid,changes=changes))
             write('records',rows)
     if conf=='full':
@@ -109,6 +110,10 @@ try:
         def invoke(k,bits,mode,path,ip,reps):
             with target.open('wb') as o:o.write(inputs[k])
             return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
+        weight=int(sp.check_output([tmp/'verify','--write-score-delta'],text=True))
+        writes={q['sample']:q['changes']*weight for q in rows if q['bits']==32 and q['syntax']==0 and q['flags']==3}
+        assert writes['putty32'] == 3*weight
+        write('register-score',dict(per_instruction=weight,checksums=writes))
         timing=[]
         for name,bits,path,ip in panels[2:]+other_cases:
             for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
@@ -116,7 +121,7 @@ try:
                 for i in range(11):
                     keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
-                        v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
+                        v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2]-(writes.get(name,0) if k=="candidate" and mode==3 else 0);cyc[k].append(v[:2])
                     cycles.append(cyc)
                 timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
                 write('timings',timing)

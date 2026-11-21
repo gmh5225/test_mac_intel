@@ -1,4 +1,5 @@
 #include <capstone/capstone.h>
+#include "acceptance.h"
 #include <dlfcn.h>
 #include <algorithm>
 #include <array>
@@ -79,6 +80,7 @@ struct Pair {
         (void)required;
         same &= x.detail==(detail?&xd:nullptr) && y.detail==(detail?&yd:nullptr);
         unsigned before=x.id;
+        if(ok && detail && !diet && expect_vector_writes(bits,x.id,xd,yd)) ++c.corrected;
         x.detail=nullptr;y.detail=nullptr;
         if(!same||std::memcmp(&x,&y,sizeof x)||std::memcmp(&xd,&yd,sizeof xd)){
             std::fprintf(stderr,"record mismatch ip=%llx len=%zu bits=%u flags=%u old/new=%u/%u valid=%u/%u required=%u:",(unsigned long long)ip,n,bits,flags,before,y.id,ok,ok2,required);
@@ -121,6 +123,9 @@ void float_matrix(Pair &p) {
         }
 }
 int main(int argc,char **argv) {
+    if(argc==2 && std::strcmp(argv[1],"--write-score-delta")==0) {
+        std::printf("%u\n",vector_write_score_delta());return 0;
+    }
     if(argc!=8)return 2;
     Api a(argv[1]),b(argv[2]);unsigned bits=std::stoul(argv[3]);
     bool generated=std::strcmp(argv[4],"matrix")==0;uint64_t ip=std::stoull(argv[5],nullptr,0);

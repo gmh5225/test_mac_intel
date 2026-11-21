@@ -1,4 +1,5 @@
 #include <capstone/capstone.h>
+#include "acceptance.h"
 #include <dlfcn.h>
 #include <algorithm>
 #include <cstdio>
@@ -81,6 +82,7 @@ int main(int argc, char **argv) {
         right.detail=left.detail;
         bool same=!std::memcmp(&left,&right,sizeof(left));
         right.detail=d;
+        if (same && left.detail && d) expect_vector_writes(bits,left.id,*left.detail,*d);
         if (!same || bool(left.detail)!=bool(d) || (d && std::memcmp(left.detail,d,sizeof(*d))))
           throw std::runtime_error("batch instruction or detail mismatch");
       }
@@ -91,6 +93,8 @@ int main(int argc, char **argv) {
     };
     const uint8_t compare_and_moves[]={0xc5,0xf8,0xc2,0xc1,0x02,0x8b,0x03,0x90};
     check_batch(compare_and_moves,sizeof(compare_and_moves),0,0xfffffffeULL);
+    const uint8_t clear[]={0xc5,0xf8,0x77,0xc4,0xe1,0x7c,0x77};
+    check_batch(clear,sizeof(clear),0,0x2000);
     const size_t counts[]={0,1,7,64};
     for (size_t at=0; at<data.size(); at+=4093)
       for (size_t count : counts)
@@ -118,6 +122,8 @@ int main(int argc, char **argv) {
         if(insn[i].detail!=&detail[i]) throw std::runtime_error("detail pointer");
         insn[i].detail=nullptr;
       }
+      if (ok[0] && ok[1] && cfg.detail && insn[0].id==insn[1].id)
+        expect_vector_writes(bits,insn[0].id,detail[0],detail[1]);
       if(ok[0]!=ok[1] || left[0]!=left[1] || cur[0]!=cur[1] || ip[0]!=ip[1] ||
          err[0]!=err[1] || std::memcmp(insn,insn+1,sizeof(cs_insn)) ||
          std::memcmp(detail,detail+1,sizeof(cs_detail))) {
