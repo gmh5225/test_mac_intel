@@ -67,6 +67,28 @@ jobs:
           if ($LASTEXITCODE) { throw "native entry state differs $LASTEXITCODE" }
           Copy-Item inputs.json ../evidence/entry-capture-inputs.json
           Pop-Location
+      - name: Authenticate the additional ARM64 inbox driver images
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $drivers = Get-CimInstance Win32_SystemDriver
+          $images = foreach ($name in @('beep', 'fltmgr', 'storport', 'usbpmapi', 'wpprecorder')) {
+            $file = Join-Path "$env:SystemRoot/System32/drivers" "$name.sys"
+            $sig = Get-AuthenticodeSignature -LiteralPath $file
+            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Microsoft') {
+              throw "Invalid Microsoft signature for $name"
+            }
+            $bytes = [IO.File]::ReadAllBytes($file)
+            $nt = [BitConverter]::ToInt32($bytes, 60)
+            $machine = [BitConverter]::ToUInt16($bytes, $nt + 4)
+            if ($machine -ne 0xaa64) { throw "$name is not native ARM64" }
+            $service = @($drivers | Where-Object { $_.Name -eq $name })
+            [ordered]@{name="$name.sys"; machine=$machine; signature=$sig.Status.ToString();
+              signer=$sig.SignerCertificate.Subject; service_state=@($service.State);
+              entry_rva=[BitConverter]::ToUInt32($bytes, $nt+40);
+              sha256=(Get-FileHash $file).Hash.ToLower()}
+          }
+          $images | ConvertTo-Json -Depth 4 | Set-Content evidence/inbox-identities.json
       - name: Replay the exact qualified entry code against the signed inbox driver
         shell: pwsh
         run: |
