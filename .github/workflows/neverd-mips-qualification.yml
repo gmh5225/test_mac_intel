@@ -19,6 +19,7 @@ jobs:
       required: ${{ steps.input.outputs.required }}
       runners: ${{ steps.input.outputs.runners }}
       reference: ${{ steps.input.outputs.reference }}
+      benchmark: ${{ steps.input.outputs.benchmark }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -40,6 +41,7 @@ jobs:
               assert matrix
               print('runners=' + json.dumps({'include': matrix}), file=out)
               print('reference=' + str(config.get('r4000_reference', False)).lower(), file=out)
+              print('benchmark=' + str(config.get('measure_decode', False)).lower(), file=out)
               for key in ('revision', 'target', 'filter', 'required'):
                   value = config[key]
                   assert value and '\n' not in value and '\r' not in value
@@ -60,6 +62,7 @@ jobs:
       TEST_TARGET: ${{ needs.source.outputs.target }}
       TEST_FILTER: ${{ needs.source.outputs.filter }}
       REQUIRED_TEST: ${{ needs.source.outputs.required }}
+      BENCHMARK: ${{ needs.source.outputs.benchmark }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -103,7 +106,9 @@ jobs:
             -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
             -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS="$semantic" "${args[@]}"
-          python scripts/build.py build-check --config Release --parallel 4 --target "$TEST_TARGET"
+          targets=("$TEST_TARGET")
+          if [[ "$BENCHMARK" == true ]]; then targets+=(neverd-mips-bench NeverDMIPSFlowTests); fi
+          python scripts/build.py build-check --config Release --parallel 4 --target "${targets[@]}"
       - name: Run the requested tests and verify the regression executed
         run: |
           mkdir -p evidence
@@ -117,6 +122,18 @@ jobs:
           assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == os.environ['REVISION']
           Path('evidence/source.txt').write_text(os.environ['REVISION'] + '\n' + subprocess.check_output(['git','submodule','status','third_party/capstone'],text=True))
           PY
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: needs.source.outputs.benchmark == 'true'
+        with:
+          path: qualification-driver
+          persist-credentials: false
+          sparse-checkout: neverd-mips-qualification
+      - name: Qualify flow and time each decoder on identical target bytes
+        if: needs.source.outputs.benchmark == 'true'
+        run: |
+          build-check/bin/NeverDMIPSFlowTests --gtest_output=xml:evidence/flow.xml
+          python qualification-driver/neverd-mips-qualification/native-benchmark.py build-check/bin/neverd-mips-bench evidence/performance.json
+          cp build-check/neverd-dependency-inputs.json build-check/neverd-build-receipt.json evidence/
       - name: Retain configuration diagnostics for a failed build
         if: failure()
         run: |
