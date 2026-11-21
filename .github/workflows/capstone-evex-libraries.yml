@@ -1,7 +1,7 @@
-name: Compare public and NeverD text entry points with both forked iced formatters
+name: Compare ordered operand access with both iced formatters and the NeverD entry
 on:
   push:
-    branches: [codex/capstone-public-private-iced-comparison]
+    branches: [codex/capstone-ordered-access-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compare-entries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ordered-entries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
