@@ -1,69 +1,53 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d04037ba..77d1aaa8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -179,7 +179,7 @@ if(capstone_enabled_architectures STREQUAL "LOONGARCH")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "PPC")
+-    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS CAPSTONE_PPC_PRIMARY_DISPATCH)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+diff --git a/Makefile b/Makefile
+index 3d17212d..b8b582a0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -140,7 +140,7 @@ CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),powerpc)
+-CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS
++CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPATCH
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
 diff --git a/arch/PowerPC/PPCDisassembler.c b/arch/PowerPC/PPCDisassembler.c
-index fbc9f525..78db5053 100644
+index fbc9f525..1c549d35 100644
 --- a/arch/PowerPC/PPCDisassembler.c
 +++ b/arch/PowerPC/PPCDisassembler.c
-@@ -398,37 +398,30 @@ DecodeStatus getInstruction(csh ud, const uint8_t *Bytes, size_t BytesLen,
+@@ -398,6 +398,19 @@ DecodeStatus getInstruction(csh ud, const uint8_t *Bytes, size_t BytesLen,
  			    MCInst *MI, uint16_t *Size, uint64_t Address,
  			    void *Info)
  {
--	// If this is an 8-byte prefixed instruction, handle it here.
--	// Note: prefixed instructions aren't technically 8-byte entities - the
--	// prefix
--	//       appears in memory at an address 4 bytes prior to that of the base
--	//       instruction regardless of endianness. So we read the two pieces and
--	//       rebuild the 8-byte instruction.
--	// TODO: In this function we call decodeInstruction several times with
--	//       different decoder tables. It may be possible to only call once by
--	//       looking at the top 6 bits of the instruction.
--	if (PPC_getFeatureBits(MI->csh->mode, PPC_FeaturePrefixInstrs) &&
--	    BytesLen >= 8) {
--		uint32_t Prefix = readBytes32(MI, Bytes);
--		uint32_t BaseInst = readBytes32(MI, Bytes + 4);
--		uint64_t Inst = BaseInst | (uint64_t)Prefix << 32;
-+	if (BytesLen < 4) {
-+		*Size = 0;
-+		return MCDisassembler_Fail;
++#ifdef CAPSTONE_PPC_PRIMARY_DISPATCH
++	/* Only these primary opcodes can reach a prefixed or extension decoder. */
++	if (BytesLen >= 4) {
++		const uint32_t word = readBytes32(MI, Bytes);
++		const unsigned major = word >> 26;
++		if (major != PPC_PREFIX_MAJOR &&
++		    !(PPC_EXTENSION_MAJORS & (UINT64_C(1) << major))) {
++			*Size = 4;
++			return decodeInstruction_4(DecoderTable32, MI, word,
++						   Address, NULL);
++		}
 +	}
-+
-+	const uint32_t Inst = readBytes32(MI, Bytes);
-+	const unsigned major = Inst >> 26;
-+	/* The first word is the prefix, including in little-endian mode. */
-+	if (major == PPC_PREFIX_MAJOR && BytesLen >= 8 &&
-+	    PPC_getFeatureBits(MI->csh->mode, PPC_FeaturePrefixInstrs)) {
-+		const uint64_t pair =
-+			((uint64_t)Inst << 32) | readBytes32(MI, Bytes + 4);
- 		DecodeStatus result = decodeInstruction_4(DecoderTable64, MI,
--							  Inst, Address, NULL);
-+							  pair, Address, NULL);
- 		if (result != MCDisassembler_Fail) {
- 			*Size = 8;
- 			return result;
- 		}
- 	}
- 
--	// Get the four bytes of the instruction.
- 	*Size = 4;
--	if (BytesLen < 4) {
--		*Size = 0;
--		return MCDisassembler_Fail;
--	}
--
--	// Read the instruction in the proper endianness.
--	uint64_t Inst = readBytes32(MI, Bytes);
-+	/* Preserve the QPX, SPE, PS priority when multiple mode bits are set. */
-+	if (!(PPC_EXTENSION_MAJORS & (UINT64_C(1) << major)))
-+		goto base32;
- 
- 	if (PPC_getFeatureBits(MI->csh->mode, PPC_FeatureQPX)) {
- 		DecodeStatus result = decodeInstruction_4(DecoderTableQPX32, MI,
-@@ -447,6 +440,7 @@ DecodeStatus getInstruction(csh ud, const uint8_t *Bytes, size_t BytesLen,
- 			return result;
- 	}
- 
-+base32:
- 	return decodeInstruction_4(DecoderTable32, MI, Inst, Address, NULL);
- }
- 
++#endif
+ 	// If this is an 8-byte prefixed instruction, handle it here.
+ 	// Note: prefixed instructions aren't technically 8-byte entities - the
+ 	// prefix
 diff --git a/arch/PowerPC/PPCGenDirectDecoder.inc b/arch/PowerPC/PPCGenDirectDecoder.inc
 index 92881b1b..d0db0df5 100644
 --- a/arch/PowerPC/PPCGenDirectDecoder.inc

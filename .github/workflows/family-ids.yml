@@ -1,7 +1,7 @@
-name: Measure first-word PowerPC dispatch on three real ELF programs and verify across seven profiles
+name: Time dedicated PowerPC dispatch and compare unchanged multiarch libraries
 on:
   push:
-    branches: [codex/capstone-powerpc-word-dispatch]
+    branches: [codex/capstone-powerpc-dedicated-primary]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 38d0847fb739b95708e6929af78ffdf1ebc806b5
+          ref: e41ed2cc9e8bacfc2e020dcb0deafca1ce1a251b
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: ppc-word-dispatch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-ppc-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
