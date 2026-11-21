@@ -13,7 +13,7 @@
 extern "C" { unsigned profile_stages[9]; }
 
 int main(int argc, char **argv) {
-    if (argc != 4) return 1;
+    if (argc != 6) return 1;
     csh handle = 0;
     if (cs_open(CS_ARCH_X86, std::atoi(argv[1]) == 64 ? CS_MODE_64 : CS_MODE_32, &handle) ||
         cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF)) return 2;
@@ -27,6 +27,8 @@ int main(int argc, char **argv) {
     std::ifstream file(argv[2], std::ios::binary), spans(argv[3]);
     const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(file), {}};
     std::map<std::string, std::array<uint64_t, 10>> counts;
+    std::ofstream records(argv[4], std::ios::binary), differences(argv[5]);
+    if (!records || !differences) return 4;
     size_t offset, left;
     uint64_t ip;
     while (spans >> offset >> left >> ip) {
@@ -38,13 +40,32 @@ int main(int argc, char **argv) {
             uint64_t rendered_pc = ip;
             const uint8_t *rendered_cursor = cursor;
             const auto *begin = cursor;
+            const auto initial_ip = ip;
+            const size_t initial_left = left;
             bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);
             std::array<unsigned, 7> scan;
             std::copy_n(profile_stages, scan.size(), scan.begin());
             std::fill_n(profile_stages, 9, 0);
             bool formatted = cs_disasm_iter(output, &rendered_cursor, &rendered_left, &rendered_pc, rendered);
+            const uint64_t observed[] = {
+                static_cast<uint64_t>(begin-bytes.data()), initial_left, initial_ip,
+                ok, static_cast<uint64_t>(cursor-begin), left, ip,
+                ok ? insn->id : 0u, ok ? static_cast<unsigned>(insn->size) : 0u,
+                formatted, static_cast<uint64_t>(rendered_cursor-begin), rendered_left, rendered_pc,
+                formatted ? rendered->id : 0u, formatted ? static_cast<unsigned>(rendered->size) : 0u,
+            };
+            records.write(reinterpret_cast<const char *>(observed),sizeof(observed));
             if (formatted != ok || rendered_left != left || rendered_pc != ip || rendered_cursor != cursor ||
-                (ok && (rendered->id != insn->id || rendered->size != insn->size))) return 6;
+                (ok && (rendered->id != insn->id || rendered->size != insn->size))) {
+                static const char hex[] = "0123456789abcdef";
+                differences << std::hex << initial_ip << ' ';
+                for (size_t i=0;i<std::min<size_t>(initial_left,15);++i)
+                    differences << hex[begin[i]>>4] << hex[begin[i]&15];
+                differences << std::dec << ' ' << ok << ' ' << observed[7] << ' ' << observed[8]
+                            << ' ' << formatted << ' ' << observed[13] << ' ' << observed[14]
+                            << ' ' << (ok ? cs_insn_name(handle,insn->id) : "-")
+                            << ' ' << (formatted ? rendered->mnemonic : "-") << '\n';
+            }
             std::string key;
             if (ok) {
                 const char *name = cs_insn_name(handle, insn->id);
@@ -65,7 +86,8 @@ int main(int argc, char **argv) {
             row[8]+=profile_stages[7];row[9]+=profile_stages[8];
         }
     }
-    if (!spans.eof()) return 5;
+    records.close(); differences.close();
+    if (!spans.eof() || !records || !differences) return 5;
     for (const auto &[name,row] : counts) {
         std::cout << name;
         for (auto v : row) std::cout << '\t' << v;

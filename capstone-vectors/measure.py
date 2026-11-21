@@ -66,6 +66,7 @@ def main(w):
         objects[label]={name:sha(path) for name,path in active.items()}
         assert len(objects[label])>30
         if label=='integer':
+            run(['clang++','-O2','-std=c++17','-I',tree/'include',r/'observer.cpp',b/'libcapstone.a','-lm','-o',w/'reference-observer'],'link-reference-observer')
             shutil.copyfile(objroot/'arch/X86/X86OutputIterator.c.o',w/'baseline-plan.o')
         else:
             changed={name for name,value in objects['integer'].items() if objects[label].get(name)!=value}
@@ -127,7 +128,20 @@ def main(w):
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
-            obs=sp.check_output([w/'observer',str(bits),f,intervals],text=True)
+            import filecmp
+            rows_by={}
+            for key,program in [('base',w/'reference-observer'),('candidate',w/'observer')]:
+                rows_by[key]=sp.check_output([program,str(bits),f,intervals,w/(key+'.rec'),w/(key+'.diff')],text=True)
+            for suffix in ('rec','diff'):
+                if not filecmp.cmp(w/('base.'+suffix),w/('candidate.'+suffix),shallow=False):
+                    raise RuntimeError(name+' has different same-mode baseline and candidate '+suffix+' results')
+            lines=(w/'base.diff').read_text().splitlines()
+            from collections import Counter
+            count=Counter(tuple(line.split()[2:]) for line in lines)
+            save(name+'-mode-reference.json',dict(bytes=(w/'base.rec').stat().st_size,record_sha256=sha(w/'base.rec'),differences_between_modes=len(lines),categories=[(list(k),v) for k,v in count.most_common()],examples=lines[:15],same_mode_differences=0))
+            for key in rows_by:
+                for suffix in ('rec','diff'):(w/(key+'.'+suffix)).unlink()
+            obs=rows_by['candidate']
             stages={}
             for line in obs.splitlines():
                 fields=line.split('\t')
