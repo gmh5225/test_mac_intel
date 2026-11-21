@@ -1,0 +1,84 @@
+name: Qualify the complete ARM64 Microsoft catalog with the retained native reader
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - .github/workflows/neverd-native-sdk-generation.yml
+permissions:
+  contents: read
+jobs:
+  sdk:
+    runs-on: windows-11-arm
+    timeout-minutes: 22
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: native-driver-entry
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 043da0c8d6fd22761354173a4f62bd2387f4cfb0
+          path: source
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ${{ runner.temp }}/nb/bin/neverd.exe
+          key: neverd-arm64-type-reader-d035e9bb8941f8f33a96560c8eb020496df499e2-1
+          fail-on-cache-miss: true
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - name: Generate and authenticate the original WDK, SDK and UCRT catalog
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $cache = "$env:RUNNER_TEMP/sdk-packages"
+          $exe = "$env:RUNNER_TEMP/nb/bin/neverd.exe"
+          $out = "$env:RUNNER_TEMP/sdk-types/arm64"
+          $pe = [IO.File]::ReadAllBytes($exe)
+          $nt = [BitConverter]::ToInt32($pe,60)
+          if ([BitConverter]::ToUInt16($pe,$nt+4) -ne 0xaa64) { throw 'The retained type reader has an unexpected PE machine' }
+          python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
+          Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
+          python source/scripts/generate_microsoft_windows_types.py --architecture arm64 --ucrt --ucrt-compatibility --legacy-sdk --output $out --cache $cache --neverd $exe --clang clang --llvm-readobj llvm-readobj
+          $manifest = Get-Content -Raw "$out/manifest.json" | ConvertFrom-Json
+          if ($manifest.architecture -ne 'arm64' -or $manifest.libraries.Count -ne 2) { throw 'Incomplete native catalog' }
+          $libraries = @()
+          $selected = @{}
+          foreach ($lib in $manifest.libraries) {
+            $hash = (Get-FileHash "$out/$($lib.name).h").Hash.ToLower()
+            if ($hash -ne $lib.sha256) { throw "Header digest for $($lib.name) differs" }
+            $libraries += @{name=$lib.name; sha256=$hash; types=$lib.types; prototypes=$lib.prototypes}
+            foreach ($provider in $lib.providers) {
+              if ($provider.name -eq 'RDBSS') { $selected['RDBSS']=$provider.metadata.cpp_header_bridge.verified_functions.Count }
+              if ($provider.name -in @('InternetControlMessage','TransactionManager','SensorUtilities','WebAuthentication','SNMPUtilities')) {
+                $selected[$provider.name]=$provider.metadata.sdk_import_bridge.published_abi.verified_functions.Count
+              }
+            }
+          }
+          if ($selected.Count -ne 6 -or $selected.RDBSS -ne 285 -or ($selected.Values | Measure-Object -Sum).Sum -ne 412) { throw 'Incomplete provider evidence' }
+          @{generator_revision='043da0c8d6fd22761354173a4f62bd2387f4cfb0'; reader_revision='d035e9bb8941f8f33a96560c8eb020496df499e2'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+      - name: Record the first failing official interface or compiler
+        if: failure()
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP/sdk-types/arm64"
+          if (Test-Path $dir) {
+            Get-ChildItem -Recurse -Filter '*.log' $dir | Sort-Object LastWriteTime -Descending | Select-Object -First 8 | ForEach-Object {
+              Write-Host $_.Name
+              if ($_.Name -like '*.parse.log' -and $_.Length -gt 0) {
+                try { Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json | Select-Object -First 5 | ForEach-Object { Write-Host $_.message } } catch {}
+              }
+              Select-String -Path $_.FullName -Pattern '(fatal error|error:|exception:)' | Select-Object -First 5 | ForEach-Object { Write-Host $_.Line.Trim().Substring(0,[Math]::Min(250,$_.Line.Trim().Length)) }
+            }
+          }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-catalog-evidence
+          path: native-catalog-evidence.json
+          if-no-files-found: error
+          retention-days: 14
