@@ -76,26 +76,9 @@ struct Pair {
         bool ok=a.iter(ah,&l,&ls,&li,&x),ok2=b.iter(bh,&r,&rs,&ri,&y);
         bool same=ok==ok2 && l==r && ls==rs && li==ri && a.error(ah)==b.error(bh);
         if(ok) ++c.valid;
-        if(required) same &= ok && y.id==required && y.size==n;
+        (void)required;
         same &= x.detail==(detail?&xd:nullptr) && y.detail==(detail?&yd:nullptr);
         unsigned before=x.id;
-        // The published DIET formatter increments generic VPCMP by the
-        // alias predicate index. Without mnemonic text its old fixup has no suffix.
-        const bool evex_family=ok && x.size<=n && family(start,x.size)==y.id && y.id;
-        const uint8_t imm=evex_family ? start[x.size-1] : 255;
-        const bool diet_alias=diet && (flags&1) && imm<8 && imm!=3 && imm!=7 &&
-                              x.id==unsigned(X86_INS_VPCMP)+imm+1;
-        const unsigned fp=ok && x.size<=n ? floating(start,x.size) : 0;
-        bool float_alias=false;
-        if(fp && y.id==fp){
-            uint8_t p=start[x.size-1]&31;
-            float_alias=x.id==X86_INS_VCMP ||
-                        ((flags&1) &&
-                         (x.id==unsigned(X86_INS_VCMP)+1+p || x.id==fp+1+p));
-        }
-        if(x.id!=y.id && ((evex_family && (x.id==X86_INS_VPCMP || diet_alias)) || float_alias)) {
-            ++c.corrected; x.id=y.id;
-        }
         x.detail=nullptr;y.detail=nullptr;
         if(!same||std::memcmp(&x,&y,sizeof x)||std::memcmp(&xd,&yd,sizeof xd)){
             std::fprintf(stderr,"record mismatch ip=%llx len=%zu bits=%u flags=%u old/new=%u/%u valid=%u/%u required=%u:",(unsigned long long)ip,n,bits,flags,before,y.id,ok,ok2,required);

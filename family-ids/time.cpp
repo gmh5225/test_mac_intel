@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <capstone/capstone.h>
 #include <cstdint>
 #include <cstdio>
@@ -23,7 +24,7 @@ int main(int argc,char **argv){
  }
  csh handle{};if(cs_open(arch,cm,&handle) ||
  cs_option(handle,CS_OPT_TEXT,mode==0?CS_OPT_OFF:CS_OPT_ON)||
- cs_option(handle,CS_OPT_DETAIL,mode==2?CS_OPT_ON:CS_OPT_OFF))return 3;
+ cs_option(handle,CS_OPT_DETAIL,mode>=2?CS_OPT_ON:CS_OPT_OFF))return 3;
  cs_insn *i=cs_malloc(handle);if(!i)return 4;
  auto go=[&]{
    uint64_t count=0,values=0;
@@ -31,8 +32,15 @@ int main(int argc,char **argv){
    while(left){
      if(cs_disasm_iter(handle,&ptr,&left,&va,i)){
        ++count;values+=i->size;
+       if(mode==3){
+           cs_regs rr,ww;uint8_t nr=0,nw=0;
+           if(cs_regs_access(handle,i,rr,&nr,ww,&nw)!=CS_ERR_OK)std::abort();
+           values+=nr+nw;
+           for(unsigned n=0;n<nr;++n)values+=rr[n];
+           for(unsigned n=0;n<nw;++n)values+=ww[n];
+       }
        if(mode)values+=uint8_t(i->mnemonic[0])+uint8_t(i->op_str[0]);
-       if(mode==2){
+       if(mode>=2){
          switch(arch){
            case CS_ARCH_ARM:values+=i->detail->arm.op_count;break;
            case CS_ARCH_AARCH64:values+=i->detail->aarch64.op_count;break;

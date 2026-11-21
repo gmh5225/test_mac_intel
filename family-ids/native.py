@@ -18,13 +18,34 @@ try:
     if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
+    verified={}
     for variant in ('base','candidate'):
         if variant=='candidate':
             git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
-    selected=['x86_scan_batch'] if reduce or diet else units
+        if not diet:
+            mapping=s/'arch/X86/X86Mapping.c';original=mapping.read_bytes()
+            try:
+                mapping.write_bytes(original+b'\n'+(r/'lookup.c').read_bytes())
+                run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-tables-'+variant)
+                verified[variant]=tmp/(variant+'-tables.so')
+                shutil.copyfile(path,verified[variant])
+            finally:
+                mapping.write_bytes(original)
+    if not diet:
+        run(['c++','-O2','-std=c++17','-I',s/'include',r/'lookup.cpp','-ldl','-o',tmp/'lookup'],'compile-tables')
+        result=json.loads(sp.check_output([tmp/'lookup',verified['base'],verified['candidate']],text=True))
+        assert result['checked']==6*(result['ids']+3) and result['present']>0 and result['absent']>0
+        write('lookup',result)
+    targets=sp.check_output(['cmake','--build',b,'--target','help'],text=True)
+    requested=units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access']
+    # CMakeLists exposes a different target set in reduced and DIET builds.
+    available=set(sp.check_output(['ninja','-C',b,'-t','targets','all'],text=True).splitlines())
+    selected=[name for name in requested if any(line.startswith(name+':') for line in available)]
+    if conf=='full':assert set(requested)==set(selected),(requested,selected)
+    assert selected
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
     run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
@@ -48,8 +69,7 @@ try:
             z=sp.check_output([tmp/'verify',libs['base'],libs['candidate'],str(bits),path,str(ip),str(syntax),str(int(diet))],text=True)
             for line in z.splitlines():
                 ib,flags,sy,calls,valid,changes=map(int,line.split());assert ib==bits and sy==syntax and calls>=valid>=changes
-                if name=='openssl' and flags&1==0:assert changes>=144
-                if name=='libmvec' and flags in (0,1):assert changes>0
+                assert changes==0
                 rows.append(dict(sample=name,bits=bits,syntax=syntax,flags=flags,calls=calls,success=valid,changes=changes))
             write('records',rows)
     other_cases=[]
@@ -78,7 +98,7 @@ try:
             return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
         timing=[]
         for name,bits,path,ip in panels[2:]+other_cases:
-            for mode in (0,1,2):
+            for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
                 first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
                 for i in range(7):
                     keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}

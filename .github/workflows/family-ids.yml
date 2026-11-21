@@ -1,7 +1,7 @@
-name: Verify floating and integer compare families and time six backends
+name: Verify every legacy access-table entry and benchmark real x86 instruction information across configurations
 on:
   push:
-    branches: [codex/capstone-compare-family-owner]
+    branches: [codex/capstone-x86-access-metadata]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: compare-families-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: access-table-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
