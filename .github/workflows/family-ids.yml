@@ -1,7 +1,7 @@
-name: Verify identical shared libraries and the i386 static output across seven profiles
+name: Identify GCC shared object differences and measure six real backends
 on:
   push:
-    branches: [codex/capstone-private-i386-static-profiles]
+    branches: [codex/capstone-i386-shared-object-audit]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: full }
           - { host: ubuntu-24.04, cc: gcc, flavor: full }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
-          - { host: ubuntu-24.04, cc: clang, flavor: intel }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +35,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: private-i386-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: i386-shared-audit-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

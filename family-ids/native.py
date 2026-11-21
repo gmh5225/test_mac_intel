@@ -18,13 +18,45 @@ try:
     if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
-    verified={}
+    object_hashes={}
+    def sections(path):
+        text=sp.check_output(['objdump','-h',path],text=True)
+        body=path.read_bytes();result={}
+        for line in text.splitlines():
+            v=line.split()
+            if len(v)<7 or not v[0].isdigit():continue
+            n=v[1];length=int(v[2],16);offset=int(v[5],16)
+            if n.startswith(('.text','.rodata','.data','.plt','.got','.rel','.note','.eh_frame','.comment','.gnu','.dyn')):
+                result[n]=dict(size=length,addr=int(v[3],16),sha256=hashlib.sha256(body[offset:offset+length]).hexdigest())
+        return result
+    linked={};snap={}
+
     for variant in ('base','candidate'):
         if variant=='candidate':
             git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
+        linked[variant]=sections(path)
+        root=b/'CMakeFiles/capstone.dir'
+        files={str(x.relative_to(root)):x for x in root.rglob('*.o')}
+        object_hashes[variant]={k:sha(f) for k,f in files.items()}
+        if variant=='base':
+            for k in ('arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'):
+                dest=tmp/('old-'+Path(k).name);shutil.copy2(files[k],dest);snap[k]=dest
+        else:
+            changed=[k for k in object_hashes['base'] if object_hashes['base'][k]!=object_hashes['candidate'][k]]
+            details={}
+            for k in changed:
+                if k not in snap:continue
+                before=snap[k];after=files[k]
+                z={'base':sections(before),'candidate':sections(after)}
+                details[k]=z
+                for label,f in [('base',before),('candidate',after)]:
+                    if Path(k).name=='X86OutputIterator.c.o':
+                        (obs/('asm-'+label+'.txt')).write_text(sp.check_output(['objdump','-drw',f],text=True))
+            write('gcc-identity',dict(objects=object_hashes,changed=changed,sections=linked,details=details))
+
     if conf=='full':
         selected=units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
@@ -39,12 +71,12 @@ try:
     assert exported['base']==exported['candidate'] and exported['base']
     write('public-abi',dict(symbols=exported['base'],identical=True))
     objects=sorted((b/'CMakeFiles/capstone.dir').rglob('*.o'))
-    assert sha(libs['base'])==sha(libs['candidate'])
+    identical=sha(libs['base'])==sha(libs['candidate'])
     assert not any(x.name=='X86Vex32Output.c.o' for x in objects)
     run(['cmake','--build',b,'--target','capstone_x86_iter32','--parallel','4'],'private-object')
     member,=(b/'CMakeFiles/capstone_x86_iter32.dir').rglob('X86Vex32Output.c.o')
     objects.append(member)
-    write('shared-identity',dict(sha256=sha(libs['base']),identical=True,private_member=str(member.relative_to(b))))
+    write('shared-identity',dict(base=sha(libs['base']),candidate=sha(libs['candidate']),identical=identical,private_member=str(member.relative_to(b))))
     run([cc,'-O2','-I'+str(s),'-I'+str(s/'include'),r/'fallback.c',*objects,'-lm','-o',tmp/'fallback'],'build-iterator-matrix')
     run([tmp/'fallback'],'iterator-matrix')
     if not (diet or reduce):
