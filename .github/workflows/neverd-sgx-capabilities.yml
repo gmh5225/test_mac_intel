@@ -76,7 +76,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1360b1a674cb2ce86d00d07f1c369e025534683a
+          ref: bbf0a914d5d86ba7c67a3f3f42203a5f43c00846
           path: NeverD
           persist-credentials: false
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
@@ -88,12 +88,14 @@ jobs:
       - name: Install the x64 tools and verify the NeverC package
         run: |
           sudo apt-get update -qq
-          sudo apt-get install --yes clang lld ninja-build
+          sudo apt-get install --yes clang lld ninja-build qemu-user
           git -C NeverD submodule update --init --depth 1 third_party/capstone third_party/unicorn
           curl --fail --location --retry 3 --output neverc.zip https://github.com/NeverSight/NeverC/releases/download/v3389.1.4/neverc-linux-x64.zip
           echo '60d17433b7a8f738e8dd34f4f0c6fc5b956b7ef51b115b8831739568f986fe64  neverc.zip' | sha256sum --check
           unzip -q neverc.zip -d neverc
-          echo "NEVERD_TEST_NEVERC=$PWD/neverc/bin/neverc" >> "$GITHUB_ENV"
+          python neverd-sgx-capabilities/prepare_neverc.py --compiler neverc/bin/neverc --output compiler-check
+          mkdir -p software-evidence
+          cp compiler-check/compiler.json software-evidence/
       - name: Configure with the LLVM release pinned by NeverD
         working-directory: NeverD
         run: |
