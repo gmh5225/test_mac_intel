@@ -1,7 +1,16 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..1be7a64d 100644
+index d57235c9..86d2384a 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
+@@ -51,7 +51,7 @@
+ 
+ #define DEBUG_TYPE "mips-disassembler"
+ 
+-bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
++static inline bool hasFeature(unsigned int mode, unsigned int feature)
+ {
+ 	switch (feature) {
+ 	case Mips_FeatureGP64Bit:
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
  	case Mips_FeatureNanoMips:
  		return mode & (CS_MODE_NANOMIPS | CS_MODE_NMS1 | CS_MODE_I7200);
@@ -11,6 +20,158 @@ index d57235c9..1be7a64d 100644
  	case Mips_FeatureTLB:
  		return mode & CS_MODE_I7200;
  	case Mips_FeatureCnMips:
+@@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
+ 	}
+ }
+ 
++bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
++{
++	return hasFeature(mode, feature);
++}
++
+ #if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+ 	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
+ #define CAPSTONE_MIPS_PRIMARY_DISPATCH
+@@ -1474,20 +1479,7 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		goto DecodeStandard;
+ 	}
+ #endif
+-	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
+-	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
+-	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
+-	bool IsMips64r6 = Mips_getFeatureBits(mode, Mips_FeatureMips64r6);
+-	bool IsMips2 = Mips_getFeatureBits(mode, Mips_FeatureMips2);
+-	bool IsMips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
+-	bool IsCnMips = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
+-	bool IsCnMipsP = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
+-	IsFP64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
+-	IsGP64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
+-	bool IsPTR64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
+-	// Only present in MIPS-I and MIPS-II
+-	bool HasCOP3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
+-		       !Mips_getFeatureBits(mode, Mips_FeatureMips3);
++	bool IsNanoMips = hasFeature(mode, Mips_FeatureNanoMips);
+ 
+ 	if (IsNanoMips) {
+ 		uint64_t Insn2;
+@@ -1546,12 +1538,13 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		return MCDisassembler_Fail;
+ 	}
+ 
+-	if (IsMicroMips) {
++	if (hasFeature(mode, Mips_FeatureMicroMips)) {
+ 		Result = readInstruction16(Bytes, BytesLen, Address, Size,
+ 					   &Insn, IsBigEndian);
+ 		if (Result == MCDisassembler_Fail)
+ 			return MCDisassembler_Fail;
+ 
++		const bool IsMips32r6 = hasFeature(mode, Mips_FeatureMips32r6);
+ 		if (IsMips32r6) {
+ 			// Calling the auto-generated decoder function for microMIPS32R6
+ 			// 16-bit instructions.
+@@ -1574,7 +1567,7 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		}
+ 
+ 		Result = readInstruction32(Bytes, BytesLen, Address, Size,
+-					   &Insn, IsBigEndian, IsMicroMips);
++					   &Insn, IsBigEndian, true);
+ 		if (Result == MCDisassembler_Fail)
+ 			return MCDisassembler_Fail;
+ 
+@@ -1612,7 +1605,7 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 		}
+ 
+-		if (IsFP64) {
++		if (hasFeature(mode, Mips_FeatureFP64Bit)) {
+ 			Result =
+ 				decodeInstruction_4(DecoderTableMicroMipsFP6432,
+ 						    Instr, Insn, Address, NULL);
+@@ -1631,7 +1624,7 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		return MCDisassembler_Fail;
+ 	}
+ 
+-	if (IsMips16)
++	if (hasFeature(mode, Mips_FeatureMips16))
+ 		return decodeMips16Instruction(Instr, Size, Bytes, BytesLen,
+ 					       Address, IsBigEndian);
+ 
+@@ -1639,20 +1632,24 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 	// the buffer is not 4 bytes long, let the higher level logic figure out
+ 	// what to do with a size of zero and MCDisassembler::Fail.
+ 	Result = readInstruction32(Bytes, BytesLen, Address, Size, &Insn,
+-				   IsBigEndian, IsMicroMips);
++				   IsBigEndian, false);
+ 	if (Result == MCDisassembler_Fail)
+ 		return MCDisassembler_Fail;
+ 
+ 	// The only instruction size for standard encoded MIPS.
+ 	*Size = 4;
+ 
+-	if (HasCOP3) {
++	// COP3 is present in MIPS-I and MIPS-II only.
++	if (!hasFeature(mode, Mips_FeatureMips32) &&
++	    !hasFeature(mode, Mips_FeatureMips3)) {
+ 		Result = decodeInstruction_4(DecoderTableCOP3_32, Instr, Insn,
+ 					     Address, NULL);
+ 		if (Result != MCDisassembler_Fail)
+ 			return Result;
+ 	}
+ 
++	const bool IsMips32r6 = hasFeature(mode, Mips_FeatureMips32r6);
++	IsGP64 = hasFeature(mode, Mips_FeatureGP64Bit);
+ 	if (IsMips32r6 && IsGP64) {
+ 		Result = decodeInstruction_4(DecoderTableMips32r6_64r6_GP6432,
+ 					     Instr, Insn, Address, NULL);
+@@ -1660,6 +1657,7 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
++	const bool IsPTR64 = hasFeature(mode, Mips_FeaturePTR64Bit);
+ 	if (IsMips32r6 && IsPTR64) {
+ 		Result = decodeInstruction_4(DecoderTableMips32r6_64r6_PTR6432,
+ 					     Instr, Insn, Address, NULL);
+@@ -1667,7 +1665,7 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
+-	if (IsMips32r6 || IsMips64r6) {
++	if (IsMips32r6 || hasFeature(mode, Mips_FeatureMips64r6)) {
+ 		Result = decodeInstruction_4(
+ 			DecoderTableMips32r6_64r6_BranchZero32, Instr, Insn,
+ 			Address, NULL);
+@@ -1686,27 +1684,28 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
+-	if (IsMips2 && IsPTR64) {
++	if (IsPTR64 && hasFeature(mode, Mips_FeatureMips2)) {
+ 		Result = decodeInstruction_4(DecoderTableMips32_64_PTR6432,
+ 					     Instr, Insn, Address, NULL);
+ 		if (Result != MCDisassembler_Fail)
+ 			return Result;
+ 	}
+ 
+-	if (IsCnMips) {
++	if (hasFeature(mode, Mips_FeatureCnMips)) {
+ 		Result = decodeInstruction_4(DecoderTableCnMips32, Instr, Insn,
+ 					     Address, NULL);
+ 		if (Result != MCDisassembler_Fail)
+ 			return Result;
+ 	}
+ 
+-	if (IsCnMipsP) {
++	if (hasFeature(mode, Mips_FeatureCnMipsP)) {
+ 		Result = decodeInstruction_4(DecoderTableCnMipsP32, Instr, Insn,
+ 					     Address, NULL);
+ 		if (Result != MCDisassembler_Fail)
+ 			return Result;
+ 	}
+ 
++	IsFP64 = hasFeature(mode, Mips_FeatureFP64Bit);
+ #ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
+ DecodeStandard:
+ 	/* A primary-opcode miss in these generated tables reaches Fail before
 diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
 index 4b1738be..4f2e6db2 100644
 --- a/arch/Mips/MipsGenDirectDecoder.inc
