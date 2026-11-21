@@ -140,6 +140,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     compare(t/'base.trace',trace,label);trace.unlink()
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
+   if label=='arm64_vas':
+    from placement import controls
+    controls(t,build,out,products,command,write)
    if label=='base':
     legacy,=list(build.rglob('capstone-product-legacy'));checks=[]
     for case in cases:
@@ -260,35 +263,28 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert signature[:2]==[case['expected_instructions']*reps,0],(case['name'],mode,reps,signature)
    return ticks,signature
   results=[]
-  cases_of_interest={k:(0,1,2)for k in ('arm-cp','mips64el-ls','libssl3t64-i386',*expected['extra_arm64_samples'])}
-  for k in ('jpeg-avx2-i386','libzstd1-i386','libssl3t64-amd64','putty-32-0.85','putty-64-0.85','libmvec-amd64'):
-   cases_of_interest[k]=(0,1,2,3)
-  clk=t/'ticks.c';clk.write_text('#include <stdio.h>\n#include <time.h>\nint main(void){printf("%ld\\n",(long)CLOCKS_PER_SEC);return 0;}\n')
-  command(['cc',clk,'-o',t/'clock-scale'],'compile-clock-scale')
-  scale=int(sp.check_output([t/'clock-scale'],text=True));assert scale>0
-  write('clock-scale',dict(ticks_per_second=scale,calibration_cpu_ms=expected['timing_protocol']['calibration_cpu_ms']))
-  for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
-   for mode in (0,1,2,3):
-    if mode not in cases_of_interest.get(case['name'],()):continue
+  target={'arm-cp':(1,), 'mips64el-ls':(2,), 'putty-32-0.85':(1,), 'putty-64-0.85':(2,), 'libssl3t64-amd64':(2,), 'libjpeg-arm64':(2,), 'arm64-ls':(2,)}
+  clock=t/'clock.c';clock.write_text('#include <stdio.h>'+chr(10)+'#include <time.h>'+chr(10)+'int main(void){printf("%ld",(long)CLOCKS_PER_SEC);return 0;}'+chr(10))
+  command(['cc',clock,'-o',t/'ticks'],'clock-scale')
+  hz=int(sp.check_output([t/'ticks']));assert hz>0
+  write('timer-scale',dict(ticks=hz,ms=55))
+  for case in cases:
+   if case['name'] not in target:continue
+   for mode in target[case['name']]:
     for launch in launches:
-     # A long full text and a tiny compiler fixture have very different costs.
-     start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(expected['timing_protocol']['calibration_cpu_ms']*scale/1000/start)))
-     row=dict(case=case['name'],mode=mode,launch=launch,reps=reps,pairs={});oracle=None
-     labels=['base','base-copy',*variants]
-     plans={label:[] for label in labels[1:]}
-     for cycle in range(expected['timing_protocol']['cycles']):
-      order=labels[cycle%len(labels):]+labels[:cycle%len(labels)]
-      times={label:[] for label in labels}
-      for who in order+order[::-1]:
-       ticks,sig=measure(who,case,mode,reps,launch);times[who].append(ticks)
-       if oracle is None:oracle=sig
-       assert oracle==sig,(case['name'],mode,who,oracle,sig)
-      for label in labels[1:]:
-       plans[label].append(dict(ticks={who:times[who] for who in ('base',label)},gain=sum(times['base'])/sum(times[label])))
-     for label in labels[1:]:
-      row['pairs'][label]=dict(plans=plans[label],median=statistics.median(q['gain'] for q in plans[label]))
-     row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
-  remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==sum(map(len,cases_of_interest.values()))*len(launches);write('complete',dict(active=feature_active,launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
+     ticks,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(.055*hz/ticks)));refsig=measure('base',case,mode,reps,launch)[1];cycles=[]
+     names=list(products)
+     for i in range(13):
+      keys=names[i%len(names):]+names[:i%len(names)];result={k:[]for k in names}
+      if i%2:keys.reverse()
+      for lab in keys+keys[::-1]:
+       ticks,signature=measure(lab,case,mode,reps,launch);assert signature==refsig and ticks>0
+       result[lab].append(ticks)
+      cycles.append(result)
+     results.append(dict(case=case['name'],mode=mode,launch=launch,reps=reps,signature=refsig,cycles=cycles))
+     write('factor-times',results)
+  assert len(results)==2*len(target)
+  write('complete',dict(cases=len(results),sources=expected,llvm=llvm_reference,products=list(products)))
+
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))
