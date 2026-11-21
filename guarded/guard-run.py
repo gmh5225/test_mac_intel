@@ -10,7 +10,7 @@ m=json.loads((r/'tree.json').read_text());assert git('rev-parse','HEAD')==m['par
 run('apply',['git','-C',s,'apply','--index',r/'candidate.patch']);assert git('write-tree')==m['tree']
 t=Path(tempfile.mkdtemp());kind=os.environ['GUARD_KIND'];flags=['-fsanitize=address','-fno-omit-frame-pointer']if kind=='asan'else[]
 try:
- run('cmake',['cmake','-G','Ninja','-S',s,'-B',t/'b','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS='+' '.join(flags),'-DCMAKE_EXE_LINKER_FLAGS='+' '.join(flags),'-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'])
+ run('cmake',['cmake','-G','Ninja','-S',s,'-B',t/'b','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS='+' '.join(flags),'-DCMAKE_EXE_LINKER_FLAGS='+' '.join(flags),'-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'])
  units=['x86_buffer_bounds','x86_x87_environment','x86_x87_environment_hardware'] if kind=='release' else ['x86_buffer_bounds']
  run('build',['cmake','--build',t/'b','--parallel','4','--target','capstone_static',*units])
  run('unit',['ctest','--test-dir',t/'b','--no-tests=error','--output-on-failure','-V','-R','^unit_('+'|'.join(units)+')$'])
