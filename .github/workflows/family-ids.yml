@@ -1,7 +1,7 @@
-name: Check isolated SSE records and unchanged shared libraries in seven builds
+name: Verify both static iterators and regenerate SSE tables with the fixed private headers
 on:
   push:
-    branches: [codex/capstone-isolated-amd64-seven-profiles]
+    branches: [codex/capstone-amd64-sse-gnu-generators]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: sse64-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: sse64-gnu-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
