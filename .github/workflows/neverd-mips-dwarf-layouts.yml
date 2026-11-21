@@ -1,0 +1,100 @@
+name: NeverD cross-ABI DWARF source integration
+on:
+  push:
+    branches: [codex/neverd-mips-historical-nov22]
+    paths: ['.github/workflows/neverd-mips-dwarf-layouts.yml', 'neverd-mips-dwarf/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  NEVERD_SHA: ea2b35cc04eca1cddf2b8fc238a31b52947e95ad
+  LLVM_SHA: a8386d0ad455d7353f9f42232ba01bc96361e83a
+jobs:
+  fixtures:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.NEVERD_SHA }}
+          path: consumer
+          sparse-checkout: unittests/types/fixtures
+          persist-credentials: false
+      - run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends clang-18 gcc-mips-linux-gnu
+          python3 neverd-mips-dwarf/fixtures.py consumer/unittests/types/fixtures/dwarf_mips_bitfields.c inputs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mips-objects-${{ env.NEVERD_SHA }}
+          path: inputs/
+          retention-days: 3
+  import:
+    needs: fixtures
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 130
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.NEVERD_SHA }}
+          path: consumer
+          sparse-checkout: |
+            include/neverd
+            lib/types
+            cmake
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/llvm-project
+          ref: ${{ env.LLVM_SHA }}
+          path: llvm-source
+          sparse-checkout: |
+            llvm
+            cmake
+            third-party
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: mips-objects-${{ env.NEVERD_SHA }}
+          path: inputs
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+      - name: Build and test the source recorded by the consumer
+        run: |
+          test "$(git -C consumer rev-parse HEAD)" = "$NEVERD_SHA"
+          test "$(git -C consumer ls-tree HEAD third_party/llvm-project | awk '{print $3}')" = "$LLVM_SHA"
+          test "$(git -C llvm-source rev-parse HEAD)" = "$LLVM_SHA"
+          cmake -S llvm-source/llvm -B llvm-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_TARGETS_TO_BUILD=Mips -DLLVM_ENABLE_RTTI=ON -DLLVM_INCLUDE_TESTS=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF \
+            -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_ENABLE_LIBXML2=OFF
+          cmake --build llvm-build --target LLVMDebugInfoDWARF LLVMObject --parallel 4
+          cmake -S neverd-mips-dwarf -B reader -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DNEVERD="${PWD}/consumer" -DLLVM_DIR="${PWD}/llvm-build/lib/cmake/llvm"
+          cmake --build reader --parallel 4
+          mkdir evidence
+          suffix=""
+          if [[ "$RUNNER_OS" == Windows ]]; then suffix=".exe"; fi
+          python neverd-mips-dwarf/verify.py "reader/mips-layout-reader${suffix}" inputs evidence/layouts.json
+          git -C consumer rev-parse HEAD > evidence/source.txt
+          git -C llvm-source rev-parse HEAD >> evidence/source.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: n32-source-layout-${{ runner.os }}-${{ env.NEVERD_SHA }}
+          path: evidence/
+          retention-days: 7
