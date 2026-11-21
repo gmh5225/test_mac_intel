@@ -1,7 +1,7 @@
-name: Measure indirect branch operands alongside packed SIMD formatting in PE32, PE64 and ELF
+name: Time i386 indirect calls and absolute operands in isolation on current amd64 packed output
 on:
   push:
-    branches: [codex/capstone-packed-and-indirect-memory]
+    branches: [codex/capstone-mode-specific-i386-addresses]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-indirect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: narrow-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
