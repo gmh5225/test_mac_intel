@@ -27,6 +27,7 @@ try:
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
     if conf=='full':
         selected=['riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
+        selected.extend(['mips_scan','mips16_frames','mips16e2'])
     elif conf=='intel':
         selected=units
     else:
@@ -74,8 +75,8 @@ try:
     if conf=='full':
         import corpus
         raw=corpus.prepare(r,tmp,obs,run)
-        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}
-        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
+        names={'arm-cp','arm64-ls','mips64el-ls','mips64el-cp','mips64el-sort','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}
+        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'mips64el-cp':103,'mips64el-sort':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
         other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
         assert len(other_cases)==len(names)
         for arch in ('arm','aarch64','ppc','riscv','mips'):
