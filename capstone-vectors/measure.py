@@ -79,7 +79,7 @@ def main(w):
         if name not in data['samples']:continue
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
-        intervals.write_text(''.join('%d %d %d\\n'%v for v in spans))
+        intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
         audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('integer','typed')]
         assert audit[0]==audit[1]
         trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
@@ -89,7 +89,7 @@ def main(w):
         selected=[a for a,v in common if panel!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0])]
         if panel=='whole-text':assert len(selected)==1 and selected[0][1]==f.stat().st_size,(name,trace[:1])
         assert selected
-        intervals.write_text(''.join('%d %d %d\\n'%tuple(a) for a in selected))
+        intervals.write_text(''.join('%d %d %d\n'%tuple(a) for a in selected))
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
