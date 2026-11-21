@@ -1,7 +1,7 @@
-name: Verify floating and integer compare families and time six backends
+name: Verify a projection-only x86 compare fix across six production backends
 on:
   push:
-    branches: [codex/capstone-compare-family-owner]
+    branches: [codex/capstone-compare-table-projection]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: compare-families-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: compare-projection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

@@ -29,6 +29,7 @@ try:
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
     run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
     run(['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
+    run(['python3','-B',s/'suite/synctools/x86_compare_families.py','--check'],'compare-projection')
     run(['c++','-O2','-std=c++17','-I',s/'include',r/'records.cpp','-ldl','-o',tmp/'verify'],'compile-verify')
     if reduce:panels=[]
     else:panels=[('matrix32',32,'matrix',0),('matrix64',64,'matrix',0)]

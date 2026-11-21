@@ -1,101 +1,3 @@
-diff --git a/MCInst.h b/MCInst.h
-index 641480ed..c2839d53 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -170,7 +170,6 @@ struct MCInst {
- 		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
- 	// operand access index for list of registers sharing the same access right (for ARM)
- 	uint8_t ac_idx;
--	uint8_t popcode_adjust; // Pseudo X86 instruction adjust
- 	char assembly[8]; // for special instruction, so that we don't need printer
- 	unsigned char evm_data[32]; // for EVM PUSH operand
- 	cs_wasm_op wasm_data; // for WASM operand
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..a7499d71 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -44,7 +44,6 @@ typedef struct X86ScanResult {
- 	unsigned opcode;
- 	unsigned opcode_pub;
- 	uint16_t length;
--	uint8_t popcode_adjust;
- } X86ScanResult;
- 
- bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..4ba27e66 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3308,7 +3308,6 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 	instr.Opcode = 0;
- 	instr.OpcodePub = 0;
- 	instr.size = 0;
--	instr.popcode_adjust = 0;
- 	instr.csh = handle;
- 	instr.address = insn->address;
- 	instr.flat_insn = insn;
-@@ -3346,7 +3345,6 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 	result->opcode = instr.Opcode;
- 	result->opcode_pub = instr.OpcodePub;
- 	result->length = size;
--	result->popcode_adjust = instr.popcode_adjust;
- 	return true;
- }
- 
-@@ -3375,7 +3373,6 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
- 			result->opcode = 0;
- 			result->opcode_pub = id;
- 			result->length = (uint16_t)length;
--			result->popcode_adjust = 0;
- 			return true;
- 		}
- 	}
-@@ -3402,7 +3399,6 @@ X86_DECODE_INLINE bool completeTerminalScanResult(X86ScanResult *result,
- 		return false;
- 	result->opcode = 0;
- 	result->opcode_pub = instructionID;
--	result->popcode_adjust = 0;
- 	return true;
- }
- 
-@@ -3497,7 +3493,6 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 	result->opcode = insn.instructionID;
- 	result->opcode_pub = metadata >> X86_VEX_SCAN_PUBLIC_SHIFT;
- 	result->length = (uint16_t)insn.length;
--	result->popcode_adjust = 0;
- 	return X86_SCAN_COMPLETE;
- }
- 
-@@ -3757,7 +3752,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_SCAN_IMPL
- 
--/* Keep the admitted terminal's public ID and zero alias adjustment visible
-+/* Keep the admitted terminal's public ID visible
-  * through output completion. Cold helpers can take the fallback result's
-  * address without forcing terminal output through that escaped object. */
- X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
-@@ -3781,7 +3776,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 	}
- 	if (initial != X86_SCAN_COMPLETE)
- 		return false;
--	X86ScanResult result = { 0, instructionID, length, 0 };
-+	X86ScanResult result = { 0, instructionID, length };
- 	*insn_size = length;
- 	finish_x86_scan(handle, insn, &result, code, batch, true);
- 	return true;
-diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
-index ccaec06a..c61e8d0e 100644
---- a/arch/X86/X86EvexScan.c
-+++ b/arch/X86/X86EvexScan.c
-@@ -65,7 +65,6 @@ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
- 		if (id && code_len >= length) {
- 			instr->Opcode = 0;
- 			instr->OpcodePub = id;
--			instr->popcode_adjust = 0;
- 			*size = (uint16_t)length;
- 			return X86_FEATURE_DECODED;
- 		}
 diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
 index 2c0da2cd..e4fb38f1 100644
 --- a/arch/X86/X86GenVexScan.inc
@@ -135,75 +37,6 @@ index 2ee82ef7..f061af53 100644
  		break;
  	}
  }
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 8c5f511c..8c5c9e2a 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -12543,53 +12543,6 @@ static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
- 		memory->avx_bcast = broadcast;
- }
- 
--static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
--{
--	char mnemonic[CS_MNEMONIC_SIZE] = { 0 };
--	char operands[2] = { 0 };
--	size_t length;
--
--	if (insn->id != X86_INS_VPCMP)
--		return;
--	SStream_extract_mnem_opstr(assembly, mnemonic, sizeof(mnemonic),
--				   operands, sizeof(operands));
--	if (strncmp(mnemonic, "vpcmp", 5) != 0)
--		return;
--
--	// The condition printer's pseudo-ID adjustment assumes that every
--	// predicate spelling has a contiguous public ID. Integer compares expose
--	// element-family IDs instead, so applying that adjustment can collide with
--	// an unrelated instruction. Normalize aliases to their family ID here.
--	mci->popcode_adjust = 0;
--	length = strlen(mnemonic);
--	if (mnemonic_has_suffix(mnemonic, "ub"))
--		insn->id = X86_INS_VPCMPUB;
--	else if (mnemonic_has_suffix(mnemonic, "uw"))
--		insn->id = X86_INS_VPCMPUW;
--	else if (mnemonic_has_suffix(mnemonic, "ud"))
--		insn->id = X86_INS_VPCMPUD;
--	else if (mnemonic_has_suffix(mnemonic, "uq"))
--		insn->id = X86_INS_VPCMPUQ;
--	else if (length != 0) {
--		switch (mnemonic[length - 1]) {
--		case 'b':
--			insn->id = X86_INS_VPCMPB;
--			break;
--		case 'w':
--			insn->id = X86_INS_VPCMPW;
--			break;
--		case 'd':
--			insn->id = X86_INS_VPCMPD;
--			break;
--		case 'q':
--			insn->id = X86_INS_VPCMPQ;
--			break;
--		default:
--			break;
--		}
--	}
--}
--
- static void repair_vector_mask_conversion_access(cs_x86 *x86,
- 						 unsigned int instruction_id)
- {
-@@ -12752,9 +12705,9 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
- 	bool has_mask = false;
- 	uint8_t i;
- 
-+	(void)mci;
- 	if (!insn)
- 		return;
--	repair_vpcmp_id(insn, mnem, mci);
- 	if (!insn->detail)
- 		return;
- 
 diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
 index 7e5e7f51..55068b6a 100644
 --- a/arch/X86/X86MappingInsn.inc
@@ -3440,84 +3273,6 @@ index a082891f..97b87834 100644
  	0,
  	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
  },
-diff --git a/cs.c b/cs.c
-index 7b069255..ebf8578e 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1039,20 +1039,20 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
- static __attribute__((noinline)) CS_PRESERVE_MOST bool
- decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch);
-+		    cs_insn *insn, uint16_t *insn_size);
- 
- CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch)
-+		    cs_insn *insn, uint16_t *insn_size)
- {
- 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
- 		return true;
--	return decode_full_insn_body(handle, code, size, insn, insn_size, batch);
-+	return decode_full_insn_body(handle, code, size, insn, insn_size);
- }
- 
- static __attribute__((noinline)) CS_PRESERVE_MOST bool
- decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch)
-+		    cs_insn *insn, uint16_t *insn_size)
- {
- #else
- #if defined(_MSC_VER)
-@@ -1062,7 +1062,7 @@ __attribute__((noinline))
- #endif
- CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch)
-+		    cs_insn *insn, uint16_t *insn_size)
- {
- #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
- 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
-@@ -1143,8 +1143,6 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 				  code, false);
- 		}
- 	}
--	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
--		insn->id += mci.popcode_adjust;
- 	return true;
- }
- 
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..3323026b 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -20,7 +20,7 @@
-  * selection and callbacks keep their original order. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch);
-+		    cs_insn *insn, uint16_t *insn_size);
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
- 			size_t *size, uint64_t *address, cs_insn *insn);
-@@ -134,8 +134,6 @@ CS_DECODE_INLINE void finish_x86_scan(cs_struct *handle, cs_insn *insn,
- 		map_insn_id(handle, insn, result->opcode);
- 	if (store_bytes)
- 		fill_insn_without_text(insn, 0, code, !batch);
--	if (!batch || insn->id != X86_INS_VCMP)
--		insn->id += result->popcode_adjust;
- }
- #endif
- 
-@@ -163,7 +161,7 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
- 		return true;
- #endif
--	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size);
- }
- #undef CS_DECODE_SCAN
- 
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
 index 1aebfa2d..b62d9c02 100644
 --- a/docs/ARCHITECTURE.md
@@ -3550,6 +3305,92 @@ index 80f8ce9e..a95df08f 100644
  } cs_opt_type;
  
  /// Runtime option value (associated with option type above)
+diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
+index 9c1dbe81..e8847c15 100644
+--- a/suite/auto-sync/README.md
++++ b/suite/auto-sync/README.md
+@@ -146,6 +146,12 @@ SSE `CMPPD`/`CMPPS`/`CMPSD`/`CMPSS` rows incorrectly modify arithmetic flags.
+ `unit_x86_reg_access` checks predicate aliases and retains the flag effects of
+ integer/string comparisons and `(U)COMISD`/`(U)COMISS`.
+ 
++When regenerating the x86 opcode and operand-access mappings, run
++`python3 suite/synctools/x86_compare_families.py` to restore the public floating
++and integer comparison families. Then regenerate the compact VEX rows with
++`python3 suite/synctools/x86_operand_specializations.py`. Both scripts accept
++`--check`. The x86 compare-ID and scan-batch units cover both projections.
++
+ After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
+ `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
+ The generated immediate-size lookup preserves the original metadata and uses
+diff --git a/suite/synctools/x86_compare_families.py b/suite/synctools/x86_compare_families.py
+new file mode 100644
+index 00000000..5a303e92
+--- /dev/null
++++ b/suite/synctools/x86_compare_families.py
+@@ -0,0 +1,63 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: BSD-3-Clause
++"""Restore the public operation family on legacy-generated x86 compare aliases."""
++
++import argparse
++from pathlib import Path
++import re
++
++ROOT = Path(__file__).resolve().parents[2] / "arch" / "X86"
++COMPARE = re.compile(r"X86_(VCMP(?:PS|PD|SS|SD)|VPCMPU?[BWDQ])[A-Za-z0-9_]*")
++MAPPING = re.compile(r"\b(X86_\w+), (X86_INS_\w+), ([01]),")
++ACCESS = re.compile(r"/\* (X86_\w+), (X86_INS_\w+): (\w+)(?= \*/)")
++
++
++def project(mapping, access):
++    families = {}
++
++    def mapping_id(match):
++        opcode, public, wide = match.groups()
++        family = COMPARE.fullmatch(opcode)
++        if family is None:
++            if public in ("X86_INS_VCMP", "X86_INS_VPCMP"):
++                raise ValueError(f"Unknown generic compare opcode {opcode}")
++            return match[0]
++        expected = "X86_INS_" + family[1]
++        if public not in (expected, "X86_INS_VCMP", "X86_INS_VPCMP"):
++            raise ValueError(f"Unexpected public ID {public} for {opcode}")
++        families[opcode] = expected
++        return f"{opcode}, {expected}, {wide},"
++
++    def access_label(match):
++        opcode, current, mnemonic = match.groups()
++        expected = families.get(opcode)
++        if expected is None:
++            return match[0]
++        if current not in (expected, "X86_INS_VCMP", "X86_INS_VPCMP"):
++            raise ValueError(f"Unexpected access-table ID {current} for {opcode}")
++        # Explicit-immediate rows already have their own mnemonic spelling.
++        if current == expected:
++            return match[0]
++        return f"/* {opcode}, {expected}: {expected[len('X86_INS_'):].lower()}"
++
++    mapping = MAPPING.sub(mapping_id, mapping)
++    return mapping, ACCESS.sub(access_label, access)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--check", action="store_true")
++    args = parser.parse_args()
++    for suffix in ("", "_reduce"):
++        files = [ROOT / f"X86MappingInsn{part}{suffix}.inc" for part in ("", "Op")]
++        original = [path.read_text() for path in files]
++        for path, before, after in zip(files, original, project(*original)):
++            if after == before:
++                continue
++            if args.check:
++                parser.exit(1, f"Compare family projection is stale in {path.name}\n")
++            path.write_text(after)
++
++
++if __name__ == "__main__":
++    main()
 diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
 index 1a30e853..ff35c5b8 100644
 --- a/tests/unit/x86_evex_vpcmp_id.c
