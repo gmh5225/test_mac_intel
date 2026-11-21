@@ -47,7 +47,9 @@ def main():
         rejected.append({"option": target, "diagnostic": result.stderr.strip()})
     with compiler.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    info = {"source_commit": subprocess.check_output(
+    cpu_model = next((line.split(":", 1)[1].strip() for line in
+                      Path("/proc/cpuinfo").read_text().splitlines() if line.startswith("model name")), "")
+    info = {"host_cpu_model": cpu_model, "source_commit": subprocess.check_output(
                 ["git", "-C", args.source, "rev-parse", "HEAD"], text=True).strip(),
             "version": subprocess.check_output([compiler, "--version"], text=True).strip(),
             "binary_sha256": digest, "compiler_execution": "native",

@@ -27,6 +27,7 @@ TESTS = {
         MODE + "RsmRestoresNormalizedDebugStateAndRejectsInvalidControlsBeforePaeReload",
         MODE + "RsmDebugUsesFirmwareBeforeCommitAndRestoredTablesAfterCommit",
         MODE + "InactiveRsmDeliversOriginalUndefinedOpcode",
+        MODE + "AuthenticatedCr8WriteSynchronizesTprBeforeTheNextEvent",
         MODE + "MachineCheckReportsRetainBankOwnershipAndPriority",
         MODE + "MachineCheckMsrReadAndAcknowledgeUseOriginalInstructions",
         MODE + "CorrectedErrorsCountToCmciAndKeepMaskedArrivals",
