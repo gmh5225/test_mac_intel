@@ -1,7 +1,7 @@
-name: Measure indirect branch operands alongside packed SIMD formatting in PE32, PE64 and ELF
+name: Time a direct call to the canonical VEX register writer for preclassified i386 ModRM
 on:
   push:
-    branches: [codex/capstone-packed-and-indirect-memory]
+    branches: [codex/capstone-i386-preclassified-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-indirect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: known-register-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

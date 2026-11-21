@@ -1,0 +1,58 @@
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 883b628a..46ad3450 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -70,6 +70,13 @@ CAPSTONE_INTERNAL void X86_writeImmediateOutput(
+ 	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
+ 	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
+ 
++/* The caller has verified a two- or three-byte VEX prefix, the opcode
++ * and a register-only ModR/M. The writer validates the row and immediate. */
++CAPSTONE_INTERNAL bool X86_writeVexRegisterOutput(const uint8_t *code,
++						  size_t size, cs_insn *insn,
++						  uint16_t *insn_size,
++						  unsigned prefix);
++
+ CAPSTONE_INTERNAL bool
+ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 82166d23..d3241f44 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -460,9 +460,8 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 
+ /* The VEX register plan supplies the public fields for vvvv register operands.
+  * Memory forms and unsupported vector widths fall back before any output. */
+-static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+-				   cs_insn *insn, uint16_t *insn_size,
+-				   unsigned prefix)
++bool X86_writeVexRegisterOutput(const uint8_t *code, size_t size, cs_insn *insn,
++				uint16_t *insn_size, unsigned prefix)
+ {
+ 	const unsigned flags = code[prefix - 1];
+ 	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
+@@ -516,8 +515,8 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		return writeVexRipLoad(code, size, insn, insn_size);
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+ 	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
+-		return writeVexRegisterOutput(code, size, insn, insn_size,
+-					      prefix);
++		return X86_writeVexRegisterOutput(code, size, insn, insn_size,
++						  prefix);
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
+ }
+ /* A regular base, an unmasked destination and a full 128-bit memory tuple.
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index dfbe52c0..32780dbb 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -147,7 +147,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	if (code[prefix + 1] < 0xc0)
+ 		return prefix == 2 &&
+ 		       writeVex32Memory(code, size, insn, insn_size);
+-	if (!X86_writeVectorOutput(code, size, insn, insn_size, NULL, true))
++	if (!X86_writeVexRegisterOutput(code, size, insn, insn_size, prefix))
+ 		return false;
+ 	if (insn->detail) {
+ 		insn->detail->x86.rex = 0;
