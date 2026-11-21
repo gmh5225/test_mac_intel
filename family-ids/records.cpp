@@ -41,10 +41,10 @@ struct Count { uint64_t calls=0, valid=0, corrected=0; };
 struct Pair {
     const Api &a,&b;
     csh ah=0,bh=0;
-    bool detail;
+    bool detail,diet;
     unsigned flags,bits;
     Count c;
-    Pair(const Api &a,const Api &b,unsigned bits,unsigned flags,bool att):a(a),b(b),detail(flags&2),flags(flags),bits(bits) {
+    Pair(const Api &a,const Api &b,unsigned bits,unsigned flags,bool att,bool diet):a(a),b(b),detail(flags&2),diet(diet),flags(flags),bits(bits) {
         for(auto pair : {std::make_pair(&a,&ah),std::make_pair(&b,&bh)}) {
             auto [d,h]=pair;
             if(d->open(CS_ARCH_X86,bits==64?CS_MODE_64:CS_MODE_32,h)||
@@ -66,7 +66,13 @@ struct Pair {
         if(ok) ++c.valid;
         if(required) same &= ok && y.id==required && y.size==n;
         unsigned before=x.id;
-        if(ok && x.id!=y.id && x.id==X86_INS_VPCMP && family(start,x.size)==y.id) {
+        // The published DIET formatter increments generic VPCMP by the
+        // alias predicate index. Without mnemonic text its old fixup has no suffix.
+        const bool evex_family=ok && x.size<=n && family(start,x.size)==y.id && y.id;
+        const uint8_t imm=evex_family ? start[x.size-1] : 255;
+        const bool diet_alias=diet && (flags&1) && imm<8 && imm!=3 && imm!=7 &&
+                              x.id==unsigned(X86_INS_VPCMP)+imm+1;
+        if(evex_family && x.id!=y.id && (x.id==X86_INS_VPCMP || diet_alias)) {
             ++c.corrected; x.id=y.id;
         }
         x.detail=nullptr;y.detail=nullptr;
@@ -103,7 +109,7 @@ int main(int argc,char **argv) {
     bool att=std::atoi(argv[6]);bool diet=std::atoi(argv[7]);std::vector<uint8_t> bytes;
     if(!generated){std::ifstream f(argv[4],std::ios::binary);if(!f)return 2;bytes.assign(std::istreambuf_iterator<char>(f),{});}
     for(unsigned flags=0;flags<(diet?2:4);++flags){
-        Pair p(a,b,bits,flags,att);
+        Pair p(a,b,bits,flags,att,diet);
         if(generated)matrix(p);else for(size_t k=0;k<bytes.size();){
             auto n=p.decode(bytes.data()+k,bytes.size()-k,ip+k);k+=n?n:1;
         }

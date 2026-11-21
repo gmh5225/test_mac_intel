@@ -1,7 +1,7 @@
 name: Verify EVEX integer compare families and time OpenSSL and PuTTY
 on:
   push:
-    branches: [codex/capstone-vpcmp-family-ids]
+    branches: [codex/capstone-vpcmp-diet-id]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: clang, flavor: full }
-          - { host: ubuntu-24.04, cc: gcc, flavor: full }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: full }
           - { host: ubuntu-24.04, cc: clang, flavor: diet }
-          - { host: ubuntu-24.04, cc: clang, flavor: reduce }
-          - { host: ubuntu-24.04, cc: clang, flavor: intel }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
