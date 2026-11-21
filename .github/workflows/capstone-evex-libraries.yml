@@ -1,7 +1,7 @@
-name: Compare i386 widening move output with iced on real PE and ELF
+name: Factor 32-bit decoder growth and 64-bit OpenSSL performance by linked section order
 on:
   push:
-    branches: [codex/capstone-i386-extend-operands]
+    branches: [codex/capstone-i386-private-link-order]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -17,6 +17,7 @@ jobs:
     timeout-minutes: 105
     env:
       CC: ${{ matrix.cc }}
+      IMAGE_VERSION: ${{ matrix.host }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -38,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: extend32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: link-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
