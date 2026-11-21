@@ -1,8 +1,8 @@
-name: Verify the private i386 widening source on native windows
+name: Verify RISC-V record parity and MIPS and x86 units on native macOS and Windows
 on:
   push:
-    branches: [codex/capstone-i386-width-output-windows]
-    paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
+    branches: [codex/capstone-portable-riscv-next]
+    paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
 jobs:
@@ -11,34 +11,32 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: x64, compiler: amd64 }
-          - { arch: x86, compiler: amd64_x86 }
-    runs-on: windows-2022
-    timeout-minutes: 70
+          - { host: windows-2022, arch: amd64 }
+          - { host: windows-2022, arch: amd64_x86 }
+          - { host: macos-15, arch: arm64 }
+          - { host: macos-15-intel, arch: x86_64 }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          sparse-checkout: private-win
+          sparse-checkout: portable-next
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 09ba26d9848f4ad0920ad0ef5feb512899fabe6c
+          ref: 38d0847fb739b95708e6929af78ffdf1ebc806b5
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
         with:
-          arch: ${{ matrix.compiler }}
-      - name: Verify public and private output through the native ABI
-        env:
-          TEST_MACHINE: ${{ matrix.arch }}
-        run: python private-win/measure.py
-      - if: always()
-        shell: bash
-        run: rm -rf -- "$GITHUB_WORKSPACE/source"
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          arch: ${{ matrix.arch }}
+      - name: Compare original and candidate bytes and native tests
+        run: python -B portable-next/verify.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
         with:
-          name: win-qualified-${{ matrix.arch }}
-          path: evidence/
-          retention-days: 14
+          name: portable-next-${{ matrix.host }}-${{ matrix.arch }}
+          path: evidence
+          retention-days: 7
