@@ -1,4 +1,4 @@
-name: NeverD SGX runner capability discovery
+name: NeverD SGX runner and native enclave checks
 
 on:
   push:
@@ -7,6 +7,11 @@ on:
       - neverd-sgx-capabilities/**
       - .github/workflows/neverd-sgx-capabilities.yml
   workflow_dispatch:
+    inputs:
+      linux_runner:
+        description: Linux x64 runner label for native SGX verification
+        type: string
+        default: ubuntu-24.04
 
 permissions:
   contents: read
@@ -15,19 +20,39 @@ jobs:
   capabilities:
     name: SGX discovery / ${{ matrix.image }}
     runs-on: ${{ matrix.image }}
-    timeout-minutes: 5
+    timeout-minutes: 12
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        image: [ubuntu-24.04, macos-15-intel, macos-26-intel]
+        image:
+          - ${{ inputs.linux_runner || 'ubuntu-24.04' }}
+          - macos-15-intel
+          - macos-26-intel
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - name: Probe CPUID, EPC and SGX driver access
         run: python3 neverd-sgx-capabilities/probe.py --output sgx-capabilities
-      - name: Retain discovery evidence, including unavailable SGX
+      - name: Check out the Linux SGX selftests
+        if: runner.os == 'Linux'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: torvalds/linux
+          ref: 7d0a66e4bb9081d75c82ec4957c50034cb0ea449
+          path: linux-sgx
+          sparse-checkout: |
+            tools/testing/selftests/sgx
+            tools/testing/selftests/x86
+            tools/include
+            tools/scripts
+            arch/x86/include
+          persist-credentials: false
+      - name: Build and exercise native enclave entry, exit and resume
+        if: runner.os == 'Linux'
+        run: python3 neverd-sgx-capabilities/native_selftest.py --linux linux-sgx --output sgx-capabilities
+      - name: Retain capability, native build and execution evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
