@@ -41,7 +41,7 @@ def run(args):
         if sha256(pdb) != record["pdb_sha256"]:
             raise ValueError(f"{image.name} has a different symbol file")
         for function in ("DllInitialize", "DllUnload"):
-            parameters = r"ptr\b[^,()\r\n]*" if function == "DllInitialize" else ""
+            parameters = r"ptr\b(?:[^,()\r\n]|\([^()\r\n]*\))*" if function == "DllInitialize" else ""
             definition = re.compile(r"(?m)^define\b[^\r\n]*?\bi32 @" + function + r"\(" + parameters + r"\)")
             for route in ("high", "llvm"):
                 source = args.work / f"{image.stem}-{function}-{route}.c"

@@ -45,6 +45,7 @@ jobs:
           arch: arm64
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
       - name: Build the Windows ARM64 engine from source
+        id: engine
         shell: pwsh
         working-directory: source
         run: |
@@ -84,7 +85,8 @@ jobs:
             & $exe decompile "$root/null.sys" '--func=GsDriverEntry' -o "$root/$route.c" @extra
             clang --target=aarch64-pc-windows-msvc -S -emit-llvm -O1 "$root/$route.c" -o "$root/$route.ll"
             $ir = Get-Content -Raw "$root/$route.ll"
-            $pointerPair = 'ptr\b[^,()\r\n]*,\s*ptr\b[^,()\r\n]*'
+            $pointer = 'ptr\b(?:[^,()\r\n]|\([^()\r\n]*\))*'
+            $pointerPair = "$pointer,\s*$pointer"
             if ($ir -notmatch "(?m)^define\b[^\r\n]*\bi32 @GsDriverEntry\($pointerPair\)" -or
                 $ir -notmatch "(?m)^declare\b[^\r\n]*\bi32 @DriverEntry\($pointerPair\)" -or
                 $ir -notmatch '(?m)^declare\b[^\r\n]*\bvoid @__security_init_cookie\(\)') {
@@ -108,6 +110,7 @@ jobs:
           & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.KernelLibraryCallbacksUseTheTargetWDK'
           python native-driver-entry/check_export_entries.py --neverd "$env:RUNNER_TEMP/nb/bin/neverd.exe" --work "$env:RUNNER_TEMP/entry-exports" --report native-export-verification.json
       - name: Execute original SDK COM callbacks and both recovered views on ARM64
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
