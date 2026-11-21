@@ -141,3 +141,11 @@ with no failures or skips. Archive, manifest, source, binary, probe and runtime
 XML hashes were independently checked. This delivery is separate from the
 cold builds; its temporary workflows and draft-release assets are removed after
 preserving evidence. The maintained source profile pins this tested implementation.
+
+## Hosted arm64e.x1 qualification
+
+Run **Measure hosted Apple arm64e.x1 support** from the Actions tab to probe
+current hosted Macs. Each runner uses the same resolved NeverD dev commit and
+writes its CPU and qualification result in the job summary. The artifact contains
+the compiler, original PAC call, cursor and checked-writeback probe reports. A
+runner with missing features reports each one as unavailable.

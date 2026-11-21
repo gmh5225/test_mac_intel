@@ -1,0 +1,67 @@
+name: Measure hosted Apple arm64e.x1 support
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/neverd-hosted-arm64e-x1.yml
+      - neverd-arm64e-native/HostedX1.def
+      - neverd-arm64e-native/hosted_x1.py
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      repository: ${{ steps.resolve.outputs.repository }}
+      revision: ${{ steps.resolve.outputs.revision }}
+      runners: ${{ steps.resolve.outputs.runners }}
+      timeout_minutes: ${{ steps.resolve.outputs.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: neverd-arm64e-native
+      - id: resolve
+        run: python3 neverd-arm64e-native/hosted_x1.py resolve
+
+  measure:
+    needs: source
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ fromJSON(needs.source.outputs.timeout_minutes) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.source.outputs.runners) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: neverd-arm64e-native
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.source.outputs.repository }}
+          ref: ${{ needs.source.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            unittests/lift/aarch64
+            unittests/lift/format
+            include/neverd/runtime
+            include/neverd/ir/intrinsics/AArch64
+      - name: Run the native instruction and checked-writeback probes
+        env:
+          SOURCE_REVISION: ${{ needs.source.outputs.revision }}
+        run: |
+          ulimit -c 0
+          python3 neverd-arm64e-native/hosted_x1.py neverd "$RUNNER_TEMP/x1"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-x1-${{ matrix.runner }}
+          path: ${{ runner.temp }}/x1
+          retention-days: 7
+          if-no-files-found: error

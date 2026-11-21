@@ -1,0 +1,21 @@
+{
+  "repository": "NeverSight/NeverD",
+  "url": "https://github.com/NeverSight/NeverD.git",
+  "ref": "refs/heads/dev",
+  "runners": [
+    "macos-15",
+    "macos-26",
+    "xcode-27"
+  ],
+  "timeout_minutes": 12,
+  "policy": "scripts/verify_arm64e_native.def",
+  "verifier": "scripts/verify_arm64e_native.py",
+  "hardware_command": [
+    "/usr/sbin/sysctl",
+    "-n",
+    "machdep.cpu.brand_string"
+  ],
+  "summary": "### {hardware}\n\nNative arm64e.x1 qualification **{status}** at `{revision}`.\n",
+  "missing_heading": "\nThe runner did not qualify these features.\n",
+  "inconsistent_result": "The native report, source revision and verifier exit status disagree."
+}
