@@ -7,7 +7,11 @@ def run(args,name,cwd=None):
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 meta=json.loads((r/'tree.json').read_text())
 git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
-assert git('rev-parse','HEAD')==meta['parent'] and sha(r/'candidate.patch')==meta['sha256']
+integration=json.loads((r/'integration.json').read_text())
+assert git('rev-parse','HEAD')==integration['parent'] and sha(r/'bootstrap.patch')==integration['sha256']
+git('apply','--index',str(r/'bootstrap.patch'))
+assert git('write-tree')==integration['tree'] and integration['commit']==meta['parent']
+assert sha(r/'candidate.patch')==meta['sha256']
 units=['x86_scan_batch','x86_evex_vpcmp_id','x86_evex_vpcmp_mask_size','x86_evex_detail','x86_buffer_bounds','x86_simple_output','text_option','detail_option','x86_kmask_width']
 conf=os.environ.get('FLAVOR','full');cc=os.environ['CC'];diet=conf=='diet';reduce=conf=='reduce';att=conf!='intel'
 tmp=Path(tempfile.mkdtemp());b=tmp/'build';fixed=tmp/'selected';fixed.mkdir()
@@ -84,8 +88,8 @@ try:
     if conf=='full':
         import corpus
         raw=corpus.prepare(r,tmp,obs,run)
-        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}
-        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
+        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort','ppc64el-cp','ppc64el-sort'}
+        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105,'ppc64el-cp':104,'ppc64el-sort':104}
         other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
         assert len(other_cases)==len(names)
         for arch in ('arm','aarch64','ppc','riscv','mips'):
