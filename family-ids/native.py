@@ -14,7 +14,7 @@ tmp=Path(tempfile.mkdtemp());b=tmp/'build';fixed=tmp/'selected';fixed.mkdir()
 try:
     opts=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers')]
     if conf=='full':opts.extend('-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('ARM','AARCH64','MIPS','RISCV','PPC'))
-    if diet:opts.append('-DCAPSTONE_BUILD_DIET=ON')
+    if diet:opts.extend(['-DCAPSTONE_BUILD_DIET=ON','-DCAPSTONE_RISCV_SUPPORT=ON'])
     if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
@@ -25,6 +25,15 @@ try:
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
+        if conf=='full':
+            obj=next(b.rglob('RISCVMapping.c.o'))
+            symbols={}
+            for line in sp.check_output(['nm','-S','--radix=d',obj],text=True).splitlines():
+                cols=line.split()
+                if len(cols)==4 and cols[3] in ('riscv_public_blocks','riscv_public_rows','riscv_public_effects','insns'):
+                    symbols[cols[3]]=int(cols[1],10)
+            assert symbols.get('insns',0)>1000000 and ((len(symbols)==4)==(variant=='candidate')),symbols
+            write(variant+'-mapping-bytes',symbols)
     if conf=='full':
         selected=['riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
@@ -35,9 +44,10 @@ try:
     if diet or reduce:
         assert sha(libs['base'])==sha(libs['candidate'])
         write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
+    run(['python3','-B',s/'suite/synctools/riscv_public_mapping.py','--check'],'public-mapping-generation')
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
-    run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
+    run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected+(['riscv_public_mapping_generator'] if conf=='full' or diet else []))+')$'],'units')
     run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
     run(['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     run(['c++','-O2','-std=c++17','-I',s/'include',r/'records.cpp','-ldl','-o',tmp/'verify'],'compile-verify')
