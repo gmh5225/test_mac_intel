@@ -21,19 +21,6 @@ index 69c494cc..59de6da5 100644
      # Use normal capstone name. Otherwise we get libcapstone_static.a
      set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")
      if(MSVC AND CAPSTONE_BUILD_SHARED_LIBS)
-diff --git a/MCInst.h b/MCInst.h
-index 641480ed..e0409109 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -179,7 +179,7 @@ struct MCInst {
- 	uint8_t x86Lock; // Set when the X86 LOCK prefix is present
- 	bool isAliasInstr; // Flag if this MCInst is an alias.
- 	bool fillDetailOps; // If set, detail->operands gets filled.
--	hppa_ext hppa_ext; ///< for HPPA operand. Contains info about modifiers and their effect on the instruction
-+	struct hppa_ext hppa_ext; ///< for HPPA operand. Contains info about modifiers and their effect on the instruction
- 	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
- };
- 
 diff --git a/Makefile b/Makefile
 index afbaa4aa..30dcf191 100644
 --- a/Makefile
@@ -1418,19 +1405,6 @@ index 00000000..ee7663db
 +	return X86_disasmIter(ud, code, size, address, insn);
 +}
 +#endif
-diff --git a/cs_priv.h b/cs_priv.h
-index 95d36ef5..84e1c748 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -132,7 +132,7 @@ struct cs_struct {
- 	// A mapping of LLVM instruction IDs to capstone instruction IDs, with
- 	// some supplementary information, sorted in ascending order by LLVM
- 	// instruction ID.
--	const insn_map *insn_map;
-+	const struct insn_map *insn_map;
- 	// The number of elements in the array pointed to by .insn_map
- 	unsigned short insn_map_size;
- 	bool no_text; // CS_OPT_TEXT is off: instructions are not printed
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
 index 183605d1..27517fde 100644
 --- a/suite/synctools/x86_vector_output.cpp

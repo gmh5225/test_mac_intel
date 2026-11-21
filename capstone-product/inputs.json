@@ -1,16 +1,16 @@
 {
-  "neverd": "7736edfaaf5fcd64b094917d99eb9bcf48bf7064",
-  "capstone": "09ba26d9848f4ad0920ad0ef5feb512899fabe6c",
+  "neverd": "6f81b8559bac0dd326d9426269b5b7d48c03b343",
+  "capstone": "5086dcd111161f146736f23cd2e6e2adede04a55",
   "variants": {
-    "iterator32": {
-      "tree": "4abbab27c845ca2752ad3279c185f92a636b2d30",
-      "patch": "iterator32.patch",
-      "patch_sha256": "86dd1498cf4abc00f8adb9210e63ea7d9aac48cbdd680a90720f9bd5b83b7d69"
-    },
     "immediate32": {
       "tree": "e907379b58d6810f9f3e4195d2e19a471816de43",
       "patch": "immediate32.patch",
-      "patch_sha256": "2435142340000dd2bd55ede226de18705a8cab585e0a4bdd2984de290810993d"
+      "patch_sha256": "9aa3d9c0941c17e5f38239a248ec2e408b289f37536f757382b450fce1a428b3"
+    },
+    "both_sizes": {
+      "tree": "1c747e21e5c6174f09c2f2eecb222c56006c5e8d",
+      "patch": "both_sizes.patch",
+      "patch_sha256": "309fc77a2e58ef5de51afab508cfd7e1f5403b08c5e4c9e6ef7d0271d55a5810"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -18,8 +18,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Source-built NeverD on the identical C++ caller. Compare static i386 output with and without ordinary memory-immediate MOV; include the GCC private-header fixes in both variants.",
-  "parent": "a64a279d908030e2c2caa867eda43a572c3433e9",
+  "scope": "Actual NeverD static decoder, measured at the same call site with or without canonical AMD64 SSE output. The i386-only control includes the C6/C7 memory-immediate writer.",
+  "parent": "085b9952c98d08d00562a45e6c2ad3f1c00b05d3",
   "integration": {
     "path": "lib/decode/Decoder.cpp",
     "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
@@ -32,10 +32,16 @@
     "candidate": "593901fa5e1ac1277ec8dd23ab72aae4ce1f492c",
     "sha256": "6cc96bcfb3f680032be4bf6dd1e146b7e5a913d09045452d17ce0e27f6ab05de"
   },
-  "branch_integration": {
+  "wide_integration": {
     "path": "lib/decode/Decoder.cpp",
     "base": "8c4e4e839bca739e264e385bfa4936fd237f3e76",
-    "candidate": "117d607d198648c6bb611276475554da2246f5c9",
-    "sha256": "a6707021fca71b079c1971cbbe9d9c6a02faacc304b646faafa5592c883be526"
+    "candidate": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
+    "sha256": "3d87cafb8b8c8f9532b91673b9537e9eca924969382a33d33ebde11cec557f52"
+  },
+  "wide_build_options": {
+    "path": "CMakeLists.txt",
+    "base": "f7a7b6dccb8f8c4f1faeaeb69432740ea32bce99",
+    "candidate": "d47008ce99c1c77d6ec51e1da8eb89d2b449da17",
+    "sha256": "14fcbb8c05ad585da1f59e83c6556a18ab113754c9221f7396db7935b7285edc"
   }
 }

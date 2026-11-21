@@ -1,7 +1,7 @@
-name: Test the exact i386 memory-immediate changes in the source-built NeverD decoder
+name: Compare the static x86 text iterators in the current source-built NeverD decoder
 on:
   push:
-    branches: [codex/neverd-i386-memory-immediate-product]
+    branches: [codex/neverd-static-both-x86-sizes]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 7736edfaaf5fcd64b094917d99eb9bcf48bf7064
+          ref: 6f81b8559bac0dd326d9426269b5b7d48c03b343
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,8 +44,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "7736edfaaf5fcd64b094917d99eb9bcf48bf7064"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "09ba26d9848f4ad0920ad0ef5feb512899fabe6c"
+          test "$(git rev-parse HEAD)" = "6f81b8559bac0dd326d9426269b5b7d48c03b343"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "5086dcd111161f146736f23cd2e6e2adede04a55"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-mem32-${{ matrix.os }}-${{ matrix.cc }}
+          name: static-sse-and-i386-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
