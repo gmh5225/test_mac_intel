@@ -34,15 +34,13 @@ jobs:
       - name: Execute qualified guest images with KVM
         if: steps.discovery.outputs.available == 'true'
         run: |
-          if ! command -v qemu-system-x86_64; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends qemu-system-x86 seabios
-          fi
-          python3 neverd-vmrun-kvm/check.py --guests neverd-vmrun-kvm/fixtures --report evidence/kvm-svm.json
+          cc -std=c11 -D_DEFAULT_SOURCE -O2 -Wall -Wextra -Werror neverd-vmrun-kvm/run.c -o "$RUNNER_TEMP/neverd-vmrun-kvm"
+          sudo -u "$(id -un)" -g "$(stat -c %G /dev/kvm)" -- python3 neverd-vmrun-kvm/check.py \
+            --guests neverd-vmrun-kvm/fixtures --runner "$RUNNER_TEMP/neverd-vmrun-kvm" --report evidence/kvm-svm.json
       - name: Retain KVM capability and original execution evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: neverd-kvm-svm-${{ matrix.image }}
+          name: neverd-kvm-svm-${{ matrix.image }}-attempt-${{ github.run_attempt }}
           path: evidence/
           retention-days: 14

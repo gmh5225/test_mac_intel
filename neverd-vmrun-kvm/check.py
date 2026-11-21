@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import struct
 import subprocess
 
@@ -50,7 +49,7 @@ def discover():
     return report
 
 
-def run_guest(directory, guest, logs):
+def run_guest(directory, guest, runner):
     image = directory / guest["image"]
     digest = hashlib.sha256(image.read_bytes()).hexdigest()
     receipt = {"image": image.name, "route": guest["route"], "optimization": guest["optimization"],
@@ -58,29 +57,36 @@ def run_guest(directory, guest, logs):
                "completed_contexts": 0}
     if digest != guest["sha256"]:
         return dict(receipt, diagnostic="Fixture digest does not match the manifest")
-    command = [shutil.which("qemu-system-x86_64"), "-accel", "kvm", "-cpu", "host",
-               "-machine", "pc", "-m", "32M", "-nodefaults", "-display", "none",
-               "-serial", "none", "-monitor", "none", "-no-reboot", "-nic", "none",
-               "-device", "isa-debug-exit,iobase=0xf4,iosize=4", "-kernel", str(image),
-               "-debugcon", "stdio", "-d", "guest_errors,int,cpu_reset",
-               "-D", str(logs / (image.stem + ".log"))]
+    command = [runner, image, guest["vmcb"], *guest["breakpoints"]]
     try:
         run = subprocess.run(command, capture_output=True, timeout=45)
     except subprocess.TimeoutExpired as error:
         return dict(receipt, timed_out=True, console=(error.stdout or b"").decode(errors="replace"),
                     diagnostic=(error.stderr or b"").decode(errors="replace"))
     console = run.stdout.decode(errors="replace")
-    completed = run.returncode == 33 and console.splitlines() == guest["expected_console"]
+    trace = []
+    diagnostic = []
+    for line in run.stderr.decode(errors="replace").splitlines():
+        try:
+            trace.append(json.loads(line))
+        except ValueError:
+            diagnostic.append(line)
+    observed_rcx = any(event["event"] == "after_vmexit" and event["rcx"] == "0x5678"
+                       and event["vmcb_exit"] == "0x81" for event in trace)
+    completed = observed_rcx and run.returncode == 33 and console.splitlines() == guest["expected_console"]
     return dict(receipt, return_code=run.returncode, completed=completed,
                 completed_contexts=guest["contexts"] if completed else 0, console=console,
-                diagnostic=run.stderr.decode(errors="replace"))
+                diagnostic="\n".join(diagnostic), trace=trace, observed_original_rcx=observed_rcx)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--guests", type=Path)
+    parser.add_argument("--runner", type=Path)
     opts = parser.parse_args()
+    if bool(opts.guests) != bool(opts.runner):
+        parser.error("--guests and --runner are used together")
     report = discover()
     opts.report.parent.mkdir(parents=True, exist_ok=True)
     if out := os.getenv("GITHUB_OUTPUT"):
@@ -91,7 +97,7 @@ def main():
             raise RuntimeError("KVM SVM was lost after capability discovery")
         manifest = json.loads((opts.guests / "manifest.json").read_text())
         for guest in manifest["guests"]:
-            report["guest_runs"].append(run_guest(opts.guests, guest, opts.report.parent))
+            report["guest_runs"].append(run_guest(opts.guests, guest, opts.runner))
         report["status"] = ("passed" if report["guest_runs"] and
                             all(r["completed"] for r in report["guest_runs"]) else "failed")
         report["completed_contexts"] = sum(r["completed_contexts"] for r in report["guest_runs"])
