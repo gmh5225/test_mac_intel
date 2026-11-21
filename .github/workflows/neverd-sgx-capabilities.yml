@@ -60,3 +60,60 @@ jobs:
           path: sgx-capabilities/
           if-no-files-found: error
           retention-days: 14
+
+  software:
+    name: NeverD x86 software semantics / Linux x64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+      NEVERD_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check out the NeverD revision under test
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 3e5e10f19e0b4fd57e736dcab5934f4267cda390
+          path: NeverD
+          persist-credentials: false
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+        with:
+          version: v0.16.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.14'
+      - name: Install the x64 tools and verify the NeverC package
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes clang lld ninja-build
+          git -C NeverD submodule update --init --depth 1 third_party/capstone
+          curl --fail --location --retry 3 --output neverc.zip https://github.com/NeverSight/NeverC/releases/download/v3389.1.4/neverc-linux-x64.zip
+          echo '60d17433b7a8f738e8dd34f4f0c6fc5b956b7ef51b115b8831739568f986fe64  neverc.zip' | sha256sum --check
+          unzip -q neverc.zip -d neverc
+          echo "NEVERD_TEST_NEVERC=$PWD/neverc/bin/neverc" >> "$GITHUB_ENV"
+      - name: Configure with the LLVM release pinned by NeverD
+        working-directory: NeverD
+        run: |
+          cmake -S . -B build-check -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DNEVERD_LLVM_PREBUILT=ON -DBUILD_TESTING=ON \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_BUILD_GUI=OFF -DNEVERD_BUILD_PLUGINS=OFF
+      - name: Build the production execution and paging test owners
+        working-directory: NeverD
+        run: python scripts/build.py build-check --parallel 4 --target NeverDX64PagedExecutionTests NeverDX86PagingTests neverd
+      - name: Execute mixed-mode, SMM, SGX and asynchronous event regressions
+        run: python neverd-sgx-capabilities/software_semantics.py --source NeverD --build NeverD/build-check --output software-evidence
+      - name: Retain execution receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neverd-x86-software
+          path: software-evidence/
+          if-no-files-found: warn
+          retention-days: 14
