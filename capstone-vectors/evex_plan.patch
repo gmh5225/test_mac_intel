@@ -1,0 +1,149 @@
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..5084988e 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -83,7 +83,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			545, 549, 546, 550, 0, 0, 0, 0, 553, 557, 554, 558, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
+-			0, 0, 65535, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
++			0, 0, X86_EVEX_OUTPUT_PLAN, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
+ 			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
+ 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index aff17085..2746ba4f 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -51,6 +51,13 @@ enum X86SimpleForm {
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+ #define X86_PLAN_VECTOR UINT16_MAX
++/* The static 64-bit iterator specializes the bare EVEX vector plan. */
++#define X86_PLAN_EVEX ((UINT16_MAX & ~7u) | X86_SIMPLE_RELATIVE)
++#ifdef X86_FIXED_EVEX
++#define X86_EVEX_OUTPUT_PLAN X86_PLAN_EVEX
++#else
++#define X86_EVEX_OUTPUT_PLAN X86_PLAN_VECTOR
++#endif
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index b70b1b5f..bd593096 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -69,18 +69,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return false;
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+-		if (plan == X86_PLAN_VECTOR) {
+-			bool ok = X86_writeVectorOutput(code, size, insn,
+-							insn_size,
+-							x86_simple_registers[3],
+-							wide);
+-#ifdef X86_VECTOR_MISS
+-			if (!ok)
+-				return X86_VECTOR_MISS(code, size, insn,
+-						       insn_size);
++		if (plan == X86_PLAN_VECTOR)
++			return X86_writeVectorOutput(code, size, insn,
++						     insn_size,
++						     x86_simple_registers[3],
++						     wide);
++#ifdef X86_FIXED_EVEX
++		if (plan == X86_PLAN_EVEX)
++			return X86_FIXED_EVEX(code, size, insn, insn_size);
+ #endif
+-			return ok;
+-		}
+ 		unsigned row;
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index ac36c51b..332398bd 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -14,6 +14,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
++#define X86_FIXED_EVEX writeEvex64
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ #include "X86VectorOperands.h"
+@@ -145,17 +146,18 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
+-static bool writeRoundedFma(const uint8_t *code, size_t size, cs_insn *insn,
+-			    uint16_t *insn_size)
++static bool writeEvex64(const uint8_t *code, size_t size, cs_insn *insn,
++			uint16_t *insn_size)
+ {
+-	/* The vector writer has already handled ordinary lengths and broadcasts.
+-	 * For register FMA, EVEX.b selects rounding and L'L encodes RC. */
+-	if (code[0] != 0x62 || size < 6 || code[5] < 0xc0 ||
+-	    (code[3] & 0x97) != 0x10)
+-		return false;
++	/* Only a register with EVEX.b set can encode static rounding. The
++	 * ordinary register writer rejects that bit; memory keeps its usual
++	 * broadcast and tuple checks. */
++	if (size < 6 || !(code[3] & 0x10) || code[5] < 0xc0)
++		return X86_writeVectorOutput(code, size, insn, insn_size,
++					     x86_simple_registers[3], true);
+ 	const unsigned opcode = code[4];
+-	if ((code[1] & 15) != 2 || (code[2] & 7) != 5 || opcode < 0x98 ||
+-	    opcode > 0xbe || (opcode & 9) != 8)
++	if ((code[1] & 15) != 2 || (code[2] & 7) != 5 || (code[3] & 0x87) ||
++	    opcode < 0x98 || opcode > 0xbe || (opcode & 9) != 8)
+ 		return false;
+ 	const unsigned w = code[2] >> 7, rc = (code[3] >> 5) & 3;
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
+@@ -179,12 +181,11 @@ static bool writeRoundedFma(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
+ 
+-#define X86_VECTOR_MISS writeRoundedFma
+ #define X86_FIXED_OUTPUT tryOutput64
+ #define X86_FIXED_WIDE true
+ #define X86_OUTPUT_MISS writeExtraOutput64
+ #include "X86SimpleOutputImpl.h"
+-#undef X86_VECTOR_MISS
++#undef X86_FIXED_EVEX
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index 90ec3864..7178b8a1 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -544,9 +544,16 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 			std::cout << "\t\t{\n";
+ 			for (unsigned j = 0; j < 256; j += 16) {
+ 				std::cout << "\t\t\t";
+-				for (unsigned k = 0; k < 16; ++k)
+-					std::cout << (k ? " " : "")
+-						  << prefix[j + k] << ',';
++				for (unsigned k = 0; k < 16; ++k) {
++					std::cout << (k ? " " : "");
++					const unsigned plan = prefix[j + k];
++					if (plan == X86_PLAN_EVEX)
++						std::cout
++							<< "X86_EVEX_OUTPUT_PLAN";
++					else
++						std::cout << plan;
++					std::cout << ',';
++				}
+ 				std::cout << '\n';
+ 			}
+ 			std::cout << "\t\t},\n";
+@@ -782,7 +789,7 @@ int main(int argc, char **argv)
+ 	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
+ 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
+ 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
+-	plans[1][0][0x62] = X86_PLAN_VECTOR;
++	plans[1][0][0x62] = X86_PLAN_EVEX;
+ 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
+ 	plans[1][0][0xc5] = X86_PLAN_VECTOR;
+ 	for (unsigned wide = 0; wide < 2; ++wide) {
