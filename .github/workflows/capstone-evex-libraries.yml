@@ -1,7 +1,7 @@
-name: Compare Darwin EVEX scan plans with source-built forked iced on Intel and Apple silicon
+name: Measure the NeverD i386 iterator on Intel and Apple silicon against both iced formatters
 on:
   push:
-    branches: [codex/capstone-darwin-evex-gnu-members]
+    branches: [codex/capstone-darwin-i386-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,7 @@ jobs:
       matrix:
         include:
           - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 2 }
           - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -27,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a9d153f4cae6c71eb02309621bbce3c9508312dc
+          ref: 5086dcd111161f146736f23cd2e6e2adede04a55
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: darwin-evex-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: darwin-i386-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

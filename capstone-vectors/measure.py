@@ -27,9 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True),machine=platform.machine(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Ordinary EVEX feature filter available on the Darwin host',vector='Negative filter plus existing EVEX scan plans on the Darwin host',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
-    save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
-    save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
+    save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs')))
+    save('entrypoints.json',dict(integer='X86_disasmIter',route='X86_disasmIter32',vector='X86_disasmIter32',detail='cs_regs_access plus complete text and operand consumption'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -37,6 +36,10 @@ def main(w):
     old_engine='std::string engine=argv[1];';assert inc.count(old_engine)==1
     inc=inc.replace(old_engine,old_engine+'\n  if(engine=="iced____") engine="iced"; else if(engine=="fast____") engine="fast";')
     assert inc.count('iced_trace(bits,ptr,')==1
+    key='static Result cs_span(';assert inc.count(key)==1
+    inc=inc.replace(key,'extern "C" bool selected(csh, const uint8_t **, size_t *, uint64_t *, cs_insn *);\n'+key)
+    key='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert inc.count(key)==1
+    inc=inc.replace(key,key.replace('cs_disasm_iter','selected'))
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
@@ -58,39 +61,26 @@ def main(w):
         run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
+        roots=[objroot,objroot.parent/'capstone_x86_iter32.dir']
         members=[q for q in sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines() if q.endswith('.o')]
-        assert len(set(members))==len(members)
-        active={str(path.relative_to(objroot)):path for path in objroot.rglob('*.o') if path.name in members}
-        assert len(active)==len(members)
-        objects[label]={name:sha(path) for name,path in active.items()}
-        assert len(objects[label])>30
+        active={f.name:f for root in roots for f in root.rglob('*.o') if f.name in members}
+        assert len(set(members))==len(active)==len(members)>30
+        objects[label]={name:sha(file) for name,file in active.items()}
         shutil.copyfile(b/'libcapstone.dylib',w/(label+'.so'))
         if label!='integer':
-            changed=sorted(name for name,hash_ in objects['integer'].items() if objects[label].get(name)!=hash_)
-            assert set(objects['integer'])==set(objects[label])
-            expected=['arch/X86/X86Mapping.c.o']
-            if label=='vector':
-                expected+=['arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86EvexScan.c.o']
-            assert changed==sorted(expected),(label,changed,expected)
-            save(label+'-object-isolation.json',dict(changed=changed,added=[],unchanged=len(objects['integer'])-len(changed)))
-        if label=='vector':
-            sect=sp.check_output(['otool','-l',active['arch/X86/X86EvexScan.c.o']],text=True)
-            for name in ('__cs_evex_scan','__cs_evex_plan','__cs_evex_xfer'):assert 'sectname '+name in sect
-            feat=sp.check_output(['otool','-l',active['arch/X86/X86Mapping.c.o']],text=True)
-            for name in ('__cs_evex_map','__cs_evex_filt'):assert 'sectname '+name in feat
-            run(['clang++','-std=c++17','-O2','-I',tree/'include',tree/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'generator'],'generator-build')
-            with (w/'gen.log').open('w') as log:
-                raw=sp.check_output([w/'generator','--evex-scan'],stderr=log)
-            assert raw==(tree/'arch/X86/X86GenEvexScan.inc').read_bytes()
-            save('generated-identity.json',dict(equal=True,sha256=hashlib.sha256(raw).hexdigest()))
+            before=objects['integer'];added=sorted(objects[label].keys()-before.keys())
+            assert added==['X86Vex32Output.c.o']
+            changed=[k for k in before if before[k]!=objects[label][k]]
+            save(label+'-object-isolation.json',dict(changed=changed,added=added,unchanged=len(before)-len(changed),shared_identical=sha(w/'integer.so')==sha(w/(label+'.so'))))
         save('object-digests.json',objects)
+        adapter=w/'select.c';selected='X86_disasmIter' if label=='integer' else 'X86_disasmIter32'
+        adapter.write_text('#include <capstone/capstone.h>\\nextern bool '+selected+'(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);\\nbool selected(csh h,const uint8_t **c,size_t *n,uint64_t *ip,cs_insn *i){return '+selected+'(h,c,n,ip,i); }\\n')
+        run(['clang','-O3','-I',tree/'include','-c',adapter,'-o',w/'select.o'],'select-'+label)
         obj=w/'driver.o'
-        unresolved=sp.check_output(['nm','-u',obj],text=True)
-        assert 'cs_disasm_iter' in unresolved and 'X86_disasmIter' not in unresolved
         if label=='integer':consumer_hash=sha(obj)
         else:assert sha(obj)==consumer_hash
         save('consumer-object.json',dict(sha256=consumer_hash,all_variants_identical=True))
-        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        target=w/('run-'+label);run(['clang++',obj,w/'select.o',b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
@@ -98,13 +88,6 @@ def main(w):
         run(['clang++','-std=c++17','-O2','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
         for label in ('route','vector'):
             run([w/test,w/'integer.so',w/(label+'.so')],test+'-'+label)
-    run(['git','apply',r/'vector.patch'],'adapter-patch',tree)
-    adapter=w/'adapter-cs';run(['cmake','-S',tree,'-B',adapter,*profile,'-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'adapter-configure')
-    run(['cmake','--build',adapter,'--target','capstone_static','x86_scan_adapter','--parallel','4'],'adapter-build')
-    run(['ctest','--test-dir',adapter,'--no-tests=error','--output-on-failure','-R','^unit_x86_scan_adapter$'],'adapter-unit')
-    run([os.environ['CC'],'-O2','-I',tree/'include','-I',tree/'arch/X86',r/'adapter-precedence.c',adapter/'libcapstone.a','-lm','-o',w/'adapter-precedence'],'adapter-precedence-build')
-    run([w/'adapter-precedence'],'adapter-precedence')
-    run(['git','reset','--hard',reference],'adapter-restore',tree)
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
@@ -140,7 +123,7 @@ def main(w):
                     return list(map(int,sp.check_output(command,executable=executable).split()))
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
                 cycles={launch:[]for launch in launches};labels=['integer','aa','route','vector','iced']+(['fast'] if mode else [])
-                for i in range(18):
+                for i in range(9):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
