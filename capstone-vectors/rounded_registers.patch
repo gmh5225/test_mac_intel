@@ -1,0 +1,410 @@
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..f15df78e 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -86,6 +86,137 @@ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, uns
+ 	default: return NULL;
+ 	}
+ }
++static const struct VectorOutputRow evex_rounded_rows[] = {
++	{ 0 },
++	{ X86_INS_VADDPS, "vaddps", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
++	{ X86_INS_VADDPD, "vaddpd", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
++	{ X86_INS_VMULPS, "vmulps", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
++	{ X86_INS_VMULPD, "vmulpd", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
++	{ X86_INS_VSUBPS, "vsubps", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
++	{ X86_INS_VSUBPD, "vsubpd", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
++	{ X86_INS_VDIVPS, "vdivps", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VDIVPD, "vdivpd", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VSCALEFPS, "vscalefps", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VSCALEFPD, "vscalefpd", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB132PS, "vfmaddsub132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB132PD, "vfmaddsub132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD132PS, "vfmsubadd132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD132PD, "vfmsubadd132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD132PS, "vfmadd132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD132PD, "vfmadd132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB132PS, "vfmsub132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB132PD, "vfmsub132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD132PS, "vfnmadd132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD132PD, "vfnmadd132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB132PS, "vfnmsub132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB132PD, "vfnmsub132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB213PS, "vfmaddsub213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB213PD, "vfmaddsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD213PS, "vfmsubadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD213PD, "vfmsubadd213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD213PD, "vfmadd213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB213PS, "vfmsub213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB213PD, "vfmsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD213PS, "vfnmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD213PD, "vfnmadd213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB213PS, "vfnmsub213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB213PD, "vfnmsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB231PS, "vfmaddsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB231PD, "vfmaddsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD231PS, "vfmsubadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD231PD, "vfmsubadd231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD231PS, "vfmadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD231PD, "vfmadd231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB231PS, "vfmsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB231PD, "vfmsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD231PS, "vfnmadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD231PD, "vfnmadd231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB231PS, "vfnmsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB231PD, "vfnmsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++};
++static const uint8_t evex_rounded_prefixes[][8] = {
++	{ 0, 0, 0, 0, 0, 0, 0, 0, },
++	{ 1, 0, 0, 0, 0, 2, 0, 0, },
++	{ 3, 0, 0, 0, 0, 4, 0, 0, },
++	{ 5, 0, 0, 0, 0, 6, 0, 0, },
++	{ 7, 0, 0, 0, 0, 8, 0, 0, },
++	{ 0, 9, 0, 0, 0, 10, 0, 0, },
++	{ 0, 11, 0, 0, 0, 12, 0, 0, },
++	{ 0, 13, 0, 0, 0, 14, 0, 0, },
++	{ 0, 15, 0, 0, 0, 16, 0, 0, },
++	{ 0, 17, 0, 0, 0, 18, 0, 0, },
++	{ 0, 19, 0, 0, 0, 20, 0, 0, },
++	{ 0, 21, 0, 0, 0, 22, 0, 0, },
++	{ 0, 23, 0, 0, 0, 24, 0, 0, },
++	{ 0, 25, 0, 0, 0, 26, 0, 0, },
++	{ 0, 27, 0, 0, 0, 28, 0, 0, },
++	{ 0, 29, 0, 0, 0, 30, 0, 0, },
++	{ 0, 31, 0, 0, 0, 32, 0, 0, },
++	{ 0, 33, 0, 0, 0, 34, 0, 0, },
++	{ 0, 35, 0, 0, 0, 36, 0, 0, },
++	{ 0, 37, 0, 0, 0, 38, 0, 0, },
++	{ 0, 39, 0, 0, 0, 40, 0, 0, },
++	{ 0, 41, 0, 0, 0, 42, 0, 0, },
++	{ 0, 43, 0, 0, 0, 44, 0, 0, },
++	{ 0, 45, 0, 0, 0, 46, 0, 0, },
++};
++static const uint8_t evex_rounded_plans[3][256] = {
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 0, 0, 3, 0, 4, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6, 7, 8, 0, 9, 0, 10, 0, 11, 0,
++		0, 0, 0, 0, 0, 0, 12, 13, 14, 0, 15, 0, 16, 0, 17, 0,
++		0, 0, 0, 0, 0, 0, 18, 19, 20, 0, 21, 0, 22, 0, 23, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++};
+ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
+ 	{
+ 		{ X86_INS_VMOVAPS, "vmovaps", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 82166d23..37abeb29 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -92,6 +92,45 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	return true;
+ }
+ 
++/* EVEX.b selects embedded rounding for these register-only packed operations.
++ * The caller has checked six bytes, register addressing and the EVEX.b bit. */
++static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
++				  uint16_t *insn_size)
++{
++	const unsigned map = code[1] & 15, flags = code[2];
++	if (map < 1 || map > 3 || !(flags & 4) || (code[3] & 0x87))
++		return false;
++	const unsigned w = flags >> 7, pp = flags & 3;
++	const unsigned plan = evex_rounded_plans[map - 1][code[4]];
++	const unsigned index = evex_rounded_prefixes[plan][w * 4 + pp];
++	if (!index)
++		return false;
++	const unsigned rc = code[3] >> 5, rxb = (~(unsigned)code[1] >> 5) & 7;
++	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
++					  (~(unsigned)code[1] & 16),
++				  ((~flags >> 3) & 15) |
++					  ((~(unsigned)code[3] & 8) << 1),
++				  (code[5] & 7) | ((rxb & 3) << 3) };
++	writeVectorRegisters(code, insn, insn_size, &evex_rounded_rows[index],
++			     4, 2, 0x40 | (w << 3) | rxb, 2, regs, 3);
++	static const char suffix[][11] = { ", {rn-sae}", ", {rd-sae}",
++					   ", {ru-sae}", ", {rz-sae}" };
++	/* Three ZMM names and two separators take 16 bytes plus a digit
++	 * for each two-digit register number. */
++	const unsigned end =
++		16 + (regs[0] >= 10) + (regs[1] >= 10) + (regs[2] >= 10);
++	memcpy(insn->op_str + end, suffix[rc], sizeof(suffix[rc]));
++	if (insn->detail) {
++		static const x86_avx_rm modes[] = { X86_AVX_RM_RN,
++						    X86_AVX_RM_RD,
++						    X86_AVX_RM_RU,
++						    X86_AVX_RM_RZ };
++		insn->detail->x86.avx_sae = true;
++		insn->detail->x86.avx_rm = modes[rc];
++	}
++	return true;
++}
++
+ #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 			       uint16_t *insn_size,
+@@ -116,7 +155,8 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 					  address_regs);
+ #endif
+ 	if (X86_EVEX_REGISTER_PREFIX_REJECTS(code, size))
+-		return false;
++		return size >= 6 && (code[3] & 0x10) &&
++		       writeRoundedRegisters(code, insn, insn_size);
+ 	const unsigned ll = code[3] >> 5;
+ 	const unsigned w = code[2] >> 7;
+ 	const unsigned key = ((code[1] & 15) << 8) | code[4];
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 27517fde..2b01f94e 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -1377,6 +1377,159 @@ void emit_vex32_memory()
+ 		     static_cast<unsigned long long>(decoder.probes));
+ }
+ 
++struct RoundedRow {
++	unsigned id = 0;
++	std::string mnemonic;
++	Bytes4 groups{}, access{};
++	unsigned group_count = 0;
++};
++
++bool observe_rounded(Decoder &decoder, unsigned map, unsigned opcode,
++		     unsigned pp, unsigned w, unsigned rc, unsigned dst,
++		     unsigned src, unsigned rm, RoundedRow &row)
++{
++	const uint8_t code[] = {
++		0x62,
++		uint8_t(map | ((dst & 8) ? 0 : 0x80) | ((rm & 16) ? 0 : 0x40) |
++			((rm & 8) ? 0 : 0x20) | (~dst & 16)),
++		uint8_t((w << 7) | ((~src & 15) << 3) | 4 | pp),
++		uint8_t((rc << 5) | 0x10 | ((src & 16) ? 0 : 8)),
++		uint8_t(opcode),
++		uint8_t(0xc0 | ((dst & 7) << 3) | (rm & 7))
++	};
++	const unsigned id = decoder.decode(code, sizeof(code));
++	if (!id)
++		return false;
++	const cs_insn &insn = *decoder.insn;
++	const cs_detail &detail = *insn.detail;
++	if (insn.illegal || insn.is_alias || insn.usesAliasDetails ||
++	    std::strlen(insn.mnemonic) >= 16 || detail.groups_count > 4)
++		return false;
++	if (!row.id) {
++		row.id = id;
++		row.mnemonic = insn.mnemonic;
++		row.group_count = detail.groups_count;
++		std::copy_n(detail.groups, row.group_count, row.groups.begin());
++		for (unsigned n = 0; n < 3; ++n)
++			row.access[n] = detail.x86.operands[n].access;
++	}
++	const char *const endings[] = { ", {rn-sae}", ", {rd-sae}",
++					", {ru-sae}", ", {rz-sae}" };
++	const x86_avx_rm modes[] = { X86_AVX_RM_RN, X86_AVX_RM_RD,
++				     X86_AVX_RM_RU, X86_AVX_RM_RZ };
++	const std::string text = "zmm" + std::to_string(dst) + ", zmm" +
++				 std::to_string(src) + ", zmm" +
++				 std::to_string(rm) + endings[rc];
++	if (row.id != id || row.mnemonic != insn.mnemonic ||
++	    text != insn.op_str)
++		return false;
++	cs_detail expected{};
++	expected.groups_count = uint8_t(row.group_count);
++	std::copy_n(row.groups.begin(), row.group_count, expected.groups);
++	cs_x86 &x = expected.x86;
++	std::memcpy(x.opcode, code, 4);
++	x.modrm = code[5];
++	x.rex = uint8_t(0x40 | (w << 3) | ((~unsigned(code[1]) >> 5) & 7));
++	x.addr_size = 8;
++	x.avx_sae = true;
++	x.avx_rm = modes[rc];
++	x.encoding.modrm_offset = 5;
++	x.op_count = 3;
++	const unsigned numbers[] = { dst, src, rm };
++	for (unsigned n = 0; n < 3; ++n) {
++		auto &op = x.operands[n];
++		op.type = X86_OP_REG;
++		op.size = 64;
++		op.reg = x86_reg(X86_REG_ZMM0 + numbers[n]);
++		op.access = cs_ac_type(row.access[n]);
++	}
++	return std::memcmp(&expected, &detail,
++			   offsetof(cs_detail, x86) + sizeof(cs_x86)) == 0;
++}
++
++void emit_rounded_vectors(Decoder &decoder)
++{
++	using PrefixRow = std::array<unsigned, 8>;
++	std::array<std::array<unsigned, 256>, 3> plans{};
++	std::vector<PrefixRow> prefixes(1);
++	std::vector<std::string> rows;
++	for (unsigned map = 1; map <= plans.size(); ++map) {
++		for (unsigned opcode = 0; opcode < 256; ++opcode) {
++			PrefixRow prefix{};
++			for (unsigned key = 0; key < prefix.size(); ++key) {
++				RoundedRow row;
++				auto same = [&](unsigned rc, unsigned dst,
++						unsigned src, unsigned rm) {
++					return observe_rounded(decoder, map,
++							       opcode, key & 3,
++							       key >> 2, rc,
++							       dst, src, rm,
++							       row);
++				};
++				if (!same(0, 3, 2, 1))
++					continue;
++				bool uniform = true;
++				for (unsigned rc = 0; rc < 4 && uniform; ++rc)
++					for (unsigned n = 0;
++					     n < 32768 && uniform; ++n)
++						uniform = same(rc, n >> 10,
++							       (n >> 5) & 31,
++							       n & 31);
++				if (!uniform)
++					continue;
++				const std::string value =
++					"{ " + decoder.symbol(row.id) + ", \"" +
++					row.mnemonic + "\", " +
++					std::to_string(row.group_count) + ", " +
++					fields(row.groups) + ", " +
++					fields(row.access) + ", 0 }";
++				const auto i = std::find(rows.begin(),
++							 rows.end(), value);
++				const unsigned idx =
++					unsigned(i - rows.begin()) + 1;
++				if (i == rows.end())
++					rows.push_back(value);
++				prefix[key] = idx;
++			}
++			const auto i = std::find(prefixes.begin(),
++						 prefixes.end(), prefix);
++			const unsigned idx = unsigned(i - prefixes.begin());
++			if (i == prefixes.end())
++				prefixes.push_back(prefix);
++			plans[map - 1][opcode] = idx;
++		}
++	}
++	if (!plans[0][0x58] || !plans[1][0xa8] || prefixes.size() > 256 ||
++	    rows.size() > UINT8_MAX)
++		throw std::runtime_error("invalid rounded EVEX register plans");
++	std::puts(
++		"static const struct VectorOutputRow evex_rounded_rows[] = {\n\t{ 0 },");
++	for (const auto &row : rows)
++		std::printf("\t%s,\n", row.c_str());
++	std::puts("};\nstatic const uint8_t evex_rounded_prefixes[][8] = {");
++	for (const auto &p : prefixes) {
++		std::printf("\t{");
++		for (const auto v : p)
++			std::printf(" %u,", v);
++		std::puts(" },");
++	}
++	std::puts("};\nstatic const uint8_t evex_rounded_plans[3][256] = {");
++	for (const auto &p : plans) {
++		std::puts("\t{");
++		for (unsigned n = 0; n < p.size(); n += 16) {
++			std::printf("\t\t");
++			for (unsigned k = 0; k < 16; ++k)
++				std::printf("%s%u,", k ? " " : "", p[n + k]);
++			std::putchar('\n');
++		}
++		std::puts("\t},");
++	}
++	std::puts("};");
++	std::fprintf(stderr,
++		     "%zu rounded EVEX register rows, %zu prefix plans\n",
++		     rows.size(), prefixes.size() - 1);
++}
++
+ void emit_output(Decoder &decoder, bool scan_only)
+ {
+ 	std::vector<std::string> records;
+@@ -1428,6 +1581,7 @@ void emit_output(Decoder &decoder, bool scan_only)
+ 			"\t\treturn rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];\n\t}");
+ 	}
+ 	std::puts("\tdefault: return NULL;\n\t}\n}");
++	emit_rounded_vectors(decoder);
+ 	emit_vex_indexed(decoder);
+ 	emit_vex_registers(decoder);
+ 	emit_vex_shifts(decoder);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6ca1b43b..dc644a06 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -358,6 +358,31 @@ static bool check_evex_extract(csh handles[2])
+ 
+ static bool check_evex(csh handles[2])
+ {
++	/* Compare all EVEX embedded rounding modes, truncations, and register
++	 * extensions for packed arithmetic. Include masked and memory forms. */
++	for (unsigned n = 0; n < 4096; ++n) {
++		const uint8_t ops[] = { 0x58, 0x59, 0x5c, 0x5e,
++					0x98, 0xa8, 0xb8, 0xbc };
++		const unsigned family = n & 7;
++		const uint8_t bytes[] = {
++			0x62,
++			(uint8_t)((n & 0xf0) | (family < 4 ? 1 : 2)),
++			(uint8_t)(((n >> 3) & 0xf8) | 4 | ((n >> 10) & 3)),
++			(uint8_t)((((n >> 5) & 3) << 5) | 0x10 |
++				  ((n >> 4) & 8) | (n % 13 == 0 ? 1 : 0)),
++			ops[family],
++			(uint8_t)((n % 11 == 0 ? 0x40 : 0xc0) |
++				  ((n >> 1) & 63)),
++			0x80,
++			0,
++			0,
++			0
++		};
++		const size_t extent = n % 5 == 0 ? (n >> 8) % 7 : sizeof(bytes);
++		if (!compare(handles, bytes, extent, n))
++			return false;
++	}
++
+ 	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
+ 					  0x344, 0x325, 0x1fe, 0x200 };
+ 	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
