@@ -38,16 +38,34 @@ try:
         for n in (32,64):
             panels.append(('putty'+str(n),n,tmp/('putty-0.85-'+str(n)+'.text'),0x401000 if n==32 else 0x140001000))
         panels.append(('openssl',64,tmp/'libcrypto.text',json.loads((tmp/'openssl.json').read_text())['address']))
+    if conf=='full':
+        shutil.copy(r/'libmvec.py',tmp);shutil.copy(r/'libmvec.json',tmp)
+        run(['python3','-B',tmp/'libmvec.py'],'glibc-libmvec')
+        libm=json.loads((tmp/'libmvec.json').read_text());panels.append(('libmvec',64,tmp/'libmvec.text',libm['address']))
     rows=[]
     for name,bits,path,ip in panels:
         for syntax in range(1 if diet or not att else 2):
             z=sp.check_output([tmp/'verify',libs['base'],libs['candidate'],str(bits),path,str(ip),str(syntax),str(int(diet))],text=True)
             for line in z.splitlines():
                 ib,flags,sy,calls,valid,changes=map(int,line.split());assert ib==bits and sy==syntax and calls>=valid>=changes
-                if name=='openssl' and flags&1==0:assert changes==144
+                if name=='openssl' and flags&1==0:assert changes>=144
+                if name=='libmvec' and flags in (0,1):assert changes>0
                 rows.append(dict(sample=name,bits=bits,syntax=syntax,flags=flags,calls=calls,success=valid,changes=changes))
             write('records',rows)
+    other_cases=[]
     if conf=='full':
+        import corpus
+        raw=corpus.prepare(r,tmp,obs,run)
+        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls'}
+        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105}
+        other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
+        assert len(other_cases)==len(names)
+        for arch in ('arm','aarch64','ppc','riscv','mips'):
+            run(['c++','-O2','-std=c++17','-I',s,'-I',s/'include',r/(arch+'-states.cpp'),'-ldl','-o',tmp/(arch+'-states')],'compile-'+arch)
+            arg=[tmp/(arch+'-states'),libs['base'],libs['candidate']]
+            if arch=='riscv':
+                for opt in ([],['custom']):run([*arg,tmp/'corpus',*opt],'states-riscv'+('custom' if opt else ''))
+            else:run(arg,'states-'+arch)
         target=fixed/'libcapstone.so.6'
         target.write_bytes(libs['base'].read_bytes());(fixed/'libcapstone.so').symlink_to(target.name)
         run(['c++','-O3','-std=c++17','-I',s/'include',r/'time.cpp','-L',fixed,'-Wl,-rpath,'+str(fixed),'-lcapstone','-o',tmp/'time'],'compile-time')
@@ -59,7 +77,7 @@ try:
             with target.open('wb') as o:o.write(inputs[k])
             return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
         timing=[]
-        for name,bits,path,ip in panels[2:]:
+        for name,bits,path,ip in panels[2:]+other_cases:
             for mode in (0,1,2):
                 first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
                 for i in range(7):

@@ -1,25 +1,140 @@
+diff --git a/MCInst.h b/MCInst.h
+index 641480ed..c2839d53 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -170,7 +170,6 @@ struct MCInst {
+ 		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
+ 	// operand access index for list of registers sharing the same access right (for ARM)
+ 	uint8_t ac_idx;
+-	uint8_t popcode_adjust; // Pseudo X86 instruction adjust
+ 	char assembly[8]; // for special instruction, so that we don't need printer
+ 	unsigned char evm_data[32]; // for EVM PUSH operand
+ 	cs_wasm_op wasm_data; // for WASM operand
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..a7499d71 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -44,7 +44,6 @@ typedef struct X86ScanResult {
+ 	unsigned opcode;
+ 	unsigned opcode_pub;
+ 	uint16_t length;
+-	uint8_t popcode_adjust;
+ } X86ScanResult;
+ 
+ bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..4ba27e66 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3308,7 +3308,6 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	instr.Opcode = 0;
+ 	instr.OpcodePub = 0;
+ 	instr.size = 0;
+-	instr.popcode_adjust = 0;
+ 	instr.csh = handle;
+ 	instr.address = insn->address;
+ 	instr.flat_insn = insn;
+@@ -3346,7 +3345,6 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	result->opcode = instr.Opcode;
+ 	result->opcode_pub = instr.OpcodePub;
+ 	result->length = size;
+-	result->popcode_adjust = instr.popcode_adjust;
+ 	return true;
+ }
+ 
+@@ -3375,7 +3373,6 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			result->opcode = 0;
+ 			result->opcode_pub = id;
+ 			result->length = (uint16_t)length;
+-			result->popcode_adjust = 0;
+ 			return true;
+ 		}
+ 	}
+@@ -3402,7 +3399,6 @@ X86_DECODE_INLINE bool completeTerminalScanResult(X86ScanResult *result,
+ 		return false;
+ 	result->opcode = 0;
+ 	result->opcode_pub = instructionID;
+-	result->popcode_adjust = 0;
+ 	return true;
+ }
+ 
+@@ -3497,7 +3493,6 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 	result->opcode = insn.instructionID;
+ 	result->opcode_pub = metadata >> X86_VEX_SCAN_PUBLIC_SHIFT;
+ 	result->length = (uint16_t)insn.length;
+-	result->popcode_adjust = 0;
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+@@ -3757,7 +3752,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
+ 
+-/* Keep the admitted terminal's public ID and zero alias adjustment visible
++/* Keep the admitted terminal's public ID visible
+  * through output completion. Cold helpers can take the fallback result's
+  * address without forcing terminal output through that escaped object. */
+ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3781,7 +3776,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	}
+ 	if (initial != X86_SCAN_COMPLETE)
+ 		return false;
+-	X86ScanResult result = { 0, instructionID, length, 0 };
++	X86ScanResult result = { 0, instructionID, length };
+ 	*insn_size = length;
+ 	finish_x86_scan(handle, insn, &result, code, batch, true);
+ 	return true;
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index ccaec06a..c61e8d0e 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -65,7 +65,6 @@ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
+ 		if (id && code_len >= length) {
+ 			instr->Opcode = 0;
+ 			instr->OpcodePub = id;
+-			instr->popcode_adjust = 0;
+ 			*size = (uint16_t)length;
+ 			return X86_FEATURE_DECODED;
+ 		}
+diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
+index 2c0da2cd..e4fb38f1 100644
+--- a/arch/X86/X86GenVexScan.inc
++++ b/arch/X86/X86GenVexScan.inc
+@@ -826,9 +826,9 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
+ 	0x00000000u, 0x00000000u, 0x00000000u, 0x00031f03u, 0x00000000u, 0x00031f03u, 0x00032003u, 0x00000000u,
+ 	0x00000000u, 0x00032003u, 0x00032003u, 0x00032003u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+ 	0x00032003u, 0x00032003u, 0x00032003u, 0x00032003u, 0x00000000u, 0x00032003u, 0x00032003u, 0x00000000u,
+-	0x00031d03u, 0x00032003u, 0x00032103u, 0x00000000u, 0x00000000u, 0x00032103u, 0x00032103u, 0x00032103u,
++	0x00032003u, 0x00032003u, 0x00032103u, 0x00000000u, 0x00000000u, 0x00032103u, 0x00032103u, 0x00032103u,
+ 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00032103u, 0x00032103u, 0x00032103u, 0x00032103u,
+-	0x00000000u, 0x00032103u, 0x00032103u, 0x00000000u, 0x00031d03u, 0x00032103u, 0x00000000u, 0x00032203u,
++	0x00000000u, 0x00032103u, 0x00032103u, 0x00000000u, 0x00032103u, 0x00032103u, 0x00000000u, 0x00032203u,
+ 	0x00000000u, 0x00032203u, 0x00000000u, 0x00032205u, 0x00032203u, 0x00032206u, 0x00032203u, 0x00000000u,
+ 	0x00032303u, 0x00000000u, 0x00032303u, 0x00000000u, 0x00032305u, 0x00032303u, 0x00032306u, 0x00032303u,
+ 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..bd7078ff 100644
+index 2ee82ef7..f061af53 100644
 --- a/arch/X86/X86InstPrinterCommon.c
 +++ b/arch/X86/X86InstPrinterCommon.c
-@@ -214,6 +214,17 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
- 		if (MI->flat_insn->detail)
+@@ -203,8 +203,8 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+ 		break;
+ 	}
+ 
+-	// Legacy SSE aliases retain their family ID. Predicate-index arithmetic
+-	// collides with unrelated public IDs, including string comparisons.
++	// The operation ID comes from the decoder. Legacy SSE records expose
++	// the predicate in sse_cc, and VEX/EVEX records expose it in avx_cc.
+ 	switch (MI->flat_insn->id) {
+ 	case X86_INS_CMPPS:
+ 	case X86_INS_CMPPD:
+@@ -215,7 +215,6 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
  			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
  		break;
-+	/* Integer compare mnemonics encode the predicate in the spelling.
-+	 * Their public IDs identify the element width and signedness. */
-+	case X86_INS_VPCMPB:
-+	case X86_INS_VPCMPUB:
-+	case X86_INS_VPCMPW:
-+	case X86_INS_VPCMPUW:
-+	case X86_INS_VPCMPD:
-+	case X86_INS_VPCMPUD:
-+	case X86_INS_VPCMPQ:
-+	case X86_INS_VPCMPUQ:
-+		break;
  	default:
- 		MI->popcode_adjust = Imm + 1;
+-		MI->popcode_adjust = Imm + 1;
  		break;
+ 	}
+ }
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
 index 8c5f511c..8c5c9e2a 100644
 --- a/arch/X86/X86Mapping.c
@@ -90,9 +205,573 @@ index 8c5f511c..8c5c9e2a 100644
  		return;
  
 diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
-index 7e5e7f51..ac9bd6f3 100644
+index 7e5e7f51..55068b6a 100644
 --- a/arch/X86/X86MappingInsn.inc
 +++ b/arch/X86/X86MappingInsn.inc
+@@ -22824,7 +22824,7 @@
+ },
+ 
+ {
+-	X86_VCMPPDYrmi, X86_INS_VCMP, 0,
++	X86_VCMPPDYrmi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -22838,7 +22838,7 @@
+ },
+ 
+ {
+-	X86_VCMPPDYrri, X86_INS_VCMP, 0,
++	X86_VCMPPDYrri, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -22852,7 +22852,7 @@
+ },
+ 
+ {
+-	X86_VCMPPDZ128rmbi, X86_INS_VCMP, 0,
++	X86_VCMPPDZ128rmbi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -22873,14 +22873,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZ128rmbik, X86_INS_VCMP, 0,
++	X86_VCMPPDZ128rmbik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZ128rmi, X86_INS_VCMP, 0,
++	X86_VCMPPDZ128rmi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -22901,14 +22901,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZ128rmik, X86_INS_VCMP, 0,
++	X86_VCMPPDZ128rmik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZ128rri, X86_INS_VCMP, 0,
++	X86_VCMPPDZ128rri, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -22929,14 +22929,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZ128rrik, X86_INS_VCMP, 0,
++	X86_VCMPPDZ128rrik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZ256rmbi, X86_INS_VCMP, 0,
++	X86_VCMPPDZ256rmbi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -22957,14 +22957,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZ256rmbik, X86_INS_VCMP, 0,
++	X86_VCMPPDZ256rmbik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZ256rmi, X86_INS_VCMP, 0,
++	X86_VCMPPDZ256rmi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -22985,14 +22985,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZ256rmik, X86_INS_VCMP, 0,
++	X86_VCMPPDZ256rmik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZ256rri, X86_INS_VCMP, 0,
++	X86_VCMPPDZ256rri, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23013,14 +23013,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZ256rrik, X86_INS_VCMP, 0,
++	X86_VCMPPDZ256rrik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZrmbi, X86_INS_VCMP, 0,
++	X86_VCMPPDZrmbi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23041,14 +23041,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZrmbik, X86_INS_VCMP, 0,
++	X86_VCMPPDZrmbik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZrmi, X86_INS_VCMP, 0,
++	X86_VCMPPDZrmi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -23069,14 +23069,14 @@
+ },
+ 
+ {
+-	X86_VCMPPDZrmik, X86_INS_VCMP, 0,
++	X86_VCMPPDZrmik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZrri, X86_INS_VCMP, 0,
++	X86_VCMPPDZrri, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -23097,7 +23097,7 @@
+ },
+ 
+ {
+-	X86_VCMPPDZrrib, X86_INS_VCMP, 0,
++	X86_VCMPPDZrrib, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -23118,21 +23118,21 @@
+ },
+ 
+ {
+-	X86_VCMPPDZrribk, X86_INS_VCMP, 0,
++	X86_VCMPPDZrribk, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDZrrik, X86_INS_VCMP, 0,
++	X86_VCMPPDZrrik, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPDrmi, X86_INS_VCMP, 0,
++	X86_VCMPPDrmi, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23146,7 +23146,7 @@
+ },
+ 
+ {
+-	X86_VCMPPDrri, X86_INS_VCMP, 0,
++	X86_VCMPPDrri, X86_INS_VCMPPD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23160,7 +23160,7 @@
+ },
+ 
+ {
+-	X86_VCMPPSYrmi, X86_INS_VCMP, 0,
++	X86_VCMPPSYrmi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23174,7 +23174,7 @@
+ },
+ 
+ {
+-	X86_VCMPPSYrri, X86_INS_VCMP, 0,
++	X86_VCMPPSYrri, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23188,7 +23188,7 @@
+ },
+ 
+ {
+-	X86_VCMPPSZ128rmbi, X86_INS_VCMP, 0,
++	X86_VCMPPSZ128rmbi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23209,14 +23209,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZ128rmbik, X86_INS_VCMP, 0,
++	X86_VCMPPSZ128rmbik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZ128rmi, X86_INS_VCMP, 0,
++	X86_VCMPPSZ128rmi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23237,14 +23237,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZ128rmik, X86_INS_VCMP, 0,
++	X86_VCMPPSZ128rmik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZ128rri, X86_INS_VCMP, 0,
++	X86_VCMPPSZ128rri, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23265,14 +23265,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZ128rrik, X86_INS_VCMP, 0,
++	X86_VCMPPSZ128rrik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZ256rmbi, X86_INS_VCMP, 0,
++	X86_VCMPPSZ256rmbi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23293,14 +23293,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZ256rmbik, X86_INS_VCMP, 0,
++	X86_VCMPPSZ256rmbik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZ256rmi, X86_INS_VCMP, 0,
++	X86_VCMPPSZ256rmi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23321,14 +23321,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZ256rmik, X86_INS_VCMP, 0,
++	X86_VCMPPSZ256rmik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZ256rri, X86_INS_VCMP, 0,
++	X86_VCMPPSZ256rri, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23349,14 +23349,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZ256rrik, X86_INS_VCMP, 0,
++	X86_VCMPPSZ256rrik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZrmbi, X86_INS_VCMP, 0,
++	X86_VCMPPSZrmbi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23377,14 +23377,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZrmbik, X86_INS_VCMP, 0,
++	X86_VCMPPSZrmbik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZrmi, X86_INS_VCMP, 0,
++	X86_VCMPPSZrmi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -23405,14 +23405,14 @@
+ },
+ 
+ {
+-	X86_VCMPPSZrmik, X86_INS_VCMP, 0,
++	X86_VCMPPSZrmik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZrri, X86_INS_VCMP, 0,
++	X86_VCMPPSZrri, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -23433,7 +23433,7 @@
+ },
+ 
+ {
+-	X86_VCMPPSZrrib, X86_INS_VCMP, 0,
++	X86_VCMPPSZrrib, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
+ #endif
+@@ -23454,21 +23454,21 @@
+ },
+ 
+ {
+-	X86_VCMPPSZrribk, X86_INS_VCMP, 0,
++	X86_VCMPPSZrribk, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSZrrik, X86_INS_VCMP, 0,
++	X86_VCMPPSZrrik, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPPSrmi, X86_INS_VCMP, 0,
++	X86_VCMPPSrmi, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23482,7 +23482,7 @@
+ },
+ 
+ {
+-	X86_VCMPPSrri, X86_INS_VCMP, 0,
++	X86_VCMPPSrri, X86_INS_VCMPPS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23503,14 +23503,14 @@
+ },
+ 
+ {
+-	X86_VCMPSDZrm_Int, X86_INS_VCMP, 0,
++	X86_VCMPSDZrm_Int, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSDZrm_Intk, X86_INS_VCMP, 0,
++	X86_VCMPSDZrm_Intk, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23538,28 +23538,28 @@
+ },
+ 
+ {
+-	X86_VCMPSDZrr_Int, X86_INS_VCMP, 0,
++	X86_VCMPSDZrr_Int, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSDZrr_Intk, X86_INS_VCMP, 0,
++	X86_VCMPSDZrr_Intk, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSDZrrb_Int, X86_INS_VCMP, 0,
++	X86_VCMPSDZrrb_Int, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSDZrrb_Intk, X86_INS_VCMP, 0,
++	X86_VCMPSDZrrb_Intk, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23594,7 +23594,7 @@
+ },
+ 
+ {
+-	X86_VCMPSDrm, X86_INS_VCMP, 0,
++	X86_VCMPSDrm, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23615,14 +23615,14 @@
+ },
+ 
+ {
+-	X86_VCMPSDrr, X86_INS_VCMP, 0,
++	X86_VCMPSDrr, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSDrr_Int, X86_INS_VCMP, 0,
++	X86_VCMPSDrr_Int, X86_INS_VCMPSD, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23643,14 +23643,14 @@
+ },
+ 
+ {
+-	X86_VCMPSSZrm_Int, X86_INS_VCMP, 0,
++	X86_VCMPSSZrm_Int, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSSZrm_Intk, X86_INS_VCMP, 0,
++	X86_VCMPSSZrm_Intk, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23678,28 +23678,28 @@
+ },
+ 
+ {
+-	X86_VCMPSSZrr_Int, X86_INS_VCMP, 0,
++	X86_VCMPSSZrr_Int, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSSZrr_Intk, X86_INS_VCMP, 0,
++	X86_VCMPSSZrr_Intk, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSSZrrb_Int, X86_INS_VCMP, 0,
++	X86_VCMPSSZrrb_Int, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSSZrrb_Intk, X86_INS_VCMP, 0,
++	X86_VCMPSSZrrb_Intk, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
+@@ -23734,7 +23734,7 @@
+ },
+ 
+ {
+-	X86_VCMPSSrm, X86_INS_VCMP, 0,
++	X86_VCMPSSrm, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+@@ -23755,14 +23755,14 @@
+ },
+ 
+ {
+-	X86_VCMPSSrr, X86_INS_VCMP, 0,
++	X86_VCMPSSrr, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+-	X86_VCMPSSrr_Int, X86_INS_VCMP, 0,
++	X86_VCMPSSrr_Int, X86_INS_VCMPSS, 0,
+ #ifndef CAPSTONE_DIET
+ 	{ 0 }, { 0 }, { 0 }, 0, 0
+ #endif
 @@ -62479,7 +62479,7 @@
  },
  
@@ -1174,9 +1853,513 @@ index 7e5e7f51..ac9bd6f3 100644
  	{ 0 }, { 0 }, { X86_GRP_BWI, 0 }, 0, 0
  #endif
 diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
-index a082891f..d843795f 100644
+index a082891f..97b87834 100644
 --- a/arch/X86/X86MappingInsnOp.inc
 +++ b/arch/X86/X86MappingInsnOp.inc
+@@ -16303,7 +16303,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPPDYrmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDYrmi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16313,7 +16313,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPPDYrri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDYrri, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16323,7 +16323,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ128rmbi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ128rmbi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16338,12 +16338,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ128rmbik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ128rmbik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ128rmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ128rmi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16358,12 +16358,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ128rmik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ128rmik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ128rri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ128rri, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16378,12 +16378,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ128rrik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ128rrik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ256rmbi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ256rmbi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16398,12 +16398,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ256rmbik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ256rmbik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ256rmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ256rmi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16418,12 +16418,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ256rmik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ256rmik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ256rri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ256rri, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16438,12 +16438,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZ256rrik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZ256rrik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrmbi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrmbi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16458,12 +16458,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrmbik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrmbik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrmi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+@@ -16478,12 +16478,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrmik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrmik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrri, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16498,7 +16498,7 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrrib, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrrib, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16513,17 +16513,17 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrribk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrribk, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDZrrik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDZrrik, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPDrmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDrmi, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16533,7 +16533,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPPDrri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPDrri, X86_INS_VCMPPD: vcmppd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16543,7 +16543,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPPSYrmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSYrmi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16553,7 +16553,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPPSYrri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSYrri, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16563,7 +16563,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ128rmbi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ128rmbi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16578,12 +16578,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ128rmbik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ128rmbik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ128rmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ128rmi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16598,12 +16598,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ128rmik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ128rmik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ128rri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ128rri, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16618,12 +16618,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ128rrik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ128rrik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ256rmbi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ256rmbi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16638,12 +16638,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ256rmbik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ256rmbik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ256rmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ256rmi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16658,12 +16658,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ256rmik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ256rmik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ256rri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ256rri, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16678,12 +16678,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZ256rrik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZ256rrik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrmbi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrmbi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16698,12 +16698,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrmbik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrmbik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrmi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+@@ -16718,12 +16718,12 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrmik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrmik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrri, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16738,7 +16738,7 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrrib, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrrib, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16753,17 +16753,17 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrribk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrribk, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSZrrik, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSZrrik, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPPSrmi, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSrmi, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16773,7 +16773,7 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPPSrri, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPPSrri, X86_INS_VCMPPS: vcmpps */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16788,12 +16788,12 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPSDZrm_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDZrm_Int, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSDZrm_Intk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDZrm_Intk, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16813,22 +16813,22 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPSDZrr_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDZrr_Int, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSDZrr_Intk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDZrr_Intk, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSDZrrb_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDZrrb_Int, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSDZrrb_Intk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDZrrb_Intk, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16853,7 +16853,7 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSDrm, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDrm, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16868,12 +16868,12 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPSDrr, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDrr, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPSDrr_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSDrr_Int, X86_INS_VCMPSD: vcmpsd */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16888,12 +16888,12 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPSSZrm_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSZrm_Int, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSSZrm_Intk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSZrm_Intk, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16913,22 +16913,22 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPSSZrr_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSZrr_Int, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPSSZrr_Intk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSZrr_Intk, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSSZrrb_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSZrrb_Int, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSSZrrb_Intk, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSZrrb_Intk, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ 0 }
+ },
+@@ -16953,7 +16953,7 @@
+ 	{ 0 }
+ },
+ 
+-{	/* X86_VCMPSSrm, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSrm, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+@@ -16968,12 +16968,12 @@
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_IGNORE, 0 }
+ },
+ 
+-{	/* X86_VCMPSSrr, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSrr, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+-{	/* X86_VCMPSSrr_Int, X86_INS_VCMP: vcmp */
++{	/* X86_VCMPSSrr_Int, X86_INS_VCMPSS: vcmpss */
+ 	0,
+ 	{ 0 }
+ },
 @@ -44628,7 +44628,7 @@
  	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
  },
@@ -2257,22 +3440,193 @@ index a082891f..d843795f 100644
  	0,
  	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
  },
+diff --git a/cs.c b/cs.c
+index 7b069255..ebf8578e 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1039,20 +1039,20 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+ static __attribute__((noinline)) CS_PRESERVE_MOST bool
+ decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size);
+ 
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size)
+ {
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+-	return decode_full_insn_body(handle, code, size, insn, insn_size, batch);
++	return decode_full_insn_body(handle, code, size, insn, insn_size);
+ }
+ 
+ static __attribute__((noinline)) CS_PRESERVE_MOST bool
+ decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size)
+ {
+ #else
+ #if defined(_MSC_VER)
+@@ -1062,7 +1062,7 @@ __attribute__((noinline))
+ #endif
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size)
+ {
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+@@ -1143,8 +1143,6 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				  code, false);
+ 		}
+ 	}
+-	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
+-		insn->id += mci.popcode_adjust;
+ 	return true;
+ }
+ 
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..3323026b 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -20,7 +20,7 @@
+  * selection and callbacks keep their original order. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size);
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+ 			size_t *size, uint64_t *address, cs_insn *insn);
+@@ -134,8 +134,6 @@ CS_DECODE_INLINE void finish_x86_scan(cs_struct *handle, cs_insn *insn,
+ 		map_insn_id(handle, insn, result->opcode);
+ 	if (store_bytes)
+ 		fill_insn_without_text(insn, 0, code, !batch);
+-	if (!batch || insn->id != X86_INS_VCMP)
+-		insn->id += result->popcode_adjust;
+ }
+ #endif
+ 
+@@ -163,7 +161,7 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
+-	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	return cs_decode_full_insn(handle, code, size, insn, insn_size);
+ }
+ #undef CS_DECODE_SCAN
+ 
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index 1aebfa2d..ff05bdde 100644
+index 1aebfa2d..b62d9c02 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
 @@ -780,6 +780,11 @@ custom formatter can observe partial detail or change options, so it retains
  the earlier assignments as well; kernel and custom-runtime builds retain that
  path too. AT&T keeps its separate ordering and mask handling.
  
-+For EVEX integer comparisons, the opcode mapping supplies the public instruction
-+ID for the element width and signedness. The predicate changes the printed
-+mnemonic or appears as an immediate. Both scan and formatted records carry the
-+same instruction ID.
++For VEX/EVEX floating-point and integer comparisons, the opcode mapping
++supplies the instruction ID for the operand family. The predicate can change
++the printed mnemonic or appear as an immediate. Scan, formatted and batch
++records carry the same instruction ID.
 +
  The x86 postprinter finds the first memory operand and presence of mask
  registers in one pass. Broadcast and mask-only repairs reuse these facts, while
  narrowing, x87 and RCL repairs retain their original order and conditions.
+diff --git a/include/capstone/capstone.h b/include/capstone/capstone.h
+index 80f8ce9e..a95df08f 100644
+--- a/include/capstone/capstone.h
++++ b/include/capstone/capstone.h
+@@ -395,9 +395,8 @@ typedef enum cs_opt_type {
+ 	CS_OPT_LITBASE, ///< Xtensa, set the LITBASE value. LITBASE is set to 0 by default.
+ 	CS_OPT_TEXT, ///< Print instructions into mnemonic and op_str (default on).
+ 	///< With CS_OPT_OFF the printer does not run: mnemonic and op_str are
+-	///< empty, operand detail is not filled, and an ID the printer adjusts
+-	///< (an x86 compare with a predicate, say) is left unadjusted.  For a
+-	///< caller that reads only an instruction's size, bytes and ID.
++	///< empty and operand detail is not filled. Instruction size, bytes
++	///< and the decoded instruction ID remain available.
+ } cs_opt_type;
+ 
+ /// Runtime option value (associated with option type above)
+diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
+index 1a30e853..ff35c5b8 100644
+--- a/tests/unit/x86_evex_vpcmp_id.c
++++ b/tests/unit/x86_evex_vpcmp_id.c
+@@ -49,6 +49,56 @@ static bool test_vpcmp(csh handle, bool expect_detail)
+ 	return success;
+ }
+ 
++/* The printed predicate may vary while the operation remains scalar or
++ * packed, single or double precision. Both public decoding APIs expose it. */
++static bool test_float_compare_ids(csh handle, bool restore_detail)
++{
++	static const unsigned ids[] = { X86_INS_VCMPPS, X86_INS_VCMPPD,
++					X86_INS_VCMPSS, X86_INS_VCMPSD };
++	static const uint8_t predicates[] = { 0, 1, 6, 7, 15, 31, 32, 255 };
++	bool success = true;
++	for (unsigned int flags = 0; flags < 4; ++flags) {
++		if (cs_option(handle, CS_OPT_TEXT,
++			      flags & 1 ? CS_OPT_ON : CS_OPT_OFF) ||
++		    cs_option(handle, CS_OPT_DETAIL,
++			      flags & 2 ? CS_OPT_ON : CS_OPT_OFF))
++			return false;
++		cs_insn *slot = cs_malloc(handle);
++		if (!slot)
++			return false;
++		for (unsigned int form = 0; form < 4; ++form) {
++			uint8_t code[] = { 0xc5, (uint8_t)(0xe8 | form), 0xc2,
++					   0xc1, 0 };
++			for (size_t p = 0; p < sizeof(predicates); ++p) {
++				cs_insn *list = NULL;
++				const uint8_t *cursor = code;
++				size_t left = sizeof(code);
++				uint64_t address = 0;
++				code[4] = predicates[p];
++				size_t n = cs_disasm(handle, code, sizeof(code),
++						     0, 1, &list);
++				success &= check(
++					n == 1 && list->id == ids[form],
++					"allocated floating compare family");
++				cs_free(list, n);
++				success &= check(
++					cs_disasm_iter(handle, &cursor, &left,
++						       &address, slot) &&
++						slot->id == ids[form] &&
++						left == 0 &&
++						address == sizeof(code),
++					"iterator floating compare family");
++			}
++		}
++		cs_free(slot, 1);
++	}
++	return cs_option(handle, CS_OPT_TEXT, CS_OPT_ON) == CS_ERR_OK &&
++	       cs_option(handle, CS_OPT_DETAIL,
++			 restore_detail ? CS_OPT_ON | CS_OPT_DETAIL_REAL :
++					  CS_OPT_OFF) == CS_ERR_OK &&
++	       success;
++}
++
+ int main(void)
+ {
+ 	csh handle = 0;
+@@ -57,6 +107,7 @@ int main(void)
+ 	if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) == CS_ERR_OK,
+ 		   "open 64-bit mode"))
+ 		return 1;
++	success &= test_float_compare_ids(handle, false);
+ 	success &= test_vpcmp(handle, false);
+ 	if (!check(cs_option(handle, CS_OPT_DETAIL,
+ 			    CS_OPT_ON | CS_OPT_DETAIL_REAL) == CS_ERR_OK,
+@@ -69,6 +120,7 @@ int main(void)
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
++	success &= test_float_compare_ids(handle, true);
+ 	success &= test_vpcmp(handle, true);
+ #endif
+ 	cs_close(&handle);
 diff --git a/tests/unit/x86_evex_vpcmp_mask_size.c b/tests/unit/x86_evex_vpcmp_mask_size.c
 index 8942d52c..fb5c3fd9 100644
 --- a/tests/unit/x86_evex_vpcmp_mask_size.c
