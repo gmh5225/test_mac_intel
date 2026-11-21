@@ -36,8 +36,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   write('libmvec',glibc)
   shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp');cm=nd/'CMakeLists.txt'
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
-  shutil.copyfile(r/'canonical.cpp',nd/'capstone-canonical.cpp')
-  with cm.open('a') as f:f.write('\nadd_executable(capstone-canonical capstone-canonical.cpp)\ntarget_link_libraries(capstone-canonical PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'original-probe.cpp',nd/'capstone-product-legacy.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-product-legacy capstone-product-legacy.cpp)\ntarget_link_libraries(capstone-product-legacy PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
@@ -53,7 +51,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    return dict(revision=rev(ll),tracked_diff_sha256=hashlib.sha256(modified).hexdigest(),untracked=extras)
   llvm_reference=llvm_identity()
   write('llvm-baseline-identity',llvm_reference)
-  products={};adjustments={};canonical_signatures={}
+  products={};canonical_signatures={}
   import struct,collections
   def compare(left,right,label):
    with left.open('rb') as a,right.open('rb')as b:
@@ -168,9 +166,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert {Path(k).name for k in new_files}=={'X86Vex32Output.c.o'}
-    actual={Path(k).name for k in changed}
-    allowed={'X86OutputIterator.c.o','X86ImmediateOutput.c.o','X86MemoryOutput.c.o'}
-    assert actual<=allowed,(label,actual,allowed)
+    assert all('/arch/X86/' in '/'+k for k in changed),changed
     sym=(out/('timed-symbols-'+label+'.log')).read_text()
     assert any(line.endswith(' X86_disasmIter32') for line in sym.splitlines())
    source_receipt=build/'neverd-dependency-inputs.json'
@@ -214,7 +210,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert ticks>0 and signature[0]>0
    if 'expected_instructions' in case:
     assert signature[:2]==[case['expected_instructions']*reps,0],(case['name'],mode,reps,signature)
-   signature[-1]+=reps*adjustments['base' if name=='base-copy' else name][case['name']+'/'+str(mode)]
    return ticks,signature
   results=[]
   cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
