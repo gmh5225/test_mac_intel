@@ -1,7 +1,7 @@
-name: Verify the exact static i386 source tree on Windows x86 and x64
+name: Attribute PE32 code changes and compare the real public decoder on native Windows
 on:
   push:
-    branches: [codex/capstone-i386-msvc-canonical-tree]
+    branches: [codex/capstone-public-pe32-code-comparison]
     paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,7 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { arch: x64, compiler: amd64 }
           - { arch: x86, compiler: amd64_x86 }
     runs-on: windows-2022
     timeout-minutes: 70
@@ -39,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-i386-msvc-${{ matrix.arch }}
+          name: native-pe32-code-${{ matrix.arch }}
           path: evidence/
           retention-days: 14
