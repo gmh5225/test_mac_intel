@@ -659,10 +659,10 @@ index bd0f6c94..ba0526c4 100644
  #endif
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
 new file mode 100644
-index 00000000..7fb50ee9
+index 00000000..db8e4393
 --- /dev/null
 +++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -0,0 +1,161 @@
+@@ -0,0 +1,169 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -670,9 +670,9 @@ index 00000000..7fb50ee9
 +#define CS_X86_MEMORY_OUTPUT_IMPL_H
 +
 +/* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
-+#ifdef X86_MEMORY_IMMEDIATE32
++#ifdef X86_MEMORY_IMMEDIATE
 +#include "X86UnsignedImmediate.h"
-+static bool writeMemoryImmediate32(
++static bool X86_MEMORY_IMMEDIATE(
 +#else
 +bool X86_writeMemoryOutput(
 +#endif
@@ -680,8 +680,8 @@ index 00000000..7fb50ee9
 +	const struct X86SimpleOutput *row,
 +	const struct X86SimpleRegister regs[4][16])
 +{
-+#ifdef X86_MEMORY_IMMEDIATE32
-+	const bool wide = false;
++#ifdef X86_MEMORY_IMMEDIATE
++	const bool wide = X86_IMMEDIATE_WIDE;
 +#else
 +	const bool wide = row->address_size == 8;
 +#endif
@@ -692,7 +692,7 @@ index 00000000..7fb50ee9
 +	const bool sib = rm == 4, rip = !mod && rm == 5;
 +	const unsigned offset = lead + 2 + sib;
 +	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
-+#ifdef X86_MEMORY_IMMEDIATE32
++#ifdef X86_MEMORY_IMMEDIATE
 +	const unsigned imm_size = (opcode & 1) ? 4 : 1;
 +	const unsigned imm_offset = offset + disp_size;
 +	const unsigned length = imm_offset + imm_size;
@@ -719,7 +719,7 @@ index 00000000..7fb50ee9
 +		}
 +	}
 +
-+#ifdef X86_MEMORY_IMMEDIATE32
++#ifdef X86_MEMORY_IMMEDIATE
 +	const bool lea = false, load = false;
 +#else
 +	const bool push = opcode == 0xff, lea = opcode == 0x8d;
@@ -779,10 +779,18 @@ index 00000000..7fb50ee9
 +	}
 +	out = X86_writeDisplacement(out, displacement);
 +	*out++ = ']';
-+#ifdef X86_MEMORY_IMMEDIATE32
-+	const uint32_t value =
++#ifdef X86_MEMORY_IMMEDIATE
++	const uint32_t encoded =
 +		imm_size == 1 ? code[imm_offset] :
 +				(uint32_t)X86_readDisp32(code + imm_offset);
++	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
++#if X86_IMMEDIATE_WIDE
++	const uint64_t value = row->ops[0].size == 8 ?
++				       (uint64_t)(int64_t)(int32_t)encoded :
++				       encoded;
++#else
++	const uint32_t value = encoded;
++#endif
 +	memcpy(out, ", ", 2);
 +	writeUnsignedImmediate(out + 2, value);
 +#else
@@ -795,7 +803,7 @@ index 00000000..7fb50ee9
 +		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
 +				      load ? reg->reg : 0, load ? 0 : reg->reg);
 +		cs_x86 *x = &insn->detail->x86;
-+#ifdef X86_MEMORY_IMMEDIATE32
++#ifdef X86_MEMORY_IMMEDIATE
 +		x->operands[1].type = X86_OP_IMM;
 +		x->operands[1].imm = (int64_t)value;
 +		x->operands[1].access = 0;
@@ -1295,10 +1303,10 @@ index 00000000..30cec08f
 +#endif
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
 new file mode 100644
-index 00000000..fa7f31a1
+index 00000000..c18016c4
 --- /dev/null
 +++ b/arch/X86/X86Sse64Output.c
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,170 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1318,6 +1326,11 @@ index 00000000..fa7f31a1
 +#include "X86SimpleOutput.h"
 +#include "X86GenSimpleOutput.inc"
 +#include "X86VectorRegisterWriter.h"
++#define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
++#define X86_IMMEDIATE_WIDE 1
++#include "X86MemoryOutputImpl.h"
++#undef X86_IMMEDIATE_WIDE
++#undef X86_MEMORY_IMMEDIATE
 +
 +struct X86SseRegisterOutput {
 +	struct X86SimpleOutput output;
@@ -1376,14 +1389,30 @@ index 00000000..fa7f31a1
 +
 +/* The scalar plans have already declined this instruction. A single opcode
 + * lookup supplies the mnemonic, operand order and all implicit effects. */
-+static bool writeSse64RegisterOutput(cs_struct *handle, const uint8_t *code,
-+				     size_t size, cs_insn *insn,
-+				     uint16_t *insn_size)
++static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
++			       size_t size, cs_insn *insn, uint16_t *insn_size)
 +{
 +	const bool has_rex = (code[0] & 0xf0) == 0x40;
 +	const unsigned length = 3 + has_rex;
-+	if (size < length || code[has_rex] != 0x0f ||
-+	    (code[length - 1] < 0xc0 && (code[length - 1] & 0xc7) != 5))
++	if (size < length)
++		return false;
++	const uint8_t primary = code[has_rex];
++	if (primary != 0x0f) {
++		const uint8_t mr = code[has_rex + 1];
++		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
++		    X86_OUTPUT_UNSUPPORTED(handle, false))
++			return false;
++		const unsigned prefix_class =
++			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
++		/* The MOV store row carries its operand width and access. */
++		const unsigned row = x86_simple_plans[1][prefix_class]
++						     [0x88 | (primary & 1)] >>
++				     2;
++		return writeMemoryImmediate64(code, size, insn, insn_size,
++					      &x86_simple_outputs[row],
++					      x86_simple_registers);
++	}
++	if (code[length - 1] < 0xc0 && (code[length - 1] & 0xc7) != 5)
 +		return false;
 +	const uint8_t opcode = code[length - 2];
 +	const unsigned index = opcode - X86_SSE_REGISTER_FIRST;
@@ -1426,7 +1455,7 @@ index 00000000..fa7f31a1
 +
 +#define X86_FIXED_OUTPUT tryOutput64
 +#define X86_FIXED_WIDE true
-+#define X86_OUTPUT_MISS writeSse64RegisterOutput
++#define X86_OUTPUT_MISS writeExtraOutput64
 +#include "X86SimpleOutputImpl.h"
 +#undef X86_OUTPUT_MISS
 +#undef X86_FIXED_WIDE
@@ -1436,8 +1465,8 @@ index 00000000..fa7f31a1
 +#endif
 +
 +CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
-+					size_t *size, uint64_t *address,
-+					cs_insn *insn)
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
 +{
 +#ifdef CS_DECODE_TRY_OUTPUT
 +	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
@@ -1480,10 +1509,10 @@ index 00000000..435b8fa4
 +#endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 new file mode 100644
-index 00000000..d6b6de6c
+index 00000000..8bb11904
 --- /dev/null
 +++ b/arch/X86/X86Vex32Output.c
-@@ -0,0 +1,178 @@
+@@ -0,0 +1,180 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1502,9 +1531,11 @@ index 00000000..d6b6de6c
 +#include "X86SimpleOutput.h"
 +#include "X86GenSimpleOutput.inc"
 +#include "X86VectorRegisterWriter.h"
-+#define X86_MEMORY_IMMEDIATE32
++#define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
++#define X86_IMMEDIATE_WIDE 0
 +#include "X86MemoryOutputImpl.h"
-+#undef X86_MEMORY_IMMEDIATE32
++#undef X86_IMMEDIATE_WIDE
++#undef X86_MEMORY_IMMEDIATE
 +
 +#include "X86GenVex32MemoryOutput.inc"
 +
@@ -2140,7 +2171,7 @@ index 92212e8d..ee084661 100644
      set_tests_properties(unit_x86_x87_environment unit_x86_bound_access unit_x86_printer_prechecked PROPERTIES SKIP_RETURN_CODE 77)
      set_tests_properties(unit_x86_x87_environment_hardware PROPERTIES
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 982bcc03..8994b759 100644
+index 982bcc03..1b5facf3 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -9,6 +9,9 @@
@@ -2367,17 +2398,18 @@ index 982bcc03..8994b759 100644
  		    !check_rex_stack(handles) ||
  		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
  		    !check_evex_memory_moves(handles) ||
-@@ -829,6 +1007,9 @@ static bool check_mode(cs_mode mode)
+@@ -829,6 +1007,10 @@ static bool check_mode(cs_mode mode)
  		    !check_alu_memory(handles, mode) ||
  		    !check_alu_immediates(handles, mode) ||
  		    !check_legacy_vectors(handles, mode) ||
 +		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
-+		     (!check_vex2_base_memory(handles) ||
-+		      !check_mov_memory_immediates(handles, mode))) ||
++		     !check_vex2_base_memory(handles)) ||
++		    (private_iter != X86_disasmIter &&
++		     !check_mov_memory_immediates(handles, mode)) ||
  		    !check_vex_register_forms(handles) ||
  		    (mode == CS_MODE_64 &&
  		     (!check_evex(handles) || !check_evex_extract(handles) ||
-@@ -866,5 +1047,12 @@ done:
+@@ -866,5 +1048,12 @@ done:
  
  int main(void)
  {

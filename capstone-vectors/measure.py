@@ -41,9 +41,9 @@ def main(w):
     key='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert inc.count(key)==1
     inc=inc.replace(key,key.replace('cs_disasm_iter','selected'))
     decl='extern "C" bool selected('
-    inc=inc.replace(decl,'extern "C" void choose_entry(const char *);'+chr(10)+decl)
+    inc=inc.replace(decl,'extern "C" void choose_entry(const char *, unsigned);'+chr(10)+decl)
     assert inc.count(old_engine)==1
-    inc=inc.replace(old_engine,old_engine+chr(10)+'  choose_entry(engine.c_str()); if(engine=="generic_" || engine=="narrow__" || engine=="wide____") engine="capstone";')
+    inc=inc.replace(old_engine,old_engine+chr(10)+'  choose_entry(engine.c_str(), unsigned(std::stoul(argv[6]))); if(engine=="generic_" || engine=="narrow__" || engine=="wide____") engine="capstone";')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
@@ -80,7 +80,7 @@ def main(w):
         adapter=w/'select.c';selected={'integer':'X86_disasmIter','route':'X86_disasmIter32','vector':'X86_disasmIterText'}[label]
         adapter.write_text(chr(10).join((
             '#include <capstone/capstone.h>',
-            'void choose_entry(const char *label){(void)label;}',
+            'void choose_entry(const char *label,unsigned bits){(void)label;(void)bits;}',
             'extern bool '+selected+'(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);',
             'bool selected(csh h,const uint8_t **c,size_t *n,uint64_t *ip,cs_insn *i){return '+selected+'(h,c,n,ip,i);}',
             '')))

@@ -6,11 +6,11 @@ extern bool X86_disasmIter32(csh, const uint8_t **, size_t *, uint64_t *, cs_ins
 extern bool X86_disasmIterText(csh, const uint8_t **, size_t *, uint64_t *, cs_insn *);
 static Iterator entry;
 
-void choose_entry(const char *label)
+void choose_entry(const char *label, unsigned bits)
 {
     switch (label[0]) {
-    case 'w': entry = X86_disasmIterText; break;
-    case 'n': entry = X86_disasmIter32; break;
+    case 'w': entry = bits == 32 ? X86_disasmIter32 : X86_disasmIterText; break;
+    case 'n': entry = bits == 32 ? X86_disasmIter32 : X86_disasmIter; break;
     default: entry = X86_disasmIter; break;
     }
 }
