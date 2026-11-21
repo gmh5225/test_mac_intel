@@ -52,6 +52,12 @@ def main(w):
     assert inc.count(key)==1
     inc=inc.replace('#include "arch/X86/X86ScanAdapter.h"', '#include "arch/X86/X86ScanAdapter.h"\n'+weak)
     inc=inc.replace(key,'else if(engine=="x86_iter" && bits==32 && X86_disasmIter32) row=cs_span<X86_disasmIter32>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        else if(engine=="x86_iter" && X86_disasmIterText) row=cs_span<X86_disasmIterText>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        '+key)
+    origin='else if(engine=="x86_iter" && bits==32 && X86_disasmIter32) row=cs_span<X86_disasmIter32>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        '
+    assert inc.count(origin)==1
+    inc=inc.replace(origin,'')
+    inc='#include <valgrind/callgrind.h>\n'+inc
+    inc=inc.replace('Result warm=run(1);','Result warm=run(1); CALLGRIND_ZERO_STATS;')
+    inc=inc.replace('Result timed=run(reps);','CALLGRIND_TOGGLE_COLLECT; Result timed=run(reps); CALLGRIND_TOGGLE_COLLECT;')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
@@ -61,44 +67,22 @@ def main(w):
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
     for label,tree in data['trees'].items():
-        if label=='narrow_forms':
-            assert sha(r/'narrow_forms.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'narrow_forms.patch'],'apply')
+        if label=='proposed':
+            assert sha(r/'proposed.patch')==data['patch_sha256']
+            run(['git','-C',base,'apply','--index',r/'proposed.patch'],'apply')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
-        run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
-        ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
-        for image,selected in [(ordinary,False),(target,True)]:
-            symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
-            assert (('X86_disasmIter32' in symbols),('X86_disasmIterText' in symbols))==(selected,selected)
-        members={name:hashlib.sha256(sp.check_output(['ar','p',libs[0],name])).hexdigest()for name in sp.check_output(['ar','t',libs[0]],text=True).splitlines()}
-        if label=='baseline':prior=members
-        else:
-            changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Vex32Output.c.o'},changed
-            assert sha(ordinary)==sha(w/'unselected-baseline')
-            save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
+        run(['clang++',obj,'-Wl,--undefined=cs_disasm_iter','-Wl,--undefined=X86_disasmIterText',*libs,'-o',target],'link-'+label)
+        symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',target],text=True).splitlines() if line.strip()}
+        assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText'}<=symbols
         exe[label]=target
     save('tested-trees.json',data)
-    exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
-    exe['private_base']=exe['baseline'];exe['private_narrow_forms']=exe['narrow_forms']
-    exe['iced']=exe['fast']=exe['baseline']
-    payloads={key:path.read_bytes()for key,path in exe.items()}
-    assert payloads['baseline']==payloads['aa']
-    maximum=max(map(len,payloads.values()))
-    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-    image=w/'same-image';image.write_bytes(padded['baseline']);image.chmod(0o755)
-    image_inode=image.stat().st_ino
-    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
-    assert set(launches)=={'images','same-file-fixed'}
+    from costs import parse
     import pe_panels,itertools
     shutil.copyfile(r/'libmvec.py',w/'libmvec.py');shutil.copyfile(r/'libmvec.json',w/'libmvec.json')
     run(['python3','-B',w/'libmvec.py'],'glibc')
@@ -109,7 +93,7 @@ def main(w):
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('baseline','narrow_forms')]
+        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('released','proposed')]
         assert audit[0]==audit[1]
         trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
         views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
@@ -122,49 +106,37 @@ def main(w):
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
-        for mode in (0,1,2):
-            def measure(lib,n,launch):
-                engine=lib+'____' if lib in ('iced','fast') else 'x86_iter' if lib.startswith('private_') else 'capstone'
-                tail=[engine,str(mode),str(n),str(f),str(intervals),str(bits)]
-                if launch=='images':
-                    command=[str(exe[lib]),*tail];executable=None
-                elif launch=='same-argv':
-                    command=[str(image),*tail];executable=str(exe[lib])
-                else:
-                    with image.open('r+b')as out:
-                        assert out.write(padded[lib])==maximum
-                    assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                    command=[str(image),*tail];executable=None
-                    if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                return list(map(int,sp.check_output(command,executable=executable).split()))
-            probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','narrow_forms','iced']+(['fast','private_base','private_narrow_forms'] if mode else [])
-            stable={}
-            for i in range(data['cycles']):
-                launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                for launch in launch_order:
-                    order=labels[i%len(labels):]+labels[:i%len(labels)]
-                    obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                    assert all(len(v)==6 for k,v in obs)
-                    assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                    for k,v in obs:
-                        root='baseline' if k=='aa' else k
-                        if root not in stable:stable[root]=v[2:]
-                        assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['narrow_forms']
-                    if mode:assert stable['private_base']==stable['private_narrow_forms']==stable['narrow_forms'],(name,mode,stable)
-                    cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-            for launch,observations in cycles.items():
-                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','narrow_forms')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','narrow_forms')} if mode else None
-                reported.append(row)
-            save('measurements.json',reported)
+        for mode in range(5):
+            engines=[('released','capstone'if mode==0 else 'x86_iter'),('proposed','capstone'if mode==0 else 'x86_iter')]
+            if mode<=2:engines+=[('released','iced____')]+([('released','fast____')]if mode else [])
+            reference=None
+            for variant,engine in engines:
+                ident=name+'-'+str(mode)+'-'+variant+'-'+engine;raw=w/'active.out';packed=w/'active.gz'
+                args=[str(exe[variant]),engine,str(mode),'1',str(f),str(intervals),str(bits)]
+                native=list(map(int,sp.check_output(args,text=True).split()));assert len(native)==6 and native[2]>0
+                if reference is None:reference=native
+                assert native[2:5]==reference[2:5]
+                if engine in ('x86_iter','capstone'):assert native[2:]==reference[2:]
+                result=sp.run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--dump-instr=yes','--collect-atstart=no','--callgrind-out-file='+str(raw),*args],capture_output=True,text=True)
+                if result.returncode:raise RuntimeError((ident,result.stderr))
+                measured=list(map(int,result.stdout.split()));assert measured[2:]==native[2:]
+                with raw.open('rb')as inp,gzip.open(packed,'wb',compresslevel=1)as out:shutil.copyfileobj(inp,out)
+                events,tot,cost,edges=parse(packed)
+                assert set(['Ir','Dr','Dw','Bc','Bi'])<=set(events) and len(tot)==len(events) and all(x>=0 for x in tot)
+                funcs=[]
+                for (obj,fn),rows in cost.items():
+                    aggregate=[sum(v[i] for v in rows.values()) for i in range(len(events))]
+                    funcs.append(dict(fn=fn,object=Path(obj).name,events=dict(zip(events,aggregate))))
+                funcs.sort(key=lambda x:x['events']['Ir'],reverse=True)
+                assert sum(v['events']['Ir']for v in funcs)==tot[events.index('Ir')]
+                call_counts={}
+                for (caller,callee),count in edges.items():call_counts[callee]=call_counts.get(callee,0)+count
+                relevant={k:v for k,v in call_counts.items()if k in ('cs_decode_full_insn','cs_regs_access','X86_Intel_printInst','X86_getInstruction','X86_disasmIter32','X86_disasmIterText','X86_writeSimpleDetail')or 'Formatter' in k or 'decode_out' in k}
+                reported.append(dict(case=name,mode=mode,tree=variant,engine=engine,signature=measured[2:],totals=dict(zip(events,tot)),top=funcs[:55],calls=relevant,sha256=sha(raw)))
+                raw.unlink();packed.unlink();save('counts.json',reported)
         print(name,panel,len(sel),flush=True)
-    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
-    assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
-    save('complete.json',dict(cases=len(reported),success=True,launches=launches))
+    assert len(reported)==60 and len(manifest)==4,(len(reported),len(manifest))
+    save('complete.json',dict(cases=len(reported),success=True,hardware_timing=False,scope='Timed loop only after a full warmup; per-symbol exclusive totals independently summed against Callgrind.'))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
