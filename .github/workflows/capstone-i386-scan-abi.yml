@@ -1,7 +1,7 @@
-name: Verify i386 scan record and callback semantics across native and reduced builds
+name: Verify the public i386 scan entry against the MSVC static target output
 on:
   push:
-    branches: [codex/capstone-scan-abi-and-adapter]
+    branches: [codex/capstone-scan-win-static-library]
     paths: [scan-abi/**, .github/workflows/capstone-i386-scan-abi.yml]
 permissions:
   contents: read
@@ -11,13 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {host: ubuntu-24.04, label: linux-gcc, cc: gcc, profile: full}
-          - {host: ubuntu-24.04-arm, label: linux-arm, cc: clang, profile: full}
-          - {host: ubuntu-24.04, label: diet, cc: clang, profile: diet}
-          - {host: ubuntu-24.04, label: reduce, cc: clang, profile: reduce}
-          - {host: ubuntu-22.04, label: adapter, cc: clang, profile: adapter}
-          - {host: macos-15, label: apple-arm, cc: clang, profile: full}
-          - {host: macos-15-intel, label: apple-intel, cc: clang, profile: full}
           - {host: windows-2022, label: win32, cc: cl, profile: full, msvc: amd64_x86}
           - {host: windows-2022, label: win64, cc: cl, profile: full, msvc: amd64}
     runs-on: ${{ matrix.host }}

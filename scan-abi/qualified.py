@@ -26,7 +26,7 @@ try:
  run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*tests],'build')
  run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(tests)+')$'],'units')
  run([sys.executable,'-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-generator')
- lib,=list(b.rglob('capstone_static.lib' if win else 'libcapstone.a'));exe=t/('check.exe'if win else 'check')
+ lib,=list(b.rglob('capstone.lib' if win else 'libcapstone.a'));exe=t/('check.exe'if win else 'check')
  if win:args=['cl','/nologo','/O2','/MT','/std:c11','/I'+str(s),'/I'+str(s/'include'),str(r/'selected.c'),str(lib),'/Fo'+str(t/'selected.obj'),'/Fe:'+str(exe)]
  else:args=[cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',lib,'-lm','-o',exe]
  run(args,'compile-selected');run([exe],'selected')
