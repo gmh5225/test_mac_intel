@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <string.h>
 
 /* Scalars are read and written through plain pointer casts at any address:
    build for a target with unaligned access, with -fno-strict-aliasing. */

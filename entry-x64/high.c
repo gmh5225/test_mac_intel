@@ -8,7 +8,7 @@ extern int64_t read_cpu_leaf();
  * code=[0x140001000, 0x14000101A), unwind=0x1400020F8
  * highir.structured_regions=0, fallback_regions=0
  */
-int64_t forward_4(int32_t arg0, int64_t arg1, int64_t arg2, int64_t arg3) {
-    read_cpu_leaf(arg0);
+int64_t forward_4(int64_t arg0, int64_t arg1, int64_t arg2, int64_t arg3) {
+    read_cpu_leaf();
     return consume_four(0, 0, 0, arg3);
 }

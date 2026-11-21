@@ -67,6 +67,27 @@ jobs:
           if ($LASTEXITCODE) { throw "native entry state differs $LASTEXITCODE" }
           Copy-Item inputs.json ../evidence/entry-capture-inputs.json
           Pop-Location
+      - name: Replay the exact qualified entry code against the signed inbox driver
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $driver = Get-Content evidence/driver.json | ConvertFrom-Json
+          $inputProof = Get-Content native-driver-entry/qualified.json | ConvertFrom-Json
+          if ($driver.sha256 -ne $inputProof.driver_sha256) { throw 'Unexpected signed driver image' }
+          Push-Location native-driver-entry
+          python extract.py $driver.path init-shim.bin
+          clang --target=aarch64-pc-windows-msvc -c shim.S -o original.obj
+          foreach ($route in @('high','llvm')) {
+            clang --target=aarch64-pc-windows-msvc -O2 -fno-function-sections -fno-stack-protector "-DQUALIFIED_SHIM=${route}_shim" -c contract.c -o "$route.obj"
+            python coff_entry.py "$route.obj" $route qualified.json
+          }
+          clang-cl --target=aarch64-pc-windows-msvc /nologo /O2 compare.c original.obj high.obj llvm.obj /Fe:native-entry.exe
+          .\native-entry.exe | Set-Content ../evidence/signed-driver-entry.json
+          $replay = Get-Content ../evidence/signed-driver-entry.json | ConvertFrom-Json
+          if ($replay.native_machine -ne 0xaa64 -or $replay.process_machine -ne 0 -or $replay.observations.Count -ne 15) { throw 'Native entry replay incomplete' }
+          Copy-Item qualified.json ../evidence/signed-driver-entry-inputs.json
+          Pop-Location
       - name: Inventory Windows driver and DLL exports
         if: always()
         shell: pwsh
