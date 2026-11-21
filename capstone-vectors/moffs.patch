@@ -1,0 +1,104 @@
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index dfbe52c0..a21e5511 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -121,11 +121,73 @@ static bool writeVex32Memory(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
+ 
++/* A0..A3 encode the 32-bit address directly, without ModRM or SIB. */
++static bool writeAccumulatorMemory32(const uint8_t *code, size_t size,
++				     cs_insn *insn, uint16_t *insn_size)
++{
++	if (size < 5)
++		return false;
++	const uint8_t opcode = code[0];
++	const bool store = (opcode & 2) != 0;
++	const bool dword = (opcode & 1) != 0;
++	const uint32_t address = (uint32_t)X86_readDisp32(code + 1);
++	const struct X86SimpleRegister *acc =
++		&x86_simple_registers[dword ? 2 : 0][0];
++	/* The corresponding MOV register pair owns the access flags and widths. */
++	const unsigned mov = (store ? 0x88 : 0x8a) | (opcode & 1);
++	const struct X86SimpleOutput *row =
++		&x86_simple_outputs[x86_simple_plans[0][0][mov] >> 2];
++	insn->id = row->id;
++	insn->size = *insn_size = 5;
++	memcpy(insn->bytes, code, 5);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	char *out = insn->op_str;
++	if (!store) {
++		memcpy(out, acc->name, acc->length);
++		out += acc->length;
++		memcpy(out, ", ", 2);
++		out += 2;
++	}
++	if (dword) {
++		memcpy(out, "dword ptr [", 11);
++		out += 11;
++	} else {
++		memcpy(out, "byte ptr [", 10);
++		out += 10;
++	}
++	out = writeUnsignedImmediate(out, address);
++	*out++ = ']';
++	if (store) {
++		memcpy(out, ", ", 2);
++		memcpy(out + 2, acc->name, acc->length);
++	}
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, opcode, 0, 0,
++				      store ? 0 : acc->reg,
++				      store ? acc->reg : 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->encoding.modrm_offset = 0;
++		x->encoding.disp_offset = 1;
++		x->encoding.disp_size = 4;
++		cs_x86_op *mem = &x->operands[!store];
++		mem->type = X86_OP_MEM;
++		mem->mem.scale = 1;
++		mem->mem.disp = x->disp = address;
++	}
++	return true;
++}
++
+ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 			       size_t size, cs_insn *insn, uint16_t *insn_size)
+ {
+ 	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
+-	if ((code[0] & 0xfc) != 0xc4 || X86_OUTPUT_UNSUPPORTED(handle, false))
++	if ((code[0] & 0xfc) != 0xc4)
++		return (code[0] & 0xfc) == 0xa0 &&
++		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++		       writeAccumulatorMemory32(code, size, insn, insn_size);
++	if (X86_OUTPUT_UNSUPPORTED(handle, false))
+ 		return false;
+ 	if (code[0] & 2) {
+ 		if (size < 2 || code[1] >= 0xc0 || (code[1] & 0x38))
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6ca1b43b..05ea8768 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -847,6 +847,20 @@ static bool check_absolute_addresses32(csh handles[2])
+ 	};
+ 	static const uint8_t opcodes[] = { 0x00, 0x03, 0x38, 0x3b, 0x84, 0x89,
+ 					   0x8b, 0x8d, 0xc6, 0xc7, 0xff };
++	for (unsigned op = 0xa0; op < 0xa4; ++op) {
++		for (size_t i = 0; i < sizeof(addresses) / sizeof(addresses[0]);
++		     ++i) {
++			const uint32_t a = addresses[i];
++			const uint8_t bytes[] = { (uint8_t)op, (uint8_t)a,
++						  (uint8_t)(a >> 8),
++						  (uint8_t)(a >> 16),
++						  (uint8_t)(a >> 24) };
++			for (size_t n = 1; n <= sizeof(bytes); ++n)
++				if (!compare(handles, bytes, n,
++					     op + (unsigned)i))
++					return false;
++		}
++	}
+ 	for (unsigned op = 0; op < sizeof(opcodes); ++op) {
+ 		for (unsigned group = 0; group < 8; ++group) {
+ 			for (unsigned i = 0;
