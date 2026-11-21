@@ -1,7 +1,7 @@
-name: Measure SSE2 packed memory and unchanged VEX and scalar output on real binaries
+name: Measure indirect branch operands alongside packed SIMD formatting in PE32, PE64 and ELF
 on:
   push:
-    branches: [codex/capstone-sse2-packed-memory]
+    branches: [codex/capstone-packed-and-indirect-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: sse2-packed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: packed-indirect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
