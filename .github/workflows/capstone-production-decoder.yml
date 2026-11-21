@@ -1,7 +1,7 @@
-name: Verify ARM64-host EVEX scan and feature filtering through NeverD
+name: Verify qualified i386 VEX scan and public formatting on actual NeverD dev
 on:
   push:
-    branches: [codex/capstone-evex-actual-arm64-product]
+    branches: [codex/capstone-clang-real-pe-output]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             cc: clang
     runs-on: ${{ matrix.os }}
     timeout-minutes: 235
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: bba1bc7024075922ec18545306ccebf8958fb68d
+          ref: fad4c85477e4451f71d9a52f5d6cd1fb8d27bd6b
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,10 +44,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          git update-index --cacheinfo 160000,a9d153f4cae6c71eb02309621bbce3c9508312dc,third_party/capstone
-          test "$(git write-tree)" = "f380e8bf7e880b72165503e850834514035d8162"
-          test "$(git hash-object -t commit -w "$GITHUB_WORKSPACE/capstone-product/dev-commit.txt")" = "2b23b42c72ac6cadf84deeb6d9a5317210b48490"
-          git checkout --detach 2b23b42c72ac6cadf84deeb6d9a5317210b48490
+          test "$(git rev-parse HEAD)" = "fad4c85477e4451f71d9a52f5d6cd1fb8d27bd6b"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "e2266247a3b0f090bcad5bd3a4ead8c3220de367"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -60,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm64-host-evex-product-${{ matrix.os }}-${{ matrix.cc }}
+          name: clang-vex32-product-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

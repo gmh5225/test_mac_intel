@@ -1,27 +1,34 @@
 {
-  "neverd": "2b23b42c72ac6cadf84deeb6d9a5317210b48490",
-  "capstone": "a9d153f4cae6c71eb02309621bbce3c9508312dc",
+  "neverd": "fad4c85477e4451f71d9a52f5d6cd1fb8d27bd6b",
+  "capstone": "e2266247a3b0f090bcad5bd3a4ead8c3220de367",
   "variants": {
     "route": {
-      "source": "round1529-aarch64-host-evex-scan",
+      "source": "round1521-fork-vex32-public-output",
       "patch": "route.patch",
-      "tree": "b3e36f22325921e68df902a746f943482a2cc1fa",
-      "patch_sha256": "0d63d70ab724b78f4f28ef8665bd3feb4682d02484ac2b97bc964aaabc7cc1e4",
-      "added": [],
+      "tree": "ef4139cea0c64c310e9f23fe1a27b2fc19e6c5dd",
+      "patch_sha256": "0ebf5e11836614adad6ec1e4610ba66842e5312b88cf0dde9cd1161b06a5a978",
+      "added": [
+        "X86Vex32Output.c.o"
+      ],
       "changed": [
-        "X86Mapping.c.o"
+        "X86DisassemblerDecoder.c.o",
+        "X86OutputIterator.c.o",
+        "X86VectorOutput.c.o"
       ]
     },
     "vector": {
-      "source": "round1529-aarch64-host-evex-scan",
+      "source": "round1534-vex32-prefix-dispatch",
       "patch": "vector.patch",
-      "tree": "8b134814f624698a12965009d59ceced1f3e2739",
-      "patch_sha256": "f14788043cb6b706b2a4a1e79ca1db9fff727aa9d40260c40d665b8b2c4f2ded",
-      "added": [],
+      "tree": "bb2f705e469753cc70c4e7094a0641a8b6f0aa87",
+      "patch_sha256": "fb662c1197edb72e40f1ea944918073aa5d954e28dfabf34d97c2a59c67c576a",
+      "added": [
+        "X86Vex32Output.c.o",
+        "X86VexScan.c.o"
+      ],
       "changed": [
-        "X86Mapping.c.o",
         "X86DisassemblerDecoder.c.o",
-        "X86EvexScan.c.o"
+        "X86OutputIterator.c.o",
+        "X86VectorOutput.c.o"
       ]
     }
   },
@@ -30,6 +37,6 @@
     "cycles": 9,
     "calibration_cpu_ms": 45
   },
-  "scope": "AArch64 ELF host, actual NeverD with source-built fork LLVM and real x86 PE/ELF and ARM, AArch64 and MIPS regression panels. Compare the feature filter and full existing EVEX plan independently.",
-  "parent": "bba1bc7024075922ec18545306ccebf8958fb68d"
+  "scope": "Actual NeverD dev and the source-built live LLVM fork: x86-64 Clang Linux, complete PE32/PE64, scalar and SIMD ELF, controls for ARM, AArch64 and MIPS.",
+  "parent": "fad4c85477e4451f71d9a52f5d6cd1fb8d27bd6b"
 }
