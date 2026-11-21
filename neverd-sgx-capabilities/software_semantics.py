@@ -23,10 +23,13 @@ TESTS = {
         MODE + "InactiveRsmDeliversOriginalUndefinedOpcode",
         MODE + "MachineCheckReportsRetainBankOwnershipAndPriority",
         MODE + "MachineCheckMsrReadAndAcknowledgeUseOriginalInstructions",
+        MODE + "CorrectedErrorsCountToCmciAndKeepMaskedArrivals",
+        MODE + "CmciNmiAndSmiUseTheExistingEventLatches",
         MODE + "StartupInputsRequireBindingAndRestartShutdown",
         MODE + "StartupInitStaysLatchedInSmmUntilRsmCompletes",
         "X86ModeSgxThreadTest.EnclaveNotificationResumeAndDecrementSelectCorrectFrames",
         "X86ModeSgxThreadTest.DebugOptInSelectsTrapAndBreakpointState",
+        "X86ModeSgxThreadTest.NestedHandlerRepairsDivideAtOriginalInstruction",
         "X86ModeSgxTest.SoftwareEnclaveResumesFromSSAAfterIRQAndInstructionFaults",
     ],
 }
