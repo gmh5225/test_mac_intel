@@ -33,19 +33,22 @@ try:
                 verified[variant]=tmp/(variant+'-tables.so')
                 shutil.copyfile(path,verified[variant])
             finally:
-                mapping.write_bytes(original)
+                git('restore','--worktree','--','arch/X86/X86Mapping.c')
+                assert mapping.read_bytes()==original
     if not diet:
         run(['c++','-O2','-std=c++17','-I',s/'include',r/'lookup.cpp','-ldl','-o',tmp/'lookup'],'compile-tables')
         result=json.loads(sp.check_output([tmp/'lookup',verified['base'],verified['candidate']],text=True))
         assert result['checked']==6*(result['ids']+3) and result['present']>0 and result['absent']>0
         write('lookup',result)
-    targets=sp.check_output(['cmake','--build',b,'--target','help'],text=True)
-    requested=units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access']
-    # CMakeLists exposes a different target set in reduced and DIET builds.
-    available=set(sp.check_output(['ninja','-C',b,'-t','targets','all'],text=True).splitlines())
-    selected=[name for name in requested if any(line.startswith(name+':') for line in available)]
-    if conf=='full':assert set(requested)==set(selected),(requested,selected)
-    assert selected
+    if conf=='full':
+        selected=units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access']
+    elif conf=='intel':
+        selected=units
+    else:
+        selected=['x86_scan_batch','text_option','detail_option']
+    if diet:
+        assert sha(libs['base'])==sha(libs['candidate'])
+        write('diet-images',dict(identical=True,sha256=sha(libs['base'])))
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
     run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
