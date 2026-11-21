@@ -1,7 +1,7 @@
-name: Verify nanoMIPS branch correction on the released packed EVEX library
+name: Measure constant mode tests and verify nanoMIPS branches with six native backends
 on:
   push:
-    branches: [codex/capstone-packed-release-nanomips]
+    branches: [codex/capstone-mips-local-mode-features]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-nanomips-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: local-mips-features-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

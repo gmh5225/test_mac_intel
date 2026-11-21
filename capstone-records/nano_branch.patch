@@ -1,7 +1,16 @@
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..1be7a64d 100644
+index d57235c9..7761dc2c 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
+@@ -51,7 +51,7 @@
+ 
+ #define DEBUG_TYPE "mips-disassembler"
+ 
+-bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
++static inline bool hasFeature(unsigned int mode, unsigned int feature)
+ {
+ 	switch (feature) {
+ 	case Mips_FeatureGP64Bit:
 @@ -181,7 +181,7 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
  	case Mips_FeatureNanoMips:
  		return mode & (CS_MODE_NANOMIPS | CS_MODE_NMS1 | CS_MODE_I7200);
@@ -11,6 +20,53 @@ index d57235c9..1be7a64d 100644
  	case Mips_FeatureTLB:
  		return mode & CS_MODE_I7200;
  	case Mips_FeatureCnMips:
+@@ -228,6 +228,12 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
+ 	}
+ }
+ 
++bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
++{
++	return hasFeature(mode, feature);
++}
++
++
+ #if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+ 	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
+ #define CAPSTONE_MIPS_PRIMARY_DISPATCH
+@@ -1474,20 +1480,20 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 		goto DecodeStandard;
+ 	}
+ #endif
+-	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
+-	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
+-	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
+-	bool IsMips64r6 = Mips_getFeatureBits(mode, Mips_FeatureMips64r6);
+-	bool IsMips2 = Mips_getFeatureBits(mode, Mips_FeatureMips2);
+-	bool IsMips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
+-	bool IsCnMips = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
+-	bool IsCnMipsP = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
+-	IsFP64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
+-	IsGP64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
+-	bool IsPTR64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
++	bool IsMicroMips = hasFeature(mode, Mips_FeatureMicroMips);
++	bool IsNanoMips = hasFeature(mode, Mips_FeatureNanoMips);
++	bool IsMips32r6 = hasFeature(mode, Mips_FeatureMips32r6);
++	bool IsMips64r6 = hasFeature(mode, Mips_FeatureMips64r6);
++	bool IsMips2 = hasFeature(mode, Mips_FeatureMips2);
++	bool IsMips16 = hasFeature(mode, Mips_FeatureMips16);
++	bool IsCnMips = hasFeature(mode, Mips_FeatureCnMips);
++	bool IsCnMipsP = hasFeature(mode, Mips_FeatureCnMipsP);
++	IsFP64 = hasFeature(mode, Mips_FeatureFP64Bit);
++	IsGP64 = hasFeature(mode, Mips_FeatureGP64Bit);
++	bool IsPTR64 = hasFeature(mode, Mips_FeaturePTR64Bit);
+ 	// Only present in MIPS-I and MIPS-II
+-	bool HasCOP3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
+-		       !Mips_getFeatureBits(mode, Mips_FeatureMips3);
++	bool HasCOP3 = !hasFeature(mode, Mips_FeatureMips32) &&
++		       !hasFeature(mode, Mips_FeatureMips3);
+ 
+ 	if (IsNanoMips) {
+ 		uint64_t Insn2;
 diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
 index 4b1738be..4f2e6db2 100644
 --- a/arch/Mips/MipsGenDirectDecoder.inc

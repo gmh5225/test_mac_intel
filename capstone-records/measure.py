@@ -61,6 +61,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-feature-masks-') as temp:
         assert objects['base'].keys()==objects['candidate'].keys()
         changed=sorted(k for k in objects['base'] if objects['base'][k]!=objects['candidate'][k])
         write('objects',dict(changed=changed,lineage=meta))
+        write('consumer',dict(sha256=sha(t/'one.o'),sources=meta))
         assert changed==['arch/Mips/MipsDisassembler.c.o'],changed
         run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'check-generated-direct')
         targets=['mcinst','mapping','arm_private_stream','arm_post_index','detail_option','text_option','riscv_writeback_postprocess','mips_scan','mips_nanomips_branch']
