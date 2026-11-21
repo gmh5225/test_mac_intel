@@ -49,7 +49,7 @@ def discover():
     return report
 
 
-def run_guest(directory, guest, runner):
+def run_guest(directory, guest, runner, kvm_fd):
     image = directory / guest["image"]
     digest = hashlib.sha256(image.read_bytes()).hexdigest()
     receipt = {"image": image.name, "route": guest["route"], "optimization": guest["optimization"],
@@ -57,9 +57,9 @@ def run_guest(directory, guest, runner):
                "completed_contexts": 0}
     if digest != guest["sha256"]:
         return dict(receipt, diagnostic="Fixture digest does not match the manifest")
-    command = [runner, image, guest["vmcb"], *guest["breakpoints"]]
+    command = [runner, image, guest["vmcb"], *guest["breakpoints"], str(kvm_fd)]
     try:
-        run = subprocess.run(command, capture_output=True, timeout=45)
+        run = subprocess.run(command, capture_output=True, timeout=45, pass_fds=(kvm_fd,))
     except subprocess.TimeoutExpired as error:
         return dict(receipt, timed_out=True, console=(error.stdout or b"").decode(errors="replace"),
                     diagnostic=(error.stderr or b"").decode(errors="replace"))
@@ -96,8 +96,12 @@ def main():
         if not report["available"]:
             raise RuntimeError("KVM SVM was lost after capability discovery")
         manifest = json.loads((opts.guests / "manifest.json").read_text())
-        for guest in manifest["guests"]:
-            report["guest_runs"].append(run_guest(opts.guests, guest, opts.runner))
+        kvm_fd = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC)
+        try:
+            for guest in manifest["guests"]:
+                report["guest_runs"].append(run_guest(opts.guests, guest, opts.runner, kvm_fd))
+        finally:
+            os.close(kvm_fd)
         report["status"] = ("passed" if report["guest_runs"] and
                             all(r["completed"] for r in report["guest_runs"]) else "failed")
         report["completed_contexts"] = sum(r["completed_contexts"] for r in report["guest_runs"])

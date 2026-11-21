@@ -84,7 +84,7 @@ static void record_state(const char *event, int cpu, const uint8_t *ram,
 }
 
 int main(int argc, char **argv) {
-  if (argc != 6)
+  if (argc != 7)
     return 2;
   uint32_t vmcb = strtoul(argv[2], NULL, 0);
   if (vmcb > RamBytes - 4096)
@@ -94,9 +94,9 @@ int main(int argc, char **argv) {
   if (ram == MAP_FAILED)
     fail("map RAM");
   uint32_t entry = load_guest(argv[1], ram);
-  int kvm = open("/dev/kvm", O_RDWR);
-  if (kvm < 0)
-    fail("open /dev/kvm");
+  int kvm = (int)strtol(argv[6], NULL, 10);
+  if (KVM(kvm, KVM_GET_API_VERSION, 0) != KVM_API_VERSION)
+    return 2;
   int vm = KVM(kvm, KVM_CREATE_VM, 0);
   KVM(vm, KVM_SET_TSS_ADDR, 0xfffbd000);
   KVM(vm, KVM_CREATE_IRQCHIP, 0);
