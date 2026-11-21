@@ -1,7 +1,7 @@
-name: Benchmark the dedicated MIPS alias writer and verify identical multiarch libraries
+name: Measure separate and combined MIPS table filters and alias printing in dedicated builds
 on:
   push:
-    branches: [codex/capstone-mips-dedicated-alias]
+    branches: [codex/capstone-mips-filter-and-alias]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: filter-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

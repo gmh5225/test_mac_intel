@@ -9,15 +9,16 @@ def run(args,n):
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 m=json.loads((d/'tree.json').read_text());assert g('rev-parse','HEAD')=='958b98cbbeb217ab3e8babe1de7175546ec82748' and sha(d/'candidate.patch')==m['sha256']
-assert sha(d/'parent.patch')==(d/'parent.sha').read_text().strip()
-g('apply','--index',str(d/'parent.patch'));assert g('write-tree')==(d/'parent-tree.txt').read_text().strip()
+trees=json.loads((d/'trees.json').read_text());assert g('write-tree')==trees['base']
 cc=os.environ['CC'];cfg=os.environ['FLAVOR'];tmp=Path(tempfile.mkdtemp());units=['sstream','utils','mcinst','instruction_bytes','feature_mode','mapping']
 try:
     flavors=['dedicated','multiarch'] if cfg=='full' else [cfg]
     libraries={x:{} for x in flavors}
-    for label in ('base','candidate'):
-        if label=='candidate':
-            g('apply','--index',str(d/'candidate.patch'));assert g('write-tree')==m['tree']
+    for label in ('base','alias','dispatch','candidate'):
+        if label!='base':
+            g('restore','--source',trees['base'],'--staged','--worktree','--','arch/Mips/MipsDisassembler.c','arch/Mips/MipsInstPrinter.c')
+            g('apply','--index',str(d/(label+'.patch')))
+        assert g('write-tree')==trees[label]
         for f in flavors:
             b=tmp/f
             arches=['MIPS']if f in ('dedicated','diet')else ['X86','MIPS','ARM','AARCH64','PPC','RISCV']
@@ -32,13 +33,13 @@ try:
             dest=tmp/(f+'-'+label+'.so');shutil.copyfile(path,dest);libraries[f][label]=dest
     run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'generation')
     identities={f:{k:sha(v)for k,v in libs.items()}for f,libs in libraries.items()}
-    for f,ids in identities.items():assert (ids['base']==ids['candidate'])==(f!='dedicated'),(f,ids)
+    for f,ids in identities.items():assert len(set(ids.values()))==(4 if f=='dedicated' else 1),(f,ids)
     put('identities',identities)
     active='dedicated'if cfg=='full'else cfg
     if active=='dedicated':
         libs=libraries[active];run(['c++','-O2','-std=c++17','-I',s/'include',d/'mips-states.cpp','-ldl','-o',tmp/'records'],'build-records')
-        run([tmp/'records',libs['base'],libs['candidate']],'records')
-        text=(out/'records.log').read_text().splitlines()[-1];assert '40894464 raw records' in text
+        for label in ('dispatch','candidate'):run([tmp/'records',libs['base'],libs[label]],'records-'+label)
+        text=(out/'records-candidate.log').read_text().splitlines()[-1];assert '40894464 raw records' in text
         cases=[z for z in corpus.prepare(d,tmp,out,run) if z['name'].startswith('mips64el-')];assert len(cases)==3
         run(['c++','-O2','-std=c++17','-I',s/'include',d/'real.cpp','-ldl','-o',tmp/'real'],'compile-real')
         counts={}
