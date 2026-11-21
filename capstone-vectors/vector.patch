@@ -29,10 +29,10 @@ index a70bcb62..b8006c38 100644
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..eefb4855 100644
+index ae1554b0..475383da 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -20,14 +20,22 @@
+@@ -20,14 +20,23 @@
  #include "../../MCRegisterInfo.h"
  #include "X86DisassemblerDecoderCommon.h"
  
@@ -44,12 +44,13 @@ index ae1554b0..eefb4855 100644
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
  #include "../../cs_priv.h"
++#include "X86HostConfig.h"
 +#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
  #define CAPSTONE_X86_DEDICATED_OUTPUT
  CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
  					 size_t size, cs_insn *insn,
  					 uint16_t *insn_size);
-+#else
++#elif defined(X86_CLANG_VEX32_OUTPUT)
 +#define CAPSTONE_X86_ITERATOR_OUTPUT
 +CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 +X86_decodeIteratorOutput(cs_struct *handle, const uint8_t *code, size_t size,
@@ -803,35 +804,46 @@ index 00000000..7817a761
 +#endif
 +
 +#endif
+diff --git a/arch/X86/X86HostConfig.h b/arch/X86/X86HostConfig.h
+new file mode 100644
+index 00000000..eecccfb2
+--- /dev/null
++++ b/arch/X86/X86HostConfig.h
+@@ -0,0 +1,16 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_HOST_CONFIG_H
++#define CS_X86_HOST_CONFIG_H
++
++/* The multi-backend iterator and compact i386 VEX plans are qualified on
++ * x86-64 Linux Clang hosts with full userspace output support. */
++#if defined(__clang__) && defined(__x86_64__) && defined(__ELF__) && \
++	defined(__linux__) && !defined(CAPSTONE_DIET) && \
++	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(_KERNEL_MODE)
++#define X86_CLANG_VEX32_OUTPUT
++#endif
++
++#endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..82a5b0d7 100644
+index 11e8578a..b063c0e9 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -4,12 +4,10 @@
+@@ -4,12 +4,12 @@
  #ifdef CAPSTONE_HAS_X86
  #include "../../cs_priv.h"
  #include "X86ScanAdapter.h"
--
--#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
--	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
--	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
--	!defined(_WIN32_WCE)
- #include "X86Disassembler.h"
-+
-+#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) || \
-+	defined(CAPSTONE_X86_ITERATOR_OUTPUT)
++#include "X86Disassembler.h"
+ 
+ #if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+-#include "X86Disassembler.h"
  #include "X86InstPrinter.h"
  #include "X86InstPrinterCommon.h"
  #include "../../utils.h"
-@@ -21,6 +19,8 @@
-  * present. Memory admission and bounds checks belong to the address writer. */
- #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
- CAPSTONE_INTERNAL
-+#elif defined(__GNUC__) && !defined(__clang__)
-+static inline __attribute__((always_inline))
- #else
- static
- #endif
 @@ -84,6 +84,12 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
@@ -865,14 +877,22 @@ index 11e8578a..82a5b0d7 100644
 +#endif
  #endif
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index aff17085..e8111b45 100644
+index aff17085..fda966a8 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -89,6 +89,17 @@ X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
+@@ -8,6 +8,7 @@
+ #include <string.h>
+ #include <capstone/capstone.h>
+ #include "../../utils.h"
++#include "X86HostConfig.h"
+ 
+ /* The generated records describe the same register operands and implicit
+  * effects as the ordinary Intel printer. Only the public x86 prefix of the
+@@ -89,6 +90,17 @@ X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
  
  #endif
  
-+#if defined(__clang__) || (defined(__GNUC__) && defined(__ELF__))
++#ifdef X86_CLANG_VEX32_OUTPUT
 +#define X86_HAS_VEX32_OUTPUT
 +/* PUSH and VEX32 share the exceptional arm. The opcode distinguishes them
 + * after the ordinary vector arm, keeping its direct call unchanged. */
@@ -1336,17 +1356,22 @@ index 00000000..69146b46
 +#endif
 diff --git a/arch/X86/X86VexScan.h b/arch/X86/X86VexScan.h
 new file mode 100644
-index 00000000..19c104a5
+index 00000000..c93f970c
 --- /dev/null
 +++ b/arch/X86/X86VexScan.h
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,27 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +#ifndef CS_X86_VEX_SCAN_H
 +#define CS_X86_VEX_SCAN_H
 +
 +#include "../../cs_priv.h"
++#include "X86HostConfig.h"
++#ifdef X86_CLANG_VEX32_OUTPUT
 +#include "X86GenVexPublicPlans.inc"
++#else
++#define X86_HAS_VEX2_PUBLIC_PLANS 0
++#endif
 +
 +#if X86_HAS_VEX2_PUBLIC_PLANS
 +/* The caller admits a bare 32-bit VEX2 prefix. Return (public_id << 8) |

@@ -1,10 +1,8 @@
-tree 4e0b7e3c1b6470a5975d18f661d38af5671a987b
-parent 78f02050072f4a3778d1339374ec1c31f9b42c1a
-author NeverSightAI <neversightai@gmail.com> 1795199007 +0800
-committer NeverSightAI <neversightai@gmail.com> 1795199007 +0800
+tree b59b7039832404d2270e7888403d2fd635dc1be6
+parent a9d153f4cae6c71eb02309621bbce3c9508312dc
+author NeverSightAI <neversightai@gmail.com> 1795203973 +0800
+committer NeverSightAI <neversightai@gmail.com> 1795203973 +0800
 
-X86: bound native MSVC inlining of the legacy scan decoder
+X86: use canonical EVEX scan plans on AArch64 ELF hosts
 
-MSVC 19.52 runs out of compiler heap while building the generated legacy
-terminal at /O2 /Ob2. Keep a single copy of that switch on this compiler
-and preserve the existing inline policy on the other supported compilers.
+Enable the existing extension prefilter and compact EVEX scan plans when the compiler targets AArch64 ELF. The generated opcode map and the decoder retain ownership of operand legality and adapter precedence.

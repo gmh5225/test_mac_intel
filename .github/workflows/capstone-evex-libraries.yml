@@ -1,7 +1,7 @@
-name: Measure i386 packed scan inside the existing VEX prefix decision
+name: Verify the public x86 formatter against the iced fork and unchanged passive hosts
 on:
   push:
-    branches: [codex/capstone-existing-vex-prefix]
+    branches: [codex/capstone-clang-vex32-public]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a9d153f4cae6c71eb02309621bbce3c9508312dc
+          ref: e2266247a3b0f090bcad5bd3a4ead8c3220de367
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: prefix-vex32-fork-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: clang-vex32-public-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

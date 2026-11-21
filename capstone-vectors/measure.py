@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Public writer plus packed VEX2 on every late miss',vector='Same packed reader only on the C5 branch of the existing late VEX dispatch',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('variants.json',dict(integer='Four-backend baseline tree '+json.loads((r/'experiment.json').read_text())['baseline_tree'],aa='Byte-identical baseline copy',route='Clang x86-64 ELF: public writer, including compact i386 VEX formatting plans',vector='Same writer plus packed i386 scan inside the existing C5 dispatch',iced='NeverSight compatibility branch iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='cs_disasm_iter',detail='cs_disasm_iter',consumer='Common public iterator for every mode; actual NeverD product and private-entry qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -41,7 +41,8 @@ def main(w):
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
-    objects={}
+    objects={}; linked={}
+    eligible=platform.machine()=='x86_64' and os.environ['CC']=='clang'
     inputs=json.loads((r/'experiment.json').read_text())
     for label in ('integer','aa','route','vector'):
         if label=='aa':
@@ -70,15 +71,22 @@ def main(w):
         else:
             changed={name for name,value in objects['integer'].items() if objects[label].get(name)!=value}
             added=set(objects[label])-set(objects['integer'])
-            expected_changed = {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
-            expected_added = {'arch/X86/X86Vex32Output.c.o'} | {'arch/X86/X86VexScan.c.o'}
-            assert added == expected_added, (label, added)
-            assert expected_changed <= changed <= expected_changed | {'arch/X86/X86VectorOutput.c.o'}, (label, changed)
-            if label == 'vector':
+            required={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
+            extra={'arch/X86/X86Vex32Output.c.o'}
+            if label=='vector':extra.add('arch/X86/X86VexScan.c.o')
+            assert added==extra,(label,added,extra)
+            if eligible:
+                assert required<=changed<=required|{'arch/X86/X86VectorOutput.c.o'},(label,changed)
+            else:
+                assert not changed,(label,changed)
+                for name in sorted(added):
+                    assert not sp.check_output(['nm','-g','--defined-only',objroot/name]).strip(),name
+            if label=='vector':
                 diff=sorted(k for k in objects[label] if objects[label][k]!=objects['route'].get(k))
-                wanted=['arch/X86/X86DisassemblerDecoder.c.o']
+                wanted=['arch/X86/X86VexScan.c.o']
+                if eligible:wanted.insert(0,'arch/X86/X86DisassemblerDecoder.c.o')
                 assert diff==wanted,(diff,wanted)
-                save('compiler-scope.json',dict(changed=diff, total=len(objects[label])))
+                save('compiler-scope.json',dict(active=eligible,changed=diff,total=len(objects[label])))
                 run(['python3','-B',tree/'suite/synctools/x86_operand_specializations.py','--check'],'vex-scan-rows')
 
                 for tool, jobs in [('x86_simple_output', [([], 'X86GenSimpleOutput.inc')]), ('x86_vector_output', [(['--vex32-memory'], 'X86GenVex32MemoryOutput.inc'), (['--vex-pairs32'], 'X86GenVex32PairOutput.inc')])]:
@@ -97,13 +105,22 @@ def main(w):
         else:assert sha(obj)==consumer_hash
         save('consumer-object.json',dict(sha256=consumer_hash,all_variants_identical=True))
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        if not eligible:
+            linked[label]={}
+            for section in ('.text','.rodata'):
+                binary=w/'linked-section'
+                run(['objcopy','--dump-section',section+'='+str(binary),target], 'linked'+section+'-'+label)
+                linked[label][section]=sha(binary)
+                binary.unlink()
+            assert linked[label]==linked['integer'],(label,linked)
+            save('passive-sections.json',linked)
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
     verify_build=w/'verify-build'
     run(['cmake','-S',tree,'-B',verify_build,*profile,'-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'verify-configure')
-    for label in ('route','vector'):
-        run(['git','apply',r/(label+'.patch')],'verify-patch-'+label,tree)
+    for label in ('integer','route','vector'):
+        if label!='integer':run(['git','apply',r/(label+'.patch')],'verify-patch-'+label,tree)
         it=tree/'arch/X86/X86OutputIterator.c'
         it.write_bytes(it.read_bytes()+(r/'owned-shim.txt').read_bytes())
         run(['cmake','--build',verify_build,'--target','capstone_shared','--parallel','4'],'verify-lib-'+label)
@@ -111,11 +128,13 @@ def main(w):
         run(['git','reset','--hard',reference],'verify-restore-'+label,tree)
         run(['git','clean','-fdx'],'verify-prune-'+label,tree)
     for test in ('verify','private-guard','public-verify'):
-        run(['clang++','-std=c++17','-O2','-DACTIVE_OUTPUT=1','-DPREVIOUS_OUTPUT=1','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
-        run([w/test,w/'route.so',w/'vector.so'],test)
+        run(['clang++','-std=c++17','-O2','-DACTIVE_OUTPUT='+str(int(eligible)),'-DPREVIOUS_OUTPUT=0','-I',tree/'include',r/(test+'.cpp'),'-ldl','-o',w/test],test+'-build')
+        run([w/test,w/'integer.so',w/'vector.so'],test)
+        if test=='public-verify':
+            run([w/test,w/'integer.so',w/'route.so'],'public-route-verify')
     for name,args in [('vex-scan-diff',['-ldl']),('vex-scan-guard',[b/'libcapstone.a','-lm'])]:
         run(['clang++','-O2','-std=c++17','-I',tree,'-I',tree/'include',r/(name+'.cpp'),*args,'-o',w/name],name+'-build')
-        run([w/name,*([w/'route.so',w/'vector.so'] if name=='vex-scan-diff' else [])],name)
+        run([w/name,*([w/'integer.so',w/'vector.so'] if name=='vex-scan-diff' else [])],name)
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
