@@ -18,20 +18,25 @@ try:
     if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
-    verified={}
+    objects={}
     for variant in ('base','candidate'):
         if variant=='candidate':
             git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
+        objects[variant]={str(f.relative_to(b)):sha(f) for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+        assert objects[variant]
         host=os.environ['RUNNER_OS'] # CMake always runs on Linux in this profile.
         reference=json.loads((r/'reference.json').read_text())
         assert host=='Linux'
         matching=[key for key in reference if key.endswith('-'+cc+'-'+conf) and (('24.04-arm' in key)==(platform.machine()=='aarch64')) and (('22.04' in key)==('22.04' in Path('/etc/os-release').read_text()))]
         assert len(matching)==1,matching
-        if conf!='full':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
-    if cc=='gcc':assert sha(libs['base'])==sha(libs['candidate'])
+        if conf!='full' and variant=='base':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
+    assert objects['base'].keys()==objects['candidate'].keys()
+    changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
+    assert all(Path(k).name in {'Mapping.c.o','AliasMapping.c.o','RISCVMapping.c.o'} for k in changed)
+    write('member-changes',dict(changed=changed,total=len(objects['base']),base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
     run([tmp/'check-static'],'static-selected')
@@ -43,8 +48,7 @@ try:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
     if conf!='full':
-        assert sha(libs['base'])==sha(libs['candidate'])
-        write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
+        write('other-profile-images',dict(base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')

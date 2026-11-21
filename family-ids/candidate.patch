@@ -1,17 +1,68 @@
-diff --git a/AliasMapping.c b/AliasMapping.c
-index 77e2395c..7c23ab67 100644
---- a/AliasMapping.c
-+++ b/AliasMapping.c
-@@ -10,8 +10,10 @@
- #define CAPSTONE_ALIAS_ROLLED_LOOP
+diff --git a/Mapping.c b/Mapping.c
+index d3bb3e3d..ec5ff099 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -488,9 +488,10 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
+ 		++i;
+ 	}
+ 	const char *alias_mnem = asm_str_buf + i;
++	const char delimiter = mnemonic_delimiter(MI->csh->arch);
+ 	// Retain the existing 15-byte mnemonic limit.
+ 	for (; j < 15; ++j, ++i) {
+-		if (char_ends_mnem(asm_str_buf[i], MI->csh->arch))
++		if (char_ends_mnem(asm_str_buf[i], delimiter))
+ 			break;
+ 	}
  
- #if defined(__ELF__) && defined(__GNUC__)
--#define ALIAS_LOOKUP_CODE __attribute__((noinline, section(".cs_alias_lookup")))
--#define ALIAS_LOOKUP_DATA __attribute__((section(".cs_alias_lookup_rodata")))
-+/* Place alias lookup with ordinary code and read-only data so growth in
-+ * unrelated ISA-specific ELF sections does not move the lookup within its page. */
-+#define ALIAS_LOOKUP_CODE __attribute__((noinline, section(".text.cs_alias_lookup")))
-+#define ALIAS_LOOKUP_DATA __attribute__((section(".rodata.cs_alias_lookup")))
+diff --git a/MappingAlias.h b/MappingAlias.h
+index d6575cb9..6920e606 100644
+--- a/MappingAlias.h
++++ b/MappingAlias.h
+@@ -7,19 +7,26 @@
+ #include "Mapping.h"
+ #include "utils.h"
+ 
+-static inline bool char_ends_mnem(const char c, cs_arch arch)
++/* Some assemblers admit punctuation in a mnemonic. Select its additional
++ * terminator once for all characters in the alias. */
++static inline char mnemonic_delimiter(cs_arch arch)
+ {
+ 	switch (arch) {
+-	default:
+-		return (!c || c == ' ' || c == '\t' || c == '.');
+ 	case CS_ARCH_PPC:
+ 	case CS_ARCH_RISCV:
+-		return (!c || c == ' ' || c == '\t');
++		return '\0';
+ 	case CS_ARCH_SPARC:
+-		return (!c || c == ' ' || c == '\t' || c == ',');
++		return ',';
++	default:
++		return '.';
+ 	}
+ }
+ 
++static inline bool char_ends_mnem(char c, char delimiter)
++{
++	return !c || is_blank_char(c) || c == delimiter;
++}
++
+ #ifdef CAPSTONE_ALIAS_ROLLED_LOOP
+ static
  #else
- #define ALIAS_LOOKUP_CODE __attribute__((noinline))
- #define ALIAS_LOOKUP_DATA
+@@ -34,13 +41,14 @@ static inline
+ 		const char *name = O->buffer;
+ 		while (is_blank_char(*name))
+ 			++name;
++		const char delimiter = mnemonic_delimiter(MI->csh->arch);
+ 		unsigned int state = 1;
+ 		/* The public alias parser considers at most 15 bytes. */
+ #ifdef CAPSTONE_ALIAS_ROLLED_LOOP
+ #pragma clang loop unroll(disable)
+ #endif
+ 		for (size_t i = 0; i < 15; ++i) {
+-			if (char_ends_mnem(name[i], MI->csh->arch))
++			if (char_ends_mnem(name[i], delimiter))
+ 				break;
+ 			unsigned int next =
+ 				trie[state].offset + (unsigned char)name[i];
