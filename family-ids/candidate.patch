@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d04037ba..956d7a4c 100644
+index 77d1aaa8..96f9c216 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1044,8 +1044,19 @@ target_include_directories(capstone PUBLIC
+@@ -1044,8 +1044,17 @@ target_include_directories(capstone PUBLIC
  )
  set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
  
@@ -12,9 +12,7 @@ index d04037ba..956d7a4c 100644
 +if(CAPSTONE_X86_SUPPORT AND NOT capstone_enabled_architectures STREQUAL "X86"
 +   AND CAPSTONE_USE_DEFAULT_ALLOC AND NOT CAPSTONE_BUILD_DIET
 +   AND NOT CAPSTONE_X86_REDUCE AND NOT CAPSTONE_OSXKERNEL_SUPPORT)
-+    set(capstone_width_iterators ON)
-+    set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY
-+        COMPILE_DEFINITIONS CAPSTONE_X86_WIDTH_ITERATORS)
++    add_compile_definitions(CAPSTONE_X86_WIDTH_ITERATORS)
 +    target_sources(capstone PRIVATE arch/X86/X86Vex32Output.c arch/X86/X86Sse64Output.c)
 +    if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
 +        set_property(SOURCE arch/X86/X86Sse64Output.c APPEND PROPERTY
@@ -25,7 +23,7 @@ index d04037ba..956d7a4c 100644
      target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
      set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
 diff --git a/Makefile b/Makefile
-index 3d17212d..d5ec3f49 100644
+index b8b582a0..b00035e4 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -436,6 +436,16 @@ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $
@@ -36,7 +34,7 @@ index 3d17212d..d5ec3f49 100644
 +ifneq (,$(filter-out x86,$(CAPSTONE_ARCHS)))
 +ifeq ($(CAPSTONE_USE_SYS_DYN_MEM),yes)
 +ifeq (,$(filter yes,$(CAPSTONE_DIET) $(CAPSTONE_X86_REDUCE) $(CAPSTONE_HAS_OSXKERNEL)))
-+$(OBJDIR)/arch/X86/X86DisassemblerDecoder.o: CFLAGS += -DCAPSTONE_X86_WIDTH_ITERATORS
++CFLAGS += -DCAPSTONE_X86_WIDTH_ITERATORS
 +LIBOBJ_SHARED += $(LIBOBJ_X86_STATIC_OUTPUT)
 +endif
 +endif
@@ -46,25 +44,187 @@ index 3d17212d..d5ec3f49 100644
  
  ifeq ($(PKG_EXTRA),)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..1db4347f 100644
+index 12428fff..44fdd5fb 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3792,6 +3792,15 @@ X86_DECODE_ALIGN
+@@ -3787,12 +3787,28 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
+ 
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++CAPSTONE_INTERNAL X86_DECODE_ALIGN bool
++X86_disasmIterCanonical(csh ud, const uint8_t **code, size_t *size,
++			uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_core(ud, code, size, address, insn);
++}
++#endif
++
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
  bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
  				 uint64_t *address, cs_insn *insn)
  {
-+#if defined(CAPSTONE_X86_WIDTH_ITERATORS) && !defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
 +	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (*size && handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
-+		if (handle->mode == CS_MODE_64)
-+			return X86_disasmIterText(ud, code, size, address, insn);
-+		if (handle->mode == CS_MODE_32)
-+			return X86_disasmIter32(ud, code, size, address, insn);
-+	}
-+#endif
++	if (!handle)
++		return false;
++	return handle->iterator(ud, code, size, address, insn);
++#else
  	return cs_disasm_iter_core(ud, code, size, address, insn);
++#endif
  }
  
+ X86_DECODE_ALIGN
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index a1423650..dfac101f 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -37,6 +37,11 @@ uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
+ /* Private static-link iterator for x86 consumers that request text. Uses the
+  * same options, cursor, errors, callbacks and public records as cs_disasm_iter.
+  * Other architectures and text-free scans use cs_disasm_iter directly. */
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++CAPSTONE_INTERNAL bool X86_disasmIterCanonical(csh ud, const uint8_t **code,
++					       size_t *size, uint64_t *address,
++					       cs_insn *insn);
++#endif
+ bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
+ 		    uint64_t *address, cs_insn *insn);
+ 
+diff --git a/cs.c b/cs.c
+index ab0ca56b..ee71e9db 100644
+--- a/cs.c
++++ b/cs.c
+@@ -82,6 +82,9 @@
+ #ifdef CAPSTONE_HAS_X86
+ #include "arch/X86/X86Mapping.h"
+ #include "arch/X86/X86Disassembler.h"
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++#include "arch/X86/X86ScanAdapter.h"
++#endif
+ #endif
+ #include "arch/X86/X86Module.h"
+ #include "arch/XCore/XCoreModule.h"
+@@ -818,6 +821,25 @@ const char *CAPSTONE_API cs_strerror(cs_err code)
+ 	}
+ }
+ 
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++static bool disasm_iter_foreign(csh ud, const uint8_t **code, size_t *size,
++				uint64_t *address, cs_insn *insn);
++
++/* The width-specific entry still reads syntax, detail and formatter options
++ * from the handle. Only architecture, mode and text select the entry. */
++static void select_iterator(cs_struct *handle)
++{
++	if (handle->arch != CS_ARCH_X86)
++		handle->iterator = disasm_iter_foreign;
++	else if (!handle->no_text && handle->mode == CS_MODE_32)
++		handle->iterator = X86_disasmIter32;
++	else if (!handle->no_text && handle->mode == CS_MODE_64)
++		handle->iterator = X86_disasmIterText;
++	else
++		handle->iterator = X86_disasmIterCanonical;
++}
++#endif
++
+ CAPSTONE_EXPORT
+ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
+ {
+@@ -864,6 +886,9 @@ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
+ 	if ((err = populate_insn_map_cache(ud)))
+ 		goto fail;
+ 
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++	select_iterator(ud);
++#endif
+ 	*handle = (uintptr_t)ud;
+ 	return CS_ERR_OK;
+ 
+@@ -937,6 +962,9 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ }
+ #endif
+ 
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++#define CS_DECODE_FOREIGN_ITERATOR
++#endif
+ #include "cs_disasm_internal.h"
+ 
+ /* Keep the generic copy specialized without the private x86 length checks. */
+@@ -1313,6 +1341,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 
+ 	case CS_OPT_TEXT:
+ 		handle->no_text = value == CS_OPT_OFF;
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++		select_iterator(handle);
++#endif
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_DETAIL:
+@@ -1432,7 +1463,13 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 	if (!arch_configs[handle->arch].arch_option)
+ 		return CS_ERR_ARCH;
+ 
+-	return arch_configs[handle->arch].arch_option(handle, type, value);
++	cs_err result =
++		arch_configs[handle->arch].arch_option(handle, type, value);
++#ifdef CAPSTONE_WIDTH_ITERATOR_ENTRY
++	if (type == CS_OPT_MODE)
++		select_iterator(handle);
++#endif
++	return result;
+ }
+ 
+ // generate @op_str for data instruction of SKIPDATA
+@@ -1734,7 +1771,13 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
+ 	return insn;
+ }
+ 
+-#ifndef CAPSTONE_HAS_X86
++#if defined(CAPSTONE_WIDTH_ITERATOR_ENTRY)
++static bool disasm_iter_foreign(csh ud, const uint8_t **code, size_t *size,
++				uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_core(ud, code, size, address, insn);
++}
++#elif !defined(CAPSTONE_HAS_X86)
+ CAPSTONE_EXPORT
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..e25ed65c 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -176,7 +176,11 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
++#ifdef CS_DECODE_FOREIGN_ITERATOR
++	const bool scan = false;
++#else
+ 	const bool scan = use_x86_scan(handle);
++#endif
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+diff --git a/cs_priv.h b/cs_priv.h
+index 84e1c748..a171eeee 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -151,6 +151,12 @@ struct cs_struct {
+ 	void *x86_scan_adapter_data;
+ 	cs_mode x86_scan_adapter_mode;
+ #endif
++#if defined(CAPSTONE_X86_WIDTH_ITERATORS) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CAPSTONE_WIDTH_ITERATOR_ENTRY
++	bool (*iterator)(csh, const uint8_t **, size_t *, uint64_t *,
++			 cs_insn *);
++#endif
+ };
+ 
+ #define MAX_ARCH CS_ARCH_MAX
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 7738367c..cf80f27a 100644
 --- a/tests/unit/CMakeLists.txt
@@ -78,3 +238,70 @@ index 7738367c..cf80f27a 100644
      target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
  endif()
  
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 678bc384..5bd89890 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1285,8 +1285,62 @@ done:
+ 	return ok;
+ }
+ 
++static bool check_public_mode_changes(void)
++{
++	static const uint8_t code[][5] = { { 0x48, 0x89, 0xd8 },
++					   { 0xb8, 0x34, 0x12, 0x78, 0x56 } };
++	static const cs_mode modes[] = { CS_MODE_64, CS_MODE_16, CS_MODE_32,
++					 CS_MODE_16, CS_MODE_64, CS_MODE_32 };
++	csh handle;
++	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
++		return false;
++	cs_insn *insn = cs_malloc(handle);
++	bool ok = false;
++	if (!insn)
++		goto done;
++	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i) {
++		if (cs_option(handle, CS_OPT_MODE, modes[i]) != CS_ERR_OK ||
++		    cs_option(handle, CS_OPT_MODE, CS_MODE_BIG_ENDIAN) !=
++			    CS_ERR_OPTION)
++			goto done;
++		for (unsigned text = 0; text < 2; ++text) {
++			if (cs_option(handle, CS_OPT_TEXT,
++				      text ? CS_OPT_ON : CS_OPT_OFF) !=
++			    CS_ERR_OK)
++				goto done;
++			for (unsigned k = 0; k < 2; ++k) {
++				const uint8_t *cursor = code[k];
++				size_t size = sizeof(code[k]);
++				uint64_t address = 0x1000;
++				unsigned length =
++					k ? (modes[i] == CS_MODE_16 ? 3 : 5) :
++					    (modes[i] == CS_MODE_64 ? 3 : 1);
++				unsigned id = k || modes[i] == CS_MODE_64 ?
++						      X86_INS_MOV :
++						      X86_INS_DEC;
++				if (!cs_disasm_iter(handle, &cursor, &size,
++						    &address, insn) ||
++				    insn->id != id || insn->size != length ||
++				    cursor != code[k] + length ||
++				    size != sizeof(code[k]) - length ||
++				    address != 0x1000 + length ||
++				    (insn->mnemonic[0] != '\0') != (text != 0))
++					goto done;
++			}
++		}
++	}
++	ok = true;
++done:
++	if (insn)
++		cs_free(insn, 1);
++	cs_close(&handle);
++	return ok;
++}
++
+ int main(void)
+ {
++	if (!check_public_mode_changes())
++		return 1;
+ 	private_iter = X86_disasmIter32;
+ 	if (!check_mode(CS_MODE_32))
+ 		return 1;
