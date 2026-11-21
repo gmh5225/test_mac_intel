@@ -65,11 +65,23 @@ jobs:
         run: |
           & "$env:RUNNER_TEMP/nb/bin/NeverDPEHeaderMappingTests.exe" '--gtest_filter=PEHeaderMapping.LinkerGroupsClassifyMergedDataRelocations'
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Cache the unprofiled native type reader for provider diagnostics
+      - name: Stage and check the native reader and its engine DLL
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $bundle = "$env:RUNNER_TEMP/neverd-provider-tools"
+          New-Item -Type Directory $bundle
+          Copy-Item "$env:RUNNER_TEMP/nb/bin/neverd.exe","$env:RUNNER_TEMP/nb/bin/neverd.dll" -Destination $bundle
+          $deps = (dumpbin /nologo /dependents "$bundle/neverd.exe") -join "`n"
+          if ($deps -notmatch '(?im)^\s*neverd\.dll\s*$') { throw 'Unexpected native CLI dependency list' }
+          Push-Location $bundle
+          try { & "./neverd.exe" types --help | Out-Null } finally { Pop-Location }
+      - name: Cache the unprofiled native Windows SDK reader and engine DLL
         uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
-          path: ${{ runner.temp }}/nb/bin/neverd.exe
-          key: neverd-arm64-type-reader-${{ env.NEVERD_REV }}-1
+          path: ${{ runner.temp }}/neverd-provider-tools
+          key: neverd-arm64-provider-tools-${{ env.NEVERD_REV }}-v2
       - name: Check the physical target, driver ABI and both decompiler outputs
         shell: pwsh
         run: |
@@ -159,6 +171,27 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           & "$env:RUNNER_TEMP/nb/bin/NeverDLocalTypesDebugContextTests.exe" '--gtest_filter=LocalTypesDebugContext.ExecutableDLLEntryBindsTheLoaderResultAndArguments'
           python native-driver-entry/loader/check_dll_loader.py --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --work "$env:RUNNER_TEMP/dll-loader" --report native-dll-loader.json
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ef54583450403651546c28f9fca4b60f80379e71
+          path: original-generator
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: Verify the original RDBSS failure and qualified retry against the same WDK
+        if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $cache = "$env:RUNNER_TEMP/sdk-packages"
+          python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
+          $originalInclude = $env:INCLUDE
+          try {
+            Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
+            python native-driver-entry/compare_native_wdk_includes.py --scripts original-generator/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-shadow" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --expected rejected --report wdk-header-search-original.json
+            python native-driver-entry/compare_native_wdk_includes.py --scripts source/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-shadow" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --expected qualified --report wdk-header-search-fixed.json
+          } finally { $env:INCLUDE = $originalInclude }
       - name: Qualify the native engine with the official ARM64 SDK and WDK profile
         if: ${{ !cancelled() && steps.engine.outcome == 'success' }}
         shell: pwsh
@@ -230,6 +263,8 @@ jobs:
             native-com-observations.json
             native-process-sdk.json
             native-sdk-profile.json
+            wdk-header-search-original.json
+            wdk-header-search-fixed.json
             native-dll-loader.json
             ${{ runner.temp }}/nb/neverd-build-receipt.json
             ${{ runner.temp }}/nb/neverd-dependency-inputs.json
