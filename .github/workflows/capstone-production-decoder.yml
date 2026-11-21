@@ -1,7 +1,7 @@
-name: Compare the shipping mode check and private i386 memory path in the source-built production decoder
+name: Isolate the MIPS printer alias lookup and the x86 output changes in source-built NeverD
 on:
   push:
-    branches: [codex/neverd-production-private-i386-addresses]
+    branches: [codex/neverd-production-skip-mips-nonalias]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 1de4e60626967be8fc60694411df714d31ac39d7
+          ref: ac6108fe6caa3e7bede9d8447ebd9d4d46851863
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "1de4e60626967be8fc60694411df714d31ac39d7"
+          test "$(git rev-parse HEAD)" = "ac6108fe6caa3e7bede9d8447ebd9d4d46851863"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "88f64f91be1b3c9de7c5819e93806fa8d79127db"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-address-${{ matrix.os }}-${{ matrix.cc }}
+          name: mips-printed-alias-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

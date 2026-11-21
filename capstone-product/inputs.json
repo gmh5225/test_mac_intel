@@ -1,47 +1,49 @@
 {
-  "neverd": "1de4e60626967be8fc60694411df714d31ac39d7",
+  "neverd": "ac6108fe6caa3e7bede9d8447ebd9d4d46851863",
   "capstone": "88f64f91be1b3c9de7c5819e93806fa8d79127db",
   "variants": {
-    "legacy_gate": {
+    "mips_only": {
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "commit": "35103e240ab4dee1c801898d366a92e15b891d9e",
-      "tree": "4d0572fbb3852a12668e7b06fa438771d7983871",
-      "neverd_tree": "b8384ead51a504c46b3d1df85ab6b7736b2bfd85",
+      "commit": "04b727c382e0bd595513274f5dbee78c8744094e",
+      "tree": "82dfbf98d01fa58d24c5440b9a73225eca39aeab",
+      "neverd_tree": "86fa77230672fe4964adb661a8f97c0133f0ab7f",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
         "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
       },
-      "capstone_patch": "legacy_gate-capstone.patch",
-      "capstone_sha256": "ac38753e594ad274436a67c044bbf53519b40eaabf71a9aaac662595f2334021"
+      "capstone_patch": "mips_only-capstone.patch",
+      "capstone_sha256": "f32d79a724ccb80a943f37a71d32f95f2dd75f0c8178f15cbeda702b4b489141"
     },
-    "memory32": {
+    "x86_only": {
       "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "commit": "422d35aad42db14b2b19d5e098affb5dc39664b8",
-      "tree": "30dd09d0604e4da2f52e368cb5753e4cdab54c00",
-      "neverd_tree": "b8384ead51a504c46b3d1df85ab6b7736b2bfd85",
-      "blobs": {
-        "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
-        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
-        "lib/decode/CMakeLists.txt": "f0120e421cbbae64373d7dc72474dcded7c129b5"
-      },
-      "capstone_patch": "memory32-capstone.patch",
-      "capstone_sha256": "b929c490aa74ceb2360d9ae250bfe05575bb2e3eb4499f6b65a34f4502f1baa7"
-    },
-    "ordered32": {
-      "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
-      "patch": "resolve-i386.patch",
+      "patch": "x86_only-neverd.patch",
       "patch_sha256": "4ad3da8f85e81b5911e8fa627dd2d8a557852f5a7f0563f9f812fec48695ad28",
-      "commit": "422d35aad42db14b2b19d5e098affb5dc39664b8",
-      "tree": "30dd09d0604e4da2f52e368cb5753e4cdab54c00",
-      "neverd_tree": "095e5b469a4bcf1ed7b782f368ba75c11d8ad9f4",
+      "commit": "2d76851669423838603ba389ea6d53dc0dcb64fc",
+      "tree": "02241f2cfa233fdec1b5d1be464184b6b950a179",
+      "neverd_tree": "7bd9b9d3ae1c0c9aea210c0ed1acf79a31805b82",
       "blobs": {
         "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
         "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
         "lib/decode/CMakeLists.txt": "678ea2a40f4aa558bb3a39c44150501e88124fb2"
       },
-      "capstone_patch": "ordered32-capstone.patch",
-      "capstone_sha256": "b929c490aa74ceb2360d9ae250bfe05575bb2e3eb4499f6b65a34f4502f1baa7"
+      "capstone_patch": "x86_only-capstone.patch",
+      "capstone_sha256": "7c3bed95c44204bf4a729dcddd7d64dd1f1cb8f87221dc90b9edc255fefdaa82"
+    },
+    "combined": {
+      "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
+      "patch": "combined-neverd.patch",
+      "patch_sha256": "4ad3da8f85e81b5911e8fa627dd2d8a557852f5a7f0563f9f812fec48695ad28",
+      "commit": "bb70dfd13bfa42bab9e0e0088d032f842ecb4fe4",
+      "tree": "8b4594a0ab086185d09dd6046d0a1bc33a582396",
+      "neverd_tree": "7bd9b9d3ae1c0c9aea210c0ed1acf79a31805b82",
+      "blobs": {
+        "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",
+        "include/neverd/decode/Decoder.h": "e89dd0cc31e9e34b99d67eb2231b23783a9064bc",
+        "lib/decode/CMakeLists.txt": "678ea2a40f4aa558bb3a39c44150501e88124fb2"
+      },
+      "capstone_patch": "combined-capstone.patch",
+      "capstone_sha256": "269008eca30ec65b47b4f28c6bd9831ff948579793aac0fb3a7329b125579a14"
     }
   },
   "llvm": "Live NeverSight main from source, prebuilt OFF. Identity checked across variants.",
@@ -49,8 +51,8 @@
     "cycles": 7,
     "calibration_cpu_ms": 45
   },
-  "scope": "Measure the i386 tail dispatch used in the shipping decoder with packed amd64 memory. Isolate the narrow absolute memory and indirect branch writer and archive order while keeping the C++ decoder object identical.",
-  "parent": "6d901201b6cee4018f95e78fce8be4d495fd544e",
+  "scope": "Independent MIPS printer alias decision, packed x86 only, and both in the full source-built product.",
+  "parent": "c8b998e12328945814324b0d0b776682d4809e3e",
   "build_blob": "3df7e6d89801ff9a5bdcebaf9bb56061864d0acb",
   "base_blobs": {
     "lib/decode/Decoder.cpp": "745a3a8ce906f5892ffc36e5384ee72237b5f365",

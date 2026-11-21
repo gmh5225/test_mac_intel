@@ -180,8 +180,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert inclusions and any('X86OutputIterator.c.o' in v for v in inclusions)
    (out/('capstone-link-map-'+label+'.log')).write_text(chr(10).join(inclusions)+chr(10))
    command_line=sp.check_output(['ninja','-C',build,'-t','commands','capstone-product'],text=True).splitlines()[-1]
-   assert '--undefined=X86_disasmIter' in command_line and ('--undefined=X86_disasmIter32' in command_line)==(label=='ordered32')
-   write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True,i386_first=label=='ordered32'))
+   assert '--undefined=X86_disasmIter' in command_line and ('--undefined=X86_disasmIter32' in command_line)==(label in ('x86_only','combined'))
+   write(label+'-link-options',dict(force_fallback='--undefined=X86_disasmIter' in command_line,linker_map=True,i386_first=label in ('x86_only','combined')))
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    assert rev(cs)==ref
@@ -205,8 +205,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     prior=json.loads((out/'base-objects.json').read_text())
     assert prior.keys()==objects.keys()
-    assert {Path(k).name for k in prior if prior[k]!=objects[k]}==({'X86Sse64Output.c.o'} if label=='legacy_gate' else {'X86Sse64Output.c.o','X86Vex32Output.c.o'})
-    if label=='ordered32':assert objects==json.loads((out/'memory32-objects.json').read_text())
+    assert {Path(k).name for k in prior if prior[k]!=objects[k]}==({'MipsMapping.c.o'} if label=='mips_only' else {'X86Sse64Output.c.o','X86Vex32Output.c.o'} if label=='x86_only' else {'MipsMapping.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'})
    assert 'X86Vex32Output.c.o' in members
    sym=(out/('timed-symbols-'+label+'.log')).read_text().splitlines()
    assert any(line.endswith(' X86_disasmIter') for line in sym)
