@@ -22,10 +22,12 @@ git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
 raw=sp.check_output(['git','-C',r.parent,'cat-file','blob','HEAD:private-win/candidate.patch'])
 save('input',dict(canonical_sha256=sha(raw),checkout_sha256=sha((r/'candidate.patch').read_bytes()),source=git('rev-parse','HEAD')))
 assert sha(raw)==m['sha256'] and git('rev-parse','HEAD')==m['parent']
+git('config','core.autocrlf','false');git('checkout-index','--force','--all')
 t=Path(tempfile.mkdtemp());b=t/'build';checks={}
 try:
     patch=t/'canonical.patch';patch.write_bytes(raw)
     run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTEST=ON'],'configure')
+    save('toolchain',dict(compiler=shutil.which('cl'),target=arch))
     for k in ('base','candidate'):
         if k=='candidate':
             git('apply','--index',str(patch));assert git('write-tree')==m['tree']

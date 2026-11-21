@@ -1,7 +1,7 @@
-name: Build the private i386 iterator with x86 and x64 MSVC
+name: Test native 32-bit and 64-bit MSVC output with the 64-bit host compiler
 on:
   push:
-    branches: [codex/capstone-i386-private-windows]
+    branches: [codex/capstone-i386-chained-options-msvc]
     paths: [private-win/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -10,7 +10,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, x86]
+        include:
+          - { arch: x64, compiler: amd64 }
+          - { arch: x86, compiler: amd64_x86 }
     runs-on: windows-2022
     timeout-minutes: 70
     steps:
@@ -26,7 +28,7 @@ jobs:
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
         with:
-          arch: ${{ matrix.arch }}
+          arch: ${{ matrix.compiler }}
       - name: Verify public and private output through the native ABI
         env:
           TEST_MACHINE: ${{ matrix.arch }}
@@ -37,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: private-members-msvc-${{ matrix.arch }}
+          name: chained-options-msvc-${{ matrix.arch }}
           path: evidence/
           retention-days: 14
