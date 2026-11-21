@@ -146,6 +146,24 @@ class Image:
                 yield pc, target, "bl" if word >> 31 else "b"
 
 
+def scoped_disassembly(output, entry, body):
+    rows = {}
+    pattern = re.compile(
+        rb"^\s*([0-9a-f]+):\s*((?:[0-9a-f]{2}[ \t]+){4})")
+    for line in output.splitlines(keepends=True):
+        match = pattern.match(line)
+        if not match:
+            continue
+        pc = int(match[1], 16)
+        if entry <= pc < entry + len(body):
+            assert pc not in rows
+            offset = pc - entry
+            assert bytes.fromhex(match[2].decode()) == body[offset:offset + 4]
+            rows[pc] = line
+    assert list(rows) == list(range(entry, entry + len(body), 4))
+    return b"".join(rows.values())
+
+
 def collect(root):
     path = root / "usr/lib/swift/libswiftCore.dylib"
     actual = path.read_bytes()
@@ -193,8 +211,7 @@ def collect(root):
                    "--start-address=" + hex(entry), "--stop-address=" + hex(end), str(path)]
         name = hex(entry) + ".asm"
         output = subprocess.check_output(command)
-        assert re.search(rb"^\s*" + f"{entry:x}".encode() + rb":", output, flags=re.M)
-        (OUTPUT / name).write_bytes(output)
+        (OUTPUT / name).write_bytes(scoped_disassembly(output, entry, body))
         captured[entry] = dict(entry=hex(entry), end=hex(end), depth=level,
                                symbols=image.symbols.get(entry, []), code_sha256=sha(body),
                                arm64_instructions=[f"{row[0]:08x}" for row in struct.iter_unpack("<I",body)],
