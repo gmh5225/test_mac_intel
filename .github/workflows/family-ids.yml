@@ -1,7 +1,7 @@
-name: Check multiarch formatting with frameless public x86 forwarding
+name: Verify the ISA-selected public iterator against real records and unrelated ISAs
 on:
   push:
-    branches: [codex/capstone-tail-iter-profiles]
+    branches: [codex/public-iterator-isa-selection-controls]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 958b98cbbeb217ab3e8babe1de7175546ec82748
+          ref: 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: tail-iter-profiles-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-isa-selection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

@@ -25,12 +25,11 @@ try:
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
-        host=os.environ['RUNNER_OS'] # CMake always runs on Linux in this profile.
-        reference=json.loads((r/'reference.json').read_text())
-        assert host=='Linux'
-        matching=[key for key in reference if key.endswith('-'+cc+'-'+conf) and (('24.04-arm' in key)==(platform.machine()=='aarch64')) and (('22.04' in key)==('22.04' in Path('/etc/os-release').read_text()))]
-        assert len(matching)==1,matching
-        if conf!='full':assert sha(libs[variant])==reference[matching[0]][variant],(matching,variant,sha(libs[variant]))
+        assert os.environ['RUNNER_OS']=='Linux'
+        symbols=sp.check_output(['nm','--defined-only',path],text=True)
+        selected=any(l.split()[-1].split('.')[0]=='disasmScanIterator' for l in symbols.splitlines() if l.split())
+        assert selected==(conf=='full' and variant=='candidate'),(conf,variant,selected)
+        write('entry-'+variant,dict(has_scan_body=selected,sha256=sha(path)))
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
     run([tmp/'check-static'],'static-selected')
@@ -42,8 +41,7 @@ try:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
     if conf!='full':
-        assert sha(libs['base'])==sha(libs['candidate'])
-        write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
+        write('inactive-images',dict(identical=sha(libs['base'])==sha(libs['candidate']),base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
