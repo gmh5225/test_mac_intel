@@ -1,7 +1,7 @@
-name: Measure compact broadcasts and mode-correct implicit registers in two source-built NeverD products
+name: Test sparse VEX memory records in two NeverD products built from fork LLVM source
 on:
   push:
-    branches: [codex/product-vector-broadcast-register-repair]
+    branches: [codex/product-vex-register-bits]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: broadcast-repair-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex-bit-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
