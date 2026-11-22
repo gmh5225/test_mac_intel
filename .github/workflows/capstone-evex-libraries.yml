@@ -1,7 +1,7 @@
-name: Compare generated secondary opcode extents with canonical decoding on protected pages and real x86 files
+name: Measure constant-width native batch loops with matched opcode tables on ELF and both PE widths
 on:
   push:
-    branches: [codex/capstone-secondary-batch-widths]
+    branches: [codex/capstone-width-specialized-batch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: secondary-batch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: width-loops-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

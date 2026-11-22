@@ -95,6 +95,10 @@ def main(w):
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'raw64.cpp',b/'libcapstone.a','-o',w/'raw64'],'build-guard64')
             run([w/'raw64'],'guard64')
         if label=='integrated':
+            with (w/'regenerated.inc').open('wb') as generated, (evidence/'generator.log').open('wb') as log:
+                run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'producer'],'build-producer')
+                sp.run([w/'producer','--evex-scan'],stdout=generated,stderr=log,check=True)
+            assert (w/'regenerated.inc').read_bytes()==(base/'arch/X86/X86GenEvexScan.inc').read_bytes()
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'plan.c','-o',w/'plan.o'],'build-evex-plan')
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'evex.cpp',w/'plan.o',b/'libcapstone.a','-o',w/'evex'],'build-evex')
             run([w/'evex'],'evex-oracle')
@@ -105,6 +109,15 @@ def main(w):
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*(['-Wl,--undefined=X86_scanNativeBatch'] if label!='baseline' else []),*libs,'-o',target],'link-'+label)
+        if label!='baseline':
+            member=sp.check_output(['ar','p',libs[0],'X86BatchScan.c.o']);(w/'batch.o').write_bytes(member)
+            run(['objdump','-d','-r','--no-show-raw-insn',w/'batch.o'],'batch-assembly-'+label)
+            syms=sp.check_output(['nm','-S','--size-sort',target],text=True)
+            selected=[s for s in syms.splitlines() if any(n in s.split()[-1] for n in ('scanBatch','scanNativeBatch','readFirst','readPrimary','readVex2Plan'))]
+            save('batch-layout-'+label+'.json',dict(symbols=selected,object_sha256=sha(w/'batch.o')))
+            if label=='integrated':
+                assert all(any(s.endswith(' '+name) for s in selected) for name in ('scanBatch32','scanBatch64'))
+                assert not any(s.endswith(' scanBatch') for s in selected)
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}

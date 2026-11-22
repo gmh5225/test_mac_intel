@@ -31,7 +31,7 @@ int main() {
         code[1]=uint8_t(((op+p3)<<4)|((op+p3+flags)&15));code[2]=uint8_t(((op^p3)&0x78)|(flags&7)|((flags&8)<<4));code[3]=uint8_t(p3);code[4]=uint8_t(op);code[5]=uint8_t(3*op+p3);
         test((op+flags)&15);test(15);
     }
-    const uint8_t ops[]={0x00,0x6f,0x7f,0x19,0x1a,0x1b,0x25,0x39,0x3b,0x44,0xdb,0xdc,0xdd,0xde,0xdf,0xef,0xfe};
+    const uint8_t ops[]={0x10,0x11,0x28,0x29,0x00,0x6f,0x7f,0x19,0x1a,0x1b,0x25,0x39,0x3b,0x44,0xdb,0xdc,0xdd,0xde,0xdf,0xef,0xfe};
     for(auto op:ops)for(unsigned map=1;map<=3;++map)for(unsigned pw=0;pw<8;++pw)for(unsigned ll=0;ll<4;++ll)for(unsigned mr=0;mr<256;++mr){
         code[1]=uint8_t(0xf0|map);code[2]=uint8_t(0x7c|(pw&3)|((pw&4)<<5));code[3]=uint8_t((ll<<5)|8);code[4]=op;code[5]=uint8_t(mr);code[6]=uint8_t((mr&1)?0x25:0x24);
         test(15);test(6);test(7);test((op+mr)&15);
