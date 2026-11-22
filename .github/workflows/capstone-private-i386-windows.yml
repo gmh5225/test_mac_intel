@@ -1,7 +1,7 @@
-name: Verify complete vector regression functions in all static and shared configurations
+name: Check the isolated scan update and composed register effects in 16 static and shared configurations
 on:
   push:
-    branches: [codex/capstone-complete-vector-configuration-checks]
+    branches: [codex/capstone-scan-validation-and-regs-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: vector-checked-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: scan-register-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

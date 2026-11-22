@@ -18,7 +18,7 @@ add_library(observed OBJECT "INPUT/second.c")
 target_compile_definitions(observed PRIVATE CAPSTONE_HAS_X86 CAPSTONE_USE_SYS_DYN_MEM)
 target_include_directories(observed PRIVATE "SOURCE" "SOURCE/include")
 target_link_libraries(observed PRIVATE capstone)
-foreach(name IN ITEMS rounded shift)
+foreach(name IN ITEMS rounded shift mandatory vex3)
   add_executable(probe-${name} "INPUT/${name}.cpp" $<TARGET_OBJECTS:observed>)
   target_compile_features(probe-${name} PRIVATE cxx_std_17)
   target_include_directories(probe-${name} PRIVATE "SOURCE")
@@ -40,7 +40,7 @@ endforeach()
     suite=['x86_simple_output','x86_buffer_bounds','x86_packed_move_access','x86_reg_access','detail_option','text_option','x86_scan_batch','x86_mapping_counts','x86_evex_move_access','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
     tests=[n for n in suite if 'unit_'+n in names];full=profile in ('full','noatt')
     assert len(tests)>=4 and ('x86_simple_output' in tests or not full),(profile,tests)
-    cmd('build',['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*tests,*(['check-rows','check-memory'] if full else []),*(['probe-rounded','probe-shift'] if full and label=='combined' else [])])
+    cmd('build',['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*tests,*(['check-rows','check-memory'] if full else []),*(['probe-mandatory','probe-vex3'] if full else []),*(['probe-rounded','probe-shift'] if full and label!='vex' else [])])
     cmd('units',['ctest','--test-dir',b,'-C','Release','--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(tests)+')$'])
     if full:
        exe,=[f for f in b.rglob('check-rows.exe'if win else 'check-rows')if f.is_file()]
@@ -49,14 +49,19 @@ endforeach()
            executable,=[p for p in b.rglob(target+('.exe' if win else ''))if p.is_file()]
            got=sp.check_output([executable,flag]).replace(b'\r\n',b'\n')
            assert got==(s/'arch/X86'/name).read_bytes().replace(b'\r\n',b'\n'),name
-       check_table('check-memory','--legacy-packed-memory','X86GenLegacyPackedMemory.inc')
-       check_table('check-rows','--evex-shifts','X86GenEvexShiftOutput.inc')
-       if label=='combined':
+       def guard(name,expected):
+           exe,=[f for f in b.rglob('probe-'+name+('.exe' if win else ''))if f.is_file()]
+           actual=list(map(int,sp.check_output([exe]).split()))
+           assert actual==expected,(name,actual)
+           save('oracle-'+name,dict(counts=actual))
+       for name,expected in [('mandatory',[13369344,6120742]),('vex3',[18874368,1074938])]:
+           guard(name,expected)
+       if label!='vex':
+           check_table('check-memory','--legacy-packed-memory','X86GenLegacyPackedMemory.inc')
+           check_table('check-rows','--evex-shifts','X86GenEvexShiftOutput.inc')
            check_table('check-rows','--rounded-registers64','X86GenRoundedRegister64.inc')
            for name,expected in [('rounded',[12582912,40376]),('shift',[10485760,2160])]:
-               exe,=[f for f in b.rglob('probe-'+name+('.exe' if win else ''))if f.is_file()]
-               actual=list(map(int,sp.check_output([exe]).split()))
-               assert actual==expected,(name,actual)
+               guard(name,expected)
     save('checked',dict(stage=label,complete=True,source=q,profile=profile,tests=tests,machine=platform.machine(),generator=bool(full)))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);out=d.parent/'evidence';save('cleanup',dict(removed=not t.exists(),bytes=n))
