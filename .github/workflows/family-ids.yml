@@ -1,7 +1,7 @@
-name: Verify the aggregate initializer on GCC and require exact Clang library identity before rechecking all targets
+name: Select measured mixed RISC-V operand layout on x86 hosts and verify native ARM, GCC and four-backend images
 on:
   push:
-    branches: [codex/capstone-mapping-initializer-portability]
+    branches: [codex/capstone-riscv-host-qualified]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 989508842d378789f9d98465de059feb99913c96
+          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: portable-stack-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: host-qualified-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
