@@ -1,5 +1,5 @@
 """Expose real i386 AVX2 JPEG assembly with local symbol boundaries from Debian's static archive."""
-import hashlib,io,re,subprocess as sp,tarfile
+import hashlib,io,platform,re,subprocess as sp,tarfile
 from pathlib import Path
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
@@ -18,10 +18,12 @@ def jpeg_avx2(w,host,packages):
  with tarfile.open(fileobj=data,mode='r|*') as ar:
   found=[ar.extractfile(m).read() for m in ar if m.isfile() and Path(m.name).name=='libjpeg.a']
  assert len(found)==1;archive=w/'libjpeg-i386.a';archive.write_bytes(found[0])
- names=[v for v in sp.check_output(['ar','t',archive],text=True).splitlines() if 'avx2' in v.lower()];assert names
+ darwin=platform.system()=='Darwin'
+ listing=['bsdtar','-tf',archive] if darwin else ['ar','t',archive]
+ names=[v for v in sp.check_output(listing,text=True).splitlines() if 'avx2' in v.lower()];assert names
  out=bytearray();spans=[];members={}
  for name in names:
-  obj=sp.check_output(['ar','p',archive,name]);elf=ELFFile(io.BytesIO(obj));assert elf['e_machine']=='EM_386'
+  obj=sp.check_output(['bsdtar','-xOf',archive,name] if darwin else ['ar','p',archive,name]);elf=ELFFile(io.BytesIO(obj));assert elf['e_machine']=='EM_386'
   sec=elf.get_section_by_name('.text');idx=elf.get_section_index('.text')
   if sec is None or not sec['sh_size']:continue
   code=sec.data();entries=sorted({int(s['st_value']) for sym in elf.iter_sections() if isinstance(sym,SymbolTableSection) for s in sym.iter_symbols() if s['st_shndx']==idx and s['st_info']['bind'] in ('STB_GLOBAL','STB_WEAK') and s['st_info']['type'] in ('STT_FUNC','STT_NOTYPE') and int(s['st_value'])<len(code)})
