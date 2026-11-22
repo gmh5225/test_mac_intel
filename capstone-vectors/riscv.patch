@@ -1,0 +1,70 @@
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 4190862e..77d5f89f 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -752,6 +752,10 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 		2, !RISCV_getFeatureBits(MI->csh->mode, RISCV_Feature64Bit),
+ 		DecoderTableRISCV32Only_16,
+ 		"RISCV32Only_16 table (16-bit Instruction)");
++	/* The 32-bit-only table above retains first chance. For other
++	 * compressed extensions the top six bits can exclude every table. */
++	if (!(RISCV_COMPRESSED_EXTENSIONS & (UINT64_C(1) << (Insn >> 10))))
++		goto base16;
+ 	TRY_TO_DECODE_FEATURE(2, RISCV_FeatureStdExtZicfiss,
+ 			      DecoderTableZicfiss16,
+ 			      "RVZicfiss table (Shadow Stack)");
+@@ -760,6 +764,7 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 	TRY_TO_DECODE_FEATURE(
+ 		2, RISCV_FeatureStdExtZcmp, DecoderTableRVZcmp16,
+ 		"Zcmp table (16-bit Push/Pop & Double Move Instructions)");
++base16:
+ 	TRY_TO_DECODE_AND_ADD_SP(2, true, DecoderTable16,
+ 				 "RISCV_C table (16-bit Instruction)");
+ 
+diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
+index 10c7f1f7..823f8b59 100644
+--- a/arch/RISCV/RISCVGenDirectDecoder.inc
++++ b/arch/RISCV/RISCVGenDirectDecoder.inc
+@@ -17212,6 +17212,8 @@ Decode:
+ 
+ #define RISCV_EXTENSION_MAJORS UINT32_C(0x405f0c04)
+ 
++#define RISCV_COMPRESSED_EXTENSIONS UINT64_C(0x0000c90001000000)
++
+ static DecodeStatus directInstruction_2(const uint8_t *Table, MCInst *MI, uint16_t insn, uint64_t Address, const void *Decoder)
+ 
+ {
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index ab09030b..d4e2b65c 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -332,6 +332,7 @@ def main():
+         ]
+         counts = []
+         extension_majors = 0
++        compressed_extensions = 0
+         ppc_extension_majors = 0
+         for name, body in tables:
+             encoded_width = int(name[-2:])
+@@ -346,6 +347,11 @@ def main():
+             if arch == "RISCV" and encoded_width == 32 and name != "DecoderTable32":
+                 for opcode_prefix in observable_field_values(nodes, 0, 7):
+                     extension_majors |= 1 << (opcode_prefix >> 2)
++            if arch == "RISCV" and encoded_width == 16 and name not in (
++                "DecoderTable16", "DecoderTableRISCV32Only_16"
++            ):
++                for bits in observable_field_values(nodes, 10, 6):
++                    compressed_extensions |= 1 << bits
+             if arch == "PowerPC" and name != "DecoderTable32":
+                 if encoded_width == 64:
+                     # The first word in memory occupies bits 63:32, for either endianness.
+@@ -366,6 +372,9 @@ def main():
+             output.append(
+                 f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
+             )
++            output.append(
++                f"#define RISCV_COMPRESSED_EXTENSIONS UINT64_C(0x{compressed_extensions:016x})"
++            )
+         if arch == "PowerPC":
+             output.append(
+                 f"#define PPC_EXTENSION_MAJORS UINT64_C(0x{ppc_extension_majors:016x})"

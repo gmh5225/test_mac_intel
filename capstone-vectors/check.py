@@ -20,11 +20,13 @@ try:
     opts=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON']
     run('configure',['cmake','-S',project,'-B',b,'-G','Ninja',*opts]);rows={}
     for key,pair in stages.items():
-        if key!='base':git('apply','--index',str(d/(key+'.patch')))
+        if key in ('writer','fix'):git('apply','--index',str(d/(key+'.patch')))
         assert git('write-tree')==pair['original']
         # Save the original tree so the next x86 delta applies only once.
         for variant in ('original','rebased'):
-            if variant=='rebased':git('apply','--index',str(d/'mips.patch'))
+            if variant=='rebased':
+                git('apply','--index',str(d/'diet.patch'))
+                if key!='base':git('apply','--index',str(d/'riscv.patch'))
             assert git('write-tree')==pair[variant]
             run(key+'-'+variant,['cmake','--build',b,'--target','compare-abi','--parallel','4'])
             lib,=b.rglob('libcapstone.a');exe=b/'compare-abi'
@@ -36,7 +38,7 @@ try:
             rows.setdefault(key,{})[variant]=dict(tree=pair[variant],members=members,archive=sha(lib),linked=sha(exe))
         a,z=rows[key].values();assert a['members']==z['members'] and a['linked']==z['linked'],key
         if sys.platform.startswith('linux'):assert a['archive']==z['archive']
-        git('restore','--source',pair['original'],'--staged','--worktree','--','arch/Mips/MipsDisassembler.c','arch/Mips/MipsInstPrinter.c')
+        git('read-tree','--reset','-u',pair['original'])
         save('pairs',rows)
     save('checked',dict(complete=True,source=m,pairs=rows,compiler=sp.check_output([os.getenv('CC','cc'),'--version'],text=True).splitlines()[0],system=sys.platform))
 finally:
