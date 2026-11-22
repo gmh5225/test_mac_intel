@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','mapping','clear'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base', 'registers', 'mapping_registers', 'clear_registers'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -39,7 +39,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','mapping','clear'):
+    for variant in ('base', 'registers', 'mapping_registers', 'clear_registers'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -57,7 +57,7 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant=='base' or v[0]=='64' else 8) for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant in ('base','registers') or v[0]=='64' else 8) for v in regs)
         if variant!='base':
             for unit in ('x86_simple_output','x86_reg_access'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
@@ -84,7 +84,14 @@ try:
         assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86MemoryFallback32.c.o') < members.index('X86BatchScan.c.o'),members
 
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
-        save('layout-'+variant,dict(member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
+        import io
+        obj_bytes=sp.check_output(['ar','p',archive,'X86ImmediateOutput.c.o'])
+        contents=ELFFile(io.BytesIO(obj_bytes))
+        immediate_code={se.name:hashlib.sha256(se.data()).hexdigest() for se in contents.iter_sections() if se.data_size and se['sh_flags'] & 4}
+        assert '.text' in immediate_code
+        if variant=='base':original_immediate=immediate_code
+        else:assert original_immediate==immediate_code
+        save('layout-'+variant,dict(immediate_code=immediate_code,member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
 
         if variant!='base':
             for mode in ('32','64'):
@@ -102,7 +109,7 @@ try:
         if variant !='base':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
             assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
-        if variant=='clear':
+        if variant=='clear_registers':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
@@ -121,7 +128,7 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        if variant in ('mapping','clear'):
+        if variant in ('registers', 'mapping_registers', 'clear_registers'):
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
             assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
@@ -154,7 +161,7 @@ try:
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k!='base' and k!='copy':wanted[-1]-=delta*n
+                    if k.endswith('_registers'):wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
