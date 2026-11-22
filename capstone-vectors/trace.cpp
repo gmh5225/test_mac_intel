@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     csh h = 0;
     if (cs_open(CS_ARCH_X86, bits == 64 ? CS_MODE_64 : CS_MODE_32, &h) ||
         cs_option(h, CS_OPT_TEXT, CS_OPT_OFF)) return 3;
-    using Key = std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
+    using Key = std::tuple<unsigned, unsigned, unsigned, unsigned, unsigned, unsigned, unsigned, unsigned>;
     std::map<Key, unsigned> counts;
     size_t pos, size; uint64_t ip;
     while (spans >> pos >> size >> ip) {
@@ -43,13 +43,27 @@ int main(int argc, char **argv) {
             } else if (bits==64 && (byte&0xf0)==0x40 && length>=2) {
                 op=p[1];if(op==0x0f && length>=3){map=1;op=p[2];}
             }
-            ++counts[{word?2:result.count?1:0,byte,map,op,form,reference>>8}];
+            unsigned flags=0, reg_group=0;
+            if(byte==0x62 && map && length>=6) {
+                const auto p2=p[3];
+                flags=(p2&0xf7) | (unsigned(p[2]&3)<<8) | (unsigned(p[2]>>7)<<10);
+                reg_group=(p[5]>>3)&7;
+            } else if((byte==0xf2 || byte==0xf3 || byte==0x66) && length>=2) {
+                unsigned n=1;
+                if(bits==64 && (p[n]&0xf0)==0x40) {flags=p[n];++n;}
+                if(n<length && p[n]==0x0f && ++n<length) {
+                    map=1;
+                    if((p[n]==0x38 || p[n]==0x3a) && n+1<length){map=p[n]==0x38?2:3;++n;}
+                    op=p[n];
+                }
+            }
+            ++counts[{word?2:result.count?1:0,byte,map,op,form,reference>>8,flags,reg_group}];
             pos+=length; size-=length; ip+=length;
         }
     }
     for (const auto &[key,n]:counts) {
-        const auto [stage,byte,map,op,form,id]=key;
-        std::printf("%u %u %u %u %u %u %u\n",stage,byte,map,op,form,id,n);
+        const auto [stage,byte,map,op,form,id,flags,group]=key;
+        std::printf("%u %u %u %u %u %u %u %u %u\n",stage,byte,map,op,form,id,flags,group,n);
     }
     return cs_close(&h)!=CS_ERR_OK;
 }
