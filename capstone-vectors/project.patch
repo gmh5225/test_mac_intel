@@ -115,7 +115,7 @@ index ae1554b0..92196e8d 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..c62cb817 100644
+index 12428fff..453495e8 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3771,6 +3771,17 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
@@ -136,22 +136,53 @@ index 12428fff..c62cb817 100644
  		if (!getInstructionScanResultAfterInitial(
  			    (csh)(uintptr_t)handle, code, size, insn, &result,
  			    true))
-@@ -3787,12 +3798,65 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3787,12 +3798,87 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  	return true;
  }
  
 +#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+/* Only scan calls need the scan decoder's stack frame and mapping state. */
 +#if defined(_MSC_VER)
-+__declspec(noinline)
++#define X86_ITERATOR_NOINLINE __declspec(noinline)
 +#elif defined(__GNUC__)
-+__attribute__((noinline))
++#define X86_ITERATOR_NOINLINE __attribute__((noinline))
++#else
++#define X86_ITERATOR_NOINLINE
 +#endif
-+static bool disasmScanIterator(cs_struct *handle, const uint8_t **code,
-+			       size_t *size, uint64_t *address, cs_insn *insn)
++
++/* Keep scan and general decoding frames out of the public text dispatch. */
++static X86_ITERATOR_NOINLINE bool
++disasmScanIterator(cs_struct *handle, const uint8_t **code, size_t *size,
++		   uint64_t *address, cs_insn *insn)
 +{
 +	return cs_disasm_iter_valid(handle, code, size, address, insn, true);
 +}
++
++#ifndef CAPSTONE_X86_SCAN_ADAPTER
++static X86_ITERATOR_NOINLINE bool
++disasmProjectedScan64(cs_struct *handle, const uint8_t **code, size_t *size,
++		      uint64_t *address, cs_insn *insn)
++{
++	const uint32_t word = X86_readScanWord(*code, *size, true);
++	if (word) {
++		const X86ScanResult result = { 0, word >> 8,
++					       (uint16_t)(word & 0xff), 0 };
++		handle->errnum = CS_ERR_OK;
++		insn->address = *address;
++		finish_x86_scan(handle, insn, &result, *code, false, true);
++		advance_iter(code, size, address, result.length);
++		return true;
++	}
++	return disasmScanIterator(handle, code, size, address, insn);
++}
++#endif
++
++static X86_ITERATOR_NOINLINE bool
++disasmOtherIterator(cs_struct *handle, const uint8_t **code, size_t *size,
++		    uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_valid(handle, code, size, address, insn, false);
++}
++#undef X86_ITERATOR_NOINLINE
 +#endif
 +
  CAPSTONE_EXPORT
@@ -166,9 +197,11 @@ index 12428fff..c62cb817 100644
 +	if (handle->arch == CS_ARCH_X86) {
 +		if (!handle->no_text) {
 +			if (handle->mode == CS_MODE_64)
-+				return X86_disasmIterText(ud, code, size, address, insn);
++				return X86_disasmIterText(ud, code, size,
++							  address, insn);
 +			if (handle->mode == CS_MODE_32)
-+				return X86_disasmIter32(ud, code, size, address, insn);
++				return X86_disasmIter32(ud, code, size, address,
++							insn);
 +#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
 +			return X86_disasmIter(ud, code, size, address, insn);
 +#endif
@@ -176,26 +209,15 @@ index 12428fff..c62cb817 100644
 +#ifndef CAPSTONE_X86_SCAN_ADAPTER
 +			if (handle->mode == CS_MODE_64 &&
 +			    handle->insn_id == X86_get_insn_id &&
-+			    handle->disasm == X86_getInstruction) {
-+				const uint32_t word = X86_readScanWord(
-+					*code, *size, true);
-+				if (word) {
-+					const X86ScanResult result = {
-+						0, word >> 8, (uint16_t)(word & 0xff), 0
-+					};
-+					handle->errnum = CS_ERR_OK;
-+					insn->address = *address;
-+					finish_x86_scan(handle, insn, &result,
-+							*code, false, true);
-+					advance_iter(code, size, address, result.length);
-+					return true;
-+				}
-+			}
++			    handle->disasm == X86_getInstruction)
++				return disasmProjectedScan64(handle, code, size,
++							     address, insn);
 +#endif
-+			return disasmScanIterator(handle, code, size, address, insn);
++			return disasmScanIterator(handle, code, size, address,
++						  insn);
 +		}
 +	}
-+	return cs_disasm_iter_valid(handle, code, size, address, insn, false);
++	return disasmOtherIterator(handle, code, size, address, insn);
 +#else
  	return cs_disasm_iter_core(ud, code, size, address, insn);
 +#endif
