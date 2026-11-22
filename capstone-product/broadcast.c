@@ -7,5 +7,9 @@ bool observed_broadcast(csh h, bool wide, const uint8_t *bytes, size_t size, cs_
 	cs_struct *s = (cs_struct *)(uintptr_t)h;
 	if (size < 6 || bytes[0] != 0x62 || !wide || X86_OUTPUT_UNSUPPORTED(s, false))
 		return false;
+#if __has_include("arch/X86/X86GenIntegerBlockBroadcast.inc")
+	if (bytes[4] == 0x5a)
+		return X86_writeIntegerBlockBroadcast(bytes, size, out, length, x86_simple_registers[3]);
+#endif
 	return X86_writeEvexBroadcastPrechecked(bytes, size, out, length, x86_simple_registers[3]);
 }

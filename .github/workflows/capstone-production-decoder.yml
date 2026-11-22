@@ -1,7 +1,7 @@
-name: Test sparse VEX memory records in two NeverD products built from fork LLVM source
+name: Measure the isolated block broadcast reader in two source-built NeverD products
 on:
   push:
-    branches: [codex/product-vex-register-bits]
+    branches: [codex/product-amd64-block-broadcast]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-bit-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: late-broadcast-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
