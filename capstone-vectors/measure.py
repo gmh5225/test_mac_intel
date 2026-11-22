@@ -92,22 +92,25 @@ def main(w):
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
-        assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==z['commit']
+        assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
+        if key in ('word','project'):
+            patch=r/(key+'.patch');assert sha(patch)==z['sha256']
+            run(['git','apply','--index',patch],'apply-'+key,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/('build-'+key);project=base
-        if key=='project':
+        if key!='official':
             nd=r.parent/'neverd-config';record=m['neverd']
             assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
             for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
             text=(nd/'CMakeLists.txt').read_text();a=text.index('# --- Capstone (our fork');end=text.index('# --- NeverD CMake helpers',a)
-            project=w/'project';(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
+            project=w/('project-'+key);(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
             shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake')
             (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+text[a:end])
         run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
         db=json.loads((build/'compile_commands.json').read_text());files={Path(u['file']).name for u in db}
         near={Path(u['file']).name for u in db if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in u['command'].split()}
-        assert near==({'X86Sse64Output.c'}if key=='project'and not darwin else set()),near
-        assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(key=='project')
+        assert near==({'X86Sse64Output.c'}if key!='official'and not darwin else set()),near
+        assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(key!='official')
         save('compile-'+key+'.json',dict(archive_profile=key,near_indirect=sorted(near),neverd=m['neverd'],compile_commands_sha256=sha(build/'compile_commands.json')))
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if key=='official' else [])],'build-'+key)
@@ -123,7 +126,7 @@ def main(w):
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
         if key=='project':
-            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-DX86_disasmRecordIter=observed_disasm_record_iter','-DX86_readScanWord=observed_read_scan_word','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
                 run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/(name+'.cpp'),w/'plan.o',lib,'-o',w/name],'compile-'+name)
                 run([w/name],'oracle-'+name)
@@ -150,14 +153,15 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
             def timed(label,count):
-                key='official'if label=='official'else 'project'
-                engine={'iced':'iced____','fast':'fast____','public':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
+                key={'official':'official','public_release':'release','public_word':'word'}.get(label,'project')
+                engine={'iced':'iced____','fast':'fast____','public':'capstone','public_release':'capstone','public_word':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
                 return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
-            labels=['official','project','copy','public','iced']+(['fast']if mode else [])
+            labels=['official','project','copy','public','public_word','public_release','iced']+(['fast']if mode else [])
             for idx in range(13):
                 labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public')})==1
+                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public','public_word','public_release')})==1
+                assert len({tuple(v[2:])for k,v in obs if k in ('public','public_word','public_release')})==1
                 if mode:assert len({tuple(v[2:])for k,v in obs if k in ('public','project')})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)

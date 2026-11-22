@@ -1,7 +1,7 @@
-name: Compare the repaired x86-only and production configurations against iced on four hosts
+name: Measure two public scan and format dispatches against the released iterator and iced on four hosts
 on:
   push:
-    branches: [codex/shipped-optional-aliases-versus-iced]
+    branches: [codex/public-full-records-versus-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-records-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
