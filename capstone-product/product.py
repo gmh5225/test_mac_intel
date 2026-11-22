@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['official_capstone']
-assert sha(r/'candidate.patch')==m['candidate']['sha256']
+for key in ('base','alias','minimal','tagged'):assert sha(r/(key+'.patch'))==m[key]['sha256']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
@@ -34,8 +34,9 @@ try:
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
-    for variant in ('base','candidate'):
-        if variant=='candidate':command(['git','apply','--index',r/'candidate.patch'],'apply-candidate',cs)
+    for variant in ('base','alias','minimal','tagged'):
+        command(['git','restore','--source=HEAD','--staged','--worktree','.'],'restore-'+variant,cs)
+        command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree']
         decoder=nd/'lib/decode/X86/X86Decoder.cpp'
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
@@ -50,7 +51,14 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant=='base' or v[0]=='64' else 8) for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant in ('base','alias') or v[0]=='64' else 8) for v in regs)
+        members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in sp.check_output(['ar','t',archive],text=True).splitlines()}
+        if variant=='base':reference=members
+        else:
+            changed=sorted(k for k,v in members.items() if reference[k]!=v)
+            wanted={'alias':['AliasMapping.c.o'],'minimal':['X86Mapping.c.o'],'tagged':['X86Mapping.c.o']}[variant]
+            assert changed==wanted,(changed,wanted)
+        save('members-'+variant,members)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder),records=regs)
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -66,7 +74,7 @@ try:
     for c in cases:
         for mode in (range(4) if c['selector'] in (32,64) else range(3)):
             single=execute('base',c,mode,1)
-            n=max(1,round(65000/single[0]))
+            n=max(1,round(50000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             delta,occurrences=0,0
@@ -76,18 +84,18 @@ try:
                 assert counted[3:]==single[1:]
                 assert (occurrences==0)==(delta==0)
                 if c['name']=='putty-32-0.85':assert occurrences==3
-            for rep in range(17):
-                keys=['base','copy','candidate'];rng.shuffle(keys);ticks={v:[] for v in keys}
+            for rep in range(13):
+                keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k=='candidate':wanted[-1]-=delta*n
+                    if k in ('minimal','tagged'):wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
             rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],clears=occurrences,score_change_per_pass=delta,reps=n,cycles=cycles))
             save('timings',rows)
-    save('complete',dict(done=True,pairs=17,panels=len(rows),source=llvm))
+    save('complete',dict(done=True,pairs=13,panels=len(rows),source=llvm))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())
     shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))
