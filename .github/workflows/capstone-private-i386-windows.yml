@@ -1,7 +1,7 @@
-name: Exercise integrated batch, native i386 output and register detail in all Windows and Apple profiles
+name: Verify combined formatting and public EVEX projections in Windows and Apple configurations
 on:
   push:
-    branches: [codex/capstone-integrated-static-shared-output]
+    branches: [codex/capstone-combined-vector-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
+          ref: 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: checked-output-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: vector-checked-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
