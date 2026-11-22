@@ -86,6 +86,8 @@ def main(w):
     inc=once(inc,'engine!="x86_iter" &&','engine!="x86_iter" && engine!="x86_len_" &&')
     inc='#include <cstring>\n'+inc
     inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
+    inc='#include <valgrind/callgrind.h>\n'+inc
+    inc=once(inc,'Result timed=run(reps);','CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT; Result timed=run(reps); CALLGRIND_TOGGLE_COLLECT;')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={}
@@ -151,22 +153,21 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (0,1,2):
-            def timed(label,count):
-                key={'official':'official','public_release':'release','public_word':'word','public_single':'single','single_release':'official'}.get(label,'project')
-                engine={'iced':'iced____','fast':'fast____','public':'capstone','public_release':'capstone','public_word':'capstone','public_single':'capstone','single_release':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
-                return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
-            labels=['official','project','copy','public','public_word','public_release','public_single','single_release','iced']+(['fast']if mode else [])
-            for idx in range(13):
-                labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public','public_word','public_release','public_single','single_release')})==1
-                assert len({tuple(v[2:])for k,v in obs if k in ('public','public_word','public_release','public_single','single_release')})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k in ('public','project')})==1
-                cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
-    save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
+        save(name+'-input.json',dict(extent_sha256=sha(intervals),text_sha256=sha(f),extents=len(selected)))
+        from costs import profile
+        for mode in (1,2,4):
+            variants=[('private','release','x86_len_'),('public','release','capstone'),('fixed','project','capstone')]
+            if mode!=4:variants.append(('iced','release','fast____'))
+            seen=[]
+            for label,key,engine in variants:
+                target=evidence/label;target.mkdir(exist_ok=True)
+                row=profile(bins[key],engine,mode,bits,f,intervals,w,target,name)
+                row.update(engine=label,binary_engine=engine)
+                results.append(row);seen.append(row['raw_signature'])
+            assert len({tuple(z[:3])for z in seen})==1 and len({tuple(z)for z in seen[:3]})==1
+            save('profile.json',results)
+    assert len(results)==11*len(m['samples'])
+    save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
     if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

@@ -1,7 +1,7 @@
-name: Compare compatible public fixed-mode writers and both shipped configurations against iced
+name: Attribute work per instruction for released native public and fixed iterators and iced FastFormatter
 on:
   push:
-    branches: [codex/compatible-shipped-public-iced]
+    branches: [codex/profile-published-and-public-formatter]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -42,6 +39,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -50,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-compatible-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: product-formatter-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
