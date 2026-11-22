@@ -1,7 +1,7 @@
-name: Qualify ordinary vector RIP memory on Intel and ARM Mac and 32-bit and 64-bit Windows
+name: Build and verify current RIP and public writers in sixteen Windows and macOS configurations
 on:
   push:
-    branches: [codex/portable-rip-memory-output]
+    branches: [codex/portable-public-mode-writers]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 40125a7e11dcc4e9a5f43d2d11405212ed9d8184
+          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-rip-output-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: public-rip-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
