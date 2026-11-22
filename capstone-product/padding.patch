@@ -1,0 +1,82 @@
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..75b1c12f 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -7,6 +7,10 @@
+ #pragma clang section text = ".cs_x86_native_batch_text" rodata = \
+ 	".cs_x86_native_batch_rodata"
+ #endif
++#if defined(__ELF__) && defined(__clang__) && defined(__x86_64__)
++__asm__(".pushsection .cs_x86_native_batch_text, \"ax\", @progbits\n"
++        ".space 1072, 0x90\n.popsection\n");
++#endif
+ #include "X86ScanAdapter.h"
+ #include "../../cs_priv.h"
+ 
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index ac63ca24..3047f132 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -67,6 +67,16 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 		}
+ 	}
+ fallback:
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
++	defined(__x86_64__)
++	/* The fixed AMD64 decoder has just tried the shared output plans.
++	 * Its VEX2 helper also tries the shared writer on a miss. Only its
++	 * EVEX register-rounding override can decline before that writer. */
++	if (!(size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
++	      (code[3] & 0x10)))
++		return cs_decode_full_insn_body(handle, code, size, insn,
++						insn_size, batch);
++#endif
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
+ #endif
+diff --git a/cs.c b/cs.c
+index c2c4d890..c87f3f47 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1041,21 +1041,17 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+-static __attribute__((noinline)) CS_PRESERVE_MOST bool
+-decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
+-
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+-	return decode_full_insn_body(handle, code, size, insn, insn_size, batch);
++	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
+ }
+ 
+-static __attribute__((noinline)) CS_PRESERVE_MOST bool
+-decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
++__attribute__((noinline)) CS_PRESERVE_MOST bool
++cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
+ #else
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index a0e2ebc0..f3dfc374 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -21,6 +21,12 @@
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
++	defined(__x86_64__)
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+ 			size_t *size, uint64_t *address, cs_insn *insn);

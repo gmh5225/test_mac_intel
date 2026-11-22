@@ -1,0 +1,245 @@
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index ab00f23f..45de9b87 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -46,38 +46,7 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 	}
+ }
+ 
+-static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+-			     const struct X86SimpleRegister *reg,
+-			     const uint8_t *code, uint8_t rex,
+-			     uint16_t *insn_size)
+-{
+-	const unsigned offset = 1 + (rex != 0);
+-	const uint8_t *raw = code + offset;
+-	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
+-			       ((uint32_t)raw[2] << 16) |
+-			       ((uint32_t)raw[3] << 24);
+-	insn->id = row->id;
+-	*insn_size = insn->size = (uint16_t)(offset + 4);
+-	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+-	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+-	char *out = insn->op_str + reg->length;
+-	memcpy(out, ", ", 2);
+-	writeUnsignedImmediate(out + 2, value);
+-	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex, 0,
+-				      reg->reg, 0);
+-		cs_x86 *x = &insn->detail->x86;
+-		x->encoding.modrm_offset = 0;
+-		x->encoding.imm_offset = (uint8_t)offset;
+-		x->encoding.imm_size = 4;
+-		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = value;
+-		x->operands[1].access = 0;
+-	}
+-}
++#include "X86RegisterImmediateOutput.h"
+ 
+ /* The /digit selects the same flags and register access as the corresponding
+  * ALU register pair. The immediate's public width follows the destination. */
+@@ -145,7 +114,8 @@ void X86_writeImmediateOutput(const uint8_t *code, cs_insn *insn,
+ 		writePushImmediate(insn, code, row, row->address_size == 8,
+ 				   insn_size);
+ 	else if ((opcode & 0xf8) == 0xb8)
+-		writeMovRegImm32(insn, row, reg, code, rex, insn_size);
++		writeUnsignedRegisterImmediate(insn, row, reg, code, rex, 0,
++					       1 + (rex != 0), 4, insn_size);
+ 	else
+ 		writeRegisterImmediate(insn, row, reg, code, rex,
+ 				       code[1 + (rex != 0)], opcode, insn_size);
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index f500c60f..8ff4e87a 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -12,7 +12,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+-#include "X86SimpleOutput.h"
++#include "X86RegisterImmediateOutput.h"
+ #include "X86VectorRegisterOutput.h"
+ #define X86_VEX32_REGISTER_MOVES
+ #include "X86GenVex32MemoryOutput.inc"
+@@ -60,6 +60,23 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return true;
+ 		}
+ 		break;
++	case 0xf6:
++	case 0xf7: {
++		const bool byte = opcode == 0xf6;
++		const unsigned width = byte ? 1 : 4;
++		if (size >= 2 + width && (code[1] & 0xf8) == 0xc0 &&
++		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const unsigned row =
++				x86_simple_plans[0][0][byte ? 0x84 : 0x85] >> 2;
++			const struct X86SimpleRegister *reg =
++				&x86_simple_registers[byte ? 0 : 2][code[1] & 7];
++			writeUnsignedRegisterImmediate(
++				insn, &x86_simple_outputs[row], reg, code, 0,
++				code[1], 2, width, insn_size);
++			return true;
++		}
++		break;
++	}
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+diff --git a/arch/X86/X86RegisterImmediateOutput.h b/arch/X86/X86RegisterImmediateOutput.h
+new file mode 100644
+index 00000000..ac91ab9b
+--- /dev/null
++++ b/arch/X86/X86RegisterImmediateOutput.h
+@@ -0,0 +1,46 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_REGISTER_IMMEDIATE_OUTPUT_H
++#define CS_X86_REGISTER_IMMEDIATE_OUTPUT_H
++
++#include "X86SimpleOutput.h"
++#include "X86UnsignedImmediate.h"
++
++/* MOV opcode-register and TEST ModR/M-register forms have unsigned immediates.
++ * A register-direct ModR/M byte always has its top two bits set. */
++static inline void writeUnsignedRegisterImmediate(
++	cs_insn *insn, const struct X86SimpleOutput *row,
++	const struct X86SimpleRegister *reg, const uint8_t *code, uint8_t rex,
++	uint8_t modrm, unsigned offset, unsigned imm_size, uint16_t *insn_size)
++{
++	const uint8_t *raw = code + offset;
++	const uint32_t value =
++		imm_size == 1 ? raw[0] :
++				(uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
++					((uint32_t)raw[2] << 16) |
++					((uint32_t)raw[3] << 24);
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(offset + imm_size);
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	char *out = insn->op_str + reg->length;
++	memcpy(out, ", ", 2);
++	writeUnsignedImmediate(out + 2, value);
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex,
++				      modrm, reg->reg, 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->encoding.modrm_offset = modrm ? (uint8_t)(offset - 1) : 0;
++		x->encoding.imm_offset = (uint8_t)offset;
++		x->encoding.imm_size = (uint8_t)imm_size;
++		x->operands[1].type = X86_OP_IMM;
++		x->operands[1].imm = value;
++		x->operands[1].access = 0;
++	}
++}
++
++#endif
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index ac63ca24..3047f132 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -67,6 +67,16 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 		}
+ 	}
+ fallback:
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
++	defined(__x86_64__)
++	/* The fixed AMD64 decoder has just tried the shared output plans.
++	 * Its VEX2 helper also tries the shared writer on a miss. Only its
++	 * EVEX register-rounding override can decline before that writer. */
++	if (!(size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
++	      (code[3] & 0x10)))
++		return cs_decode_full_insn_body(handle, code, size, insn,
++						insn_size, batch);
++#endif
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
+ #endif
+diff --git a/cs.c b/cs.c
+index c2c4d890..c87f3f47 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1041,21 +1041,17 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+-static __attribute__((noinline)) CS_PRESERVE_MOST bool
+-decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
+-
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+-	return decode_full_insn_body(handle, code, size, insn, insn_size, batch);
++	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
+ }
+ 
+-static __attribute__((noinline)) CS_PRESERVE_MOST bool
+-decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
++__attribute__((noinline)) CS_PRESERVE_MOST bool
++cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
+ #else
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index a0e2ebc0..f3dfc374 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -21,6 +21,12 @@
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
++	defined(__x86_64__)
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+ 			size_t *size, uint64_t *address, cs_insn *insn);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index e603a619..c6b6d9c5 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -966,15 +966,17 @@ static bool check_segment_lea32(csh handles[2])
+ 	return true;
+ }
+ 
+-static bool check_memory_compares(csh handles[2], cs_mode mode)
++static bool check_memory_flag_immediates(csh handles[2], cs_mode mode)
+ {
+ 	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
+ 	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
++	const uint8_t opcodes[] = { 0x80, 0x81, 0x82, 0x83, 0xf6, 0xf7 };
+ 	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
+ 	     ++prefix) {
+-		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
+-			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
+-				if ((mr & 0x30) != 0x30)
++		for (unsigned index = 0; index < sizeof(opcodes); ++index) {
++			const unsigned opcode = opcodes[index];
++			for (unsigned mr = 0; mr <= 0xff; ++mr) {
++				if ((mr & 0x30) != (opcode >= 0xf6 ? 0 : 0x30))
+ 					continue;
+ 				for (unsigned n = 0; n < sizeof(values); ++n) {
+ 					uint8_t code[12];
+@@ -1463,7 +1465,7 @@ static bool check_mode(cs_mode mode)
+ 		    (mode == CS_MODE_32 &&
+ 		     (!check_segment_lea32(handles) ||
+ 		      !check_vex32_register_moves(handles) ||
+-		      !check_memory_compares(handles, mode))) ||
++		      !check_memory_flag_immediates(handles, mode))) ||
+ 		    !check_alu_memory(handles, mode) ||
+ 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+ 		     (!check_absolute_addresses32(handles) ||

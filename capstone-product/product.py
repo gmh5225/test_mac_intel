@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base', 'registers', 'mapping_registers', 'clear_registers'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base', 'original', 'padding', 'late'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -39,7 +39,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base', 'registers', 'mapping_registers', 'clear_registers'):
+    for variant in ('base', 'original', 'padding', 'late'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -57,7 +57,7 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant in ('base','registers') or v[0]=='64' else 8) for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16) for v in regs)
         if variant!='base':
             for unit in ('x86_simple_output','x86_reg_access'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
@@ -74,7 +74,7 @@ try:
             fields=ln.split(maxsplit=3)
             if len(fields)!=4 or fields[2].lower()!='t':continue
             name=fields[3]
-            if name.startswith(('cs_decode_full_insn','cs_disasm_iter','X86_disasmIter','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
+            if name.startswith(('cs_decode_full_insn','cs_disasm_iter','X86_disasmIter','X86_scanNativeBatch','X86_decodeOutputMiss','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
                 symbols[name]=[int(fields[0],16),int(fields[1],16)]
         assert 'cs_disasm_iter' in symbols and any('classifyX86Prefix' in n for n in symbols)
         with binary.open('rb') as file:
@@ -91,7 +91,14 @@ try:
         assert '.text' in immediate_code
         if variant=='base':original_immediate=immediate_code
         else:assert original_immediate==immediate_code
-        save('layout-'+variant,dict(immediate_code=immediate_code,member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
+        assert 'X86_scanNativeBatch' in symbols
+        if variant=='base':
+            reference_scan=symbols['X86_scanNativeBatch']
+        else:
+            difference=symbols['X86_scanNativeBatch'][0]-reference_scan[0]
+            print('scanner entry offset against base',variant,difference,flush=True)
+        changed_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest()for n in members}
+        save('layout-'+variant,dict(all_members=changed_members,immediate_code=immediate_code,member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
 
         if variant!='base':
             for mode in ('32','64'):
@@ -109,7 +116,9 @@ try:
         if variant !='base':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
             assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
-        if variant=='clear_registers':
+        if variant=='late':
+            assert sp.check_output([t/'simple-generator','--test32-registers'])==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
+            assert sp.check_output([t/'simple-generator'])==(cs/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
@@ -128,7 +137,7 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        if variant in ('registers', 'mapping_registers', 'clear_registers'):
+        if variant in ('original', 'padding', 'late'):
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
             assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
@@ -161,7 +170,6 @@ try:
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k.endswith('_registers'):wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
