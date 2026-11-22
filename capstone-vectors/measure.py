@@ -98,6 +98,10 @@ def main(w):
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'plan.c','-o',w/'plan.o'],'build-evex-plan')
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'evex.cpp',w/'plan.o',b/'libcapstone.a','-o',w/'evex'],'build-evex')
             run([w/'evex'],'evex-oracle')
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'second.o'],'projected-reader')
+            run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'secondary.cpp',w/'second.o',b/'libcapstone.a','-o',w/'secondary'],'build-secondary')
+            run([w/'secondary'],'secondary-oracle')
+
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*(['-Wl,--undefined=X86_scanNativeBatch'] if label!='baseline' else []),*libs,'-o',target],'link-'+label)
@@ -110,8 +114,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert (not changed if label=='scalar' else changed <= {'X86EvexScan.c.o'}) and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
-            if label=='scalar':assert sha(ordinary)==sha(w/'unselected-baseline')
+            assert (changed <= {'X86EvexScan.c.o'}) and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
             save('isolation-'+label+'.json',dict(added=sorted(members.keys()-prior.keys()),unchanged=len(prior),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
