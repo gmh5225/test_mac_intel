@@ -29,7 +29,7 @@ add_executable(check-vzero "INPUT/registers.c")
 target_include_directories(check-vzero PRIVATE "SOURCE/include")
 target_link_libraries(check-vzero PRIVATE capstone_static)
 
-foreach(kind IN ITEMS plain legacy)
+foreach(kind IN ITEMS plain legacy rip)
   add_library(check-${kind}-observed OBJECT "INPUT/${kind}.c")
   target_compile_definitions(check-${kind}-observed PRIVATE CAPSTONE_HAS_X86 CAPSTONE_USE_SYS_DYN_MEM)
   target_include_directories(check-${kind}-observed PRIVATE "SOURCE" "SOURCE/include")
@@ -82,15 +82,19 @@ endforeach()
        check_table('check-rows','--plain-evex-registers','X86GenPlainEvexRegisterOutput.inc')
        cmd('build-plain',['cmake','--build',b,'--target','probe-plain','--parallel','4'])
        guard('plain',[11337732,0,47444])
-       check_table('check-rows','--legacy-register-immediates','X86GenLegacyRegisterImmediates.inc')
-       cmd('build-legacy',['cmake','--build',b,'--target','probe-legacy','--parallel','4'])
-       guard('legacy',[3785220,0,1253376])
-       if label!='legacy':check_table('check-memory','--test32-registers','X86GenTest32Registers.inc')
+       check_table('check-rows','--evex-rip-memory','X86GenEvexRipMemory.inc')
+       cmd('build-rip',['cmake','--build',b,'--target','probe-rip','--parallel','4'])
+       guard('rip',[15532048,0,36310])
+       if label=='combined':
+           check_table('check-rows','--legacy-register-immediates','X86GenLegacyRegisterImmediates.inc')
+           cmd('build-legacy',['cmake','--build',b,'--target','probe-legacy','--parallel','4'])
+           guard('legacy',[3785220,0,1253376])
+           check_table('check-memory','--test32-registers','X86GenTest32Registers.inc')
        cmd('build-vzero',['cmake','--build',b,'--target','check-vzero','--parallel','4'])
        vz,=[f for f in b.rglob('check-vzero.exe' if win else 'check-vzero')if f.is_file()]
        obs=[ln.split()for ln in sp.check_output([vz],text=True).splitlines()];assert len(obs)==12
        for bits,name,enc,num,nw,first,last in obs:
-           expected=16 if bits=='64' or label!='repair' else 8
+           expected=16
            assert int(num)==int(nw)==expected and first=='ymm0' and last=='ymm'+str(expected-1)
        save('vzero',obs)
     cmd('mapping-counts',[sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
