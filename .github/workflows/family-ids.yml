@@ -1,7 +1,7 @@
-name: Measure mode-specific repair dispatch with full dirty state and fixed-image Clang 14/18 replicated controls
+name: Isolate ELF placement effects on RISC-V and x86 with the same object files and fixed-address controls
 on:
   push:
-    branches: [codex/capstone-variable-effects-only]
+    branches: [codex/capstone-mapping-order-attribution]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,14 +31,16 @@ jobs:
           ref: 989508842d378789f9d98465de059feb99913c96
           path: source
           persist-credentials: false
-      - if: matrix.flavor == 'first'
-        run: command -v valgrind || (sudo apt-get -qq update && sudo apt-get -qq install -y valgrind)
-      - run: python3 -B family-ids/native.py
+      - name: Inspect each linked ELF and compare the fixed-address libraries
+        run: |
+          python3 -m venv "$RUNNER_TEMP/layout-env"
+          "$RUNNER_TEMP/layout-env/bin/pip" -q install pyelftools==0.32
+          "$RUNNER_TEMP/layout-env/bin/python" -B family-ids/native.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: variable-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mapping-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
