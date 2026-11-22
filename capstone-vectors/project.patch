@@ -1,71 +1,67 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bcde9790..0733e473 100644
+index 46b3184d..cba52a39 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1045,41 +1045,32 @@ target_include_directories(capstone PUBLIC
+@@ -1038,27 +1038,33 @@ set(ALL_HEADERS
+ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
+ 
+ ## targets
++add_library(capstone_build_settings INTERFACE)
+ add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
++target_link_libraries(capstone PUBLIC capstone_build_settings)
+ set_property(TARGET capstone PROPERTY C_STANDARD 99)
+-target_include_directories(capstone PUBLIC
++target_include_directories(capstone_build_settings INTERFACE
+     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
  )
  set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
  
 -# The i386 iterator is an internal static-link entry used by NeverD.
 -if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
--    add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
--    target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
--    set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
--    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
--    target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
++# Public and fixed-mode iterators share these readers in both library forms.
 +if(CAPSTONE_X86_SUPPORT)
-+    target_sources(capstone PRIVATE
-+        arch/X86/X86Vex32Output.c arch/X86/X86Sse64Output.c
-+        arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c
-+        arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c
-+        arch/X86/X86PlainEvexOutput.c)
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+-    target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
++    target_link_libraries(capstone_x86_iter32 PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
+-    target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
++    target_link_libraries(capstone_x86_iter64 PRIVATE capstone_build_settings)
      if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
--        target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
-+        set_property(SOURCE arch/X86/X86Sse64Output.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
      endif()
--    set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
--    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
 -    target_link_libraries(capstone_x86_native PRIVATE capstone)
--    set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++    target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++    set(capstone_x86_objects
++        $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
++        $<TARGET_OBJECTS:capstone_x86_native>)
++    target_sources(capstone INTERFACE ${capstone_x86_objects})
  endif()
  
  if(CAPSTONE_BUILD_STATIC_LIBS)
-     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
--    set(capstone_alias_patterns_tail)
--    if(TARGET capstone_x86_iter32)
--        if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
--           AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
--            # Backends reference the alias parser indirectly. Keep its hot code
--            # ahead of the optional native readers even when all are linked.
--            # Keep the opcode rows after the native scanner when both are linked.
--            set(capstone_alias_patterns_tail
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
--            set(capstone_static_objects
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
--                $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
--        else()
--            list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
--        endif()
--        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
-+    if(CAPSTONE_X86_SUPPORT AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
-+       AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-+       AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
-+        # Preserve the placement of alias parsing and the native readers.
-+        set(iterators "X86Vex32Output|X86Sse64Output")
-+        set(readers "X86MemoryFallback32|X86BatchScan|X86VectorFallback64|X86VexRegisterImmediate|X86PlainEvexOutput")
-+        set(capstone_static_objects
-+            "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(${iterators}|${readers}|AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-+            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(${iterators})[.]c[.]o$>"
-+            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>"
-+            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(${readers})[.]c[.]o$>"
-+            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-     endif()
-     add_library(capstone_static STATIC ${capstone_static_objects})
-     # Use normal capstone name. Otherwise we get libcapstone_static.a
+@@ -1094,7 +1100,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+ endif()
+ 
+ if(CAPSTONE_BUILD_SHARED_LIBS)
+-    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone>)
++    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_shared.so
+     set_target_properties(capstone_shared PROPERTIES OUTPUT_NAME "capstone")
+     set_target_properties(capstone_shared PROPERTIES
+@@ -1104,7 +1110,7 @@ if(CAPSTONE_BUILD_SHARED_LIBS)
+     target_include_directories(capstone_shared PUBLIC
+         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+     )
+-    target_compile_definitions(capstone PUBLIC CAPSTONE_SHARED)
++    target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_SHARED)
+     # Build pdb file for dll on Windows
+     if(MSVC)
+         message("Enabling PDB for Windows")
 diff --git a/Makefile b/Makefile
-index c52271d1..f1142574 100644
+index da328571..470de3c8 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -434,8 +434,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
