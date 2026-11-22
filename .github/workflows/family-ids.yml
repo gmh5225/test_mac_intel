@@ -1,7 +1,7 @@
-name: Compare DIET EVEX public IDs and operand metadata on real binaries and every compare predicate
+name: Check RISC-V raw decoder prototypes and both backend header orders
 on:
   push:
-    branches: [codex/capstone-diet-evex-typed-compares]
+    branches: [codex/capstone-riscv-header-contracts]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0fbbaa9ca1ab4eb9c390d08ff26a42384d052e82
+          ref: 3458b2498e513a5c37d32f71db0909f8f75dd7c4
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: typed-diet-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: decoder-headers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
