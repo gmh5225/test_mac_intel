@@ -1,0 +1,135 @@
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..340fe728 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10296,6 +10296,29 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ 
+ #ifndef CAPSTONE_DIET
+ #include "X86GenMappingCounts.inc"
++
++static void set_implicit_writes(cs_detail *detail, unsigned int i, cs_mode mode)
++{
++	const insn_map_x86 *mapping = &insns[i];
++	if (mode != CS_MODE_64) {
++		switch (mapping->mapid) {
++		case X86_INS_RDTSC:
++		case X86_INS_RDTSCP: {
++			const bool serial = mapping->mapid == X86_INS_RDTSCP;
++			detail->regs_write[0] = X86_REG_EAX;
++			if (serial)
++				detail->regs_write[1] = X86_REG_ECX;
++			detail->regs_write[1 + serial] = X86_REG_EDX;
++			detail->regs_write_count = 2 + serial;
++			return;
++		}
++		default:
++			break;
++		}
++	}
++	memcpy(detail->regs_write, mapping->regs_mod, sizeof(mapping->regs_mod));
++	detail->regs_write_count = (x86_mapping_counts[i] >> 5) & 31;
++}
+ #endif
+ 
+ // given internal insn id, return public instruction info
+@@ -10322,50 +10345,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			insn->detail->regs_read_count =
+ 				(x86_mapping_counts[i] & 31);
+ 
+-			// special cases when regs_write[] depends on arch
+-			switch (id) {
+-			default:
+-				memcpy(insn->detail->regs_write,
+-				       insns[i].regs_mod,
+-				       sizeof(insns[i].regs_mod));
+-				insn->detail->regs_write_count =
+-					((x86_mapping_counts[i] >> 5) & 31);
+-				break;
+-			case X86_RDTSC:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 2;
+-				}
+-				break;
+-			case X86_RDTSCP:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_ECX;
+-					insn->detail->regs_write[2] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 3;
+-				}
+-				break;
+-			}
++			set_implicit_writes(insn->detail, i, mode);
+ 			/* The generator derives eligibility from the switches below. */
+ 			if (!(x86_mapping_counts[i] &
+ 			      X86_MAPPING_IMPLICIT_REPAIR))
+diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
+index d9dd18e2..a37103f0 100644
+--- a/tests/unit/x86_reg_access.c
++++ b/tests/unit/x86_reg_access.c
+@@ -772,6 +772,34 @@ static bool check_scalar_segment_reads(void)
+ 	return true;
+ }
+ 
++static bool check_timestamp_writes(csh handle)
++{
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_64, CS_MODE_32 };
++	const uint8_t bytes[] = { 0x0f, 0x31, 0x0f, 0x01, 0xf9 };
++	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
++		if (cs_option(handle, CS_OPT_MODE, modes[m]) != CS_ERR_OK)
++			return false;
++		const bool wide = modes[m] == CS_MODE_64;
++		const uint16_t expected[] = { wide ? X86_REG_RAX : X86_REG_EAX,
++					      wide ? X86_REG_RCX : X86_REG_ECX,
++					      wide ? X86_REG_RDX : X86_REG_EDX };
++		cs_insn *insn = NULL;
++		size_t count = cs_disasm(handle, bytes, sizeof(bytes), 0, 0, &insn);
++		bool ok = count == 2;
++		for (unsigned n = 0; ok && n < count; ++n) {
++			const cs_detail *detail = insn[n].detail;
++			ok = detail && detail->regs_write_count == 2 + n &&
++			     detail->regs_write[0] == expected[0] &&
++			     detail->regs_write[1 + n] == expected[2] &&
++			     (!n || detail->regs_write[1] == expected[1]);
++		}
++		cs_free(insn, count);
++		if (!ok)
++			return false;
++	}
++	return cs_option(handle, CS_OPT_MODE, CS_MODE_64) == CS_ERR_OK;
++}
++
+ int main(void)
+ {
+ 	if (cs_support(CS_SUPPORT_DIET))
+@@ -783,7 +811,8 @@ int main(void)
+ 		cs_close(&handle);
+ 		return 1;
+ 	}
+-	bool success = check_implicit_copies(handle) && check_test_operands() &&
++	bool success = check_implicit_copies(handle) &&
++		       check_timestamp_writes(handle) && check_test_operands() &&
+ 		       check_scalar_move_flags() &&
+ 		       check_scalar_segment_reads() &&
+ 		       check_vector_compare_flags();

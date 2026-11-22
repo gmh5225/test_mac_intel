@@ -1,7 +1,7 @@
-name: Pair mode-correct AVX detail and active alias row indexes on top of the EVEX output tree
+name: Measure mode-specific vector and timestamp writes and the i386 LEA miss in the released NeverD product
 on:
   push:
-    branches: [codex/product-mode-repair-after-register-output]
+    branches: [codex/product-grouped-implicit-writes-and-lea]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 9f3cee5253cc0a0d469fa1afe493ee06364d61d9
+          ref: 48ecdc46cf427dcd9df8000b49a3ed67d73b2c75
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "9f3cee5253cc0a0d469fa1afe493ee06364d61d9"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d"
+          test "$(git rev-parse HEAD)" = "48ecdc46cf427dcd9df8000b49a3ed67d73b2c75"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "22ff038a78971a4414930e602bff1e469c52a619"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
-          git -C third_party/capstone checkout --detach 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
+          git -C third_party/capstone fetch --depth=1 origin 22ff038a78971a4414930e602bff1e469c52a619
+          git -C third_party/capstone checkout --detach 22ff038a78971a4414930e602bff1e469c52a619
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: corrected-register-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: grouped-mode-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
