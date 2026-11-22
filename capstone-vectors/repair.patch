@@ -1,98 +1,201 @@
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 8968a732..21414e7a 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -118,7 +118,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		if (plan == X86_PLAN_VECTOR) {
- #ifdef X86_FIXED_VEX2
- 			if (code[0] == 0xc5)
--				return X86_FIXED_VEX2(code, size, insn,
-+				return X86_FIXED_VEX2(handle, code, size, insn,
- 						      insn_size);
- #endif
- #ifdef X86_FIXED_ROUNDED
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 2bd24bc5..337e9879 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -14,7 +14,9 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#define X86_FIXED_VEX2 writeVex2Memory64
-+#define GET_INSTRINFO_ENUM
-+#include "X86GenInstrInfo.inc"
-+#define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
- #include "X86VectorRegisterOutput.h"
-@@ -181,9 +183,35 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 64ee3a95..947fd2d2 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -53,9 +53,9 @@
  
- /* Only the bare VEX2 opcode plan enters here. Packed base-relative
-  * loads and stores share their address and detail construction with SSE. */
--static bool writeVex2Memory64(const uint8_t *code, size_t size, cs_insn *insn,
--			      uint16_t *insn_size)
-+static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size)
- {
-+	/* The bare vector clear instructions have no ModR/M or operands. */
-+	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
-+		const bool all = (code[1] & 4) != 0;
-+		insn->size = *insn_size = 3;
-+		memcpy(insn->bytes, code, 3);
-+		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+		if (all)
-+			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
-+		else
-+			memcpy(insn->mnemonic, "vzeroupper",
-+			       sizeof("vzeroupper"));
-+		memset(insn->op_str, 0, sizeof(insn->op_str));
-+		if (insn->detail) {
-+			cs_detail *detail = insn->detail;
-+			memset(detail, 0,
-+			       offsetof(cs_detail, x86) + sizeof(cs_x86));
-+			detail->x86.addr_size = 8;
-+			detail->x86.rex = 0x40;
-+			memcpy(detail->x86.opcode, code, 2);
-+			X86_get_insn_id(handle, insn,
-+					all ? X86_VZEROALL : X86_VZEROUPPER);
-+		} else {
-+			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
-+		}
-+		return true;
-+	}
- 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
- 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
- 		const uint8_t rex =
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 678bc384..7781ca39 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -570,6 +570,17 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
+ #define DEBUG_TYPE "riscv-disassembler"
+ 
++#ifndef RISCV_USE_STACK_OPERAND_POSITIONS
+ void addSPOperands(MCInst *MI);
+-;
+-// end anonymous namespace
++#endif
+ 
+ static DecodeStatus DecodeGPRRegisterClass(MCInst *Inst, uint32_t RegNo,
+ 					   uint64_t Address,
+@@ -575,6 +575,29 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+ 	return MCDisassembler_Success;
+ }
+ 
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++/* Positions refer to the final operand list. Inserting from lowest to highest
++ * keeps subsequent positions valid when an instruction implies SP twice. */
++static void insertSPOperands(MCInst *MI, unsigned positions)
++{
++	MCOperand sp;
++	sp.MachineOperandType = kRegister;
++	sp.Kind = kRegister;
++	sp.RegVal = RISCV_X2;
++	do {
++		MCInst_insert0(MI, CountTrailingZeros_32(positions), &sp);
++		positions &= positions - 1;
++	} while (positions);
++}
++
++static inline void addSPOperands(MCInst *MI)
++{
++	unsigned positions =
++		RISCV_getStackOperandPositions(MCInst_getOpcode(MI));
++	if (positions)
++		insertSPOperands(MI, positions);
++}
++#else
+ // Add implied SP operand for C.*SP compressed instructions. The SP operand
+ // isn't explicitly encoded in the instruction.
+ void addSPOperands(MCInst *MI)
+@@ -590,6 +613,7 @@ void addSPOperands(MCInst *MI)
+ 		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
+ 			MCInst_insert0(MI, i, &SPReg);
+ }
++#endif
+ 
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 				  const uint8_t *Bytes, size_t BytesLen,
+diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
+index e36ec509..00348e68 100644
+--- a/arch/RISCV/RISCVDisassembler.h
++++ b/arch/RISCV/RISCVDisassembler.h
+@@ -11,6 +11,15 @@
+ #include "../../MCDisassembler.h"
+ #include "../../SStream.h"
+ 
++/* Select the position table in dedicated builds where scanning and detail
++ * construction both benefit. GCC's full decoder keeps the descriptor walk. */
++#if defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && \
++	(defined(CAPSTONE_DIET) || \
++	 (defined(__linux__) && defined(__clang__) && \
++	  (defined(__x86_64__) || defined(__aarch64__))))
++#define RISCV_USE_STACK_OPERAND_POSITIONS
++#endif
++
+ void RISCV_init(MCRegisterInfo *MRI);
+ 
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+diff --git a/arch/RISCV/RISCVGenWriteback.inc b/arch/RISCV/RISCVGenWriteback.inc
+index 34eec991..a49228cc 100644
+--- a/arch/RISCV/RISCVGenWriteback.inc
++++ b/arch/RISCV/RISCVGenWriteback.inc
+@@ -415,3 +415,16 @@ static const uint8_t RISCVWritebackFlags[] = {
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0,
+ };
++
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++static const uint8_t RISCVStackOperandPositions[] = {
++	3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
++	0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
++};
++static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)
++{
++	unsigned index = opcode - 11749U;
++	return index < sizeof(RISCVStackOperandPositions) ?
++		       RISCVStackOperandPositions[index] : 0;
++}
++#endif
+diff --git a/suite/synctools/operand_writeback.py b/suite/synctools/operand_writeback.py
+index 828785ee..9ae08504 100644
+--- a/suite/synctools/operand_writeback.py
++++ b/suite/synctools/operand_writeback.py
+@@ -60,12 +60,18 @@ def generated_flags(arch, source):
+         f"{arch} opcode coverage changed",
+     )
+     flags = [0] * count
++    stack_positions = {}
+     for length, offset, uid, _ in descriptors:
+         length, offset, uid = int(length), int(offset), int(uid)
+         require(
+             offset + length <= len(operands), f"{arch} operand extent exceeds table"
+         )
+-        for _, _, _, constraints in operands[offset : offset + length]:
++        for index, (reg_class, _, _, constraints) in enumerate(
++            operands[offset : offset + length]
++        ):
++            if arch == "RISCV" and reg_class == "RISCV_SPRegClassID":
++                require(index < 8, "RISC-V implied SP position exceeds one byte")
++                stack_positions[uid] = stack_positions.get(uid, 0) | (1 << index)
+             if re.fullmatch(r"CONSTRAINT_MCOI_TIED_TO\(\d+\)", constraints):
+                 flags[uid] = 1
+             else:
+@@ -84,6 +90,27 @@ def generated_flags(arch, source):
+     for index in range(0, count, 32):
+         lines.append("\t" + ", ".join(map(str, flags[index : index + 32])) + ",")
+     lines += ["};", ""]
++    if arch == "RISCV":
++        require(stack_positions, "No implied RISC-V SP operands found")
++        first, last = min(stack_positions), max(stack_positions)
++        positions = [stack_positions.get(opcode, 0) for opcode in range(first, last + 1)]
++        lines += [
++            "#ifdef RISCV_USE_STACK_OPERAND_POSITIONS",
++            "static const uint8_t RISCVStackOperandPositions[] = {",
++        ]
++        for index in range(0, len(positions), 32):
++            lines.append("\t" + ", ".join(map(str, positions[index : index + 32])) + ",")
++        lines += [
++            "};",
++            "static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)",
++            "{",
++            f"\tunsigned index = opcode - {first}U;",
++            "\treturn index < sizeof(RISCVStackOperandPositions) ?",
++            "\t\t       RISCVStackOperandPositions[index] : 0;",
++            "}",
++            "#endif",
++            "",
++        ]
+     return "\n".join(lines)
+ 
+ 
+diff --git a/tests/unit/writeback_postprocess.c b/tests/unit/writeback_postprocess.c
+index 1afe180d..e983ed2f 100644
+--- a/tests/unit/writeback_postprocess.c
++++ b/tests/unit/writeback_postprocess.c
+@@ -15,6 +15,7 @@
+ 
+ #ifdef WRITEBACK_TEST_RISCV
+ #include "../../arch/RISCV/RISCVBaseInfo.h"
++#include "../../arch/RISCV/RISCVDisassembler.h"
+ #include "../../arch/RISCV/RISCVMapping.h"
+ #define GET_REGINFO_ENUM
+ #include "../../arch/RISCV/RISCVGenRegisterInfo.inc"
+@@ -44,6 +45,30 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
  	return true;
  }
  
-+static bool check_vex_clear(csh handles[2])
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++static bool checkStackOperandPositions(void)
 +{
-+	for (unsigned flags = 0; flags < 256; ++flags) {
-+		uint8_t bytes[] = { 0xc5, (uint8_t)flags, 0x77, 0xc0 };
-+		for (size_t length = 1; length <= sizeof(bytes); ++length)
-+			if (!compare(handles, bytes, length, flags))
++	size_t count = ARR_SIZE(RISCVDescs.Insts);
++	for (unsigned opcode = 0; opcode < count; ++opcode) {
++		const MCInstrDesc *desc = &RISCVDescs.Insts[count - 1 - opcode];
++		unsigned positions = 0;
++		for (unsigned index = 0; index < desc->NumOperands; ++index) {
++			if (desc->OpInfo[index].RegClass != RISCV_SPRegClassID)
++				continue;
++			if (index >= 8)
 +				return false;
++			positions |= 1U << index;
++		}
++		if (positions != RISCV_getStackOperandPositions(opcode)) {
++			fprintf(stderr, "RISC-V stack operand mismatch %u\n",
++				opcode);
++			return false;
++		}
 +	}
 +	return true;
 +}
++#endif
 +
- static bool check_vex_rip_loads(csh handles[2])
+ int main(void)
  {
- 	const uint32_t edges[] = {
-@@ -1230,7 +1241,8 @@ static bool check_mode(cs_mode mode)
- 		     (!check_vex_rip_loads(handles) ||
- 		      !check_sse_rip_memory(handles) ||
- 		      (private_iter == X86_disasmIterText &&
--		       (!check_sse_base_memory(handles) ||
-+		       (!check_vex_clear(handles) ||
-+			!check_sse_base_memory(handles) ||
- 			!check_vex_packed_memory(handles))))) ||
- 		    !check_rex_stack(handles) ||
- 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
+ #ifdef WRITEBACK_TEST_ARM
+@@ -52,6 +77,10 @@ int main(void)
+ 		return 1;
+ #endif
+ #ifdef WRITEBACK_TEST_RISCV
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++	if (!checkStackOperandPositions())
++		return 1;
++#endif
+ 	if (!check(RISCVDescs.Insts, RISCVWritebackFlags,
+ 		   ARR_SIZE(RISCVDescs.Insts), "RISCV"))
+ 		return 1;

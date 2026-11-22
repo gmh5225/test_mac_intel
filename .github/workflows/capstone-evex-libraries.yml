@@ -1,7 +1,7 @@
-name: Compare AMD64 conditional moves with both iced formatters and verify the i386 consumer
+name: Measure shared AMD64 conditional move operands against fixed rows and the two iced formatters
 on:
   push:
-    branches: [codex/capstone-amd64-conditional-output]
+    branches: [codex/capstone-shared-cmov-operands]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 9615f6450fb7c47dad85a76cd89ad246c6962de3
+          ref: 77b7043a31582684a0234f104a1fc24d90f0a12d
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: amd64-cmov-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: compact-cmov-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
