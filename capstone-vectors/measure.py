@@ -119,9 +119,31 @@ def main(w):
             parent='release' if key=='project'else 'official'
             a,b=objects[parent],objects[key];assert a.keys()==b.keys()
             changed=[n for n in a if a[n]!=b[n]]
-            assert 'X86DisassemblerDecoder.c.o' in changed and 'cs.c.o' in changed
-            assert all(n not in changed for n in ('X86Vex32Output.c.o','X86Sse64Output.c.o','X86BatchScan.c.o')),changed
+            allowed={'X86Vex32Output.c.o','X86Sse64Output.c.o','X86DisassemblerDecoder.c.o','X86OutputIterator.c.o'}
+            if key=='project':assert not changed,changed
+            else:assert 'X86DisassemblerDecoder.c.o' in changed and set(changed)<=allowed,changed
             save('archive-'+key+'.json',dict(baseline=parent,all_members=len(a),changed=changed,objects=[a,b]))
+        if key in ('single','official') and not darwin:
+            functions={}
+            for fn,names in [('X86DisassemblerDecoder',('cs_disasm_iter',)),('X86Vex32Output',('X86_disasmIter32','tryOutput32','X86_tryOutput32')),('X86Sse64Output',('X86_disasmIterText','tryOutput64','X86_tryOutput64'))]:
+                source_obj,=build.rglob(fn+'.c.o')
+                table=[row.split()for row in sp.check_output(['objdump','-t',source_obj],text=True).splitlines()]
+                for name in names:
+                    matches=[row for row in table if row[-1:]==[name]]
+                    if not matches:continue
+                    sym,=matches
+                    sym=[v for v in sym if v not in ('.hidden','.protected','.internal')]
+                    off,section,sz=int(sym[0],16),sym[-3],int(sym[-2],16)
+                    op=w/'isolated';run(['objcopy','--dump-section',section+'='+str(op),source_obj,w/'objcopy.o'],'object-'+name+'-'+key)
+                    data=op.read_bytes()[off:off+sz];assert len(data)==sz and sz>0
+                    rel=[]
+                    for line in sp.check_output(['objdump','-r','-j',section,source_obj],text=True).splitlines():
+                        z=line.split()
+                        if len(z)==3 and z[1].startswith('R_') and off<=int(z[0],16)<off+sz:rel.append([int(z[0],16)-off,z[1],z[2]])
+                    functions[name]=dict(size=sz,section=section,sha256=hashlib.sha256(data).hexdigest(),relocations=rel)
+            assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText'}<=functions.keys()
+            if key=='single':assert {'X86_tryOutput32','X86_tryOutput64'}<=functions.keys()
+            save('functions-'+key+'.json',functions)
         if key in ('single','official'):
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
