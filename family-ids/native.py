@@ -21,7 +21,7 @@ try:
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        names={'cs_decode_public_record','matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','Sparc_getInstruction','Sparc_printInst','LoongArch_getInstruction','Xtensa_getInstruction','X86_disasmProjected32','X86_disasmProjected64','X86_decodeTextRecord32','X86_decodeTextRecord64','scanBatch32','scanBatch64','readFirst32','readFirst64'}
+        names={'cs_disasm_default_iter','cs_decode_public_record','matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','Sparc_getInstruction','Sparc_printInst','LoongArch_getInstruction','Xtensa_getInstruction','X86_disasmProjected32','X86_disasmProjected64','X86_decodeTextRecord32','X86_decodeTextRecord64','scanBatch32','scanBatch64','readFirst32','readFirst64'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
@@ -34,10 +34,11 @@ try:
         else:assert regular_code==original
         sections=sp.check_output(['readelf','-SW',so],text=True)
         save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
-        for symbol in ('cs_disasm_iter','cs_decode_public_record','cs_decode_full_insn','X86_disasmScanFallback','X86_disasmProjected32','X86_disasmProjected64','X86_decodeTextRecord32','X86_decodeTextRecord64','scanBatch32','scanBatch64'):
+        for symbol in ('cs_disasm_iter','cs_disasm_default_iter','cs_decode_full_insn','X86_disasmScanFallback','X86_disasmProjected32','X86_disasmProjected64','X86_decodeTextRecord32','X86_decodeTextRecord64','scanBatch32','scanBatch64'):
             cmd('assembly-'+symbol+'-'+k,['objdump','-d','--disassemble='+symbol,so])
         decoder,=b.rglob('X86DisassemblerDecoder.c.o')
-        symbol,=[ln.split() for ln in sp.check_output(['objdump','-t',decoder],text=True).splitlines()if ln.split()[-1:]==['cs_disasm_iter']]
+        underlying='cs_disasm_iter' if k=='base' else 'cs_disasm_default_iter'
+        symbol,=[ln.split() for ln in sp.check_output(['objdump','-t',decoder],text=True).splitlines()if ln.split()[-1:]==[underlying]]
         off=int(symbol[0],16);section=symbol[-3];length=int(symbol[-2],16)
         output=t/'iterator-section.bin'
         cmd('iterator-section-'+k,['objcopy','--dump-section',section+'='+str(output),decoder,t/'iterator.dump.o'])
@@ -48,7 +49,7 @@ try:
             z=line.split()
             if len(z)==3 and z[1].startswith('R_') and off<=int(z[0],16)<off+length:
                 calls.append([int(z[0],16)-off,z[1],z[2]])
-        save('scan-bytes-'+k,dict(section=section,offset=off,size=length,sha256=hashlib.sha256(body).hexdigest(),relocations=calls))
+        save('scan-bytes-'+k,dict(symbol=underlying,section=section,offset=off,size=length,sha256=hashlib.sha256(body).hexdigest(),relocations=calls))
         command_line=sp.check_output(['ninja','-C',b,'-t','commands','capstone_static'],text=True)
         assert 'X86BatchScan.c' in command_line
         ids[k]=sha(so)
@@ -61,7 +62,7 @@ try:
             cmd('alias-oracle-'+k,[t/'alias'])
             assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
         if k=='indexed':
-            names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
+            names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch','text_option']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
             cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
