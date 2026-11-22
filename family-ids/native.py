@@ -39,6 +39,7 @@ try:
         decoder,=b.rglob('X86DisassemblerDecoder.c.o')
         underlying='cs_disasm_iter' if k=='base' else 'cs_disasm_default_iter'
         symbol,=[ln.split() for ln in sp.check_output(['objdump','-t',decoder],text=True).splitlines()if ln.split()[-1:]==[underlying]]
+        symbol=[f for f in symbol if f not in ('.hidden','.protected','.internal')]
         off=int(symbol[0],16);section=symbol[-3];length=int(symbol[-2],16)
         output=t/'iterator-section.bin'
         cmd('iterator-section-'+k,['objcopy','--dump-section',section+'='+str(output),decoder,t/'iterator.dump.o'])
