@@ -109,7 +109,7 @@ try:
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             for rep in range(13):
-                keys=['base','copy','linked','ordered','packed','private'];rng.shuffle(keys);ticks={v:[] for v in keys}
+                keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     assert expected==sample[1:],(c['name'],mode,k,expected,sample)
