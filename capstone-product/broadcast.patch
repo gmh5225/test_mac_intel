@@ -1,0 +1,219 @@
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 7d3a6e84..d78a771c 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -626,17 +626,11 @@ static const uint8_t vex_shift_plans[3][8][4] = {
+ 		{ 19, 20, 19, 20 },
+ 	},
+ };
+-static const struct VectorOutputRow broadcast_rows[2][3] = {
+-	{
+-		{ 0 },
+-		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
+-		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
+-	},
+-	{
+-		{ 0 },
+-		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
+-		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
+-	},
++static const struct BroadcastOutput broadcast_rows[] = {
++	{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", { 255, 0, 0 } },
++	{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", { 255, 0, 0 } },
++	{ X86_INS_VBROADCASTI32X4, "vbroadcasti32x4", { 255, 0, 134 } },
++	{ X86_INS_VBROADCASTI64X2, "vbroadcasti64x2", { 255, 0, 0 } },
+ };
+ struct VexRipLoad {
+ 	unsigned id; char mnemonic[12], address[20];
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index dceebc42..28a8aec1 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -20,6 +20,14 @@ struct PaddingOutput {
+ 		index, scale;
+ };
+ 
++/* The generator records UINT8_MAX for an unsupported vector length.
++ * An admitted length has either no group or one nonzero public group. */
++struct BroadcastOutput {
++	uint16_t id;
++	char mnemonic[16];
++	uint8_t group[3];
++};
++
+ #include "X86GenVectorOutput.inc"
+ #include "X86VectorRegisterOutput.h"
+ 
+@@ -473,18 +481,21 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 		size < 6 ||
+ #endif
+ 		(code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
+-		(code[3] & 0x9f) != 8 || code[4] != 0x1a)
++		(code[3] & 0x9f) != 8 || (code[4] & 0xbf) != 0x1a)
+ 		return false;
+ 	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
+ 	const uint8_t modrm = code[5];
+ 	const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 	if (ll >= 3 || mod > 1 || (!mod && rm == 5))
+ 		return false;
+-	const struct VectorOutputRow *row = &broadcast_rows[w][ll];
++	/* Opcodes 1A and 5A broadcast a 16-byte floating or integer block. */
++	const unsigned form = ((code[4] >> 5) & 2) | w;
++	const struct BroadcastOutput *row = &broadcast_rows[form];
++	const uint8_t group = row->group[ll];
+ 	const bool sib = rm == 4;
+ 	const unsigned offset = 6 + sib, length = offset + mod;
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
+-	if (!row->id || size < length ||
++	if (group == UINT8_MAX || size < length ||
+ 	    (sib && ((rxb & 2) || code[6] != 0x24)))
+ 		return false;
+ 	const unsigned dst = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
+@@ -518,8 +529,8 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+ 		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
+-		d->groups_count = row->group_count;
+-		memcpy(d->groups, row->groups, sizeof(row->groups));
++		d->groups_count = group != 0;
++		d->groups[0] = group;
+ 		cs_x86 *x = &d->x86;
+ 		memcpy(x->opcode, code, sizeof(x->opcode));
+ 		x->rex = (uint8_t)(0x40 | w << 3 | rxb);
+@@ -543,14 +554,14 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 							X86_REG_YMM0,
+ 							X86_REG_ZMM0 };
+ 		op->reg = (x86_reg)(vector_bases[ll] + dst);
+-		op->access = (cs_ac_type)row->access[0];
++		op->access = CS_AC_WRITE;
+ 		op = &x->operands[1];
+ 		op->type = X86_OP_MEM;
+ 		op->size = 16;
+ 		op->mem.base = (x86_reg)base->reg;
+ 		op->mem.scale = 1;
+ 		op->mem.disp = x->disp = displacement;
+-		op->access = (cs_ac_type)row->access[1];
++		op->access = CS_AC_READ;
+ 	}
+ 	return true;
+ }
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 91426243..e7431705 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -500,28 +500,28 @@ void emit_legacy_registers(Decoder &wide, bool map38 = false)
+  * decoder, including the disp8 tuple multiplier and both operand sizes. */
+ void emit_broadcast_rows(Decoder &decoder)
+ {
+-	std::puts(
+-		"static const struct VectorOutputRow broadcast_rows[2][3] = {");
+-	for (unsigned w = 0; w != 2; ++w) {
+-		std::puts("\t{");
++	std::puts("static const struct BroadcastOutput broadcast_rows[] = {");
++	const char *const mnemonics[] = { "vbroadcastf32x4", "vbroadcastf64x2",
++					   "vbroadcasti32x4", "vbroadcasti64x2" };
++	for (unsigned form = 0; form < 4; ++form) {
++		const unsigned w = form & 1;
++		std::array<unsigned, 3> groups{ UINT8_MAX, UINT8_MAX, UINT8_MAX };
++		std::string symbol;
+ 		for (unsigned ll = 0; ll != 3; ++ll) {
+ 			uint8_t bytes[] = { 0x62,
+ 					    0xf2,
+ 					    uint8_t(0x7d | w << 7),
+ 					    uint8_t(8 | ll << 5),
+-					    0x1a,
++					    uint8_t(form < 2 ? 0x1a : 0x5a),
+ 					    0x58,
+ 					    1 };
+ 			unsigned id = decoder.decode(bytes, sizeof(bytes));
+-			if (!id) {
+-				std::puts("\t\t{ 0 },");
++			if (!id)
+ 				continue;
+-			}
+ 			const cs_insn &insn = *decoder.insn;
+ 			const cs_detail &detail = *insn.detail;
+ 			const cs_x86 &x = detail.x86;
+-			const char *mnemonic = w ? "vbroadcastf64x2" :
+-						   "vbroadcastf32x4";
++			const char *mnemonic = mnemonics[form];
+ 			const std::string dest = std::string(ll == 2 ? "zmm" :
+ 							     ll == 1 ? "ymm" :
+ 								       "xmm") +
+@@ -556,23 +556,20 @@ void emit_broadcast_rows(Decoder &decoder)
+ 			    insn.op_str !=
+ 				    dest + ", xmmword ptr [rax + 0x10]" ||
+ 			    detail.regs_read_count || detail.regs_write_count ||
+-			    detail.groups_count > 4 ||
+-			    std::memcmp(&x, &expect, sizeof(x))) {
+-				std::puts("\t\t{ 0 },");
++			    detail.groups_count > 1 ||
++			    (detail.groups_count && (detail.groups[0] == 0 ||
++						     detail.groups[0] == UINT8_MAX)) ||
++			    std::memcmp(&x, &expect, sizeof(x)))
+ 				continue;
+-			}
+-			Bytes4 groups{}, access{ unsigned(reg.access),
+-						 unsigned(mem.access), 0, 0 };
+-			std::copy_n(detail.groups, detail.groups_count,
+-				    groups.begin());
+-			const std::string symbol = decoder.symbol(id);
+-			std::printf("\t\t{ %s, \"%s\", %u, %s, %s, 0 },\n",
+-				    symbol.c_str(), mnemonic,
+-				    unsigned(detail.groups_count),
+-				    fields(groups).c_str(),
+-				    fields(access).c_str());
++			const std::string current = decoder.symbol(id);
++			if (!symbol.empty() && current != symbol)
++				throw std::runtime_error("nonuniform EVEX broadcast ID");
++			symbol = current;
++			groups[ll] = detail.groups_count ? detail.groups[0] : 0;
+ 		}
+-		std::puts("\t},");
++		std::printf("\t{ %s, \"%s\", { %u, %u, %u } },\n",
++			    symbol.empty() ? "0" : symbol.c_str(), mnemonics[form],
++			    groups[0], groups[1], groups[2]);
+ 	}
+ 	std::puts("};");
+ }
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 586b3c09..cae7747f 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -821,7 +821,7 @@ static bool check_evex_memory_moves(csh handles[2])
+ 	}
+ 	return true;
+ }
+-static bool check_broadcast(csh handles[2])
++static bool check_broadcast(csh handles[2], uint8_t opcode)
+ {
+ 	static const uint8_t disp[] = { 0, 1, 0x7f, 0x80, 0xff };
+ 	for (unsigned rx = 0; rx < 16; ++rx)
+@@ -840,7 +840,7 @@ static bool check_broadcast(csh handles[2])
+ 							(uint8_t)(0x7d |
+ 								  w << 7),
+ 							(uint8_t)(8 | ll << 5),
+-							0x1a,
++							opcode,
+ 							(uint8_t)mr,
+ 							0x24,
+ 							0,
+@@ -860,7 +860,7 @@ static bool check_broadcast(csh handles[2])
+ 							return false;
+ 					}
+ 	/* Reserved and masked EVEX payloads must fall back to the canonical decoder. */
+-	uint8_t bytes[] = { 0x62, 0xf2, 0xfd, 0x48, 0x1a, 0x58, 0x80 };
++	uint8_t bytes[] = { 0x62, 0xf2, 0xfd, 0x48, opcode, 0x58, 0x80 };
+ 	for (unsigned field = 1; field <= 3; ++field) {
+ 		uint8_t save = bytes[field];
+ 		for (unsigned v = 0; v < 256; ++v) {
+@@ -1619,7 +1619,8 @@ static bool check_mode(cs_mode mode)
+ 			!check_legacy_memory(handles, 0xf3) ||
+ 			!check_vex_packed_memory(handles))))) ||
+ 		    !check_rex_stack(handles) ||
+-		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
++		    (mode == CS_MODE_64 && (!check_broadcast(handles, 0x1a) ||
++					     !check_broadcast(handles, 0x5a))) ||
+ 		    !check_evex_memory_moves(handles) ||
+ 		    !check_padding(handles) ||
+ 		    (mode == CS_MODE_32 &&
