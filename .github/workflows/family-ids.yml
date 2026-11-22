@@ -1,7 +1,7 @@
-name: Measure implicit register repair outside the common mapper and the corrected legacy vector bank
+name: Measure the legacy vector bank with mode lookup confined to cache misses and mode transitions
 on:
   push:
-    branches: [codex/implicit-register-repair-branch]
+    branches: [codex/uncached-legacy-register-banks]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: implicit-register-repair-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: cold-register-bank-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

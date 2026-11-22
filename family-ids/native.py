@@ -25,9 +25,11 @@ try:
         syms={}
         for line in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             e=line.split()
-            if len(e)==4 and e[3] in ('repair_implicit_registers','X86_get_insn_id','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
+            if len(e)==4 and e[3] in ('find_insn_uncached','X86_update_mode_mappings','X86_get_insn_id','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
         assert 'cs_disasm_iter' in syms and 'X86_get_insn_id' in syms
-        assert ('repair_implicit_registers' in syms)==(k=='fixed')
+        if k=='fixed':assert 'find_insn_uncached' in syms and 'X86_update_mode_mappings' in syms
+        for fname in ('X86_get_insn_id','find_insn_uncached'):
+            cmd(fname+'-'+k,['objdump','-d','--disassemble='+fname,so])
         save('layout-'+k,dict(symbols=syms,text_sha=sha(raw),size=raw.stat().st_size))
         cmd('build-tests-'+k,['cmake','--build',b,'--parallel','4','--target','x86_reg_access','x86_buffer_bounds','x86_scan_batch'])
         cmd('test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(x86_reg_access|x86_buffer_bounds|x86_scan_batch)$'])
