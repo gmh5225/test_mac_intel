@@ -43,7 +43,7 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         scores=out/('registers-'+variant+'.log');records=[v.split() for v in scores.read_text().splitlines()]
-        assert len(records)==12 and all(int(v[3])==int(v[4])==(16 if variant=='base' or v[0]=='64' else 8) for v in records)
+        assert len(records)==12 and all(int(v[3])==int(v[4])==(16 if variant!='candidate' or v[0]=='64' else 8) for v in records)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=git(cs,'write-tree'),llvm=llvm,records=records)
         src=t/'sum.c';src.write_text('#include <capstone/capstone.h>\n#include <stdio.h>\nint main(void){unsigned sum=0;for(unsigned i=8;i<16;++i)sum+=X86_REG_YMM0+i;printf("%u\\n",sum);}\n')
         command(['clang','-O2','-I',cs/'include',src,'-o',t/'weight'],'register-weight')
@@ -60,23 +60,23 @@ try:
         return list(map(int,sp.check_output(['setarch','x86_64','-R',t/'selected',case['path'],sel,str(mode),str(reps)],text=True).split()))
     rows=[];rng=random.Random(1739)
     for c in cases:
-        for mode in range(3):
+        for mode in (range(4) if c['selector'] in (32,64) else range(3)):
             single=execute('base',c,mode,1)
             n=max(1,round(65000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             delta=3*n*per if c['name']=='putty-32-0.85'and mode==2 else 0
-            for rep in range(11):
+            for rep in range(13):
                 keys=['base','copy','correct','candidate'];rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k in ('correct','candidate'):wanted[-1]-=delta
+                    if k=='candidate':wanted[-1]-=delta
                     assert wanted==sample[1:],(c['name'],mode,k,expected,delta,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
             rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],expected_difference=delta,reps=n,cycles=cycles))
             save('timings',rows)
-    save('complete',dict(done=True,pairs=11,panels=len(rows),source=llvm))
+    save('complete',dict(done=True,pairs=13,panels=len(rows),source=llvm))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())
     shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))
