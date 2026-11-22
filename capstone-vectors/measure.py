@@ -19,8 +19,6 @@ def module(path):
 def main(w):
     reference=json.loads((r/'experiment.json').read_text())['baseline_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
-    assert sha(r/'i386.patch')==json.loads((r/'experiment.json').read_text())['i386_patch_sha256']
-    run(['git','-C',base,'apply','--index',r/'i386.patch'],'baseline-i386')
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
     run(['git','init','--bare',w/'iced-git'],'iced-repo');run(['git','-C',w/'iced-git','fetch','--depth','1','https://github.com/NeverSight/iced.git',iced],'iced-fetch');run(['git','-C',w/'iced-git','archive','--format=tar','-o',tar,iced,'src/rust/iced-x86'],'iced-archive');run(['tar','-xf',tar,'-C',checkout],'iced-extract');tar.unlink()
@@ -60,16 +58,18 @@ def main(w):
     inc=inc.replace('Result timed=run(reps);','CALLGRIND_TOGGLE_COLLECT; Result timed=run(reps); CALLGRIND_TOGGLE_COLLECT;')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    profile += ['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON']
     data=json.loads((r/'experiment.json').read_text())
     b=w/'build';exe={}
     run(['cmake','-S',base,'-B',b,*profile],'configure')
+    commands=json.loads((b/'compile_commands.json').read_text())
+    owners={opt:sorted({Path(row['file']).name for row in commands if '-D'+opt in row['command'].split() or '-D'+opt+'=1' in row['command'].split()}) for opt in ('CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS','CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
+    assert list(owners.values())==[['MipsMapping.c'],['MipsInstPrinter.c'],['X86Sse64Output.c']]
+    save('flag-owners.json',owners)
     obj=w/'driver.o'
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
     for label,tree in data['trees'].items():
-        if label=='proposed':
-            assert sha(r/'proposed.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'proposed.patch'],'apply')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
@@ -93,8 +93,8 @@ def main(w):
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in ('released','proposed')]
-        assert audit[0]==audit[1]
+        audit=[sp.check_output([exe[k],'audit','0','1',f,intervals,str(bits)],text=True) for k in data['trees']]
+        assert len(audit)==1
         trace=[list(map(int,x.split())) for x in audit[0].splitlines()]
         views=[list(map(int,x.split())) for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
         assert len(views)==len(spans)==len(trace)
@@ -107,7 +107,7 @@ def main(w):
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
         for mode in range(5):
-            engines=[('released','capstone'if mode==0 else 'x86_iter'),('proposed','capstone'if mode==0 else 'x86_iter')]
+            engines=[('released','capstone')]+([('released','x86_iter')] if mode else [])
             if mode<=2:engines+=[('released','iced____')]+([('released','fast____')]if mode else [])
             reference=None
             for variant,engine in engines:
@@ -135,7 +135,7 @@ def main(w):
                 reported.append(dict(case=name,mode=mode,tree=variant,engine=engine,signature=measured[2:],totals=dict(zip(events,tot)),top=funcs[:55],calls=relevant,sha256=sha(raw)))
                 raw.unlink();packed.unlink();save('counts.json',reported)
         print(name,panel,len(sel),flush=True)
-    assert len(reported)==60 and len(manifest)==4,(len(reported),len(manifest))
+    assert len(reported)==56 and len(manifest)==4,(len(reported),len(manifest))
     save('complete.json',dict(cases=len(reported),success=True,hardware_timing=False,scope='Timed loop only after a full warmup; per-symbol exclusive totals independently summed against Callgrind.'))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:

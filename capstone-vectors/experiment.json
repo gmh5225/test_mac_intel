@@ -1,12 +1,5 @@
 {
-  "baseline_commit": "205dcd8bd67fb7561e6eb6c15ea4630e20c85d12",
-  "baseline_tree": "aca6daa7a77f9c5c9ddaeb4e19f71ee7f236f6c3",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
-  "trees": {
-    "released": "aca6daa7a77f9c5c9ddaeb4e19f71ee7f236f6c3",
-    "proposed": "30dd09d0604e4da2f52e368cb5753e4cdab54c00"
-  },
-  "patch_sha256": "b929c490aa74ceb2360d9ae250bfe05575bb2e3eb4499f6b65a34f4502f1baa7",
   "tests": [
     "x86_evex_vpcmp_id",
     "x86_evex_vpcmp_mask_size",
@@ -29,15 +22,9 @@
     "jpeg-avx2-i386": "simd-functions",
     "libmvec-amd64": "whole-text"
   },
-  "cycles": 7,
-  "entrypoints": {
-    "public": "cs_disasm_iter",
-    "neverd-text": "X86_disasmIter",
-    "neverd-no-text": "cs_disasm_iter"
+  "baseline_commit": "77b7043a31582684a0234f104a1fc24d90f0a12d",
+  "trees": {
+    "released": "fbfb40b33cea9a8b7f8a7a205b34e1e9047e9edd"
   },
-  "iced_branch": "codex/neverd-capstone-compat",
-  "candidate": "Time i386 indirect calls and absolute operands in isolation on current amd64 packed output",
-  "i386_patch_sha256": "0fb5f924ff4d01e9fb410fab0bda706f720a397bc12b6749b993977eaebc247e",
-  "baseline_static_commit": "88f64f91be1b3c9de7c5819e93806fa8d79127db",
-  "scope": "Single timed traversal after warmup, matches the shipping X86_disasmIterText call for both bitnesses. Directional callgrind cost attribution, independent of the native throughput gate."
+  "scope": "Guest instructions and cache/branch events after warmup on the same verified function extents; the shipping four-backend flags, including AMD64 private output, are active."
 }

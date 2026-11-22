@@ -1,7 +1,7 @@
-name: Locate per-instruction work in the shipping Capstone and forked iced formatters
+name: Measure public and production Capstone formatting work against iced fast and full on current next
 on:
   push:
-    branches: [codex/capstone-shipping-iced-formatter-costs]
+    branches: [codex/capstone-shipping-private-public-costs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 205dcd8bd67fb7561e6eb6c15ea4630e20c85d12
+          ref: 77b7043a31582684a0234f104a1fc24d90f0a12d
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: hot-format-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shipping-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
