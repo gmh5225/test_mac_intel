@@ -71,6 +71,10 @@ def main(w):
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
         run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'census.cpp',b/'libcapstone.a','-o',w/('census-'+label)],'census-link-'+label)
+        if label=='integrated':
+            run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
+            produced=sp.check_output([w/'table-check','--vex32-memory'])
+            assert produced==(base/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes() and b'vex32_move_rows[2]' in produced
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
