@@ -62,13 +62,13 @@ try:
     for k in ('base','active','indexed'):
         libs[k]=t/(k+'.so');libs[k].write_bytes(imgs[k])
     states={}
-    for k in ('active','indexed'):
+    for k in ('base','active','indexed'):
         states[k]={}
         for label,bits,f in [('real-pe32',32,t/'putty-0.85-32.text'),('real-pe64',64,t/'putty-0.85-64.text'),('code16',16,t/'putty-0.85-32.text'),('simd64',64,t/'libmvec.text')]:
             z=json.loads(sp.check_output([t/'public-states',libs['base'],libs[k],f,str(bits)],text=True))
             assert z['complete_record_comparisons']>0 and z['batch_records']>0
             states[k][label]=z
-    assert states['active']==states['indexed']
+    assert states['base']==states['active']==states['indexed']
     save('public-differential',states)
     import corpus
     foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name'] in ('arm-ls', 'arm64-ls', 'mips64el-ls', 'ppc64el-ls', 'riscv64-ls', 'sparc64-ls', 's390x-ls', 'loong64-ls')]

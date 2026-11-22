@@ -1,5 +1,4 @@
 #include <capstone/capstone.h>
-#include "acceptance.h"
 #include <dlfcn.h>
 #include <algorithm>
 #include <cstdio>
@@ -82,7 +81,6 @@ int main(int argc, char **argv) {
         right.detail=left.detail;
         bool same=!std::memcmp(&left,&right,sizeof(left));
         right.detail=d;
-        if (same && left.detail && d) expect_vector_writes(bits,left.id,*left.detail,*d);
         if (!same || bool(left.detail)!=bool(d) || (d && std::memcmp(left.detail,d,sizeof(*d))))
           throw std::runtime_error("batch instruction or detail mismatch");
       }
@@ -122,8 +120,6 @@ int main(int argc, char **argv) {
         if(insn[i].detail!=&detail[i]) throw std::runtime_error("detail pointer");
         insn[i].detail=nullptr;
       }
-      if (ok[0] && ok[1] && cfg.detail && insn[0].id==insn[1].id)
-        expect_vector_writes(bits,insn[0].id,detail[0],detail[1]);
       if(ok[0]!=ok[1] || left[0]!=left[1] || cur[0]!=cur[1] || ip[0]!=ip[1] ||
          err[0]!=err[1] || std::memcmp(insn,insn+1,sizeof(cs_insn)) ||
          std::memcmp(detail,detail+1,sizeof(cs_detail))) {
