@@ -18,23 +18,28 @@ try:
     if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
     if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
     run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
-    verified={}
+    objects={}
     for variant in ('base','candidate'):
         if variant=='candidate':
             git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
         run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
         path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
+        objects[variant]={str(p.relative_to(b)):sha(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+    changed=[k for k,v in objects['base'].items()if v!=objects['candidate'][k]]
+    assert len(objects['base'])>5 and objects['base'].keys()==objects['candidate'].keys() and ([Path(k).name for k in changed]==['RISCVDisassembler.c.o'] if conf=='full' else not changed)
+    write('member-changes',dict(changed=changed,total=len(objects['base'])))
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
     run([tmp/'check-static'],'static-selected')
     if conf=='full':
-        selected=['mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
+        selected=['mips_single','mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
         selected=units
     else:
         selected=['x86_scan_batch','text_option','detail_option']
         if diet:selected.append('x86_kmask_width')
+    if conf in ('diet','reduce'):selected += ['x86_evex_vpcmp_id','x86_evex_detail']
     if conf!='full':
         assert sha(libs['base'])==sha(libs['candidate'])
         write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
@@ -102,7 +107,7 @@ try:
         for name,bits,path,ip in panels[2:]+other_cases:
             for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
                 first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
-                for i in range(7):
+                for i in range(13):
                     keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
                         v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
