@@ -20,6 +20,8 @@ def main(w):
     reference=json.loads((r/'experiment.json').read_text())['checkout_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     meta=json.loads((r/'experiment.json').read_text())
+    assert sha(r/'baseline.patch')==meta['baseline_patch']
+    run(['git','-C',base,'apply','--index',r/'baseline.patch'],'apply-base')
     assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['baseline_tree']
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -116,7 +118,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert members.keys()==prior.keys() and 'X86Vex32Output.c.o'in changed and 'X86MemoryFallback32.c.o'in changed
+            assert members.keys()==prior.keys() and changed=={'X86MemoryFallback32.c.o'}
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
@@ -141,6 +143,7 @@ def main(w):
     run(['python3','-B',w/'libmvec.py'],'glibc')
     glibc=json.loads((w/'libmvec.json').read_text())
     extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
+    sampled={}
     for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w),extra):
         if name not in data['samples']:continue
         if name in data['samples']:
@@ -164,6 +167,7 @@ def main(w):
         if panel=='whole-text':assert len(selected)==1 and selected[0][1]==f.stat().st_size,(name,trace[:1])
         assert selected
         intervals.write_text(''.join('%d %d %d\n'%tuple(a) for a in selected))
+        if bits==32:sampled[name]=(f,intervals)
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
@@ -212,6 +216,7 @@ def main(w):
     from observe import install
     for variant in ('baseline','integrated'):
         run(['git','-C',base,'restore','--source',reference,'--staged','--worktree','--','.'],'restore-guard-'+variant)
+        run(['git','-C',base,'apply','--index',r/'baseline.patch'],'guard-base-'+variant)
         if variant=='integrated':run(['git','-C',base,'apply','--index',r/'integrated.patch'],'apply-guard')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==data['trees'][variant]
         install(base)
@@ -220,6 +225,10 @@ def main(w):
         counts=list(map(int,sp.check_output([w/'sib'],text=True).split()))
         assert counts==data['sib_guard']['parent' if variant=='baseline' else 'commit']
         save('sib-'+variant+'.json',counts)
+        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'coverage.cpp',b/'libcapstone.a','-o',w/'lea-observed'],'coverage-compile-'+variant)
+        result={name:list(map(int,sp.check_output([w/'lea-observed',f,intervals]).split()))for name,(f,intervals)in sampled.items()}
+        assert len(result)==3
+        save('lea-coverage-'+variant+'.json',result)
     save('complete.json',dict(cases=len(reported),success=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:

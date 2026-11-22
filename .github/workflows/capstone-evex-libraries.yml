@@ -1,7 +1,7 @@
-name: Check omitted EIZ registers and encoded SIB scales in real i386 instruction streams
+name: Check recovered i386 base-only SIB loads in real PE and ELF with fixed scanner code
 on:
   push:
-    branches: [codex/capstone-i386-no-index-register]
+    branches: [codex/i386-lea-fallback-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: bbba0e240053b9ad2897390bdc76f6f6115e3a55
+          ref: 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: no-index-sib-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: lea-miss-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
