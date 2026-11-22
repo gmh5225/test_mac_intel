@@ -21,7 +21,7 @@ try:
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name'}
+        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','SystemZ_LLVM_getRegisterName','printFormattedRegName'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
@@ -63,9 +63,7 @@ try:
             cmd('regression-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_systemz_register_dialects$'])
         if k=='indexed':
             cmd('register-static',['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-            gen=s/'suite/synctools/systemz_register_output.c'
-            cmd('generate-registers',[cc,'-O2','-I',s/'include',gen,b/'libcapstone.a','-o',t/'generate-registers'])
-            assert sp.check_output([t/'generate-registers'])==(s/'arch/SystemZ/SystemZGenRegisterOutput.inc').read_bytes()
+            cmd('generate-registers',['python3','-B',s/'suite/synctools/systemz_register_names.py','--check'])
         if k=='indexed':
             names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])

@@ -1,7 +1,7 @@
-name: Compare four-byte counted SystemZ register spellings and verify nine architecture outputs
+name: Measure one register spelling table for public names and SystemZ dialects across nine ISAs
 on:
   push:
-    branches: [codex/systemz-counted-register-rows]
+    branches: [codex/shared-systemz-register-spellings]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
+          ref: 771f67c4d5bbb9e3528279edea0518cdc2828bca
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-four-byte-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-shared-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
