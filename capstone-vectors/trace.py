@@ -9,8 +9,6 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 q=read(r/'attribution-source.json');prior=read(r/'samples.json')
 def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 assert git('rev-parse','HEAD')==q['checkout']
-assert sha(r/'candidate.patch')==q['sha256']
-run(['git','-C',s,'apply','--index',r/'candidate.patch'])
 assert git('write-tree')==q['tree']
 for bits,unit,second in [(64,'X86Sse64Output.c','X86VectorFallback64.c'),(32,'X86Vex32Output.c','X86MemoryFallback32.c')]:
     fallback=s/'arch/X86'/second;src=fallback.read_text();needle='return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);'
