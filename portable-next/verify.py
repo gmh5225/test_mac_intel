@@ -38,9 +38,10 @@ try:
             table=sp.check_output([exe],env=env).replace(b'\r\n',b'\n')
             assert table==(s/'arch/X86/X86GenVectorOutput.inc').read_bytes().replace(b'\r\n',b'\n')
             save(v/'table.json',dict(bytes=len(table),sha256=hashlib.sha256(table).hexdigest()))
-            if name=='vex':
-                bits=sp.check_output([exe,'--vex-rip-memory'],env=env).replace(b'\r\n',b'\n')
-                assert bits==(s/'arch/X86/X86GenVexRipMemory.inc').read_bytes().replace(b'\r\n',b'\n')
+            if name in ('memory','broadcast'):
+                table,filename=('--vex-base-memory','X86GenVexBaseMemory.inc') if name=='memory' else ('--integer-block-broadcast','X86GenIntegerBlockBroadcast.inc')
+                bits=sp.check_output([exe,table],env=env).replace(b'\r\n',b'\n')
+                assert bits==(s/'arch/X86'/filename).read_bytes().replace(b'\r\n',b'\n')
                 save(v/'bits.json',dict(sha256=hashlib.sha256(bits).hexdigest(),bytes=len(bits)))
             rows=[]
             for suffix in ('static','shared'):
