@@ -1,0 +1,1538 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 77d1aaa8..a7d92439 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1049,7 +1049,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+     target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
++    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c arch/X86/X86BatchScan.c)
+     target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
+     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+diff --git a/Makefile b/Makefile
+index b8b582a0..ea8f85dc 100644
+--- a/Makefile
++++ b/Makefile
+@@ -278,7 +278,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86BatchScan.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
+index 00348e68..8344d742 100644
+--- a/arch/RISCV/RISCVDisassembler.h
++++ b/arch/RISCV/RISCVDisassembler.h
+@@ -11,12 +11,13 @@
+ #include "../../MCDisassembler.h"
+ #include "../../SStream.h"
+ 
+-/* Select the position table in dedicated builds where scanning and detail
+- * construction both benefit. GCC's full decoder keeps the descriptor walk. */
+-#if defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && \
+-	(defined(CAPSTONE_DIET) || \
+-	 (defined(__linux__) && defined(__clang__) && \
+-	  (defined(__x86_64__) || defined(__aarch64__))))
++/* The compact SP positions are also profitable in mixed x86-64 Linux
++ * builds with Clang 18 and later. */
++#if (defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && defined(CAPSTONE_DIET)) || \
++	(defined(__linux__) && defined(__clang__) && !defined(CAPSTONE_DIET) && \
++	 (defined(__x86_64__) || defined(__aarch64__)) && \
++	 (defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) || \
++	  (defined(CAPSTONE_HAS_X86) && defined(__x86_64__) && __clang_major__ >= 18)))
+ #define RISCV_USE_STACK_OPERAND_POSITIONS
+ #endif
+ 
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+new file mode 100644
+index 00000000..92cd1a79
+--- /dev/null
++++ b/arch/X86/X86BatchScan.c
+@@ -0,0 +1,270 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++/* Keep the optional static iterator and its tables in their own ELF sections. */
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_native_batch_text" rodata = \
++	".cs_x86_native_batch_rodata"
++#endif
++#include "X86ScanAdapter.h"
++#include "../../cs_priv.h"
++
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++#include "../../cs_disasm_internal.h"
++#define X86_DEFINE_VEX2_PUBLIC_PLANS
++#include "X86GenVexPublicPlans.inc"
++#undef X86_DEFINE_VEX2_PUBLIC_PLANS
++#include "X86GenBatchPrimary.inc"
++#include "X86FeatureExtension.h"
++#ifdef X86_EVEX_REGISTER_SCAN
++#define X86_EVEX_SCAN_RODATA ".cs_x86_native_batch_rodata"
++#include "X86EvexScanPlan.h"
++#endif
++
++/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
++static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
++			 unsigned *tail)
++{
++	if (size <= offset)
++		return false;
++	const uint8_t modrm = code[offset];
++	if (modrm >= 0xc0) {
++		*tail = 0;
++		return true;
++	}
++	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
++					       { 1, 1, 1, 1, 2, 1, 1, 1 },
++					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
++	unsigned length = lengths[modrm >> 6][modrm & 7];
++	if ((modrm & 0xc7) == 4) {
++		if (size <= offset + 1)
++			return false;
++		if ((code[offset + 1] & 7) == 5)
++			length += 4;
++	}
++	*tail = length;
++	return true;
++}
++
++static uint32_t readPrimary(const uint8_t *code, size_t size, unsigned plan)
++{
++	if (plan & X86_BATCH_REG_GROUP) {
++		if (size < 2)
++			return 0;
++		const uint8_t mr = code[1];
++		plan = x86BatchRegGroups[plan & ~X86_BATCH_REG_GROUP]
++					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
++		if (!plan)
++			return 0;
++	}
++	unsigned length = plan & 15;
++	if (plan & 0x10) {
++		unsigned tail;
++		if (!addressBytes(code, size, 1, &tail))
++			return 0;
++		length += tail;
++	}
++	return length <= size ? (plan & ~0xffu) | length : 0;
++}
++
++/* Every admitted plan has the same public ID, reserved-vvvv rule and
++ * immediate extent as all of its canonical ModR/M outcomes. */
++static uint32_t readVex2Plan(const uint8_t *code, size_t size)
++{
++	if (size < 3)
++		return 0;
++	const unsigned payload = code[1];
++	unsigned plan = x86Vex2PublicPlans[payload & 3][code[2]];
++	if (plan & (X86_VEX2_PUBLIC_LENGTH | X86_VEX2_PUBLIC_GROUP)) {
++#if X86_HAS_VEX2_LENGTH_PLANS
++		if (plan & X86_VEX2_PUBLIC_LENGTH)
++			plan = x86Vex2LengthPlans[plan &
++						  (X86_VEX2_PUBLIC_LENGTH - 1)]
++						 [(payload >> 2) & 1];
++#endif
++#if X86_HAS_VEX2_PUBLIC_GROUPS
++		if (plan & X86_VEX2_PUBLIC_GROUP) {
++			if (size < 4)
++				return 0;
++			const unsigned modrm = code[3];
++			plan = x86Vex2PublicGroups[plan &
++						   (X86_VEX2_PUBLIC_GROUP - 1)]
++						  [((modrm >> 3) & 7) +
++						   (modrm >= 0xc0 ? 8 : 0)];
++		}
++#endif
++	}
++	if (!plan)
++		return 0;
++	if ((plan & 2) && (payload & 0x78) != 0x78)
++		return 0;
++	unsigned end = 3;
++	if (plan & 4) {
++		unsigned tail;
++		if (!addressBytes(code, size, 3, &tail))
++			return 0;
++		end = 4 + tail;
++	}
++	end += plan & 1;
++	if (end > size)
++		return 0;
++	return ((plan >> 3) << 8) | end;
++}
++
++static uint32_t readFirst32(const uint8_t *code, size_t size)
++{
++	const unsigned plan = x86Batch32Primary[code[0]];
++	if (plan)
++		return readPrimary(code, size, plan);
++	if (code[0] == 0xc5 && size >= 3 && (code[1] & 0xc0) == 0xc0)
++		return readVex2Plan(code, size);
++	return 0;
++}
++
++/* The offset includes the 0F escape. All extents in the projected
++ * descriptors start at the secondary opcode, just as readPrimary expects. */
++static uint32_t readSecondary64(const uint8_t *code, size_t size,
++				unsigned offset, bool wide_operand,
++				bool operand_prefix)
++{
++	if (offset >= size)
++		return 0;
++	const uint32_t *plans;
++	if (operand_prefix)
++		plans = wide_operand ? x86Batch64RexWOpSizeSecondary :
++				       x86Batch64OpSizeSecondary;
++	else
++		plans = wide_operand ? x86Batch64RexWSecondary :
++				       x86Batch64Secondary;
++	const unsigned plan = plans[code[offset]];
++	const uint32_t word =
++		plan ? readPrimary(code + offset, size - offset, plan) : 0;
++	return word ? word + offset : 0;
++}
++
++static uint32_t readFirst64(const uint8_t *code, size_t size)
++{
++	const unsigned byte = code[0];
++	if ((byte & 0xf0) == 0x40) {
++		if (size < 2)
++			return 0;
++		const unsigned opcode = code[1];
++		if (opcode == 0x0f)
++			return readSecondary64(code, size, 2, byte & 8, false);
++		/* getIDForMode repairs 90 with REX.B to XCHG. */
++		if (opcode == 0x90 && (byte & 1))
++			return 0;
++		const unsigned plan = (byte & 8 ? x86Batch64RexWPrimary :
++						  x86Batch64Primary)[opcode];
++		const uint32_t word =
++			plan ? readPrimary(code + 1, size - 1, plan) : 0;
++		return word ? word + 1 : 0;
++	}
++	const unsigned plan = x86Batch64Primary[byte];
++	if (plan)
++		return readPrimary(code, size, plan);
++	if (byte == 0x0f)
++		return readSecondary64(code, size, 1, false, false);
++	if (byte == 0x66 && size >= 3) {
++		const bool rex = (code[1] & 0xf0) == 0x40;
++		if (code[1 + rex] == 0x0f)
++			return readSecondary64(code, size, 2 + rex,
++					       rex && (code[1] & 8), true);
++	}
++	if (byte == 0xc5)
++		return readVex2Plan(code, size);
++#ifdef X86_EVEX_REGISTER_SCAN
++	if (byte == 0x62 && size >= 6) {
++		unsigned id, length;
++		if (X86_readEvexScanPlan(code, size, &id, &length))
++			return (id << 8) | length;
++	}
++#endif
++	return 0;
++}
++
++CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
++					      size_t size, uint64_t address,
++					      uint32_t *output, size_t capacity,
++					      bool wide)
++{
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	X86ScanBatchResult batch = { 0, 0 };
++	cs_insn insn = { 0 };
++	handle->errnum = CS_ERR_OK;
++	while (batch.count < capacity && size) {
++		uint32_t packed = wide ? readFirst64(code, size) :
++					 readFirst32(code, size);
++		if (!packed) {
++			insn.address = address;
++			X86ScanResult result;
++			if (!X86_getInstructionScanResult(ud, code, size, &insn,
++							  &result))
++				break;
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++			packed = (insn.id << 8) | result.length;
++		}
++		output[batch.count++] = packed;
++		const unsigned length = packed & 0xff;
++		batch.bytes += length;
++		code += length;
++		size -= length;
++		address += length;
++	}
++	return batch;
++}
++
++/* The width is constant throughout this loop. */
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((noinline, section(".cs_x86_batch32_text")))
++#elif defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static X86ScanBatchResult scanBatch32(csh ud, const uint8_t *code, size_t size,
++				      uint64_t address, uint32_t *output,
++				      size_t capacity)
++{
++	return scanBatch(ud, code, size, address, output, capacity, false);
++}
++
++/* The width is constant throughout this loop. */
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((noinline, section(".cs_x86_batch64_text")))
++#elif defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static X86ScanBatchResult scanBatch64(csh ud, const uint8_t *code, size_t size,
++				      uint64_t address, uint32_t *output,
++				      size_t capacity)
++{
++	return scanBatch(ud, code, size, address, output, capacity, true);
++}
++#endif
++
++CAPSTONE_INTERNAL
++X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
++				       uint64_t address, uint32_t *output,
++				       size_t capacity)
++{
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (handle && use_x86_scan(handle) && !handle->skipdata && code &&
++	    output && capacity && size && handle->insn_id == X86_get_insn_id &&
++	    handle->disasm == X86_getInstruction) {
++		if (handle->mode == CS_MODE_32)
++			return scanBatch32(ud, code, size, address, output,
++					   capacity);
++		if (handle->mode == CS_MODE_64)
++			return scanBatch64(ud, code, size, address, output,
++					   capacity);
++	}
++#endif
++	return X86_scanBatch(ud, code, size, address, output, capacity);
++}
++#endif
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index ccaec06a..7b8535ac 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -4,73 +4,29 @@
+ #ifdef CAPSTONE_HAS_X86
+ #include "X86FeatureExtension.h"
+ #ifdef X86_EVEX_REGISTER_SCAN
+-#include "X86EvexAdmission.h"
+-#include "X86GenEvexScan.inc"
++#include "X86EvexScanPlan.h"
+ 
+ /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
+  * The ordinary output generator owns the admitted IDs and widths. */
+-__attribute__((noinline, section(".cs_x86_evex_scan_text")))
+-static x86_feature_decode_result
++__attribute__((
++	noinline,
++	section(".cs_x86_evex_scan_text"))) static x86_feature_decode_result
+ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
+-		      MCInst *instr, uint16_t *size, uint8_t opcode)
++		       MCInst *instr, uint16_t *size, uint8_t opcode)
+ {
+ 	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
+-	const unsigned pp = code[2] & 3;
++	unsigned id, length;
+ 	if (handle->mode == CS_MODE_64 &&
+-	    !X86_EVEX_PREFIX_REJECTS(code, code_len, pp)
+ #ifdef CAPSTONE_X86_SCAN_ADAPTER
+-	    && !handle->x86_scan_adapter
++	    !handle->x86_scan_adapter &&
+ #endif
+-	) {
+-		const unsigned map = code[1] & 15;
+-		const unsigned index = evex_scan_index[code[4]];
+-		unsigned id, length;
+-		if (index & 128) {
+-			if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+-				goto fallback;
+-			unsigned kind;
+-			if (index == EVEX_SCAN_MOVE) {
+-				if (map != 1 || !pp)
+-					goto fallback;
+-				kind = pp;
+-			} else {
+-				if (map != 2 || pp != 1 || code[5] >= 0xc0)
+-					goto fallback;
+-				kind = 0;
+-			}
+-			id = evex_transfer_scan_ids[kind][code[2] >> 7]
+-						  [code[3] >> 5];
+-			length = evex_transfer_lengths[((code[5] >> 3) & 24) |
+-						       (code[5] & 7)];
+-			/* Only mod=0 with SIB needs its base field to determine
+-			 * the extent. Every other ordinary SIB value is valid. */
+-			if (!length) {
+-				if (code_len < 7)
+-					goto fallback;
+-				length = 7 + 4 * ((code[6] & 7) == 5);
+-			}
+-		} else {
+-			if (pp != 1 || code[5] < 0xc0)
+-				goto fallback;
+-			const struct EvexScanPlan *plan = &evex_scan_plans[index];
+-			if (plan->map != map)
+-				goto fallback;
+-			const unsigned key = (map << 8) | code[4];
+-			if (X86_EVEX_REGISTER_EXTRACT(key) &&
+-			    X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+-				goto fallback;
+-			id = plan->ids[code[2] >> 7][code[3] >> 5];
+-			length = plan->length;
+-		}
+-		if (id && code_len >= length) {
+-			instr->Opcode = 0;
+-			instr->OpcodePub = id;
+-			instr->popcode_adjust = 0;
+-			*size = (uint16_t)length;
+-			return X86_FEATURE_DECODED;
+-		}
++	    X86_readEvexScanPlan(code, code_len, &id, &length)) {
++		instr->Opcode = 0;
++		instr->OpcodePub = id;
++		instr->popcode_adjust = 0;
++		*size = (uint16_t)length;
++		return X86_FEATURE_DECODED;
+ 	}
+-fallback:
+ 	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
+ 					  opcode);
+ }
+@@ -85,7 +41,7 @@ X86_decodeScanFeatureExtension(csh ud, const uint8_t *code, size_t code_len,
+ 	if (opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
+ 	    (((cs_struct *)(uintptr_t)ud)->mode & CS_MODE_64))
+ 		return decodeEvexRegisterScan(ud, code, code_len, instr, size,
+-					     opcode);
++					      opcode);
+ 	return X86_decodeFeatureExtensionSlow(ud, code, code_len, instr, size,
+ 					      opcode);
+ }
+diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
+new file mode 100644
+index 00000000..af85a328
+--- /dev/null
++++ b/arch/X86/X86EvexScanPlan.h
+@@ -0,0 +1,71 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_EVEX_SCAN_PLAN_H
++#define CS_X86_EVEX_SCAN_PLAN_H
++#include "X86EvexAdmission.h"
++#ifndef X86_EVEX_SCAN_RODATA
++#define X86_EVEX_SCAN_RODATA ".cs_x86_evex_scan_rodata"
++#endif
++#include "X86GenEvexScan.inc"
++#undef X86_EVEX_SCAN_RODATA
++
++/* Callers provide six bytes of bare EVEX in 64-bit mode. Return the same
++ * generated public ID and extent to the ordinary and batch scan entries. */
++static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
++					unsigned *instruction_id,
++					unsigned *instruction_length)
++{
++	const unsigned pp = code[2] & 3;
++	if (X86_EVEX_PREFIX_REJECTS(code, code_len, pp))
++		return false;
++	const unsigned map = code[1] & 15;
++	const unsigned index = evex_scan_index[code[4]];
++	unsigned id, length;
++	if (index & 128) {
++		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
++			return false;
++		unsigned kind;
++		if (index == EVEX_SCAN_MOVE) {
++			if (map != 1 || !pp)
++				return false;
++			kind = pp;
++		} else if (index >= EVEX_SCAN_PACKED) {
++			if (map != 1 || pp > 1)
++				return false;
++			kind = 4 + (index - EVEX_SCAN_PACKED) * 2 + pp;
++		} else {
++			if (map != 2 || pp != 1 || code[5] >= 0xc0)
++				return false;
++			kind = 0;
++		}
++		id = evex_transfer_scan_ids[kind][code[2] >> 7][code[3] >> 5];
++		length = evex_transfer_lengths[((code[5] >> 3) & 24) |
++					       (code[5] & 7)];
++		/* Only mod=0 with SIB needs its base field to determine
++		 * the extent. Every other ordinary SIB value is valid. */
++		if (!length) {
++			if (code_len < 7)
++				return false;
++			length = 7 + 4 * ((code[6] & 7) == 5);
++		}
++	} else {
++		if (pp != 1 || code[5] < 0xc0)
++			return false;
++		const struct EvexScanPlan *plan = &evex_scan_plans[index];
++		if (plan->map != map)
++			return false;
++		const unsigned key = (map << 8) | code[4];
++		if (X86_EVEX_REGISTER_EXTRACT(key) &&
++		    X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
++			return false;
++		id = plan->ids[code[2] >> 7][code[3] >> 5];
++		length = plan->length;
++	}
++	if (!id || length > code_len)
++		return false;
++	*instruction_id = id;
++	*instruction_length = length;
++	return true;
++}
++#endif
+diff --git a/arch/X86/X86GenBatchPrimary.inc b/arch/X86/X86GenBatchPrimary.inc
+new file mode 100644
+index 00000000..a9b0138c
+--- /dev/null
++++ b/arch/X86/X86GenBatchPrimary.inc
+@@ -0,0 +1,297 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++/* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */
++
++#ifdef CAPSTONE_X86_REDUCE
++/* The private batch entries use the full decoder. */
++#else
++#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)
++static const uint32_t x86Batch32Primary[256] = {
++	0x00000812u, 0x00000812u, 0x00000812u, 0x00000812u, 0x00000802u, 0x00000805u, 0x00026101u, 0x00024901u,
++	0x00020012u, 0x00020012u, 0x00020012u, 0x00020012u, 0x00020002u, 0x00020005u, 0x00026101u, 0x00000000u,
++	0x00000612u, 0x00000612u, 0x00000612u, 0x00000612u, 0x00000602u, 0x00000605u, 0x00026101u, 0x00024901u,
++	0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c02u, 0x00028c05u, 0x00026101u, 0x00024901u,
++	0x00001812u, 0x00001812u, 0x00001812u, 0x00001812u, 0x00001802u, 0x00001805u, 0x00000000u, 0x00009001u,
++	0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb02u, 0x0002cb05u, 0x00000000u, 0x00009101u,
++	0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df02u, 0x0005df05u, 0x00000000u, 0x00000101u,
++	0x00006912u, 0x00006912u, 0x00006912u, 0x00006912u, 0x00006902u, 0x00006905u, 0x00000000u, 0x00000401u,
++	0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u,
++	0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u,
++	0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u,
++	0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u,
++	0x00026301u, 0x00024b01u, 0x00000000u, 0x00001e12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026105u, 0x0000e416u, 0x00026102u, 0x0000e413u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00010d02u, 0x00010a02u, 0x00010102u, 0x0000fe02u, 0x00010402u, 0x00010902u, 0x00010002u, 0x0000ff02u,
++	0x00011002u, 0x00010c02u, 0x00010e02u, 0x00010b02u, 0x00010802u, 0x00010502u, 0x00010702u, 0x00010602u,
++	0x80000000u, 0x80000001u, 0x80000000u, 0x80000000u, 0x0002de12u, 0x0002de12u, 0x00000000u, 0x00000000u,
++	0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x00000000u, 0x80000002u, 0x00000000u, 0x00000000u,
++	0x0001fe01u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u,
++	0x00008f01u, 0x00004001u, 0x0000aa07u, 0x0005c601u, 0x00026501u, 0x00024e01u, 0x00028601u, 0x00014401u,
++	0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0002de02u, 0x0002de05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u,
++	0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u,
++	0x80000003u, 0x80000003u, 0x00027903u, 0x00027901u, 0x00000000u, 0x00000000u, 0x80000004u, 0x80000005u,
++	0x0000a604u, 0x00014d01u, 0x00015f03u, 0x00015f01u, 0x0000f001u, 0x0000ee02u, 0x0000f101u, 0x0000f901u,
++	0x80000006u, 0x80000006u, 0x80000006u, 0x80000006u, 0x00000302u, 0x00000000u, 0x00028801u, 0x0005de01u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00015e02u, 0x00015d02u, 0x00015c02u, 0x00010302u, 0x0000e502u, 0x0000e502u, 0x00020302u, 0x00020302u,
++	0x00003e05u, 0x0000ac05u, 0x0000ab07u, 0x0000ac02u, 0x0000e501u, 0x0000e501u, 0x00020301u, 0x00020301u,
++	0x00000000u, 0x0000ef01u, 0x00000000u, 0x00000000u, 0x0000df01u, 0x00004f01u, 0x80000007u, 0x80000008u,
++	0x00004401u, 0x0002bf01u, 0x00004a01u, 0x0002c201u, 0x00004501u, 0x0002c001u, 0x80000009u, 0x8000000au,
++};
++static const uint32_t x86Batch64Primary[256] = {
++	0x00000812u, 0x00000812u, 0x00000812u, 0x00000812u, 0x00000802u, 0x00000805u, 0x00000000u, 0x00000000u,
++	0x00020012u, 0x00020012u, 0x00020012u, 0x00020012u, 0x00020002u, 0x00020005u, 0x00000000u, 0x00000000u,
++	0x00000612u, 0x00000612u, 0x00000612u, 0x00000612u, 0x00000602u, 0x00000605u, 0x00000000u, 0x00000000u,
++	0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c02u, 0x00028c05u, 0x00000000u, 0x00000000u,
++	0x00001812u, 0x00001812u, 0x00001812u, 0x00001812u, 0x00001802u, 0x00001805u, 0x00000000u, 0x00000000u,
++	0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb02u, 0x0002cb05u, 0x00000000u, 0x00000000u,
++	0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df02u, 0x0005df05u, 0x00000000u, 0x00000000u,
++	0x00006912u, 0x00006912u, 0x00006912u, 0x00006912u, 0x00006902u, 0x00006905u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u,
++	0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x0001ed12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026105u, 0x0000e416u, 0x00026102u, 0x0000e413u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00010d02u, 0x00010a02u, 0x00010102u, 0x0000fe02u, 0x00010402u, 0x00010902u, 0x00010002u, 0x0000ff02u,
++	0x00011002u, 0x00010c02u, 0x00010e02u, 0x00010b02u, 0x00010802u, 0x00010502u, 0x00010702u, 0x00010602u,
++	0x80000000u, 0x80000001u, 0x00000000u, 0x80000000u, 0x0002de12u, 0x0002de12u, 0x00000000u, 0x00000000u,
++	0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x00000000u, 0x80000002u, 0x00000000u, 0x00000000u,
++	0x0001fe01u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u,
++	0x00008f01u, 0x00004001u, 0x00000000u, 0x0005c601u, 0x00026601u, 0x00024f01u, 0x00028601u, 0x00014401u,
++	0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0002de02u, 0x0002de05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u,
++	0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u,
++	0x80000003u, 0x80000003u, 0x00027903u, 0x00027901u, 0x00000000u, 0x00000000u, 0x80000004u, 0x80000005u,
++	0x0000a604u, 0x00014d01u, 0x00015f03u, 0x00015f01u, 0x0000f001u, 0x0000ee02u, 0x00000000u, 0x0000f901u,
++	0x80000006u, 0x80000006u, 0x80000006u, 0x80000006u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0005de01u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00015e02u, 0x00015d02u, 0x00015c02u, 0x00010f02u, 0x0000e502u, 0x0000e502u, 0x00020302u, 0x00020302u,
++	0x00003e05u, 0x0000ac05u, 0x00000000u, 0x0000ac02u, 0x0000e501u, 0x0000e501u, 0x00020301u, 0x00020301u,
++	0x00000000u, 0x0000ef01u, 0x00000000u, 0x00000000u, 0x0000df01u, 0x00004f01u, 0x80000007u, 0x80000008u,
++	0x00004401u, 0x0002bf01u, 0x00004a01u, 0x0002c201u, 0x00004501u, 0x0002c001u, 0x80000009u, 0x8000000au,
++};
++static const uint32_t x86Batch64RexWPrimary[256] = {
++	0x00000812u, 0x00000812u, 0x00000812u, 0x00000812u, 0x00000802u, 0x00000805u, 0x00000000u, 0x00000000u,
++	0x00020012u, 0x00020012u, 0x00020012u, 0x00020012u, 0x00020002u, 0x00020005u, 0x00000000u, 0x00000000u,
++	0x00000612u, 0x00000612u, 0x00000612u, 0x00000612u, 0x00000602u, 0x00000605u, 0x00000000u, 0x00000000u,
++	0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c02u, 0x00028c05u, 0x00000000u, 0x00000000u,
++	0x00001812u, 0x00001812u, 0x00001812u, 0x00001812u, 0x00001802u, 0x00001805u, 0x00000000u, 0x00000000u,
++	0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb02u, 0x0002cb05u, 0x00000000u, 0x00000000u,
++	0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df02u, 0x0005df05u, 0x00000000u, 0x00000000u,
++	0x00006912u, 0x00006912u, 0x00006912u, 0x00006912u, 0x00006902u, 0x00006905u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u,
++	0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x0001ed12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026105u, 0x0000e416u, 0x00026102u, 0x0000e413u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00010d02u, 0x00010a02u, 0x00010102u, 0x0000fe02u, 0x00010402u, 0x00010902u, 0x00010002u, 0x0000ff02u,
++	0x00011002u, 0x00010c02u, 0x00010e02u, 0x00010b02u, 0x00010802u, 0x00010502u, 0x00010702u, 0x00010602u,
++	0x80000000u, 0x80000001u, 0x00000000u, 0x80000000u, 0x0002de12u, 0x0002de12u, 0x00000000u, 0x00000000u,
++	0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x00000000u, 0x80000002u, 0x00000000u, 0x00000000u,
++	0x0001fe01u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u,
++	0x00004101u, 0x00007c01u, 0x00000000u, 0x0005c601u, 0x00026601u, 0x00024f01u, 0x00028601u, 0x00014401u,
++	0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0002de02u, 0x0002de05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u,
++	0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u,
++	0x80000003u, 0x80000003u, 0x00027903u, 0x00027901u, 0x00000000u, 0x00000000u, 0x80000004u, 0x80000005u,
++	0x0000a604u, 0x00014d01u, 0x00016003u, 0x00016001u, 0x0000f001u, 0x0000ee02u, 0x00000000u, 0x0000fa01u,
++	0x80000006u, 0x80000006u, 0x80000006u, 0x80000006u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0005de01u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00015e02u, 0x00015d02u, 0x00015c02u, 0x00010f02u, 0x0000e502u, 0x0000e502u, 0x00020302u, 0x00020302u,
++	0x00003e05u, 0x0000ac05u, 0x00000000u, 0x0000ac02u, 0x0000e501u, 0x0000e501u, 0x00020301u, 0x00020301u,
++	0x00000000u, 0x0000ef01u, 0x00000000u, 0x00000000u, 0x0000df01u, 0x00004f01u, 0x80000007u, 0x80000008u,
++	0x00004401u, 0x0002bf01u, 0x00004a01u, 0x0002c201u, 0x00004501u, 0x0002c001u, 0x80000009u, 0x8000000bu,
++};
++static const uint32_t x86Batch64Secondary[256] = {
++	0x00000000u, 0x00000000u, 0x00014512u, 0x00016112u, 0x00000000u, 0x0002d701u, 0x00004c01u, 0x0002db01u,
++	0x0000f201u, 0x0005c701u, 0x00000000u, 0x0002ec01u, 0x00000000u, 0x8000000cu, 0x0000b201u, 0x00000000u,
++	0x0001ef12u, 0x0001ef12u, 0x8000000du, 0x8000000eu, 0x0002f212u, 0x0002f012u, 0x8000000fu, 0x80000010u,
++	0x80000011u, 0x0001fe12u, 0x00000000u, 0x00000000u, 0x80000012u, 0x80000013u, 0x80000013u, 0x0001fe12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cf12u, 0x0001cf12u, 0x00017312u, 0x80000014u, 0x00017612u, 0x00017412u, 0x0002e412u, 0x00007512u,
++	0x0005cb01u, 0x00027501u, 0x00026d01u, 0x00027001u, 0x0002d801u, 0x0002d901u, 0x00000000u, 0x0000d901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00006512u, 0x00006012u, 0x00005212u, 0x00005112u, 0x00005612u, 0x00005e12u, 0x00005312u, 0x00005012u,
++	0x00006812u, 0x00006412u, 0x00006612u, 0x00006112u, 0x00005a12u, 0x00005912u, 0x00005b12u, 0x00005812u,
++	0x80000015u, 0x0002ba12u, 0x00028312u, 0x00026812u, 0x00001d12u, 0x00001b12u, 0x00020212u, 0x0005e112u,
++	0x00000a12u, 0x0001f412u, 0x00008312u, 0x00007f12u, 0x0002cd12u, 0x00016e12u, 0x00009612u, 0x00016912u,
++	0x0001c512u, 0x0001c712u, 0x0001c612u, 0x00018212u, 0x00019412u, 0x00019612u, 0x00019512u, 0x00018312u,
++	0x0001c212u, 0x0001c412u, 0x0001c312u, 0x00018112u, 0x00000000u, 0x00000000u, 0x00017912u, 0x00017a12u,
++	0x0001ae13u, 0x80000016u, 0x80000017u, 0x80000018u, 0x00019112u, 0x00019312u, 0x00019212u, 0x00017701u,
++	0x00041f12u, 0x00042712u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00017912u, 0x00017a12u,
++	0x00010d05u, 0x00010a05u, 0x00010105u, 0x0000fe05u, 0x00010405u, 0x00010905u, 0x00010005u, 0x0000ff05u,
++	0x00011005u, 0x00010c05u, 0x00010e05u, 0x00010b05u, 0x00010805u, 0x00010505u, 0x00010705u, 0x00010605u,
++	0x00029e12u, 0x00029b12u, 0x00029412u, 0x00029112u, 0x00029512u, 0x00029a12u, 0x00029312u, 0x00029212u,
++	0x0002a112u, 0x00029d12u, 0x00029f12u, 0x00029c12u, 0x00029912u, 0x00029612u, 0x00029812u, 0x00029712u,
++	0x00026101u, 0x00024901u, 0x00007b01u, 0x00003912u, 0x00000000u, 0x0002ac12u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00024901u, 0x00028201u, 0x00003c12u, 0x00000000u, 0x0002af12u, 0x80000019u, 0x0000e412u,
++	0x00007212u, 0x00007212u, 0x8000001au, 0x00003b12u, 0x8000001bu, 0x8000001cu, 0x0001f012u, 0x0001f012u,
++	0x00000000u, 0x00000000u, 0x8000001du, 0x00003a12u, 0x00003612u, 0x00003712u, 0x0001ec12u, 0x0001ec12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x8000001eu, 0x00019e13u, 0x8000001fu, 0x0002b213u, 0x00000000u,
++	0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u,
++	0x00000000u, 0x0001b912u, 0x0001b712u, 0x0001b812u, 0x00018612u, 0x0001a912u, 0x00000000u, 0x80000020u,
++	0x0001bf12u, 0x0001c012u, 0x0001a412u, 0x00018e12u, 0x00018912u, 0x00018a12u, 0x0001a212u, 0x00018d12u,
++	0x00018f12u, 0x0001b612u, 0x0001b512u, 0x00019012u, 0x0001a712u, 0x0001a812u, 0x00000000u, 0x80000021u,
++	0x0001bd12u, 0x0001be12u, 0x0001a312u, 0x0001ab12u, 0x00018712u, 0x00018812u, 0x0001a112u, 0x0001c812u,
++	0x00000000u, 0x0001b412u, 0x0001b212u, 0x0001b312u, 0x0001aa12u, 0x0001a012u, 0x0001ac12u, 0x80000022u,
++	0x0001ba12u, 0x0001c112u, 0x0001bb12u, 0x0001bc12u, 0x00018412u, 0x00018b12u, 0x00018512u, 0x0002ea01u,
++};
++static const uint32_t x86Batch64RexWSecondary[256] = {
++	0x00000000u, 0x00000000u, 0x00014512u, 0x00016112u, 0x00000000u, 0x0002d701u, 0x00004c01u, 0x0002dc01u,
++	0x0000f201u, 0x0005c701u, 0x00000000u, 0x0002ec01u, 0x00000000u, 0x8000000cu, 0x0000b201u, 0x00000000u,
++	0x0001ef12u, 0x0001ef12u, 0x8000000du, 0x8000000eu, 0x0002f212u, 0x0002f012u, 0x8000000fu, 0x80000010u,
++	0x80000011u, 0x0001fe12u, 0x00000000u, 0x00000000u, 0x80000012u, 0x80000013u, 0x80000013u, 0x0001fe12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cf12u, 0x0001cf12u, 0x00017312u, 0x80000014u, 0x00017612u, 0x00017412u, 0x0002e412u, 0x00007512u,
++	0x0005cb01u, 0x00027501u, 0x00026d01u, 0x00027001u, 0x0002d801u, 0x0002da01u, 0x00000000u, 0x0000d901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00006512u, 0x00006012u, 0x00005212u, 0x00005112u, 0x00005612u, 0x00005e12u, 0x00005312u, 0x00005012u,
++	0x00006812u, 0x00006412u, 0x00006612u, 0x00006112u, 0x00005a12u, 0x00005912u, 0x00005b12u, 0x00005812u,
++	0x80000015u, 0x0002ba12u, 0x00028312u, 0x00026812u, 0x00001d12u, 0x00001b12u, 0x00020212u, 0x0005e112u,
++	0x00000a12u, 0x0001f412u, 0x00008312u, 0x00007f12u, 0x0002cd12u, 0x00016e12u, 0x00009612u, 0x00016912u,
++	0x0001c512u, 0x0001c712u, 0x0001c612u, 0x00018212u, 0x00019412u, 0x00019612u, 0x00019512u, 0x00018312u,
++	0x0001c212u, 0x0001c412u, 0x0001c312u, 0x00018112u, 0x00000000u, 0x00000000u, 0x80000023u, 0x00017a12u,
++	0x0001ae13u, 0x80000016u, 0x80000017u, 0x80000018u, 0x00019112u, 0x00019312u, 0x00019212u, 0x00017701u,
++	0x00041f12u, 0x00042712u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x80000023u, 0x00017a12u,
++	0x00010d05u, 0x00010a05u, 0x00010105u, 0x0000fe05u, 0x00010405u, 0x00010905u, 0x00010005u, 0x0000ff05u,
++	0x00011005u, 0x00010c05u, 0x00010e05u, 0x00010b05u, 0x00010805u, 0x00010505u, 0x00010705u, 0x00010605u,
++	0x00029e12u, 0x00029b12u, 0x00029412u, 0x00029112u, 0x00029512u, 0x00029a12u, 0x00029312u, 0x00029212u,
++	0x0002a112u, 0x00029d12u, 0x00029f12u, 0x00029c12u, 0x00029912u, 0x00029612u, 0x00029812u, 0x00029712u,
++	0x00026101u, 0x00024901u, 0x00007b01u, 0x00003912u, 0x00000000u, 0x0002ac12u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00024901u, 0x00028201u, 0x00003c12u, 0x00000000u, 0x0002af12u, 0x80000024u, 0x0000e412u,
++	0x00007212u, 0x00007212u, 0x8000001au, 0x00003b12u, 0x8000001bu, 0x8000001cu, 0x0001f012u, 0x0001f012u,
++	0x00000000u, 0x00000000u, 0x8000001du, 0x00003a12u, 0x00003612u, 0x00003712u, 0x0001ec12u, 0x0001ec12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x8000001eu, 0x00019e13u, 0x8000001fu, 0x0002b213u, 0x00000000u,
++	0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u,
++	0x00000000u, 0x0001b912u, 0x0001b712u, 0x0001b812u, 0x00018612u, 0x0001a912u, 0x00000000u, 0x80000020u,
++	0x0001bf12u, 0x0001c012u, 0x0001a412u, 0x00018e12u, 0x00018912u, 0x00018a12u, 0x0001a212u, 0x00018d12u,
++	0x00018f12u, 0x0001b612u, 0x0001b512u, 0x00019012u, 0x0001a712u, 0x0001a812u, 0x00000000u, 0x80000021u,
++	0x0001bd12u, 0x0001be12u, 0x0001a312u, 0x0001ab12u, 0x00018712u, 0x00018812u, 0x0001a112u, 0x0001c812u,
++	0x00000000u, 0x0001b412u, 0x0001b212u, 0x0001b312u, 0x0001aa12u, 0x0001a012u, 0x0001ac12u, 0x80000022u,
++	0x0001ba12u, 0x0001c112u, 0x0001bb12u, 0x0001bc12u, 0x00018412u, 0x00018b12u, 0x00018512u, 0x0002ea01u,
++};
++static const uint32_t x86Batch64OpSizeSecondary[256] = {
++	0x00000000u, 0x00000000u, 0x00014512u, 0x00016112u, 0x00000000u, 0x0002d701u, 0x00004c01u, 0x0002db01u,
++	0x0000f201u, 0x0005c701u, 0x00000000u, 0x0002ec01u, 0x00000000u, 0x8000000cu, 0x0000b201u, 0x00000000u,
++	0x0001ee12u, 0x0001ee12u, 0x80000025u, 0x80000025u, 0x0002f112u, 0x0002ef12u, 0x80000026u, 0x80000026u,
++	0x80000011u, 0x0001fe12u, 0x00000000u, 0x00000000u, 0x80000013u, 0x80000013u, 0x80000013u, 0x0001fe12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001ce12u, 0x0001ce12u, 0x00017212u, 0x80000027u, 0x00017512u, 0x00017112u, 0x0002e312u, 0x00007412u,
++	0x0005cb01u, 0x00027501u, 0x00026d01u, 0x00027001u, 0x0002d801u, 0x0002d901u, 0x00000000u, 0x0000d901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00006512u, 0x00006012u, 0x00005212u, 0x00005112u, 0x00005612u, 0x00005e12u, 0x00005312u, 0x00005012u,
++	0x00006812u, 0x00006412u, 0x00006612u, 0x00006112u, 0x00005a12u, 0x00005912u, 0x00005b12u, 0x00005812u,
++	0x80000028u, 0x0002b912u, 0x00000000u, 0x00000000u, 0x00001c12u, 0x00001a12u, 0x00020112u, 0x0005e012u,
++	0x00000912u, 0x0001f312u, 0x00008112u, 0x00008212u, 0x0002cc12u, 0x00016d12u, 0x00009512u, 0x00016812u,
++	0x0001c512u, 0x0001c712u, 0x0001c612u, 0x00018212u, 0x00019412u, 0x00019612u, 0x00019512u, 0x00018312u,
++	0x0001c212u, 0x0001c412u, 0x0001c312u, 0x00018112u, 0x00026012u, 0x00025f12u, 0x00017912u, 0x0001d412u,
++	0x00025713u, 0x80000016u, 0x80000017u, 0x80000029u, 0x00019112u, 0x00019312u, 0x00019212u, 0x00000000u,
++	0x00000000u, 0x8000002au, 0x00000000u, 0x00000000u, 0x0000dd12u, 0x0000e012u, 0x00017912u, 0x0001d412u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00029e12u, 0x00029b12u, 0x00029412u, 0x00029112u, 0x00029512u, 0x00029a12u, 0x00029312u, 0x00029212u,
++	0x0002a112u, 0x00029d12u, 0x00029f12u, 0x00029c12u, 0x00029912u, 0x00029612u, 0x00029812u, 0x00029712u,
++	0x00026101u, 0x00024901u, 0x00007b01u, 0x00003912u, 0x00000000u, 0x0002ac12u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00024901u, 0x00028201u, 0x00003c12u, 0x00000000u, 0x0002af12u, 0x00000000u, 0x0000e412u,
++	0x00007212u, 0x00007212u, 0x8000001au, 0x00003b12u, 0x8000001bu, 0x8000001cu, 0x0001f012u, 0x0001f012u,
++	0x00000000u, 0x00000000u, 0x8000001du, 0x00003a12u, 0x00003612u, 0x00003712u, 0x0001ec12u, 0x0001ec12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00019e13u, 0x8000001fu, 0x0002b113u, 0x00000000u,
++	0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u,
++	0x00000d12u, 0x0001b912u, 0x0001b712u, 0x0001b812u, 0x00018612u, 0x0001a912u, 0x00017a12u, 0x80000020u,
++	0x0001bf12u, 0x0001c012u, 0x0001a412u, 0x00018e12u, 0x00018912u, 0x00018a12u, 0x0001a212u, 0x00018d12u,
++	0x00018f12u, 0x0001b612u, 0x0001b512u, 0x00019012u, 0x0001a712u, 0x0001a812u, 0x00008a12u, 0x8000002bu,
++	0x0001bd12u, 0x0001be12u, 0x0001a312u, 0x0001ab12u, 0x00018712u, 0x00018812u, 0x0001a112u, 0x0001c812u,
++	0x00000000u, 0x0001b412u, 0x0001b212u, 0x0001b312u, 0x0001aa12u, 0x0001a012u, 0x0001ac12u, 0x8000002cu,
++	0x0001ba12u, 0x0001c112u, 0x0001bb12u, 0x0001bc12u, 0x00018412u, 0x00018b12u, 0x00018512u, 0x0002ea01u,
++};
++static const uint32_t x86Batch64RexWOpSizeSecondary[256] = {
++	0x00000000u, 0x00000000u, 0x00014512u, 0x00016112u, 0x00000000u, 0x0002d701u, 0x00004c01u, 0x0002dc01u,
++	0x0000f201u, 0x0005c701u, 0x00000000u, 0x0002ec01u, 0x00000000u, 0x8000000cu, 0x0000b201u, 0x00000000u,
++	0x0001ee12u, 0x0001ee12u, 0x8000002du, 0x80000025u, 0x0002f112u, 0x0002ef12u, 0x8000002eu, 0x80000026u,
++	0x80000011u, 0x0001fe12u, 0x00000000u, 0x00000000u, 0x80000013u, 0x80000013u, 0x80000013u, 0x0001fe12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001ce12u, 0x0001ce12u, 0x00017212u, 0x80000027u, 0x00017512u, 0x00017112u, 0x0002e312u, 0x00007412u,
++	0x0005cb01u, 0x00027501u, 0x00026d01u, 0x00027001u, 0x0002d801u, 0x0002da01u, 0x00000000u, 0x0000d901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00006512u, 0x00006012u, 0x00005212u, 0x00005112u, 0x00005612u, 0x00005e12u, 0x00005312u, 0x00005012u,
++	0x00006812u, 0x00006412u, 0x00006612u, 0x00006112u, 0x00005a12u, 0x00005912u, 0x00005b12u, 0x00005812u,
++	0x80000028u, 0x0002b912u, 0x00028312u, 0x00026812u, 0x00001c12u, 0x00001a12u, 0x00020112u, 0x0005e012u,
++	0x00000912u, 0x0001f312u, 0x00008112u, 0x00008212u, 0x0002cc12u, 0x00016d12u, 0x00009512u, 0x00016812u,
++	0x0001c512u, 0x0001c712u, 0x0001c612u, 0x00018212u, 0x00019412u, 0x00019612u, 0x00019512u, 0x00018312u,
++	0x0001c212u, 0x0001c412u, 0x0001c312u, 0x00018112u, 0x00026012u, 0x00025f12u, 0x00017a12u, 0x0001d412u,
++	0x00025713u, 0x80000016u, 0x80000017u, 0x80000029u, 0x00019112u, 0x00019312u, 0x00019212u, 0x00017701u,
++	0x00000000u, 0x8000002fu, 0x00000000u, 0x00000000u, 0x0000dd12u, 0x0000e012u, 0x00017a12u, 0x0001d412u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00029e12u, 0x00029b12u, 0x00029412u, 0x00029112u, 0x00029512u, 0x00029a12u, 0x00029312u, 0x00029212u,
++	0x0002a112u, 0x00029d12u, 0x00029f12u, 0x00029c12u, 0x00029912u, 0x00029612u, 0x00029812u, 0x00029712u,
++	0x00026101u, 0x00024901u, 0x00007b01u, 0x00003912u, 0x00000000u, 0x0002ac12u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00024901u, 0x00028201u, 0x00003c12u, 0x00000000u, 0x0002af12u, 0x00000000u, 0x0000e412u,
++	0x00007212u, 0x00007212u, 0x8000001au, 0x00003b12u, 0x8000001bu, 0x8000001cu, 0x0001f012u, 0x0001f012u,
++	0x00000000u, 0x00000000u, 0x8000001du, 0x00003a12u, 0x00003612u, 0x00003712u, 0x0001ec12u, 0x0001ec12u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x8000001eu, 0x00019e13u, 0x8000001fu, 0x0002b113u, 0x00000000u,
++	0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u, 0x00003801u,
++	0x00000d12u, 0x0001b912u, 0x0001b712u, 0x0001b812u, 0x00018612u, 0x0001a912u, 0x00017a12u, 0x80000020u,
++	0x0001bf12u, 0x0001c012u, 0x0001a412u, 0x00018e12u, 0x00018912u, 0x00018a12u, 0x0001a212u, 0x00018d12u,
++	0x00018f12u, 0x0001b612u, 0x0001b512u, 0x00019012u, 0x0001a712u, 0x0001a812u, 0x00008a12u, 0x8000002bu,
++	0x0001bd12u, 0x0001be12u, 0x0001a312u, 0x0001ab12u, 0x00018712u, 0x00018812u, 0x0001a112u, 0x0001c812u,
++	0x00000000u, 0x0001b412u, 0x0001b212u, 0x0001b312u, 0x0001aa12u, 0x0001a012u, 0x0001ac12u, 0x8000002cu,
++	0x0001ba12u, 0x0001c112u, 0x0001bb12u, 0x0001bc12u, 0x00018412u, 0x00018b12u, 0x00018512u, 0x0002ea01u,
++};
++static const uint32_t x86BatchRegGroups[][16] = {
++	{ 0x00000813u, 0x00020013u, 0x00000613u, 0x00028c13u, 0x00001813u, 0x0002cb13u, 0x0005df13u, 0x00006913u, 0x00000813u, 0x00020013u, 0x00000613u, 0x00028c13u, 0x00001813u, 0x0002cb13u, 0x0005df13u, 0x00006913u },
++	{ 0x00000816u, 0x00020016u, 0x00000616u, 0x00028c16u, 0x00001816u, 0x0002cb16u, 0x0005df16u, 0x00006916u, 0x00000816u, 0x00020016u, 0x00000616u, 0x00028c16u, 0x00001816u, 0x0002cb16u, 0x0005df16u, 0x00006916u },
++	{ 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00027b13u, 0x00027c13u, 0x00026713u, 0x00026a13u, 0x0002ab13u, 0x0002ae13u, 0x00028713u, 0x00028913u, 0x00027b13u, 0x00027c13u, 0x00026713u, 0x00026a13u, 0x0002ab13u, 0x0002ae13u, 0x00028713u, 0x00028913u },
++	{ 0x0001cc13u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001cc13u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001cc16u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001cc16u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00027b12u, 0x00027c12u, 0x00026712u, 0x00026a12u, 0x0002ab12u, 0x0002ae12u, 0x00028712u, 0x00028912u, 0x00027b12u, 0x00027c12u, 0x00026712u, 0x00026a12u, 0x0002ab12u, 0x0002ae12u, 0x00028712u, 0x00028912u },
++	{ 0x0002de13u, 0x0002de13u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u, 0x0002de13u, 0x0002de13u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u },
++	{ 0x0002de16u, 0x0002de16u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u, 0x0002de16u, 0x0002de16u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u },
++	{ 0x0000e612u, 0x00009312u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0000e612u, 0x00009312u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0000e612u, 0x00009312u, 0x00003e12u, 0x00003e12u, 0x0000ac12u, 0x0000ac12u, 0x00026112u, 0x00000000u, 0x0000e612u, 0x00009312u, 0x00003e12u, 0x00000000u, 0x0000ac12u, 0x00000000u, 0x00026112u, 0x00000000u },
++	{ 0x0000e612u, 0x00009312u, 0x00003e12u, 0x0000aa12u, 0x0000ac12u, 0x0000ab12u, 0x00026112u, 0x00000000u, 0x0000e612u, 0x00009312u, 0x00003e12u, 0x00000000u, 0x0000ac12u, 0x00000000u, 0x00026112u, 0x00000000u },
++	{ 0x00025012u, 0x00025512u, 0x00025612u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u },
++	{ 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x0001db12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u },
++	{ 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x0001d812u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00025112u, 0x00025212u, 0x00025312u, 0x00025412u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u },
++	{ 0x00004612u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x0001fe12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001e212u, 0x0001e212u, 0x0001e212u, 0x0001e212u, 0x0001e212u, 0x0001e212u, 0x0001e212u, 0x0001e212u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001dd12u, 0x0001dd12u, 0x0001dd12u, 0x0001dd12u, 0x0001dd12u, 0x0001dd12u, 0x0001dd12u, 0x0001dd12u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001b913u, 0x00000000u, 0x0001b613u, 0x00000000u, 0x0001b413u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001b713u, 0x00000000u, 0x0001b513u, 0x00000000u, 0x0001b213u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001b813u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001b313u, 0x00000000u },
++	{ 0x0000d412u, 0x0000d212u, 0x00014712u, 0x0002c312u, 0x0005e712u, 0x0005e312u, 0x0005eb12u, 0x00004712u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00016212u, 0x00016212u, 0x00016212u, 0x00016212u, 0x00016212u, 0x00016212u, 0x00016212u, 0x00016212u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00015012u, 0x00015012u, 0x00015012u, 0x00015012u, 0x00015012u, 0x00015012u, 0x00015012u, 0x00015012u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00015212u, 0x00015212u, 0x00015212u, 0x00015212u, 0x00015212u, 0x00015212u, 0x00015212u, 0x00015212u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00003913u, 0x00003c13u, 0x00003b13u, 0x00003a13u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00003913u, 0x00003c13u, 0x00003b13u, 0x00003a13u },
++	{ 0x0001e012u, 0x0001e012u, 0x0001e012u, 0x0001e012u, 0x0001e012u, 0x0001e012u, 0x0001e012u, 0x0001e012u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00019713u, 0x00019713u, 0x00019713u, 0x00019713u, 0x00019713u, 0x00019713u, 0x00019713u, 0x00019713u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001a512u, 0x0001a512u, 0x0001a512u, 0x0001a512u, 0x0001a512u, 0x0001a512u, 0x0001a512u, 0x0001a512u },
++	{ 0x00017c12u, 0x00017c12u, 0x00017c12u, 0x00017c12u, 0x00017c12u, 0x00017c12u, 0x00017c12u, 0x00017c12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00017812u, 0x00017812u, 0x00017812u, 0x00017812u, 0x00017812u, 0x00017812u, 0x00017812u, 0x00017812u },
++	{ 0x00017912u, 0x00017912u, 0x00017912u, 0x00017912u, 0x00017912u, 0x00017912u, 0x00017912u, 0x00017912u, 0x00017a12u, 0x00017a12u, 0x00017a12u, 0x00017a12u, 0x00017a12u, 0x00017a12u, 0x00017a12u, 0x00017a12u },
++	{ 0x0000d512u, 0x0000d312u, 0x00014712u, 0x0002c312u, 0x0005e812u, 0x0005e412u, 0x0005ec12u, 0x00004712u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001e112u, 0x0001e112u, 0x0001e112u, 0x0001e112u, 0x0001e112u, 0x0001e112u, 0x0001e112u, 0x0001e112u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001dc12u, 0x0001dc12u, 0x0001dc12u, 0x0001dc12u, 0x0001dc12u, 0x0001dc12u, 0x0001dc12u, 0x0001dc12u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001b813u, 0x00025b13u, 0x00000000u, 0x00000000u, 0x0001b313u, 0x00025a13u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u },
++	{ 0x0001df12u, 0x0001df12u, 0x0001df12u, 0x0001df12u, 0x0001df12u, 0x0001df12u, 0x0001df12u, 0x0001df12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00016712u, 0x00016712u, 0x00016712u, 0x00016712u, 0x00016712u, 0x00016712u, 0x00016712u, 0x00016712u },
++	{ 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001da12u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u, 0x0001d612u },
++	{ 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d712u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u, 0x0001d912u },
++	{ 0x00042712u, 0x00042712u, 0x00042712u, 0x00042712u, 0x00042712u, 0x00042712u, 0x00042712u, 0x00042712u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u, 0x0000a812u },
++};
++#endif
+diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
+index 80cda582..fe668f2f 100644
+--- a/arch/X86/X86GenEvexScan.inc
++++ b/arch/X86/X86GenEvexScan.inc
+@@ -1,11 +1,11 @@
+ /* Generated by suite/synctools/x86_vector_output.cpp. */
+-enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };
++enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129, EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };
+ struct EvexScanPlan {
+ 	uint8_t map, length;
+ 	uint16_t ids[2][3];
+ };
+ static const struct EvexScanPlan evex_scan_plans[]
+-	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	__attribute__((section(X86_EVEX_SCAN_RODATA))) = {
+ 	{ 0 },
+ 	{ 1, 6, { { X86_INS_VPXORD, X86_INS_VPXORD, X86_INS_VPXORD }, { X86_INS_VPXORQ, X86_INS_VPXORQ, X86_INS_VPXORQ } } },
+ 	{ 1, 6, { { X86_INS_VPADDD, X86_INS_VPADDD, X86_INS_VPADDD }, { 0, 0, 0 } } },
+@@ -22,10 +22,10 @@ static const struct EvexScanPlan evex_scan_plans[]
+ 	{ 3, 7, { { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ } } },
+ };
+ static const uint8_t evex_scan_index[256]
+-	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	__attribute__((section(X86_EVEX_SCAN_RODATA))) = {
+ 	3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 129, 9, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	130, 130, 0, 0, 0, 0, 0, 0, 0, 8, 129, 9, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 10, 0, 0, 131, 131, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 12, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -40,7 +40,7 @@ static const uint8_t evex_scan_index[256]
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0,
+ };
+-static const uint16_t evex_transfer_scan_ids[4][2][3]
++static const uint16_t evex_transfer_scan_ids[][2][3]
+ 	__attribute__((section(".cs_x86_evex_transfer_rodata"))) = {
+ 	{
+ 		{ 0, X86_INS_VBROADCASTF32X4, X86_INS_VBROADCASTF32X4 },
+@@ -58,6 +58,22 @@ static const uint16_t evex_transfer_scan_ids[4][2][3]
+ 		{ X86_INS_VMOVDQU8, X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 },
+ 		{ X86_INS_VMOVDQU16, X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 },
+ 	},
++	{
++		{ X86_INS_VMOVUPS, X86_INS_VMOVUPS, X86_INS_VMOVUPS },
++		{ 0, 0, 0 },
++	},
++	{
++		{ 0, 0, 0 },
++		{ X86_INS_VMOVUPD, X86_INS_VMOVUPD, X86_INS_VMOVUPD },
++	},
++	{
++		{ X86_INS_VMOVAPS, X86_INS_VMOVAPS, X86_INS_VMOVAPS },
++		{ 0, 0, 0 },
++	},
++	{
++		{ 0, 0, 0 },
++		{ X86_INS_VMOVAPD, X86_INS_VMOVAPD, X86_INS_VMOVAPD },
++	},
+ };
+ static const uint8_t evex_transfer_lengths[32]
+ 	__attribute__((section(".cs_x86_evex_transfer_rodata"))) = {
+diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
+new file mode 100644
+index 00000000..7817a761
+--- /dev/null
++++ b/arch/X86/X86GenVexPublicPlans.inc
+@@ -0,0 +1,135 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++/* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */
++
++#ifdef CAPSTONE_X86_REDUCE
++#define X86_HAS_VEX2_PUBLIC_PLANS 0
++#define X86_HAS_VEX2_PUBLIC_GROUPS 0
++
++#else
++#define X86_HAS_VEX2_PUBLIC_PLANS 1
++#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS
++enum { X86_VEX2_PUBLIC_LENGTH = 16384, X86_VEX2_PUBLIC_GROUP = 32768 };
++/* Public plan, tagged L pair or ModR/M group by pp/opcode. */
++static const uint16_t x86Vex2PublicPlans[4][256] = {
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8414, 8414, 16384, 16385, 11788, 11772, 16386, 16387, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8190, 8190, 0, 32772, 0, 0, 11758, 6430,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32773, 11670, 11470, 11294, 6212, 6196, 8540, 11804, 6084, 8484, 6526, 6462, 11708, 8124, 6804, 8068,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 16388, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11653, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8406, 8406, 16389, 16390, 11780, 11764, 16391, 16392, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8182, 8182, 0, 32778, 0, 0, 11750, 6422,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32779, 11662, 0, 0, 6204, 6188, 8532, 11796, 6076, 8476, 6478, 6518, 11700, 8116, 6796, 8060,
++		11140, 11164, 11148, 8604, 8956, 8980, 8964, 8620, 11108, 11132, 11116, 8596, 11156, 11124, 16393, 8230,
++		10751, 32780, 32781, 32782, 8908, 8932, 8916, 0, 0, 0, 0, 0, 7900, 7916, 16393, 8230,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 16394, 16395, 11645, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6108, 10948, 10908, 10916, 8644, 10348, 16396, 32784, 10996, 11004, 9956, 8740, 8668, 8676, 9892, 8724,
++		8748, 10892, 10852, 8756, 10316, 10324, 6646, 32785, 10980, 10988, 9948, 10420, 8652, 8660, 9884, 11188,
++		0, 10844, 10804, 10812, 10364, 9836, 10532, 16397, 10956, 11012, 10964, 10972, 8628, 8684, 8636, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32787, 32787, 8390, 0, 0, 0, 8382, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6612, 0, 6726, 6630, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11684, 11476, 11300, 0, 0, 0, 0, 6100, 8500, 6620, 6678, 11724, 8140, 6820, 8084,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		10759, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16396, 8270,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6454, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32788, 32788, 8198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6604, 0, 6710, 6582, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11676, 0, 0, 0, 0, 0, 0, 6092, 8492, 6588, 0, 11716, 8132, 6812, 8076,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		10767, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7908, 7924, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6470, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++};
++
++#define X86_HAS_VEX2_PUBLIC_GROUPS 1
++#define X86_HAS_VEX2_LENGTH_PLANS 1
++static const uint16_t x86Vex2LengthPlans[14][2] = {
++	{ 32768, 0 },
++	{ 32769, 0 },
++	{ 32770, 0 },
++	{ 32771, 0 },
++	{ 11818, 11810 },
++	{ 32774, 0 },
++	{ 32775, 0 },
++	{ 32776, 0 },
++	{ 32777, 0 },
++	{ 8206, 0 },
++	{ 9693, 0 },
++	{ 32783, 0 },
++	{ 8174, 0 },
++	{ 32786, 0 },
++};
++
++/* Register form and ModR/M.reg select an exact public plan. */
++static const uint16_t x86Vex2PublicGroups[22][16] = {
++	{ 8316, 8316, 8316, 8316, 8316, 8316, 8316, 8316, 8276, 8276, 8276, 8276, 8276, 8276, 8276, 8276 },
++	{ 8318, 8318, 8318, 8318, 8318, 8318, 8318, 8318, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8292, 8292, 8292, 8292, 8292, 8292, 8292, 8292, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300 },
++	{ 8294, 8294, 8294, 8294, 8294, 8294, 8294, 8294, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8366, 8366, 8366, 8366, 8366, 8366, 8366, 8366, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 8334, 8334, 8334, 8334, 8334, 8334, 8334, 8334 },
++	{ 8308, 8308, 8308, 8308, 8308, 8308, 8308, 8308, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8310, 8310, 8310, 8310, 8310, 8310, 8310, 8310, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8284, 8284, 8284, 8284, 8284, 8284, 8284, 8284, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8286, 8286, 8286, 8286, 8286, 8286, 8286, 8286, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8358, 8358, 8358, 8358, 8358, 8358, 8358, 8358, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 8326, 8326, 8326, 8326, 8326, 8326, 8326, 8326 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10949, 0, 10893, 0, 10845, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10909, 0, 10853, 0, 10805, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10917, 10901, 0, 0, 10813, 10797 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 9455, 9455, 9455, 9455, 9455, 9455, 9455, 9455 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 10054, 10054, 10054, 10054, 10054, 10054, 10054, 10054 },
++	{ 8350, 8350, 8350, 8350, 8350, 8350, 8350, 8350, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 8038, 8038, 8038, 8038, 8038, 8038, 8038, 8038 },
++	{ 8398, 8398, 8398, 8398, 8398, 8398, 8398, 8398, 8396, 8396, 8396, 8396, 8396, 8396, 8396, 8396 },
++	{ 8374, 8374, 8374, 8374, 8374, 8374, 8374, 8374, 8372, 8372, 8372, 8372, 8372, 8372, 8372, 8372 },
++	{ 8022, 8022, 8022, 8022, 8022, 8022, 8022, 8022, 0, 0, 0, 0, 0, 0, 0, 0 },
++};
++#endif
++
++#endif
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index a1423650..246ee26c 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -25,6 +25,12 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
+ 				 uint64_t address, uint32_t *output,
+ 				 size_t capacity);
+ 
++/* Static batch reader with the X86_scanBatch contract. The handle selects
++ * the 32- or 64-bit primary tables once for each batch. */
++X86ScanBatchResult X86_scanNativeBatch(csh handle, const uint8_t *code,
++				      size_t size, uint64_t address,
++				      uint32_t *output, size_t capacity);
++
+ /* Decode a direct near CALL and write its absolute target using the same
+  * operand-size and wrapping rules as full operand detail. Returns its length,
+  * or zero with target untouched for invalid input or any other instruction.
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index cdc59ba3..e4c4a82f 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -897,6 +897,121 @@ def emit_terminal_selection(target, modrm, entries, invalid):
+     ]
+ 
+ 
++def terminal_immediate_bytes(tail, size, address_size):
++    readers = {
++        f"readImmediateImpl(insn, {width}, false)": width
++        for width in IMMEDIATES.values()
++    }
++    total, immediate = 0, size
++    for call in tail:
++        if call == "readMemoryOffset(insn, false)":
++            total += address_size
++            immediate = 0
++        else:
++            width = readers[call]
++            immediate = immediate if width == "insn->immediateSize" else int(width)
++            tables.require(immediate > 0, "Invalid immediate extent")
++            total += immediate
++    return total
++
++
++def emit_batch_primary(suffix):
++    if suffix:
++        return "/* The private batch entries use the full decoder. */"
++    groups, terminals, rows, _, _, _ = legacy_terminal_model(suffix, public=True)
++    mapping = public_instruction_ids(suffix)
++    widths = {}
++    modrm_call = "(!insn->consumedModRM && readModRMScan(insn))"
++    for (ops, _), handler in groups.items():
++        reads = read_operand_calls(ops, materialize=False)
++        modrm = bool(reads and reads[0] == modrm_call)
++        tail = reads[1:] if modrm else reads
++        tables.require(modrm_call not in tail, "Expected leading ModR/M")
++        widths[handler] = modrm, tail
++
++    # Leave every prefix or escape with the existing classifier. REX bytes
++    # encode INC/DEC in i386 mode and use ordinary primary descriptors.
++    header = tables.uncomment((X86 / "X86FeatureExtension.h").read_text())
++    flags = header.split("feature_prefix_flags[256]", 1)[1].split("{", 1)[1].split("}", 1)[0]
++    flags = [int(v.strip(), 0) for v in flags.split(",") if v.strip()]
++    rex = int(re.search(r"\bFEATURE_REX_PREFIX\s*=\s*(\d+)", header)[1])
++    tables.require(len(flags) == 256 and flags[0x0F] != 0, "Invalid primary opcode classes")
++
++    indexed = []
++    group_bit = 1 << 31
++
++    def opcode_plans(context, secondary):
++        legacy = context == "X86_TERMINAL_32"
++        direct = []
++        index = next(i for i, row in enumerate(TERMINAL_ROWS) if row[0] == context)
++        has_opsize = TERMINAL_ROWS[index][3]
++        immediate_size = 2 if has_opsize and "REXW" not in context else 4
++        extents = {handler: (reads_modrm, terminal_immediate_bytes(tail, immediate_size, 4 if legacy else 8))
++                   for handler, (reads_modrm, tail) in widths.items()}
++        for opcode, (first, kind) in enumerate(rows[index][int(secondary)]):
++            if secondary:
++                # getIDForMode owns size-prefixed branch and state-save repairs.
++                # Other escape maps and feature extensions use the full decoder.
++                excluded = opcode in (0x00, 0x01, 0x0F, 0x38, 0x3A, 0xC7) or (
++                    has_opsize and (opcode == 0xAE or 0x80 <= opcode <= 0x8F))
++            else:
++                excluded = flags[opcode] and not (legacy and flags[opcode] == rex)
++            if excluded or not first:
++                direct.append(0)
++                continue
++            values = []
++            for modrm in range(256):
++                uid, _, handler = tables.source_id(terminals, kind, first, modrm)
++                if not uid:
++                    values.append(0)
++                    continue
++                reads_modrm, tail = extents[handler]
++                reads_modrm |= kind != "MODRM_ONEENTRY"
++                fixed = 1 + int(reads_modrm) + tail
++                tables.require(fixed <= 15 and mapping[uid] < (group_bit >> 8), "Primary plan overflow")
++                values.append((mapping[uid] << 8) | (0x10 if reads_modrm else 0) | fixed)
++            if len(set(values)) == 1:
++                direct.append(values[0])
++                continue
++            by_reg = []
++            for register in (False, True):
++                for reg in range(8):
++                    outcomes = {v for mr, v in enumerate(values)
++                                if (mr >= 0xC0) == register and (mr >> 3) & 7 == reg}
++                    by_reg.append(outcomes.pop() if len(outcomes) == 1 else 0)
++            if not any(by_reg):
++                direct.append(0)
++                continue
++            if by_reg not in indexed:
++                indexed.append(by_reg)
++            direct.append(group_bit | indexed.index(by_reg))
++            for mr, expected in enumerate(values):
++                fast = by_reg[((mr >> 3) & 7) + (8 if mr >= 0xC0 else 0)]
++                tables.require(not fast or fast == expected, "Primary group changed a terminal")
++        tables.require(len(direct) == 256, "Incomplete primary opcode map")
++        return direct
++
++    lines = ["#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)"]
++    for name, context, secondary in (
++        ("x86Batch32Primary", "X86_TERMINAL_32", False),
++        ("x86Batch64Primary", "X86_TERMINAL_64", False),
++        ("x86Batch64RexWPrimary", "X86_TERMINAL_64_REXW", False),
++        ("x86Batch64Secondary", "X86_TERMINAL_64", True),
++        ("x86Batch64RexWSecondary", "X86_TERMINAL_64_REXW", True),
++        ("x86Batch64OpSizeSecondary", "X86_TERMINAL_64_OPSIZE", True),
++        ("x86Batch64RexWOpSizeSecondary", "X86_TERMINAL_64_REXW_OPSIZE", True),
++    ):
++        direct = opcode_plans(context, secondary)
++        lines.append(f"static const uint32_t {name}[256] = {{")
++        for start in range(0, 256, 8):
++            lines.append("\t" + ", ".join(f"0x{v:08x}u" for v in direct[start:start+8]) + ",")
++        lines.append("};")
++    lines.append("static const uint32_t x86BatchRegGroups[][16] = {")
++    for group in indexed or [[0] * 16]:
++        lines.append("\t{ " + ", ".join(f"0x{v:08x}u" for v in group) + " },")
++    return "\n".join(lines + ["};"])
++
++
+ def emit_terminal(suffix):
+     groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
+         suffix
+@@ -947,25 +1062,11 @@ def emit_terminal(suffix):
+     lines += emit_terminal_tables("Legacy", words, rows, kinds)
+     lines += emit_terminal_tables("LegacyPublic", public_words, public_rows, kinds)
+     lines.append("#ifdef X86_COMPACT_PUBLIC_HEADER")
+-    immediate_readers = {
+-        f"readImmediateImpl(insn, {width}, false)": width
+-        for width in IMMEDIATES.values()
+-    }
+     lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
+     for size, address_size in ((2, 2), (4, 4), (4, 8)):
+         extents = []
+         for tail in public_tails:
+-            total, immediate = 0, size
+-            for call in tail:
+-                if call == "readMemoryOffset(insn, false)":
+-                    total += address_size
+-                    immediate = 0
+-                else:
+-                    width = immediate_readers[call]
+-                    immediate = immediate if width == "insn->immediateSize" else int(width)
+-                    tables.require(immediate > 0, "Invalid immediate extent")
+-                    total += immediate
+-            extents.append(str(total))
++            extents.append(str(terminal_immediate_bytes(tail, size, address_size)))
+         lines.append("\t{ " + ", ".join(extents) + " },")
+     lines += [
+         "};",
+@@ -1158,7 +1259,130 @@ def vex_scan_form(operands, register_form):
+     return True
+ 
+ 
+-def emit_vex_scan_rows(suffix):
++def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
++                    metadata, patterns):
++    """Collapse identical ModR/M outcomes into one public ID and operand extent."""
++    ids = tables.parse_ids(source, contexts)
++    maps = tables.parse_maps(
++        (X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
++        names[:4] if suffix else names, len(contexts),
++    )
++    _, indices, rows = maps[1]
++    tails = {number: len(lengths) for lengths, number in patterns.items()
++             if not lengths or lengths == ("1",)}
++    out, groups = [], []
++    for selector in range(8):
++        attributes = attrs["ATTR_VEX"] | pp[selector & 3]
++        if selector & 4:
++            attributes |= attrs["ATTR_VEXL"]
++        index = indices[contexts.index(context_values[attributes])]
++        long_index = indices[contexts.index(context_values[attributes | attrs["ATTR_64BIT"]])]
++        tables.require(index == long_index, "VEX2 opcode map differs by bitness")
++        row = rows[index - 1] if index else [("MODRM_ONEENTRY", 0)] * 256
++        plans = []
++        for opcode, (kind, offset) in enumerate(row):
++            def plan(modrm):
++                uid = tables.source_id(ids, kind, offset, modrm)
++                if not uid or uid >= len(metadata) or not metadata[uid]:
++                    return 0
++                word = metadata[uid]
++                public_id, flags = word >> 8, word & 255
++                if not public_id or (flags >> 4) not in tails:
++                    return 0
++                has_modrm = kind != "MODRM_ONEENTRY" or bool(flags & 4)
++                form = 2 if modrm >= 0xc0 else 1
++                if has_modrm and not flags & form:
++                    return 0
++                tables.require(public_id < 2048, "VEX2 public ID overlaps the plan tags")
++                return ((public_id << 3) | (int(has_modrm) << 2)
++                        | (int(not flags & 8) << 1) | tails[flags >> 4])
++
++            # These opcodes retain the general ID and size repairs of tryVexTerminalScan.
++            if opcode == 0xae or 0x82 <= opcode <= 0x8f:
++                plans.append(0)
++                continue
++            candidate = plan(0)
++            if candidate and all(plan(mr) == candidate for mr in range(1, 256)):
++                plans.append(candidate)
++            else:
++                # ModR/M.mod selects the operand form, and ModR/M.reg selects
++                # a group opcode. Only uniform outcomes within each partition
++                # can use a public plan. Zero retains canonical decoding.
++                outcomes = [plan(mr) for mr in range(256)]
++                group = []
++                for register_form in (False, True):
++                    for reg in range(8):
++                        values = [outcomes[mr] for mr in range(256)
++                                  if (mr >= 0xc0) == register_form
++                                  and ((mr >> 3) & 7) == reg]
++                        group.append(values[0] if len(set(values)) == 1 else 0)
++                if not any(group):
++                    plans.append(0)
++                    continue
++                tables.require(all(not word or word & 4 for word in group),
++                               "VEX2 grouped outcome has no ModR/M")
++                group = tuple(group)
++                if group not in groups:
++                    groups.append(group)
++                index = groups.index(group)
++                tables.require(index < 32768, "VEX2 group index exceeds tag")
++                plans.append(32768 | index)
++        out.append(plans)
++    if not any(any(row) for row in out):
++        return ["#define X86_HAS_VEX2_PUBLIC_PLANS 0",
++                "#define X86_HAS_VEX2_PUBLIC_GROUPS 0", ""]
++    # L commonly selects only operand width, which the public scan result
++    # does not expose. Preserve differing validity or IDs through tagged pairs.
++    length_pairs, shared = [], []
++    for prefix in range(4):
++        row = []
++        for opcode in range(256):
++            pair = (out[prefix][opcode], out[prefix + 4][opcode])
++            if pair[0] == pair[1]:
++                row.append(pair[0])
++            else:
++                if pair not in length_pairs:
++                    length_pairs.append(pair)
++                index = length_pairs.index(pair)
++                tables.require(index < 16384, "VEX2 length index exceeds tag")
++                row.append(16384 | index)
++        shared.append(row)
++    # Check all original selectors before replacing the dense generated rows.
++    for selector in range(8):
++        for opcode in range(256):
++            plan = shared[selector & 3][opcode]
++            if plan & 16384:
++                plan = length_pairs[plan & 16383][selector >> 2]
++            tables.require(plan == out[selector][opcode], "VEX2 compact plan differs")
++    out = shared
++    lines = ["#define X86_HAS_VEX2_PUBLIC_PLANS 1",
++             "#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS",
++             "enum { X86_VEX2_PUBLIC_LENGTH = 16384, X86_VEX2_PUBLIC_GROUP = 32768 };",
++        "/* Public plan, tagged L pair or ModR/M group by pp/opcode. */",
++             "static const uint16_t x86Vex2PublicPlans[4][256] = {"]
++    for row in out:
++        lines.append("\t{")
++        for i in range(0, len(row), 16):
++            lines.append("\t\t" + ", ".join(map(str, row[i:i + 16])) + ",")
++        lines.append("\t},")
++    lines += ["};", "", f"#define X86_HAS_VEX2_PUBLIC_GROUPS {int(bool(groups))}"]
++    lines += [f"#define X86_HAS_VEX2_LENGTH_PLANS {int(bool(length_pairs))}"]
++    if length_pairs:
++        lines += [f"static const uint16_t x86Vex2LengthPlans[{len(length_pairs)}][2] = {{"]
++        for pair in length_pairs:
++            lines.append("\t{ " + ", ".join(map(str, pair)) + " },")
++        lines += ["};", ""]
++    if groups:
++        lines += [
++                  "/* Register form and ModR/M.reg select an exact public plan. */",
++                  f"static const uint16_t x86Vex2PublicGroups[{len(groups)}][16] = {{"]
++        for group in groups:
++            lines.append("\t{ " + ", ".join(map(str, group)) + " },")
++        lines += ["};"]
++    return lines + ["#endif", ""]
++
++
++def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
+     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+     contexts, kinds, names = tables.parse_common(common)
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+@@ -1204,15 +1428,23 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            # A two-byte VEX has map 1 and W=0. Its 32-bit reader uses
++            # these same entries with the address and operand sizes of its mode.
++            if name == names[1] and key < 8:
++                other = indices[contexts.index(context_values[attributes & ~attrs["ATTR_64BIT"]])]
++                tables.require(row == other, "VEX2 row differs between 32 and 64 bits")
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
+         lines.append("\t},")
+     lines += ["};", ""]
++    if public_plans:
++        return emit_vex2_plans(suffix, source, contexts, names, context_values,
++                              attrs, pp, metadata, patterns)
+     return lines
+ 
+ 
+-def emit_vex_scan(suffix):
++def emit_vex_scan(suffix, public_plans=False):
+     # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
+     # no gather, mask, register-limit or predicate-dependent opcode checks.
+     reads = dict(read_specializations(suffix))
+@@ -1279,7 +1511,7 @@ def emit_vex_scan(suffix):
+             ]
+         lines.append("\t\treturn X86_SCAN_COMPLETE;")
+     lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
+-    return "\n".join(emit_vex_scan_rows(suffix) + lines)
++    return "\n".join(emit_vex_scan_rows(suffix, metadata, patterns, public_plans) + ([] if public_plans else lines))
+ 
+ 
+ def emit_writemask_opcodes(suffix):
+@@ -1341,7 +1573,9 @@ def main():
+         (TRANSLATE_OUTPUT, emit_translation),
+         (SCAN_OUTPUT, emit_scan),
+         (TERMINAL_OUTPUT, emit_terminal),
++        (X86 / "X86GenBatchPrimary.inc", emit_batch_primary),
+         (X86 / "X86GenVexScan.inc", emit_vex_scan),
++        (X86 / "X86GenVexPublicPlans.inc", lambda suffix: emit_vex_scan(suffix, True)),
+         (X86 / "X86GenWritemask.inc", emit_writemask_opcodes),
+     ]
+     generated = [(path, generated_output(emit)) for path, emit in outputs]
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 9dc7d8eb..b6af0e23 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -919,29 +919,42 @@ void emit_vex_registers(Decoder &decoder)
+ }
+ void emit_evex_transfer_scan(Decoder &decoder)
+ {
+-	std::puts("static const uint16_t evex_transfer_scan_ids[4][2][3]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {");
+-	for (unsigned kind = 0; kind < 4; ++kind) {
++	// The pair of directions must have the same public ID for every
++	// admitted register, ModR/M and SIB combination.
++	struct TransferForm {
++		uint8_t map, pp, load, store;
++	};
++	constexpr TransferForm transfers[] = {
++		{ 2, 1, 0x1a, 0 },       // Broadcast from memory only
++		{ 1, 1, 0x6f, 0x7f }, { 1, 2, 0x6f, 0x7f },
++		{ 1, 3, 0x6f, 0x7f },
++		{ 1, 0, 0x10, 0x11 }, { 1, 1, 0x10, 0x11 },
++		{ 1, 0, 0x28, 0x29 }, { 1, 1, 0x28, 0x29 },
++	};
++	std::puts("static const uint16_t evex_transfer_scan_ids[][2][3]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {");
++	for (const auto &form : transfers) {
+ 		std::puts("\t{");
+ 		for (unsigned w = 0; w < 2; ++w) {
+ 			std::printf("\t\t{ ");
+ 			for (unsigned ll = 0; ll < 3; ++ll) {
+-				const unsigned pp = kind ? kind : 1;
+-				const unsigned map = kind ? 1 : 2;
++				const unsigned pp = form.pp, map = form.map;
+ 				uint8_t bytes[11] = {
+ 					0x62, uint8_t(0xf0 | map),
+ 					uint8_t(0x7c | pp | w << 7),
+ 					uint8_t(8 | ll << 5),
+-					uint8_t(kind ? 0x6f : 0x1a), 0x58, 0x80
++					form.load, 0x58, 0x80
+ 				};
+ 				unsigned id = decoder.decode(bytes, 7);
+ 				if (id > UINT16_MAX)
+ 					throw std::runtime_error("EVEX transfer ID exceeds uint16_t");
+ 				if (id) {
+-					for (unsigned store = 0; store < (kind ? 2u : 1u); ++store) {
+-						bytes[4] = uint8_t(kind ? 0x6f | store << 4 : 0x1a);
++					for (auto opcode : { form.load, form.store }) {
++						if (!opcode)
++							continue;
++						bytes[4] = opcode;
+ 						for (unsigned ext = 0; ext < 16; ++ext) {
+ 							bytes[1] = uint8_t(ext << 4 | map);
+-							for (unsigned modrm = 0; modrm < (kind ? 256u : 192u); ++modrm) {
++							for (unsigned modrm = 0; modrm < (form.store ? 256u : 192u); ++modrm) {
+ 								bytes[5] = uint8_t(modrm);
+ 								const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 								const bool sib = mod < 3 && rm == 4;
+@@ -991,13 +1004,16 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 			throw std::runtime_error("EVEX scan opcode plan collision");
+ 		index[key & 255] = plan;
+ 	}
+-	if (index[0x6f] || index[0x7f] || index[0x1a] || plan >= 128)
++	if (index[0x6f] || index[0x7f] || index[0x1a] || index[0x10] ||
++	    index[0x11] || index[0x28] || index[0x29] || plan >= 128)
+ 		throw std::runtime_error("EVEX transfer opcode plan collision");
+ 	index[0x6f] = index[0x7f] = 128;
+ 	index[0x1a] = 129;
+-	std::puts("enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };");
++	index[0x10] = index[0x11] = 130;
++	index[0x28] = index[0x29] = 131;
++	std::puts("enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129, EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };");
+ 	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
+-	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
++	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(X86_EVEX_SCAN_RODATA))) = {\n\t{ 0 },");
+ 	for (const auto &[key, widths] : ids) {
+ 		const auto &form = descriptions.at(key);
+ 		std::printf("\t{ %u, %u, { ", form.map, 6 + form.immediate);
+@@ -1013,7 +1029,7 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 		}
+ 		std::puts(" } },");
+ 	}
+-	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {");
++	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(X86_EVEX_SCAN_RODATA))) = {");
+ 	for (unsigned i = 0; i < index.size(); i += 16) {
+ 		std::printf("\t");
+ 		for (unsigned j = 0; j < 16; ++j)
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 7781ca39..a29ada5d 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1212,6 +1212,47 @@ static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_primary_batches(csh handle)
++{
++	static const uint8_t code[] = {
++		0xb8, 0xc5, 0xfd, 0x6f, 0xc1, /* VEX-looking bytes in a MOV immediate */
++		0xc5, 0xfd, 0x6f, 0xc1,
++		0xc5, 0xfd, 0x6f, 0x84, 0x25, 0, 0, 0, 0,
++		0x62, 0xf3, 0x7d, 0x48, 0x44, 0xc1, 0x11, /* VPCLMULQDQ */
++		0x0f, 0x10, 0x44, 0x24, 0x08, /* MOVUPS */
++		0x66, 0x44, 0x0f, 0x58, 0xc1, /* ADDPD */
++		0x66, 0x0f, 0x84, 1, 0, 0, 0, /* size-dependent near JE */
++		0x62, 0xf1, 0x7c, 0x48, 0x10, 0x44, 0x24, 1, /* VMOVUPS */
++		0x62, 0xf1, 0xfd, 0x28, 0x29, 0xc1, /* VMOVAPD */
++		0x62, 0xf1, 0xfe, 0x48, 0x6f, 0x44, 0x24, 1, /* VMOVDQU64 */
++
++		0x83, 0x6c, 0x24, 0x08, 0xff, /* SUB dword ptr [esp+8],-1 */
++		0x8b, 0x04, 0x2d, 0xc5, 0, 0, 0, /* base-less SIB */
++		0x81, 0xf9, 0xc5, 0xfd, 0x77, 0, /* CMP ECX,imm32 */
++		0xc5, 0xf8, 0x77, 0x90, 0xc5, 0xf0, 0x77
++	};
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) ||
++	    cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF))
++		return false;
++	for (size_t start = 0; start < sizeof(code); ++start) {
++		for (size_t n = 0; n <= sizeof(code) - start; ++n) {
++			for (size_t cap = 0; cap <= 16; ++cap) {
++				uint32_t a[16], b[16];
++				memset(a, 0xa5, sizeof(a));
++				memcpy(b, a, sizeof(a));
++				X86ScanBatchResult x = X86_scanBatch(
++					handle, code + start, n, UINT64_MAX - 5, a, cap);
++				X86ScanBatchResult y = X86_scanNativeBatch(
++					handle, code + start, n, UINT64_MAX - 5, b, cap);
++				if (x.bytes != y.bytes || x.count != y.count ||
++				    memcmp(a, b, sizeof(a)))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1289,7 +1330,7 @@ static bool check_mode(cs_mode mode)
+ 			}
+ 		}
+ 	}
+-	ok = check_callbacks(handles);
++	ok = check_callbacks(handles) && check_primary_batches(handles[0]);
+ done:
+ 	for (unsigned i = 0; i < 2; ++i)
+ 		if (handles[i])
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index e3319a1d..5bd4e977 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -231,6 +231,7 @@
+ 		DCFE248A19DDCDC000EF8EA9 /* X86Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */; };
+ 		2577BA5E41DF2459B4D95926 /* X86OutputIterator.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B56000BA9634450923573AB /* X86OutputIterator.c */; };
+ 		7E0CD60EC1143E92BF232050 /* X86Vex32Output.c in Sources */ = {isa = PBXBuildFile; fileRef = BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */; };
++		E9B25ED2C244E92BE35AD7F0 /* X86BatchScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 9A62153712655DA2CA950D57 /* X86BatchScan.c */; };
+ 		F475C40E5319E61F44B33A21 /* X86Sse64Output.c in Sources */ = {isa = PBXBuildFile; fileRef = 33715F65E8AB5BCE857343EE /* X86Sse64Output.c */; };
+ 		F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */; };
+ 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+@@ -521,6 +522,7 @@
+ 		DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Disassembler.c; sourceTree = "<group>"; };
+ 		3B56000BA9634450923573AB /* X86OutputIterator.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86OutputIterator.c; sourceTree = "<group>"; };
+ 		BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Vex32Output.c; sourceTree = "<group>"; };
++		9A62153712655DA2CA950D57 /* X86BatchScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86BatchScan.c; sourceTree = "<group>"; };
+ 		33715F65E8AB5BCE857343EE /* X86Sse64Output.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Sse64Output.c; sourceTree = "<group>"; };
+ 		526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86ImmediateOutput.c; sourceTree = "<group>"; };
+ 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
+@@ -1002,6 +1004,7 @@
+ 				DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */,
+ 				3B56000BA9634450923573AB /* X86OutputIterator.c */,
+ 				BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */,
++				9A62153712655DA2CA950D57 /* X86BatchScan.c */,
+ 				33715F65E8AB5BCE857343EE /* X86Sse64Output.c */,
+ 				526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */,
+ 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
+@@ -1767,6 +1770,7 @@
+ 				DCFE248A19DDCDC000EF8EA9 /* X86Disassembler.c in Sources */,
+ 				2577BA5E41DF2459B4D95926 /* X86OutputIterator.c in Sources */,
+ 				7E0CD60EC1143E92BF232050 /* X86Vex32Output.c in Sources */,
++				E9B25ED2C244E92BE35AD7F0 /* X86BatchScan.c in Sources */,
+ 				F475C40E5319E61F44B33A21 /* X86Sse64Output.c in Sources */,
+ 				F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */,
+ 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
