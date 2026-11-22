@@ -1,7 +1,7 @@
-name: Separate VZERO semantic repair from ELF mapper placement on four real workloads
+name: Measure the small public mapper and its rare implicit-register corrections
 on:
   push:
-    branches: [codex/isolate-vector-mode-mapping]
+    branches: [codex/outline-implicit-register-repair]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mapping-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: rare-implicit-mapping-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
