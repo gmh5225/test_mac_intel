@@ -1,0 +1,36 @@
+name: Close real ICMP handles through original and emitted Windows ARM64 callers
+on:
+  push:
+    branches: [codex/neverd-native-icmp-execution-20261122]
+    paths:
+      - native-icmp-caller/**
+      - .github/workflows/neverd-native-icmp-caller.yml
+permissions:
+  contents: read
+jobs:
+  icmp:
+    runs-on: windows-11-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: native-icmp-caller
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 6d7cfc6d935c0330798c63abefb51dc9f9d60e35
+          path: neverd-source
+          sparse-checkout: unittests/types/fixtures
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - name: Compile, link and execute all three source routes
+        run: python native-icmp-caller/verify.py neverd-source/unittests/types/fixtures/windows_sdk_system_calls.c
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: icmp-native-execution
+          path: native-icmp-caller/result.json
+          if-no-files-found: error
+          retention-days: 14
