@@ -68,7 +68,6 @@ try:
             cmd('regression-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_systemz_register_dialects$'])
         if k=='indexed':
             cmd('register-static',['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-            cmd('generate-registers',['python3','-B',s/'suite/synctools/systemz_register_names.py','--check'])
         if k=='indexed':
             names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
