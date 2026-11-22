@@ -1,7 +1,7 @@
-name: Measure direct per-opcode implicit effects against indexed pools and the shipping detail mapper
+name: Check projected x86 branch groups and IP repairs against direct and shipping effects
 on:
   push:
-    branches: [codex/capstone-direct-x86-detail-opcode]
+    branches: [codex/capstone-precompute-x86-branch-effects]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: direct-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: branch-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
