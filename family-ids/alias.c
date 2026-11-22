@@ -39,7 +39,7 @@ static int sweep(cs_arch arch, Lookup lookup, const name_map *rows, size_t count
 int main(void)
 {
     unsigned long total=0;
-    if(sweep(CS_ARCH_AARCH64,map_set_aarch64_alias_id,arm_names,ARR_SIZE(arm_names),&total)||
-       sweep(CS_ARCH_MIPS,map_set_mips_alias_id,mips_names,ARR_SIZE(mips_names),&total))return 1;
+    if(sweep(CS_ARCH_AARCH64,map_set_aarch64_alias_id,arm_names,sizeof(arm_names)/sizeof(arm_names[0]),&total)||
+       sweep(CS_ARCH_MIPS,map_set_mips_alias_id,mips_names,sizeof(mips_names)/sizeof(mips_names[0]),&total))return 1;
     printf("%lu\n",total);return total>500000?0:2;
 }

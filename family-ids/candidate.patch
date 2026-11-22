@@ -1,35 +1,19 @@
 diff --git a/MappingAlias.h b/MappingAlias.h
-index d6575cb9..c5b29186 100644
+index d6575cb9..451013f8 100644
 --- a/MappingAlias.h
 +++ b/MappingAlias.h
-@@ -7,11 +7,16 @@
- #include "Mapping.h"
- #include "utils.h"
- 
-+static inline bool char_ends_default_mnem(const char c)
-+{
-+	return !c || c == ' ' || c == '\t' || c == '.';
-+}
-+
- static inline bool char_ends_mnem(const char c, cs_arch arch)
- {
+@@ -12,11 +12,14 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
  	switch (arch) {
  	default:
--		return (!c || c == ' ' || c == '\t' || c == '.');
-+		return char_ends_default_mnem(c);
+ 		return (!c || c == ' ' || c == '\t' || c == '.');
++/* The isolated parser serves AArch64 and MIPS, both of which use the default delimiters. */
++#ifndef CAPSTONE_ALIAS_ROLLED_LOOP
  	case CS_ARCH_PPC:
  	case CS_ARCH_RISCV:
  		return (!c || c == ' ' || c == '\t');
-@@ -40,7 +45,12 @@ static inline
- #pragma clang loop unroll(disable)
- #endif
- 		for (size_t i = 0; i < 15; ++i) {
-+#ifdef CAPSTONE_ALIAS_ROLLED_LOOP
-+			/* The shared AArch64 and MIPS tables both use the default delimiters. */
-+			if (char_ends_default_mnem(name[i]))
-+#else
- 			if (char_ends_mnem(name[i], MI->csh->arch))
+ 	case CS_ARCH_SPARC:
+ 		return (!c || c == ' ' || c == '\t' || c == ',');
 +#endif
- 				break;
- 			unsigned int next =
- 				trie[state].offset + (unsigned char)name[i];
+ 	}
+ }
+ 
