@@ -1,7 +1,7 @@
-name: Count actual scalar, VEX and EVEX batch admissions over the six exact measured real image extents
+name: Count residual real instruction families in both width-specialized production-configured batch loops
 on:
   push:
-    branches: [codex/capstone-batch-fallback-attribution]
+    branches: [codex/capstone-final-batch-attribution]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: actual-prefix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: residual-prefix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
