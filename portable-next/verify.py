@@ -81,14 +81,14 @@ endforeach()
        check_table('check-rows','--vex-register-immediates','X86GenVexRegisterImmediates.inc')
        check_table('check-rows','--plain-evex-registers','X86GenPlainEvexRegisterOutput.inc')
        cmd('build-plain',['cmake','--build',b,'--target','probe-plain','--parallel','4'])
-       guard('plain',[11337732,0,47444])
+       guard('plain',[16392204,0,100320])
        check_table('check-rows','--evex-rip-memory','X86GenEvexRipMemory.inc')
        cmd('build-rip',['cmake','--build',b,'--target','probe-rip','--parallel','4'])
        guard('rip',[15532048,0,36310])
-       if label in ('vex','combined'):
+       if label in ('vex_imm','combined_imm'):
            check_table('check-rows','--vex-rip-memory','X86GenVexRipMemory.inc')
        cmd('build-vexrip',['cmake','--build',b,'--target','probe-vexrip','--parallel','4'])
-       guard('vexrip',[6914064,0,44762 if label in ('vex','combined') else 0])
+       guard('vexrip',[6914064,0,44762 if label in ('vex_imm','combined_imm') else 0])
        check_table('check-rows','--legacy-map38-registers','X86GenLegacyMap38Registers.inc')
        cmd('build-map38',['cmake','--build',b,'--target','probe-map38','--parallel','4'])
        guard('map38',[6111236,0,113152])
@@ -100,7 +100,7 @@ endforeach()
        vz,=[f for f in b.rglob('check-vzero.exe' if win else 'check-vzero')if f.is_file()]
        obs=[ln.split()for ln in sp.check_output([vz],text=True).splitlines()];assert len(obs)==12
        for bits,name,enc,num,nw,first,last in obs:
-           expected=8 if label in ('writes','combined') and bits!='64' else 16
+           expected=8 if label in ('writes_imm','combined_imm') and bits!='64' else 16
            assert int(num)==int(nw)==expected and first=='ymm0' and last=='ymm'+str(expected-1)
        save('vzero',obs)
     cmd('mapping-counts',[sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
