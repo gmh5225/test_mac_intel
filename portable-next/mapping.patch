@@ -1,0 +1,93 @@
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..f1154cb4 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10324,6 +10324,21 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 
+ 			// special cases when regs_write[] depends on arch
+ 			switch (id) {
++#ifndef CAPSTONE_X86_REDUCE
++			case X86_VZEROALL:
++			case X86_VZEROUPPER:
++				if (mode != CS_MODE_64) {
++					const size_t bytes =
++						8 * sizeof(insns[i].regs_mod[0]);
++					memcpy(insn->detail->regs_write,
++					       insns[i].regs_mod, bytes);
++					memset(insn->detail->regs_write + 8, 0,
++					       sizeof(insns[i].regs_mod) - bytes);
++					insn->detail->regs_write_count = 8;
++					break;
++				}
++				/* FALLTHROUGH */
++#endif
+ 			default:
+ 				memcpy(insn->detail->regs_write,
+ 				       insns[i].regs_mod,
+diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
+index d9dd18e2..428aed88 100644
+--- a/tests/unit/x86_reg_access.c
++++ b/tests/unit/x86_reg_access.c
+@@ -53,6 +53,54 @@ static bool check_implicit_copies(csh handle)
+ 	return true;
+ }
+ 
++static bool check_vector_clear_writes(void)
++{
++	if (cs_support(CS_SUPPORT_X86_REDUCE))
++		return true;
++
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
++	const uint8_t bytes[][4] = { { 0xc5, 0xf8, 0x77 },
++				     { 0xc5, 0xfc, 0x77 },
++				     { 0xc4, 0xe1, 0x78, 0x77 },
++				     { 0xc4, 0xe1, 0x7c, 0x77 } };
++	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
++		const unsigned expected = modes[m] == CS_MODE_64 ? 16 : 8;
++		csh h = 0;
++		if (cs_open(CS_ARCH_X86, modes[m], &h) != CS_ERR_OK)
++			return false;
++		bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
++		for (unsigned n = 0; n < sizeof(bytes) / sizeof(bytes[0]) && ok;
++		     ++n) {
++			cs_insn *insn = NULL;
++			size_t size = n < 2 ? 3 : 4;
++			size_t count =
++				cs_disasm(h, bytes[n], size, 0, 1, &insn);
++			cs_regs reads, writes;
++			uint8_t nr, nw;
++			ok = count == 1 && insn->size == size &&
++			     insn->id == (n % 2 ? X86_INS_VZEROALL :
++						  X86_INS_VZEROUPPER) &&
++			     insn->detail->regs_write_count == expected &&
++			     cs_regs_access(h, insn, reads, &nr, writes, &nw) ==
++				     CS_ERR_OK &&
++			     nw == expected;
++			for (unsigned i = 0; ok && i < expected; ++i)
++				ok = insn->detail->regs_write[i] ==
++					     X86_REG_YMM0 + i &&
++				     writes[i] == X86_REG_YMM0 + i;
++			cs_free(insn, count);
++			if (!ok)
++				fprintf(stderr,
++					"vector clear writes: mode=%u encoding=%u\n",
++					(unsigned)modes[m], n);
++		}
++		cs_close(&h);
++		if (!ok)
++			return false;
++	}
++	return true;
++}
++
+ static bool check_test_operands(void)
+ {
+ 	static const unsigned widths[] = { 1, 2, 4, 8 };
+@@ -784,6 +832,7 @@ int main(void)
+ 		return 1;
+ 	}
+ 	bool success = check_implicit_copies(handle) && check_test_operands() &&
++		       check_vector_clear_writes() &&
+ 		       check_scalar_move_flags() &&
+ 		       check_scalar_segment_reads() &&
+ 		       check_vector_compare_flags();
