@@ -5,19 +5,33 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <sys/mman.h>
 #include <unistd.h>
+#endif
 
 extern "C" bool observed_plain(csh, bool, const uint8_t *, size_t,
                                cs_insn *, uint16_t *);
 
 int main() {
     uint64_t trials = 0, hits32 = 0, hits64 = 0;
+#ifdef _WIN32
+    SYSTEM_INFO system;
+    GetSystemInfo(&system);
+    const size_t page = system.dwPageSize;
+    auto *area = static_cast<uint8_t *>(VirtualAlloc(nullptr, page * 2, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    DWORD old_flags;
+    if (!area || !VirtualProtect(area + page, page, PAGE_NOACCESS, &old_flags))
+        return 2;
+#else
     const size_t page = static_cast<size_t>(sysconf(_SC_PAGESIZE));
     auto *area = static_cast<uint8_t *>(mmap(nullptr, page * 2,
         PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0));
     if (area == MAP_FAILED || mprotect(area + page, page, PROT_NONE))
         return 2;
+#endif
     for (unsigned wide : {0, 1}) for (unsigned detail : {0, 1}) {
         const auto mode = wide ? CS_MODE_64 : CS_MODE_32;
         csh fast = 0, ordinary = 0;
@@ -97,7 +111,11 @@ int main() {
         cs_close(&ordinary);
         cs_close(&fast);
     }
-    munmap(area, page*2);
+#ifdef _WIN32
+    VirtualFree(area,0,MEM_RELEASE);
+#else
+    munmap(area,page*2);
+#endif
     std::printf("%llu %llu %llu\n", (unsigned long long)trials,
                 (unsigned long long)hits32,(unsigned long long)hits64);
 }
