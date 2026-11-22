@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base', 'rip', 'map38', 'combined'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base', 'vex', 'writes', 'combined'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -40,7 +40,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base', 'rip', 'map38', 'combined'):
+    for variant in ('base', 'vex', 'writes', 'combined'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -69,7 +69,7 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==(8 if variant == 'repair' and v[0]!='64' else 16) for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(8 if variant in ('writes','combined') and v[0]!='64' else 16) for v in regs)
         if variant!='base':
             for unit in ('x86_simple_output','x86_reg_access'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
@@ -145,7 +145,7 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        if variant in ('rip', 'map38', 'combined'):
+        if variant in ('vex', 'writes', 'combined'):
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
             assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             assert sp.check_output([t/'table-producer','--evex-memory'])==(cs/'arch/X86/X86GenEvexMemoryOutput.inc').read_bytes()
@@ -166,26 +166,33 @@ try:
             command([t/'legacy'],'legacy-guard-'+variant)
         if variant!='base':
             assert sp.check_output([t/'simple-generator','--test32-registers'])==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
-        if variant in ('base','rip','map38','combined'):
+        if variant in ('base','vex','writes','combined'):
             from observe import install
             observed=t/'probe-source';arch=observed/'arch/X86';arch.mkdir(parents=True,exist_ok=True)
             sources=('X86MemoryFallback32','X86Vex32Output')
             for name in sources:shutil.copy2(cs/('arch/X86/'+name+'.c'),arch/(name+'.c'))
             install(observed)
             for name in sources:
-                command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT','-I',cs/'arch/X86','-I',cs,'-I',cs/'include','-c',arch/(name+'.c'),'-o',t/(name+'.o')],'lea-compile-'+name+'-'+variant)
+                command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT','-DX86_disasmIter32=observed_text32','-DX86_decodeOutputMiss32=observed_miss32','-I',cs/'arch/X86','-I',cs,'-I',cs/'include','-c',arch/(name+'.c'),'-o',t/(name+'.o')],'lea-compile-'+name+'-'+variant)
             command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'sib-guard.cpp',*[t/(name+'.o') for name in sources],archive,'-o',t/'sib-guard'],'lea-link-'+variant)
             command([t/'sib-guard'],'lea-guard-'+variant)
-        if variant in ('rip','combined'):
+        if variant!='base':
             assert sp.check_output([t/'table-producer','--evex-rip-memory'])==(cs/'arch/X86/X86GenEvexRipMemory.inc').read_bytes()
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'rip.c','-o',t/'rip.o'],'rip-wrapper-'+variant)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'rip.cpp',t/'rip.o',archive,'-o',t/'rip'],'rip-link-'+variant)
         command([t/'rip'],'rip-guard-'+variant)
-        if variant in ('map38','combined'):
+        if variant!='base':
             assert sp.check_output([t/'table-producer','--legacy-map38-registers'])==(cs/'arch/X86/X86GenLegacyMap38Registers.inc').read_bytes()
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'map38.c','-o',t/'map38.o'],'map38-wrapper-'+variant)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'map38.cpp',t/'map38.o',archive,'-o',t/'map38'],'map38-link-'+variant)
         command([t/'map38'],'map38-guard-'+variant)
+        if variant in ('writes','combined'):
+            command(['python3','-B',cs/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-writes-'+variant)
+        if variant in ('vex','combined'):
+            assert sp.check_output([t/'table-producer','--vex-rip-memory'])==(cs/'arch/X86/X86GenVexRipMemory.inc').read_bytes()
+        command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'vexrip.c','-o',t/'vexrip.o'],'vexrip-wrap-'+variant)
+        command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'vexrip.cpp',t/'vexrip.o',archive,'-o',t/'vexrip'],'vexrip-link-'+variant)
+        command([t/'vexrip'],'vexrip-guard-'+variant)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -216,6 +223,7 @@ try:
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
+                    if k in ('writes','combined'):wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
