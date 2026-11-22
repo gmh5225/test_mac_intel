@@ -89,6 +89,13 @@ def main(w):
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={}
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    nd=r.parent/'neverd-config';record=m['neverd']
+    assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
+    for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
+    text=(nd/'CMakeLists.txt').read_text();a=text.index('# --- Capstone (our fork');end=text.index('# --- NeverD CMake helpers',a)
+    project=w/'project';(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
+    shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake')
+    (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+text[a:end])
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         diff=r/('candidate-from-checkout.patch' if key=='candidate' else 'official.patch')
@@ -96,23 +103,25 @@ def main(w):
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/'build';run(['cmake','-S',base,'-B',build,*cfg],'configure-'+key)
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access']
+        listed=json.loads(sp.check_output(['ctest','--test-dir',build,'--show-only=json-v1'],text=True,stderr=sp.DEVNULL));families=('evex','apx','avx512','vcmp','vfpclass','bound','4fmaps')
+        units=sorted(set(units)|{p['name'][5:]for p in listed['tests']if p['name'].startswith('unit_x86_')and any(a in p['name']for a in families)});assert len(units)>45
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*units],'build-'+key)
         run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         lib=build/'libcapstone.a';exe=w/key
-        run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'census.cpp',lib,'-o',w/('census-'+key)],'link-census-'+key)
-        obj=['cs.c.o','X86VectorFallback64.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o']
-        def members(lib):return {k:hashlib.sha256(sp.check_output(['ar','p',lib,k])).hexdigest() for k in obj}
+        def members(lib):return {n:hashlib.sha256(sp.check_output(['ar','p',lib,n])).hexdigest() for n in sp.check_output(['ar','t',lib],text=True).splitlines() if n.endswith('.o')}
         standalone=members(lib)
-        multi=w/'multi'
-        run(['cmake','-S',base,'-B',multi,*cfg,'-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF'],'configure-multi-'+key)
-        run(['cmake','--build',multi,'--parallel','4','--target','capstone_static'],'build-multi-'+key)
-        both=members(multi/'libcapstone.a')
+        target=w/'project-build'
+        run(['cmake','-S',project,'-B',target,*cfg,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'],'configure-project-'+key)
+        run(['cmake','--build',target,'--parallel','4','--target','capstone_static'],'build-project-'+key)
+        lib,=target.rglob('libcapstone.a');both=members(lib);assert len(both)>=45
         save('objects-'+key+'.json',dict(standalone=standalone,multi=both))
         if key=='official':prior_objects=(standalone,both)
         else:
-            assert both==prior_objects[1]
-            for n in ('X86Sse64Output.c.o','X86Vex32Output.c.o'):assert standalone[n]==prior_objects[0][n]
-            if darwin:assert standalone==prior_objects[0]
+            for current,old in zip((standalone,both),prior_objects):assert current.keys()==old.keys() and {n for n in old if old[n]!=current[n]}=={'X86Disassembler.c.o'}
+        run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'census.cpp',lib,'-o',w/('census-'+key)],'link-census-'+key)
+        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'probe.cpp',lib,'-o',w/'probe'],'link-normalization-'+key)
+        run([w/'probe'],'normalization-'+key)
+        if key=='candidate':assert (evidence/'normalization-official.log').read_bytes()==(evidence/'normalization-candidate.log').read_bytes()
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe

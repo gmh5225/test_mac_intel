@@ -1,20 +1,278 @@
-diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index ccd06357..b56826b0 100644
---- a/arch/X86/X86BatchScan.c
-+++ b/arch/X86/X86BatchScan.c
-@@ -207,9 +207,9 @@ static uint32_t readFirst64(const uint8_t *code, size_t size)
- 			plan ? readPrimary(code + 1, size - 1, plan) : 0;
- 		return word ? word + 1 : 0;
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..476e86f3 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -326,53 +326,94 @@ static bool scan_x86_evex_prefix(const uint8_t *code, size_t code_len,
+ 	return false;
+ }
+ 
++enum EvexNormalization {
++	EVEX_ORDINARY,
++	EVEX_COMPARE,
++	EVEX_EXP_RCP28,
++	EVEX_RCP14,
++	EVEX_FPCLASS,
++	EVEX_4FMAPS
++};
++
++/* Only these opcode families need non-APX normalization. Map, prefix and
++ * operand checks remain with the corresponding rule. */
++static inline enum EvexNormalization evexNormalization(uint8_t opcode)
++{
++	switch (opcode) {
++	case 0xc2:
++		return EVEX_COMPARE;
++	case 0xc8:
++	case 0xca:
++	case 0xcb:
++	case 0xcc:
++	case 0xcd:
++		return EVEX_EXP_RCP28;
++	case 0x4c:
++	case 0x4d:
++	case 0x4e:
++	case 0x4f:
++		return EVEX_RCP14;
++	case 0x67:
++		return EVEX_FPCLASS;
++	case 0x9b:
++	case 0xab:
++		return EVEX_4FMAPS;
++	default:
++		return EVEX_ORDINARY;
++	}
++}
++
+ /* Keep EVEX normalization state off the ordinary decoding path. */
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static int
+-decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+-		      size_t code_len, cs_mode mode,
+-		      bool *scalar_compare_p2_normalized,
+-		      uint8_t *original_scalar_compare_p2)
++static int decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
++				 size_t code_len, cs_mode mode,
++				 bool *scalar_compare_p2_normalized,
++				 uint8_t *original_scalar_compare_p2)
+ {
+ 	const uint8_t *decode_code = code;
+ 	size_t decode_size = code_len;
+ 	uint8_t normalized_code[15];
+-	size_t evex_normalization_limit = 0;
++	const size_t evex_normalization_limit =
++		code_len < sizeof(normalized_code) ? code_len :
++						     sizeof(normalized_code);
+ 	size_t evex_normalization_offset = 0;
+ 	unsigned int evex_segment_count = 0;
+ 	unsigned int evex_address_size_count = 0;
+ 	bool evex_invalid_prefix = false;
+-	bool has_evex_normalization_prefix = false;
+ 	uint8_t apx_evex_p0 = 0, apx_evex_p1 = 0;
+ 	bool apx_evex_normalized = false;
+ 	bool apx_evex_b4 = false, apx_evex_x4 = false;
+-	evex_normalization_limit = code_len < sizeof(normalized_code) ?
+-					   code_len :
+-					   sizeof(normalized_code);
+-	has_evex_normalization_prefix = scan_x86_evex_prefix(
+-		code, evex_normalization_limit, (mode & CS_MODE_64) != 0,
+-		&evex_normalization_offset, &evex_segment_count,
+-		&evex_address_size_count, &evex_invalid_prefix);
++
++	if (!scan_x86_evex_prefix(
++		    code, evex_normalization_limit, (mode & CS_MODE_64) != 0,
++		    &evex_normalization_offset, &evex_segment_count,
++		    &evex_address_size_count, &evex_invalid_prefix) ||
++	    evex_normalization_limit - evex_normalization_offset < 6)
++		return decodeInstruction(insn, code, code_len, mode);
++
++	const uint8_t *evex = code + evex_normalization_offset;
++	const unsigned map = evex[1] & 7;
++	const enum EvexNormalization rule = evexNormalization(evex[4]);
++	const bool apx = map >= 1 && map <= 3 &&
++			 ((evex[1] & 8) || !(evex[2] & 4));
++	if (rule == EVEX_ORDINARY && !apx)
++		return decodeInstruction(insn, code, code_len, mode);
+ 
+ 	/* Packed VCMPPS/PD uses EVEX.L'L as its vector length unless EVEX.b
+ 	 * selects SAE and a fixed 512-bit length for a register source.  The
+ 	 * generated decoder accepts reserved LL=3 memory and non-SAE register
+ 	 * forms. */
+-	if (has_evex_normalization_prefix &&
++	if (rule == EVEX_COMPARE && map == 1 &&
+ 	    evex_normalization_limit - evex_normalization_offset >= 7 &&
+-	    (code[evex_normalization_offset + 1] & 7) == 1 &&
+-	    ((code[evex_normalization_offset + 2] & 0x83) == 0x00 ||
+-	     (code[evex_normalization_offset + 2] & 0x83) == 0x81) &&
+-	    code[evex_normalization_offset + 4] == 0xc2) {
+-		const uint8_t p2 = code[evex_normalization_offset + 3];
++	    ((evex[2] & 0x83) == 0x00 || (evex[2] & 0x83) == 0x81)) {
++		const uint8_t p2 = evex[3];
+ 		const uint8_t ll = (p2 >> 5) & 3;
+ 		const bool b = (p2 & 0x10) != 0;
+-		const bool memory =
+-			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
++		const bool memory = (evex[5] & 0xc0) != 0xc0;
+ 
+ 		if (evex_invalid_prefix || evex_segment_count > 1 ||
+ 		    evex_address_size_count > 1 || (ll == 3 && !(b && !memory)))
+@@ -382,18 +423,12 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 	/* Scalar VCMPSS/SD treats EVEX.L'L as LLIG when EVEX.b is clear.
+ 	 * The generated decoder only contains the LL=0 spelling.  EVEX.b is
+ 	 * SAE for a register source and remains reserved for a memory source. */
+-	if (has_evex_normalization_prefix &&
++	if (rule == EVEX_COMPARE && map == 1 &&
+ 	    evex_normalization_limit - evex_normalization_offset >= 7 &&
+-	    (code[evex_normalization_offset + 1] & 7) == 1 &&
+-	    ((code[evex_normalization_offset + 2] & 0x83) == 0x02 ||
+-	     (code[evex_normalization_offset + 2] & 0x83) == 0x83) &&
+-	    code[evex_normalization_offset + 4] == 0xc2) {
+-		const uint8_t ll = (code[evex_normalization_offset + 3] >> 5) &
+-				   3;
+-		const bool b = (code[evex_normalization_offset + 3] & 0x10) !=
+-			       0;
+-		const bool memory =
+-			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
++	    ((evex[2] & 0x83) == 0x02 || (evex[2] & 0x83) == 0x83)) {
++		const uint8_t ll = (evex[3] >> 5) & 3;
++		const bool b = (evex[3] & 0x10) != 0;
++		const bool memory = (evex[5] & 0xc0) != 0xc0;
+ 
+ 		if (evex_invalid_prefix || evex_segment_count > 1 ||
+ 		    evex_address_size_count > 1 || (memory && b) ||
+@@ -414,22 +449,11 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 	 * so canonicalize the other legal spellings after rejecting reserved
+ 	 * combinations.  Packed forms remain fixed at 512 bits; EVEX.b means
+ 	 * SAE for a register source and broadcast for a memory source. */
+-	if (has_evex_normalization_prefix &&
+-	    evex_normalization_limit - evex_normalization_offset >= 6 &&
+-	    (code[evex_normalization_offset + 1] & 7) == 2 &&
+-	    (code[evex_normalization_offset + 2] & 3) == 1 &&
+-	    (code[evex_normalization_offset + 4] == 0xc8 ||
+-	     (code[evex_normalization_offset + 4] >= 0xca &&
+-	      code[evex_normalization_offset + 4] <= 0xcd))) {
+-		const uint8_t ll = (code[evex_normalization_offset + 3] >> 5) &
+-				   3;
+-		const bool b = (code[evex_normalization_offset + 3] & 0x10) !=
+-			       0;
+-		const bool memory =
+-			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
+-		const bool scalar = code[evex_normalization_offset + 4] ==
+-					    0xcb ||
+-				    code[evex_normalization_offset + 4] == 0xcd;
++	if (rule == EVEX_EXP_RCP28 && map == 2 && (evex[2] & 3) == 1) {
++		const uint8_t ll = (evex[3] >> 5) & 3;
++		const bool b = (evex[3] & 0x10) != 0;
++		const bool memory = (evex[5] & 0xc0) != 0xc0;
++		const bool scalar = evex[4] == 0xcb || evex[4] == 0xcd;
+ 
+ 		if (evex_invalid_prefix || evex_segment_count > 1 ||
+ 		    evex_address_size_count > 1)
+@@ -454,20 +478,11 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 	 * packed forms use LL as their actual vector length.  EVEX.b is only
+ 	 * defined for packed memory broadcast and is reserved for registers and
+ 	 * all scalar forms. */
+-	if (has_evex_normalization_prefix &&
+-	    evex_normalization_limit - evex_normalization_offset >= 6 &&
+-	    (code[evex_normalization_offset + 1] & 7) == 2 &&
+-	    (code[evex_normalization_offset + 2] & 3) == 1 &&
+-	    code[evex_normalization_offset + 4] >= 0x4c &&
+-	    code[evex_normalization_offset + 4] <= 0x4f) {
+-		const uint8_t ll = (code[evex_normalization_offset + 3] >> 5) &
+-				   3;
+-		const bool b = (code[evex_normalization_offset + 3] & 0x10) !=
+-			       0;
+-		const bool memory =
+-			(code[evex_normalization_offset + 5] & 0xc0) != 0xc0;
+-		const bool scalar = (code[evex_normalization_offset + 4] & 1) !=
+-				    0;
++	if (rule == EVEX_RCP14 && map == 2 && (evex[2] & 3) == 1) {
++		const uint8_t ll = (evex[3] >> 5) & 3;
++		const bool b = (evex[3] & 0x10) != 0;
++		const bool memory = (evex[5] & 0xc0) != 0xc0;
++		const bool scalar = (evex[4] & 1) != 0;
+ 
+ 		if (evex_invalid_prefix || evex_segment_count > 1 ||
+ 		    evex_address_size_count > 1)
+@@ -485,15 +500,11 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
  	}
--	const unsigned plan = x86Batch64Primary[byte];
--	if (plan)
--		return readPrimary(code, size, plan);
-+	const unsigned primary = x86Batch64Primary[byte];
-+	if (primary)
-+		return readPrimary(code, size, primary);
- 	if (byte == 0x0f)
- 		return readSecondary64(code, size, 1, false, false);
- 	if (byte == 0x66 && size >= 3) {
+ 	/* Scalar VFPCLASSSS/SD treats EVEX.L'L as LLIG for its register and
+ 	 * m32/m64 source forms.  The generated tables only contain LL=0. */
+-	if (has_evex_normalization_prefix &&
++	if (rule == EVEX_FPCLASS && map == 3 &&
+ 	    evex_normalization_limit - evex_normalization_offset >= 7 &&
+-	    (code[evex_normalization_offset + 1] & 7) == 3 &&
+-	    (code[evex_normalization_offset + 2] & 3) == 1 &&
+-	    code[evex_normalization_offset + 4] == 0x67) {
+-		const uint8_t ll = (code[evex_normalization_offset + 3] >> 5) &
+-				   3;
+-		const bool b = (code[evex_normalization_offset + 3] & 0x10) !=
+-			       0;
++	    (evex[2] & 3) == 1) {
++		const uint8_t ll = (evex[3] >> 5) & 3;
++		const bool b = (evex[3] & 0x10) != 0;
+ 
+ 		if (evex_invalid_prefix || evex_segment_count > 1 ||
+ 		    evex_address_size_count > 1)
+@@ -515,13 +526,8 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 	 * any operand bits.  Packed PS opcodes are deliberately excluded because
+ 	 * their vector length remains fixed. */
+ 	{
+-		if (has_evex_normalization_prefix &&
+-		    evex_normalization_limit - evex_normalization_offset >= 6 &&
+-		    (code[evex_normalization_offset + 1] & 7) == 2 &&
+-		    (code[evex_normalization_offset + 2] & 3) == 3 &&
+-		    (code[evex_normalization_offset + 4] == 0x9b ||
+-		     code[evex_normalization_offset + 4] == 0xab)) {
+-			const uint8_t p2 = code[evex_normalization_offset + 3];
++		if (rule == EVEX_4FMAPS && map == 2 && (evex[2] & 3) == 3) {
++			const uint8_t p2 = evex[3];
+ 			const uint8_t ll = (p2 >> 5) & 3;
+ 			const uint8_t mask = p2 & 7;
+ 			const bool broadcast = (p2 & 0x10) != 0;
+@@ -550,24 +556,16 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 	 * VSIB continues to use V4 for its vector index; X4 is ignored there.
+ 	 * A register r/m has no index, so U=0 remains #UD there, as in XED. */
+ 	{
+-		if (has_evex_normalization_prefix &&
+-		    evex_normalization_limit - evex_normalization_offset >= 6 &&
+-		    code[evex_normalization_offset] == 0x62 &&
+-		    (code[evex_normalization_offset + 1] & 7) >= 1 &&
+-		    (code[evex_normalization_offset + 1] & 7) <= 3 &&
+-		    ((code[evex_normalization_offset + 1] & 0x08) != 0 ||
+-		     (code[evex_normalization_offset + 2] & 0x04) == 0)) {
+-			const uint8_t modrm =
+-				code[evex_normalization_offset + 5];
++		if (apx) {
++			const uint8_t modrm = evex[5];
+ 
+ 			if (!(mode & CS_MODE_64) || evex_invalid_prefix ||
+ 			    evex_segment_count > 1 ||
+ 			    evex_address_size_count > 1 ||
+-			    ((modrm & 0xc0) == 0xc0 &&
+-			     (code[evex_normalization_offset + 2] & 0x04) == 0))
++			    ((modrm & 0xc0) == 0xc0 && (evex[2] & 0x04) == 0))
+ 				return -1;
+-			apx_evex_p0 = code[evex_normalization_offset + 1];
+-			apx_evex_p1 = code[evex_normalization_offset + 2];
++			apx_evex_p0 = evex[1];
++			apx_evex_p1 = evex[2];
+ 			apx_evex_b4 = (apx_evex_p0 & 0x08) != 0;
+ 			apx_evex_x4 = (modrm & 0xc0) != 0xc0 &&
+ 				      (apx_evex_p1 & 0x04) == 0;
+@@ -597,8 +595,7 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 		insn->vectorExtensionPrefix[2] = apx_evex_p1;
+ 	}
+ 	if (*scalar_compare_p2_normalized)
+-		*original_scalar_compare_p2 =
+-			code[evex_normalization_offset + 3];
++		*original_scalar_compare_p2 = evex[3];
+ 	return 0;
+ }
+ 
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
 index ac63ca24..3047f132 100644
 --- a/arch/X86/X86VectorFallback64.c
