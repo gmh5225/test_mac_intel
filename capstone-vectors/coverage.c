@@ -1,20 +1,31 @@
-#include "cs_priv.h"
+#include "cs_disasm_internal.h"
 #include <inttypes.h>
 #include <stdio.h>
 
 static uint64_t attempts, accepted;
+static bool probing;
 
-extern bool __real_X86_writeVexRipMemory(const uint8_t *, unsigned, cs_insn *, uint16_t *);
+CS_PRESERVE_MOST bool __real_X86_decodeOutputMiss32(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
+CS_PRESERVE_MOST bool __real_X86_decodeRegisterFallback32(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
 
-bool __wrap_X86_writeVexRipMemory(const uint8_t *code, unsigned prefix, cs_insn *insn, uint16_t *size)
+CS_PRESERVE_MOST bool __wrap_X86_decodeRegisterFallback32(cs_struct *h, const uint8_t *p, size_t n, cs_insn *i, uint16_t *z, bool bulk)
 {
-	++attempts;
-	bool hit = __real_X86_writeVexRipMemory(code, prefix, insn, size);
-	accepted += hit;
-	return hit;
+	probing = false;
+	return __real_X86_decodeRegisterFallback32(h, p, n, i, z, bulk);
+}
+
+CS_PRESERVE_MOST bool __wrap_X86_decodeOutputMiss32(cs_struct *h, const uint8_t *p, size_t n, cs_insn *i, uint16_t *z, bool bulk)
+{
+	const bool seg = p[0] == 0x26 || p[0] == 0x2e || p[0] == 0x36 || p[0] == 0x3e || p[0] == 0x64 || p[0] == 0x65;
+	probing = n >= 7 && seg && (p[1] == 0x2b || p[1] == 0x89 || p[1] == 0x8b) && (p[2] & 0xc7) == 5;
+	attempts += probing;
+	bool ok = __real_X86_decodeOutputMiss32(h, p, n, i, z, bulk);
+	accepted += probing && ok;
+	probing = false;
+	return ok;
 }
 
 __attribute__((destructor)) static void report(void)
 {
-	fprintf(stderr, "vexrip %" PRIu64 " %" PRIu64 "\n", attempts, accepted);
+	fprintf(stderr, "segment %" PRIu64 " %" PRIu64 "\n", attempts, accepted);
 }

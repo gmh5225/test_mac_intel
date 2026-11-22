@@ -68,7 +68,7 @@ int main() {
             size_t left = n;
             uint64_t ip = reference.address;
             if (!cs_disasm_iter(ordinary, &cursor, &left, &ip, &reference) ||
-                length != (p[0] == 0xc5 ? 8 : 9) || cursor != p + length || left != n - length ||
+                length != 7 || cursor != p + length || left != n - length ||
                 ip != actual.address + length || actual.id != reference.id ||
                 actual.size != length || reference.size != length ||
                 std::memcmp(actual.bytes, reference.bytes, sizeof(actual.bytes)) ||
@@ -81,36 +81,25 @@ int main() {
                 std::memcmp(&act, &ref, sizeof(act))) return false;
             return true;
         };
-        for (unsigned prefix : {2u,3u}) for(unsigned map=0;map<(prefix==2 ? 1u :32u);++map)
-            for(unsigned opcode=0;opcode<256;++opcode) for(unsigned flags=0;flags<16;++flags)
-                for(unsigned f=0;f<(wide && (prefix==2 || (map>=1 && map<=3)) ? 32u : 2u);++f) {
-                    const unsigned n=prefix+6, dst=(opcode+f*3)&15,src=(opcode*3+f)&15;
-                    const unsigned rxb=((dst>>3)<<2) | (f&3);
-                    constexpr uint32_t ds[]={0U,1U,9U,10U,UINT32_MAX,0xfffffff6U,0x7fffffffU,0x80000000U};
-                    const uint32_t disp=ds[f%8];
-                    std::array<uint8_t,11> bytes{};
-                    bytes[0]=uint8_t(prefix==2?0xc5:0xc4);
-                    bytes[1]=uint8_t(((~rxb&7)<<5)|map);
-                    bytes[prefix-1]=uint8_t((prefix==2?((~rxb&4)<<5):((flags&8)<<4))|((~src&15)<<3)|(flags&7));
-                    bytes[prefix]=uint8_t(opcode);
-                    bytes[prefix+1]=uint8_t(((dst&7)<<3)|(f==30?4:f==31?0xc5:5));
-                    for (unsigned i=0;i<4;++i)bytes[prefix+2+i]=uint8_t(disp>>(8*i));
-                    const bool reject=!wide||(prefix==3 && (map<1||map>3))||(flags&3)!=1||f>=30;
-                    if (!check(bytes,n,reject)) {
-                        std::fprintf(stderr,"VEX prefix=%u map=%u op=%02x flags=%u f=%u displacement=%x\\n",prefix,map,opcode,flags,f,disp);
-                        return 3;
+        const uint8_t segments[]={0x26,0x2e,0x36,0x3e,0x64,0x65,0x66,0x67,0xf2,0xf3};
+        const unsigned disps[]={0U,1U,9U,10U,255,0x7fffffffU,0x80000000U,0xfffffff6U,0xffffffffU};
+        for (unsigned prefix=0;prefix<sizeof(segments);++prefix) for (unsigned op : {0x2bu,0x89u,0x8bu,0x8au,0x8fu})
+            for (unsigned mr=0;mr<256;++mr) for(unsigned disp:disps) {
+                std::array<uint8_t,11> b{{segments[prefix],uint8_t(op),uint8_t(mr)}};
+                for(unsigned i=0;i<4;++i)b[3+i]=uint8_t(disp>>(8*i));
+                const bool admit=!wide && prefix<6 && (mr&0xc7)==5 && (op==0x2b || op==0x89 || op==0x8b);
+                for (unsigned n : {0u,1u,2u,3u,4u,5u,6u,7u,8u,11u}) {
+                    if (!check(b,n,!admit||n<7)) {
+                        std::fprintf(stderr,"i386 segment=%02x op=%02x mr=%02x disp=%x n=%u detail=%u\\n",segments[prefix],op,mr,disp,n,detail);return 8;
                     }
-                    if (f==0)for(unsigned end=0;end<n;++end)if(!check(bytes,end,true))return 4;
                 }
-        std::array<uint8_t,11> supported{{0xc4,0x62,0xed,0xa8,0x05,0x36,0xc3,0x06,0,0x90,0x90}};
-        if (!check(supported,11,false))return 5;
-        for (auto opt : {CS_OPT_UNSIGNED,CS_OPT_TEXT}) {
-            const auto on = opt==CS_OPT_TEXT ? CS_OPT_OFF : CS_OPT_ON;
-            const auto off = opt==CS_OPT_TEXT ? CS_OPT_ON : CS_OPT_OFF;
-            if (cs_option(fast,opt,on) || !check(supported,10,true) || cs_option(fast,opt,off))return 6;
+            }
+        std::array<uint8_t,11> b{{0x65,0x2b,0x05,0x14,0,0,0}};
+        for(auto opt:{CS_OPT_UNSIGNED,CS_OPT_TEXT}){
+            if(cs_option(fast,opt,opt==CS_OPT_TEXT?CS_OPT_OFF:CS_OPT_ON)||!check(b,7,true)||
+               cs_option(fast,opt,opt==CS_OPT_TEXT?CS_OPT_ON:CS_OPT_OFF))return 6;
         }
-        if (cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) ||
-            !check(supported,10,true))return 7;
+        if(cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names))||!check(b,7,true))return 7;
         cs_close(&ordinary);
         cs_close(&fast);
     }

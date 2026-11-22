@@ -80,24 +80,12 @@ def main(w):
         counts=list(map(int,sp.check_output([w/'direct-guard'],text=True).split()))
         assert counts==data['guard_counts']['parent' if label=='baseline' else 'commit']
         save('direct-guard-'+label,dict(counts=counts))
-        if label=='integrated':
-            run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
-            assert sp.check_output([w/'verify-evex-memory','--vex-rip-memory'])==(base/'arch/X86/X86GenVexRipMemory.inc').read_bytes()
-        from elftools.elf.elffile import ELFFile
-        vector_obj,=b.rglob('X86VectorOutput.c.o')
-        with vector_obj.open('rb')as f:
-            ef=ELFFile(f)
-            sections={z.name:dict(bytes=z.data_size,sha256=hashlib.sha256(z.data()).hexdigest())for z in ef.iter_sections()if z['sh_flags']&4 and z.data_size and z['sh_type']=='SHT_PROGBITS'}
-        syms=[line.split()for line in sp.check_output(['nm','-S','--defined-only',vector_obj],text=True).splitlines()]
-        flags=[int(line[1],16)for line in syms if line[-1]=='vex_rip_register_rows']
-        assert flags==([34]if label=='integrated' else [])
-        save('shared-reader-code-'+label+'.json',dict(sections=sections,table=flags))
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
         if label=='integrated':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
-            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVexRipMemory',*libs,'-o',w/'coverage'],'link-counter')
+            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_decodeOutputMiss32','-Wl,--wrap=X86_decodeRegisterFallback32',*libs,'-o',w/'coverage'],'link-counter')
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -129,7 +117,7 @@ def main(w):
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
             added=set(members)-set(prior)
-            assert set(prior)<=set(members) and not added and {'X86VectorOutput.c.o','X86VectorFallback64.c.o'}<=changed<={'X86PlainEvexOutput.c.o','X86VectorOutput.c.o','X86VectorFallback64.c.o'},(changed,added)
+            assert set(prior)<=set(members) and not added and changed=={'X86MemoryFallback32.c.o'}
             changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
@@ -190,7 +178,7 @@ def main(w):
             assert result[2:]==list(map(int,normal.split()))[2:] and len(result)==6
             prefix,attempt,accepted=observed.stderr.split()
             attempt,accepted=int(attempt),int(accepted)
-            assert prefix=='vexrip' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
+            assert prefix=='segment' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
             if bits==32:assert attempt==0
             if bits==32:assert attempt==0
             coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
