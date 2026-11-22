@@ -1,7 +1,7 @@
-name: Count exact native fallback paths and register shapes in the released source
+name: Count remaining complete fallback paths and operand construction in the published decoder
 on:
   push:
-    branches: [codex/capstone-shipped-iterator-paths]
+    branches: [codex/current-record-fallback-census]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,8 +25,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: bbba0e240053b9ad2897390bdc76f6f6115e3a55
+          ref: 771f67c4d5bbb9e3528279edea0518cdc2828bca
           path: source
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: c4849a70bbf9f1c1b99f91e211984613a2c6a446
+          path: neverd-config
+          sparse-checkout: |
+            cmake/NeverDCapstoneCompilerOptions.inc
+            CMakeLists.txt
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
@@ -38,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-stages-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: released-record-paths-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

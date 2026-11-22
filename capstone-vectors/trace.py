@@ -1,6 +1,6 @@
 from pathlib import Path
 import hashlib,itertools,json,os,shutil,subprocess as sp,tempfile
-import frozen_deb,pe_panels
+import frozen_deb,pe_panels,re
 r=Path(__file__).resolve().parent;s=r.parent/'source';out=r.parent/'evidence';out.mkdir(exist_ok=True)
 def run(a):sp.run(a,check=True)
 def read(p):return json.loads(p.read_text())
@@ -10,20 +10,32 @@ q=read(r/'attribution-source.json');prior=read(r/'samples.json')
 def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 assert git('rev-parse','HEAD')==q['checkout']
 assert git('write-tree')==q['tree']
-for bits,unit,second in [(64,'X86Sse64Output.c','X86VectorFallback64.c'),(32,'X86Vex32Output.c','X86MemoryFallback32.c')]:
-    fallback=s/'arch/X86'/second;src=fallback.read_text();needle='return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);'
-    assert src.count(needle)==1
-    fallback.write_text(src.replace(needle,'(void)batch; return false;'))
+for bits,unit,second,expected in [(64,'X86Sse64Output.c','X86VectorFallback64.c',2),(32,'X86Vex32Output.c','X86RegisterFallback32.c',1)]:
+    fallback=s/'arch/X86'/second
+    source,observed=re.subn(r'return cs_decode_full_insn(?:_body)?\(handle, code, size, insn,\s*insn_size, batch\);','return false;',fallback.read_text())
+    assert observed==expected
+    fallback.write_text(source)
     file=s/'arch/X86'/unit
     with file.open('a') as f:
         f.write('\nbool observedOutput%d(csh h,const uint8_t *p,size_t n,cs_insn *insn,uint16_t *length,unsigned *path){\n'%(bits))
         f.write('cs_struct *handle=(cs_struct *)(uintptr_t)h; if(tryOutput%d(handle,p,n,insn,length)){*path=1;return true;} if(X86_decodeOutputMiss%d(handle,p,n,insn,length,false)){*path=2;return true;} *path=0;return false;}\n'%(bits,bits))
 w=Path(tempfile.mkdtemp());b=w/'build'
 try:
-    run(['cmake','-G','Ninja','-S',s,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'])
+    nd=r.parent/'neverd-config';record=q['neverd']
+    assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
+    for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
+    text=(nd/'CMakeLists.txt').read_text();a=text.index('# --- Capstone (our fork');end=text.index('# --- NeverD CMake helpers',a)
+    project=w/'project';(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(s,target_is_directory=True)
+    shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake')
+    (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+text[a:end])
+    run(['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang'])
+    commands=read(b/'compile_commands.json')
+    near=sorted({Path(c['file']).name for c in commands if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in c['command'].split()})
+    assert near==['X86Sse64Output.c']
+    save('compile',dict(neverd=record,near=near,sha256=sha(b/'compile_commands.json')))
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-    run(['clang++','-O2','-std=c++17','-I',s,'-I',s/'include',r/'trace.cpp',b/'libcapstone.a','-o',w/'trace'])
-    run(['clang++','-O2','-I',s/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'])
+    run(['clang++','-O2','-std=c++17','-I',s,'-I',s/'include',r/'trace.cpp',next(b.rglob('libcapstone.a')),'-o',w/'trace'])
+    run(['clang++','-O2','-I',s/'include',r/'vectors.cpp',next(b.rglob('libcapstone.a')),'-o',w/'vectors'])
     for file in ('libmvec.json','libmvec.py'):shutil.copy2(r/file,w/file)
     run(['python3','-B',w/'libmvec.py']);glibc=read(w/'libmvec.json')
     extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
