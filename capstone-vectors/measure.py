@@ -52,10 +52,11 @@ def main(w):
     assert inc.count(key)==1
     inc=inc.replace('#include "arch/X86/X86ScanAdapter.h"', '#include "arch/X86/X86ScanAdapter.h"\n'+weak)
     inc=inc.replace(key,'else if(engine=="x86_iter" && bits==32 && X86_disasmIter32) row=cs_span<X86_disasmIter32>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        else if(engine=="x86_iter" && X86_disasmIterText) row=cs_span<X86_disasmIterText>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        '+key)
+    needle='  while (s[n])\n    ++n;';assert inc.count(needle)==1;inc='#include <cstring>\n'+inc.replace(needle,'  n=std::strlen(s);')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
-    profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
-    profile += ['-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'];b=w/'build';exe={}
+    profile+=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'];b=w/'build';exe={}
     run(['cmake','-S',base,'-B',b,*profile],'configure')
     obj=w/'driver.o'
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
@@ -66,7 +67,7 @@ def main(w):
             run(['git','-C',base,'apply','--index',r/'integrated.patch'],'apply')
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
         flags={f:sorted({Path(v['file']).name for v in json.loads((b/'compile_commands.json').read_text())if '-D'+f in v['command'].split() or '-D'+f+'=1' in v['command'].split()}) for f in ('CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS','CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
-        assert flags=={'CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS':['MipsMapping.c'],'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':['MipsInstPrinter.c'],'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':['X86Sse64Output.c']}
+        assert flags=={'CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS':[],'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':[],'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':[]}
         save('flags-'+label+'.json',flags)
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
@@ -99,6 +100,14 @@ def main(w):
         table=ev.get_section_by_name('.cs_x86_evex_output_rodata')
         assert sec and table
         save('ordinary-evex-'+label+'.json',dict(size=sec.data_size,digest=hashlib.sha256(sec.data()).hexdigest(),tables=table.data_size))
+        multi=w/'multi'
+        run(['cmake','-S',base,'-B',multi,*profile,'-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCAPSTONE_BUILD_CSTEST=OFF'],'configure-multi-'+label)
+        run(['cmake','--build',multi,'--parallel','4','--target','capstone_static'],'build-multi-'+label)
+        archive=multi/'libcapstone.a'
+        record={name:hashlib.sha256(sp.check_output(['ar','p',archive,name])).hexdigest()for name in sp.check_output(['ar','t',archive],text=True).splitlines()}
+        if label=='baseline':multi_reference=record
+        else:assert multi_reference==record
+        save('multi-archive-'+label+'.json',record)
         contents=sp.check_output(['ar','p',libs[0],'X86Vex32Output.c.o'])
         ef=ELFFile(io.BytesIO(contents))
         exec_sections={se.name:hashlib.sha256(se.data()).hexdigest() for se in ef.iter_sections() if se.data_size and se['sh_flags']&4}
@@ -116,7 +125,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert members.keys()==prior.keys() and 'X86EvexMemoryOutput.c.o' in changed and changed<={'X86EvexMemoryOutput.c.o','X86MemoryOutput.c.o','X86Vex32Output.c.o','X86MemoryFallback32.c.o','X86Sse64Output.c.o','X86VectorFallback64.c.o'},changed
+            assert members.keys()==prior.keys() and changed=={'cs.c.o','X86VectorFallback64.c.o'},changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
