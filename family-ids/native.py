@@ -13,9 +13,12 @@ t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==m
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
-    for k in ('base','indexed'):
+    for k in ('base','active','indexed'):
         if k!='base':
-            assert sha(d/'candidate.patch')==meta['sha256'];g('apply','--index',str(d/'candidate.patch'));assert g('write-tree')==meta['tree']
+            g('restore','--source','HEAD','--staged','--worktree','--','.')
+            selected=load(d/'active-tree.json') if k=='active' else meta
+            patch=d/('active.patch' if k=='active' else 'candidate.patch')
+            assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
         names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name'}
@@ -35,6 +38,8 @@ try:
         imgs[k]=so.read_bytes()
         if cc=='clang':
             cmd('alias-static-'+k,['cmake','--build',b,'--target','capstone_static','--parallel','4'])
+            cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'spans.c',b/'libcapstone.a','-o',t/'spans'])
+            cmd('spans-'+k,[t/'spans'])
             cmd('alias-compile-'+k,[cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_AARCH64','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'alias.c',b/'libcapstone.a','-o',t/'alias'])
             cmd('alias-oracle-'+k,[t/'alias'])
             assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
@@ -63,7 +68,7 @@ try:
     cmd('compile-records',['c++','-std=c++17','-O2','-I',s/'include',d/'raw.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'raw'])
     samples=[q for q in foreign if q['name'].split('-')[0] in selectors]+[extra[-1]]
     bystage={}
-    for k in ('base','indexed'):
+    for k in ('base','active','indexed'):
         target.write_bytes(imgs[k]);rows={}
         for q in samples:
             for opt in range(5):
@@ -71,7 +76,7 @@ try:
                 assert len(raw)==4 and raw[0]>0
                 rows[q['name']+'/'+str(opt)]=raw
         bystage[k]=rows
-    assert bystage['base']==bystage['indexed'] and len(bystage['base'])>=10
+    assert bystage['base']==bystage['active']==bystage['indexed'] and len(bystage['base'])>=10
     save('raw-records',bystage)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
     save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output([cc,'--version'],text=True),images=ids,osrel=osrel,machine=platform.machine(),cc=cc))

@@ -1,7 +1,7 @@
-name: Measure bounded alias lookup on nine ISAs using real ELF, Xtensa libc and PE controls
+name: Compare real alias users with bounded SystemZ and Xtensa register spelling in nine architectures
 on:
   push:
-    branches: [codex/capstone-nine-arch-alias-blocks]
+    branches: [codex/capstone-active-aliases-and-register-text]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alias-blocks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: active-alias-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
