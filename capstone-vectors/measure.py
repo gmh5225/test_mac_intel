@@ -86,10 +86,10 @@ def main(w):
             patch=r/(label+'.patch');assert sha(patch)==data['patch_sha256' if label=='integrated' else 'scalar_sha256']
             run(['git','-C',base,'apply','--index',patch],'apply-'+label)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
-        flags={f:sorted({Path(v['file']).name for v in json.loads((b/'compile_commands.json').read_text())if '-D'+f in v['command'].split() or '-D'+f+'=1' in v['command'].split()}) for f in ('CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS','CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
-        assert flags=={'CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS':['MipsMapping.c'],'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':['MipsInstPrinter.c'],'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':['X86Sse64Output.c']}
-        save('flags-'+label+'.json',flags)
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
+        flags={f:sorted({Path(v['file']).name for v in json.loads((b/'compile_commands.json').read_text())if '-D'+f in v['command'].split() or '-D'+f+'=1' in v['command'].split()}) for f in ('CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS','CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
+        assert flags=={'CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS':['MipsMapping.c'],'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':['MipsInstPrinter.c'],'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':(['X86Sse64Output.c'] if label=='baseline' else ['X86BatchScan.c','X86Sse64Output.c'])}
+        save('flags-'+label+'.json',flags)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
         if label=='integrated':
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'raw64.cpp',b/'libcapstone.a','-o',w/'raw64'],'build-guard64')

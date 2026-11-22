@@ -1,18 +1,45 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 77d1aaa8..5fdf3e07 100644
+index 77d1aaa8..c2d2dc10 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1046,7 +1046,7 @@ set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
- 
- # The i386 iterator is an internal static-link entry used by NeverD.
- if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
--    add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
-+    add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c arch/X86/X86BatchScan.c)
+@@ -1049,7 +1049,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
      target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
      set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-     add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
+-    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
++    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c arch/X86/X86BatchScan.c)
+     target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
+     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+@@ -1058,10 +1058,24 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+ endif()
+ 
+ if(CAPSTONE_BUILD_STATIC_LIBS)
+-    add_library(capstone_static STATIC $<TARGET_OBJECTS:capstone>)
++    set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
+     if(TARGET capstone_x86_iter32)
+-        target_sources(capstone_static PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
++        if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++           AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
++            # The alias parser is referenced by backend objects, so an archive
++            # linker may extract it after directly referenced private iterators.
++            # Keep that parser before the optional batch tables in either case.
++            set(capstone_static_objects
++                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/AliasMapping[.]c[.]o$>"
++                $<TARGET_OBJECTS:capstone_x86_iter32>
++                "$<FILTER:$<TARGET_OBJECTS:capstone_x86_iter64>,EXCLUDE,/X86BatchScan[.]c[.]o$>"
++                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>"
++                "$<FILTER:$<TARGET_OBJECTS:capstone_x86_iter64>,INCLUDE,/X86BatchScan[.]c[.]o$>")
++        else()
++            list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
++        endif()
+     endif()
++    add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+     set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")
+     if(MSVC AND CAPSTONE_BUILD_SHARED_LIBS)
 diff --git a/Makefile b/Makefile
-index b8b582a0..336293f0 100644
+index b8b582a0..ea8f85dc 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -278,7 +278,7 @@ endif
@@ -20,16 +47,16 @@ index b8b582a0..336293f0 100644
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
 -	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o
-+	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86BatchScan.o
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
  
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
 new file mode 100644
-index 00000000..84dd75fd
+index 00000000..39e06690
 --- /dev/null
 +++ b/arch/X86/X86BatchScan.c
-@@ -0,0 +1,305 @@
+@@ -0,0 +1,306 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -52,6 +79,7 @@ index 00000000..84dd75fd
 +#include "X86GenBatchPrimary.inc"
 +#include "X86FeatureExtension.h"
 +#ifdef X86_EVEX_REGISTER_SCAN
++#define X86_EVEX_SCAN_RODATA ".cs_x86_native_batch_rodata"
 +#include "X86EvexScanPlan.h"
 +#endif
 +
@@ -437,17 +465,21 @@ index ccaec06a..7b8535ac 100644
  }
 diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
 new file mode 100644
-index 00000000..3c42941c
+index 00000000..af85a328
 --- /dev/null
 +++ b/arch/X86/X86EvexScanPlan.h
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,71 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#ifndef CS_X86_EVEX_SCAN_PLAN_H
 +#define CS_X86_EVEX_SCAN_PLAN_H
 +#include "X86EvexAdmission.h"
++#ifndef X86_EVEX_SCAN_RODATA
++#define X86_EVEX_SCAN_RODATA ".cs_x86_evex_scan_rodata"
++#endif
 +#include "X86GenEvexScan.inc"
++#undef X86_EVEX_SCAN_RODATA
 +
 +/* Callers provide six bytes of bare EVEX in 64-bit mode. Return the same
 + * generated public ID and extent to the ordinary and batch scan entries. */
@@ -812,19 +844,29 @@ index 00000000..a9b0138c
 +};
 +#endif
 diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
-index 80cda582..9c47f0ba 100644
+index 80cda582..fe668f2f 100644
 --- a/arch/X86/X86GenEvexScan.inc
 +++ b/arch/X86/X86GenEvexScan.inc
-@@ -1,5 +1,5 @@
+@@ -1,11 +1,11 @@
  /* Generated by suite/synctools/x86_vector_output.cpp. */
 -enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };
 +enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129, EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };
  struct EvexScanPlan {
  	uint8_t map, length;
  	uint16_t ids[2][3];
-@@ -24,8 +24,8 @@ static const struct EvexScanPlan evex_scan_plans[]
+ };
+ static const struct EvexScanPlan evex_scan_plans[]
+-	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	__attribute__((section(X86_EVEX_SCAN_RODATA))) = {
+ 	{ 0 },
+ 	{ 1, 6, { { X86_INS_VPXORD, X86_INS_VPXORD, X86_INS_VPXORD }, { X86_INS_VPXORQ, X86_INS_VPXORQ, X86_INS_VPXORQ } } },
+ 	{ 1, 6, { { X86_INS_VPADDD, X86_INS_VPADDD, X86_INS_VPADDD }, { 0, 0, 0 } } },
+@@ -22,10 +22,10 @@ static const struct EvexScanPlan evex_scan_plans[]
+ 	{ 3, 7, { { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ } } },
+ };
  static const uint8_t evex_scan_index[256]
- 	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
+-	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	__attribute__((section(X86_EVEX_SCAN_RODATA))) = {
  	3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 -	0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 129, 9, 0, 0, 0, 0,
 -	0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1759,7 +1801,7 @@ index cdc59ba3..f488989f 100644
      ]
      generated = [(path, generated_output(emit)) for path, emit in outputs]
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 9dc7d8eb..d5d34ef6 100644
+index 9dc7d8eb..b6af0e23 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
 @@ -919,29 +919,42 @@ void emit_vex_registers(Decoder &decoder)
@@ -1813,7 +1855,7 @@ index 9dc7d8eb..d5d34ef6 100644
  								bytes[5] = uint8_t(modrm);
  								const unsigned mod = modrm >> 6, rm = modrm & 7;
  								const bool sib = mod < 3 && rm == 4;
-@@ -991,11 +1004,14 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+@@ -991,13 +1004,16 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
  			throw std::runtime_error("EVEX scan opcode plan collision");
  		index[key & 255] = plan;
  	}
@@ -1828,8 +1870,20 @@ index 9dc7d8eb..d5d34ef6 100644
 +	index[0x28] = index[0x29] = 131;
 +	std::puts("enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129, EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };");
  	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
- 	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
+-	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
++	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(X86_EVEX_SCAN_RODATA))) = {\n\t{ 0 },");
  	for (const auto &[key, widths] : ids) {
+ 		const auto &form = descriptions.at(key);
+ 		std::printf("\t{ %u, %u, { ", form.map, 6 + form.immediate);
+@@ -1013,7 +1029,7 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 		}
+ 		std::puts(" } },");
+ 	}
+-	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {");
++	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(X86_EVEX_SCAN_RODATA))) = {");
+ 	for (unsigned i = 0; i < index.size(); i += 16) {
+ 		std::printf("\t");
+ 		for (unsigned j = 0; j < 16; ++j)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index 7781ca39..a29ada5d 100644
 --- a/tests/unit/x86_simple_output.c
