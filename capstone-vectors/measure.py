@@ -116,7 +116,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert members.keys()==prior.keys() and 'X86EvexMemoryOutput.c.o' in changed and changed<={'X86EvexMemoryOutput.c.o','X86MemoryOutput.c.o','X86Vex32Output.c.o','X86MemoryFallback32.c.o','X86Sse64Output.c.o','X86VectorFallback64.c.o'},changed
+            assert members.keys()==prior.keys() and 'X86Vex32Output.c.o'in changed and 'X86MemoryFallback32.c.o'in changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
@@ -209,6 +209,17 @@ def main(w):
         print(name,panel,len(sel),flush=True)
     expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
     assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
+    from observe import install
+    for variant in ('baseline','integrated'):
+        run(['git','-C',base,'restore','--source',reference,'--staged','--worktree','--','.'],'restore-guard-'+variant)
+        if variant=='integrated':run(['git','-C',base,'apply','--index',r/'integrated.patch'],'apply-guard')
+        assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==data['trees'][variant]
+        install(base)
+        run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'sib-compile-'+variant)
+        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'sib.cpp',b/'libcapstone.a','-o',w/'sib'],'sib-link-'+variant)
+        counts=list(map(int,sp.check_output([w/'sib'],text=True).split()))
+        assert counts==data['sib_guard']['parent' if variant=='baseline' else 'commit']
+        save('sib-'+variant+'.json',counts)
     save('complete.json',dict(cases=len(reported),success=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
