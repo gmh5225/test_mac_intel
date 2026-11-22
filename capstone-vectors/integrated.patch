@@ -1,18 +1,27 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..e141459c 100644
+index 12428fff..e48aa18b 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3292,6 +3292,71 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
- X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 					 uint8_t prefix, X86ScanResult *result);
+@@ -3673,6 +3673,83 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 	return initial;
+ }
  
 +#ifndef CAPSTONE_X86_REDUCE
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_i386_scan" rodata = \
++	".cs_x86_i386_scan_constants"
++#endif
 +#define X86_DEFINE_VEX2_PUBLIC_PLANS
 +#include "X86GenVexPublicPlans.inc"
 +#undef X86_DEFINE_VEX2_PUBLIC_PLANS
 +
 +/* Every admitted plan has the same public ID, reserved-vvvv rule and
 + * immediate extent as all of its canonical ModR/M outcomes. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
 +static uint32_t readVex2Scan32(const uint8_t *code, size_t size)
 +{
 +	if (size < 3 || (code[1] & 0xc0) != 0xc0)
@@ -69,34 +78,51 @@ index 12428fff..e141459c 100644
 +		return 0;
 +	return ((plan >> 3) << 8) | end;
 +}
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = "" rodata = ""
++#endif
 +#endif
 +
- /* Only generic and extension decoding need an MCInst in the core scan path. */
- #if defined(_MSC_VER)
- __declspec(noinline)
-@@ -3379,6 +3444,22 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
- 			return true;
- 		}
- 	}
-+#endif
+ X86_DECODE_INLINE bool
+ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 				     size_t code_len, cs_insn *insn,
+@@ -3717,10 +3794,32 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	if (opcodeOffset && opcodeOffset != SIZE_MAX)
+ 		return decodeLegacyPrefixedResult(ud, code, code_len, insn,
+ 						  result);
+-	if (code_len && (code[0] == 0xc4 || code[0] == 0xc5) &&
+-	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+-		return decodeVexTerminalResult(ud, code, code_len, insn, result,
+-					       opcode);
++	if (code_len && (code[0] == 0xc4 || code[0] == 0xc5)) {
++		if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
++			return decodeVexTerminalResult(ud, code, code_len, insn,
++						       result, opcode);
 +#ifndef CAPSTONE_X86_REDUCE
-+	/* Bare VEX2 in 32-bit mode shares its escape with LDS. Only complete
-+	 * generated operand plans can supply the public ID and byte extent. */
-+	if (opcode == 0xc5 && handle->mode == CS_MODE_32 && code_len &&
-+	    code[0] == 0xc5 && handle->insn_id == X86_get_insn_id &&
-+	    handle->disasm == X86_getInstruction) {
-+		const uint32_t packed = readVex2Scan32(code, code_len);
-+		if (packed) {
-+			result->opcode = 0;
-+			result->opcode_pub = packed >> 8;
-+			result->length = (uint16_t)(packed & 0xff);
-+			result->popcode_adjust = 0;
-+			return true;
++		/* Only bare VEX2 in i386 mode can use these generated public
++		 * records. An installed adapter retains its original priority. */
++		if (opcode == 0xc5 && code[0] == 0xc5 &&
++		    handle->mode == CS_MODE_32 &&
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++		    !(handle->x86_scan_adapter &&
++		      handle->x86_scan_adapter_mode == handle->mode) &&
++#endif
++		    handle->insn_id == X86_get_insn_id &&
++		    handle->disasm == X86_getInstruction) {
++			uint32_t packed = readVex2Scan32(code, code_len);
++			if (packed) {
++				result->opcode = 0;
++				result->opcode_pub = packed >> 8;
++				result->length = (uint16_t)(packed & 0xff);
++				result->popcode_adjust = 0;
++				return true;
++			}
 +		}
++#endif
 +	}
- #endif
- 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
- 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+ 	return decodeScanResultFallback(ud, code, code_len, insn, result,
+ 					opcode, false);
+ }
 diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
 new file mode 100644
 index 00000000..7817a761
