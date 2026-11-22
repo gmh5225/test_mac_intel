@@ -1,7 +1,7 @@
-name: Attribute work per instruction for released native public and fixed iterators and iced FastFormatter
+name: Attribute actual scan and output work for four public reader placements and fork iced
 on:
   push:
-    branches: [codex/profile-published-and-public-formatter]
+    branches: [codex/trace-public-reader-work]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -48,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-formatter-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-reader-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

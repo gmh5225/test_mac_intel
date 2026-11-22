@@ -95,7 +95,7 @@ def main(w):
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
-        if key in ('word','project','single'):
+        if key!='release':
             patch=r/(('project' if key=='single' else key)+'.patch');assert sha(patch)==z['sha256']
             run(['git','apply','--index',patch],'apply-'+key,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
@@ -128,7 +128,7 @@ def main(w):
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
         if key=='project':
-            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-DX86_disasmRecordIter=observed_disasm_record_iter','-DX86_readScanWord=observed_read_scan_word','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-DX86_disasmRecordIter=observed_disasm_record_iter','-DX86_readScanWord=observed_read_scan_word','-DX86_disasmProjected32=observed_scan32','-DX86_disasmProjected64=observed_scan64','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
                 run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/(name+'.cpp'),w/'plan.o',lib,'-o',w/name],'compile-'+name)
                 run([w/name],'oracle-'+name)
@@ -155,18 +155,18 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         save(name+'-input.json',dict(extent_sha256=sha(intervals),text_sha256=sha(f),extents=len(selected)))
         from costs import profile
-        for mode in (1,2,4):
-            variants=[('private','release','x86_len_'),('public','release','capstone'),('fixed','project','capstone')]
-            if mode!=4:variants.append(('iced','release','fast____'))
-            seen=[]
+        for mode in (0,1,2):
+            variants=([(q,q,'capstone')for q in trees]+[('batch','release','vecbatch'),('iced','release','iced____')] if mode==0 else [(q,q,'capstone')for q in ('word','thin','project')]+[('native','release','x86_len_'),('iced','release','fast____')])
+            signatures={}
             for label,key,engine in variants:
                 target=evidence/label;target.mkdir(exist_ok=True)
                 row=profile(bins[key],engine,mode,bits,f,intervals,w,target,name)
                 row.update(engine=label,binary_engine=engine)
-                results.append(row);seen.append(row['raw_signature'])
-            assert len({tuple(z[:3])for z in seen})==1 and len({tuple(z)for z in seen[:3]})==1
+                results.append(row);signatures[label]=row['raw_signature']
+            assert len({tuple(z[:3])for z in signatures.values()})==1
+            assert len({tuple(z)for label,z in signatures.items()if label not in ('iced','batch')})==1
             save('profile.json',results)
-    assert len(results)==11*len(m['samples'])
+    assert len(results)==17*len(m['samples'])
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
