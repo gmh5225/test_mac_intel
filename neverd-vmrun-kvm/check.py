@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import struct
 import subprocess
 
@@ -49,6 +50,57 @@ def discover():
     return report
 
 
+def generated_fault_origin(directory, guest, pc):
+    """Prove the fault belongs to the NeverD step's native VMRUN intrinsic."""
+    elf = directory / guest["source_elf"]
+    if hashlib.sha256(elf.read_bytes()).hexdigest() != guest["source_elf_sha256"]:
+        raise ValueError("The generated guest ELF digest changed")
+    output = subprocess.run(["nm", "-S", "-n", elf], capture_output=True,
+                            text=True, check=True).stdout
+    symbols = {}
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) == 4 and fields[-1] in ("neverd_step_v10_1010",
+                                               "__llvm_x86_vmrun_context.1"):
+            symbols[fields[-1]] = (int(fields[0], 16), int(fields[1], 16))
+    if len(symbols) != 2:
+        raise ValueError("The generated VMRUN step or intrinsic symbol is missing")
+    start, size = symbols["__llvm_x86_vmrun_context.1"]
+    if not start <= pc < start + size:
+        raise ValueError("The guest fault did not occur in the generated intrinsic")
+    step, step_size = symbols["neverd_step_v10_1010"]
+    disassembly = subprocess.run(["objdump", "-d",
+                                  "--disassemble=neverd_step_v10_1010", elf],
+                                 capture_output=True, text=True, check=True).stdout
+    calls = [line for line in disassembly.splitlines()
+             if re.search(r"\bcall\s+[0-9a-f]+ <__llvm_x86_vmrun_context\.1>", line)]
+    if len(calls) != 1:
+        raise ValueError("The original NeverD VMRUN step has no unique intrinsic call")
+    call_pc = int(calls[0].split(":", 1)[0].strip(), 16)
+    if not step <= call_pc < step + step_size:
+        raise ValueError("The intrinsic call is outside the NeverD VMRUN step")
+    complete_disassembly = subprocess.run(["objdump", "-d", elf],
+                                          capture_output=True, text=True,
+                                          check=True).stdout
+    owners = [line for line in complete_disassembly.splitlines()
+              if re.search(r"\bcall\s+[0-9a-f]+ <__llvm_x86_vmrun_context\.1>", line)]
+    if len(owners) != 1 or owners[0] != calls[0]:
+        raise ValueError("The native VMRUN helper has another direct caller")
+    fault_instruction = subprocess.run(["objdump", "-d",
+                                        "--start-address=" + hex(pc),
+                                        "--stop-address=" + hex(pc + 4), elf],
+                                       capture_output=True, text=True, check=True).stdout
+    if not re.search(r"^\s*" + format(pc, "x") +
+                     r":\s+67 0f 01 d8\s+addr32 vmrun\b", fault_instruction,
+                     re.MULTILINE):
+        raise ValueError("The generated fault site is not addr32 VMRUN")
+    return {"source_elf_sha256": guest["source_elf_sha256"],
+            "step": "neverd_step_v10_1010", "step_call_pc": hex(call_pc),
+            "intrinsic": "__llvm_x86_vmrun_context.1",
+            "intrinsic_range": [hex(start), hex(start + size)],
+            "fault_pc": hex(pc), "fault_bytes": "670f01d8"}
+
+
 def run_guest(directory, guest, runner, kvm_fd):
     image = directory / guest["image"]
     digest = hashlib.sha256(image.read_bytes()).hexdigest()
@@ -80,17 +132,28 @@ def run_guest(directory, guest, runner, kvm_fd):
                          for event in trace))
     completed = (observed_rcx and run.returncode == 33 and
                  console.splitlines() == guest["expected_console"] and mapped_addr32)
+    generated_origin = None
+    fault = next((event for event in trace if event["event"] == "exception"), None)
+    if guest["vmcb_input"] == "tagged" and guest["route"] != "original" and fault:
+        try:
+            generated_origin = generated_fault_origin(directory, guest,
+                                                      int(fault["pc"], 0))
+        except (OSError, ValueError, subprocess.CalledProcessError) as error:
+            diagnostic.append(str(error))
     tagged_rax = 0xfedcba9800000000 | int(guest["vmcb"], 0)
     tagged_fault = (guest["vmcb_input"] == "tagged" and run.returncode == 1 and
                     (guest["route"] != "original" or observed_rcx) and
-                    any(event["event"] == "exception" and event["vector"] == 13
-                        and event["error"] == "0" and event["bytes"] == "670f01d8"
-                        and int(event["rax"], 0) == tagged_rax for event in trace))
+                    fault is not None and fault["vector"] == 13 and
+                    fault["error"] == "0" and fault["bytes"] == "670f01d8" and
+                    int(fault["rax"], 0) == tagged_rax and
+                    (int(fault["pc"], 0) == int(guest["breakpoints"][2], 0)
+                     if guest["route"] == "original" else generated_origin is not None))
     return dict(receipt, return_code=run.returncode, completed=completed,
                 mapped_addr32_observed=mapped_addr32,
                 tagged_addr32_gp=tagged_fault,
                 completed_contexts=guest["contexts"] if completed else 0, console=console,
-                diagnostic="\n".join(diagnostic), trace=trace, observed_original_rcx=observed_rcx)
+                diagnostic="\n".join(diagnostic), trace=trace, observed_original_rcx=observed_rcx,
+                generated_fault_origin=generated_origin)
 
 
 def main():
