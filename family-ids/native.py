@@ -115,13 +115,13 @@ try:
                     cycles.append(cyc)
                 timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
                 write('timings',timing)
-        if cc=='clang' and platform.machine()=='x86_64':
+        if platform.machine()=='x86_64':
             import re
             name,bits,path,ip=next(z for z in other_cases if z[0]=='riscv64-sort')
             stats={}
             for libname in ('base','candidate'):
                 target.write_bytes(inputs[libname]);profile=tmp/('callgrind-'+libname)
-                run([*bind,'valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(profile),tmp/'time',str(bits),'0',path,str(ip),'1'],'trace-'+libname)
+                run([*bind,'valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(profile),tmp/'time',str(bits),'2' if cc=='gcc' else '0',path,str(ip),'1'],'trace-'+libname)
                 raw=profile.read_text();events=re.search(r'^events: (.+)$',raw,re.M)[1].split();totals=re.search(r'^totals: (.+)$',raw,re.M)[1].split()
                 stats[libname]=dict(zip(events,map(int,totals)))
                 run(['callgrind_annotate','--show=Ir,Bc,Bcm,D1mr,D1mw','--auto=no','--threshold=99.95',profile],'functions-'+libname)

@@ -1,8 +1,8 @@
 diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index 4190862e..1726adaa 100644
+index 64ee3a95..8e741a9c 100644
 --- a/arch/RISCV/RISCVDisassembler.c
 +++ b/arch/RISCV/RISCVDisassembler.c
-@@ -581,15 +581,17 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+@@ -579,15 +579,17 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
  // isn't explicitly encoded in the instruction.
  void addSPOperands(MCInst *MI)
  {
@@ -25,7 +25,7 @@ index 4190862e..1726adaa 100644
  			MCInst_insert0(MI, i, &SPReg);
  }
  
-@@ -775,7 +777,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+@@ -773,7 +775,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
  	DecodeStatus ret =
  		RISCV_getInstruction(MI, Size, Bytes, ByteLen, Address, NULL);
  

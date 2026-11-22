@@ -1,7 +1,7 @@
-name: Check RISC-V positional stack operand construction and measure real scan and detail costs
+name: Replicate compressed RISC-V operands on the new shipping headers and profile GCC detail construction
 on:
   push:
-    branches: [codex/capstone-riscv-implied-position]
+    branches: [codex/capstone-riscv-stack-operands-repeat]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,10 +31,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3458b2498e513a5c37d32f71db0909f8f75dd7c4
+          ref: 9615f6450fb7c47dad85a76cd89ad246c6962de3
           path: source
           persist-credentials: false
-      - if: matrix.flavor == 'full' && matrix.cc == 'clang' && matrix.host != 'ubuntu-24.04-arm'
+      - if: matrix.flavor == 'full' && matrix.host != 'ubuntu-24.04-arm'
         run: command -v valgrind || (sudo apt-get update -qq && sudo apt-get install -y valgrind)
       - run: python3 -B family-ids/native.py
       - if: always()
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: implied-positions-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: shipped-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
