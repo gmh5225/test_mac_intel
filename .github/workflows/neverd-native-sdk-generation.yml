@@ -56,7 +56,8 @@ jobs:
             foreach ($provider in $lib.providers) {
               if ($provider.name -eq 'RDBSS') { $selected['RDBSS']=$provider.metadata.cpp_header_bridge.verified_functions.Count }
               if ($provider.name -in @('InternetControlMessage','TransactionManager','SensorUtilities','WebAuthentication','SNMPUtilities','WebAuthenticationRuntime','EventCollector','DeviceManagementRegistration','NetworkTrafficControl','ComputeStorage')) {
-                $selected[$provider.name]=$provider.metadata.sdk_import_bridge.published_abi.verified_functions.Count
+                $bridge = if ($provider.name -eq 'WebAuthenticationRuntime') { $provider.metadata.sdk_runtime_bridge } else { $provider.metadata.sdk_import_bridge }
+                $selected[$provider.name]=$bridge.published_abi.verified_functions.Count
               }
             }
           }
