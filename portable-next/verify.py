@@ -33,6 +33,7 @@ endif()
         data=sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+stage+'.patch'])
         assert sha(data)==m[stage]['sha256'];patch=t/'input.patch';patch.write_bytes(data)
         g('apply','--index',str(patch));assert g('write-tree')==m[stage]['tree']
+        run('mapping-counts-'+stage,['python','-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
         for profile,flags in profiles.items():
             if profile != os.environ['SCAN_PROFILE']:continue
             b=t/profile;units=['x86_mapping_counts','x86_scan_batch','x86_reg_access','x86_encoding_accuracy']
