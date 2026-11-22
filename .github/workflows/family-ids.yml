@@ -1,7 +1,7 @@
-name: Test generated mode-dependent timestamp and vector implicit writes on real PE and RISC-V
+name: Measure mode-selected VZERO mappings on real PE32 and non-x86 workloads
 on:
   push:
-    branches: [codex/mode-write-metadata]
+    branches: [codex/vzero-mode-lookup]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
+          ref: 771f67c4d5bbb9e3528279edea0518cdc2828bca
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mode-write-metadata-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: vzero-mode-lookup-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
