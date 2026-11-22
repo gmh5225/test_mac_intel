@@ -53,11 +53,14 @@ try:
         imgs[k]=so.read_bytes()
         if cc=='clang':
             cmd('alias-static-'+k,['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-            cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'spans.c',b/'libcapstone.a','-o',t/'spans'])
+            cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/('spans.c' if k=='base' else 'spans-fixed.c'),b/'libcapstone.a','-o',t/'spans'])
             cmd('spans-'+k,[t/'spans'])
             cmd('alias-compile-'+k,[cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_AARCH64','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'alias.c',b/'libcapstone.a','-o',t/'alias'])
             cmd('alias-oracle-'+k,[t/'alias'])
             assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
+        if k!='base':
+            cmd('regression-build-'+k,['cmake','--build',b,'--parallel','4','--target','systemz_register_dialects'])
+            cmd('regression-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_systemz_register_dialects$'])
         if k=='indexed':
             names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
