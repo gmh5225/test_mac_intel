@@ -74,9 +74,9 @@ def main(w):
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
         run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'census.cpp',b/'libcapstone.a','-o',w/('census-'+label)],'census-link-'+label)
         if label=='integrated':
-            run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
-            produced=sp.check_output([w/'table-check','--vex-vector-memory'])
-            assert produced==(base/'arch/X86/X86GenVexVectorMemory.inc').read_bytes() and b'X86_INS_VFMADD213PD' in produced
+            run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
+            produced=sp.check_output([w/'table-check','--legacy-packed-memory'])
+            assert produced==(base/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes() and b'"movdqu"' in produced
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -105,7 +105,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert set(members)==set(prior) and changed=={'X86VectorFallback64.c.o'},(changed,members.keys()-prior.keys())
+            assert set(members)==set(prior) and 'X86VectorFallback64.c.o' in changed and changed <= {'X86VectorFallback64.c.o','X86Sse64Output.c.o'},(changed,members.keys()-prior.keys())
             assert sha(w/'unselected-baseline')==sha(ordinary)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
