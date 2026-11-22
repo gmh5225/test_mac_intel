@@ -66,6 +66,7 @@ def main(w):
     assert inc.count(anchor)==1;inc=inc.replace(anchor,'else if(engine=="vecbatch" && X86_scanBatch32) row=batch_span<false,X86_scanBatch32>(bytes.data()+f.offset,f.size,handle,insn,f.ip);\n        '+anchor)
     anchor='(void)batch_span<true>(ptr,f.size,handle,insn,f.ip);'
     assert inc.count(anchor)==1;inc=inc.replace(anchor,anchor+'\n      if(X86_scanBatch32)(void)batch_span<true,X86_scanBatch32>(ptr,f.size,handle,insn,f.ip);')
+    inc=inc.replace('engine=="vecbatch" && X86_scanBatch32','engine=="vecbatch" && bits==32 && X86_scanBatch32').replace('else if(engine=="batch___") row=batch_span<false>', 'else if(engine=="batch___" || engine=="vecbatch") row=batch_span<false>')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
