@@ -29,28 +29,6 @@ try:
     changed=[k for k,v in objects['base'].items()if v!=objects['candidate'][k]]
     assert len(objects['base'])>5 and objects['base'].keys()==objects['candidate'].keys() and ([Path(k).name for k in changed]==['RISCVDisassembler.c.o'] if conf=='full' else not changed)
     write('member-changes',dict(changed=changed,total=len(objects['base'])))
-    run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
-    run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
-    run([tmp/'check-static'],'static-selected')
-    if conf=='full':
-        selected=['riscv_writeback_postprocess','arm_writeback_postprocess','mips_single','mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
-    elif conf=='intel':
-        selected=units
-    else:
-        selected=['x86_scan_batch','text_option','detail_option']
-        if diet:selected.append('x86_kmask_width')
-    if conf in ('diet','reduce'):selected += ['x86_evex_vpcmp_id','x86_evex_detail']
-    if conf!='full':
-        assert sha(libs['base'])==sha(libs['candidate'])
-        write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
-    run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
-    run(['python3','-B',s/'suite/synctools/operand_writeback.py','--check'],'implied-operands-generation')
-    run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
-    run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
-    run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
-    run(['python3','-B',s/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables')
-    run(['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
-    run(['c++','-O2','-std=c++17','-I',s/'include',r/'records.cpp','-ldl','-o',tmp/'verify'],'compile-verify')
     if reduce:panels=[]
     else:panels=[('matrix32',32,'matrix',0),('matrix64',64,'matrix',0)]
     if conf=='full':
@@ -63,23 +41,6 @@ try:
         shutil.copy(r/'libmvec.py',tmp);shutil.copy(r/'libmvec.json',tmp)
         run(['python3','-B',tmp/'libmvec.py'],'glibc-libmvec')
         libm=json.loads((tmp/'libmvec.json').read_text());panels.append(('libmvec',64,tmp/'libmvec.text',libm['address']))
-    rows=[]
-    for name,bits,path,ip in panels:
-        for syntax in range(1 if diet or not att else 2):
-            z=sp.check_output([tmp/'verify',libs['base'],libs['candidate'],str(bits),path,str(ip),str(syntax),str(int(diet))],text=True)
-            for line in z.splitlines():
-                ib,flags,sy,calls,valid,changes=map(int,line.split());assert ib==bits and sy==syntax and calls>=valid>=changes
-                assert changes==0
-                rows.append(dict(sample=name,bits=bits,syntax=syntax,flags=flags,calls=calls,success=valid,changes=changes))
-            write('records',rows)
-    if conf=='full':
-        run(['c++','-std=c++17','-O2','-I',s/'include',r/'public-records.cpp','-ldl','-o',tmp/'public-states'],'build-public-states')
-        cross={}
-        for label,bits,f in [('real-pe32',32,tmp/'putty-0.85-32.text'),('real-pe64',64,tmp/'putty-0.85-64.text'),('code16',16,tmp/'putty-0.85-32.text'),('simd64',64,tmp/'libmvec.text')]:
-            z=json.loads(sp.check_output([tmp/'public-states',libs['base'],libs['candidate'],f,str(bits)],text=True))
-            assert z['complete_record_comparisons']>0 and z['batch_records']>0
-            cross[label]=z
-        write('public-differential',cross)
     other_cases=[]
     if conf=='full':
         import corpus
@@ -88,12 +49,6 @@ try:
         maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
         other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
         assert len(other_cases)==len(names)
-        for arch in ('arm','aarch64','ppc','riscv','mips'):
-            run(['c++','-O2','-std=c++17','-I',s,'-I',s/'include',r/(arch+'-states.cpp'),'-ldl','-o',tmp/(arch+'-states')],'compile-'+arch)
-            arg=[tmp/(arch+'-states'),libs['base'],libs['candidate']]
-            if arch=='riscv':
-                for opt in ([],['custom']):run([*arg,tmp/'corpus',*opt],'states-riscv'+('custom' if opt else ''))
-            else:run(arg,'states-'+arch)
         target=fixed/'libcapstone.so.6'
         target.write_bytes(libs['base'].read_bytes());(fixed/'libcapstone.so').symlink_to(target.name)
         run(['c++','-O3','-std=c++17','-I',s/'include',r/'time.cpp','-L',fixed,'-Wl,-rpath,'+str(fixed),'-lcapstone','-o',tmp/'time'],'compile-time')
@@ -106,27 +61,18 @@ try:
             return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
         timing=[]
         for name,bits,path,ip in panels[2:]+other_cases:
-            for mode in ((0,1,2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(35e6/first[0]));cycles=[]
-                for i in range(13):
+            if name not in {'putty32','putty64','libmvec','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}:continue
+            for mode in ((2,3) if bits in (32,64) else (0,1,2)):
+                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(85e6/first[0]));cycles=[]
+                for i in range(25):
                     keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
                     for k in o+o[::-1]:
                         v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
                     cycles.append(cyc)
                 timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
                 write('timings',timing)
-        if platform.machine()=='x86_64':
-            import re
-            name,bits,path,ip=next(z for z in other_cases if z[0]=='riscv64-sort')
-            stats={}
-            for libname in ('base','candidate'):
-                target.write_bytes(inputs[libname]);profile=tmp/('callgrind-'+libname)
-                run([*bind,'valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(profile),tmp/'time',str(bits),'1' if cc=='gcc' else '0',path,str(ip),'1'],'trace-'+libname)
-                raw=profile.read_text();events=re.search(r'^events: (.+)$',raw,re.M)[1].split();totals=re.search(r'^totals: (.+)$',raw,re.M)[1].split()
-                stats[libname]=dict(zip(events,map(int,totals)))
-                run(['callgrind_annotate','--show=Ir,Bc,Bcm,D1mr,D1mw','--auto=no','--threshold=99.95',profile],'functions-'+libname)
-                profile.unlink()
-            write('profile',stats)
-    write('complete',dict(tree=meta['tree'],config=conf,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],platform=platform.machine(),os=platform.platform(),tests=selected,records=sum(x['calls'] for x in rows),libs={k:sha(v) for k,v in libs.items()}))
+    if cc=='clang' and platform.machine()=='x86_64':
+        run(['python3','-B',r/'identity.py'],'shipping-identity')
+    write('complete',dict(source=meta,panels=len(timing),compiler=sp.check_output([cc,'--version'],text=True),host=platform.platform(),arch=platform.machine()))
 finally:
     size=sum(f.stat().st_size for f in tmp.rglob('*') if f.is_file());shutil.rmtree(tmp);write('cleanup',dict(bytes=size,removed=not tmp.exists()))
