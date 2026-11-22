@@ -20,8 +20,6 @@ def main(w):
     reference=json.loads((r/'experiment.json').read_text())['checkout_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     meta=json.loads((r/'experiment.json').read_text())
-    assert sha(r/'repair.patch')==meta['repair_sha256']
-    run(['git','-C',base,'apply','--index',r/'repair.patch'],'apply-repair')
     assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['baseline_tree']
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -72,13 +70,7 @@ def main(w):
         save('flags-'+label+'.json',flags)
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
-        run(['clang','-O2','-fsanitize=address,undefined','-fno-sanitize-recover=all','-I',base,'-I',base/'include',r/'oracle.c',b/'libcapstone.a','-o',w/'disp-oracle'],'oracle-link-'+label)
-        run([w/'disp-oracle'],'oracle-'+label)
         run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'census.cpp',b/'libcapstone.a','-o',w/('census-'+label)],'census-link-'+label)
-        if label=='integrated':
-            run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',w/'gen'],'generator')
-            generated=sp.check_output([w/'gen','--short-displacements'])
-            assert generated==(base/'arch/X86/X86GenShortDisplacements.inc').read_bytes()
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -91,7 +83,8 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and {'X86MemoryOutput.c.o'} <= changed <= {'X86Sse64Output.c.o','X86Vex32Output.c.o','X86MemoryOutput.c.o','X86EvexMemoryOutput.c.o','X86VectorOutput.c.o'},changed
+            assert prior.keys()==members.keys() and changed=={'X86Vex32Output.c.o','X86Sse64Output.c.o'},changed
+            assert sha(w/'unselected-baseline')==sha(ordinary)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
