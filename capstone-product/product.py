@@ -12,13 +12,14 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base', 'registers', 'mapping_registers', 'clear_registers'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base', 'alias', 'clear_alias', 'all'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
 try:
     build=t/'build';cases=corpus.prepare(r,t,out,command)
+    foreign=[z for z in cases if z['name'].startswith(('arm64-','mips64el-'))]
     selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls'}
     cases=[c for c in cases if c['name'] in selected]
     assert {c['name']for c in cases}==selected
@@ -39,7 +40,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base', 'registers', 'mapping_registers', 'clear_registers'):
+    for variant in ('base', 'alias', 'clear_alias', 'all'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -54,10 +55,23 @@ try:
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
+        command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
+        records={}
+        for z in foreign:
+            for option in range(5):
+                result=list(map(int,sp.check_output([t/'alias-raw','arm'if z['name'].startswith('arm64-')else 'mips',z['path'],str(option)]).split()))
+                assert len(result)==4 and result[0]>0
+                records[z['name']+'/'+str(option)]=result
+        assert len(records)>=10
+        if variant=='base':base_records=records
+        else:assert base_records==records
+        save('alias-records-'+variant,records)
+        if variant!='base':
+            command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant in ('base','registers') or v[0]=='64' else 8) for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant in ('base','alias') or v[0]=='64' else 8) for v in regs)
         if variant!='base':
             for unit in ('x86_simple_output','x86_reg_access'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
@@ -109,7 +123,7 @@ try:
         if variant !='base':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
             assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
-        if variant=='clear_registers':
+        if variant=='all':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
@@ -128,7 +142,7 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        if variant in ('registers', 'mapping_registers', 'clear_registers'):
+        if variant in ('alias', 'clear_alias', 'all'):
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
             assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
@@ -161,7 +175,7 @@ try:
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k.endswith('_registers'):wanted[-1]-=delta*n
+                    if k in ('clear_alias','all'):wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)

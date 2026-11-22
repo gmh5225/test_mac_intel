@@ -1,7 +1,7 @@
-name: Measure i386 TEST register operands and platform-independent controls in production
+name: Measure indexed alias candidates inside NeverD with issued x86 optimizations
 on:
   push:
-    branches: [codex/capstone-register-direct-test-products]
+    branches: [codex/capstone-alias-row-production]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: register-output-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: alias-row-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
