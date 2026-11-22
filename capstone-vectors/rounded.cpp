@@ -40,7 +40,7 @@ int main() {
                 ++claimed;
             }
             if(!equal){
-                std::fprintf(stderr,"VEX3 mismatch map=%u key=%u mr=%02x bytes=",map,key,mr);
+                std::fprintf(stderr,"Rounded EVEX mismatch map=%u key=%u mr=%02x bytes=",map,key,bytes[5]);
                 for(unsigned i=0;i<n;++i)std::fprintf(stderr,"%02x",p[i]);
                 std::fprintf(stderr," full=%s/%u:%u before=%x after=%x direct=%x\n",record->mnemonic,record->id,record->size,a,b,word);
                 return 5;
