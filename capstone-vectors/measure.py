@@ -88,7 +88,7 @@ def main(w):
     inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
-    darwin=platform.system()=='Darwin';bins={}
+    darwin=platform.system()=='Darwin';bins={};archives={}
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
@@ -97,13 +97,15 @@ def main(w):
             patch=r/(('project' if key=='single' else key)+'.patch');assert sha(patch)==z['sha256']
             run(['git','apply','--index',patch],'apply-'+key,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
-        build=w/('build-'+key);project=base
+        build=w/('single-config-build' if key in ('official','single') else 'mixed-config-build');project=base
+        if build.exists():shutil.rmtree(build)
         if key not in ('official','single'):
             nd=r.parent/'neverd-config';record=m['neverd']
             assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
             for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
             text=(nd/'CMakeLists.txt').read_text();a=text.index('# --- Capstone (our fork');end=text.index('# --- NeverD CMake helpers',a)
-            project=w/('project-'+key);(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
+            project=w/'mixed-config';(project/'cmake').mkdir(parents=True,exist_ok=True);(project/'third_party').mkdir(exist_ok=True)
+            if not (project/'third_party/capstone').is_symlink():(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
             shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake')
             (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+text[a:end])
         run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
@@ -115,6 +117,18 @@ def main(w):
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if key in ('official','single') else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
+        objects=[(v.relative_to(build).as_posix(),sha(v)) for v in build.rglob('*.c.o')]
+        members=sp.check_output(['ar','t',lib],text=True).splitlines()
+        archives[key]=dict(objects=dict(sorted(objects)),members=members)
+        assert members and len(objects)>20
+        if key in ('project','single'):
+            ref='release' if key=='project' else 'official'
+            src=archives[ref];dst=archives[key]
+            assert src['members']==dst['members'] and src['objects'].keys()==dst['objects'].keys()
+            changed=[k for k,h in dst['objects'].items() if h!=src['objects'][k]]
+            save('archive-'+key+'.json',dict(reference=ref,raw_members=members,changed=changed,hashes=[src['objects'],dst['objects']]))
+            if key=='project':assert not changed,changed
+            else:assert {Path(f).name for f in changed}=={'X86DisassemblerDecoder.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'},changed
         if key in ('official','single'):
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -153,11 +167,11 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
             def timed(label,count):
-                key={'official':'official','public_release':'release','public_word':'word','public_single':'single','single_release':'official'}.get(label,'project')
+                key={'official':'official','public_release':'release','public_word':'word','public_single':'single','single_release':'official','single_fixed':'single'}.get(label,'project')
                 engine={'iced':'iced____','fast':'fast____','public':'capstone','public_release':'capstone','public_word':'capstone','public_single':'capstone','single_release':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
                 return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
-            labels=['official','project','copy','public','public_word','public_release','public_single','single_release','iced']+(['fast']if mode else [])
+            labels=['official','project','copy','public','public_word','public_release','public_single','single_release','single_fixed','iced']+(['fast']if mode else [])
             for idx in range(13):
                 labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public','public_word','public_release','public_single','single_release')})==1
