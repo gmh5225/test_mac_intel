@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base', 'early', 'late', 'late_clear'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base', 'test32', 'plain', 'legacy', 'clear', 'alias_clear'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -40,7 +40,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base', 'early', 'late', 'late_clear'):
+    for variant in ('base', 'test32', 'plain', 'legacy', 'clear', 'alias_clear'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -66,12 +66,12 @@ try:
         if variant=='base':base_records=records
         else:assert base_records==records
         save('alias-records-'+variant,records)
-        if variant in ('early','late','late_clear'):
+        if variant in ('alias_clear',):
             command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant in ('base','early','late') or v[0]=='64' else 8) for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(8 if variant in ('clear','alias_clear') and v[0]!='64' else 16) for v in regs)
         if variant!='base':
             for unit in ('x86_simple_output','x86_reg_access'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
@@ -88,7 +88,7 @@ try:
             fields=ln.split(maxsplit=3)
             if len(fields)!=4 or fields[2].lower()!='t':continue
             name=fields[3]
-            if name.startswith(('cs_decode_full_insn','cs_disasm_iter','X86_disasmIter','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
+            if name.startswith(('cs_decode_full_insn','cs_disasm_iter','X86_disasmIter','X86_scanNativeBatch','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
                 symbols[name]=[int(fields[0],16),int(fields[1],16)]
         assert 'cs_disasm_iter' in symbols and any('classifyX86Prefix' in n for n in symbols)
         with binary.open('rb') as file:
@@ -97,9 +97,10 @@ try:
         members=sp.check_output(['ar','t',archive],text=True).splitlines()
         assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86MemoryFallback32.c.o') < members.index('X86BatchScan.c.o'),members
 
-        if variant.startswith('late'):
+        if variant=='alias_clear':
             assert members.index('AliasPatternLookup.c.o')>members.index('X86VectorFallback64.c.o')
         else:assert 'AliasPatternLookup.c.o' not in members
+        all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
         obj_bytes=sp.check_output(['ar','p',archive,'X86ImmediateOutput.c.o'])
@@ -108,7 +109,7 @@ try:
         assert '.text' in immediate_code
         if variant=='base':original_immediate=immediate_code
         else:assert original_immediate==immediate_code
-        save('layout-'+variant,dict(immediate_code=immediate_code,member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
+        save('layout-'+variant,dict(all_members=all_members,immediate_code=immediate_code,member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
 
         if variant!='base':
             for mode in ('32','64'):
@@ -126,7 +127,7 @@ try:
         if variant !='base':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
             assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
-        if variant=='late_clear':
+        if variant in ('clear','alias_clear'):
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
@@ -145,10 +146,18 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        if variant in ('early', 'late', 'late_clear'):
+        if variant in ('test32', 'plain', 'legacy', 'clear', 'alias_clear'):
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
             assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             assert sp.check_output([t/'table-producer','--evex-memory'])==(cs/'arch/X86/X86GenEvexMemoryOutput.inc').read_bytes()
+        if variant in ('plain','legacy','test32'):
+            options={'legacy':('--legacy-register-immediates','X86GenLegacyRegisterImmediates.inc'),'plain':('--plain-evex-registers','X86GenPlainEvexRegisterOutput.inc'),'test32':('--test32-registers','X86GenTest32Registers.inc')}
+            option,generated=options[variant];exe=t/('simple-generator' if variant=='test32' else 'table-producer')
+            assert sp.check_output([exe,option])==(cs/'arch/X86'/generated).read_bytes()
+        if variant in ('legacy','plain'):
+            command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/(variant+'.c'),'-o',t/'shape.o'],'shape-wrapper-'+variant)
+            command(['clang++','-O2','-std=c++17','-I',cs/'include',r/(variant+'.cpp'),t/'shape.o',archive,'-o',t/'shape'],'shape-link-'+variant)
+            command([t/'shape'],'shape-'+variant)
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'indexed.c','-o',t/'indexed.o'],'indexed-wrapper-'+variant)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'indexed.cpp',t/'indexed.o',archive,'-o',t/'indexed'],'indexed-link-'+variant)
         command([t/'indexed'],'indexed-records-'+variant)
@@ -182,7 +191,7 @@ try:
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k=='late_clear':wanted[-1]-=delta*n
+                    if k in ('clear','alias_clear'):wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
