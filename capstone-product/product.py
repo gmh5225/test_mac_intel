@@ -13,7 +13,7 @@ def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
 assert sha(r/'neverd.patch')==m['decoder_patch']
-for k in ('ordered','packed','private'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('output','ordered','packed','private'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==m['base']['tree']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -38,24 +38,22 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','ordered','linked','packed','private'):
+    for variant in ('base','output','ordered','packed','private'):
         if variant!='base':
             command(['git','restore','--source',m['base']['tree'],'--staged','--worktree','--','.'],'restore-'+variant,cs)
-            filename='ordered' if variant=='linked' else variant
+            filename=variant
             command(['git','apply','--index',r/(filename+'.patch')],'apply-'+variant,cs)
             command(['git','restore','--source','HEAD','--',str(decoder.relative_to(nd))],'decoder-'+variant,nd)
             cmake_file.write_text(normal_cmake)
-            if variant=='linked':
-                cmake_file.write_text(normal_cmake+'\ntarget_link_options(capstone-product PRIVATE LINKER:--undefined=X86_scanNativeBatch)\n')
-            else:command(['git','apply',r/'neverd.patch'],'call-'+variant,nd)
-        actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and ('return X86_scanNativeBatch(' in decoder.read_text())==(variant not in ('base','linked'))
+            if variant!='output':command(['git','apply',r/'neverd.patch'],'call-'+variant,nd)
+        actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and ('return X86_scanNativeBatch(' in decoder.read_text())==(variant not in ('base','output'))
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
-        assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())==(variant!='base')
+        assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())==(variant not in ('base','output'))
         archive,=build.rglob('libcapstone.a')
         obj,=build.rglob('X86Decoder.cpp.o')
         with obj.open('rb') as f:
@@ -75,8 +73,8 @@ try:
             elf=ELFFile(file)
             linked_sections={s.name:[s['sh_addr'],s.data_size,hashlib.sha256(s.data()).hexdigest()] for s in elf.iter_sections() if s['sh_flags'] & 2 and s['sh_type']=='SHT_PROGBITS'}
         members=sp.check_output(['ar','t',archive],text=True).splitlines()
-        if variant!='base':
-            assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86BatchScan.c.o'),members
+        if variant not in ('base','output'):
+            assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86MemoryFallback32.c.o') < members.index('X86BatchScan.c.o'),members
 
         save('layout-'+variant,dict(symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
 
@@ -92,6 +90,7 @@ try:
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
+            assert sp.check_output([t/'table-producer','--vex32-memory'])==(cs/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes()
         if variant=='base':
             import frozen_ssl64
             name,bits,path,spans,metadata=next(iter(frozen_ssl64.prepare(t)));q=json.loads((r/'ssl64-extents.json').read_text())
@@ -125,7 +124,7 @@ try:
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             for rep in range(13):
-                keys=['base','copy','linked','ordered','packed','private'];rng.shuffle(keys);ticks={v:[] for v in keys}
+                keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     assert expected==sample[1:],(c['name'],mode,k,expected,sample)
