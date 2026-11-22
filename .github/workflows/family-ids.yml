@@ -1,7 +1,7 @@
-name: Check projected x86 branch groups and IP repairs against direct and shipping effects
+name: Measure mode-specific repair dispatch with full dirty state and fixed-image Clang 14/18 replicated controls
 on:
   push:
-    branches: [codex/capstone-precompute-x86-branch-effects]
+    branches: [codex/capstone-variable-effects-only]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 77b7043a31582684a0234f104a1fc24d90f0a12d
+          ref: 989508842d378789f9d98465de059feb99913c96
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: branch-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: variable-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
