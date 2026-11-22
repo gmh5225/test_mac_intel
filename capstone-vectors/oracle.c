@@ -1,12 +1,11 @@
-#include "cs_priv.h"
+#include "arch/X86/X86OutputOptions.h"
 #include "arch/X86/X86SimpleOutput.h"
-bool observed_plain(csh h, bool wide, const uint8_t *p, size_t n, cs_insn *out, uint16_t *length)
+#include "arch/X86/X86GenSimpleOutput.inc"
+
+bool observed_broadcast(csh h, bool wide, const uint8_t *bytes, size_t size, cs_insn *out, uint16_t *length)
 {
-    if (!wide || n < 6 || p[0] != 0x62 || p[5] < 0xc0)
-        return false;
-#ifdef OBSERVE_WITH_SIZE
-    return X86_writePlainEvexRegisters((cs_struct *)(uintptr_t)h,p,n,out,length);
-#else
-    return X86_writePlainEvexRegisters((cs_struct *)(uintptr_t)h,p,out,length);
-#endif
+	cs_struct *s = (cs_struct *)(uintptr_t)h;
+	if (size < 6 || bytes[0] != 0x62 || !wide || X86_OUTPUT_UNSUPPORTED(s, false))
+		return false;
+	return X86_writeEvexBroadcastPrechecked(bytes, size, out, length, x86_simple_registers[3]);
 }

@@ -1,21 +1,20 @@
-#include "cs_priv.h"
+#include "arch/X86/X86SimpleOutput.h"
 #include <inttypes.h>
 #include <stdio.h>
 
 static uint64_t attempts, accepted;
+extern bool __real_X86_writeEvexBroadcastPrechecked(const uint8_t *, size_t, cs_insn *, uint16_t *, const struct X86SimpleRegister *);
 
-extern bool __real_X86_writePlainEvexRegisters(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *);
-
-bool __wrap_X86_writePlainEvexRegisters(cs_struct *handle, const uint8_t *code, size_t available, cs_insn *insn, uint16_t *size)
+bool __wrap_X86_writeEvexBroadcastPrechecked(const uint8_t *bytes, size_t available, cs_insn *insn, uint16_t *length, const struct X86SimpleRegister *regs)
 {
-	const bool control = (code[1] & 15) == 3 && available >= 7;
-	attempts += control;
-	bool hit = __real_X86_writePlainEvexRegisters(handle, code, available, insn, size);
-	accepted += control && hit && *size == 7;
-	return hit;
+	const bool integer = available >= 6 && bytes[4] == 0x5a;
+	attempts += integer;
+	bool ok = __real_X86_writeEvexBroadcastPrechecked(bytes, available, insn, length, regs);
+	accepted += integer && ok;
+	return ok;
 }
 
 __attribute__((destructor)) static void report(void)
 {
-	fprintf(stderr, "imm8 %" PRIu64 " %" PRIu64 "\n", attempts, accepted);
+	fprintf(stderr, "broadcast %" PRIu64 " %" PRIu64 "\n", attempts, accepted);
 }
