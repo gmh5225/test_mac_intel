@@ -1,7 +1,7 @@
-name: Measure table-owned EVEX source validity and AVX mode effects in complete NeverD binaries
+name: Validate mode-correct AVX clear effects through the full decoder and measure the i386 writer
 on:
   push:
-    branches: [codex/capstone-source-reservation-and-mode-effects]
+    branches: [codex/capstone-mode-specific-vector-clear-products]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 359a30178db985ce8c6d1445a558b22e637fe426
+          ref: 4b281bc8327c4570e0c17c5f294bf5cbffc52a43
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "359a30178db985ce8c6d1445a558b22e637fe426"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "68ca96c3343b0a7c110b9db372a9ee2642d857ef"
+          test "$(git rev-parse HEAD)" = "4b281bc8327c4570e0c17c5f294bf5cbffc52a43"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "bbba0e240053b9ad2897390bdc76f6f6115e3a55"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
-          git -C third_party/capstone checkout --detach 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
+          git -C third_party/capstone fetch --depth=1 origin ca73ea7f0c6aa0d618372481d6a29d9707c00d90
+          git -C third_party/capstone checkout --detach ca73ea7f0c6aa0d618372481d6a29d9707c00d90
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-effects-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vector-clear-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
