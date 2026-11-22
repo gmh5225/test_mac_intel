@@ -8,17 +8,16 @@ def cmd(n,a,cwd=None):
     if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2200:]);z.check_returncode()
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
-cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
+cc=os.environ['CC'];stages=load(d/'stages.json');meta=stages['both'];osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
 t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['parent']
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
-    imgs={};ids={}
-    for k in ('base','active','indexed'):
-        if k!='base':
-            g('restore','--source','HEAD','--staged','--worktree','--','.')
-            selected=load(d/'active-tree.json') if k=='active' else meta
-            patch=d/('active.patch' if k=='active' else 'candidate.patch')
-            assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
+    from placement import record,padded,rv
+    imgs={};ids={};stats={}
+    for k,selected in stages.items():
+        g('restore','--source','HEAD','--staged','--worktree','--','.')
+        patch=d/(k+'.patch');assert sha(patch)==selected['sha256']
+        g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
         names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name'}
@@ -35,7 +34,7 @@ try:
         sections=sp.check_output(['readelf','-SW',so],text=True)
         save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
         ids[k]=sha(so)
-        imgs[k]=so.read_bytes()
+        imgs[k]=so.read_bytes();stats[k]=record(b,so,t/k)
         if cc=='clang':
             cmd('alias-static-'+k,['cmake','--build',b,'--target','capstone_static','--parallel','4'])
             cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'spans.c',b/'libcapstone.a','-o',t/'spans'])
@@ -43,13 +42,16 @@ try:
             cmd('alias-compile-'+k,[cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_AARCH64','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'alias.c',b/'libcapstone.a','-o',t/'alias'])
             cmd('alias-oracle-'+k,[t/'alias'])
             assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
-        if k=='indexed':
+        if k=='both':
             names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
             cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
             cmd('index-check',['python3','-B',s/'suite/synctools/alias_pattern_rows.py','--check'])
-    assert ids['base']!=ids['indexed']
+    assert len(set(ids.values()))==4 and all(len({stats[k]['objects'][n]['sha256'] for k in stages})==1 for n in rv)
+    for k in ('base','both'):
+        v='slot_'+k;stats[v]=padded(b,so,t,k,stats);imgs[v]=so.read_bytes();ids[v]=sha(so)
+    save('printer-layouts',stats)
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
@@ -65,10 +67,11 @@ try:
     panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
     panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
     panels.extend((q['name'],selectors[q['name'].split('-')[0]],Path(q['path']),0x100000,(0,1,2))for q in extra)
+    panels=[p for p in panels if p[0] in ('s390x-ls','xtensa-picolibc','riscv64-ls','arm64-ls','mips64el-ls','putty32')]
     cmd('compile-records',['c++','-std=c++17','-O2','-I',s/'include',d/'raw.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'raw'])
     samples=[q for q in foreign if q['name'].split('-')[0] in selectors]+[extra[-1]]
     bystage={}
-    for k in ('base','active','indexed'):
+    for k in (v for v in imgs if v!='copy'):
         target.write_bytes(imgs[k]);rows={}
         for q in samples:
             for opt in range(5):
@@ -76,7 +79,7 @@ try:
                 assert len(raw)==4 and raw[0]>0
                 rows[q['name']+'/'+str(opt)]=raw
         bystage[k]=rows
-    assert bystage['base']==bystage['active']==bystage['indexed'] and len(bystage['base'])>=10
+    assert all(v==bystage['base'] for v in bystage.values()) and len(bystage['base'])>=10
     save('raw-records',bystage)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
     save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output([cc,'--version'],text=True),images=ids,osrel=osrel,machine=platform.machine(),cc=cc))
