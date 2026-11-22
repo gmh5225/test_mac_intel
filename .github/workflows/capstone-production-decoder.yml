@@ -1,7 +1,7 @@
-name: Check indexed EVEX output in standalone and combined NeverD products
+name: Verify generated VEX immediate writers within the NeverD Decoder on real binaries
 on:
   push:
-    branches: [codex/capstone-indexed-evex-product]
+    branches: [codex/capstone-mixed-output-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: indexed-evex-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: mixed-register-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
