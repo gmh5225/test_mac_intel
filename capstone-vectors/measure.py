@@ -83,27 +83,13 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Sse64Output.c.o'},changed
+            assert set(members)-set(prior)=={'X86VectorFallback64.c.o'} and not (set(prior)-set(members)) and changed=={'X86Sse64Output.c.o'},changed
             assert sha(ordinary)==sha(w/'unselected-baseline')
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
-    exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
-    exe['private_base']=exe['baseline'];exe['private_integrated']=exe['integrated']
-    exe['iced']=exe['fast']=exe['baseline']
-    payloads={key:path.read_bytes()for key,path in exe.items()}
-    assert payloads['baseline']==payloads['aa']
-    maximum=max(map(len,payloads.values()))
-    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-    image=w/'same-image';image.write_bytes(padded['baseline']);image.chmod(0o755)
-    image_inode=image.stat().st_ino
-    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the public iterator against its bounds-corrected baseline and the current NeverSight iced fork in both launch controls.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
-    assert set(launches)=={'images','same-file-fixed'}
     import pe_panels,itertools
     shutil.copyfile(r/'libmvec.py',w/'libmvec.py');shutil.copyfile(r/'libmvec.json',w/'libmvec.json')
     run(['python3','-B',w/'libmvec.py'],'glibc')
@@ -126,19 +112,22 @@ def main(w):
         intervals.write_text(''.join('%d %d %d\n'%tuple(a) for a in selected))
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
+        for k in ('extent_sha256','text_sha256'):
+            assert manifest[name][k]==data['provenance'][name][k],(name,k)
         save('provenance.json',manifest)
         from costs import profile
-        for mode in (0,1,2):
+        for mode in (1,2,4):
             profiles={}
             for label,binname,engine in [('static_base','baseline','x86_iter'),('integrated','integrated','x86_iter'),('public','integrated','capstone'),('iced_fast','integrated','iced____' if mode==0 else 'fast____')]:
+                if mode==4 and label=='iced_fast':continue
                 target=evidence/label;target.mkdir(exist_ok=True)
                 row=profile(exe[binname],engine,mode,bits,f,intervals,w,target,name)
                 row['variant']=label
                 profiles[label]=row
             assert profiles['static_base']['raw_signature']==profiles['integrated']['raw_signature']==profiles['public']['raw_signature']
-            assert profiles['integrated']['raw_signature'][:3]==profiles['iced_fast']['raw_signature'][:3]
+            if 'iced_fast' in profiles:assert profiles['integrated']['raw_signature'][:3]==profiles['iced_fast']['raw_signature'][:3]
             reported.extend(profiles.values());save('profile.json',reported)
-    assert len(reported)==4*3*len(data['samples'])
+    assert len(reported)==11*len(data['samples'])
     save('complete.json',dict(profiles=len(reported),cases=len(data['samples']),instrumented=True,events=reported[0]['events']))
 
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))

@@ -1,12 +1,12 @@
 {
-  "baseline_commit": "958b98cbbeb217ab3e8babe1de7175546ec82748",
-  "baseline_tree": "f7842b186ca94ebfe37bb601603136e31ed0fcde",
+  "baseline_commit": "68ca96c3343b0a7c110b9db372a9ee2642d857ef",
+  "baseline_tree": "05ca3800ee200febe7b060c8ca4d5b6b0dcd26bc",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "trees": {
-    "baseline": "f7842b186ca94ebfe37bb601603136e31ed0fcde",
-    "integrated": "7f119c86ecc9d049d97ed3c0fea79fd25a7c8950"
+    "baseline": "05ca3800ee200febe7b060c8ca4d5b6b0dcd26bc",
+    "integrated": "62f5bbdd6a063eb025ad361bddf3ffa16e6b63c1"
   },
-  "patch_sha256": "593be989ca371ea150515e8ff18434b384765adf4ef875e4648a33f7e69e913e",
+  "patch_sha256": "9af779e758605e154f8fd7e508774d52b7d75b501f9446f9e5a91070e78b42cd",
   "tests": [
     "x86_evex_vpcmp_id",
     "x86_evex_vpcmp_mask_size",
@@ -38,9 +38,204 @@
     "iced": "IntelFormatter and FastFormatter"
   },
   "iced_branch": "codex/neverd-capstone-compat",
-  "candidate": "Attribute vector-clear costs on real AMD64 code and iced",
+  "candidate": "Attribute the remaining formatter and cs_regs_access costs on the selected production trees",
   "baseline_static_commit": "958b98cbbeb217ab3e8babe1de7175546ec82748",
   "capstone_commit": "39228c3d8491f6f848f675f65fc116d3f340ebee",
   "iced_formatter_tree": "b8930fef51cec7b6c6bf3e8250cb3a749596949f",
-  "iced_default_head": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31"
+  "iced_default_head": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31",
+  "provenance": {
+    "libssl3t64-amd64": {
+      "source": {
+        "package": "libssl3t64",
+        "version": "3.5.7-1~deb13u2",
+        "url": "https://deb.debian.org/debian/pool/main/o/openssl/libssl3t64_3.5.7-1~deb13u2_amd64.deb",
+        "package_sha256": "916f7f40b34a06e6ebfaefcdab331bff458328411da672598f126a760472467d",
+        "binary_sha256": "8bb5f3fdffe280d4453eb79a4663c2c47af70b7c247fe2e94e2da703cee1fd3d",
+        "text_sha256": "6d384a7079c5be0051952ad2d085a6a84de3a60cddd58f81094e8436cc962c0c",
+        "text_bytes": 3628702,
+        "function_bytes": 3528224,
+        "functions": 13202,
+        "index_sha256": "7778d3e3f303b7ddb8ce0fe7c8d57473a076c6bf2e8f241f75421d2396352498"
+      },
+      "input_functions": 13202,
+      "common_functions": 13196,
+      "timed_functions": 320,
+      "bytes": 1069882,
+      "selection": "simd-functions",
+      "extent_sha256": "ea8b4bbf6a8a681f71dac82ebaef4e8daca85ebbd09186449e33696f8c3bfb6b",
+      "text_sha256": "6d384a7079c5be0051952ad2d085a6a84de3a60cddd58f81094e8436cc962c0c",
+      "excluded_incompatible_extents": [
+        [
+          406752,
+          1914,
+          1471584,
+          615,
+          351,
+          143
+        ],
+        [
+          408672,
+          2036,
+          1473504,
+          499,
+          361,
+          175
+        ],
+        [
+          417344,
+          3905,
+          1482176,
+          1169,
+          641,
+          175
+        ],
+        [
+          421280,
+          3244,
+          1486112,
+          759,
+          563,
+          175
+        ],
+        [
+          431904,
+          3960,
+          1496736,
+          1135,
+          623,
+          175
+        ],
+        [
+          435872,
+          4535,
+          1500704,
+          1024,
+          738,
+          175
+        ]
+      ]
+    },
+    "jpeg-avx2-i386": {
+      "source": {
+        "package": "libjpeg62-turbo-dev",
+        "version": "1:2.1.5-4",
+        "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_i386.deb",
+        "package_sha256": "7539d7d7a4fe527071f737ce4919887cde17dfc72d6b3fa9d0176b4dacb6e412",
+        "text_sha256": "4d879d6881a2ee0c2e1b48456ef0153149f788674220dfd89ec0da7c60064a1d",
+        "members": {
+          "jccolor-avx2.asm.o": {
+            "sha256": "2e8b1ae43c6d15a5f0bad04857f4db30b599c792ae128ab9fdbf36ffce3d2db5",
+            "functions": 7,
+            "section_bytes": 8384
+          },
+          "jcgray-avx2.asm.o": {
+            "sha256": "a53b3309db8314a3a72b087ef0fc2cd371ce4c55e2d159c1207298620f9dda9c",
+            "functions": 7,
+            "section_bytes": 4800
+          },
+          "jcsample-avx2.asm.o": {
+            "sha256": "ac100c60c2dc894f6be87393c35833a913749c93962bd94c84366ba8cf0dcc3d",
+            "functions": 2,
+            "section_bytes": 672
+          },
+          "jdcolor-avx2.asm.o": {
+            "sha256": "21ab2e5647b6191d3434ca327240c7a3673623a0894cef8b7906af297282d163",
+            "functions": 7,
+            "section_bytes": 5792
+          },
+          "jdmerge-avx2.asm.o": {
+            "sha256": "edc189ef3a3fc43041d718f584ad04bbc942426439f6df003931a6855a2145dd",
+            "functions": 14,
+            "section_bytes": 6464
+          },
+          "jdsample-avx2.asm.o": {
+            "sha256": "4d1c213560ab99f952e12f3f54b1c9743e42a3ecddc38ca0a63bcf668c6903e4",
+            "functions": 4,
+            "section_bytes": 1824
+          },
+          "jfdctint-avx2.asm.o": {
+            "sha256": "ad7dbb14a23fd3fbc5ed3333dc901e2b5dccd24c3862c76a554325d0c9af9e35",
+            "functions": 1,
+            "section_bytes": 832
+          },
+          "jidctint-avx2.asm.o": {
+            "sha256": "edbdc208b82031fccf1caa14b0037792331f84598c18c8cedb3dd8a541c509ed",
+            "functions": 1,
+            "section_bytes": 1344
+          },
+          "jquanti-avx2.asm.o": {
+            "sha256": "c7c2f57f57c5c5c62ae6684fa78e7d96f4cf67fc65486c13b416e75a67b844d3",
+            "functions": 2,
+            "section_bytes": 384
+          }
+        },
+        "selection": "ELF .text in AVX2 i386 libjpeg.a objects, extents bounded by external assembly entry symbols within each object"
+      },
+      "input_functions": 45,
+      "common_functions": 45,
+      "timed_functions": 37,
+      "bytes": 29664,
+      "selection": "simd-functions",
+      "extent_sha256": "9d41a35a2ee1832768ce9d30b0728176d50fa840f339e8c3729095fef75b4429",
+      "text_sha256": "4d879d6881a2ee0c2e1b48456ef0153149f788674220dfd89ec0da7c60064a1d",
+      "excluded_incompatible_extents": []
+    },
+    "putty-32-0.85": {
+      "source": {
+        "name": "putty-32-0.85",
+        "bits": 32,
+        "path": "putty-0.85-32.text",
+        "bytes": 824794,
+        "executable": "putty-0.85-32.exe",
+        "executable_sha256": "4c70267ca03a00ea761ec358498b990a7221decb36eace9b7dbe6a751be0fb3b",
+        "sha256": "f9269b449a06aac5daf0082b2fd07fbb6bfad5d99a6864b6a584e3b71c010953",
+        "source": "https://the.earth.li/~sgtatham/putty/0.85/w32/putty.exe",
+        "source_page": "https://www.chiark.greenend.org.uk/~sgtatham/putty/releases/0.85.html",
+        "checksums": "https://the.earth.li/~sgtatham/putty/0.85/sha256sums",
+        "section": ".text",
+        "section_rva": 4096,
+        "section_file_offset": 1024,
+        "extraction": "Entire initialized executable .text section; no instruction filtering.",
+        "executable_was_run": false,
+        "extent_source": "Entire initialized PE32 .text section, including rejected bytes",
+        "input_extents": 1,
+        "outside_text": 0
+      },
+      "input_functions": 1,
+      "common_functions": 1,
+      "timed_functions": 1,
+      "bytes": 824794,
+      "selection": "whole-text",
+      "extent_sha256": "97406df7c16774b041a2a9e9352c3f69845f8e4aaab322f2f3a4a911abb28dd4",
+      "text_sha256": "f9269b449a06aac5daf0082b2fd07fbb6bfad5d99a6864b6a584e3b71c010953",
+      "excluded_incompatible_extents": []
+    },
+    "libmvec-amd64": {
+      "source": {
+        "package": "libc6",
+        "version": "2.41-12+deb13u4",
+        "url": "https://deb.debian.org/debian/pool/main/g/glibc/libc6_2.41-12+deb13u4_amd64.deb",
+        "package_sha256": "967aa62605721081c3eb2a17650611a792aa802d76a6511d1840242623d204c9",
+        "index_sha256": "7778d3e3f303b7ddb8ce0fe7c8d57473a076c6bf2e8f241f75421d2396352498",
+        "member": "./usr/lib/x86_64-linux-gnu/libmvec.so.1",
+        "binary_sha256": "cd2f99df70ed0fa44f79bd6322396180d19eaa1fb527b1b6e2aec9cdfc034d9d",
+        "text_sha256": "f09973df8e1b3d5c6b650f2b9af977a635eeb0f9621bcc45b4c38cb8686a1cc1",
+        "bytes": 133596,
+        "address": 26608
+      },
+      "input_functions": 1,
+      "common_functions": 1,
+      "timed_functions": 1,
+      "bytes": 133596,
+      "selection": "whole-text",
+      "extent_sha256": "dac79dc51a209fe81bc3cb357d0182adfeb87da3a87f0dedf76477da03c75305",
+      "text_sha256": "f09973df8e1b3d5c6b650f2b9af977a635eeb0f9621bcc45b4c38cb8686a1cc1",
+      "excluded_incompatible_extents": []
+    }
+  },
+  "modes": {
+    "1": "text",
+    "2": "text, full detail and register API",
+    "4": "text and full detail without the register API"
+  }
 }
