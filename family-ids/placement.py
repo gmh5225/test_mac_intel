@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,subprocess as sp,shutil
+import hashlib,subprocess as sp,shutil,shlex
 
 printers=('SystemZInstPrinter.c.o','XtensaInstPrinter.c.o')
 rv=('RISCVDisassembler.c.o','RISCVInstPrinter.c.o','RISCVModule.c.o')
@@ -29,7 +29,19 @@ def padded(build,library,tmp,mode,stats):
         obj,=build.rglob(member)
         sp.run(['objcopy','--update-section','.text='+str(padded),tmp/mode/member,obj],check=True)
         extent[member]=dict(original=len(raw),padded=length)
-    sp.run(['cmake','--build',build,'--parallel','4','--target','capstone_shared'],check=True)
+    # Relink the library without asking Ninja to recompile the controlled objects.
+    commands=sp.check_output(['ninja','-C',build,'-t','commands','capstone_shared'],text=True)
+    links=[]
+    for line in commands.splitlines():
+        if ' -shared ' not in line:continue
+        words=shlex.split(line);output=words[words.index('-o')+1] if '-o' in words else ''
+        if Path(output).name!=library.name:continue
+        i=words.index('-shared')
+        first=max((j+1 for j,v in enumerate(words[:i])if v=='&&'),default=0)
+        last=next((j for j in range(i,len(words))if words[j]=='&&'),len(words))
+        links.append(words[first:last])
+    assert len(links)==1,(library,links)
+    sp.run(links[0],cwd=build,check=True)
     check=tmp/('verify-'+mode);check.mkdir()
     for member in printers:
         obj,=build.rglob(member);sec=check/(member+'.text')
