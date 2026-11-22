@@ -1,32 +1,137 @@
-diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index d57235c9..dcd84ff9 100644
---- a/arch/Mips/MipsDisassembler.c
-+++ b/arch/Mips/MipsDisassembler.c
-@@ -228,8 +228,9 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
- 	}
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 64ee3a95..135a86c8 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -53,10 +53,6 @@
+ 
+ #define DEBUG_TYPE "riscv-disassembler"
+ 
+-void addSPOperands(MCInst *MI);
+-;
+-// end anonymous namespace
+-
+ static DecodeStatus DecodeGPRRegisterClass(MCInst *Inst, uint32_t RegNo,
+ 					   uint64_t Address,
+ 					   const void *Decoder)
+@@ -575,20 +571,26 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+ 	return MCDisassembler_Success;
  }
  
--#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
--	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
-+#if (defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)) || \
-+	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
- #define CAPSTONE_MIPS_PRIMARY_DISPATCH
- #endif
- 
-diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 8b70fffc..1ee21fa0 100644
---- a/arch/Mips/MipsInstPrinter.c
-+++ b/arch/Mips/MipsInstPrinter.c
-@@ -500,7 +500,11 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
- static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
- 		       unsigned OpNo, SStream *OS, bool IsBranch)
+-// Add implied SP operand for C.*SP compressed instructions. The SP operand
+-// isn't explicitly encoded in the instruction.
+-void addSPOperands(MCInst *MI)
++/* Insert the implied SP at each indicated operand position, in ascending
++ * order so later indices refer to the instruction with earlier inserts. */
++static void insertSPOperands(MCInst *MI, unsigned positions)
  {
-+#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
-+	SStream_concat2(OS, "\t", Str);
-+#else
- 	SStream_concat(OS, "%s%s", "\t", Str);
+-	const MCInstrDesc *MCID = MCInstrDesc_get(MCInst_getOpcode(MI),
+-						  RISCVDescs.Insts,
+-						  ARR_SIZE(RISCVDescs.Insts));
+ 	MCOperand SPReg;
+ 	SPReg.MachineOperandType = kRegister;
+ 	SPReg.Kind = kRegister;
+ 	SPReg.RegVal = RISCV_X2;
+-	for (unsigned i = 0; i < MCID->NumOperands; i++)
+-		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
+-			MCInst_insert0(MI, i, &SPReg);
++	do {
++		MCInst_insert0(MI, CountTrailingZeros_32(positions), &SPReg);
++		positions &= positions - 1;
++	} while (positions);
++}
++
++static inline void addSPOperands(MCInst *MI)
++{
++	/* Bit zero records tied operands. */
++	unsigned positions = RISCVWritebackFlags[MCInst_getOpcode(MI)] >> 1;
++	if (positions)
++		insertSPOperands(MI, positions);
+ }
+ 
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+@@ -773,7 +775,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+ 	DecodeStatus ret =
+ 		RISCV_getInstruction(MI, Size, Bytes, ByteLen, Address, NULL);
+ 
+-	if (RISCVWritebackFlags[MCInst_getOpcode(MI)])
++	if (RISCVWritebackFlags[MCInst_getOpcode(MI)] & 1)
+ 		MCInst_handleWriteback(MI, RISCVDescs.Insts,
+ 				       ARR_SIZE(RISCVDescs.Insts));
+ 
+diff --git a/arch/RISCV/RISCVGenWriteback.inc b/arch/RISCV/RISCVGenWriteback.inc
+index 34eec991..11725b17 100644
+--- a/arch/RISCV/RISCVGenWriteback.inc
++++ b/arch/RISCV/RISCVGenWriteback.inc
+@@ -371,9 +371,9 @@ static const uint8_t RISCVWritebackFlags[] = {
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+ 	1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+-	0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1,
+-	0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 1, 1, 7, 4, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 4, 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 4,
++	0, 0, 0, 0, 0, 0, 0, 4, 1, 0, 0, 0, 0, 1, 1, 0, 0, 4, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1,
++	0, 4, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/suite/synctools/operand_writeback.py b/suite/synctools/operand_writeback.py
+index 828785ee..3f2186e4 100644
+--- a/suite/synctools/operand_writeback.py
++++ b/suite/synctools/operand_writeback.py
+@@ -65,9 +65,12 @@ def generated_flags(arch, source):
+         require(
+             offset + length <= len(operands), f"{arch} operand extent exceeds table"
+         )
+-        for _, _, _, constraints in operands[offset : offset + length]:
++        for index, (reg_class, _, _, constraints) in enumerate(operands[offset : offset + length]):
++            if arch == "RISCV" and reg_class == "RISCV_SPRegClassID":
++                require(index < 7, "RISC-V implied SP position exceeds packed operand flags")
++                flags[uid] |= 1 << (index + 1)
+             if re.fullmatch(r"CONSTRAINT_MCOI_TIED_TO\(\d+\)", constraints):
+-                flags[uid] = 1
++                flags[uid] |= 1
+             else:
+                 require(
+                     constraints in {"0", "CONSTRAINT_MCOI_EARLY_CLOBBER"},
+@@ -99,7 +102,8 @@ def integrated_source(arch, source):
+         anchor = f'#include "{arch}GenDirectDecoder.inc"'
+         require(source.count(anchor) == 1, f"Missing {arch} direct decoder include")
+         source = source.replace(anchor, anchor + "\n" + include)
+-    guard = f"if ({arch}WritebackFlags[MCInst_getOpcode(MI)])"
++    value = f"{arch}WritebackFlags[MCInst_getOpcode(MI)]"
++    guard = f"if ({value} & 1)" if arch == "RISCV" else f"if ({value})"
+     if guard not in source:
+         calls = list(
+             re.finditer(
+diff --git a/tests/unit/writeback_postprocess.c b/tests/unit/writeback_postprocess.c
+index 1afe180d..83513d25 100644
+--- a/tests/unit/writeback_postprocess.c
++++ b/tests/unit/writeback_postprocess.c
+@@ -30,15 +30,23 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
+ 	unsigned tied = 0;
+ 	for (unsigned opcode = 0; opcode < count; ++opcode) {
+ 		const MCInstrDesc *desc = &descs[count - 1 - opcode];
+-		bool expected = false;
+-		for (unsigned i = 0; i < desc->NumOperands; ++i)
++		unsigned expected = 0;
++		for (unsigned i = 0; i < desc->NumOperands; ++i) {
+ 			expected |= MCOperandInfo_isTiedToOp(&desc->OpInfo[i]);
++#ifdef WRITEBACK_TEST_RISCV
++			if (desc->OpInfo[i].RegClass == RISCV_SPRegClassID) {
++				if (i >= 7)
++					return false;
++				expected |= 2U << i;
++			}
 +#endif
- 	SStream_concat0(OS, "\t");
- 	if (IsBranch)
- 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
++		}
+ 		if (expected != flags[opcode]) {
+ 			fprintf(stderr, "%s projection mismatch %u\n", arch,
+ 				opcode);
+ 			return false;
+ 		}
+-		tied += expected;
++		tied += expected & 1;
+ 	}
+ 	printf("%s: %zu descriptors equal, %u tied\n", arch, count, tied);
+ 	return true;

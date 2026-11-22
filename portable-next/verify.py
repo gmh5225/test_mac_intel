@@ -1,7 +1,7 @@
 from pathlib import Path
 import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
 d=Path(__file__).resolve().parent;root=d.parent;s=root/'source';out=root/'evidence';out.mkdir(exist_ok=True)
-t=Path(tempfile.mkdtemp());tests=['mips_single', 'mips_scan', 'mips16_frames', 'mips16_immediates', 'mips16_memory_calls', 'mips16_shifts_hilo', 'mips16_word_order', 'mips16e2', 'mips_msa_control', 'mips_register_names', 'mips_reglist_offset']
+t=Path(tempfile.mkdtemp());tests=['riscv_op_count_iter', 'riscv_instruction_groups', 'riscv_mapping_index', 'riscv_reg_access', 'riscv_sysreg', 'riscv_insn_name_segv', 'riscv_writeback_postprocess']
 def run(args,n,cwd=None):
     with (out/(n+'.log')).open('w')as log:r=sp.run(list(map(str,args)),cwd=cwd,stdout=log,stderr=sp.STDOUT)
     if r.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2900:],flush=True);r.check_returncode()
