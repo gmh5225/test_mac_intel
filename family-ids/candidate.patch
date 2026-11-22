@@ -1,38 +1,12 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 77d1aaa8..46e70924 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -183,7 +183,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "RISCV")
--    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
-+    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_PROJECT_STACK_OPERANDS)
-     # Fixed-width implicit counts improve detailed decoding in this configuration.
-     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-diff --git a/Makefile b/Makefile
-index b8b582a0..afe325d2 100644
---- a/Makefile
-+++ b/Makefile
-@@ -144,7 +144,7 @@ CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPAT
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
--CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
-+CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_PROJECT_STACK_OPERANDS
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index 64ee3a95..49a28540 100644
+index 64ee3a95..947fd2d2 100644
 --- a/arch/RISCV/RISCVDisassembler.c
 +++ b/arch/RISCV/RISCVDisassembler.c
 @@ -53,9 +53,9 @@
  
  #define DEBUG_TYPE "riscv-disassembler"
  
-+#ifndef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++#ifndef RISCV_USE_STACK_OPERAND_POSITIONS
  void addSPOperands(MCInst *MI);
 -;
 -// end anonymous namespace
@@ -44,7 +18,7 @@ index 64ee3a95..49a28540 100644
  	return MCDisassembler_Success;
  }
  
-+#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
 +/* Positions refer to the final operand list. Inserting from lowest to highest
 + * keeps subsequent positions valid when an instruction implies SP twice. */
 +static void insertSPOperands(MCInst *MI, unsigned positions)
@@ -78,8 +52,28 @@ index 64ee3a95..49a28540 100644
  
  DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
  				  const uint8_t *Bytes, size_t BytesLen,
+diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
+index e36ec509..00348e68 100644
+--- a/arch/RISCV/RISCVDisassembler.h
++++ b/arch/RISCV/RISCVDisassembler.h
+@@ -11,6 +11,15 @@
+ #include "../../MCDisassembler.h"
+ #include "../../SStream.h"
+ 
++/* Select the position table in dedicated builds where scanning and detail
++ * construction both benefit. GCC's full decoder keeps the descriptor walk. */
++#if defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && \
++	(defined(CAPSTONE_DIET) || \
++	 (defined(__linux__) && defined(__clang__) && \
++	  (defined(__x86_64__) || defined(__aarch64__))))
++#define RISCV_USE_STACK_OPERAND_POSITIONS
++#endif
++
+ void RISCV_init(MCRegisterInfo *MRI);
+ 
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
 diff --git a/arch/RISCV/RISCVGenWriteback.inc b/arch/RISCV/RISCVGenWriteback.inc
-index 34eec991..764f1626 100644
+index 34eec991..a49228cc 100644
 --- a/arch/RISCV/RISCVGenWriteback.inc
 +++ b/arch/RISCV/RISCVGenWriteback.inc
 @@ -415,3 +415,16 @@ static const uint8_t RISCVWritebackFlags[] = {
@@ -87,7 +81,7 @@ index 34eec991..764f1626 100644
  	0, 0,
  };
 +
-+#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
 +static const uint8_t RISCVStackOperandPositions[] = {
 +	3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
 +	0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
@@ -100,7 +94,7 @@ index 34eec991..764f1626 100644
 +}
 +#endif
 diff --git a/suite/synctools/operand_writeback.py b/suite/synctools/operand_writeback.py
-index 828785ee..9e35373c 100644
+index 828785ee..9ae08504 100644
 --- a/suite/synctools/operand_writeback.py
 +++ b/suite/synctools/operand_writeback.py
 @@ -60,12 +60,18 @@ def generated_flags(arch, source):
@@ -132,7 +126,7 @@ index 828785ee..9e35373c 100644
 +        first, last = min(stack_positions), max(stack_positions)
 +        positions = [stack_positions.get(opcode, 0) for opcode in range(first, last + 1)]
 +        lines += [
-+            "#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS",
++            "#ifdef RISCV_USE_STACK_OPERAND_POSITIONS",
 +            "static const uint8_t RISCVStackOperandPositions[] = {",
 +        ]
 +        for index in range(0, len(positions), 32):
@@ -152,14 +146,22 @@ index 828785ee..9e35373c 100644
  
  
 diff --git a/tests/unit/writeback_postprocess.c b/tests/unit/writeback_postprocess.c
-index 1afe180d..89e84951 100644
+index 1afe180d..e983ed2f 100644
 --- a/tests/unit/writeback_postprocess.c
 +++ b/tests/unit/writeback_postprocess.c
-@@ -44,6 +44,30 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
+@@ -15,6 +15,7 @@
+ 
+ #ifdef WRITEBACK_TEST_RISCV
+ #include "../../arch/RISCV/RISCVBaseInfo.h"
++#include "../../arch/RISCV/RISCVDisassembler.h"
+ #include "../../arch/RISCV/RISCVMapping.h"
+ #define GET_REGINFO_ENUM
+ #include "../../arch/RISCV/RISCVGenRegisterInfo.inc"
+@@ -44,6 +45,30 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
  	return true;
  }
  
-+#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
 +static bool checkStackOperandPositions(void)
 +{
 +	size_t count = ARR_SIZE(RISCVDescs.Insts);
@@ -186,11 +188,11 @@ index 1afe180d..89e84951 100644
  int main(void)
  {
  #ifdef WRITEBACK_TEST_ARM
-@@ -52,6 +76,10 @@ int main(void)
+@@ -52,6 +77,10 @@ int main(void)
  		return 1;
  #endif
  #ifdef WRITEBACK_TEST_RISCV
-+#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
 +	if (!checkStackOperandPositions())
 +		return 1;
 +#endif

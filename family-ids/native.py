@@ -16,7 +16,12 @@ tests=['riscv_writeback_postprocess','riscv_op_count_iter','riscv_instruction_gr
 t=Path(tempfile.mkdtemp());libs={};objects={};raw={};tim=[]
 try:
     flavors=['dedicated','mixed','diet']
-    for label in ('base','candidate'):
+    prev=json.loads((r/'prototype.json').read_text())
+    assert prev['parent']==q['parent'] and sha(r/'prototype.patch')==prev['sha256']
+    for label in ('base','candidate','prototype'):
+        if label=='prototype':
+            g('read-tree','--reset','-u','HEAD')
+            g('apply','--index',str(r/'prototype.patch'));assert g('write-tree')==prev['tree']
         if label=='candidate':
             g('apply','--index',str(r/'candidate.patch'));assert g('write-tree')==q['tree']
             run(['python3','-B',s/'suite/synctools/operand_writeback.py','--check'],'generate')
@@ -32,14 +37,18 @@ try:
             path=t/(f+'-'+label+'.so');shutil.copyfile(so,path);libs.setdefault(f,{})[label]=path
             objects.setdefault(f,{})[label]={p.name:sha(p) for p in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
     for f,sets in objects.items():
-        a,b=sets.values();assert a.keys()==b.keys();changed=[k for k in a if a[k]!=b[k]]
-        assert changed==([] if f=='mixed' else ['RISCVDisassembler.c.o']),(f,changed)
-        assert (sha(libs[f]['base'])==sha(libs[f]['candidate']))==(f=='mixed')
+        active=f=='diet' or (f=='dedicated' and cc=='clang')
+        base,selected,prototype=(sets[k] for k in ('base','candidate','prototype'))
+        assert base.keys()==selected.keys()==prototype.keys()
+        diff=[k for k in base if base[k]!=selected[k]]
+        assert diff==(['RISCVDisassembler.c.o'] if active else []),(f,diff)
+        reference='prototype' if active else 'base'
+        assert selected==sets[reference] and sha(libs[f]['candidate'])==sha(libs[f][reference]),f
     save('objects',objects);save('images',{f:{k:sha(p)for k,p in v.items()}for f,v in libs.items()})
     cases=[z for z in corpus.prepare(r,t,out,run) if z['name']in ('riscv64-cp','riscv64-ls','riscv64-sort')];assert len(cases)==3
     run(['c++','-std=c++17','-O2','-I',s/'include',r/'riscv-states.cpp','-ldl','-o',t/'state'],'compile-states')
     for k,opt in [('ordinary',[]),('callbacks',['custom'])]:
-        run([t/'state',*libs['dedicated'].values(),t/'corpus',*opt],'states-'+k)
+        run([t/'state',libs['dedicated']['base'],libs['dedicated']['candidate'],t/'corpus',*opt],'states-'+k)
         raw[k]=json.loads((out/('states-'+k+'.log')).read_text().splitlines()[-1]);assert raw[k]['comparisons']>36000000
     slot=t/'slot';slot.mkdir();so=slot/'libcapstone.so.6';shutil.copyfile(libs['dedicated']['base'],so);(slot/'libcapstone.so').symlink_to(so.name)
     ld=['-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone']
@@ -47,7 +56,8 @@ try:
     run([cc,'-O2','-I',s/'include',r/'diet-records.c',*ld,'-o',t/'diet-records'],'compile-diet-states')
     bind=['setarch',platform.machine(),'-R'];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     for f in ('dedicated','diet'):
-        images={k:p.read_bytes()for k,p in libs[f].items()};images['copy']=images['base'];size=max(map(len,images.values()));images={k:v+bytes(size-len(v))for k,v in images.items()}
+        if f=='dedicated' and cc=='gcc':continue
+        images={k:p.read_bytes()for k,p in libs[f].items()if k!='prototype'};images['copy']=images['base'];size=max(map(len,images.values()));images={k:v+bytes(size-len(v))for k,v in images.items()}
         def once(k,path,mode,n):
             so.write_bytes(images[k]);return list(map(int,sp.check_output([*bind,t/'time','105',str(mode),path,'1048576',str(n)],text=True).split()))
         if f=='diet':

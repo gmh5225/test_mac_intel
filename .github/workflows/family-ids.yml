@@ -1,7 +1,7 @@
-name: Time RISC-V-only compressed operand insertion and verify mixed shared objects and shipping consumers
+name: Qualify selected RISC-V stack projection with matched binaries for every active and inactive Linux configuration
 on:
   push:
-    branches: [codex/capstone-dedicated-riscv-stack-mask]
+    branches: [codex/capstone-qualified-riscv-stack-positions]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: selected-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
