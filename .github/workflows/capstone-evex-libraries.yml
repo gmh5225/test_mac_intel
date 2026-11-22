@@ -1,7 +1,7 @@
-name: Measure full VEX RIP-relative memory records and count their actual use on six real programs
+name: Measure VEX arithmetic at the existing vector address dispatch on six real inputs
 on:
   push:
-    branches: [codex/vex-rip-output-rows]
+    branches: [codex/vex-rip-address-dispatch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-rip-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-address-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

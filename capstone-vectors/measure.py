@@ -90,7 +90,7 @@ def main(w):
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
         if label=='integrated':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
-            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVexRipMemory',*libs,'-o',w/'coverage'],'link-counter')
+            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVectorRipMemory',*libs,'-o',w/'coverage'],'link-counter')
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -122,7 +122,7 @@ def main(w):
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
             added=set(members)-set(prior)
-            assert set(prior)<=set(members) and not added and changed=={'X86PlainEvexOutput.c.o','X86VectorOutput.c.o','X86VectorFallback64.c.o'},(changed,added)
+            assert set(prior)<=set(members) and not added and changed=={'X86PlainEvexOutput.c.o','X86VectorOutput.c.o','X86EvexMemoryOutput.c.o'},(changed,added)
             changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
@@ -184,7 +184,6 @@ def main(w):
             prefix,attempt,accepted=observed.stderr.split()
             attempt,accepted=int(attempt),int(accepted)
             assert prefix=='vexrip' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
-            if bits==32:assert attempt==0
             if bits==32:assert attempt==0
             coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
         assert coverage['1']==coverage['2']
