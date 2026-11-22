@@ -25,6 +25,7 @@ endif()
     profiles={'full':[],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON']}
     answers={}
     for prof,flags in profiles.items():
+        if prof != os.environ['SCAN_PROFILE']:continue
         b=t/prof;units=['x86_scan_batch','x86_encoding_accuracy','text_option','detail_option']
         cmd=['cmake','-G','Ninja','-S',h,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*flags]
         if win:cmd+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']

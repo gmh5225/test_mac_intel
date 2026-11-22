@@ -1,7 +1,7 @@
-name: Check the i386 scalar and vector batch reader at inaccessible page boundaries on four native ABIs
+name: Verify both x86 batch modes at page boundaries
 on:
   push:
-    branches: [codex/capstone-portable-i386-reader]
+    branches: [codex/capstone-abi-by-profile-batch]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,10 +11,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2022, arch: amd64 }
-          - { host: windows-2022, arch: amd64_x86 }
-          - { host: macos-15, arch: arm64 }
-          - { host: macos-15-intel, arch: x86_64 }
+          - { host: windows-2022, arch: amd64, profile: full }
+          - { host: windows-2022, arch: amd64, profile: adapter }
+          - { host: windows-2022, arch: amd64, profile: reduced }
+          - { host: windows-2022, arch: amd64, profile: diet }
+          - { host: windows-2022, arch: amd64_x86, profile: full }
+          - { host: windows-2022, arch: amd64_x86, profile: adapter }
+          - { host: windows-2022, arch: amd64_x86, profile: reduced }
+          - { host: windows-2022, arch: amd64_x86, profile: diet }
+          - { host: macos-15, arch: arm64, profile: full }
+          - { host: macos-15, arch: arm64, profile: adapter }
+          - { host: macos-15, arch: arm64, profile: reduced }
+          - { host: macos-15, arch: arm64, profile: diet }
+          - { host: macos-15-intel, arch: x86_64, profile: full }
+          - { host: macos-15-intel, arch: x86_64, profile: adapter }
+          - { host: macos-15-intel, arch: x86_64, profile: reduced }
+          - { host: macos-15-intel, arch: x86_64, profile: diet }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     steps:
@@ -25,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 989508842d378789f9d98465de059feb99913c96
+          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -33,10 +45,12 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
       - name: Compare original and candidate bytes and native tests
+        env:
+          SCAN_PROFILE: ${{ matrix.profile }}
         run: python -B portable-next/verify.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-reader-${{ matrix.host }}-${{ matrix.arch }}
+          name: portable-reader-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
