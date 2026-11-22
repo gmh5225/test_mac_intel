@@ -1,7 +1,7 @@
-name: Verify generated SystemZ tokens against the freshly compiled candidate and compare nine architectures
+name: Compare four-byte counted SystemZ register spellings and verify nine architecture outputs
 on:
   push:
-    branches: [codex/gnu-register-token-validation]
+    branches: [codex/systemz-counted-register-rows]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-token-check-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-four-byte-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
