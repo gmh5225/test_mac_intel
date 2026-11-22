@@ -1,7 +1,7 @@
-name: Compare the released seven-printer alias index and x86 writer with iced on four hosts
+name: Compare the repaired x86-only and production configurations against iced on four hosts
 on:
   push:
-    branches: [codex/shipped-indexed-aliases-versus-iced]
+    branches: [codex/shipped-optional-aliases-versus-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b24e43f0c1473ba8a300c35a399125089b535015
+          ref: 40125a7e11dcc4e9a5f43d2d11405212ed9d8184
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 50e13e4a3f0cf637578e658165a0f93ba2f5f93a
+          ref: fe646646b61403c18430bcfa9749e6a2d2ebad85
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-aliases-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shipped-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
