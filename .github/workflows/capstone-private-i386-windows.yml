@@ -1,7 +1,7 @@
-name: Verify combined formatting and public EVEX projections in Windows and Apple configurations
+name: Verify complete vector regression functions in all static and shared configurations
 on:
   push:
-    branches: [codex/capstone-combined-vector-profiles]
+    branches: [codex/capstone-complete-vector-configuration-checks]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
+          ref: 68ca96c3343b0a7c110b9db372a9ee2642d857ef
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
