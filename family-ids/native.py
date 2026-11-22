@@ -49,6 +49,8 @@ try:
             if len(z)==3 and z[1].startswith('R_') and off<=int(z[0],16)<off+length:
                 calls.append([int(z[0],16)-off,z[1],z[2]])
         save('scan-bytes-'+k,dict(section=section,offset=off,size=length,sha256=hashlib.sha256(body).hexdigest(),relocations=calls))
+        command_line=sp.check_output(['ninja','-C',b,'-t','commands','capstone_static'],text=True)
+        assert 'X86BatchScan.c' in command_line
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
         if cc=='clang':
@@ -83,6 +85,10 @@ try:
             states[k][label]=z
     assert states['base']==states['active']==states['indexed']
     save('public-differential',states)
+    cmd('build-primary-guard',['c++','-std=c++17','-O2','-I',s/'include',d/'primary-guard.cpp','-ldl','-o',t/'primary-guard'])
+    for k in ('active','indexed'):
+        cmd('primary-guard-'+k,[t/'primary-guard',libs['base'],libs[k]])
+
     import corpus
     foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name'] in ('arm-ls', 'arm64-ls', 'mips64el-ls', 'ppc64el-ls', 'riscv64-ls', 'sparc64-ls', 's390x-ls', 'loong64-ls')]
     from xtensa import get

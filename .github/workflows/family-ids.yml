@@ -1,7 +1,7 @@
-name: Compare public text selection after scan against outer dispatch and shipped EVEX on seven toolchains
+name: Compare the public scanner using the batch primary records alone and with shared text output
 on:
   push:
-    branches: [codex/select-text-on-public-decode-miss]
+    branches: [codex/public-iterator-primary-records]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: shared-miss-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-primary-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

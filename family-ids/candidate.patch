@@ -1,3 +1,69 @@
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..7e23ace5 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -17,7 +17,7 @@
+ #include "X86GenVexPublicPlans.inc"
+ #undef X86_DEFINE_VEX2_PUBLIC_PLANS
+ #undef X86_DEFINE_VEX3_PUBLIC_PLANS
+-#include "X86GenBatchPrimary.inc"
++#include "X86PrimaryScan.h"
+ #include "X86FeatureExtension.h"
+ #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+@@ -36,52 +36,6 @@
+ #undef X86_SHIFT_SCAN_IDS
+ #endif
+ 
+-/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
+-static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
+-			 unsigned *tail)
+-{
+-	if (size <= offset)
+-		return false;
+-	const uint8_t modrm = code[offset];
+-	if (modrm >= 0xc0) {
+-		*tail = 0;
+-		return true;
+-	}
+-	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
+-					       { 1, 1, 1, 1, 2, 1, 1, 1 },
+-					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
+-	unsigned length = lengths[modrm >> 6][modrm & 7];
+-	if ((modrm & 0xc7) == 4) {
+-		if (size <= offset + 1)
+-			return false;
+-		if ((code[offset + 1] & 7) == 5)
+-			length += 4;
+-	}
+-	*tail = length;
+-	return true;
+-}
+-
+-static uint32_t readPrimary(const uint8_t *code, size_t size, unsigned plan)
+-{
+-	if (plan & X86_BATCH_REG_GROUP) {
+-		if (size < 2)
+-			return 0;
+-		const uint8_t mr = code[1];
+-		plan = x86BatchRegGroups[plan & ~X86_BATCH_REG_GROUP]
+-					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
+-		if (!plan)
+-			return 0;
+-	}
+-	unsigned length = plan & 15;
+-	if (plan & 0x10) {
+-		unsigned tail;
+-		if (!addressBytes(code, size, 1, &tail))
+-			return 0;
+-		length += tail;
+-	}
+-	return length <= size ? (plan & ~0xffu) | length : 0;
+-}
+-
+ CS_DECODE_INLINE uint32_t finishVexPlan(const uint8_t *code, size_t size,
+ 					unsigned modrm_offset, unsigned payload,
+ 					unsigned plan)
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index ae1554b0..5add0b34 100644
 --- a/arch/X86/X86Disassembler.h
@@ -21,10 +87,10 @@ index ae1554b0..5add0b34 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..b95cc1c4 100644
+index 12428fff..4fc3fc98 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,9 +3753,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3753,9 +3753,17 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  					  cs_insn *insn, uint16_t *insn_size,
  					  bool batch);
  
@@ -35,9 +101,42 @@ index 12428fff..b95cc1c4 100644
  #include "../../cs_disasm_internal.h"
  #undef CS_DECODE_SCAN_IMPL
 +#undef CS_DECODE_OUTPUT_MISS
++
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++#include "X86PrimaryScan.h"
++#endif
  
  /* Keep the admitted terminal's public ID and zero alias adjustment visible
   * through output completion. Cold helpers can take the fallback result's
+@@ -3765,6 +3773,28 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch)
+ {
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++	if ((handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
++	    handle->insn_id == X86_get_insn_id &&
++	    handle->disasm == X86_getInstruction) {
++		const uint32_t *plans = handle->mode == CS_MODE_32 ?
++						x86Batch32Primary :
++						x86Batch64Primary;
++		const unsigned plan = plans[code[0]];
++		if (plan) {
++			const uint32_t word = readPrimary(code, size, plan);
++			if (word) {
++				const X86ScanResult result = {
++					0, word >> 8, (uint16_t)(word & 0xff), 0
++				};
++				*insn_size = result.length;
++				finish_x86_scan(handle, insn, &result, code,
++						batch, true);
++				return true;
++			}
++		}
++	}
++#endif
+ 	unsigned instructionID = 0;
+ 	uint16_t length;
+ 	int initial = tryInitialScanResult(handle, code, size, &instructionID,
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 index cec4bec6..2803dec3 100644
 --- a/arch/X86/X86OutputIterator.c
@@ -61,3 +160,64 @@ index cec4bec6..2803dec3 100644
 +}
 +#endif
  #endif
+diff --git a/arch/X86/X86PrimaryScan.h b/arch/X86/X86PrimaryScan.h
+new file mode 100644
+index 00000000..9e5396c5
+--- /dev/null
++++ b/arch/X86/X86PrimaryScan.h
+@@ -0,0 +1,55 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_PRIMARY_SCAN_H
++#define CS_X86_PRIMARY_SCAN_H
++
++#include "X86GenBatchPrimary.inc"
++
++/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
++static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
++			 unsigned *tail)
++{
++	if (size <= offset)
++		return false;
++	const uint8_t modrm = code[offset];
++	if (modrm >= 0xc0) {
++		*tail = 0;
++		return true;
++	}
++	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
++					       { 1, 1, 1, 1, 2, 1, 1, 1 },
++					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
++	unsigned length = lengths[modrm >> 6][modrm & 7];
++	if ((modrm & 0xc7) == 4) {
++		if (size <= offset + 1)
++			return false;
++		if ((code[offset + 1] & 7) == 5)
++			length += 4;
++	}
++	*tail = length;
++	return true;
++}
++
++static uint32_t readPrimary(const uint8_t *code, size_t size, unsigned plan)
++{
++	if (plan & X86_BATCH_REG_GROUP) {
++		if (size < 2)
++			return 0;
++		const uint8_t mr = code[1];
++		plan = x86BatchRegGroups[plan & ~X86_BATCH_REG_GROUP]
++					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
++		if (!plan)
++			return 0;
++	}
++	unsigned length = plan & 15;
++	if (plan & 0x10) {
++		unsigned tail;
++		if (!addressBytes(code, size, 1, &tail))
++			return 0;
++		length += tail;
++	}
++	return length <= size ? (plan & ~0xffu) | length : 0;
++}
++
++#endif
