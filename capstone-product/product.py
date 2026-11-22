@@ -12,65 +12,66 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['official_capstone']
-assert all(sha(r/(stage+'.patch'))==m[stage]['sha256'] for stage in ('cold','early'))
+assert sha(r/'writer.patch')==m['writer']['sha256']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
 try:
     build=t/'build';cases=corpus.prepare(r,t,out,command)
-    selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls'}
-    cases=[c for c in cases if c['name'] in selected]
-    assert {c['name']for c in cases}==selected
-    for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
-    command([sys.executable,t/'libmvec.py'],'libmvec')
-    glibc=json.loads((t/'libmvec.json').read_text());cases.append(dict(name='libmvec-amd64',selector=64,path=str(t/'libmvec.text'),text_sha256=glibc['text_sha256']))
-    cases.append(avx_corpus.prepare(r,t,out,command))
-    data=load_ssl.prepare(r,t,out,command)
-    cases.append(data)
+    pe,=[c for c in cases if c['name']=='putty-64-0.85'];meta=json.loads((r/'extents.json').read_text())
+    assert pe['text_sha256']==meta['source']['text_sha256']
+    for k,z in meta['checked'].items():assert sha(r/(k+'.tsv'))==z['sha256']
+    shutil.copyfile(r/'attribution.cpp',nd/'attribution.cpp')
     shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp')
-    with (nd/'CMakeLists.txt').open('a') as f:f.write('\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
+    with (nd/'CMakeLists.txt').open('a') as f:f.write('\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\nadd_executable(capstone-attribution attribution.cpp)\ntarget_link_libraries(capstone-attribution PRIVATE NeverDDecode)\n')
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
-    for variant in ('base','cold','early'):
-        if variant=='early':command(['git','restore','--source',m['official_capstone'],'--staged','--worktree','--','.'],'restore-release',cs)
-        if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
+    for variant in ('base','writer'):
+        if variant=='writer':command(['git','apply','--index',r/'writer.patch'],'apply-writer',cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree']
         decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
+        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product','capstone-attribution',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
-        binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
-        archive,=build.rglob('libcapstone.a')
-        identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
+        products[variant]={};archive,=build.rglob('libcapstone.a')
+        for surface in ('product','attribution'):
+            binary,=build.rglob('capstone-'+surface)
+            products[variant][surface]=t/(variant+'-'+surface);shutil.copy2(binary,products[variant][surface])
+        identities[variant]=dict(archive=sha(archive),bins={k:sha(z)for k,z in products[variant].items()},cap_tree=actual,llvm=llvm,decoder=sha(decoder))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
-    shutil.copy2(products['base'],t/'selected')
-    imgs={k:v.read_bytes()for k,v in products.items()};imgs['copy']=imgs['base']
-    length=max(map(len,imgs.values()));imgs={k:v+bytes(length-len(v))for k,v in imgs.items()}
-    def execute(k,case,mode,reps):
-        (t/'selected').write_bytes(imgs[k])
-        sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',4:'mips64el'}[case['selector']]
-        return list(map(int,sp.check_output(['setarch','x86_64','-R',t/'selected',case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
-    rows=[];rng=random.Random(1739)
-    for c in cases:
-        for mode in (range(4) if c['selector'] in (32,64) else range(3)):
-            single=execute('base',c,mode,1)
-            n=max(1,round(65000/single[0]))
-            expected=execute('base',c,mode,n)[1:];cycles=[]
-            if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            for rep in range(13):
-                keys=['base','copy','cold','early'];rng.shuffle(keys);ticks={v:[] for v in keys}
-                for k in keys+keys[::-1]:
-                    sample=execute(k,c,mode,n)
-                    assert expected==sample[1:],(c['name'],mode,k,expected,sample)
-                    ticks[k].append(sample[0])
-                cycles.append(ticks)
-            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],reps=n,cycles=cycles))
-            save('timings',rows)
-    save('complete',dict(done=True,pairs=13,panels=len(rows),source=llvm))
+    from random import Random
+    surfaces=['product','attribution']
+    exe=t/'selected';shutil.copy2(products['base']['product'],exe)
+    payload={surface:{k:v[surface].read_bytes()for k,v in products.items()}for surface in surfaces}
+    length=max(len(b) for variants in payload.values() for b in variants.values())
+    for variants in payload.values():
+        variants['copy']=variants['base']
+        for k,raw in list(variants.items()):variants[k]=raw+bytes(length-len(raw))
+    def once(surface,k,region,entry,repetitions):
+        exe.write_bytes(payload[surface][k])
+        path=r/(region+'.tsv')
+        result=sp.check_output(['setarch','x86_64','-R',exe,pe['path'],'64',str(entry),str(repetitions),path],text=True)
+        return list(map(int,result.split()))
+    timings=[];rng=Random(1802)
+    for region in meta['checked']:
+        for surface in surfaces:
+            if surface=='product' and region!='whole-low':continue
+            for entry in ([1,2] if surface=='product' else [1,2,4,5]):
+                first=once(surface,'base',region,entry,1);n=max(1,round(85000/first[0]))
+                expect=once(surface,'base',region,entry,n)[1:];cycles=[]
+                for i in range(17):
+                    keys=['base','copy','writer'];rng.shuffle(keys);ticks={k:[]for k in keys}
+                    for k in keys+keys[::-1]:
+                        sample=once(surface,k,region,entry,n);assert sample[1:]==expect,(surface,region,entry,k)
+                        ticks[k].append(sample[0])
+                    cycles.append(ticks)
+                timings.append(dict(surface=surface,region=region,entry=entry,reps=n,first=first[1:],score=expect,cycles=cycles));save('timings',timings)
+    assert len(timings)==22
+    save('complete',dict(done=True,panels=len(timings),raw=meta,host=cpu,source=llvm,pairs=17))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())
     shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))

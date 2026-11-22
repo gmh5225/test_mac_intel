@@ -1,7 +1,7 @@
-name: Compare AMD64 conditional moves and combined i386 AMD64 output in current LLVM source-built NeverD executables
+name: Attribute PE64 conditional moves to actual image extents and entries in the same NeverD executable
 on:
   push:
-    branches: [codex/capstone-cmov-shipping-products]
+    branches: [codex/capstone-cmov64-extents-and-entry]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 7dbd226c04c1232e30666f54526bc13e7999cc45
+          ref: f96080f7401b3892794b3ace9625e4f19e232277
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,8 +48,8 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "7dbd226c04c1232e30666f54526bc13e7999cc45"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "77b7043a31582684a0234f104a1fc24d90f0a12d"
+          test "$(git rev-parse HEAD)" = "f96080f7401b3892794b3ace9625e4f19e232277"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "989508842d378789f9d98465de059feb99913c96"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -62,6 +62,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: conditional-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: cmov-attribution-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
