@@ -109,6 +109,9 @@ def main(w):
             run([w/'mandatory'],'mandatory-oracle')
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'rounded.cpp',w/'second.o',b/'libcapstone.a','-o',w/'rounded'],'build-rounded')
             run([w/'rounded'],'rounded-oracle')
+            run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'shift.cpp',w/'second.o',b/'libcapstone.a','-o',w/'shift'],'build-shift')
+            run([w/'shift'],'shift-oracle')
+            assert sp.check_output([w/'producer','--evex-shifts'])==(base/'arch/X86/X86GenEvexShiftOutput.inc').read_bytes()
             assert sp.check_output([w/'producer','--rounded-registers64'])==(base/'arch/X86/X86GenRoundedRegister64.inc').read_bytes()
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'vex3.cpp',w/'second.o',b/'libcapstone.a','-o',w/'vex3'],'build-vex3')
             run([w/'vex3'],'vex3-oracle')
@@ -140,7 +143,7 @@ def main(w):
             if label=='scalar':previous_wide=members
             else:
                 incremental={k for k in members if members[k]!=previous_wide[k]}
-                assert 'X86BatchScan.c.o' in incremental and incremental <= {'X86BatchScan.c.o','X86Sse64Output.c.o'},incremental
+                assert incremental=={'X86BatchScan.c.o'},incremental
                 save('rounded-isolation.json',dict(incremental=sorted(incremental),unchanged_public=(sha(w/'unselected-scalar')==sha(ordinary))))
             save('isolation-'+label+'.json',dict(added=sorted(members.keys()-prior.keys()),unchanged=len(prior),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
