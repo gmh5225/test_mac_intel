@@ -1,7 +1,7 @@
-name: Compare native Apple Intel ARM64 and Linux batch scanners on source-built iced and frozen real inputs
+name: Compare batch, Intel text and register detail against source-built iced on four native hosts
 on:
   push:
-    branches: [codex/capstone-portable-real-batch]
+    branches: [codex/capstone-release-format-detail-batch-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
+          ref: 68ca96c3343b0a7c110b9db372a9ee2642d857ef
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: portable-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: release-modes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
