@@ -23,7 +23,7 @@ jobs:
         run: |
           test "$(uname -m)" = aarch64
           apt-get update -qq
-          apt-get install -y --no-install-recommends 7zip msitools wimtools mtools fdisk gcc libc6-dev pkg-config libglib2.0-dev qemu-system-arm qemu-efi-aarch64 python3 ca-certificates
+          apt-get install -y --no-install-recommends 7zip msitools wimtools llvm mtools fdisk gcc libc6-dev pkg-config libglib2.0-dev qemu-system-arm qemu-efi-aarch64 python3 ca-certificates
       - name: Boot the original ARM64 WinPE image and observe the signed inbox PE entry
         run: |
           python3 native-driver-entry/winpe/prepare.py /tmp/neverd-entry

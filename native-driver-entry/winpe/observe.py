@@ -87,6 +87,7 @@ with Path("qemu.log").open("w") as log:
 proof=json.loads(record.read_text())
 fixture=json.loads((work/"fixture.json").read_text())
 assert proof['entry_rva'] == int(fixture['entry_rva'],16)
+assert proof['body_rva'] == int(fixture['driver_entry_rva'],16) and proof['x0_x1_forwarded_unchanged']
 assert proof['x0_driver_start_matches_image'] and proof['both_arguments_distinct_and_aligned']
 assert proof['x1_counted_registry_path'].lower().endswith('\\services\\null')
 result={"host_architecture":platform.machine(),"execution":"unmodified Windows ARM64 kernel in a QEMU TCG guest",

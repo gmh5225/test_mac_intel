@@ -12,6 +12,7 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 static struct qemu_plugin_register *x0, *x1;
 static GByteArray *scratch;
 static gboolean published;
+static uint64_t entry_image, entry_object, entry_path;
 
 static void registers(qemu_plugin_id_t id, unsigned int cpu) {
     (void)id;
@@ -46,12 +47,14 @@ static gboolean read_arg(struct qemu_plugin_register *reg, uint64_t *value) {
 }
 
 static void observe(unsigned int cpu, void *data) {
-    uint64_t pc = (uintptr_t)data, base = pc - ENTRY_RVA, object, string, owner, buffer;
+    uint64_t pc = (uintptr_t)data, object, string, owner, buffer;
+    gboolean is_entry = (pc & 4095) == (ENTRY_RVA & 4095);
+    uint64_t base = pc - (is_entry ? ENTRY_RVA : BODY_RVA);
     uint32_t image_size, timestamp, actual_entry;
     uint16_t type, length, maximum, machine;
     unsigned char prefix[sizeof(entry_bytes)];
     if (cpu || published || !read_field(pc, prefix, sizeof(prefix)) ||
-        memcmp(prefix, entry_bytes, sizeof(prefix)) ||
+        memcmp(prefix, is_entry ? entry_bytes : body_bytes, sizeof(prefix)) ||
         !read_field(base + PE_OFFSET + 4, &machine, 2) || machine != 0xaa64 ||
         !read_field(base + PE_OFFSET + 8, &timestamp, 4) || timestamp != PE_TIME ||
         !read_field(base + PE_OFFSET + 40, &actual_entry, 4) || actual_entry != ENTRY_RVA ||
@@ -78,13 +81,19 @@ static void observe(unsigned int cpu, void *data) {
     gboolean matched = g_str_has_prefix(lower, "\\registry\\machine\\system\\") &&
                        g_str_has_suffix(lower, "\\services\\null");
     g_free(lower);
-    if (matched) {
+    if (matched && is_entry) {
+        entry_image = base;
+        entry_object = object;
+        entry_path = string;
+    }
+    if (matched && !is_entry && entry_image == base &&
+        entry_object == object && entry_path == string) {
         gchar *escaped = g_strescape(name, NULL);
         char *report = g_strdup_printf("{\"guest\":\"Microsoft Windows PE ARM64\","
-            "\"driver\":\"null.sys\",\"event\":\"original PE entry before its first instruction\","
+            "\"driver\":\"null.sys\",\"event\":\"PE entry and PDB-identified DriverEntry before their first instructions\","
             "\"entry_rva\":%u,\"driver_object_type\":%u,\"x0_driver_start_matches_image\":true,"
             "\"x1_counted_registry_path\":\"%s\",\"registry_length_bytes\":%u,"
-            "\"both_arguments_distinct_and_aligned\":true}\n", ENTRY_RVA, type, escaped, length);
+            "\"both_arguments_distinct_and_aligned\":true,\"x0_x1_forwarded_unchanged\":true,\"body_rva\":%u}\n", ENTRY_RVA, type, escaped, length, BODY_RVA);
         if (g_file_set_contents("observed.json", report, -1, &error))
             published = TRUE;
         else {
@@ -100,13 +109,14 @@ static void observe(unsigned int cpu, void *data) {
 static void translated(qemu_plugin_id_t id, struct qemu_plugin_tb *tb) {
     (void)id;
     uint64_t pc = qemu_plugin_tb_vaddr(tb);
-    if (published || !(pc >> 63) || (pc & 4095) != (ENTRY_RVA & 4095) ||
+    if (published || !(pc >> 63) ||
+        ((pc & 4095) != (ENTRY_RVA & 4095) && (pc & 4095) != (BODY_RVA & 4095)) ||
         !qemu_plugin_tb_n_insns(tb))
         return;
     struct qemu_plugin_insn *first = qemu_plugin_tb_get_insn(tb, 0);
     unsigned char op[4];
     if (qemu_plugin_insn_data(first, op, sizeof(op)) == sizeof(op) &&
-        memcmp(op, entry_bytes, sizeof(op)) == 0)
+        memcmp(op, (pc & 4095) == (ENTRY_RVA & 4095) ? entry_bytes : body_bytes, sizeof(op)) == 0)
         qemu_plugin_register_vcpu_insn_exec_cb(first, observe, QEMU_PLUGIN_CB_R_REGS,
                                               (void *)(uintptr_t)pc);
 }

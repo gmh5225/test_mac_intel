@@ -3,6 +3,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import struct
@@ -126,14 +127,48 @@ opt = pe+24
 assert machine == 0xaa64 and struct.unpack_from("<H",raw,opt)[0] == 0x20b
 entry = struct.unpack_from("<I",raw,opt+16)[0]
 image_size = struct.unpack_from("<I",raw,opt+56)[0]
-for i in range(sections):
-    sect = opt+size+40*i
-    rva, size_on_disk, offset = struct.unpack_from("<III",raw,sect+12)
-    if rva <= entry and entry+32 <= rva+size_on_disk:
-        signature = raw[offset+entry-rva:offset+entry-rva+32]
-        break
-else:
-    raise ValueError("ARM64 PE entry is not backed by 32 file bytes")
-(ROOT/"fixture.h").write_text(f"#define ENTRY_RVA 0x{entry:x}u\n#define IMAGE_SIZE 0x{image_size:x}u\n#define PE_OFFSET {pe}u\n#define PE_TIME 0x{timestamp:x}u\nstatic const unsigned char entry_bytes[] = {{"+", ".join(f"0x{b:02x}" for b in signature)+"};\n")
-(ROOT/"fixture.json").write_text(json.dumps({"architecture":"ARM64","source":URL,"installer_sha256":INSTALLER,"windows_pe_wim_sha256":digest(wim),"driver":"null.sys","driver_sha256":digest(driver),"entry_rva":hex(entry),"size_of_image":image_size,"timestamp":timestamp,"entry_sha256":hashlib.sha256(signature).hexdigest()},indent=2))
+headers=[struct.unpack_from("<III",raw,opt+size+40*i+12) for i in range(sections)]
+def backed(rva, n):
+    for start, length, offset in headers:
+        if start <= rva and rva+n <= start+length:
+            return raw[offset+rva-start:offset+rva-start+n]
+    raise ValueError("The selected PE range is missing from the original image")
+
+# Microsoft's public PDB can be resealed at a later stream age; the DBI age
+# and the RSDS GUID identify the original image's symbol records.
+guid = "F596D8BB-656C-99BA-7D41-1343DCB65B80"
+age = 1
+debug_rva, debug_size = struct.unpack_from("<II", raw, opt+112+6*8)
+debug = backed(debug_rva, debug_size)
+import uuid
+records = []
+for pos in range(0,len(debug),28):
+    kind, length, _, off = struct.unpack_from("<IIII",debug,pos+12)
+    if kind == 2:
+        records.append(raw[off:off+length])
+assert len(records)==1 and records[0].startswith(b"RSDS")
+assert uuid.UUID(bytes_le=records[0][4:20])==uuid.UUID(guid) and struct.unpack_from("<I",records[0],20)[0]==age
+pdb = ROOT/"null.pdb"
+pdb_url = "https://msdl.microsoft.com/download/symbols/null.pdb/"+guid.replace("-","")+str(age)+"/null.pdb"
+fetch(pdb_url, pdb, "9a8c723cda5af1703c9ab1ccf11a19a0aa91519707f406c58def2894069c2e49", "sha256")
+pdbutil = os.environ.get("NEVERD_TEST_PDBUTIL","llvm-pdbutil")
+info = subprocess.check_output([pdbutil,"pdb2yaml","-dbi-stream","-pdb-stream",pdb],text=True)
+stream, dbi = info.split("DbiStream:",1)
+assert guid.lower() in stream.lower() and int(re.search(r"(?m)^  Age:\s+(\d+)",dbi)[1])==age
+publics = subprocess.check_output([pdbutil,"dump","-publics",pdb],text=True)
+def public_rva(name):
+    matches=re.findall(r"S_PUB32[^\n]*`"+name+r"`\s+flags = function, addr = (\d+):(\d+)",publics)
+    assert len(matches)==1, (name,matches)
+    section,offset=map(int,matches[0])
+    assert 1<=section<=len(headers)
+    return headers[section-1][0]+offset
+assert public_rva("GsDriverEntry")==entry
+body = public_rva("DriverEntry")
+assert body != entry
+def c_bytes(name, rva):
+    signature = backed(rva,32)
+    return f"static const unsigned char {name}[] = {{"+", ".join(f"0x{b:02x}" for b in signature)+"};\n"
+
+(ROOT/"fixture.h").write_text(f"#define ENTRY_RVA 0x{entry:x}u\n#define BODY_RVA 0x{body:x}u\n#define IMAGE_SIZE 0x{image_size:x}u\n#define PE_OFFSET {pe}u\n#define PE_TIME 0x{timestamp:x}u\n"+c_bytes("entry_bytes",entry)+c_bytes("body_bytes",body))
+(ROOT/"fixture.json").write_text(json.dumps({"architecture":"ARM64","source":URL,"installer_sha256":INSTALLER,"windows_pe_wim_sha256":digest(wim),"driver":"null.sys","driver_sha256":digest(driver),"pdb_sha256":digest(pdb),"pdb_guid":guid,"dbi_age":age,"entry_rva":hex(entry),"driver_entry_rva":hex(body),"size_of_image":image_size,"timestamp":timestamp,"entry_sha256":hashlib.sha256(backed(entry,32)).hexdigest(),"driver_entry_sha256":hashlib.sha256(backed(body,32)).hexdigest()},indent=2))
 print("Microsoft ARM64 boot media and exact inbox-driver entry verified.", flush=True)
