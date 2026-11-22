@@ -1,7 +1,7 @@
-name: Measure constant-width native batch loops with matched opcode tables on ELF and both PE widths
+name: Verify generated VEX3 instruction extents and compare every new claim to the full decoder and real vector images
 on:
   push:
-    branches: [codex/capstone-width-specialized-batch]
+    branches: [codex/capstone-generated-vex3-extent-plan]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: width-loops-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: generated-vex3-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

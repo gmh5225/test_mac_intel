@@ -26,10 +26,10 @@ index b8b582a0..336293f0 100644
  
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
 new file mode 100644
-index 00000000..4c79f638
+index 00000000..9953ea09
 --- /dev/null
 +++ b/arch/X86/X86BatchScan.c
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,269 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -215,10 +215,10 @@ index 00000000..4c79f638
 +	return 0;
 +}
 +
-+static inline X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
-+					   size_t size, uint64_t address,
-+					   uint32_t *output, size_t capacity,
-+					   bool wide)
++CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
++					      size_t size, uint64_t address,
++					      uint32_t *output, size_t capacity,
++					      bool wide)
 +{
 +	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 +	X86ScanBatchResult batch = { 0, 0 };
@@ -246,6 +246,36 @@ index 00000000..4c79f638
 +	}
 +	return batch;
 +}
++
++/* The width is constant throughout this loop. */
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((noinline, section(".cs_x86_batch32_text")))
++#elif defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static X86ScanBatchResult scanBatch32(csh ud, const uint8_t *code, size_t size,
++				      uint64_t address, uint32_t *output,
++				      size_t capacity)
++{
++	return scanBatch(ud, code, size, address, output, capacity, false);
++}
++
++/* The width is constant throughout this loop. */
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((noinline, section(".cs_x86_batch64_text")))
++#elif defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static X86ScanBatchResult scanBatch64(csh ud, const uint8_t *code, size_t size,
++				      uint64_t address, uint32_t *output,
++				      size_t capacity)
++{
++	return scanBatch(ud, code, size, address, output, capacity, true);
++}
 +#endif
 +
 +CAPSTONE_INTERNAL
@@ -259,11 +289,11 @@ index 00000000..4c79f638
 +	    output && capacity && size && handle->insn_id == X86_get_insn_id &&
 +	    handle->disasm == X86_getInstruction) {
 +		if (handle->mode == CS_MODE_32)
-+			return scanBatch(ud, code, size, address, output,
-+					 capacity, false);
++			return scanBatch32(ud, code, size, address, output,
++					   capacity);
 +		if (handle->mode == CS_MODE_64)
-+			return scanBatch(ud, code, size, address, output,
-+					 capacity, true);
++			return scanBatch64(ud, code, size, address, output,
++					   capacity);
 +	}
 +#endif
 +	return X86_scanBatch(ud, code, size, address, output, capacity);
