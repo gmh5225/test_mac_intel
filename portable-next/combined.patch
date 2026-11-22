@@ -1,189 +1,3 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 46b3184d..cba52a39 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1038,27 +1038,33 @@ set(ALL_HEADERS
- set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
- 
- ## targets
-+add_library(capstone_build_settings INTERFACE)
- add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
-+target_link_libraries(capstone PUBLIC capstone_build_settings)
- set_property(TARGET capstone PROPERTY C_STANDARD 99)
--target_include_directories(capstone PUBLIC
-+target_include_directories(capstone_build_settings INTERFACE
-     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
- )
- set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
- 
--# The i386 iterator is an internal static-link entry used by NeverD.
--if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
-+# Public and fixed-mode iterators share these readers in both library forms.
-+if(CAPSTONE_X86_SUPPORT)
-     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
--    target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
-+    target_link_libraries(capstone_x86_iter32 PRIVATE capstone_build_settings)
-     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-     add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
--    target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
-+    target_link_libraries(capstone_x86_iter64 PRIVATE capstone_build_settings)
-     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
-         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
-     endif()
-     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
--    target_link_libraries(capstone_x86_native PRIVATE capstone)
-+    target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
-     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-+    set(capstone_x86_objects
-+        $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-+        $<TARGET_OBJECTS:capstone_x86_native>)
-+    target_sources(capstone INTERFACE ${capstone_x86_objects})
- endif()
- 
- if(CAPSTONE_BUILD_STATIC_LIBS)
-@@ -1094,7 +1100,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
- endif()
- 
- if(CAPSTONE_BUILD_SHARED_LIBS)
--    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone>)
-+    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects})
-     # Use normal capstone name. Otherwise we get libcapstone_shared.so
-     set_target_properties(capstone_shared PROPERTIES OUTPUT_NAME "capstone")
-     set_target_properties(capstone_shared PROPERTIES
-@@ -1104,7 +1110,7 @@ if(CAPSTONE_BUILD_SHARED_LIBS)
-     target_include_directories(capstone_shared PUBLIC
-         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-     )
--    target_compile_definitions(capstone PUBLIC CAPSTONE_SHARED)
-+    target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_SHARED)
-     # Build pdb file for dll on Windows
-     if(MSVC)
-         message("Enabling PDB for Windows")
-diff --git a/Makefile b/Makefile
-index da328571..470de3c8 100644
---- a/Makefile
-+++ b/Makefile
-@@ -434,8 +434,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
- LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
- LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
- LIBOBJ += $(LIBOBJ_X86_NUMBERS)
--LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
- LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
-+LIBOBJ_SHARED := $(LIBOBJ)
- 
- 
- ifeq ($(PKG_EXTRA),)
-diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..0e85164d 100644
---- a/arch/X86/X86BatchScan.c
-+++ b/arch/X86/X86BatchScan.c
-@@ -350,4 +350,13 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
- #endif
- 	return X86_scanBatch(ud, code, size, address, output, capacity);
- }
-+
-+#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+/* The public iterator uses exactly the same validated ID and extent as the
-+ * batch reader. Zero passes the original input to the canonical scanner. */
-+uint32_t X86_readScanWord(const uint8_t *code, size_t size, bool wide)
-+{
-+	return wide ? readFirst64(code, size) : readFirst32(code, size);
-+}
-+#endif
- #endif
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..92196e8d 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -30,6 +30,17 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
- 					 uint16_t *insn_size);
- #endif
- 
-+#if !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#define CAPSTONE_X86_PUBLIC_OUTPUT
-+#ifndef CAPSTONE_X86_SCAN_ADAPTER
-+CAPSTONE_INTERNAL uint32_t X86_readScanWord(const uint8_t *code, size_t size,
-+					  bool wide);
-+#endif
-+#endif
-+
- bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			MCInst *instr, uint16_t *size, uint64_t address,
- 			void *info);
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..e38dfd51 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3787,12 +3787,65 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 	return true;
- }
- 
-+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+/* Only scan calls need the scan decoder's stack frame and mapping state. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+static bool disasmScanIterator(cs_struct *handle, const uint8_t **code,
-+			       size_t *size, uint64_t *address, cs_insn *insn)
-+{
-+	return cs_disasm_iter_valid(handle, code, size, address, insn, true);
-+}
-+#endif
-+
- CAPSTONE_EXPORT
- X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
- 				 uint64_t *address, cs_insn *insn)
- {
-+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (*size == 0 || !handle)
-+		return false;
-+	if (handle->arch == CS_ARCH_X86) {
-+		if (!handle->no_text) {
-+			if (handle->mode == CS_MODE_64)
-+				return X86_disasmIterText(ud, code, size, address, insn);
-+			if (handle->mode == CS_MODE_32)
-+				return X86_disasmIter32(ud, code, size, address, insn);
-+#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
-+			return X86_disasmIter(ud, code, size, address, insn);
-+#endif
-+		} else if (!handle->detail_opt) {
-+#ifndef CAPSTONE_X86_SCAN_ADAPTER
-+			if ((handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
-+			    handle->insn_id == X86_get_insn_id &&
-+			    handle->disasm == X86_getInstruction) {
-+				const uint32_t word = X86_readScanWord(
-+					*code, *size, handle->mode == CS_MODE_64);
-+				if (word) {
-+					const X86ScanResult result = {
-+						0, word >> 8, (uint16_t)(word & 0xff), 0
-+					};
-+					handle->errnum = CS_ERR_OK;
-+					insn->address = *address;
-+					finish_x86_scan(handle, insn, &result,
-+							*code, false, true);
-+					advance_iter(code, size, address, result.length);
-+					return true;
-+				}
-+			}
-+#endif
-+			return disasmScanIterator(handle, code, size, address, insn);
-+		}
-+	}
-+	return cs_disasm_iter_valid(handle, code, size, address, insn, false);
-+#else
- 	return cs_disasm_iter_core(ud, code, size, address, insn);
-+#endif
- }
- 
- X86_DECODE_ALIGN
 diff --git a/arch/X86/X86GenEvexRipMemory.inc b/arch/X86/X86GenEvexRipMemory.inc
 new file mode 100644
 index 00000000..0d10a9f3
@@ -295,6 +109,87 @@ index 00000000..0d10a9f3
 +		0x000000u, 0x000000u, 0x000000u, 0x000000u, 0x000000u, 0x000000u, 0x000000u, 0x000000u,
 +	},
 +};
+diff --git a/arch/X86/X86GenLegacyMap38Registers.inc b/arch/X86/X86GenLegacyMap38Registers.inc
+new file mode 100644
+index 00000000..ebaed95d
+--- /dev/null
++++ b/arch/X86/X86GenLegacyMap38Registers.inc
+@@ -0,0 +1,75 @@
++/* Generated by suite/synctools/x86_vector_output.cpp --legacy-map38-registers. */
++static const struct VectorOutputRow legacy_map38_rows[] = {
++	{ 0 },
++	{ X86_INS_PSHUFB, "pshufb", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PHADDW, "phaddw", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PHADDD, "phaddd", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PHADDSW, "phaddsw", 0, { 0, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMADDUBSW, "pmaddubsw", 0, { 0, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PHSUBW, "phsubw", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PHSUBD, "phsubd", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PHSUBSW, "phsubsw", 0, { 0, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PSIGNB, "psignb", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PSIGNW, "psignw", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PSIGND, "psignd", 1, { 154, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMULHRSW, "pmulhrsw", 0, { 0, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PABSB, "pabsb", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PABSW, "pabsw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PABSD, "pabsd", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVSXBW, "pmovsxbw", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVSXBD, "pmovsxbd", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVSXBQ, "pmovsxbq", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVSXWD, "pmovsxwd", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVSXWQ, "pmovsxwq", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVSXDQ, "pmovsxdq", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMULDQ, "pmuldq", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PCMPEQQ, "pcmpeqq", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PACKUSDW, "packusdw", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVZXBW, "pmovzxbw", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVZXBD, "pmovzxbd", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVZXBQ, "pmovzxbq", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVZXWD, "pmovzxwd", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVZXWQ, "pmovzxwq", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PMOVZXDQ, "pmovzxdq", 1, { 151, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_PCMPGTQ, "pcmpgtq", 1, { 152, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMINSB, "pminsb", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMINSD, "pminsd", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMINUW, "pminuw", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMINUD, "pminud", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMAXSB, "pmaxsb", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMAXSD, "pmaxsd", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMAXUW, "pmaxuw", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMAXUD, "pmaxud", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PMULLD, "pmulld", 1, { 151, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_PHMINPOSUW, "phminposuw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_SHA1NEXTE, "sha1nexte", 1, { 147, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_SHA1MSG1, "sha1msg1", 1, { 147, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_SHA1MSG2, "sha1msg2", 1, { 147, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_SHA256MSG1, "sha256msg1", 1, { 147, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_SHA256MSG2, "sha256msg2", 1, { 147, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_GF2P8MULB, "gf2p8mulb", 0, { 0, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_AESIMC, "aesimc", 1, { 130, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_AESENC, "aesenc", 1, { 130, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_AESENCLAST, "aesenclast", 1, { 130, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_AESDEC, "aesdec", 1, { 130, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++	{ X86_INS_AESDECLAST, "aesdeclast", 1, { 130, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
++};
++/* Low seven bits index legacy_map38_rows; bit 7 reverses the operands. */
++static const uint8_t legacy_map38_plans[256] = {
++	1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 14, 15, 0,
++	16, 17, 18, 19, 20, 21, 0, 0, 22, 23, 0, 24, 0, 0, 0, 0,
++	25, 26, 27, 28, 29, 30, 0, 31, 32, 33, 34, 35, 36, 37, 38, 39,
++	40, 41, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 42, 43, 44, 0, 45, 46, 0, 47,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 48, 49, 50, 51, 52,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++};
 diff --git a/arch/X86/X86PlainEvexOutput.c b/arch/X86/X86PlainEvexOutput.c
 index a82a55c5..c4b204af 100644
 --- a/arch/X86/X86PlainEvexOutput.c
@@ -396,10 +291,65 @@ index 86c0f8b9..03c98df9 100644
   * Other compilers retain the established static reader. */
  #if defined(__clang__)
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index b244bb4c..5ad39c4c 100644
+index b244bb4c..22aa2ae0 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -96,6 +96,9 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -33,6 +33,38 @@
+ #include "X86GenLegacyPackedMemory.inc"
+ 
+ #include "X86GenLegacyRegisterImmediates.inc"
++#include "X86GenLegacyMap38Registers.inc"
++
++static void setLegacyRegisterOpcode(cs_insn *insn, const uint8_t *opcode,
++				    unsigned count)
++{
++	if (insn->detail) {
++		cs_x86 *x = &insn->detail->x86;
++		x->prefix[2] = 0x66;
++		memset(x->opcode, 0, sizeof(x->opcode));
++		memcpy(x->opcode, opcode, count);
++	}
++}
++
++/* The caller has checked the escape and the entire register encoding. */
++static bool writeLegacyMap38Registers(const uint8_t *code, cs_insn *insn,
++				      uint16_t *insn_size, unsigned offset,
++				      uint8_t rex)
++{
++	const unsigned plan = legacy_map38_plans[code[offset - 1]];
++	if (!plan)
++		return false;
++	const unsigned mr = code[offset];
++	const unsigned reg = ((mr >> 3) & 7) | ((rex & 4) << 1);
++	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
++	const unsigned regs[] = { plan & 128 ? rm : reg,
++				  plan & 128 ? reg : rm };
++	writeVectorRegisters(code, insn, insn_size,
++			     &legacy_map38_rows[plan & 127], offset - 1, 0, rex,
++			     0, regs, 2);
++	setLegacyRegisterOpcode(insn, code + offset - 3, 3);
++	return true;
++}
+ 
+ /* The caller checked a complete 66 [REX] 0F 70..73 /r ib register form. */
+ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+@@ -50,14 +82,7 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+ 	writeVectorRegisters(code, insn, insn_size,
+ 			     &legacy_immediate_rows[plan - 1], offset - 2, 0,
+ 			     rex, 0, regs, shuffle ? 2 : 1);
+-	if (insn->detail) {
+-		/* Legacy prefix and escaped opcode have separate public fields. */
+-		cs_x86 *x = &insn->detail->x86;
+-		x->prefix[2] = 0x66;
+-		x->opcode[0] = 0x0f;
+-		x->opcode[1] = (uint8_t)opcode;
+-		x->opcode[2] = 0;
+-	}
++	setLegacyRegisterOpcode(insn, code + offset - 3, 2);
+ 	return true;
+ }
+ 
+@@ -96,6 +121,9 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
  	    X86_writePlainEvexRegisters(handle, code, insn, insn_size))
  		return true;
@@ -409,97 +359,139 @@ index b244bb4c..5ad39c4c 100644
  	if (code[0] == 0xc4 &&
  	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
  					  x86_simple_registers, true))
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index f3dfc374..25d3d246 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -177,16 +177,24 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- }
- #undef CS_DECODE_SCAN
- 
-+CS_DECODE_INLINE void advance_iter(const uint8_t **code, size_t *size,
-+				   uint64_t *address, uint16_t length)
-+{
-+	*code += length;
-+	*size -= length;
-+	*address += length;
-+}
-+
- CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 					  const uint8_t **code, size_t *size,
--					  uint64_t *address, cs_insn *insn)
-+					  uint64_t *address, cs_insn *insn,
-+					  bool scan)
- {
- 	uint16_t insn_size;
- 	bool r;
- 
- 	handle->errnum = CS_ERR_OK;
- 
--	const bool scan = use_x86_scan(handle);
- 	insn->address = *address;
- #ifdef CAPSTONE_DIET
- 	// zero out mnemonic & op_str
-@@ -196,9 +204,7 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 
- 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
- 	if (CS_DECODE_LIKELY(r)) {
--		*code += insn_size;
--		*size -= insn_size;
--		*address += insn_size;
-+		advance_iter(code, size, address, insn_size);
- 	} else {
- 		return cs_disasm_iter_skipdata(handle, code, size, address,
- 					       insn);
-@@ -207,17 +213,14 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 	return true;
- }
- 
--CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
--					  size_t *size, uint64_t *address,
--					  cs_insn *insn)
-+CS_DECODE_INLINE bool cs_disasm_iter_valid(struct cs_struct *handle,
-+					   const uint8_t **code, size_t *size,
-+					   uint64_t *address, cs_insn *insn,
-+					   bool scan)
- {
--	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
- 	cs_detail *detail;
- 	bool r;
- 
--	if (*size == 0 || !handle)
--		return false;
--
- 	// An instruction cs_malloc() allocated while detail was on keeps its
- 	// detail after detail is turned off.  Much of the decoder tests only
- 	// whether that pointer is set, so a decode without detail hides it, as
-@@ -225,9 +228,20 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
- 	detail = insn->detail;
- 	if (CS_DECODE_LIKELY(!handle->detail_opt))
- 		insn->detail = NULL;
--	r = cs_disasm_iter_body(handle, code, size, address, insn);
-+	r = cs_disasm_iter_body(handle, code, size, address, insn, scan);
- 	insn->detail = detail;
- 	return r;
- }
- 
-+CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
-+					  size_t *size, uint64_t *address,
-+					  cs_insn *insn)
-+{
-+	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
-+	if (*size == 0 || !handle)
-+		return false;
-+	return cs_disasm_iter_valid(handle, code, size, address, insn,
-+				    use_x86_scan(handle));
-+}
-+
- #endif
+@@ -105,7 +133,13 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 		const unsigned offset = 4 + (rex != 0);
+ 		if (size >= offset && code[offset - 3] == 0x0f) {
+ 			const unsigned opcode = code[offset - 2];
+-			if (code[offset - 1] < 0xc0) {
++			if (opcode == 0x38 && code[0] == 0x66) {
++				if (size > offset && code[offset] >= 0xc0 &&
++				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++				    writeLegacyMap38Registers(
++					    code, insn, insn_size, offset, rex))
++					return true;
++			} else if (code[offset - 1] < 0xc0) {
+ 				const unsigned bank =
+ 					code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
+ 				const unsigned row =
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 5c2649f3..2d659f4a 100644
+index 5c2649f3..53f47d84 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -1945,6 +1945,142 @@ void emit_plain_evex_registers(Decoder &decoder)
+@@ -295,17 +295,24 @@ void emit_vex_indexed(Decoder &decoder)
+ // the ordinary decoder so special encodings and aliases retain its behavior.
+ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+ 				unsigned opcode, unsigned modrm, bool reverse,
+-				int immediate = -1)
++				int immediate = -1, bool map38 = false)
+ {
+-	uint8_t bytes[6] = { 0x66,	     uint8_t(rex),
+-			     0x0f,	     uint8_t(opcode),
+-			     uint8_t(modrm), uint8_t(immediate) };
+-	const unsigned header = rex ? 5 : 4;
++	uint8_t bytes[7];
++	unsigned length = 0;
++	bytes[length++] = 0x66;
++	if (rex)
++		bytes[length++] = uint8_t(rex);
++	bytes[length++] = 0x0f;
++	if (map38)
++		bytes[length++] = 0x38;
++	bytes[length++] = uint8_t(opcode);
++	bytes[length++] = uint8_t(modrm);
++	const unsigned header = length;
+ 	const bool has_imm = immediate >= 0;
+-	const unsigned size = header + has_imm;
++	if (has_imm)
++		bytes[length++] = uint8_t(immediate);
++	const unsigned size = length;
+ 	const unsigned registers = has_imm && opcode != 0x70 ? 1 : 2;
+-	if (!rex)
+-		std::memmove(bytes + 1, bytes + 2, 3 + has_imm);
+ 	const unsigned id = decoder.decode(bytes, size);
+ 	if (!id)
+ 		return {};
+@@ -323,7 +330,9 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+ 	cs_x86 expected{};
+ 	expected.prefix[2] = 0x66;
+ 	expected.opcode[0] = 0x0f;
+-	expected.opcode[1] = uint8_t(opcode);
++	expected.opcode[1] = map38 ? 0x38 : uint8_t(opcode);
++	if (map38)
++		expected.opcode[2] = uint8_t(opcode);
+ 	expected.rex = uint8_t(rex);
+ 	expected.addr_size = wide ? 8 : 4;
+ 	expected.modrm = uint8_t(modrm);
+@@ -416,7 +425,7 @@ void emit_legacy_immediates(Decoder &decoder)
+ 	std::puts("};");
+ }
+ 
+-void emit_legacy_registers(Decoder &wide)
++void emit_legacy_registers(Decoder &wide, bool map38 = false)
+ {
+ 	Decoder narrow(CS_MODE_32);
+ 	std::vector<std::string> rows;
+@@ -424,11 +433,11 @@ void emit_legacy_registers(Decoder &wide)
+ 	for (unsigned opcode = 0; opcode < plans.size(); ++opcode) {
+ 		bool reverse = false;
+ 		auto row = legacy_register_row(narrow, false, 0, opcode, 0xd9,
+-					       reverse);
++					       reverse, -1, map38);
+ 		if (row.empty()) {
+ 			reverse = true;
+ 			row = legacy_register_row(narrow, false, 0, opcode,
+-						  0xd9, reverse);
++						  0xd9, reverse, -1, map38);
+ 		}
+ 		if (row.empty())
+ 			continue;
+@@ -440,7 +449,8 @@ void emit_legacy_registers(Decoder &wide)
+ 			for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
+ 				if (legacy_register_row(mode64 ? wide : narrow,
+ 							mode64, rex, opcode, mr,
+-							reverse) != row) {
++							reverse, -1,
++							map38) != row) {
+ 					uniform = false;
+ 					break;
+ 				}
+@@ -457,14 +467,20 @@ void emit_legacy_registers(Decoder &wide)
+ 			rows.push_back(row);
+ 		plans[opcode] = index | (reverse ? 128 : 0);
+ 	}
+-	if (!plans[0x6f] || !plans[0x7f] || !plans[0x61] || !plans[0xfe])
++	if (map38 && (!plans[0] || !plans[0xdc] || !plans[0xde]))
++		throw std::runtime_error("missing AES or SSSE3 register forms");
++	if (!map38 &&
++	    (!plans[0x6f] || !plans[0x7f] || !plans[0x61] || !plans[0xfe]))
+ 		throw std::runtime_error("missing SSE2 register forms");
+-	std::puts(
+-		"static const struct VectorOutputRow legacy_register_rows[] = {\n\t{ 0 },");
++	const char *table = map38 ? "legacy_map38" : "legacy_register";
++	std::printf(
++		"static const struct VectorOutputRow %s_rows[] = {\n\t{ 0 },\n",
++		table);
+ 	for (const auto &row : rows)
+ 		std::printf("\t%s,\n", row.c_str());
+-	std::puts(
+-		"};\n/* Low seven bits index legacy_register_rows; bit 7 reverses the operands. */\nstatic const uint8_t legacy_register_plans[256] = {");
++	std::printf(
++		"};\n/* Low seven bits index %s_rows; bit 7 reverses the operands. */\nstatic const uint8_t %s_plans[256] = {\n",
++		table, table);
+ 	for (unsigned i = 0; i < plans.size(); i += 16) {
+ 		std::putchar('\t');
+ 		for (unsigned j = 0; j < 16; ++j)
+@@ -475,6 +491,9 @@ void emit_legacy_registers(Decoder &wide)
+ 	std::fprintf(stderr, "%zu legacy register rows, %llu 32-bit probes\n",
+ 		     rows.size(),
+ 		     static_cast<unsigned long long>(narrow.probes));
++	if (map38)
++		std::fprintf(stderr, "%zu register rows from %llu canonical map 0F 38 probes\n",
++			     rows.size(), static_cast<unsigned long long>(wide.probes + narrow.probes));
+ }
+ 
+ /* Derive the unmasked EVEX.66.0F38 1A memory forms from the canonical
+@@ -1945,6 +1964,142 @@ void emit_plain_evex_registers(Decoder &decoder)
  		static_cast<unsigned long long>(decoder.probes));
  }
  
@@ -642,7 +634,7 @@ index 5c2649f3..2d659f4a 100644
  void emit_rounded_vectors(Decoder &decoder)
  {
  	using PrefixRow = std::array<unsigned, 8>;
-@@ -2152,6 +2288,11 @@ void emit_output(Decoder &decoder, bool scan_only)
+@@ -2152,11 +2307,22 @@ void emit_output(Decoder &decoder, bool scan_only)
  
  int main(int argc, char **argv)
  {
@@ -654,32 +646,28 @@ index 5c2649f3..2d659f4a 100644
  	if (argc == 2 && !std::strcmp(argv[1], "--plain-evex-registers")) {
  		Decoder decoder;
  		emit_plain_evex_registers(decoder);
-@@ -2198,7 +2339,7 @@ int main(int argc, char **argv)
+ 		return 0;
+ 	}
++	if (argc == 2 && !std::strcmp(argv[1], "--legacy-map38-registers")) {
++		Decoder wide;
++		std::puts("/* Generated by suite/synctools/x86_vector_output.cpp --legacy-map38-registers. */");
++		emit_legacy_registers(wide, true);
++		return 0;
++	}
+ 	if (argc == 2 && !std::strcmp(argv[1], "--legacy-register-immediates")) {
+ 		Decoder decoder;
+ 		emit_legacy_immediates(decoder);
+@@ -2198,7 +2364,7 @@ int main(int argc, char **argv)
  	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
  	if (argc > 1 && !scan_only)
  		throw std::runtime_error(
 -			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers|--legacy-register-immediates]");
-+			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers|--legacy-register-immediates|--evex-rip-memory]");
++			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers|--legacy-register-immediates|--evex-rip-memory|--legacy-map38-registers]");
  	Decoder decoder;
  	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
  	emit_output(decoder, scan_only);
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 92e01e07..1e3e37ce 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -208,10 +208,6 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
-     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
- endforeach()
- 
--if(TARGET x86_simple_output)
--    target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
--endif()
--
- if(CAPSTONE_X86_SUPPORT)
-     set_tests_properties(unit_x86_x87_environment unit_x86_bound_access unit_x86_printer_prechecked PROPERTIES SKIP_RETURN_CODE 77)
-     set_tests_properties(unit_x86_x87_environment_hardware PROPERTIES
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6800a4e1..6c641db7 100644
+index 6800a4e1..39578656 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -518,6 +518,19 @@ static bool check_vex_indexed(csh handles[2])
@@ -702,3 +690,39 @@ index 6800a4e1..6c641db7 100644
  	static const uint8_t flags[] = { 0,    8,    0x28, 0x48,
  					 0x68, 0x18, 0x49, 0xc9 };
  	for (unsigned map = 1; map <= 3; ++map)
+@@ -545,6 +558,27 @@ static bool check_plain_evex_registers(csh handles[2])
+ 				}
+ 	return true;
+ }
++static bool check_legacy_map38_registers(csh handles[2])
++{
++	static const uint8_t opcodes[] = { 0x00, 0x17, 0x40, 0xdc, 0xde, 0xff };
++	for (unsigned p = 0; p <= 16; ++p)
++		for (unsigned n = 0; n < sizeof(opcodes); ++n)
++			for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
++				uint8_t bytes[] = {
++					0x66, (uint8_t)(0x3f + p), 0x0f,
++					0x38, opcodes[n],	   (uint8_t)mr
++				};
++				if (!p)
++					bytes[1] = 0x66;
++				const uint8_t *start = bytes + !p;
++				const size_t length = sizeof(bytes) - !p;
++				if (!compare(handles, start, length, mr) ||
++				    !compare(handles, start, length - 1, mr))
++					return false;
++			}
++	return true;
++}
++
+ static bool check_legacy_register_immediates(csh handles[2])
+ {
+ 	static const uint8_t values[] = { 0, 9, 10, 15, 16, 127, 128, 255 };
+@@ -1571,6 +1605,7 @@ static bool check_mode(cs_mode mode)
+ 			!check_vex_clear(handles) ||
+ 			!check_sse_base_memory(handles) ||
+ 			!check_legacy_register_immediates(handles) ||
++			!check_legacy_map38_registers(handles) ||
+ 			!check_legacy_memory(handles, 0x66) ||
+ 			!check_legacy_memory(handles, 0xf2) ||
+ 			!check_legacy_memory(handles, 0xf3) ||
