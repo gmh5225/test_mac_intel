@@ -8,11 +8,18 @@ def save(n,q):(out/(n+'.json')).write_text(json.dumps(q,indent=2)+'\n')
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 q=read(r/'attribution-source.json');prior=read(r/'samples.json')
 def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
-assert git('rev-parse','HEAD')==q['commit'] and git('write-tree')==q['tree']
-for bits,unit in [(64,'X86Sse64Output.c'),(32,'X86Vex32Output.c')]:
+assert git('rev-parse','HEAD')==q['checkout']
+assert sha(r/'candidate.patch')==q['sha256']
+run(['git','-C',s,'apply','--index',r/'candidate.patch'])
+assert git('write-tree')==q['tree']
+for bits,unit,second in [(64,'X86Sse64Output.c','X86VectorFallback64.c'),(32,'X86Vex32Output.c','X86MemoryFallback32.c')]:
+    fallback=s/'arch/X86'/second;src=fallback.read_text();needle='return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);'
+    assert src.count(needle)==1
+    fallback.write_text(src.replace(needle,'(void)batch; return false;'))
     file=s/'arch/X86'/unit
     with file.open('a') as f:
-        f.write('\nbool observedOutput%d(csh h,const uint8_t *p,size_t n,cs_insn *insn,uint16_t *length){return tryOutput%d((cs_struct *)(uintptr_t)h,p,n,insn,length);}\n'%(bits,bits))
+        f.write('\nbool observedOutput%d(csh h,const uint8_t *p,size_t n,cs_insn *insn,uint16_t *length,unsigned *path){\n'%(bits))
+        f.write('cs_struct *handle=(cs_struct *)(uintptr_t)h; if(tryOutput%d(handle,p,n,insn,length)){*path=1;return true;} if(X86_decodeOutputMiss%d(handle,p,n,insn,length,false)){*path=2;return true;} *path=0;return false;}\n'%(bits,bits))
 w=Path(tempfile.mkdtemp());b=w/'build'
 try:
     run(['cmake','-G','Ninja','-S',s,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'])
@@ -36,12 +43,12 @@ try:
         sf.write_text(''.join('%d %d %d\n'%v for v in used))
         assert len(used)==p['timed_functions'] and sha(sf)==p['extent_sha256']
         with (out/(name+'-comparison.log')).open('w') as log:
-            lines=sp.check_output([w/'trace',str(bits),f,sf],text=True,stderr=log)
+            lines=sp.check_output([w/'trace',str(bits),f,sf,out/(name+'-shapes.tsv')],text=True,stderr=log)
         (out/(name+'.tsv')).write_text(lines)
         records=[list(map(int,l.split()))for l in lines.splitlines()]
         counts=[sum(l[-1]for l in records if l[0]==k)for k in range(5)]
         assert sum(counts)>0 and counts[4]>0
-        summary[name]=dict(source=p,counts=counts,histogram_sha256=hashlib.sha256(lines.encode()).hexdigest())
+        summary[name]=dict(source=p,counts=counts,shape_sha256=sha(out/(name+'-shapes.tsv')),histogram_sha256=hashlib.sha256(lines.encode()).hexdigest())
     assert len(summary)==6
     save('checked',dict(complete=True,source=q,samples=summary))
 finally:

@@ -1,7 +1,7 @@
-name: Attribute real format and detail fallbacks by decoded operand shape in both private iterators
+name: Measure both native writer stages and public register comparisons on six real x86 workloads
 on:
   push:
-    branches: [codex/capstone-actual-output-misses]
+    branches: [codex/capstone-actual-two-stage-iterator]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
+          ref: 68ca96c3343b0a7c110b9db372a9ee2642d857ef
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: actual-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: actual-stages-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
