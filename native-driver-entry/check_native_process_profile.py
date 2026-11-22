@@ -9,6 +9,8 @@ import struct
 import subprocess
 import sys
 
+from qualified_ordinal_sdk import verify as verify_ordinal_sdk
+
 
 def digest(file):
     with file.open("rb") as stream:
@@ -112,6 +114,7 @@ def main():
                   catalog={lib["name"]: lib["sha256"] for lib in manifest["libraries"]},
                   linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}
                                        for r in rows])
+    report["ordinal_exports"] = verify_ordinal_sdk(args.source, args.output, args.cache, invoke, digest)
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print("Native ARM64 engine compiled HighC and LLVMC for sixteen linked Microsoft SDK callers")
 
