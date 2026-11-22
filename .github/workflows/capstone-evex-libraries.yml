@@ -1,7 +1,7 @@
-name: Time stack-free public text routing against the same scalar-first decoder across four real machines
+name: Compare fused public scan consumption against the separated compact reader and fork iced on four hosts
 on:
   push:
-    branches: [codex/tail-public-scan-iced]
+    branches: [codex/fused-public-scan-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: thin-entry-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fused-reader-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

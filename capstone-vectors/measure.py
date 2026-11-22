@@ -126,7 +126,7 @@ def main(w):
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
         if key=='project':
-            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-DX86_disasmRecordIter=observed_disasm_record_iter','-DX86_readScanWord=observed_read_scan_word','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-DX86_disasmRecordIter=observed_disasm_record_iter','-DX86_readScanWord=observed_read_scan_word','-DX86_disasmProjected32=observed_scan32','-DX86_disasmProjected64=observed_scan64','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
                 run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/(name+'.cpp'),w/'plan.o',lib,'-o',w/name],'compile-'+name)
                 run([w/name],'oracle-'+name)
