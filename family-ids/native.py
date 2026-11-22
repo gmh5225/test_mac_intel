@@ -14,6 +14,11 @@ try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
     for k in ('base','active','indexed'):
+        if k=='indexed':
+            if cc!='clang':cmd('register-static',['cmake','--build',b,'--target','capstone_static','--parallel','4'])
+            gen=s/'suite/synctools/systemz_register_output.c'
+            cmd('generate-registers',[cc,'-O2','-I',s/'include',gen,b/'libcapstone.a','-o',t/'generate-registers'])
+            assert sp.check_output([t/'generate-registers'])==(s/'arch/SystemZ/SystemZGenRegisterOutput.inc').read_bytes()
         if k!='base':
             g('restore','--source','HEAD','--staged','--worktree','--','.')
             selected=load(d/'active-tree.json') if k=='active' else meta

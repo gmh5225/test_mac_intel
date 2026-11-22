@@ -1,7 +1,7 @@
-name: Check SystemZ dialect repair and GNU register appends on nine native corpora
+name: Compare fixed-width SystemZ GNU spellings against the canonical dialect fix in nine architectures
 on:
   push:
-    branches: [codex/systemz-dialect-real-records]
+    branches: [codex/gnu-register-tokens-systemz]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 40125a7e11dcc4e9a5f43d2d11405212ed9d8184
+          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-gnu-tokens-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
