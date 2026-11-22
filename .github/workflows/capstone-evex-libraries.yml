@@ -1,7 +1,7 @@
-name: Measure compact length-indexed broadcasts on the released Capstone and current fork iced
+name: Compare delayed integer block broadcasts against released output on real PE and ELF
 on:
   push:
-    branches: [codex/compact-integer-block-broadcast]
+    branches: [codex/broadcast-in-amd64-fallback]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-broadcast-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: late-block-broadcast-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

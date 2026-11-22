@@ -83,15 +83,20 @@ def main(w):
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
             assert sp.check_output([w/'verify-evex-memory'])==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
+        if label=='integrated':
+            assert sp.check_output([w/'verify-evex-memory','--integer-block-broadcast'])==(base/'arch/X86/X86GenIntegerBlockBroadcast.inc').read_bytes()
         member,=b.rglob('X86VectorOutput.c.o')
         table,=[line.split() for line in sp.check_output(['nm','-S','--defined-only',member],text=True).splitlines() if line.split()[-1:] == ['broadcast_rows']]
         save('broadcast-table-'+label+'.json',dict(bytes=int(table[1],16),sha=sha(member)))
+        from elftools.elf.elffile import ELFFile
+        with member.open('rb')as stream:
+            ef=ELFFile(stream);z=ef.get_section_by_name('.text');save('shared-text-'+label+'.json',dict(size=z.data_size,sha256=hashlib.sha256(z.data()).hexdigest()))
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
         if label=='integrated':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
-            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeEvexBroadcastPrechecked',*libs,'-o',w/'coverage'],'link-counter')
+            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeIntegerBlockBroadcast',*libs,'-o',w/'coverage'],'link-counter')
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -123,7 +128,7 @@ def main(w):
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
             added=set(members)-set(prior)
-            assert set(prior)<=set(members) and not added and changed=={'X86VectorOutput.c.o'},(changed,added)
+            assert set(prior)<=set(members) and not added and {'X86PlainEvexOutput.c.o','X86VectorFallback64.c.o'}<=changed<={'X86VectorOutput.c.o','X86PlainEvexOutput.c.o','X86VectorFallback64.c.o'},(changed,added)
             changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
