@@ -1,7 +1,7 @@
-name: Measure scalar and vector miss-path output in shipped NeverD with multiarc controls
+name: Measure canonical vector-clear repair and dense or compact alias lookup in real NeverD products
 on:
   push:
-    branches: [codex/capstone-current-product-miss-writers]
+    branches: [codex/current-alias-placement-and-vzero-repair]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-release-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: canonical-repair-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

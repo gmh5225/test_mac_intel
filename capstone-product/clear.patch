@@ -24,6 +24,21 @@ index ae855e64..d7348995 100644
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
  
+diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
+index ea9309f4..5444947a 100644
+--- a/arch/X86/X86GenMappingCounts.inc
++++ b/arch/X86/X86GenMappingCounts.inc
+@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
+ 	0, // X86_VXORPSZrrkz
+ 	2048, // X86_VXORPSrm
+ 	2048, // X86_VXORPSrr
+-	1536, // X86_VZEROALL
+-	1536, // X86_VZEROUPPER
++	17920, // X86_VZEROALL
++	17920, // X86_VZEROUPPER
+ 	1024, // X86_WAIT
+ 	1024, // X86_WBINVD
+ 	0, // X86_WBNOINVD
 diff --git a/arch/X86/X86GenVexRegisterImmediates.inc b/arch/X86/X86GenVexRegisterImmediates.inc
 new file mode 100644
 index 00000000..860e5075
@@ -100,31 +115,27 @@ index 00000000..860e5075
 +	},
 +};
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..f1154cb4 100644
+index bc463d2b..8a1d653c 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10324,6 +10324,21 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 
- 			// special cases when regs_write[] depends on arch
- 			switch (id) {
-+#ifndef CAPSTONE_X86_REDUCE
-+			case X86_VZEROALL:
-+			case X86_VZEROUPPER:
-+				if (mode != CS_MODE_64) {
-+					const size_t bytes =
-+						8 * sizeof(insns[i].regs_mod[0]);
-+					memcpy(insn->detail->regs_write,
-+					       insns[i].regs_mod, bytes);
-+					memset(insn->detail->regs_write + 8, 0,
-+					       sizeof(insns[i].regs_mod) - bytes);
-+					insn->detail->regs_write_count = 8;
-+					break;
-+				}
-+				/* FALLTHROUGH */
-+#endif
+@@ -10374,6 +10374,17 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			switch (insn->id) {
  			default:
- 				memcpy(insn->detail->regs_write,
- 				       insns[i].regs_mod,
+ 				break;
++			case X86_INS_VZEROALL:
++			case X86_INS_VZEROUPPER:
++				if (mode != CS_MODE_64) {
++					/* Outside long mode only YMM0 through YMM7 exist. */
++					cs_detail *d = insn->detail;
++					memset(d->regs_write + 8, 0,
++					       sizeof(insns[i].regs_mod) -
++						       8 * sizeof(d->regs_write[0]));
++					d->regs_write_count = 8;
++				}
++				break;
+ 			case X86_INS_XADD:
+ 				insn->detail->regs_write[0] = X86_REG_EFLAGS;
+ 				insn->detail->regs_write_count = 1;
 diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
 index f500c60f..80382d85 100644
 --- a/arch/X86/X86MemoryFallback32.c
@@ -159,103 +170,6 @@ index 3f08fa49..ea4448b6 100644
  /* Externalizing the broadcast reader preserves Clang's surrounding code.
   * Other compilers retain the established static reader. */
  #if defined(__clang__)
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..408de771 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -14,8 +14,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#define GET_INSTRINFO_ENUM
--#include "X86GenInstrInfo.inc"
-+#include "X86VectorClearOutput.h"
- #define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-@@ -98,32 +97,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
- 			      size_t size, cs_insn *insn, uint16_t *insn_size)
- {
--	/* The bare vector clear instructions have no ModR/M or operands. */
--	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
--		const bool all = (code[1] & 4) != 0;
--		insn->size = *insn_size = 3;
--		memcpy(insn->bytes, code, 3);
--		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--		if (all)
--			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
--		else
--			memcpy(insn->mnemonic, "vzeroupper",
--			       sizeof("vzeroupper"));
--		memset(insn->op_str, 0, sizeof(insn->op_str));
--		if (insn->detail) {
--			cs_detail *detail = insn->detail;
--			memset(detail, 0,
--			       offsetof(cs_detail, x86) + sizeof(cs_x86));
--			detail->x86.addr_size = 8;
--			detail->x86.rex = 0x40;
--			memcpy(detail->x86.opcode, code, 2);
--			X86_get_insn_id(handle, insn,
--					all ? X86_VZEROALL : X86_VZEROUPPER);
--		} else {
--			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
--		}
-+	if (writeVexClear(handle, code, size, insn, insn_size, true))
- 		return true;
--	}
- 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
- 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
- 		const uint8_t rex =
-diff --git a/arch/X86/X86VectorClearOutput.h b/arch/X86/X86VectorClearOutput.h
-new file mode 100644
-index 00000000..5b78b1d7
---- /dev/null
-+++ b/arch/X86/X86VectorClearOutput.h
-@@ -0,0 +1,43 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifndef CS_X86_VECTOR_CLEAR_OUTPUT_H
-+#define CS_X86_VECTOR_CLEAR_OUTPUT_H
-+
-+#include <string.h>
-+#include "X86Mapping.h"
-+#define GET_INSTRINFO_ENUM
-+#include "X86GenInstrInfo.inc"
-+
-+/* The caller has validated the Intel writer and the bare C5 prefix.
-+ * X86_get_insn_id owns the mode-dependent implicit register set. */
-+static inline bool writeVexClear(cs_struct *handle, const uint8_t *code,
-+				 size_t size, cs_insn *insn,
-+				 uint16_t *insn_size, bool wide)
-+{
-+	if (size < 3 || code[2] != 0x77 || (code[1] & 0xfb) != 0xf8)
-+		return false;
-+	const bool all = (code[1] & 4) != 0;
-+	insn->size = *insn_size = 3;
-+	memcpy(insn->bytes, code, 3);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	if (all)
-+		memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
-+	else
-+		memcpy(insn->mnemonic, "vzeroupper", sizeof("vzeroupper"));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	if (insn->detail) {
-+		cs_detail *detail = insn->detail;
-+		memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-+		detail->x86.addr_size = wide ? 8 : 4;
-+		detail->x86.rex = wide ? 0x40 : 0;
-+		memcpy(detail->x86.opcode, code, 2);
-+		X86_get_insn_id(handle, insn,
-+				all ? X86_VZEROALL : X86_VZEROUPPER);
-+	} else {
-+		insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
-+	}
-+	return true;
-+}
-+
-+#endif
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
 index 68a43666..36526bd6 100644
 --- a/arch/X86/X86VectorFallback64.c
@@ -271,28 +185,6 @@ index 68a43666..36526bd6 100644
  	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
  		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
  		const unsigned offset = 4 + (rex != 0);
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..793e1b95 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -13,6 +13,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
-+#include "X86VectorClearOutput.h"
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
- #include "X86VectorRegisterWriter.h"
-@@ -169,6 +170,9 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- 					      x86_simple_registers);
- 	}
- 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-+	if (prefix == 2 &&
-+	    writeVexClear(handle, code, size, insn, insn_size, false))
-+		return true;
- 	/* LDS/LES, extended registers and W=1 retain the
-      * canonical reader. The admitted rows use only XMM/YMM0..7. */
- 	if (size < prefix + 2 ||
 diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
 new file mode 100644
 index 00000000..3fe8460f
