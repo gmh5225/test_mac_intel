@@ -79,21 +79,20 @@ endforeach()
            guard(name,expected)
        check_table('check-rows','--evex-memory','X86GenEvexMemoryOutput.inc')
        check_table('check-rows','--vex-register-immediates','X86GenVexRegisterImmediates.inc')
-       if label!='solo':
-           check_table('check-rows','--plain-evex-registers','X86GenPlainEvexRegisterOutput.inc')
-           cmd('build-plain',['cmake','--build',b,'--target','probe-plain','--parallel','4'])
-           guard('plain',[11337732,0,47444])
+       check_table('check-rows','--plain-evex-registers','X86GenPlainEvexRegisterOutput.inc')
+       cmd('build-plain',['cmake','--build',b,'--target','probe-plain','--parallel','4'])
+       guard('plain',[11337732,0,47444])
        cmd('build-vzero',['cmake','--build',b,'--target','check-vzero','--parallel','4'])
        vz,=[f for f in b.rglob('check-vzero.exe' if win else 'check-vzero')if f.is_file()]
        obs=[ln.split()for ln in sp.check_output([vz],text=True).splitlines()];assert len(obs)==12
        for bits,name,enc,num,nw,first,last in obs:
-           expected=16 if bits=='64' or label=='active' else 8
+           expected=16 if bits=='64' or label!='correct' else 8
            assert int(num)==int(nw)==expected and first=='ymm0' and last=='ymm'+str(expected-1)
        save('vzero',obs)
     cmd('mapping-counts',[sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
     alias_check=(s/'suite/synctools/alias_pattern_rows.py').is_file()
     if alias_check:cmd('alias-table',[sys.executable,'-B',s/'suite/synctools/alias_pattern_rows.py','--check'])
-    assert alias_check==(label in ('active','active_clear'))
+    assert not alias_check
     save('checked',dict(stage=label,complete=True,source=q,profile=profile,tests=tests,machine=platform.machine(),generator=bool(full),alias_check=alias_check))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);out=d.parent/'evidence';save('cleanup',dict(removed=not t.exists(),bytes=n))
