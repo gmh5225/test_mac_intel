@@ -105,6 +105,8 @@ def main(w):
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'second.o'],'projected-reader')
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'secondary.cpp',w/'second.o',b/'libcapstone.a','-o',w/'secondary'],'build-secondary')
             run([w/'secondary'],'secondary-oracle')
+            run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'mandatory.cpp',w/'second.o',b/'libcapstone.a','-o',w/'mandatory'],'build-mandatory')
+            run([w/'mandatory'],'mandatory-oracle')
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'vex3.cpp',w/'second.o',b/'libcapstone.a','-o',w/'vex3'],'build-vex3')
             run([w/'vex3'],'vex3-oracle')
             run(['python3','-B',base/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables',base)
@@ -132,6 +134,10 @@ def main(w):
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
             assert (changed <= {'X86EvexScan.c.o'}) and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
+            if label=='scalar':previous_wide=members
+            else:
+                incremental={k for k in members if members[k]!=previous_wide[k]}
+                assert incremental=={'X86BatchScan.c.o'},incremental
             save('isolation-'+label+'.json',dict(added=sorted(members.keys()-prior.keys()),unchanged=len(prior),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
