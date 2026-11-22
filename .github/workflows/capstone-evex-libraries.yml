@@ -1,7 +1,7 @@
-name: Compare compatible public fixed-mode writers and both shipped configurations against iced
+name: Compare scalar-first i386 admission with the same public writers and fork iced
 on:
   push:
-    branches: [codex/compatible-shipped-public-iced]
+    branches: [codex/ordered-public-scan-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-compatible-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-first-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
