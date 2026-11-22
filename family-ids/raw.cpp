@@ -14,9 +14,22 @@ static void mix(uint64_t &value,const void *data,size_t size){
  while(size--){value=(value^*p++)*1099511628211ull;}
 }
 int main(int argc,char **argv){
- if(argc!=4)return 1;const bool arm=std::strcmp(argv[1],"arm")==0;const unsigned opt=std::atoi(argv[3]);
+ if(argc!=4)return 1;const unsigned selector=std::atoi(argv[1]);const unsigned opt=std::atoi(argv[3]);
  std::ifstream in(argv[2],std::ios::binary);if(!in)return 2;std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in),{}};
- csh h=0;if(cs_open(arm?CS_ARCH_AARCH64:CS_ARCH_MIPS,arm?CS_MODE_LITTLE_ENDIAN:CS_MODE_MIPS64,&h))return 3;
+ cs_arch arch;cs_mode mode;size_t record_size,alignment;
+ switch (selector) {
+ case 101: arch=CS_ARCH_ARM;mode=CS_MODE_ARM;record_size=sizeof(cs_arm);alignment=4;break;
+ case 102: arch=CS_ARCH_AARCH64;mode=CS_MODE_LITTLE_ENDIAN;record_size=sizeof(cs_aarch64);alignment=4;break;
+ case 103: arch=CS_ARCH_MIPS;mode=CS_MODE_MIPS64;record_size=sizeof(cs_mips);alignment=4;break;
+ case 104: arch=CS_ARCH_PPC;mode=CS_MODE_64;record_size=sizeof(cs_ppc);alignment=4;break;
+ case 105: arch=CS_ARCH_RISCV;mode=cs_mode(CS_MODE_RISCV64|CS_MODE_RISCV_C|CS_MODE_RISCV_FD|CS_MODE_RISCV_A);record_size=sizeof(cs_riscv);alignment=2;break;
+ case 106: arch=CS_ARCH_SPARC;mode=cs_mode(CS_MODE_BIG_ENDIAN|CS_MODE_V9);record_size=sizeof(cs_sparc);alignment=4;break;
+ case 107: arch=CS_ARCH_SYSTEMZ;mode=cs_mode(CS_MODE_BIG_ENDIAN|CS_MODE_SYSTEMZ_Z16);record_size=sizeof(cs_systemz);alignment=2;break;
+ case 108: arch=CS_ARCH_LOONGARCH;mode=CS_MODE_LOONGARCH64;record_size=sizeof(cs_loongarch);alignment=4;break;
+ case 109: arch=CS_ARCH_XTENSA;mode=CS_MODE_XTENSA_ESP8266;record_size=sizeof(cs_xtensa);alignment=1;break;
+ default:return 3;
+ }
+ csh h=0;if(cs_open(arch,mode,&h))return 3;
  const bool with_detail=opt!=0;
  const size_t det=opt==2?CS_OPT_ON|CS_OPT_DETAIL_REAL:opt==3?CS_OPT_ON|CS_OPT_DETAIL_ALIAS:opt?CS_OPT_ON:CS_OPT_OFF;
  if(cs_option(h,CS_OPT_DETAIL,det)!=CS_ERR_OK)return 4;
@@ -25,8 +38,8 @@ int main(int argc,char **argv){
  const uint8_t *p=bytes.data();size_t left=bytes.size();uint64_t ip=0x10000000,ok=0,bad=0,v=14695981039346656037ull,alias=0;
  while(left){
   if(cs_disasm_iter(h,&p,&left,&ip,&i)){
-   ++ok;alias+=i.is_alias;mix(v,&i,offsetof(cs_insn,detail));if(with_detail)mix(v,&detail,offsetof(cs_detail,aarch64)+(arm?sizeof(detail.aarch64):sizeof(detail.mips)));
-  }else{auto n=std::min(size_t(4),left);left-=n;p+=n;ip+=n;++bad;}
+   ++ok;alias+=i.is_alias;mix(v,&i,offsetof(cs_insn,detail));if(with_detail)mix(v,&detail,offsetof(cs_detail,aarch64)+record_size);
+  }else{auto n=std::min(alignment,left);left-=n;p+=n;ip+=n;++bad;}
   mix(v,&ip,sizeof(ip));
  }
  cs_close(&h);std::printf("%llu %llu %llu %llu\n",(unsigned long long)ok,(unsigned long long)bad,(unsigned long long)alias,(unsigned long long)v);

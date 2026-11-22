@@ -21,6 +21,10 @@ int main(int argc,char **argv){
  case 103:arch=CS_ARCH_MIPS;cm=CS_MODE_MIPS64;align=4;break;
  case 104:arch=CS_ARCH_PPC;cm=CS_MODE_64;align=4;break;
  case 105:arch=CS_ARCH_RISCV;cm=cs_mode(CS_MODE_RISCV64|CS_MODE_RISCV_C|CS_MODE_RISCV_FD|CS_MODE_RISCV_A);align=2;break;
+ case 106:arch=CS_ARCH_SPARC;cm=cs_mode(CS_MODE_BIG_ENDIAN|CS_MODE_V9);align=4;break;
+ case 107:arch=CS_ARCH_SYSTEMZ;cm=cs_mode(CS_MODE_BIG_ENDIAN|CS_MODE_SYSTEMZ_Z16);align=2;break;
+ case 108:arch=CS_ARCH_LOONGARCH;cm=CS_MODE_LOONGARCH64;align=4;break;
+ case 109:arch=CS_ARCH_XTENSA;cm=CS_MODE_XTENSA_ESP8266;align=1;break;
  }
  csh handle{};if(cs_open(arch,cm,&handle) ||
  cs_option(handle,CS_OPT_TEXT,mode==0?CS_OPT_OFF:CS_OPT_ON)||
@@ -46,6 +50,10 @@ int main(int argc,char **argv){
            case CS_ARCH_AARCH64:values+=i->detail->aarch64.op_count;break;
            case CS_ARCH_PPC:values+=i->detail->ppc.op_count;break;
            case CS_ARCH_MIPS:values+=i->detail->mips.op_count;break;
+           case CS_ARCH_SPARC:values+=i->detail->sparc.op_count;break;
+           case CS_ARCH_SYSTEMZ:values+=i->detail->systemz.op_count;break;
+           case CS_ARCH_LOONGARCH:values+=i->detail->loongarch.op_count;break;
+           case CS_ARCH_XTENSA:values+=i->detail->xtensa.op_count;break;
            case CS_ARCH_RISCV:values+=i->detail->riscv.op_count;break;
            default:values+=i->detail->x86.op_count;
          }

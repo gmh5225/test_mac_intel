@@ -1,7 +1,7 @@
-name: Measure known alias rows while preserving the common matcher binary
+name: Measure bounded alias lookup on nine ISAs using real ELF, Xtensa libc and PE controls
 on:
   push:
-    branches: [codex/capstone-ordinary-matcher-alias-suffix]
+    branches: [codex/capstone-nine-arch-alias-blocks]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: bbba0e240053b9ad2897390bdc76f6f6115e3a55
+          ref: 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alias-suffix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: alias-blocks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

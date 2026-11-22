@@ -11,7 +11,7 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
 t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['parent']
 try:
-    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
+    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
     for k in ('base','indexed'):
         if k!='base':
@@ -52,19 +52,22 @@ try:
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
     cmd('libmvec',['python3','-B',t/'libmvec.py'])
     import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('arm-ls','riscv64-ls','mips64el-ls','arm64-ls')]
-    assert len(extra)==4
+    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name'] in ('arm-ls', 'arm64-ls', 'mips64el-ls', 'ppc64el-ls', 'riscv64-ls', 'sparc64-ls', 's390x-ls', 'loong64-ls')]
+    from xtensa import get
+    xfile,xsource=get(t,load(d/'xtensa-source.json'));save('xtensa-source',xsource);extra.append(dict(name='xtensa-picolibc',path=xfile))
+    assert len(extra)==9
+    selectors={'arm': 101, 'arm64': 102, 'mips64el': 103, 'ppc64el': 104, 'riscv64': 105, 'sparc64': 106, 's390x': 107, 'loong64': 108, 'xtensa': 109}
     panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
     panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
-    panels.extend((q['name'],{'arm-ls':101,'riscv64-ls':105,'mips64el-ls':103,'arm64-ls':102}[q['name']],Path(q['path']),0x100000,(0,1,2))for q in extra)
+    panels.extend((q['name'],selectors[q['name'].split('-')[0]],Path(q['path']),0x100000,(0,1,2))for q in extra)
     cmd('compile-records',['c++','-std=c++17','-O2','-I',s/'include',d/'raw.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'raw'])
-    samples=[q for q in foreign if q['name'].startswith(('mips64el-','arm64-'))]
+    samples=[q for q in foreign if q['name'].split('-')[0] in selectors]+[extra[-1]]
     bystage={}
     for k in ('base','indexed'):
         target.write_bytes(imgs[k]);rows={}
         for q in samples:
             for opt in range(5):
-                raw=list(map(int,sp.check_output([t/'raw','arm'if q['name'].startswith('arm64-')else 'mips',q['path'],str(opt)]).split()))
+                raw=list(map(int,sp.check_output([t/'raw',str(selectors[q['name'].split('-')[0]]),q['path'],str(opt)]).split()))
                 assert len(raw)==4 and raw[0]>0
                 rows[q['name']+'/'+str(opt)]=raw
         bystage[k]=rows
