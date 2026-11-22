@@ -83,7 +83,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Vex32Output.c.o','X86Sse64Output.c.o'},changed
+            assert prior.keys()==members.keys() and changed=={'X86Vex32Output.c.o'},changed
             assert sha(w/'unselected-baseline')==sha(ordinary)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target

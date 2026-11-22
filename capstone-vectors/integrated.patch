@@ -1,203 +1,156 @@
-diff --git a/arch/X86/X86MemoryCompareFallback.h b/arch/X86/X86MemoryCompareFallback.h
-new file mode 100644
-index 00000000..26fb6745
---- /dev/null
-+++ b/arch/X86/X86MemoryCompareFallback.h
-@@ -0,0 +1,45 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+/* Only the fixed-width text iterators include this fallback. The primary
-+ * output writer has already declined the instruction. */
-+#define X86_MEMORY_IMMEDIATE writeCompareMemory
-+#define X86_COMPARE_IMMEDIATE
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_COMPARE_IMMEDIATE
-+#undef X86_MEMORY_IMMEDIATE
-+
-+/* Preserve the hot iterator's call boundary and keep this writer off its
-+ * normal instruction path. */
-+#if defined(__ELF__) && defined(__clang__)
-+__attribute__((noinline, section(".cs_x86_compare_fallback")))
-+#elif defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+static CS_PRESERVE_MOST bool
-+decodeAfterOutputMiss(cs_struct *handle, const uint8_t *code, size_t size,
-+		      cs_insn *insn, uint16_t *insn_size, bool batch)
-+{
-+	const unsigned lead = X86_IMMEDIATE_WIDE && size &&
-+			      (code[0] & 0xf0) == 0x40;
-+	if (size >= lead + 2) {
-+		const uint8_t opcode = code[lead], mr = code[lead + 1];
-+		if ((opcode == 0x80 || opcode == 0x81 || opcode == 0x83) &&
-+		    mr < 0xc0 && (mr & 0x38) == 0x38 &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			/* Register CMP supplies flags, widths and memory access. */
-+			const unsigned prefix =
-+				lead ? (1 + ((code[0] >> 3) & 1)) : 0;
-+			const unsigned plan =
-+				x86_simple_plans[X86_IMMEDIATE_WIDE][prefix]
-+						[0x38 | (opcode & 1)];
-+			if (writeCompareMemory(code, size, insn, insn_size,
-+					       &x86_simple_outputs[plan >> 2],
-+					       x86_simple_registers))
-+				return true;
-+		}
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+}
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 7ccad787..6fe7343b 100644
+index 7ccad787..090d5ae5 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -43,7 +43,11 @@ bool X86_writeMemoryOutput(
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+@@ -7,6 +7,8 @@
  #ifdef X86_MEMORY_IMMEDIATE
-+#ifdef X86_COMPARE_IMMEDIATE
-+	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
-+#else
- 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
-+#endif
- 	const unsigned imm_offset = offset + disp_size;
- 	const unsigned length = imm_offset + imm_size;
+ #include "X86UnsignedImmediate.h"
+ static bool X86_MEMORY_IMMEDIATE(
++#elif defined(X86_SEGMENT_LEA32)
++static bool X86_SEGMENT_LEA32(
+ #elif defined(X86_EXTEND64_MEMORY)
+ static bool X86_EXTEND64_MEMORY(
+ #elif defined(X86_EXTEND32_MEMORY)
+@@ -32,8 +34,8 @@ bool X86_writeMemoryOutput(
+ 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
+ #ifdef X86_EXTEND64_MEMORY
+ 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
+-#elif defined(X86_EXTEND32_MEMORY)
+-	const unsigned lead = 1; /* The caller consumed the 0F escape. */
++#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
++	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
  #else
-@@ -168,6 +172,19 @@ bool X86_writeMemoryOutput(
- 	const uint32_t encoded =
- 		imm_size == 1 ? code[imm_offset] :
- 				(uint32_t)X86_readDisp32(code + imm_offset);
-+#ifdef X86_COMPARE_IMMEDIATE
-+	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
-+	int64_t value = encoded;
-+	if (opcode == 0x83)
-+		value = (int8_t)encoded;
-+	else if (imm_size == 4 && row->ops[0].size == 8)
-+		value = (int32_t)encoded;
-+	memcpy(out, ", ", 2);
-+	out += 2;
-+	if (value < 0)
-+		*out++ = '-';
-+	writeUnsignedImmediate(out, (uint64_t)(value < 0 ? -value : value));
+ 	const unsigned lead = rex != 0;
+ #endif
+@@ -64,8 +66,14 @@ bool X86_writeMemoryOutput(
+ 		const unsigned index_reg = ((rex & 2) << 2) |
+ 					   ((encoding >> 3) & 7);
+ 		base_reg = encoding & 7;
++#ifdef X86_SEGMENT_LEA32
++		/* A scale-one SIB without an index names only its base. */
++		if ((!mod && base_reg == 5) ||
++		    (index_reg == 4 && (encoding >> 6) != 0))
 +#else
- 	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
- #if X86_IMMEDIATE_WIDE
- 	const uint64_t value = row->ops[0].size == 8 ?
-@@ -178,6 +195,7 @@ bool X86_writeMemoryOutput(
- #endif
- 	memcpy(out, ", ", 2);
- 	writeUnsignedImmediate(out + 2, value);
+ 		if ((!mod && base_reg == 5) ||
+ 		    (index_reg == 4 && encoding != 0x24))
 +#endif
+ 			return false;
+ 		if (index_reg != 4) {
+ 			index = &regs[wide ? 3 : 2][index_reg];
+@@ -80,7 +88,9 @@ bool X86_writeMemoryOutput(
+ 	const bool push = false, load = true;
+ 	const unsigned reg_width = 2; /* r32 destination */
  #else
- 	if (!load && !push) {
- 		memcpy(out, ", ", 2);
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 337e9879..fe1dc374 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -349,7 +349,14 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- #undef X86_FIXED_WIDE
- #undef X86_FIXED_OUTPUT
- #define CS_DECODE_TRY_OUTPUT tryOutput64
-+static CS_PRESERVE_MOST bool
-+decodeAfterOutputMiss(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
-+#define CS_DECODE_OUTPUT_MISS decodeAfterOutputMiss
- #include "../../cs_disasm_internal.h"
-+#define X86_IMMEDIATE_WIDE 1
-+#include "X86MemoryCompareFallback.h"
-+#undef X86_IMMEDIATE_WIDE
-+#undef CS_DECODE_OUTPUT_MISS
- #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+-#ifdef X86_MEMORY_IMMEDIATE
++#ifdef X86_SEGMENT_LEA32
++	const bool lea = true, load = true, push = false;
++#elif defined(X86_MEMORY_IMMEDIATE)
+ 	const bool lea = false, load = false;
+ #else
+ 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
+@@ -124,6 +134,18 @@ bool X86_writeMemoryOutput(
+ 		out += 10;
+ 	}
+ #else
++#ifdef X86_SEGMENT_LEA32
++	static const struct X86SimpleRegister segments[] = {
++		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
++		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
++		{ X86_REG_FS, 2, "fs" }, { X86_REG_GS, 2, "gs" },
++	};
++	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
++						   (code[0] >> 3) & 3;
++	memcpy(out, segments[segment].name, 2);
++	out[2] = ':';
++	out += 3;
++#endif
+ 	if (lea) {
+ 		*out++ = '[';
+ 	} else if (row->ops[0].size == 1) {
+@@ -194,6 +216,10 @@ bool X86_writeMemoryOutput(
+ 			x->opcode[1] = opcode;
+ 		}
+ 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
++#elif defined(X86_SEGMENT_LEA32)
++		x->prefix[1] = code[0];
++		x->encoding.modrm_offset = 2;
++		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
+ #elif defined(X86_EXTEND32_MEMORY)
+ 		x->opcode[0] = 0x0f;
+ 		x->opcode[1] = opcode;
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 5dcd5dda..02e25c54 100644
+index 5dcd5dda..fac737aa 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -196,7 +196,14 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- #undef X86_FIXED_WIDE
- #undef X86_FIXED_OUTPUT
- #define CS_DECODE_TRY_OUTPUT tryOutput32
-+static CS_PRESERVE_MOST bool
-+decodeAfterOutputMiss(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
-+#define CS_DECODE_OUTPUT_MISS decodeAfterOutputMiss
- #include "../../cs_disasm_internal.h"
-+#define X86_IMMEDIATE_WIDE 0
-+#include "X86MemoryCompareFallback.h"
-+#undef X86_IMMEDIATE_WIDE
-+#undef CS_DECODE_OUTPUT_MISS
- #endif
+@@ -24,6 +24,10 @@
+ #undef X86_MEMORY_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
  
- CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..a0e2ebc0 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -163,7 +163,11 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
- 		return true;
- #endif
-+#ifdef CS_DECODE_OUTPUT_MISS
-+	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
-+#else
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+#endif
- }
- #undef CS_DECODE_SCAN
- 
++#define X86_SEGMENT_LEA32 writeSegmentLea32
++#include "X86MemoryOutputImpl.h"
++#undef X86_SEGMENT_LEA32
++
+ #define X86_EXTEND32_MEMORY writeExtendMemory32
+ #include "X86MemoryOutputImpl.h"
+ #undef X86_EXTEND32_MEMORY
+@@ -152,11 +156,20 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 			       size_t size, cs_insn *insn, uint16_t *insn_size)
+ {
+ 	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
+-	if ((code[0] & 0xfc) != 0xc4)
++	if ((code[0] & 0xfc) != 0xc4) {
++		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
++		    ((code[0] & 0xe7) == 0x26 || (code[0] & 0xfe) == 0x64) &&
++		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
++			return writeSegmentLea32(code, size, insn, insn_size,
++						 &x86_simple_outputs[row],
++						 x86_simple_registers);
++		}
+ 		return code[0] == 0x0f && size >= 3 &&
+ 		       (code[1] & 0xf6) == 0xb6 &&
+ 		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+ 		       writeExtend32(code, size, insn, insn_size);
++	}
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, false))
+ 		return false;
+ 	if (code[0] & 2) {
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 7781ca39..1191b3ce 100644
+index 7781ca39..6de1afd3 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -930,6 +930,39 @@ static bool check_absolute_addresses32(csh handles[2])
+@@ -930,6 +930,26 @@ static bool check_absolute_addresses32(csh handles[2])
  	return true;
  }
  
-+static bool check_memory_compares(csh handles[2], cs_mode mode)
++/* Segment, ModR/M, SIB and truncation are compared against the ordinary
++ * decoder, including the complete public detail and reused output record. */
++static bool check_segment_lea32(csh handles[2])
 +{
-+	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
-+	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
-+	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
-+	     ++prefix) {
-+		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
-+			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
-+				if ((mr & 0x30) != 0x30)
-+					continue;
-+				for (unsigned n = 0; n < sizeof(values); ++n) {
-+					uint8_t code[12];
-+					memset(code, values[n], sizeof(code));
-+					code[0] = (uint8_t)(0x3f + prefix);
-+					code[1] = (uint8_t)opcode;
-+					code[2] = (uint8_t)mr;
-+					if ((mr & 7) == 4)
-+						code[3] = sibs[n];
-+					const uint8_t *start = code + !prefix;
-+					for (size_t length = 1;
-+					     length <= sizeof(code) - !prefix;
-+					     ++length)
-+						if (!compare(handles, start,
-+							     length,
-+							     prefix + mr + n))
++	const uint8_t prefixes[] = { 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 };
++	for (unsigned p = 0; p < sizeof(prefixes); ++p)
++		for (unsigned mr = 0; mr < 256; ++mr)
++			for (unsigned sib = 0; sib < ((mr & 7) == 4 ? 256u : 1u); ++sib) {
++				uint8_t code[] = { prefixes[p], 0x8d, mr, sib,
++						   0x80, 0xff, 0xff, 0xff };
++				if (!compare(handles, code, sizeof(code), mr ^ sib))
++					return false;
++				if ((mr & 0x38) == 0)
++					for (size_t len = 1; len < sizeof(code); ++len)
++						if (!compare(handles, code, len, mr ^ sib))
 +							return false;
-+				}
 +			}
-+		}
-+	}
 +	return true;
 +}
 +
  static bool check_alu_memory(csh handles[2], cs_mode mode)
  {
  	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
-@@ -1261,7 +1294,8 @@ static bool check_mode(cs_mode mode)
+@@ -1248,6 +1268,7 @@ static bool check_mode(cs_mode mode)
+ 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
+ 		    !check_evex_memory_moves(handles) ||
+ 		    !check_padding(handles) ||
++		    (mode == CS_MODE_32 && !check_segment_lea32(handles)) ||
+ 		    !check_alu_memory(handles, mode) ||
  		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
- 		     !check_vex2_base_memory(handles)) ||
- 		    (private_iter != X86_disasmIter &&
--		     !check_mov_memory_immediates(handles, mode)) ||
-+		     (!check_mov_memory_immediates(handles, mode) ||
-+		      !check_memory_compares(handles, mode))) ||
- 		    !check_vex_register_forms(handles) ||
- 		    (mode == CS_MODE_64 &&
- 		     (!check_evex(handles) || !check_evex_extract(handles) ||
+ 		     (!check_absolute_addresses32(handles) ||
