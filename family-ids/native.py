@@ -1,83 +1,42 @@
 from pathlib import Path
-import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
-d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
-def load(p):return json.loads(p.read_text())
+import hashlib,json,os,shutil,subprocess as sp,tempfile
+d=Path(__file__).resolve().parent;old=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
 def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def cmd(n,a,cwd=None):
-    with (out/(n+'.log')).open('w')as f:z=sp.run(a,cwd=cwd,stdout=f,stderr=sp.STDOUT)
-    if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2200:]);z.check_returncode()
-def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
-def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
-cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['parent']
+def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
+def cmd(n,a):
+ with (out/(n+'.log')).open('w')as log:z=sp.run(a,stdout=log,stderr=sp.STDOUT)
+ if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-1700:]);z.check_returncode()
+m=json.loads((d/'release-trees.json').read_text());t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']));pr=t/'nd';s=pr/'third_party/capstone';b=t/'build'
+def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 try:
-    cfg=['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]]
-    # Compare the ordinary six-backend bytes separately from the five-backend
-    # mixed configuration that uses the new stack operand table.
-    broad=t/'six'
-    fullcfg=[str(broad) if x==b else x for x in cfg]
-    cmd('six-configure',fullcfg)
-    cfg.remove('-DCAPSTONE_AARCH64_SUPPORT=ON')
-    cmd('configure',cfg)
-
-    imgs={};ids={}
-    for k in ('base','stack'):
-        if k!='base':
-            assert sha(d/'candidate.patch')==meta['sha256'];g('apply','--index',str(d/'candidate.patch'));assert g('write-tree')==meta['tree']
-        cmd('six-build-'+k,['cmake','--build',broad,'--parallel','4','--target','capstone_shared'])
-        six,=[x for x in broad.glob('libcapstone.so.*') if not x.is_symlink()]
-        if k=='base':original_six=sha(six)
-        else:
-            assert sha(six)==original_six
-            save('six-identities',dict(base=original_six,candidate=sha(six)))
-        cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
-        so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        ids[k]=sha(so)
-        imgs[k]=so.read_bytes()
-        cmd('compile-riscv-'+k,['cc','-O2','-I',s/'include',d/'records.c','-L',b,'-Wl,-rpath,'+str(b),'-lcapstone','-o',t/'riscv-records'])
-        hd=hashlib.sha256();length=0
-        with (out/('riscv-'+k+'.log')).open('w')as log,sp.Popen([t/'riscv-records'],stdout=sp.PIPE,stderr=log)as cp:
-            while buf:=cp.stdout.read(4194304):hd.update(buf);length+=len(buf)
-            assert cp.wait()==0
-        if k=='base':rv_reference=(hd.hexdigest(),length)
-        else:assert rv_reference==(hd.hexdigest(),length)
-        assert (out/('riscv-'+k+'.log')).read_text().startswith('262144 states, ')
-        save('riscv-bytes-'+k,dict(bytes=length,sha256=hd.hexdigest()))
-        if k=='stack':
-            names=['x86_reg_access','x86_mapping_counts','x86_evex_detail','x86_scan_batch','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv','riscv_writeback_postprocess','mips_single']
-            cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
-            cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
-            cmd('generator',['python3','-B',s/'suite/synctools/operand_writeback.py','--check'])
-    active = cc=='clang' and osrel=='24.04' and platform.machine()=='x86_64'
-    assert (ids['base']!=ids['stack'])==active,ids
-    cmd('identity',['python3','-B',d/'identity.py'])
-    imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
-    slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
-    cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
-    shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
-    for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
-    cmd('libmvec',['python3','-B',t/'libmvec.py'])
-    import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','riscv64-cp','riscv64-ls','mips64el-ls','arm-ls')]
-    assert len(extra)==5
-    panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
-    panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
-    panels.extend((q['name'],{'riscv64-sort':105,'riscv64-cp':105,'riscv64-ls':105,'mips64el-ls':103,'arm-ls':101}[q['name']],Path(q['path']),0x100000,(0,1,2))for q in extra)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
-    save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output([cc,'--version'],text=True),images=ids,osrel=osrel,machine=platform.machine(),cc=cc))
-    def invoke(k,arch,mode,path,ip,n):
-        target.write_bytes(imgs[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(arch),str(mode),path,str(ip),str(n)],text=True).split()))
-    for name,arch,path,ip,modes in panels:
-        for mode in modes:
-            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(65e6/one[0]));rows_=[]
-            for i in range(15):
-                order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
-                for k in order+order[::-1]:
-                    v=invoke(k,arch,mode,path,ip,n)
-                    expect=one[2]
-                    assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
-                rows_.append(cyc)
-            rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
-    save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
+ s.parent.mkdir(parents=True);cmd('clone',['git','clone','-q','--shared',old,s]);base=git('rev-parse','HEAD');assert base==m['ordered']['current']['parent']
+ (pr/'cmake').mkdir();shutil.copyfile(d/'compiler.inc',pr/'cmake/NeverDCapstoneCompilerOptions.inc')
+ (pr/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(VerifyNativeProduct LANGUAGES C CXX)\n'+(d/'product.cmake').read_text()+'\nadd_executable(probe probe.c)\ntarget_link_libraries(probe PRIVATE capstone_static)\n')
+ (pr/'probe.c').write_text(r'''#include <capstone/capstone.h>
+#include "third_party/capstone/arch/X86/X86ScanAdapter.h"
+int main(int argc,char **argv) {
+ static const uint8_t bytes[]={0xc5,0xf8,0x77,0x31,0xc0};
+ const uint8_t *p=bytes; size_t size=sizeof(bytes);uint64_t ip=0;uint32_t words[2]={0};csh h;
+ if(cs_open(CS_ARCH_X86,argc==1?CS_MODE_32:CS_MODE_64,&h))return 1;
+ cs_insn *v=cs_malloc(h);
+ if(!v||!X86_disasmIterText(h,&p,&size,&ip,v)||v->size!=3)return 2;
+ if(cs_option(h,CS_OPT_TEXT,CS_OPT_OFF))return 3;
+ if(X86_scanNativeBatch(h,bytes,sizeof(bytes),0,words,2).count!=2||(words[0]&255)!=3||(words[1]&255)!=2)return 4;
+ cs_free(v,1);return cs_close(&h);
+}
+''')
+ for name,versions in m.items():
+    rows={}
+    for key,meta in versions.items():
+        git('reset','--hard','-q',base);patch=d/(name+'-'+key+'.patch');assert sha(patch)==meta['checkout_sha256'];git('apply','--index',str(patch));assert git('write-tree')==meta['tree']
+        if not b.exists():
+            cmd('configure',['cmake','-S',pr,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers')])
+        cmd(name+'-'+key,['cmake','--build',b,'--target','probe','--parallel','4']);exe=b/'probe';lib,=b.rglob('libcapstone.a')
+        members=sp.check_output(['ar','t',lib],text=True).splitlines();assert members.index('X86Vex32Output.c.o')<members.index('X86Sse64Output.c.o')<members.index('X86BatchScan.c.o')
+        for mode in ([],['64']):sp.run([exe,*mode],check=True)
+        rows[key]=dict(archive=sha(lib),executable=sha(exe),members=len(members))
+    assert rows['original']==rows['current']==rows['narrow'],rows
+    save(name,rows)
+ save('complete',dict(complete=True,source=m,compiler=sp.check_output([os.environ['CC'],'--version'],text=True),cpu=sp.check_output(['lscpu'],text=True)))
 finally:
-    count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
+ count=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
