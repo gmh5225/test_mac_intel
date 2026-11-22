@@ -17,6 +17,9 @@ ROOT = Path(sys.argv[1]).resolve()
 ROOT.mkdir(parents=True, exist_ok=True)
 URL = "https://download.microsoft.com/download/a4a79e7a-f085-41c4-aebf-2538fd000790/adkwinpeaddons/adkwinpesetup.exe"
 INSTALLER = "d4de67acc83de253ccc941dd0590808d83726bdd8ea768a374a7beaff7949d6a"
+SEVEN_ZIP = shutil.which("7z") or shutil.which("7zz")
+if not SEVEN_ZIP:
+    raise RuntimeError("7zip is required to read the signed kit installer")
 KIT = ROOT / "kit"
 MEDIA = ROOT / "media"
 KIT.mkdir(exist_ok=True)
@@ -46,7 +49,7 @@ def fetch(url, file, expected, algorithm):
 setup = KIT / "adkwinpesetup.exe"
 fetch(URL, setup, INSTALLER, "sha256")
 burn = KIT / "bundle"
-subprocess.run(["7z", "x", "-y", "-o" + str(burn), str(setup), "0"], check=True, stdout=subprocess.DEVNULL)
+subprocess.run([SEVEN_ZIP, "x", "-y", "-o" + str(burn), str(setup), "0"], check=True, stdout=subprocess.DEVNULL)
 payloads = {}
 for item in ElementTree.parse(burn / "0").getroot():
     if item.tag.rsplit("}", 1)[-1] == "Payload":
@@ -97,7 +100,7 @@ def extract_media(msi):
     for name, files in members.items():
         source = payload(name)
         area = KIT / name.removesuffix(".cab")
-        subprocess.run(["7z","x","-y","-o"+str(area),str(source),*(key for key,_,_ in files)],
+        subprocess.run([SEVEN_ZIP,"x","-y","-o"+str(area),str(source),*(key for key,_,_ in files)],
                        check=True, stdout=subprocess.DEVNULL)
         for key, dest, size in files:
             original = area / key
@@ -112,7 +115,7 @@ for kind in ("Boot Files (DesktopEditions)", "Boot Files (OnecoreUAP)", "wims (D
     extract_media(payload(f"Windows PE {kind}-x86_en-us.msi"))
 wim = MEDIA / "Sources/boot.wim"
 assert all((MEDIA / f).is_file() for f in ("EFI/Boot/bootaa64.efi", "EFI/Microsoft/Boot/BCD", "Boot/boot.sdi"))
-subprocess.run(["wimlib-imagex","extract",str(wim),"1","Windows/System32/drivers/null.sys","--flat","--dest-dir="+str(ROOT)],check=True)
+subprocess.run(["wimlib-imagex","extract",str(wim),"1","Windows/System32/drivers/null.sys","--dest-dir="+str(ROOT)],check=True)
 driver = ROOT / "null.sys"
 raw = driver.read_bytes()
 pe = struct.unpack_from("<I", raw, 0x3c)[0]
