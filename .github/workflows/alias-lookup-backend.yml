@@ -1,7 +1,7 @@
-name: Build x86-only Capstone and check unchanged alias backends on four hosts
+name: Verify shipped register immediates against the real product-tested archive on four hosts
 on:
   push:
-    branches: [codex/alias-lookup-optional-backend-repair]
+    branches: [codex/qualify-packed-immediate-release]
   workflow_dispatch:
 permissions:
   contents: read
@@ -15,12 +15,12 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Reproduce the strict single-backend failure and verify the corrected tree
+      - name: Compile both trees from source, run affected units, and compare archive and shared-library bytes
         run: python3 -B alias-guard/verify.py https://github.com/NeverSight/capstone.git evidence
       - name: Upload compiler identities and object comparisons
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: alias-guard-${{ matrix.os }}
+          name: packed-output-${{ matrix.os }}
           path: evidence
           retention-days: 14
