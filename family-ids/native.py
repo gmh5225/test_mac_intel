@@ -51,6 +51,7 @@ try:
             save('raw-'+k,dict(bytes=length,sha256=digest.hexdigest()))
 
     if cc=='gcc':assert imgs['base']==imgs['stack'] and imgs['mode']==imgs['projected']
+    if cc=='clang':assert ids==load(d/'clang-image-identities.json')['/'.join((platform.machine(),osrel,cc))]
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])

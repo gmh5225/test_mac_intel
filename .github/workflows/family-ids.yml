@@ -1,7 +1,7 @@
-name: Separate RISC-V stack and x86 mapping costs across Clang generations, GCC and native arm64
+name: Verify the aggregate initializer on GCC and require exact Clang library identity before rechecking all targets
 on:
   push:
-    branches: [codex/capstone-mixed-stack-factorial]
+    branches: [codex/capstone-mapping-initializer-portability]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: stack-factorial-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: portable-stack-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
