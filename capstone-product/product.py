@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','packed','wide','combined'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','combined','row','effects'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -30,6 +30,8 @@ try:
     cases.append(data)
     shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp')
     with (nd/'CMakeLists.txt').open('a') as f:f.write('\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
+    shutil.copyfile(r/'oracle.cpp',nd/'capstone-count-clear.cpp')
+    with (nd/'CMakeLists.txt').open('a')as f:f.write('\nadd_executable(capstone-count-clear capstone-count-clear.cpp)\ntarget_link_libraries(capstone-count-clear PRIVATE NeverDDecode)\n')
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
@@ -37,18 +39,25 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','packed','wide','combined'):
+    for variant in ('base','combined','row','effects'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
+        if variant=='base':
+            command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-count-clear','--parallel','4'],'build-reference-counter',nd)
+            binary,=build.rglob('capstone-count-clear');counter=t/'count';shutil.copy2(binary,counter)
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
+        command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
+        command([t/'verify'],'registers-'+variant)
+        regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(16 if variant!='effects' or v[0]=='64' else 8) for v in regs)
         obj,=build.rglob('X86Decoder.cpp.o')
         with obj.open('rb') as f:
             ef=ELFFile(f);sections={se.name:hashlib.sha256(se.data()).hexdigest() for se in ef.iter_sections() if se['sh_flags']&4 and se.data_size}
@@ -76,7 +85,7 @@ try:
             for mode in ('32','64'):
                 command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/('native-guard'+mode+'.cpp'),archive,'-o',t/('guard'+mode)],'guard-link-'+mode+'-'+variant)
                 command([t/('guard'+mode)],'guard-'+mode+'-'+variant)
-        if variant in ('wide','combined'):
+        if variant !='base':
             command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'second.c','-o',t/'observed.o'],'projection-compile-'+variant)
             command(['clang++','-std=c++17','-O2','-I',cs,'-I',cs/'include',r/'vex3.cpp',t/'observed.o',archive,'-o',t/'vex3'],'vex3-link-'+variant)
             command([t/'vex3'],'vex3-oracle-'+variant)
@@ -85,7 +94,7 @@ try:
             for probe in ('rounded','shift'):
                 command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/(probe+'.cpp'),t/'observed.o',archive,'-o',t/probe],'compile-'+probe+variant)
                 command([t/probe],'oracle-'+probe+'-'+variant)
-        if variant in ('packed','combined'):
+        if variant !='base':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
             assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
         if variant=='combined':
@@ -107,6 +116,9 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
+        if variant in ('row','effects'):
+            command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
+            assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -125,14 +137,23 @@ try:
             n=max(1,round(50000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
+            delta,occurrences=0,0
+            if c['selector']==32 and mode==2:
+                counted=list(map(int,sp.check_output([counter,c['path'],'32','2','1',*([c['intervals']]if 'intervals'in c else [])],text=True).split()))
+                occurrences,delta=counted[:2]
+                assert counted[3:]==single[1:]
+                assert (occurrences==0)==(delta==0)
+                if c['name']=='putty-32-0.85':assert occurrences==3
             for rep in range(13):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
-                    assert expected==sample[1:],(c['name'],mode,k,expected,sample)
+                    wanted=expected.copy()
+                    if k=='effects':wanted[-1]-=delta*n
+                    assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
-            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],reps=n,cycles=cycles))
+            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],clears=occurrences,score_change_per_pass=delta,reps=n,cycles=cycles))
             save('timings',rows)
     save('complete',dict(done=True,pairs=13,panels=len(rows),source=llvm))
 finally:

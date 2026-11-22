@@ -3213,7 +3213,7 @@ index 7738367c..92e01e07 100644
  
  if(CAPSTONE_X86_SUPPORT)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index f31ff384..7378e170 100644
+index f31ff384..e603a619 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -930,6 +930,75 @@ static bool check_absolute_addresses32(csh handles[2])
@@ -3317,11 +3317,10 @@ index f31ff384..7378e170 100644
  		0x83, 0x6c, 0x24, 0x08, 0xff, /* SUB dword ptr [esp+8],-1 */
  		0x8b, 0x04, 0x2d, 0xc5, 0, 0, 0, /* base-less SIB */
  		0x81, 0xf9, 0xc5, 0xfd, 0x77, 0, /* CMP ECX,imm32 */
-@@ -1239,6 +1326,89 @@ static bool check_primary_batches(csh handle)
- 				if (x.bytes != y.bytes || x.count != y.count ||
- 				    memcmp(a, b, sizeof(a)))
- 					return false;
-+
+@@ -1245,6 +1332,94 @@ static bool check_primary_batches(csh handle)
+ 	return true;
+ }
+ 
 +static bool check_evex_immediate_shifts(csh handles[2])
 +{
 +	for (unsigned opcode = 0x71; opcode <= 0x73; ++opcode)
@@ -3404,10 +3403,16 @@ index f31ff384..7378e170 100644
 +							     mr + j + len))
 +							return false;
 +				}
- 			}
- 		}
- 	}
-@@ -1274,13 +1444,21 @@ static bool check_mode(cs_mode mode)
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1274,13 +1449,21 @@ static bool check_mode(cs_mode mode)
  		     (!check_vex_rip_loads(handles) ||
  		      !check_sse_rip_memory(handles) ||
  		      (private_iter == X86_disasmIterText &&
