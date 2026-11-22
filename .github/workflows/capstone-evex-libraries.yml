@@ -1,7 +1,7 @@
-name: Compare batch, Intel text and register detail against source-built iced on four native hosts
+name: Measure the cost of the existing text checksum with the same decoder, output, and inputs
 on:
   push:
-    branches: [codex/capstone-release-format-detail-batch-iced]
+    branches: [codex/capstone-production-text-length]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 68ca96c3343b0a7c110b9db372a9ee2642d857ef
+          ref: ca73ea7f0c6aa0d618372481d6a29d9707c00d90
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-modes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: text-length-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

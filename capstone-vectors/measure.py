@@ -72,6 +72,19 @@ def main(w):
     assert inc.count(anchor)==1
     inc=inc.replace(anchor,'if(bits==64 && X86_scanBatch64)(void)batch_span<true,X86_scanBatch64>(ptr,f.size,handle,insn,f.ip); else '+anchor)
     inc=inc.replace('X86_scanBatch32','X86_scanNativeBatch').replace('X86_scanBatch64','X86_scanNativeBatch')
+    def once(v,a,b):
+        assert v.count(a)==1,(a,v.count(a))
+        return v.replace(a,b)
+    inc=once(inc,'static void text_value(', 'template<bool NativeLength>\\nstatic void text_value(')
+    inc=once(inc,'  while (s[n])\\n    ++n;', '  if constexpr (NativeLength) n=std::strlen(s); else while (s[n]) ++n;')
+    inc=once(inc,'template <auto Next>\\nstatic Result cs_span', 'template <auto Next, bool NativeLength=false>\\nstatic Result cs_span')
+    inc=inc.replace('text_value(result,','text_value<NativeLength>(result,')
+    assert inc.count('text_value<NativeLength>')==2
+    pair='else if(engine=="x86_iter" && bits==32 && X86_disasmIter32)'
+    alt='else if(engine=="x86_len_" && bits==32) row=cs_span<X86_disasmIter32,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\\n        else if(engine=="x86_len_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\\n        '
+    inc=once(inc,pair,alt+pair)
+    inc=once(inc,'engine!="x86_iter" &&','engine!="x86_iter" && engine!="x86_len_" &&')
+    inc='#include <cstring>\\n'+inc
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={}
@@ -89,7 +102,7 @@ def main(w):
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
-        if key=='row':
+        if key=='official':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
                 run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/(name+'.cpp'),w/'plan.o',lib,'-o',w/name],'compile-'+name)
@@ -98,7 +111,6 @@ def main(w):
             for flag,file in [('--evex-scan','X86GenEvexScan.inc'),('--rounded-registers64','X86GenRoundedRegister64.inc'),('--evex-shifts','X86GenEvexShiftOutput.inc')]:
                 assert sp.check_output([w/'generator',flag])==(base/'arch/X86'/file).read_bytes(),flag
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
-    shutil.copy2(bins['baseline'],w/'copy');bins['copy']=w/'copy';bins['iced']=bins['baseline']
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
@@ -116,22 +128,19 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in range(3):
-            def timed(key,n):
-                control=key in ('iced','fast')
-                engine=('fast____'if key=='fast'else'iced____')if control else 'x86_iter'if mode else 'vecbatch'
-                exe=bins['baseline'] if control else bins[key]
-                return list(map(int,sp.check_output([exe,engine,str(mode),str(n),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('baseline',1)[0])));cycles=[]
-            labels=['baseline','copy','row','flags','iced']+(['fast']if mode else [])
+        for mode in (1,2):
+            def timed(label,count):
+                engine={'loop':'x86_iter','copy':'x86_iter','strlen':'x86_len_','iced':'iced____','fast':'fast____'}[label]
+                return list(map(int,sp.check_output([bins['official'],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
+            rep=max(1,math.ceil(50e6/max(1,timed('loop',1)[0])));cycles=[]
+            labels=['loop','strlen','copy','iced','fast']
             for idx in range(13):
                 labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1
-                assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
+                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
         print(name,len(selected),flush=True)
-    assert {(k,md)for k in m['samples']for md in range(3)}=={(x['case'],x['mode'])for x in results}
+    assert {(k,md)for k in m['samples']for md in (1,2)}=={(x['case'],x['mode'])for x in results}
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),native=platform.platform(),machine=platform.machine(),positive_scanner_coverage=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
