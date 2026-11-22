@@ -1,7 +1,7 @@
-name: Replicate compressed RISC-V operands on the new shipping headers and profile GCC detail construction
+name: Qualify RISC-V stack operands on the published vector formatter in mixed and single architecture builds
 on:
   push:
-    branches: [codex/capstone-riscv-stack-operands-repeat]
+    branches: [codex/capstone-stack-operands-current-next]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 9615f6450fb7c47dad85a76cd89ad246c6962de3
+          ref: 77b7043a31582684a0234f104a1fc24d90f0a12d
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'full' && matrix.host != 'ubuntu-24.04-arm'
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: shipped-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: release-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
