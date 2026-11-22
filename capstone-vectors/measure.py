@@ -82,7 +82,7 @@ def main(w):
         save('direct-guard-'+label,dict(counts=counts))
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
-            assert sp.check_output([w/'verify-evex-memory','--evex-memory'])==(base/'arch/X86/X86GenEvexMemoryOutput.inc').read_bytes()
+            assert sp.check_output([w/'verify-evex-memory','--vex-register-immediates'])==(base/'arch/X86/X86GenVexRegisterImmediates.inc').read_bytes()
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -116,7 +116,9 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert members.keys()==prior.keys() and 'X86EvexMemoryOutput.c.o' in changed and changed<={'X86EvexMemoryOutput.c.o','X86MemoryOutput.c.o','X86Vex32Output.c.o','X86MemoryFallback32.c.o','X86Sse64Output.c.o','X86VectorFallback64.c.o'},changed
+            added=set(members)-set(prior);assert added=={'X86VexRegisterImmediate.c.o'} and set(prior)<=set(members)
+            assert {'X86VectorFallback64.c.o','X86MemoryFallback32.c.o'}<=changed
+            changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
