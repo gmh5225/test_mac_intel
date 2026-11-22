@@ -1,19 +1,17 @@
-diff --git a/MappingAlias.h b/MappingAlias.h
-index d6575cb9..451013f8 100644
---- a/MappingAlias.h
-+++ b/MappingAlias.h
-@@ -12,11 +12,14 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
- 	switch (arch) {
- 	default:
- 		return (!c || c == ' ' || c == '\t' || c == '.');
-+/* The isolated parser serves AArch64 and MIPS, both of which use the default delimiters. */
-+#ifndef CAPSTONE_ALIAS_ROLLED_LOOP
- 	case CS_ARCH_PPC:
- 	case CS_ARCH_RISCV:
- 		return (!c || c == ' ' || c == '\t');
- 	case CS_ARCH_SPARC:
- 		return (!c || c == ' ' || c == '\t' || c == ',');
-+#endif
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index ccd06357..b56826b0 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -207,9 +207,9 @@ static uint32_t readFirst64(const uint8_t *code, size_t size)
+ 			plan ? readPrimary(code + 1, size - 1, plan) : 0;
+ 		return word ? word + 1 : 0;
  	}
- }
- 
+-	const unsigned plan = x86Batch64Primary[byte];
+-	if (plan)
+-		return readPrimary(code, size, plan);
++	const unsigned primary = x86Batch64Primary[byte];
++	if (primary)
++		return readPrimary(code, size, primary);
+ 	if (byte == 0x0f)
+ 		return readSecondary64(code, size, 1, false, false);
+ 	if (byte == 0x66 && size >= 3) {

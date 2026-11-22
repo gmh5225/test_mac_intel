@@ -1,7 +1,7 @@
-name: Check every alias name and byte terminator while retaining the generic parser
+name: Build strict GCC static and shared x86 libraries with full, DIET, reduced and no-ATT tests
 on:
   push:
-    branches: [codex/capstone-isolated-alias-terminators]
+    branches: [codex/capstone-gcc-native-batch-lookup]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -10,19 +10,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: clang, flavor: first }
-          - { host: ubuntu-24.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
+        host: [ubuntu-22.04, ubuntu-24.04]
+        profile: [full, diet, reduced, noatt]
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
-      CC: ${{ matrix.cc }}
-      FLAVOR: ${{ matrix.flavor }}
+      PROFILE: ${{ matrix.profile }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -31,15 +24,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
+          ref: ca73ea7f0c6aa0d618372481d6a29d9707c00d90
           path: source
           persist-credentials: false
-      - run: python3 -B family-ids/native.py
+      - run: python3 -B family-ids/check-ci.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alias-terminators-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: gcc-batch-${{ matrix.host }}-${{ matrix.profile }}
           retention-days: 14
