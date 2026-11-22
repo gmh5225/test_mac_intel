@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['official_capstone']
-assert all(sha(r/(stage+'.patch'))==m[stage]['sha256'] for stage in ('cold','early'))
+assert sha(r/'reader.patch')==m['selected']['sha256'] and sha(r/'neverd.patch')==m['decoder_patch']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
@@ -32,16 +32,26 @@ try:
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
-    for variant in ('base','cold','early'):
-        if variant=='early':command(['git','restore','--source',m['official_capstone'],'--staged','--worktree','--','.'],'restore-release',cs)
-        if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
-        actual=git(cs,'write-tree');assert actual==m[variant]['tree']
+    cmake_file=nd/'CMakeLists.txt'
+    normal_cmake=cmake_file.read_text()
+    for variant in ('base','linked','selected'):
         decoder=nd/'lib/decode/X86/X86Decoder.cpp'
+        if variant=='linked':
+            command(['git','apply','--index',r/'reader.patch'],'apply-reader',cs)
+            # Keep the candidate object in the control image while the decoder calls the original entry.
+            cmake_file.write_text(normal_cmake+'\ntarget_link_options(capstone-product PRIVATE LINKER:--undefined=X86_scanBatch32)\n')
+        if variant=='selected':
+            cmake_file.write_text(normal_cmake)
+            command(['git','apply',r/'neverd.patch'],'select-i386-entry',nd)
+        actual=git(cs,'write-tree')
+        assert actual==m[variant]['tree'] and ('return X86_scanBatch32(' in decoder.read_text())==(variant=='selected')
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
+        names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
+        assert any(x.split()[-1]=='X86_scanBatch32' for x in names if x.split())==(variant!='base')
         archive,=build.rglob('libcapstone.a')
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
     save('products',identities)
@@ -62,7 +72,7 @@ try:
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             for rep in range(13):
-                keys=['base','copy','cold','early'];rng.shuffle(keys);ticks={v:[] for v in keys}
+                keys=['base','copy','linked','selected'];rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     assert expected==sample[1:],(c['name'],mode,k,expected,sample)

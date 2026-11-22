@@ -1,29 +1,13 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 593901fa5e..3df7e6d898 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -115,9 +115,9 @@ add_subdirectory(third_party/capstone)
- # allowing Debug to honor its source-level debugging contract: no forced
- # optimization and Capstone's internal assertions enabled.  In particular,
- # MSVC's Debug runtime checks are incompatible with /O2. Apply the same flags
--# to the ordinary decoder and the static i386 iterator.
-+# to the ordinary decoder and both static x86 iterators.
- include(${CMAKE_SOURCE_DIR}/cmake/NeverDCapstoneCompilerOptions.inc)
--foreach(capstone_object IN ITEMS capstone capstone_x86_iter32)
-+foreach(capstone_object IN ITEMS capstone capstone_x86_iter32 capstone_x86_iter64)
-     if(MSVC)
-         target_compile_options(${capstone_object} PRIVATE
-             "$<$<NOT:$<CONFIG:Debug>>:/O2>")
-diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
-index 8c4e4e839b..745a3a8ce9 100644
---- a/lib/decode/Decoder.cpp
-+++ b/lib/decode/Decoder.cpp
-@@ -384,7 +384,7 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
-   size_t Remaining = Len;
-   uint64_t PC = Addr;
-   if (Text && X86) {
--    if (X86_disasmIter(Handle, &Code, &Remaining, &PC, InsnBuf))
-+    if (X86_disasmIterText(Handle, &Code, &Remaining, &PC, InsnBuf))
-       return true;
-   } else if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf)) {
-     return true;
+--- a/lib/decode/X86/X86Decoder.cpp
++++ b/lib/decode/X86/X86Decoder.cpp
+@@ -108,6 +108,10 @@
+ size_t
+ Decoder::classifyX86Prefix(llvm::ArrayRef<uint8_t> Bytes, va_t Addr,
+                            llvm::MutableArrayRef<uint32_t> Output) const {
++  if (TargetArch == Arch::X86)
++    return X86_scanBatch32(Handle, Bytes.data(), Bytes.size(), Addr,
++                           Output.data(), Output.size())
++        .count;
+   return X86_scanBatch(Handle, Bytes.data(), Bytes.size(), Addr, Output.data(),
+                        Output.size())
+       .count;
