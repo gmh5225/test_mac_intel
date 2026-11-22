@@ -1,7 +1,7 @@
-name: Measure the cost of the existing text checksum with the same decoder, output, and inputs
+name: Measure the already-probed x86-64 full decode fallback against both iced formatters
 on:
   push:
-    branches: [codex/capstone-production-text-length]
+    branches: [codex/capstone-x86-completed-output-plans]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: text-length-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: after-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

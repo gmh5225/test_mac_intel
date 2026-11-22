@@ -91,7 +91,7 @@ def main(w):
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
-        diff=r/(key+'.patch')
+        diff=r/('candidate-from-checkout.patch' if key=='candidate' else 'official.patch')
         assert sha(diff)==z['sha256'];run(['git','apply','--index',diff],'apply-'+key,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/'build';run(['cmake','-S',base,'-B',build,*cfg],'configure-'+key)
@@ -99,10 +99,24 @@ def main(w):
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*units],'build-'+key)
         run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         lib=build/'libcapstone.a';exe=w/key
+        run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'census.cpp',lib,'-o',w/('census-'+key)],'link-census-'+key)
+        obj=['cs.c.o','X86VectorFallback64.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o']
+        def members(lib):return {k:hashlib.sha256(sp.check_output(['ar','p',lib,k])).hexdigest() for k in obj}
+        standalone=members(lib)
+        multi=w/'multi'
+        run(['cmake','-S',base,'-B',multi,*cfg,'-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF'],'configure-multi-'+key)
+        run(['cmake','--build',multi,'--parallel','4','--target','capstone_static'],'build-multi-'+key)
+        both=members(multi/'libcapstone.a')
+        save('objects-'+key+'.json',dict(standalone=standalone,multi=both))
+        if key=='official':prior_objects=(standalone,both)
+        else:
+            assert both==prior_objects[1]
+            for n in ('X86Sse64Output.c.o','X86Vex32Output.c.o'):assert standalone[n]==prior_objects[0][n]
+            if darwin:assert standalone==prior_objects[0]
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
-        if key=='official':
+        if key=='candidate':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
                 run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/(name+'.cpp'),w/'plan.o',lib,'-o',w/name],'compile-'+name)
@@ -121,6 +135,9 @@ def main(w):
         expected=m['provenance'][name];assert sha(f)==expected['text_sha256']
         intervals=w/(name+'.tsv');emit=lambda rows:intervals.write_text(''.join('%d %d %d\n'%tuple(a)for a in rows))
         emit(spans)
+        records={k:[sp.check_output([w/('census-'+k),str(bits),str(chosen),f,str(spans[0][2])],text=True).splitlines()[0]for chosen in (0,1)]for k in trees}
+        assert records['official']==records['candidate']
+        save('records-'+name+'.json',records)
         audit=[sp.check_output([v,'audit','0','1',f,intervals,str(bits)],text=True)for k,v in bins.items()if k in trees]
         assert len(set(audit))==1
         trace=[list(map(int,l.split()))for l in audit[0].splitlines()]
@@ -128,19 +145,20 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (1,2):
-            def timed(label,count):
-                engine={'loop':'x86_iter','copy':'x86_iter','strlen':'x86_len_','iced':'iced____','fast':'fast____'}[label]
-                return list(map(int,sp.check_output([bins['official'],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('loop',1)[0])));cycles=[]
-            labels=['loop','strlen','copy','iced','fast']
+        for mode in range(3):
+            def timed(k,count):
+                tag='candidate' if k=='candidate' else 'official'
+                engine={'iced':'iced____','fast':'fast____'}.get(k, 'x86_len_' if mode else 'vecbatch')
+                return list(map(int,sp.check_output([bins[tag],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
+            rep=max(1,math.ceil(50e6/max(1,timed('official',1)[0])));cycles=[]
+            labels=['official','candidate','copy','iced']+(['fast']if mode else [])
             for idx in range(13):
                 labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
         print(name,len(selected),flush=True)
-    assert {(k,md)for k in m['samples']for md in (1,2)}=={(x['case'],x['mode'])for x in results}
+    assert {(k,md)for k in m['samples']for md in range(3)}=={(x['case'],x['mode'])for x in results}
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),native=platform.platform(),machine=platform.machine(),positive_scanner_coverage=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
