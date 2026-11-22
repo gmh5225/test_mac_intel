@@ -45,7 +45,7 @@ version = subprocess.check_output([emu, "--version"], text=True).splitlines()[0]
 if "version 10.2." not in version:
     raise ValueError(f"Unexpected QEMU plugin interface: {version}")
 command = [emu, "-machine","virt,acpi=on,gic-version=3,highmem=off","-accel","tcg,thread=single",
-           "-cpu","max","-smp","1","-m","2048","-nodefaults","-no-reboot","-display","none",
+           "-cpu","cortex-a76","-smp","1","-m","2048","-nodefaults","-no-reboot","-display","none",
            "-drive",f"if=pflash,format=raw,readonly=on,file={firmware/'AAVMF_CODE.fd'}",
            "-drive","if=pflash,format=raw,file=nvram.fd",
            "-device","ramfb","-drive","if=none,format=raw,file=bootmedia.img,id=media",
