@@ -103,40 +103,21 @@ index ae1554b0..8274f152 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..3c62ba94 100644
+index 12428fff..b9b70243 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,9 +3753,34 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3753,9 +3753,15 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  					  cs_insn *insn, uint16_t *insn_size,
  					  bool batch);
  
 +#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+X86_DECODE_INLINE bool decodeIteratorOutput(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch);
-+#define CS_DECODE_OUTPUT_MISS decodeIteratorOutput
++#define CS_DECODE_OUTPUT_MISS cs_decode_public_record
 +#endif
  #define CS_DECODE_SCAN_IMPL decodeIteratorScan
  #include "../../cs_disasm_internal.h"
  #undef CS_DECODE_SCAN_IMPL
 +#ifdef CS_DECODE_OUTPUT_MISS
 +#undef CS_DECODE_OUTPUT_MISS
-+X86_DECODE_INLINE bool decodeIteratorOutput(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch)
-+{
-+	if (handle->arch == CS_ARCH_X86 && !handle->no_text) {
-+		if (handle->mode == CS_MODE_64)
-+			return X86_decodeTextRecord64(handle, code, size, insn,
-+						      length, batch);
-+		if (handle->mode == CS_MODE_32)
-+			return X86_decodeTextRecord32(handle, code, size, insn,
-+						      length, batch);
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, length, batch);
-+}
 +#endif
  
  /* Keep the admitted terminal's public ID and zero alias adjustment visible
@@ -177,6 +158,145 @@ index 443b2f86..0110643b 100644
  #endif
  
  CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+diff --git a/cs.c b/cs.c
+index c87f3f47..c22cfcb6 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1038,42 +1038,34 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ #endif
+ }
+ 
+-/* Keep the full decoder's stack frame off generated-output hits, while
+- * retaining the public iterator's scan code and private calling convention. */
+-#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+-CS_PRESERVE_MOST bool
+-cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++/* Public record selection shares the architecture test that initializes the
++ * MCInst. The fixed x86 readers can enter the ordinary decoder on a miss. */
++CS_DECODE_INLINE bool decode_arch_record(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size, bool batch,
++					 bool public_output)
+ {
+-	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+-		return true;
+-	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
+-}
+-
+-__attribute__((noinline)) CS_PRESERVE_MOST bool
+-cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
+-{
+-#else
+-#if defined(_MSC_VER)
+-__declspec(noinline)
+-#elif defined(__GNUC__)
+-__attribute__((noinline))
+-#endif
+-CS_PRESERVE_MOST bool
+-cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
+-{
+-#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+-	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+-		return true;
+-#endif
+-#endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++		if (public_output) {
++			if (size && !handle->no_text) {
++				if (handle->mode == CS_MODE_64)
++					return X86_decodeTextRecord64(
++						handle, code, size, insn,
++						insn_size, batch);
++				if (handle->mode == CS_MODE_32)
++					return X86_decodeTextRecord32(
++						handle, code, size, insn,
++						insn_size, batch);
++			}
++			return cs_decode_full_insn(handle, code, size, insn,
++						   insn_size, batch);
++		}
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+@@ -1148,6 +1140,51 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	return true;
+ }
+ 
++/* Keep the full decoder's stack frame off generated-output hits, while
++ * retaining the public iterator's scan code and private calling convention. */
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
++CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
++		return true;
++	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
++}
++
++__attribute__((noinline)) CS_PRESERVE_MOST bool
++cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++#else
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
++	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
++		return true;
++#endif
++#endif
++	return decode_arch_record(handle, code, size, insn, insn_size, batch,
++				  false);
++}
++
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++CS_PRESERVE_MOST bool
++cs_decode_public_record(cs_struct *handle, const uint8_t *code, size_t size,
++			cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_arch_record(handle, code, size, insn, insn_size, batch,
++				  true);
++}
++#endif
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index f3dfc374..b2962d33 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -21,6 +21,11 @@
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++cs_decode_public_record(cs_struct *handle, const uint8_t *code, size_t size,
++			cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 92e01e07..1e3e37ce 100644
 --- a/tests/unit/CMakeLists.txt
