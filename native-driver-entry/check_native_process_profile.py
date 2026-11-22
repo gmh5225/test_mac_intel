@@ -74,7 +74,10 @@ def main():
                 for route in ("highc", "llvmc")}
     assert required <= {(r["api"], r["route"]) for r in rows}
     system_providers = {"InternetControlMessage": 9, "TransactionManager": 39,
-                        "SNMPUtilities": 26, "WebAuthentication": 13, "SensorUtilities": 40}
+                        "SNMPUtilities": 26, "WebAuthentication": 13, "SensorUtilities": 40,
+                        "WebAuthenticationRuntime": 29, "EventCollector": 15,
+                        "DeviceManagementRegistration": 15, "NetworkTrafficControl": 20,
+                        "ComputeStorage": 14}
     system_abi = args.output / "system-abis"
     system_calls = args.output / "system-calls"
     provider_options = [arg for name in system_providers for arg in ("--provider", name)]
@@ -92,7 +95,7 @@ def main():
     assert {(r["api"], r["route"]) for r in system_rows} == {
         (api, route) for api in system_apis for route in ("highc", "llvmc")}
     assert all(r["architecture"] == "arm64" and r["passed"] and r["retains_call"]
-               for r in system_rows)
+               and r["object_exit"] == 0 and r["link_exit"] == 0 for r in system_rows)
     data = args.engine.read_bytes()
     nt, = struct.unpack_from("<I", data, 60)
     machine, = struct.unpack_from("<H", data, nt + 4)
@@ -102,7 +105,7 @@ def main():
                   cli_sha256=digest(args.engine), provider_abis=counts,
                   system_provider_abis=system_providers,
                   system_runtime=execute_system_calls(system_calls / "arm64"),
-                  system_linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}
+                  system_linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "object_exit", "link_exit", "input_sha256")}
                                               for r in system_rows],
                   catalog={lib["name"]: lib["sha256"] for lib in manifest["libraries"]},
                   linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}

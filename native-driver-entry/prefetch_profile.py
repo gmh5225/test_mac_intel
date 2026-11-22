@@ -21,6 +21,11 @@ def inputs(scripts):
                  legacy["headers"], legacy["import_packages"]["arm64"],
                  compatibility["license"], *compatibility["sources"]):
         records.append((item["file"], item["url"], item["sha256"]))
+    runtime_inputs = scripts / "MicrosoftWebAuthnInputs.json"
+    if runtime_inputs.is_file():
+        runtime = json.loads(runtime_inputs.read_text(encoding="utf-8"))
+        for item in (*runtime["headers"], runtime["license"]):
+            records.append((item["file"], item["url"], item["sha256"]))
     unique = {}
     for name, url, checksum in records:
         if Path(name).name != name or not url.startswith("https://"):

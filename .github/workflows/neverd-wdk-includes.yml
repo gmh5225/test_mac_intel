@@ -27,14 +27,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 043da0c8d6fd22761354173a4f62bd2387f4cfb0
+          ref: 01809c4651337478d87daa8688881719a3bb2ad6
           path: repaired
           sparse-checkout: scripts
           persist-credentials: false
       - uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
-          path: ${{ runner.temp }}/nb/bin/neverd.exe
-          key: neverd-arm64-type-reader-d035e9bb8941f8f33a96560c8eb020496df499e2-1
+          path: ${{ runner.temp }}/neverd-provider-tools
+          key: neverd-arm64-provider-tools-180f23d24352f2dfb2b23cd234dd7028ded45ff1-v3
           fail-on-cache-miss: true
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
         with:
@@ -47,8 +47,8 @@ jobs:
           $cache = "$env:RUNNER_TEMP/sdk-packages"
           python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
           Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
-          python native-driver-entry/compare_native_wdk_includes.py --scripts source/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --expected rejected --report wdk-header-search-original.json
-          python native-driver-entry/compare_native_wdk_includes.py --scripts repaired/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/nb/bin/neverd.exe" --expected qualified --report wdk-header-search-fixed.json
+          python native-driver-entry/compare_native_wdk_includes.py --scripts source/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --expected rejected --report wdk-header-search-original.json
+          python native-driver-entry/compare_native_wdk_includes.py --scripts repaired/scripts --cache $cache --work "$env:RUNNER_TEMP/kit-inputs" --engine "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --expected qualified --report wdk-header-search-fixed.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
