@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
+import hashlib,json,os,platform,random,shlex,shutil,subprocess as sp,tempfile
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
 def load(p):return json.loads(p.read_text())
 def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
@@ -13,7 +13,7 @@ t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==m
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
-    for k in ('base','active','indexed'):
+    for k in ('base','indexed'):
         if k!='base':
             g('restore','--source','HEAD','--staged','--worktree','--','.')
             selected=load(d/'active-tree.json') if k=='active' else meta
@@ -21,12 +21,42 @@ try:
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
+        # Reproduce the real link, moving only SystemZInstPrinter.c.o for
+        # the second image. Both links consume the same compiled objects.
+        commands=sp.check_output(['ninja','-C',b,'-t','commands','capstone_shared'],text=True)
+        chunks=[]
+        for line in commands.splitlines():
+            if 'SystemZInstPrinter.c.o' in line and ' -shared ' in line:
+                chunks.extend(part for part in line.split('&&') if ' -shared ' in part)
+        line,=chunks
+        link=shlex.split(line);output_arg=link.index('-o')+1
+        plain=t/(k+'-normal.so');link[output_arg]=str(plain);cmd('repeat-link-'+k,link,b)
+        assert sha(plain)==sha(so)
+        positions=[n for n,o in enumerate(link) if o.endswith('.o')]
+        hit,=[n for n in positions if link[n].endswith('/SystemZInstPrinter.c.o')]
+        original=link[hit];assert hit<positions[-1];link.insert(positions[-1],link.pop(hit));assert link[positions[-1]]==original
+        moved=t/(k+'-reordered.so');link[output_arg]=str(moved);cmd('move-link-'+k,link,b)
+        assert sha(moved)!=sha(so)
+        save('link-'+k,dict(object=original,before=hit,after=positions[-1],objects=len(positions),original=sha(so),relinked=sha(plain),moved=sha(moved)))
         names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','SystemZ_LLVM_getRegisterName','printFormattedRegName'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
             if len(fs)==4 and fs[-1] in names:syms[fs[-1]]=list(map(lambda x:int(x,16),fs[:2]))
         assert 'matchAliasPatterns' in syms and 'cs_disasm_iter' in syms
+        def fingerprint(binary):
+            body=binary.read_bytes();symbols={}
+            sections=[w for l in sp.check_output(['objdump','-h',binary],text=True).splitlines() if len(w:=l.split())>=7 and w[0].isdigit()]
+            for ln in sp.check_output(['nm','-n','-S','--defined-only',binary],text=True).splitlines():
+                fs=ln.split()
+                if len(fs)!=4 or fs[-1] not in names:continue
+                addr,length=int(fs[0],16),int(fs[1],16)
+                zone=next(w for w in sections if int(w[3],16)<=addr and addr+length<=int(w[3],16)+int(w[2],16))
+                off=int(zone[5],16)+addr-int(zone[3],16);section=body[off:off+length];assert len(section)==length
+                symbols[fs[-1]]=dict(address=addr,length=length,sha256=hashlib.sha256(section).hexdigest())
+            return symbols
+        save('fingerprint-'+k,dict(normal=fingerprint(so),last=fingerprint(moved)))
+        imgs[k+'_last']=moved.read_bytes();ids[k+'_last']=sha(moved)
         printer,=b.rglob('MCInstPrinter.c.o')
         cmd('common-code-'+k,['objcopy','--dump-section','.text='+str(t/'common.text'),printer])
         regular_code=sha(t/'common.text')
@@ -82,16 +112,16 @@ try:
     cmd('libmvec',['python3','-B',t/'libmvec.py'])
     cmd('build-public-states',['c++','-std=c++17','-O2','-I',s/'include',d/'public-records.cpp','-ldl','-o',t/'public-states'])
     libs={}
-    for k in ('base','active','indexed'):
+    for k in ('base','base_last','indexed','indexed_last'):
         libs[k]=t/(k+'.so');libs[k].write_bytes(imgs[k])
     states={}
-    for k in ('base','active','indexed'):
+    for k in ('base','base_last','indexed','indexed_last'):
         states[k]={}
         for label,bits,f in [('real-pe32',32,t/'putty-0.85-32.text'),('real-pe64',64,t/'putty-0.85-64.text'),('code16',16,t/'putty-0.85-32.text'),('simd64',64,t/'libmvec.text')]:
             z=json.loads(sp.check_output([t/'public-states',libs['base'],libs[k],f,str(bits)],text=True))
             assert z['complete_record_comparisons']>0 and z['batch_records']>0
             states[k][label]=z
-    assert states['base']==states['active']==states['indexed']
+    assert states['base']==states['base_last']==states['indexed']==states['indexed_last']
     save('public-differential',states)
     import corpus
     foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name'] in ('arm-ls', 'arm64-ls', 'mips64el-ls', 'ppc64el-ls', 'riscv64-ls', 'sparc64-ls', 's390x-ls', 'loong64-ls')]
@@ -105,7 +135,7 @@ try:
     cmd('compile-records',['c++','-std=c++17','-O2','-I',s/'include',d/'raw.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'raw'])
     samples=[q for q in foreign if q['name'].split('-')[0] in selectors]+[extra[-1]]
     bystage={}
-    for k in ('base','active','indexed'):
+    for k in ('base','base_last','indexed','indexed_last'):
         target.write_bytes(imgs[k]);rows={}
         for q in samples:
             for opt in range(5):
@@ -113,7 +143,7 @@ try:
                 assert len(raw)==4 and raw[0]>0
                 rows[q['name']+'/'+str(opt)]=raw
         bystage[k]=rows
-    assert bystage['base']==bystage['active']==bystage['indexed'] and len(bystage['base'])>=10
+    assert bystage['base']==bystage['base_last']==bystage['indexed']==bystage['indexed_last'] and len(bystage['base'])>=10
     save('raw-records',bystage)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
     save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output([cc,'--version'],text=True),images=ids,osrel=osrel,machine=platform.machine(),cc=cc))

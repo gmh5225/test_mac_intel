@@ -1,7 +1,7 @@
-name: Measure direct formatting from the original SystemZ register-name strings across nine real architectures
+name: Test SystemZ spillover with byte-identical relinking and a two-by-two object order comparison
 on:
   push:
-    branches: [codex/systemz-native-name-append]
+    branches: [codex/systemz-link-order-control]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-name-append-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-link-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
