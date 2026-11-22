@@ -31,6 +31,14 @@ def text_relocations(obj):
             if len(fields)>=3 and fields[2].startswith('R_'):
                 records.append((int(fields[0],16),fields[2]))
     return sorted(records)
+def pad_object(original,obj,tmp,amount):
+    if not amount:
+        shutil.copy2(original,obj)
+        return
+    asm=tmp/'padding.s'
+    asm.write_text(chr(10).join(['.text','.space '+str(amount),'.section .note.GNU-stack,"",%progbits','']))
+    sp.run(['cc','-c',asm,'-o',tmp/'padding.o'],check=True)
+    sp.run(['ld','-r','-o',obj,original,tmp/'padding.o'],check=True)
 def padded(build,library,tmp,mode,stats):
     extent={}
     for member in printers:
@@ -38,13 +46,7 @@ def padded(build,library,tmp,mode,stats):
         length=max(included);raw=(tmp/mode/(member+'.text')).read_bytes()
         obj,=build.rglob(member)
         original=tmp/mode/member
-        if length>len(raw):
-            padding=tmp/'padding.s'
-            padding.write_text('.text\\n.space '+str(length-len(raw))+'\\n.section .note.GNU-stack,"",%progbits\\n')
-            sp.run(['cc','-c',padding,'-o',tmp/'padding.o'],check=True)
-            sp.run(['ld','-r','-o',obj,original,tmp/'padding.o'],check=True)
-        else:
-            shutil.copy2(original,obj)
+        pad_object(original,obj,tmp,length-len(raw))
         relocs=text_relocations(original)
         assert relocs and text_relocations(obj)==relocs,(member,len(relocs),len(text_relocations(obj)))
         extent[member]=dict(original=len(raw),padded=length,text_relocations=len(relocs))
