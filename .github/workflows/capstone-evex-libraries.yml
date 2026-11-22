@@ -1,7 +1,7 @@
-name: Count exact native fallback paths and register shapes in the released source
+name: Attribute remaining real formatting and detail misses on the published EVEX source
 on:
   push:
-    branches: [codex/capstone-shipped-iterator-paths]
+    branches: [codex/current-publication-fallback-census]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: bbba0e240053b9ad2897390bdc76f6f6115e3a55
+          ref: 22ff038a78971a4414930e602bff1e469c52a619
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-stages-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: released-evex-stages-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
