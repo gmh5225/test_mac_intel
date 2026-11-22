@@ -1,7 +1,7 @@
-name: Qualify indexed aliases and four cumulative x86 decoder changes on two full NeverD builds
+name: Compare vector RIP memory and i386 output changes on two source-built NeverD products
 on:
   push:
-    branches: [codex/integrated-decoder-product-ladder]
+    branches: [codex/rip-evex-on-shipping-formatter]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 48ecdc46cf427dcd9df8000b49a3ed67d73b2c75
+          ref: fe646646b61403c18430bcfa9749e6a2d2ebad85
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "48ecdc46cf427dcd9df8000b49a3ed67d73b2c75"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "22ff038a78971a4414930e602bff1e469c52a619"
+          test "$(git rev-parse HEAD)" = "fe646646b61403c18430bcfa9749e6a2d2ebad85"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "40125a7e11dcc4e9a5f43d2d11405212ed9d8184"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 22ff038a78971a4414930e602bff1e469c52a619
-          git -C third_party/capstone checkout --detach 22ff038a78971a4414930e602bff1e469c52a619
+          git -C third_party/capstone fetch --depth=1 origin 40125a7e11dcc4e9a5f43d2d11405212ed9d8184
+          git -C third_party/capstone checkout --detach 40125a7e11dcc4e9a5f43d2d11405212ed9d8184
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-output-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: rip-evex-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
