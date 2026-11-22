@@ -8,7 +8,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-extern "C" bool observed_mixed(csh, bool, const uint8_t *, size_t,
+extern "C" bool observed_legacy(csh, bool, const uint8_t *, size_t,
                                cs_insn *, uint16_t *);
 
 int main() {
@@ -42,7 +42,7 @@ int main() {
             actual.address = reference.address = 0x31415926;
             uint16_t length = 0xeeff;
             ++trials;
-            if (!observed_mixed(fast, wide, p, n, &actual, &length)) {
+            if (!observed_legacy(fast, wide, p, n, &actual, &length)) {
                 actual.detail = reference.detail;
                 if (length != 0xeeff || std::memcmp(&actual, &reference, sizeof(actual)) ||
                     std::memcmp(&act, &ref, sizeof(act))) return false;
@@ -54,7 +54,7 @@ int main() {
             size_t left = n;
             uint64_t ip = reference.address;
             if (!cs_disasm_iter(ordinary, &cursor, &left, &ip, &reference) ||
-                length != 6 || cursor != p + length || left != n - length ||
+                length != 5 + ((bytes[1] & 0xf0) == 0x40) || cursor != p + length || left != n - length ||
                 ip != actual.address + length || actual.id != reference.id ||
                 actual.size != length || reference.size != length ||
                 std::memcmp(actual.bytes, reference.bytes, sizeof(actual.bytes)) ||
@@ -64,26 +64,20 @@ int main() {
                 return false;
             return true;
         };
-        constexpr unsigned opcodes[] = {0, 1, 2, 0x13, 0x14, 0x15, 0x16, 0x17,
-            0x18, 0x19, 0x1a, 0x37, 0x38, 0x39, 0x3a, 0xef, 0xf0, 0xf1};
-        for (auto op : opcodes) for (unsigned flags=0; flags<256; ++flags)
-            for (unsigned ext=0; ext<8; ++ext) for(unsigned regs=0; regs<8; ++regs) {
-                const auto mr = static_cast<uint8_t>((regs < 2 ? regs*64 : 192) |
-                    (((flags + regs) & 7) << 3) | ((regs ^ ext) & 7));
-                std::array<uint8_t,7> bytes{{0xc4,static_cast<uint8_t>((ext<<5)|3),
-                    static_cast<uint8_t>(flags),static_cast<uint8_t>(op),mr,
-                    static_cast<uint8_t>(op + ext*43 + flags*17 + regs),0}};
-                for (unsigned n=0; n<=7; ++n) if (!check(bytes,n,n<6)) {
-                    std::fprintf(stderr, "VEX mismatch wide=%u detail=%u op=%02x P0=%02x P1=%02x ModRM=%02x length=%u\n",wide,detail,op,bytes[1],flags,mr,n);
-                    return 3;
+        for (unsigned prefix=0;prefix<=16;++prefix) for(unsigned opcode=0x6f;opcode<=0x74;++opcode)
+            for(unsigned mr=0;mr<=255;++mr) for(unsigned value=0;value<256;++value) {
+                if ((mr<192 || !wide || opcode<0x70 || opcode>0x73) && value%43) continue;
+                std::array<uint8_t,7> bytes{{0x66,static_cast<uint8_t>(0x3f+prefix),0x0f,
+                    static_cast<uint8_t>(opcode),static_cast<uint8_t>(mr),static_cast<uint8_t>(value),0}};
+                const unsigned n=5+(prefix!=0);
+                if (!prefix) std::memmove(bytes.data()+1,bytes.data()+2,4);
+                if (!check(bytes,n,!wide || mr<192 || opcode<0x70 || opcode>0x73)) {
+                    std::fprintf(stderr,"mismatch prefix=%u op=%x mr=%x imm=%x\\n",prefix,opcode,mr,value);return 3;
                 }
+                if ((value & 31)==0) for(unsigned end=0;end<n;++end)
+                    if (!check(bytes,end,true)) return 4;
             }
-        std::array<uint8_t,7> supported{{0xc4,0xe3,0x7d,0x18,0xd1,0x7f,0}};
-        for (unsigned map = 0; map < 32; ++map) {
-            if (map == 3) continue;
-            auto bytes=supported; bytes[1]=static_cast<uint8_t>(0xe0|map);
-            if (!check(bytes,6,true)) return 4;
-        }
+        std::array<uint8_t,7> supported{{0x66,0x44,0x0f,0x70,0xdc,0xe4,0}};
         if (cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) ||
             !check(supported,6,true)) return 5;
         cs_close(&ordinary);

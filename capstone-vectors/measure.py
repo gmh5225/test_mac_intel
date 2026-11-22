@@ -20,6 +20,8 @@ def main(w):
     reference=json.loads((r/'experiment.json').read_text())['checkout_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     meta=json.loads((r/'experiment.json').read_text())
+    assert sha(r/'base.patch')==meta['base_patch_sha256']
+    run(['git','-C',base,'apply','--index',r/'base.patch'],'prepare-parent')
     assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['baseline_tree']
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -82,7 +84,7 @@ def main(w):
         save('direct-guard-'+label,dict(counts=counts))
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
-            assert sp.check_output([w/'verify-evex-memory','--vex-register-immediates'])==(base/'arch/X86/X86GenVexRegisterImmediates.inc').read_bytes()
+            assert sp.check_output([w/'verify-evex-memory','--legacy-register-immediates'])==(base/'arch/X86/X86GenLegacyRegisterImmediates.inc').read_bytes()
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -116,9 +118,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            added=set(members)-set(prior);assert added=={'X86VexRegisterImmediate.c.o'} and set(prior)<=set(members)
-            assert {'X86VectorFallback64.c.o','X86MemoryFallback32.c.o'}<=changed
-            changed.update(added)
+            assert prior.keys()==members.keys() and changed=={'X86VectorFallback64.c.o'},changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)

@@ -1,7 +1,7 @@
-name: Compare VEX register immediates against the shipped indexed EVEX tree
+name: Measure PSHUFD and SSE2 register shifts through the existing AMD64 miss path
 on:
   push:
-    branches: [codex/mixed-vex-on-shipped-indexed]
+    branches: [codex/capstone-late-legacy-imm8]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: indexed-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: legacy-immediate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
