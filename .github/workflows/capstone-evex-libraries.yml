@@ -1,7 +1,7 @@
-name: Compare the released EVEX register control writer and fork iced on four native hosts
+name: Compare handle-selected public and private iterators with the released library and fork iced in two build configurations
 on:
   push:
-    branches: [codex/shipped-register-immediate-iced]
+    branches: [codex/selected-public-iterator-real]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-register-imm-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: selected-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
