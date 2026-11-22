@@ -1,0 +1,41 @@
+name: Observe the real Windows ARM64 kernel arguments to the inbox Null driver
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - '.github/workflows/neverd-winpe-entry.yml'
+      - 'native-driver-entry/winpe/**'
+permissions:
+  contents: read
+jobs:
+  winpe-guest:
+    runs-on: ubuntu-24.04-arm
+    container: ubuntu:26.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: native-driver-entry/winpe
+          persist-credentials: false
+      - name: Provision the boot-media reader and system emulator
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          test "$(uname -m)" = aarch64
+          apt-get update -qq
+          apt-get install -y --no-install-recommends 7zip msitools wimtools mtools fdisk gcc libc6-dev pkg-config libglib2.0-dev qemu-system-arm qemu-efi-aarch64 python3 ca-certificates
+      - name: Boot the original ARM64 WinPE image and observe the signed inbox PE entry
+        run: |
+          python3 native-driver-entry/winpe/prepare.py /tmp/neverd-entry
+          python3 native-driver-entry/winpe/observe.py /tmp/neverd-entry
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: windows-arm64-kernel-entry
+          path: |
+            /tmp/neverd-entry/fixture.json
+            /tmp/neverd-entry/kernel-entry.json
+            /tmp/neverd-entry/qemu.log
+            /tmp/neverd-entry/guest-serial.log
+            /tmp/neverd-entry/boot-last.ppm
+          if-no-files-found: warn
