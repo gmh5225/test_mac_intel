@@ -9,6 +9,7 @@ def cmd(n,a,cwd=None):
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 meta=load(d/'revisions.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
+pe32_score_delta=load(d/'pe32-score.json')['score_delta']
 t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['projected']['parent']==meta['mode']['parent']
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
@@ -55,7 +56,7 @@ try:
                 order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
                 for k in order+order[::-1]:
                     v=invoke(k,arch,mode,path,ip,n)
-                    expect=one[2]-(ref['pe32-score'] if name=='putty32'and mode==3 and k in ('mode','projected') else 0)
+                    expect=one[2]-(pe32_score_delta if name=='putty32'and mode==3 and k in ('mode','projected') else 0)
                     assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
                 rows_.append(cyc)
             rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
