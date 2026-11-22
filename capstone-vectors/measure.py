@@ -85,14 +85,14 @@ def main(w):
     inc=once(inc,pair,alt+pair)
     inc=once(inc,'engine!="x86_iter" &&','engine!="x86_iter" && engine!="x86_len_" &&')
     inc='#include <cstring>\n'+inc
+    inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={}
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
-        diff=r/'official.patch'
-        assert sha(diff)==z['sha256'];run(['git','apply','--index',diff],'apply-'+key,base)
+        assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==z['commit']
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/('build-'+key);project=base
         if key=='project':
@@ -151,13 +151,14 @@ def main(w):
         for mode in (0,1,2):
             def timed(label,count):
                 key='official'if label=='official'else 'project'
-                engine={'iced':'iced____','fast':'fast____'}.get(label,'x86_len_' if mode else 'vecbatch')
+                engine={'iced':'iced____','fast':'fast____','public':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
                 return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
-            labels=['official','project','copy','iced']+(['fast']if mode else [])
+            labels=['official','project','copy','public','iced']+(['fast']if mode else [])
             for idx in range(13):
                 labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
+                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public')})==1
+                if mode:assert len({tuple(v[2:])for k,v in obs if k in ('public','project')})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
     assert len(results)==3*len(m['samples'])

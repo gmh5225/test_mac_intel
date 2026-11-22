@@ -1,7 +1,7 @@
-name: Compare the real NeverD Capstone build profile and the standalone profile to both iced formatters
+name: Measure the shipped Capstone public and NeverD paths alongside both iced formatters
 on:
   push:
-    branches: [codex/capstone-project-settings-versus-iced]
+    branches: [codex/current-capstone-project-and-public-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ca73ea7f0c6aa0d618372481d6a29d9707c00d90
+          ref: 76852fa6948d8e279083a907870b207c9a2aefdc
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4b281bc8327c4570e0c17c5f294bf5cbffc52a43
+          ref: a1185a032ebb0f0ae1d643b3613caf29397df427
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: project-profile-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shipped-indexed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
