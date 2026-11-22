@@ -1,3 +1,4 @@
+#include <valgrind/callgrind.h>
 #include <cstdlib>
 #include <capstone/capstone.h>
 #include <cstdint>
@@ -30,6 +31,7 @@ int main(int argc,char **argv){
  cs_option(handle,CS_OPT_TEXT,mode==0?CS_OPT_OFF:CS_OPT_ON)||
  cs_option(handle,CS_OPT_DETAIL,mode>=2?CS_OPT_ON:CS_OPT_OFF))return 3;
  cs_insn *i=cs_malloc(handle);if(!i)return 4;
+ uint64_t decoded=0;
  auto go=[&]{
    uint64_t count=0,values=0;
    const uint8_t *ptr=bytes.data();size_t left=bytes.size();uint64_t va=ip;
@@ -60,12 +62,16 @@ int main(int argc,char **argv){
        }
      }else{size_t step=left<align?left:align;ptr+=step;left-=step;va+=step;}
    }
+   decoded=count;
    return count*0x10001+values;
  };
  uint64_t warm=go(), total=0, c=ns(CLOCK_PROCESS_CPUTIME_ID),t=ns(CLOCK_MONOTONIC);
+ CALLGRIND_START_INSTRUMENTATION;
+ CALLGRIND_ZERO_STATS;
  for(int n=0;n<reps;++n)total+=go();
+ CALLGRIND_STOP_INSTRUMENTATION;
  t=ns(CLOCK_MONOTONIC)-t;c=ns(CLOCK_PROCESS_CPUTIME_ID)-c;
  if(total!=warm*reps)return 5;
- std::printf("%llu %llu %llu\n",(unsigned long long)c,(unsigned long long)t,(unsigned long long)warm);
+ std::printf("%llu %llu %llu %llu\n",(unsigned long long)c,(unsigned long long)t,(unsigned long long)warm,(unsigned long long)decoded);
  cs_free(i,1);cs_close(&handle);
 }

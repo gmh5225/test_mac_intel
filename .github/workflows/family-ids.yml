@@ -1,7 +1,7 @@
-name: Trace direct record construction and inlined scan effects on nine other architecture backends
+name: Attribute public x86 dispatch overhead on ARM, MIPS, RISC-V and PE32
 on:
   push:
-    branches: [codex/native-nine-isa-public-record]
+    branches: [codex/explain-public-foreign-decoder-cost]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -12,12 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04, cc: clang, flavor: first }
-          - { host: ubuntu-24.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -34,6 +29,7 @@ jobs:
           ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
           path: source
           persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
       - run: python3 -B family-ids/native.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
@@ -41,5 +37,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: native-public-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-dispatch-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
