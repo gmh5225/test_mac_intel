@@ -1,0 +1,62 @@
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 4190862e..64ee3a95 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -36,6 +36,7 @@
+ #include "../../MCFixedLenDisassembler.h"
+ #include "../../cs_priv.h"
+ #include "../../utils.h"
++#include "RISCVDisassembler.h"
+ #include "RISCVDisassemblerExtension.h"
+ #include "RISCVBaseInfo.h"
+ #include "RISCVMapping.h"
+@@ -52,9 +53,6 @@
+ 
+ #define DEBUG_TYPE "riscv-disassembler"
+ 
+-DecodeStatus RISCV_getInstruction(MCInst *Instr, uint16_t *Size,
+-				  const uint8_t *Bytes, size_t BytesLen,
+-				  uint64_t Address, SStream *CStream);
+ void addSPOperands(MCInst *MI);
+ ;
+ // end anonymous namespace
+diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
+index d629928f..e36ec509 100644
+--- a/arch/RISCV/RISCVDisassembler.h
++++ b/arch/RISCV/RISCVDisassembler.h
+@@ -8,11 +8,13 @@
+ #include "../../include/capstone/capstone.h"
+ #include "../../MCRegisterInfo.h"
+ #include "../../MCInst.h"
++#include "../../MCDisassembler.h"
++#include "../../SStream.h"
+ 
+ void RISCV_init(MCRegisterInfo *MRI);
+ 
+-bool RISCV_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+-			  MCInst *instr, uint16_t *size, uint64_t address,
+-			  void *info);
++DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
++				  const uint8_t *Bytes, size_t BytesLen,
++				  uint64_t Address, SStream *CS);
+ 
+ #endif
+diff --git a/arch/RISCV/RISCVLinkage.h b/arch/RISCV/RISCVLinkage.h
+index 28047f62..aebace2a 100644
+--- a/arch/RISCV/RISCVLinkage.h
++++ b/arch/RISCV/RISCVLinkage.h
+@@ -1,5 +1,5 @@
+-#ifndef CS_MIPS_LINKAGE_H
+-#define CS_MIPS_LINKAGE_H
++#ifndef CS_RISCV_LINKAGE_H
++#define CS_RISCV_LINKAGE_H
+ 
+ #include "../../MCDisassembler.h"
+ #include "../../MCInst.h"
+@@ -14,4 +14,4 @@ const char *RISCV_LLVM_getRegisterName(unsigned RegNo, unsigned AltIdx);
+ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 				 void * /* MCRegisterInfo* */ info);
+ 
+-#endif // CS_MIPS_LINKAGE_H
+\ No newline at end of file
++#endif // CS_RISCV_LINKAGE_H

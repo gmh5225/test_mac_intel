@@ -20,13 +20,12 @@ try:
     opts=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON']
     run('configure',['cmake','-S',project,'-B',b,'-G','Ninja',*opts]);rows={}
     for key,pair in stages.items():
-        if key in ('writer','fix'):git('apply','--index',str(d/(key+'.patch')))
+        if key in ('writer','memory'):git('apply','--index',str(d/(key+'.patch')))
         assert git('write-tree')==pair['original']
         # Save the original tree so the next x86 delta applies only once.
         for variant in ('original','rebased'):
             if variant=='rebased':
-                git('apply','--index',str(d/'diet.patch'))
-                if key!='base':git('apply','--index',str(d/'riscv.patch'))
+                git('apply','--index',str(d/'headers.patch'))
             assert git('write-tree')==pair[variant]
             run(key+'-'+variant,['cmake','--build',b,'--target','compare-abi','--parallel','4'])
             lib,=b.rglob('libcapstone.a');exe=b/'compare-abi'
