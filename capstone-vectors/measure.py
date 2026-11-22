@@ -73,8 +73,9 @@ def main(w):
         run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'census.cpp',b/'libcapstone.a','-o',w/('census-'+label)],'census-link-'+label)
         if label=='integrated':
             run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
-            produced=sp.check_output([w/'table-check','--vex32-memory'])
-            assert produced==(base/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes() and b'vex32_move_rows[2]' in produced
+            for args,fn in [([], 'X86GenVectorOutput.inc'),(['--evex-scan'],'X86GenEvexScan.inc')]:
+                produced=sp.check_output([w/'table-check',*args])
+                assert produced==(base/'arch/X86'/fn).read_bytes() and b'X86_INS_VFMADD213PD' in produced
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -96,15 +97,10 @@ def main(w):
         addrs={f[3]:[int(f[0],16),int(f[1],16)] for line in sp.check_output(['nm','-S','--defined-only',target],text=True).splitlines() if len(f:=line.split())==4 and f[3] in names}
         with target.open('rb')as stream: es={z.name:[z['sh_addr'],z.data_size]for z in ELFFile(stream).iter_sections() if z['sh_flags']&2 and z['sh_type']=='SHT_PROGBITS'}
         save('private-layout-'+label+'.json',dict(executable_sections=exec_sections,entrypoints=addrs,sections=es))
-        if label=='integrated':
-            (w/'extra.o').write_bytes(sp.check_output(['ar','p',libs[0],'X86MemoryFallback32.c.o']))
-            run(['objdump','-drw','--no-show-raw-insn',w/'extra.o'],'fallback-assembly')
-
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert set(members)-set(prior)=={'X86MemoryFallback32.c.o'} and changed=={'X86Vex32Output.c.o'},(changed,members.keys()-prior.keys())
-            assert sha(w/'unselected-baseline')==sha(ordinary)
+            assert set(members)==set(prior) and changed=={'X86VectorOutput.c.o','X86EvexScan.c.o'},changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
