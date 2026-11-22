@@ -1,7 +1,7 @@
-name: Verify EVEX immediate control and RIP-relative arithmetic together across Windows and macOS
+name: Build x86-only public records and legacy-mode register mappings on Windows and macOS
 on:
   push:
-    branches: [codex/portable-register-controls]
+    branches: [codex/portable-x86-record-mode-tables]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: register-controls-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: x86-public-mode-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
