@@ -14,8 +14,6 @@ m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
 assert sha(r/'neverd.patch')==m['decoder_patch']
 for k in ('ordered','packed','private'):assert sha(r/(k+'.patch'))==m[k]['sha256']
-assert sha(r/'base-riscv.patch')==m['baseline_patch']
-command(['git','apply','--index',r/'base-riscv.patch'],'baseline-source',cs)
 assert git(cs,'write-tree')==m['base']['tree']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -78,13 +76,18 @@ try:
             linked_sections={s.name:[s['sh_addr'],s.data_size,hashlib.sha256(s.data()).hexdigest()] for s in elf.iter_sections() if s['sh_flags'] & 2 and s['sh_type']=='SHT_PROGBITS'}
         members=sp.check_output(['ar','t',archive],text=True).splitlines()
         if variant!='base':
-            assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('X86BatchScan.c.o'),members
+            assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86BatchScan.c.o'),members
+
         save('layout-'+variant,dict(symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
 
         if variant in ('ordered','packed','private'):
             for mode in ('32','64'):
                 command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/('native-guard'+mode+'.cpp'),archive,'-o',t/('guard'+mode)],'guard-link-'+mode+'-'+variant)
                 command([t/('guard'+mode)],'guard-'+mode+'-'+variant)
+        if variant in ('packed','private'):
+            command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'second.c','-o',t/'observed.o'],'projection-compile-'+variant)
+            command(['clang++','-std=c++17','-O2','-I',cs,'-I',cs/'include',r/'vex3.cpp',t/'observed.o',archive,'-o',t/'vex3'],'vex3-link-'+variant)
+            command([t/'vex3'],'vex3-oracle-'+variant)
         if variant=='private':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
