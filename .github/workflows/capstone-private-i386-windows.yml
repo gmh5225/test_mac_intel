@@ -1,7 +1,7 @@
-name: Build x86-only public records and legacy-mode register mappings on Windows and macOS
+name: Build and verify compact block broadcasts and implicit-register repairs on Windows and macOS
 on:
   push:
-    branches: [codex/portable-x86-record-mode-tables]
+    branches: [codex/portable-vector-broadcast-repair]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 771f67c4d5bbb9e3528279edea0518cdc2828bca
+          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: x86-public-mode-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: broadcast-implicit-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
