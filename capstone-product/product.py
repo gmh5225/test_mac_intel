@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','full','vex','scoped'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','packed','wide','combined'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -37,7 +37,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','full','vex','scoped'):
+    for variant in ('base','packed','wide','combined'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -76,13 +76,19 @@ try:
             for mode in ('32','64'):
                 command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/('native-guard'+mode+'.cpp'),archive,'-o',t/('guard'+mode)],'guard-link-'+mode+'-'+variant)
                 command([t/('guard'+mode)],'guard-'+mode+'-'+variant)
-        if variant!='base':
+        if variant in ('wide','combined'):
             command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'second.c','-o',t/'observed.o'],'projection-compile-'+variant)
             command(['clang++','-std=c++17','-O2','-I',cs,'-I',cs/'include',r/'vex3.cpp',t/'observed.o',archive,'-o',t/'vex3'],'vex3-link-'+variant)
             command([t/'vex3'],'vex3-oracle-'+variant)
             command(['clang++','-std=c++17','-O2','-I',cs,'-I',cs/'include',r/'mandatory.cpp',t/'observed.o',archive,'-o',t/'mandatory'],'mandatory-link-'+variant)
             command([t/'mandatory'],'mandatory-oracle-'+variant)
-        if variant=='scoped':
+            for probe in ('rounded','shift'):
+                command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/(probe+'.cpp'),t/'observed.o',archive,'-o',t/probe],'compile-'+probe+variant)
+                command([t/probe],'oracle-'+probe+'-'+variant)
+        if variant in ('packed','combined'):
+            command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
+            assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
+        if variant=='combined':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
