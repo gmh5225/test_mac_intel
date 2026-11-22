@@ -116,9 +116,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            added=set(members)-set(prior);assert added=={'X86VexRegisterImmediate.c.o'} and set(prior)<=set(members)
-            assert {'X86VectorFallback64.c.o','X86MemoryFallback32.c.o'}<=changed
-            changed.update(added)
+            assert set(prior)==set(members) and 'X86DisassemblerDecoder.c.o' in changed,changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
