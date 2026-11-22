@@ -1,7 +1,7 @@
-name: Repeat mixed RISC-V and AArch64 formatting on four x86 hosts with paired controls
+name: Repeat the AArch64 formatting observation on the same EPYC 9V45 model
 on:
   push:
-    branches: [codex/capstone-riscv-arm-guard-replicas]
+    branches: [codex/capstone-epyc-9v45-guard]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,10 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, flavor: one }
-          - { host: ubuntu-24.04, cc: clang, flavor: two }
-          - { host: ubuntu-24.04, cc: clang, flavor: three }
-          - { host: ubuntu-24.04, cc: clang, flavor: four }
+          - { host: ubuntu-24.04, cc: clang, flavor: r1 }
+          - { host: ubuntu-24.04, cc: clang, flavor: r2 }
+          - { host: ubuntu-24.04, cc: clang, flavor: r3 }
+          - { host: ubuntu-24.04, cc: clang, flavor: r4 }
+          - { host: ubuntu-latest, cc: clang, flavor: r1 }
+          - { host: ubuntu-latest, cc: clang, flavor: r2 }
+          - { host: ubuntu-latest, cc: clang, flavor: r3 }
+          - { host: ubuntu-latest, cc: clang, flavor: r4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -31,12 +35,12 @@ jobs:
           ref: 34465fdeaea6988c753bde5de6ab93942f65de36
           path: source
           persist-credentials: false
-      - run: python3 -B family-ids/native.py
+      - run: python3 -B family-ids/cpu.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: repeat-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: model-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
