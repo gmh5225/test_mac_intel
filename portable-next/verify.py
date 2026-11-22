@@ -1,42 +1,56 @@
 from pathlib import Path
 import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
-d=Path(__file__).resolve().parent;root=d.parent;s=root/'source';diet=os.environ.get('CS_TEST_DIET')=='1';out=root/'evidence'/('diet' if diet else 'full');out.mkdir(parents=True,exist_ok=True)
-t=Path(tempfile.mkdtemp());tests=['riscv_op_count_iter', 'riscv_instruction_groups', 'riscv_mapping_index', 'riscv_reg_access', 'riscv_sysreg', 'riscv_insn_name_segv', 'riscv_writeback_postprocess']
-if diet:tests=['riscv_writeback_postprocess']
-def run(args,n,cwd=None):
-    with (out/(n+'.log')).open('w')as log:r=sp.run(list(map(str,args)),cwd=cwd,stdout=log,stderr=sp.STDOUT)
-    if r.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2900:],flush=True);r.check_returncode()
-def put(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
+sha=lambda b:hashlib.sha256(b).hexdigest()
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
-def sha(b):return hashlib.sha256(b).hexdigest()
+def run(n,args):
+    with (out/(n+'.log')).open('w')as f:z=sp.run(list(map(str,args)),stdout=f,stderr=sp.STDOUT)
+    if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2200:],flush=True);z.check_returncode()
+def save(n,z):(out/(n+'.json')).write_text(json.dumps(z,indent=2)+'\n')
+m=json.loads((d/'revisions.json').read_text());assert g('rev-parse','HEAD')==m['candidate']['parent']
+t=Path(tempfile.mkdtemp());windows=os.name=='nt';profiles={'full':[], 'no-att':['-DCAPSTONE_X86_ATT_DISABLE=ON'], 'reduced':['-DCAPSTONE_X86_REDUCE=ON'], 'diet':['-DCAPSTONE_BUILD_DIET=ON']}
 try:
-    m=json.loads((d/'tree.json').read_text());z=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/candidate.patch'])
-    assert sha(z)==m['sha256'] and g('rev-parse','HEAD')==m['parent']
-    patch=t/'current.patch';patch.write_bytes(z)
-    a=t/'harness';a.mkdir();shutil.copyfile(d/('diet-records.c' if diet else 'records.c'),a/'records.c')
-    (a/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(PortableRecords LANGUAGES C CXX)\nenable_testing()\nadd_subdirectory("'+s.as_posix()+'" capstone)\nadd_executable(records records.c)\ntarget_link_libraries(records PRIVATE capstone_static)\n')
-    b=t/'b';windows=os.name=='nt'
-    opts=['cmake','-S',a,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON']
-    if diet:opts.append('-DCAPSTONE_BUILD_DIET=ON')
-    if windows:opts+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
-    run(opts,'configure');assert 'CAPSTONE_RISCV_SUPPORT:BOOL=ON' in (b/'CMakeCache.txt').read_text();bins={};trees={}
-    for label in ('base','candidate'):
-        if label=='candidate':
-            g('apply','--index',str(patch));assert g('write-tree')==m['tree']
-        trees[label]=g('write-tree')
-        run(['cmake','--build',b,'--parallel','4','--target','records',*tests],'build-'+label)
-        run(['ctest','--test-dir',b,'-C','Release','--parallel','3','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(tests)+')$'],'tests-'+label)
-        exe,=[f for f in b.rglob('records.exe' if windows else 'records')if f.is_file()]
-        dest=t/(label+('.exe'if windows else ''));shutil.copy2(exe,dest);bins[label]=dest
-    with sp.Popen([bins['base']],stdout=sp.PIPE,stderr=sp.PIPE)as left,sp.Popen([bins['candidate']],stdout=sp.PIPE,stderr=sp.PIPE)as right:
-        dig=hashlib.sha256();size=0
-        while True:
-            x=left.stdout.read(65536);y=right.stdout.read(65536)
-            assert x==y,('different bytes',size)
-            if not x:break
-            size+=len(x);dig.update(x)
-        a=left.stderr.read();b=right.stderr.read();assert left.wait()==right.wait()==0 and a==b
-        assert a.startswith(b'262144 states, ')and size>262144
-    put('checked',dict(source=m,trees=trees,host=platform.platform(),machine=platform.machine(),compiler=os.environ.get('VSCMD_ARG_TGT_ARCH','clang'),states=262144,summary=a.decode().strip(),bytes=size,raw_sha256=dig.hexdigest(),tests=tests))
+    harness=t/'harness';harness.mkdir();shutil.copy2(d/'mapper.c',harness/'mapper.c')
+    cmake='''cmake_minimum_required(VERSION 3.22)
+project(PortableMapper LANGUAGES C CXX)
+enable_testing()
+add_subdirectory("CAP_SRC" capstone)
+add_executable(mapper mapper.c)
+target_link_libraries(mapper PRIVATE capstone_static)
+target_compile_definitions(mapper PRIVATE CAPSTONE_HAS_X86)
+target_include_directories(mapper PRIVATE "CAP_SRC")
+if(CAPSTONE_X86_REDUCE)
+  target_compile_definitions(mapper PRIVATE CAPSTONE_X86_REDUCE)
+endif()
+if(CAPSTONE_BUILD_DIET)
+  target_compile_definitions(mapper PRIVATE CAPSTONE_DIET)
+endif()
+'''.replace('CAP_SRC',s.as_posix());(harness/'CMakeLists.txt').write_text(cmake)
+    answers={};records={}
+    for stage in ('oracle','candidate'):
+        g('restore','--source','HEAD','--staged','--worktree','--','.')
+        # These two generated headers do not exist at the released revision. git restore above removes newly staged files.
+        data=sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+stage+'.patch'])
+        assert sha(data)==m[stage]['sha256'];patch=t/'input.patch';patch.write_bytes(data)
+        g('apply','--index',str(patch));assert g('write-tree')==m[stage]['tree']
+        for profile,flags in profiles.items():
+            b=t/profile;units=['x86_mapping_counts','x86_scan_batch','x86_reg_access','x86_encoding_accuracy']
+            if profile in ('full','no-att'):units+=['x86_evex_detail','x86_buffer_bounds']
+            if stage=='oracle':
+                cmd=['cmake','-G','Ninja','-S',harness,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*flags]
+                if windows:cmd+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
+                run('configure-'+profile,cmd)
+            tag=stage+'-'+profile;run('build-'+tag,['cmake','--build',b,'--parallel','4','--target','mapper',*units]);run('units-'+tag,['ctest','--test-dir',b,'-C','Release','--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$'])
+            exe,=[p for p in b.rglob('mapper.exe' if windows else 'mapper')if p.is_file()]
+            h=hashlib.sha256();n=0
+            with (out/('records-'+tag+'.log')).open('w')as log,sp.Popen([exe],stdout=sp.PIPE,stderr=log)as proc:
+                while data:=proc.stdout.read(4*1024*1024):n+=len(data);h.update(data)
+                assert proc.wait()==0
+            msg=(out/('records-'+tag+'.log')).read_text().strip();count=int(msg.split()[0]);assert count>0 and int(msg.split()[4])*count==n
+            rec=dict(sha256=h.hexdigest(),bytes=n,count=count,record=msg,tests=units)
+            if stage=='oracle':records[profile]=rec
+            else:assert records[profile]==rec
+            answers[tag]=rec;save('progress',answers)
+    save('checked',dict(complete=True,source=m,results=answers,host=platform.platform(),machine=platform.machine(),compiler=os.environ.get('VSCMD_ARG_TGT_ARCH','clang')))
 finally:
-    size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);put('cleanup',dict(removed=not t.exists(),bytes=size))
+    n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
