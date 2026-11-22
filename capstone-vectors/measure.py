@@ -80,6 +80,9 @@ def main(w):
         counts=list(map(int,sp.check_output([w/'direct-guard'],text=True).split()))
         assert counts==data['guard_counts']['parent' if label=='baseline' else 'commit']
         save('direct-guard-'+label,dict(counts=counts))
+        if label=='integrated':
+            run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
+            assert sp.check_output([w/'verify-evex-memory','--evex-memory'])==(base/'arch/X86/X86GenEvexMemoryOutput.inc').read_bytes()
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -91,6 +94,11 @@ def main(w):
         save('members-'+label+'.json',members)
         from elftools.elf.elffile import ELFFile
         import io
+        ev=ELFFile(io.BytesIO(sp.check_output(['ar','p',libs[0],'X86EvexMemoryOutput.c.o'])))
+        sec=ev.get_section_by_name('.cs_x86_evex_output')
+        table=ev.get_section_by_name('.cs_x86_evex_output_rodata')
+        assert sec and table
+        save('ordinary-evex-'+label+'.json',dict(size=sec.data_size,digest=hashlib.sha256(sec.data()).hexdigest(),tables=table.data_size))
         contents=sp.check_output(['ar','p',libs[0],'X86Vex32Output.c.o'])
         ef=ELFFile(io.BytesIO(contents))
         exec_sections={se.name:hashlib.sha256(se.data()).hexdigest() for se in ef.iter_sections() if se.data_size and se['sh_flags']&4}
