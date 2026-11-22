@@ -5,19 +5,33 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#if defined(_WIN32)
+#include <windows.h>
+#else
 #include <sys/mman.h>
 #include <unistd.h>
+#endif
 
 extern "C" bool observed_plain(csh, bool, const uint8_t *, size_t,
                                cs_insn *, uint16_t *);
 
 int main() {
     uint64_t trials = 0, hits32 = 0, hits64 = 0;
+#ifdef _WIN32
+    SYSTEM_INFO system;
+    GetSystemInfo(&system);
+    const size_t page = system.dwPageSize;
+    auto *area = static_cast<uint8_t *>(VirtualAlloc(nullptr, page * 2, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE));
+    DWORD old_flags;
+    if (!area || !VirtualProtect(area + page, page, PAGE_NOACCESS, &old_flags))
+        return 2;
+#else
     const size_t page = static_cast<size_t>(sysconf(_SC_PAGESIZE));
     auto *area = static_cast<uint8_t *>(mmap(nullptr, page * 2,
         PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0));
     if (area == MAP_FAILED || mprotect(area + page, page, PROT_NONE))
         return 2;
+#endif
     for (unsigned wide : {0, 1}) for (unsigned detail : {0, 1}) {
         const auto mode = wide ? CS_MODE_64 : CS_MODE_32;
         csh fast = 0, ordinary = 0;
@@ -54,7 +68,7 @@ int main() {
             size_t left = n;
             uint64_t ip = reference.address;
             if (!cs_disasm_iter(ordinary, &cursor, &left, &ip, &reference) ||
-                length != 5 + ((bytes[1] & 0xf0) == 0x40) || cursor != p + length || left != n - length ||
+                (length != 6 && length != 7) || length > n || cursor != p + length || left != n - length ||
                 ip != actual.address + length || actual.id != reference.id ||
                 actual.size != length || reference.size != length ||
                 std::memcmp(actual.bytes, reference.bytes, sizeof(actual.bytes)) ||
@@ -62,28 +76,50 @@ int main() {
                 std::memcmp(actual.op_str, reference.op_str, sizeof(actual.op_str)) ||
                 (detail && std::memcmp(&act, &ref, offsetof(cs_detail, x86) + sizeof(cs_x86))))
                 return false;
+            actual.detail = reference.detail;
+            if (std::memcmp(&actual, &reference, sizeof(actual)) ||
+                std::memcmp(&act, &ref, sizeof(act))) return false;
             return true;
         };
-        for (unsigned prefix=0;prefix<=16;++prefix) for (unsigned opcode=0;opcode<256;++opcode)
-            for (unsigned mr=0;mr<256;++mr) {
-                std::array<uint8_t,7> bytes{{0x66,static_cast<uint8_t>(0x3f+prefix),0x0f,0x38,
-                                          static_cast<uint8_t>(opcode),static_cast<uint8_t>(mr),0}};
-                const unsigned n=5+(prefix!=0);
-                if (!prefix) std::memmove(bytes.data()+1,bytes.data()+2,4);
-                if (!check(bytes,n,!wide || mr<192)) {
-                    std::fprintf(stderr,"mismatch prefix=%u op=%x mr=%x\n",prefix,opcode,mr);
-                    return 3;
+        for (unsigned map=0;map<16;++map) for(unsigned opcode=0;opcode<256;++opcode)
+            for(unsigned flags=0;flags<16;++flags) for(unsigned ll=0;ll<4;++ll)
+                for(unsigned f=0;f<(wide && map>=1 && map<=3 ? 32u : 2u);++f) {
+                    const unsigned src=(f<8 ? 0 : (f+opcode)&31),dst=(opcode+f*3)&31,rm=(f*5+flags)&31;
+                    const unsigned mod= f==31 ? 1 : 3;
+                    std::array<uint8_t,7> bytes{{0x62,static_cast<uint8_t>(map|
+                        ((dst&8)?0:0x80)|((rm&16)?0:0x40)|((rm&8)?0:0x20)|(~dst&16)),
+                        static_cast<uint8_t>(((flags&4)<<5)|((~src&15)<<3)|((flags&8)?0:4)|(flags&3)),
+                        static_cast<uint8_t>((ll<<5)|((src&16)?0:8)|(f==29?0x81:f==30?0x10:0)),static_cast<uint8_t>(opcode),
+                        static_cast<uint8_t>((mod<<6)|((dst&7)<<3)|(rm&7)),static_cast<uint8_t>((f*7+opcode*19+flags)&255)}};
+                    const bool reject=!wide||map<1||map>3||(flags&8)||ll==3||f>=29;
+                    if (!check(bytes,6,reject) || !check(bytes,7,reject)) {
+                        std::fprintf(stderr,"EVEX map=%u op=%02x flags=%u ll=%u reg configuration=%u\\n",map,opcode,flags,ll,f);
+                        return 3;
+                    }
+                    if (f==0) for(unsigned end=0;end<6;++end) if(!check(bytes,end,true))return 4;
                 }
-                if ((mr&15)==0) for (unsigned end=0;end<n;++end)
-                    if (!check(bytes,end,true)) return 4;
-            }
-        std::array<uint8_t,7> supported{{0x66,0x44,0x0f,0x38,0xdc,0xe4,0}};
+        std::array<uint8_t,7> supported{{0x62,0xf1,0x6c,0x48,0x58,0xd9,0}};
+        std::array<uint8_t,7> shuffle{{0x62,0xf3,0xdd,0x48,0x43,0xdc,0}};
+        for(unsigned imm=0;imm<256;++imm) {
+            shuffle[6]=static_cast<uint8_t>(imm);
+            for(unsigned end=0;end<=7;++end)
+                if(!check(shuffle,end,end<7 || !wide)) return 6;
+        }
+        for (auto opt : {CS_OPT_UNSIGNED,CS_OPT_TEXT}) {
+            const auto enabled=opt==CS_OPT_TEXT ? CS_OPT_OFF : CS_OPT_ON;
+            const auto disabled=opt==CS_OPT_TEXT ? CS_OPT_ON : CS_OPT_OFF;
+            if(cs_option(fast,opt,enabled) || !check(shuffle,7,true) || cs_option(fast,opt,disabled)) return 7;
+        }
         if (cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) ||
-            !check(supported,6,true)) return 5;
+            !check(supported,6,true))return 5;
         cs_close(&ordinary);
         cs_close(&fast);
     }
-    munmap(area, page*2);
+#ifdef _WIN32
+    VirtualFree(area,0,MEM_RELEASE);
+#else
+    munmap(area,page*2);
+#endif
     std::printf("%llu %llu %llu\n", (unsigned long long)trials,
                 (unsigned long long)hits32,(unsigned long long)hits64);
 }

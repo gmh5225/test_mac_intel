@@ -1,7 +1,7 @@
-name: Time validated map 0F 38 register output on real AMD64 and i386 workloads
+name: Measure EVEX register controls through the published row lookup on six real binaries
 on:
   push:
-    branches: [codex/late-register-pairs-map38]
+    branches: [codex/unmasked-evex-control-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
+          ref: 771f67c4d5bbb9e3528279edea0518cdc2828bca
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-map38-pairs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
