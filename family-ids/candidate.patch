@@ -1,3 +1,20 @@
+diff --git a/MCAsmInfo.h b/MCAsmInfo.h
+index a059aaf5..e3b6d2d9 100644
+--- a/MCAsmInfo.h
++++ b/MCAsmInfo.h
+@@ -8,8 +8,10 @@
+ #define CS_MCASMINFO_H
+ 
+ typedef enum {
+-	SYSTEMZASMDIALECT_AD_ATT = 0,
+-	SYSTEMZASMDIALECT_AD_HLASM = 1,
++	/* An all-zero MCAsmInfo uses the target's default syntax. */
++	MCASMDIALECT_DEFAULT = 0,
++	SYSTEMZASMDIALECT_AD_ATT,
++	SYSTEMZASMDIALECT_AD_HLASM,
+ } MCAsmInfoAssemblerDialect;
+ 
+ typedef struct {
 diff --git a/MCInst.h b/MCInst.h
 index e0409109..0323e70d 100644
 --- a/MCInst.h
@@ -134,7 +151,7 @@ index 00000000..be7f5727
 +	94, 96,
 +};
 diff --git a/arch/SystemZ/SystemZInstPrinter.c b/arch/SystemZ/SystemZInstPrinter.c
-index ee9eb18e..23d618bb 100644
+index ee9eb18e..ae257544 100644
 --- a/arch/SystemZ/SystemZInstPrinter.c
 +++ b/arch/SystemZ/SystemZInstPrinter.c
 @@ -32,6 +32,7 @@
@@ -165,7 +182,7 @@ index ee9eb18e..23d618bb 100644
  {
 +#ifndef CAPSTONE_DIET
 +	const char *gnu = gnuRegisterSpelling(Reg);
-+	if (gnu && MAI->assemblerDialect == SYSTEMZASMDIALECT_AD_ATT &&
++	if (gnu && MAI->assemblerDialect != SYSTEMZASMDIALECT_AD_HLASM &&
 +	    !O->is_closed && !O->markup_stream && !O->prefixed_by_markup &&
 +	    O->index < SSTREAM_BUF_LEN - 4 && gnu[2] && !gnu[4]) {
 +		char *out = O->buffer + O->index;
@@ -289,10 +306,10 @@ index 92e01e07..2d0e4028 100644
      list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
 diff --git a/tests/unit/systemz_register_dialects.c b/tests/unit/systemz_register_dialects.c
 new file mode 100644
-index 00000000..c6fe4c52
+index 00000000..3a4e8176
 --- /dev/null
 +++ b/tests/unit/systemz_register_dialects.c
-@@ -0,0 +1,43 @@
+@@ -0,0 +1,45 @@
 +// SPDX-License-Identifier: BSD-3-Clause
 +#include "../../arch/SystemZ/SystemZInstPrinter.h"
 +
@@ -314,7 +331,7 @@ index 00000000..c6fe4c52
 +	MCInst mi;
 +	MCInst_Init(&mi, CS_ARCH_SYSTEMZ);
 +	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-+		for (unsigned mode = 0; mode < 3; ++mode) {
++		for (unsigned mode = 0; mode < 4; ++mode) {
 +			MCAsmInfo info = mi.MAI;
 +			if (mode == 1)
 +				info.assemblerDialect =
@@ -322,6 +339,8 @@ index 00000000..c6fe4c52
 +			else if (mode == 2)
 +				info.assemblerDialect =
 +					SYSTEMZASMDIALECT_AD_HLASM;
++			else if (mode == 3)
++				info = (MCAsmInfo){ 0 };
 +			SStream stream;
 +			SStream_Init(&stream);
 +			printFormattedRegName(&info, cases[i].reg, &stream);

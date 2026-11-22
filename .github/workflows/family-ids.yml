@@ -1,7 +1,7 @@
-name: Measure one register spelling table for public names and SystemZ dialects across nine ISAs
+name: Measure SystemZ spellings while preserving non-SystemZ MCInst initialization
 on:
   push:
-    branches: [codex/shared-systemz-register-spellings]
+    branches: [codex/systemz-neutral-assembly-default]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-shared-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-default-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

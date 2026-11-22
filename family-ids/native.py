@@ -34,6 +34,11 @@ try:
         else:assert regular_code==original
         sections=sp.check_output(['readelf','-SW',so],text=True)
         save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
+        core=b/'CMakeFiles/capstone.dir';obj={str(v.relative_to(core)):sha(v)for v in core.rglob('*.c.o')}
+        assert len(obj)>50
+        if k=='base':base_objects=obj
+        compared=sorted(n for n in obj if obj[n]!=base_objects.get(n));assert set(obj)==set(base_objects)
+        save('objects-'+k,dict(compared=len(obj),changed=compared))
         for symbol in ('cs_disasm_iter','disasmScanIterator','disasmCanonicalIterator'):
             cmd('assembly-'+symbol+'-'+k,['objdump','-d','--disassemble='+symbol,so])
         decoder,=b.rglob('X86DisassemblerDecoder.c.o')
