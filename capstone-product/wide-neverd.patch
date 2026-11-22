@@ -1,0 +1,17 @@
+--- a/lib/decode/X86/X86Decoder.cpp
++++ b/lib/decode/X86/X86Decoder.cpp
+@@ -108,8 +108,12 @@
+ size_t
+ Decoder::classifyX86Prefix(llvm::ArrayRef<uint8_t> Bytes, va_t Addr,
+                            llvm::MutableArrayRef<uint32_t> Output) const {
+-  return X86_scanBatch(Handle, Bytes.data(), Bytes.size(), Addr, Output.data(),
+-                       Output.size())
++  if (TargetArch == Arch::X86)
++    return X86_scanBatch32(Handle, Bytes.data(), Bytes.size(), Addr,
++                           Output.data(), Output.size())
++        .count;
++  return X86_scanBatch64(Handle, Bytes.data(), Bytes.size(), Addr, Output.data(),
++                         Output.size())
+       .count;
+ }
+ 

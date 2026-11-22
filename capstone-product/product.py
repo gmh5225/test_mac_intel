@@ -12,6 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['official_capstone']
+assert sha(r/'wide-neverd.patch')==m['wide_decoder_patch'] and sha(r/'wide.patch')==m['wide_selected']['sha256']
 assert sha(r/'reader.patch')==m['selected']['sha256'] and sha(r/'neverd.patch')==m['decoder_patch']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -34,7 +35,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     cmake_file=nd/'CMakeLists.txt'
     normal_cmake=cmake_file.read_text()
-    for variant in ('base','linked','selected'):
+    for variant in ('base','linked','selected','wide_linked','wide_selected'):
         decoder=nd/'lib/decode/X86/X86Decoder.cpp'
         if variant=='linked':
             command(['git','apply','--index',r/'reader.patch'],'apply-reader',cs)
@@ -43,8 +44,16 @@ try:
         if variant=='selected':
             cmake_file.write_text(normal_cmake)
             command(['git','apply',r/'neverd.patch'],'select-i386-entry',nd)
+        if variant=='wide_linked':
+            command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-base',cs)
+            command(['git','apply','--index',r/'wide.patch'],'apply-wide',cs)
+            command(['git','restore','--source','HEAD','--',str(decoder.relative_to(nd))],'restore-decoder',nd)
+            cmake_file.write_text(normal_cmake+'\ntarget_link_options(capstone-product PRIVATE LINKER:--undefined=X86_scanBatch64)\n')
+        if variant=='wide_selected':
+            cmake_file.write_text(normal_cmake)
+            command(['git','apply',r/'wide-neverd.patch'],'select-both-reader',nd)
         actual=git(cs,'write-tree')
-        assert actual==m[variant]['tree'] and ('return X86_scanBatch32(' in decoder.read_text())==(variant=='selected')
+        assert actual==m[variant]['tree'] and ('return X86_scanBatch32(' in decoder.read_text())==(variant in ('selected','wide_selected'))
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
@@ -53,6 +62,28 @@ try:
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanBatch32' for x in names if x.split())==(variant!='base')
         archive,=build.rglob('libcapstone.a')
+        assert any(x.split()[-1]=='X86_scanBatch64' for x in names if x.split())==(variant in ('wide_linked','wide_selected'))
+        if variant=='selected':
+            command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'guard32.cpp',archive,'-o',t/'guard32'],'guard32-link')
+            command([t/'guard32'],'guard32')
+        if variant=='wide_selected':
+            command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'raw64.cpp',archive,'-o',t/'guard64'],'guard64-link')
+            command([t/'guard64'],'guard64')
+            command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
+        if variant=='base':
+            import frozen_ssl64
+            name,bits,path,spans,metadata=next(iter(frozen_ssl64.prepare(t)));q=json.loads((r/'ssl64-extents.json').read_text())
+            assert name=='libssl3t64-amd64' and bits==64 and len(spans)==q['input_functions'] and sha(path)==q['text_sha256']
+            intervals=t/'openssl-amd64.tsv';intervals.write_text(''.join('%d %d %d\n'%s for s in spans))
+            command(['clang++','-O2','-I',cs/'include',r/'vectors.cpp',archive,'-o',t/'vectors'],'vectors')
+            views=[list(map(int,x.split()))for x in sp.check_output([t/'vectors','64',path,intervals],text=True).splitlines()]
+            assert len(views)==len(spans)
+            skip={tuple(s[:3]) for s in q['excluded_incompatible_extents']}
+            chosen=[z for z,(total,vectors) in zip(spans,views)if tuple(z)not in skip and vectors>=8 and vectors>=.15*total]
+            intervals.write_text(''.join('%d %d %d\n'%s for s in chosen));assert len(chosen)==320 and sha(intervals)==q['extent_sha256']
+            cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
+            save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
+
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -68,11 +99,11 @@ try:
     for c in cases:
         for mode in (range(4) if c['selector'] in (32,64) else range(3)):
             single=execute('base',c,mode,1)
-            n=max(1,round(65000/single[0]))
+            n=max(1,round(50000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             for rep in range(13):
-                keys=['base','copy','linked','selected'];rng.shuffle(keys);ticks={v:[] for v in keys}
+                keys=['base','copy','linked','selected','wide_linked','wide_selected'];rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     assert expected==sample[1:],(c['name'],mode,k,expected,sample)
