@@ -1,0 +1,73 @@
+name: Rebuild MIPS union callers with GCC and Clang
+on:
+  push:
+    branches: [codex/neverd-mips-historical-nov22]
+    paths: ['.github/workflows/neverd-mips-union-clients.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  REVISION: 6ec44f20ad4a77079e91ee859698666edb014426
+
+jobs:
+  clients:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 160
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.REVISION }}
+          persist-credentials: false
+      - name: Install the host and MIPS cross compilers
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends ninja-build clang-18 lld-18 g++-14 gcc-mips64-linux-gnuabi64 libc6-dev-mips-cross libc6-dev-mipsn32-cross libc6-dev-mips64-cross python3-pyelftools
+      - name: Build the exact Release CLI and guest reference
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          git submodule update --init --depth 1 third_party/capstone third_party/unicorn signatures
+          cmake -S . -B release -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14 -DNEVERD_LLVM_PREBUILT=ON -DBUILD_TESTING=OFF \
+            -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF
+          python3 scripts/build.py release --config Release --parallel 4 --target neverd neverd_shared
+          cmake -S third_party/unicorn -B guest -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON \
+            -DUNICORN_ARCH=mips -DUNICORN_BUILD_TESTS=OFF -DUNICORN_INSTALL=OFF
+          cmake --build guest --target unicorn --parallel 4
+      - name: Link rebuilt source into each original ABI and execute it
+        run: |
+          export PYTHONPATH="$PWD/third_party/unicorn/bindings/python" LIBUNICORN_PATH="$PWD/guest" PYTHONDONTWRITEBYTECODE=1
+          mkdir evidence
+          git rev-parse HEAD > evidence/source.txt
+          git submodule status third_party/capstone third_party/unicorn >> evidence/source.txt
+          for abi in 32 n32 64; do
+            for order in be le; do
+              result="evidence/$abi-$order"
+              case "$abi" in
+                32) export C_INCLUDE_PATH=/usr/mips-linux-gnu/include ;;
+                n32) export C_INCLUDE_PATH=/usr/mips64-linux-gnuabin32/include ;;
+                64) export C_INCLUDE_PATH=/usr/mips64-linux-gnuabi64/include ;;
+              esac
+              /usr/bin/python3 unittests/lift/mips/record-abi-roundtrip.py \
+                --clang /usr/bin/clang-18 --gcc /usr/bin/mips64-linux-gnuabi64-gcc \
+                --assembler /usr/bin/mips64-linux-gnuabi64-as --ld /usr/bin/mips64-linux-gnuabi64-ld \
+                --neverd "$PWD/release/bin/neverd" --sdk "$PWD/release/bin/libneverd.so" --output "$result" \
+                --abi "$abi" --endian "$order" --original-opt=-O2 --rebuild-opt=-O2 --rebuild-compiler clang \
+                --case du --case ud --prefix 0 --prefix 7
+            done
+          done
+      - name: Retain compiler and execution evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mips-union-clients-${{ env.REVISION }}
+          path: |
+            evidence/source.txt
+            evidence/*/summary.json
+            evidence/*/commands.json
+            evidence/*/observations.json
+            evidence/*/evidence/
+            evidence/*/work/command.log
+          retention-days: 7
