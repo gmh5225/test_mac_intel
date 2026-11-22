@@ -27,7 +27,7 @@ int main() {
             return 1;
         if (detail && (cs_option(fast, CS_OPT_DETAIL, CS_OPT_ON) ||
                        cs_option(ordinary, CS_OPT_DETAIL, CS_OPT_ON))) return 1;
-        auto check = [&](const std::array<uint8_t, 7>& bytes, unsigned n,
+        auto check = [&](const std::array<uint8_t, 11>& bytes, unsigned n,
                          bool must_reject) {
             auto *p = area + page - n;
             std::memcpy(p, bytes.data(), n);
@@ -54,7 +54,7 @@ int main() {
             size_t left = n;
             uint64_t ip = reference.address;
             if (!cs_disasm_iter(ordinary, &cursor, &left, &ip, &reference) ||
-                length != 6 || cursor != p + length || left != n - length ||
+                length != 10 || cursor != p + length || left != n - length ||
                 ip != actual.address + length || actual.id != reference.id ||
                 actual.size != length || reference.size != length ||
                 std::memcmp(actual.bytes, reference.bytes, sizeof(actual.bytes)) ||
@@ -68,22 +68,32 @@ int main() {
             for(unsigned flags=0;flags<16;++flags) for(unsigned ll=0;ll<4;++ll)
                 for(unsigned f=0;f<(wide && map>=1 && map<=3 ? 32u : 2u);++f) {
                     const unsigned src=(f<8 ? 0 : (f+opcode)&31),dst=(opcode+f*3)&31,rm=(f*5+flags)&31;
-                    const unsigned mod= f==31 ? 1 : 3;
-                    std::array<uint8_t,7> bytes{{0x62,static_cast<uint8_t>(map|
-                        ((dst&8)?0:0x80)|((rm&16)?0:0x40)|((rm&8)?0:0x20)|(~dst&16)),
+                    const unsigned mr = ((dst&7)<<3)|(f==31 ? (rm&7)|0x40 : 5);
+                    constexpr uint32_t ds[]={0U,1U,9U,10U,UINT32_MAX,0xfffffff6U,
+                        0x7fffffffU,0x80000000U,0x3340U,0xffe20310U};
+                    const uint32_t disp=ds[(f+flags)%10];
+                    std::array<uint8_t,11> bytes{{0x62,static_cast<uint8_t>(map|
+                        ((dst&8)?0:0x80)|((f&3)<<5)|(~dst&16)),
                         static_cast<uint8_t>(((flags&4)<<5)|((~src&15)<<3)|((flags&8)?0:4)|(flags&3)),
                         static_cast<uint8_t>((ll<<5)|((src&16)?0:8)|(f==29?0x81:f==30?0x10:0)),static_cast<uint8_t>(opcode),
-                        static_cast<uint8_t>((mod<<6)|((dst&7)<<3)|(rm&7)),0xa5}};
+                        static_cast<uint8_t>(mr),uint8_t(disp),uint8_t(disp>>8),uint8_t(disp>>16),
+                        uint8_t(disp>>24),0x90}};
                     const bool reject=!wide||map<1||map>3||(flags&8)||ll==3||f>=29;
-                    if (!check(bytes,6,reject)) {
+                    if (!check(bytes,10,reject)) {
                         std::fprintf(stderr,"EVEX map=%u op=%02x flags=%u ll=%u reg configuration=%u\\n",map,opcode,flags,ll,f);
                         return 3;
                     }
-                    if (f==0) for(unsigned end=0;end<6;++end) if(!check(bytes,end,true))return 4;
+                    if (f==0) for(unsigned end=0;end<10;++end) if(!check(bytes,end,true))return 4;
                 }
-        std::array<uint8_t,7> supported{{0x62,0xf1,0x6c,0x48,0x58,0xd9,0}};
+        std::array<uint8_t,11> supported{{0x62,0xf1,0x65,0x48,0xfe,0x1d,0x73,0x70,0x33,0x00,0}};
+        if (!check(supported,11,false))return 5;
+        for (auto opt : {CS_OPT_UNSIGNED,CS_OPT_TEXT}) {
+            const auto on = opt==CS_OPT_TEXT ? CS_OPT_OFF : CS_OPT_ON;
+            const auto off = opt==CS_OPT_TEXT ? CS_OPT_ON : CS_OPT_OFF;
+            if (cs_option(fast,opt,on) || !check(supported,10,true) || cs_option(fast,opt,off))return 6;
+        }
         if (cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) ||
-            !check(supported,6,true))return 5;
+            !check(supported,10,true))return 7;
         cs_close(&ordinary);
         cs_close(&fast);
     }
