@@ -103,8 +103,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert members.keys()==prior.keys() and 'X86MemoryFallback32.c.o' in changed and changed<={'X86MemoryFallback32.c.o','X86ImmediateOutput.c.o'},changed
-            if changed=={'X86MemoryFallback32.c.o'}:assert sha(w/'unselected-baseline')==sha(ordinary)
+            assert members.keys()==prior.keys() and changed=={'X86Mapping.c.o'},changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)

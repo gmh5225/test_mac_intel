@@ -1,228 +1,93 @@
-diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index ab00f23f..993f20cd 100644
---- a/arch/X86/X86ImmediateOutput.c
-+++ b/arch/X86/X86ImmediateOutput.c
-@@ -10,7 +10,7 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
- 
--#include "X86UnsignedImmediate.h"
-+#include "X86RegisterImmediateOutput.h"
- 
- static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 			       const struct X86SimpleOutput *row, bool wide,
-@@ -46,39 +46,6 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 	}
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..9713cf3b 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11979,6 +11979,18 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 	return NULL;
  }
  
--static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
--			     const struct X86SimpleRegister *reg,
--			     const uint8_t *code, uint8_t rex,
--			     uint16_t *insn_size)
--{
--	const unsigned offset = 1 + (rex != 0);
--	const uint8_t *raw = code + offset;
--	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
--			       ((uint32_t)raw[2] << 16) |
--			       ((uint32_t)raw[3] << 24);
--	insn->id = row->id;
--	*insn_size = insn->size = (uint16_t)(offset + 4);
--	memcpy(insn->bytes, code, insn->size);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
--	memset(insn->op_str, 0, sizeof(insn->op_str));
--	memcpy(insn->op_str, reg->name, sizeof(reg->name));
--	char *out = insn->op_str + reg->length;
--	memcpy(out, ", ", 2);
--	writeUnsignedImmediate(out + 2, value);
--	if (insn->detail) {
--		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex, 0,
--				      reg->reg, 0);
--		cs_x86 *x = &insn->detail->x86;
--		x->encoding.modrm_offset = 0;
--		x->encoding.imm_offset = (uint8_t)offset;
--		x->encoding.imm_size = 4;
--		x->operands[1].type = X86_OP_IMM;
--		x->operands[1].imm = value;
--		x->operands[1].access = 0;
--	}
--}
--
- /* The /digit selects the same flags and register access as the corresponding
-  * ALU register pair. The immediate's public width follows the destination. */
- static void writeRegisterImmediate(cs_insn *insn,
-@@ -145,7 +112,8 @@ void X86_writeImmediateOutput(const uint8_t *code, cs_insn *insn,
- 		writePushImmediate(insn, code, row, row->address_size == 8,
- 				   insn_size);
- 	else if ((opcode & 0xf8) == 0xb8)
--		writeMovRegImm32(insn, row, reg, code, rex, insn_size);
-+		writeUnsignedRegisterImmediate(insn, row, reg, code, rex, 0,
-+					       1 + (rex != 0), 4, insn_size);
- 	else
- 		writeRegisterImmediate(insn, row, reg, code, rex,
- 				       code[1 + (rex != 0)], opcode, insn_size);
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index f500c60f..c04dc54e 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -12,7 +12,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#include "X86SimpleOutput.h"
-+#include "X86RegisterImmediateOutput.h"
- #include "X86VectorRegisterOutput.h"
- #define X86_VEX32_REGISTER_MOVES
- #include "X86GenVex32MemoryOutput.inc"
-@@ -20,7 +20,7 @@
- #include "X86GenSimpleOutput.inc"
- #include "../../cs_disasm_internal.h"
- #define X86_MEMORY32_OUTPUT
--#define X86_MEMORY_IMMEDIATE writeCompare32
-+#define X86_MEMORY_IMMEDIATE writeMemoryFlagImmediate32
- #define X86_IMMEDIATE_WIDE 0
- #define X86_COMPARE_IMMEDIATE
- #include "X86MemoryOutputImpl.h"
-@@ -60,6 +60,31 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 			return true;
- 		}
- 		break;
-+	case 0xf6:
-+	case 0xf7:
-+		if (size >= 2 && !(code[1] & 0x38) &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			const bool byte = opcode == 0xf6;
-+			const unsigned row =
-+				x86_simple_plans[0][0][byte ? 0x84 : 0x85] >> 2;
-+			if (code[1] < 0xc0) {
-+				if (writeMemoryFlagImmediate32(
-+					    code, size, insn, insn_size,
-+					    &x86_simple_outputs[row],
-+					    x86_simple_registers))
-+					return true;
-+			} else if (size >= (byte ? 3u : 6u)) {
-+				const struct X86SimpleRegister *reg =
-+					&x86_simple_registers[byte ? 0 : 2]
-+							     [code[1] & 7];
-+				writeUnsignedRegisterImmediate(
-+					insn, &x86_simple_outputs[row], reg,
-+					code, 0, code[1], 2, byte ? 1 : 4,
-+					insn_size);
-+				return true;
-+			}
-+		}
-+		break;
- 	case 0x80:
- 	case 0x81:
- 	case 0x83:
-@@ -68,9 +93,10 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 			const unsigned row =
- 				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
- 				2;
--			if (writeCompare32(code, size, insn, insn_size,
--					   &x86_simple_outputs[row],
--					   x86_simple_registers))
-+			if (writeMemoryFlagImmediate32(code, size, insn,
-+						       insn_size,
-+						       &x86_simple_outputs[row],
-+						       x86_simple_registers))
- 				return true;
- 		}
- 		break;
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 044bbd10..b8b8befe 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -46,7 +46,7 @@ bool X86_writeMemoryOutput(
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
- #ifdef X86_MEMORY_IMMEDIATE
- #ifdef X86_COMPARE_IMMEDIATE
--	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
-+	const unsigned imm_size = opcode == 0x81 || opcode == 0xf7 ? 4 : 1;
- #else
- 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
- #endif
-diff --git a/arch/X86/X86RegisterImmediateOutput.h b/arch/X86/X86RegisterImmediateOutput.h
-new file mode 100644
-index 00000000..d9f9b5dd
---- /dev/null
-+++ b/arch/X86/X86RegisterImmediateOutput.h
-@@ -0,0 +1,43 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifndef CS_X86_REGISTER_IMMEDIATE_OUTPUT_H
-+#define CS_X86_REGISTER_IMMEDIATE_OUTPUT_H
-+
-+#include "X86SimpleOutput.h"
-+#include "X86UnsignedImmediate.h"
-+
-+/* MOV opcode-register and TEST ModR/M-register forms have unsigned immediates.
-+ * A register-direct ModR/M byte always has its top two bits set. */
-+static inline void writeUnsignedRegisterImmediate(
-+	cs_insn *insn, const struct X86SimpleOutput *row,
-+	const struct X86SimpleRegister *reg, const uint8_t *code, uint8_t rex,
-+	uint8_t modrm, unsigned offset, unsigned imm_size, uint16_t *insn_size)
++/* Preserve operand order while extending a caller-owned register list. */
++static inline uint16_t *append_distinct_register(uint16_t *begin, uint16_t *end,
++						 unsigned int reg)
 +{
-+	const uint32_t value = imm_size == 1 ?
-+				       code[offset] :
-+				       (uint32_t)X86_readDisp32(code + offset);
-+	insn->id = row->id;
-+	*insn_size = insn->size = (uint16_t)(offset + imm_size);
-+	memcpy(insn->bytes, code, insn->size);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	memcpy(insn->op_str, reg->name, sizeof(reg->name));
-+	char *out = insn->op_str + reg->length;
-+	memcpy(out, ", ", 2);
-+	writeUnsignedImmediate(out + 2, value);
-+	if (insn->detail) {
-+		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex,
-+				      modrm, reg->reg, 0);
-+		cs_x86 *x = &insn->detail->x86;
-+		x->encoding.modrm_offset = modrm ? (uint8_t)(offset - 1) : 0;
-+		x->encoding.imm_offset = (uint8_t)offset;
-+		x->encoding.imm_size = (uint8_t)imm_size;
-+		x->operands[1].type = X86_OP_IMM;
-+		x->operands[1].imm = value;
-+		x->operands[1].access = 0;
++	for (const uint16_t *p = end; p != begin;) {
++		if (*--p == reg)
++			return end;
 +	}
++	*end = (uint16_t)reg;
++	return end + 1;
 +}
 +
-+#endif
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index fe916d08..4bc7886d 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -966,15 +966,17 @@ static bool check_segment_lea32(csh handles[2])
- 	return true;
- }
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+@@ -12002,48 +12014,35 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		memcpy(regs_write, insn->detail->regs_write,
+ 		       write_count * sizeof(insn->detail->regs_write[0]));
  
--static bool check_memory_compares(csh handles[2], cs_mode mode)
-+static bool check_memory_flag_immediates(csh handles[2], cs_mode mode)
- {
- 	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
- 	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
-+	const uint8_t opcodes[] = { 0x80, 0x81, 0x82, 0x83, 0xf6, 0xf7 };
- 	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
- 	     ++prefix) {
--		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
--			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
--				if ((mr & 0x30) != 0x30)
-+		for (unsigned index = 0; index < sizeof(opcodes); ++index) {
-+			const unsigned opcode = opcodes[index];
-+			for (unsigned mr = 0; mr <= 0xff; ++mr) {
-+				if ((mr & 0x30) != (opcode >= 0xf6 ? 0 : 0x30))
- 					continue;
- 				for (unsigned n = 0; n < sizeof(values); ++n) {
- 					uint8_t code[12];
-@@ -1353,7 +1355,7 @@ static bool check_mode(cs_mode mode)
- 		    (mode == CS_MODE_32 &&
- 		     (!check_segment_lea32(handles) ||
- 		      !check_vex32_register_moves(handles) ||
--		      !check_memory_compares(handles, mode))) ||
-+		      !check_memory_flag_immediates(handles, mode))) ||
- 		    !check_alu_memory(handles, mode) ||
- 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
- 		     (!check_absolute_addresses32(handles) ||
+-	// explicit registers
+-	for (i = 0; i < x86->op_count; i++) {
+-		cs_x86_op *op = &(x86->operands[i]);
++	uint16_t *read_end = regs_read + read_count;
++	uint16_t *write_end = regs_write + write_count;
++	for (i = 0; i < x86->op_count; ++i) {
++		const cs_x86_op *op = &x86->operands[i];
+ 		switch ((int)op->type) {
+ 		case X86_OP_REG:
+-			if ((op->access & CS_AC_READ) &&
+-			    !arr_exist_inline(regs_read, read_count, op->reg)) {
+-				regs_read[read_count] = op->reg;
+-				read_count++;
+-			}
+-			if ((op->access & CS_AC_WRITE) &&
+-			    !arr_exist_inline(regs_write, write_count,
+-					      op->reg)) {
+-				regs_write[write_count] = op->reg;
+-				write_count++;
+-			}
++			if (op->access & CS_AC_READ)
++				read_end = append_distinct_register(
++					regs_read, read_end, op->reg);
++			if (op->access & CS_AC_WRITE)
++				write_end = append_distinct_register(
++					regs_write, write_end, op->reg);
+ 			break;
+ 		case X86_OP_MEM:
+-			// registers appeared in memory references always being read
+-			if ((op->mem.segment != X86_REG_INVALID)) {
+-				regs_read[read_count] = op->mem.segment;
+-				read_count++;
+-			}
+-			if ((op->mem.base != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
+-					      op->mem.base)) {
+-				regs_read[read_count] = op->mem.base;
+-				read_count++;
+-			}
+-			if ((op->mem.index != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
+-					      op->mem.index)) {
+-				regs_read[read_count] = op->mem.index;
+-				read_count++;
+-			}
++			if (op->mem.segment != X86_REG_INVALID)
++				*read_end++ = (uint16_t)op->mem.segment;
++			if (op->mem.base != X86_REG_INVALID)
++				read_end = append_distinct_register(
++					regs_read, read_end, op->mem.base);
++			if (op->mem.index != X86_REG_INVALID)
++				read_end = append_distinct_register(
++					regs_read, read_end, op->mem.index);
++			break;
+ 		default:
+ 			break;
+ 		}
+ 	}
+-
+-	*regs_read_count = read_count;
+-	*regs_write_count = write_count;
++	*regs_read_count = (uint8_t)(read_end - regs_read);
++	*regs_write_count = (uint8_t)(write_end - regs_write);
+ }
+ #endif
+ 
