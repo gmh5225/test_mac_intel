@@ -20,6 +20,8 @@ def main(w):
     reference=json.loads((r/'experiment.json').read_text())['checkout_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     meta=json.loads((r/'experiment.json').read_text())
+    assert sha(r/'baseline.patch')==meta['baseline_patch_sha256']
+    run(['git','-C',base,'apply','--index',r/'baseline.patch'],'apply-baseline')
     assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['baseline_tree']
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -73,8 +75,8 @@ def main(w):
         run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'census.cpp',b/'libcapstone.a','-o',w/('census-'+label)],'census-link-'+label)
         if label=='integrated':
             run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
-            produced=sp.check_output([w/'table-check','--evex-shifts'])
-            assert produced==(base/'arch/X86/X86GenEvexShiftOutput.inc').read_bytes() and b'X86_INS_VPSLLDQ' in produced
+            produced=sp.check_output([w/'table-check','--vex-vector-memory'])
+            assert produced==(base/'arch/X86/X86GenVexVectorMemory.inc').read_bytes() and b'X86_INS_VFMADD213PD' in produced
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -103,7 +105,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert set(members)-set(prior)=={'X86VectorFallback64.c.o'} and changed=={'X86Sse64Output.c.o'},(changed,members.keys()-prior.keys())
+            assert set(members)==set(prior) and changed=={'X86VectorFallback64.c.o'},(changed,members.keys()-prior.keys())
             assert sha(w/'unselected-baseline')==sha(ordinary)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
