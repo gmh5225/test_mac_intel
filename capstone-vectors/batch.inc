@@ -1,3 +1,4 @@
+extern "C" X86ScanBatchResult X86_scanBatch64(csh, const uint8_t *, size_t, uint64_t, uint32_t *, size_t) __attribute__((weak));
 extern "C" X86ScanBatchResult X86_scanBatch32(csh, const uint8_t *, size_t, uint64_t, uint32_t *, size_t) __attribute__((weak));
 template <bool Audit, auto Next = X86_scanBatch>
 static Result batch_span(const uint8_t *bytes, size_t size, csh handle, cs_insn *insn, uint64_t start_ip) {

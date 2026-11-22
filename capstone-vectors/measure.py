@@ -67,6 +67,12 @@ def main(w):
     anchor='(void)batch_span<true>(ptr,f.size,handle,insn,f.ip);'
     assert inc.count(anchor)==1;inc=inc.replace(anchor,anchor+'\n      if(X86_scanBatch32)(void)batch_span<true,X86_scanBatch32>(ptr,f.size,handle,insn,f.ip);')
     inc=inc.replace('engine=="vecbatch" && X86_scanBatch32','engine=="vecbatch" && bits==32 && X86_scanBatch32').replace('else if(engine=="batch___") row=batch_span<false>', 'else if(engine=="batch___" || engine=="vecbatch") row=batch_span<false>')
+    anchor='else if(engine=="vecbatch" && bits==32 && X86_scanBatch32)'
+    assert inc.count(anchor)==1
+    inc=inc.replace(anchor,'else if(engine=="vecbatch" && bits==64 && X86_scanBatch64) row=batch_span<false,X86_scanBatch64>(bytes.data()+f.offset,f.size,handle,insn,f.ip);\\n        '+anchor)
+    anchor='if(X86_scanBatch32)(void)batch_span<true,X86_scanBatch32>(ptr,f.size,handle,insn,f.ip);'
+    assert inc.count(anchor)==1
+    inc=inc.replace(anchor,'if(bits==64 && X86_scanBatch64)(void)batch_span<true,X86_scanBatch64>(ptr,f.size,handle,insn,f.ip); else '+anchor)
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
@@ -85,6 +91,9 @@ def main(w):
         save('flags-'+label+'.json',flags)
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
+        if label=='integrated':
+            run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'raw64.cpp',b/'libcapstone.a','-o',w/'raw64'],'build-guard64')
+            run([w/'raw64'],'guard64')
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*(['-Wl,--undefined=X86_scanBatch32'] if label=='integrated' else []),*libs,'-o',target],'link-'+label)
@@ -97,7 +106,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert not changed and members.keys()-prior.keys()=={'X86Vex32Scan.c.o'},(changed,members.keys()-prior.keys())
+            assert not changed and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
             assert sha(ordinary)==sha(w/'unselected-baseline')
             save('isolation.json',dict(added=sorted(members.keys()-prior.keys()),unchanged=len(prior),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target

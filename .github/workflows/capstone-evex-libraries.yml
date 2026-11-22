@@ -1,7 +1,7 @@
-name: Compare a one-pass i386 scalar and vector reader with the same linked decoder and iced on six real samples
+name: Compare one-pass scalar, REX and VEX2 batch readers to released Capstone and iced on both widths
 on:
   push:
-    branches: [codex/capstone-unified-i386-batch]
+    branches: [codex/capstone-unified-amd64-batch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: unified-i386-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: unified-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
