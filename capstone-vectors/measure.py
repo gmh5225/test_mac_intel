@@ -84,11 +84,11 @@ def main(w):
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
             assert sp.check_output([w/'verify-evex-memory','--vex-rip-memory'])==(base/'arch/X86/X86GenVexRipMemory.inc').read_bytes()
         from elftools.elf.elffile import ELFFile
-        obj,=b.rglob('X86VectorOutput.c.o')
-        with obj.open('rb')as f:
+        vector_obj,=b.rglob('X86VectorOutput.c.o')
+        with vector_obj.open('rb')as f:
             ef=ELFFile(f)
             sections={z.name:dict(bytes=z.data_size,sha256=hashlib.sha256(z.data()).hexdigest())for z in ef.iter_sections()if z['sh_flags']&4 and z.data_size and z['sh_type']=='SHT_PROGBITS'}
-        syms=[line.split()for line in sp.check_output(['nm','-S','--defined-only',obj],text=True).splitlines()]
+        syms=[line.split()for line in sp.check_output(['nm','-S','--defined-only',vector_obj],text=True).splitlines()]
         flags=[int(line[1],16)for line in syms if line[-1]=='vex_rip_register_rows']
         assert flags==([34]if label=='integrated' else [])
         save('shared-reader-code-'+label+'.json',dict(sections=sections,table=flags))
