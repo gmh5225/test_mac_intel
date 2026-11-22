@@ -95,6 +95,10 @@ def main(w):
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'raw64.cpp',b/'libcapstone.a','-o',w/'raw64'],'build-guard64')
             run([w/'raw64'],'guard64')
         if label=='integrated':
+            with (w/'regenerated.inc').open('wb') as generated, (evidence/'generator.log').open('wb') as log:
+                run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'producer'],'build-producer')
+                sp.run([w/'producer','--evex-scan'],stdout=generated,stderr=log,check=True)
+            assert (w/'regenerated.inc').read_bytes()==(base/'arch/X86/X86GenEvexScan.inc').read_bytes()
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'plan.c','-o',w/'plan.o'],'build-evex-plan')
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'evex.cpp',w/'plan.o',b/'libcapstone.a','-o',w/'evex'],'build-evex')
             run([w/'evex'],'evex-oracle')
@@ -110,8 +114,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert (not changed if label=='scalar' else changed <= {'X86EvexScan.c.o'}) and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
-            if label=='scalar':assert sha(ordinary)==sha(w/'unselected-baseline')
+            assert (changed <= {'X86EvexScan.c.o'}) and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
             save('isolation-'+label+'.json',dict(added=sorted(members.keys()-prior.keys()),unchanged=len(prior),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)

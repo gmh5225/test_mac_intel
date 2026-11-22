@@ -1,7 +1,7 @@
-name: Compare shared EVEX admission with the single-call scalar reader, current next and iced
+name: Time canonical EVEX packed floating-point transfers on glibc libmvec, OpenSSL and both PE widths
 on:
   push:
-    branches: [codex/capstone-evex-packed-reader]
+    branches: [codex/capstone-packed-floating-batch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-batch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: packed-moves-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

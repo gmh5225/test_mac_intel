@@ -26,10 +26,10 @@ index b8b582a0..336293f0 100644
  
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
 new file mode 100644
-index 00000000..84c9d532
+index 00000000..e445454a
 --- /dev/null
 +++ b/arch/X86/X86BatchScan.c
-@@ -0,0 +1,197 @@
+@@ -0,0 +1,208 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -48,6 +48,10 @@ index 00000000..84c9d532
 +#include "X86GenVexPublicPlans.inc"
 +#undef X86_DEFINE_VEX2_PUBLIC_PLANS
 +#include "X86GenBatchPrimary.inc"
++#include "X86FeatureExtension.h"
++#ifdef X86_EVEX_REGISTER_SCAN
++#include "X86EvexScanPlan.h"
++#endif
 +
 +/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
 +static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
@@ -170,6 +174,13 @@ index 00000000..84c9d532
 +		return readPrimary(code, size, plan);
 +	if (byte == 0xc5)
 +		return readVex2Plan(code, size);
++#ifdef X86_EVEX_REGISTER_SCAN
++	if (byte == 0x62 && size >= 6) {
++		unsigned id, length;
++		if (X86_readEvexScanPlan(code, size, &id, &length))
++			return (id << 8) | length;
++	}
++#endif
 +	return 0;
 +}
 +
@@ -225,6 +236,175 @@ index 00000000..84c9d532
 +	}
 +#endif
 +	return X86_scanBatch(ud, code, size, address, output, capacity);
++}
++#endif
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index ccaec06a..7b8535ac 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -4,73 +4,29 @@
+ #ifdef CAPSTONE_HAS_X86
+ #include "X86FeatureExtension.h"
+ #ifdef X86_EVEX_REGISTER_SCAN
+-#include "X86EvexAdmission.h"
+-#include "X86GenEvexScan.inc"
++#include "X86EvexScanPlan.h"
+ 
+ /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
+  * The ordinary output generator owns the admitted IDs and widths. */
+-__attribute__((noinline, section(".cs_x86_evex_scan_text")))
+-static x86_feature_decode_result
++__attribute__((
++	noinline,
++	section(".cs_x86_evex_scan_text"))) static x86_feature_decode_result
+ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
+-		      MCInst *instr, uint16_t *size, uint8_t opcode)
++		       MCInst *instr, uint16_t *size, uint8_t opcode)
+ {
+ 	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
+-	const unsigned pp = code[2] & 3;
++	unsigned id, length;
+ 	if (handle->mode == CS_MODE_64 &&
+-	    !X86_EVEX_PREFIX_REJECTS(code, code_len, pp)
+ #ifdef CAPSTONE_X86_SCAN_ADAPTER
+-	    && !handle->x86_scan_adapter
++	    !handle->x86_scan_adapter &&
+ #endif
+-	) {
+-		const unsigned map = code[1] & 15;
+-		const unsigned index = evex_scan_index[code[4]];
+-		unsigned id, length;
+-		if (index & 128) {
+-			if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+-				goto fallback;
+-			unsigned kind;
+-			if (index == EVEX_SCAN_MOVE) {
+-				if (map != 1 || !pp)
+-					goto fallback;
+-				kind = pp;
+-			} else {
+-				if (map != 2 || pp != 1 || code[5] >= 0xc0)
+-					goto fallback;
+-				kind = 0;
+-			}
+-			id = evex_transfer_scan_ids[kind][code[2] >> 7]
+-						  [code[3] >> 5];
+-			length = evex_transfer_lengths[((code[5] >> 3) & 24) |
+-						       (code[5] & 7)];
+-			/* Only mod=0 with SIB needs its base field to determine
+-			 * the extent. Every other ordinary SIB value is valid. */
+-			if (!length) {
+-				if (code_len < 7)
+-					goto fallback;
+-				length = 7 + 4 * ((code[6] & 7) == 5);
+-			}
+-		} else {
+-			if (pp != 1 || code[5] < 0xc0)
+-				goto fallback;
+-			const struct EvexScanPlan *plan = &evex_scan_plans[index];
+-			if (plan->map != map)
+-				goto fallback;
+-			const unsigned key = (map << 8) | code[4];
+-			if (X86_EVEX_REGISTER_EXTRACT(key) &&
+-			    X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+-				goto fallback;
+-			id = plan->ids[code[2] >> 7][code[3] >> 5];
+-			length = plan->length;
+-		}
+-		if (id && code_len >= length) {
+-			instr->Opcode = 0;
+-			instr->OpcodePub = id;
+-			instr->popcode_adjust = 0;
+-			*size = (uint16_t)length;
+-			return X86_FEATURE_DECODED;
+-		}
++	    X86_readEvexScanPlan(code, code_len, &id, &length)) {
++		instr->Opcode = 0;
++		instr->OpcodePub = id;
++		instr->popcode_adjust = 0;
++		*size = (uint16_t)length;
++		return X86_FEATURE_DECODED;
+ 	}
+-fallback:
+ 	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
+ 					  opcode);
+ }
+@@ -85,7 +41,7 @@ X86_decodeScanFeatureExtension(csh ud, const uint8_t *code, size_t code_len,
+ 	if (opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
+ 	    (((cs_struct *)(uintptr_t)ud)->mode & CS_MODE_64))
+ 		return decodeEvexRegisterScan(ud, code, code_len, instr, size,
+-					     opcode);
++					      opcode);
+ 	return X86_decodeFeatureExtensionSlow(ud, code, code_len, instr, size,
+ 					      opcode);
+ }
+diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
+new file mode 100644
+index 00000000..18d61b42
+--- /dev/null
++++ b/arch/X86/X86EvexScanPlan.h
+@@ -0,0 +1,63 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_EVEX_SCAN_PLAN_H
++#define CS_X86_EVEX_SCAN_PLAN_H
++#include "X86EvexAdmission.h"
++#include "X86GenEvexScan.inc"
++
++/* Callers provide six bytes of bare EVEX in 64-bit mode. Return the same
++ * generated public ID and extent to the ordinary and batch scan entries. */
++static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
++					unsigned *instruction_id,
++					unsigned *instruction_length)
++{
++	const unsigned pp = code[2] & 3;
++	if (X86_EVEX_PREFIX_REJECTS(code, code_len, pp))
++		return false;
++	const unsigned map = code[1] & 15;
++	const unsigned index = evex_scan_index[code[4]];
++	unsigned id, length;
++	if (index & 128) {
++		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
++			return false;
++		unsigned kind;
++		if (index == EVEX_SCAN_MOVE) {
++			if (map != 1 || !pp)
++				return false;
++			kind = pp;
++		} else {
++			if (map != 2 || pp != 1 || code[5] >= 0xc0)
++				return false;
++			kind = 0;
++		}
++		id = evex_transfer_scan_ids[kind][code[2] >> 7][code[3] >> 5];
++		length = evex_transfer_lengths[((code[5] >> 3) & 24) |
++					       (code[5] & 7)];
++		/* Only mod=0 with SIB needs its base field to determine
++		 * the extent. Every other ordinary SIB value is valid. */
++		if (!length) {
++			if (code_len < 7)
++				return false;
++			length = 7 + 4 * ((code[6] & 7) == 5);
++		}
++	} else {
++		if (pp != 1 || code[5] < 0xc0)
++			return false;
++		const struct EvexScanPlan *plan = &evex_scan_plans[index];
++		if (plan->map != map)
++			return false;
++		const unsigned key = (map << 8) | code[4];
++		if (X86_EVEX_REGISTER_EXTRACT(key) &&
++		    X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
++			return false;
++		id = plan->ids[code[2] >> 7][code[3] >> 5];
++		length = plan->length;
++	}
++	if (!id || length > code_len)
++		return false;
++	*instruction_id = id;
++	*instruction_length = length;
++	return true;
 +}
 +#endif
 diff --git a/arch/X86/X86GenBatchPrimary.inc b/arch/X86/X86GenBatchPrimary.inc
@@ -831,10 +1011,10 @@ index cdc59ba3..ac121091 100644
      ]
      generated = [(path, generated_output(emit)) for path, emit in outputs]
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 7781ca39..f31ff384 100644
+index 7781ca39..b4e642a8 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -1212,6 +1212,39 @@ static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
+@@ -1212,6 +1212,42 @@ static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -844,6 +1024,9 @@ index 7781ca39..f31ff384 100644
 +		0xb8, 0xc5, 0xfd, 0x6f, 0xc1, /* VEX-looking bytes in a MOV immediate */
 +		0xc5, 0xfd, 0x6f, 0xc1,
 +		0xc5, 0xfd, 0x6f, 0x84, 0x25, 0, 0, 0, 0,
++		0x62, 0xf3, 0x7d, 0x48, 0x44, 0xc1, 0x11, /* VPCLMULQDQ */
++		0x62, 0xf1, 0xfe, 0x48, 0x6f, 0x44, 0x24, 1, /* VMOVDQU64 */
++
 +		0x83, 0x6c, 0x24, 0x08, 0xff, /* SUB dword ptr [esp+8],-1 */
 +		0x8b, 0x04, 0x2d, 0xc5, 0, 0, 0, /* base-less SIB */
 +		0x81, 0xf9, 0xc5, 0xfd, 0x77, 0, /* CMP ECX,imm32 */
@@ -874,7 +1057,7 @@ index 7781ca39..f31ff384 100644
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -1289,7 +1322,7 @@ static bool check_mode(cs_mode mode)
+@@ -1289,7 +1325,7 @@ static bool check_mode(cs_mode mode)
  			}
  		}
  	}
