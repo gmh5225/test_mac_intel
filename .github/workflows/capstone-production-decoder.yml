@@ -1,7 +1,7 @@
-name: Check indexed EVEX output in standalone and combined NeverD products
+name: Measure the separate AArch64 and MIPS alias section with the released x86 output path
 on:
   push:
-    branches: [codex/capstone-indexed-evex-product]
+    branches: [codex/capstone-separated-alias-data]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4b281bc8327c4570e0c17c5f294bf5cbffc52a43
+          ref: c2f412ad29afc74b17bf48d05bc09713df77cdb6
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "4b281bc8327c4570e0c17c5f294bf5cbffc52a43"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "bbba0e240053b9ad2897390bdc76f6f6115e3a55"
+          test "$(git rev-parse HEAD)" = "c2f412ad29afc74b17bf48d05bc09713df77cdb6"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "79f474ac7714f11d216a4d85208fed8121055369"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin ca73ea7f0c6aa0d618372481d6a29d9707c00d90
-          git -C third_party/capstone checkout --detach ca73ea7f0c6aa0d618372481d6a29d9707c00d90
+          git -C third_party/capstone fetch --depth=1 origin bbba0e240053b9ad2897390bdc76f6f6115e3a55
+          git -C third_party/capstone checkout --detach bbba0e240053b9ad2897390bdc76f6f6115e3a55
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: indexed-evex-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: placed-alias-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
