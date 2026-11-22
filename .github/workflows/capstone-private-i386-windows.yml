@@ -1,7 +1,7 @@
-name: Verify dedicated MIPS public records on Windows and macOS
+name: Verify all RISC-V compressed halfwords and implicit stack operands on Windows and macOS
 on:
   push:
-    branches: [codex/capstone-native-mips-dedicated]
+    branches: [codex/capstone-dedicated-riscv-native-abis]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 958b98cbbeb217ab3e8babe1de7175546ec82748
+          ref: 77b7043a31582684a0234f104a1fc24d90f0a12d
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756

@@ -17,43 +17,31 @@ int main(void)
 	unsigned states = 0, valid = 0;
 	uint32_t rng = UINT32_C(0x1cb4a82d);
 	const cs_mode modes[] = {
-		(cs_mode)(CS_MODE_MIPS32),
-		(cs_mode)(CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN),
-		(cs_mode)(CS_MODE_MIPS64),
-		(cs_mode)(CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN),
-		(cs_mode)(CS_MODE_MIPS32R2),
-		(cs_mode)(CS_MODE_MIPS32R2 | CS_MODE_BIG_ENDIAN),
-		(cs_mode)(CS_MODE_MIPS64R2),
-		(cs_mode)(CS_MODE_MIPS64R2 | CS_MODE_BIG_ENDIAN),
-		(cs_mode)(CS_MODE_MIPS32R6),
-		(cs_mode)(CS_MODE_MIPS32R6 | CS_MODE_BIG_ENDIAN),
-		(cs_mode)(CS_MODE_MICRO | CS_MODE_MIPS32R2),
-		(cs_mode)(CS_MODE_MICRO | CS_MODE_MIPS32R2 | CS_MODE_BIG_ENDIAN),
-		(cs_mode)(CS_MODE_MIPS16 | CS_MODE_MIPS32R2),
-		(cs_mode)(CS_MODE_MIPS16 | CS_MODE_MIPS32R2 | CS_MODE_BIG_ENDIAN),
-		(cs_mode)(CS_MODE_NANOMIPS | CS_MODE_I7200),
-		(cs_mode)(CS_MODE_NANOMIPS | CS_MODE_I7200 | CS_MODE_BIG_ENDIAN),
+		(cs_mode)(CS_MODE_RISCV32 | CS_MODE_RISCV_C),
+		(cs_mode)(CS_MODE_RISCV64 | CS_MODE_RISCV_C),
+		(cs_mode)(CS_MODE_RISCV32 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD),
+		(cs_mode)(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD)
 	};
 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
 		csh h;
-		if (cs_open(CS_ARCH_MIPS, modes[m], &h) != CS_ERR_OK ||
+		if (cs_open(CS_ARCH_RISCV, modes[m], &h) != CS_ERR_OK ||
 		    cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
 			return 3;
 		cs_insn *insn = cs_malloc(h);
 		if (!insn || !insn->detail)
 			return 4;
 		cs_detail *detail = insn->detail;
-		for (unsigned i = 0; i < 16384; ++i) {
+		for (unsigned i = 0; i < 65536; ++i) {
 			rng = rng * UINT32_C(1664525) + UINT32_C(1013904223);
-			uint32_t first = (rng & UINT32_C(0x03ffffff)) | ((uint32_t)(i & 63) << 26);
+			uint32_t first = (rng & UINT32_C(0xffff0000)) | i;
 			uint32_t second = rng * UINT32_C(69069) + 1;
 			uint8_t bytes[8];
 			for (unsigned j = 0; j < 4; ++j) {
-				const unsigned shift = (modes[m] & CS_MODE_BIG_ENDIAN ? 3 - j : j) * 8;
+				const unsigned shift = j * 8;
 				bytes[j] = (uint8_t)(first >> shift);
 				bytes[j+4] = (uint8_t)(second >> shift);
 			}
-			size_t length = i & 0x100 ? 8 : (i >> 2) % 9;
+			size_t length = 8;
 			const uint8_t *cursor = bytes;
 			uint64_t address = UINT64_C(0x100000) + i * 4u;
 			memset(insn, (i >> 4) & 255, sizeof(*insn));
