@@ -20,15 +20,34 @@ def symbols(lib):
         if len(z)==4 and z[3]in targets:sym[z[3]]=[int(z[0],16),int(z[1],16)]
     assert 'cs_disasm_iter' in sym and 'RISCV_getInstruction' in sym and 'RISCV_LLVM_printInstruction' in sym
     return sym
+def text_relocations(obj):
+    records=[]
+    reloc_text=False
+    for line in sp.check_output(['readelf','-rW',obj],text=True).splitlines():
+        if line.startswith("Relocation section "):
+            reloc_text=line.split("'")[1] in (".rela.text",".rel.text")
+        elif reloc_text:
+            fields=line.split()
+            if len(fields)>=3 and fields[2].startswith('R_'):
+                records.append((int(fields[0],16),fields[2]))
+    return sorted(records)
 def padded(build,library,tmp,mode,stats):
     extent={}
     for member in printers:
         included=[stats[k]['objects'][member]['size']for k in ('base','both')]
         length=max(included);raw=(tmp/mode/(member+'.text')).read_bytes()
-        padded=tmp/(member+'.pad');padded.write_bytes(raw+bytes(length-len(raw)))
         obj,=build.rglob(member)
-        sp.run(['objcopy','--update-section','.text='+str(padded),tmp/mode/member,obj],check=True)
-        extent[member]=dict(original=len(raw),padded=length)
+        original=tmp/mode/member
+        if length>len(raw):
+            padding=tmp/'padding.s'
+            padding.write_text('.text\\n.space '+str(length-len(raw))+'\\n.section .note.GNU-stack,"",%progbits\\n')
+            sp.run(['cc','-c',padding,'-o',tmp/'padding.o'],check=True)
+            sp.run(['ld','-r','-o',obj,original,tmp/'padding.o'],check=True)
+        else:
+            shutil.copy2(original,obj)
+        relocs=text_relocations(original)
+        assert relocs and text_relocations(obj)==relocs,(member,len(relocs),len(text_relocations(obj)))
+        extent[member]=dict(original=len(raw),padded=length,text_relocations=len(relocs))
     # Relink the library without asking Ninja to recompile the controlled objects.
     commands=sp.check_output(['ninja','-C',build,'-t','commands','capstone_shared'],text=True)
     links=[]
