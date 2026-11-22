@@ -24,8 +24,8 @@ try:
         imgs[k]=so.read_bytes()
         candidate_objs=list(b.rglob('X86Mapping.c.o'));assert candidate_objs
         nm=sp.check_output(['nm','-S','--size-sort','--defined-only',candidate_objs[0]],text=True)
-        tables={fields[-1]:int(fields[1],16) for l in nm.splitlines() if len(fields:=l.split())==4 and fields[-1] in ('insns','x86_implicit_effects','x86_mapping_counts')}
-        assert 'insns' in tables and ('x86_implicit_effects' in tables)==(k=='projected')
+        tables={fields[-1]:int(fields[1],16) for l in nm.splitlines() if len(fields:=l.split())==4 and fields[-1] in ('insns','x86_implicit_effects','x86_mapping_counts','x86_opcode_effects')}
+        assert 'insns' in tables and ('x86_implicit_effects' in tables)==(k!='base') and ('x86_opcode_effects' in tables)==(k=='projected')
         save('tables-'+k,dict(tables=tables,shared_bytes=len(imgs[k]),shared_sha256=ids[k]))
         if k!='base':
             names=['x86_reg_access','x86_mapping_counts','x86_evex_detail','x86_scan_batch']

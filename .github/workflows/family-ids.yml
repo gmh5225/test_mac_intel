@@ -1,7 +1,7 @@
-name: Measure shared x86 implicit effects with dirty-record equality and real PE vector and other architectures
+name: Measure direct per-opcode implicit effects against indexed pools and the shipping detail mapper
 on:
   push:
-    branches: [codex/capstone-pooled-x86-implicit-metadata]
+    branches: [codex/capstone-direct-x86-detail-opcode]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: pooled-effects-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: direct-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
