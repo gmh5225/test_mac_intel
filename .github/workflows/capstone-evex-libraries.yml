@@ -1,7 +1,7 @@
-name: Compare one-pass scalar, REX and VEX2 batch readers to released Capstone and iced on both widths
+name: Compare shared EVEX admission with the single-call scalar reader, current next and iced
 on:
   push:
-    branches: [codex/capstone-unified-amd64-batch]
+    branches: [codex/capstone-evex-packed-reader]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 77b7043a31582684a0234f104a1fc24d90f0a12d
+          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: unified-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-batch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

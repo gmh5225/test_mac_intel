@@ -18,7 +18,7 @@ int main() {
         uint32_t a[4]={0x7c420a5d,2,3,4},b[4];std::memcpy(b,a,sizeof(a));
         auto p=mem+page-n;std::memcpy(p,bytes,n);
         auto base=X86_scanBatch(h,p,n,UINT64_MAX-7,a,cap);
-        auto cand=X86_scanBatch64(h,p,n,UINT64_MAX-7,b,cap);
+        auto cand=X86_scanNativeBatch(h,p,n,UINT64_MAX-7,b,cap);
         if(base.count!=cand.count||base.bytes!=cand.bytes||std::memcmp(a,b,sizeof(a))){std::fprintf(stderr,"%02x %02x %02x %02x %02x n=%u cap=%zu\n",bytes[0],bytes[1],bytes[2],bytes[3],bytes[4],n,cap);std::exit(3);}
         ++records;accepted+=base.count;
     };

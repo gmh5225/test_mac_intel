@@ -20,8 +20,6 @@ def main(w):
     reference=json.loads((r/'experiment.json').read_text())['checkout_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     meta=json.loads((r/'experiment.json').read_text())
-    assert sha(r/'repair.patch')==meta['repair_sha256']
-    run(['git','-C',base,'apply','--index',r/'repair.patch'],'apply-repair')
     assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['baseline_tree']
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -73,6 +71,7 @@ def main(w):
     anchor='if(X86_scanBatch32)(void)batch_span<true,X86_scanBatch32>(ptr,f.size,handle,insn,f.ip);'
     assert inc.count(anchor)==1
     inc=inc.replace(anchor,'if(bits==64 && X86_scanBatch64)(void)batch_span<true,X86_scanBatch64>(ptr,f.size,handle,insn,f.ip); else '+anchor)
+    inc=inc.replace('X86_scanBatch32','X86_scanNativeBatch').replace('X86_scanBatch64','X86_scanNativeBatch')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     data=json.loads((r/'experiment.json').read_text())
@@ -82,9 +81,10 @@ def main(w):
     assert 'cs_disasm_iter' in sp.check_output(['nm','-u',obj],text=True)
     save('consumer-object.json',dict(sha256=sha(obj)))
     for label,tree in data['trees'].items():
-        if label=='integrated':
-            assert sha(r/'integrated.patch')==data['patch_sha256']
-            run(['git','-C',base,'apply','--index',r/'integrated.patch'],'apply')
+        if label!='baseline':
+            if label=='integrated':run(['git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.'],'restore-next')
+            patch=r/(label+'.patch');assert sha(patch)==data['patch_sha256' if label=='integrated' else 'scalar_sha256']
+            run(['git','-C',base,'apply','--index',patch],'apply-'+label)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==tree
         flags={f:sorted({Path(v['file']).name for v in json.loads((b/'compile_commands.json').read_text())if '-D'+f in v['command'].split() or '-D'+f+'=1' in v['command'].split()}) for f in ('CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS','CAPSTONE_MIPS_FINAL_OUTPUT_TRIM','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT')}
         assert flags=={'CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS':['MipsMapping.c'],'CAPSTONE_MIPS_FINAL_OUTPUT_TRIM':['MipsInstPrinter.c'],'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT':['X86Sse64Output.c']}
@@ -94,9 +94,13 @@ def main(w):
         if label=='integrated':
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'raw64.cpp',b/'libcapstone.a','-o',w/'raw64'],'build-guard64')
             run([w/'raw64'],'guard64')
+        if label=='integrated':
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'plan.c','-o',w/'plan.o'],'build-evex-plan')
+            run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'evex.cpp',w/'plan.o',b/'libcapstone.a','-o',w/'evex'],'build-evex')
+            run([w/'evex'],'evex-oracle')
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
-        run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*(['-Wl,--undefined=X86_scanBatch32'] if label=='integrated' else []),*libs,'-o',target],'link-'+label)
+        run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*(['-Wl,--undefined=X86_scanNativeBatch'] if label!='baseline' else []),*libs,'-o',target],'link-'+label)
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -106,9 +110,9 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert not changed and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
-            assert sha(ordinary)==sha(w/'unselected-baseline')
-            save('isolation.json',dict(added=sorted(members.keys()-prior.keys()),unchanged=len(prior),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
+            assert (not changed if label=='scalar' else changed <= {'X86EvexScan.c.o'}) and members.keys()-prior.keys()=={'X86BatchScan.c.o'},(changed,members.keys()-prior.keys())
+            if label=='scalar':assert sha(ordinary)==sha(w/'unselected-baseline')
+            save('isolation-'+label+'.json',dict(added=sorted(members.keys()-prior.keys()),unchanged=len(prior),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
@@ -153,7 +157,7 @@ def main(w):
         save('provenance.json',manifest)
         for mode in (0,):
             def measure(lib,n,launch):
-                engine=lib+'____' if lib in ('iced','fast') else 'vecbatch' if lib=='adaptive' else 'batch___' if lib.startswith('batch_') else 'x86_iter' if lib.startswith('private_') else 'capstone'
+                engine=lib+'____' if lib in ('iced','fast') else 'vecbatch' if lib in ('adaptive','scalar') else 'batch___' if lib.startswith('batch_') else 'x86_iter' if lib.startswith('private_') else 'capstone'
                 tail=[engine,str(mode),str(n),str(f),str(intervals),str(bits)]
                 if launch=='images':
                     command=[str(exe[lib]),*tail];executable=None
@@ -167,7 +171,7 @@ def main(w):
                     if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                 return list(map(int,sp.check_output(command,executable=executable).split()))
             probe=measure('baseline',1,'images');rep=max(1,math.ceil(50e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','integrated','iced','batch_base','batch_test','adaptive']
+            cycles={launch:[]for launch in launches};labels=['baseline','aa','integrated','iced','batch_base','batch_test','adaptive','scalar']
             stable={}
             for i in range(data['cycles']):
                 launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
@@ -180,7 +184,7 @@ def main(w):
                         root='baseline' if k=='aa' else k
                         if root not in stable:stable[root]=v[2:]
                         assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['adaptive']==stable['batch_base']==stable['batch_test']==stable['baseline']==stable['integrated']
+                    assert stable['scalar']==stable['adaptive']==stable['batch_base']==stable['batch_test']==stable['baseline']==stable['integrated']
                     if mode:assert stable['private_base']==stable['private_integrated']==stable['integrated'],(name,mode,stable)
                     cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
             for launch,observations in cycles.items():
