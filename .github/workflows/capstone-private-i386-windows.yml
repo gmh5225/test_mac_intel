@@ -1,7 +1,7 @@
-name: Validate grouped timestamp and VZERO register writes and i386 LEA on four native ABIs
+name: Validate four cumulative register and memory formatter trees on Windows and macOS
 on:
   push:
-    branches: [codex/portable-mode-writes-and-addresses]
+    branches: [codex/portable-integrated-formatter-ladder]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-mode-writes-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: portable-integrated-output-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
