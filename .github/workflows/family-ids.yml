@@ -1,7 +1,7 @@
-name: Check both public scan layouts against byte-identical iterator and batch ABI including VZERO
+name: Compare public text selection after scan against outer dispatch and shipped EVEX on seven toolchains
 on:
   push:
-    branches: [codex/strict-public-scan-frame]
+    branches: [codex/select-text-on-public-decode-miss]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
+          ref: 22ff038a78971a4414930e602bff1e469c52a619
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: strict-public-scan-frame-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: shared-miss-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

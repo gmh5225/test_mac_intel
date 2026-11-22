@@ -1,8 +1,8 @@
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..1fabb210 100644
+index ae1554b0..5add0b34 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,6 +30,13 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,6 +30,17 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -10,118 +10,54 @@ index ae1554b0..1fabb210 100644
 +	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+#define CAPSTONE_X86_SHARED_TEXT_ITERATOR
++#include "../../cs_priv.h"
++#define CAPSTONE_X86_PUBLIC_OUTPUT
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodePublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
++		      cs_insn *insn, uint16_t *insn_size, bool batch);
 +#endif
 +
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..eea3a623 100644
+index 12428fff..b95cc1c4 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3787,12 +3787,39 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 	return true;
- }
+@@ -3753,9 +3753,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
  
-+#ifdef CAPSTONE_X86_SHARED_TEXT_ITERATOR
-+/* Keep the canonical path separate from the inline x86 scanner. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#define CS_DECODE_OUTPUT_MISS X86_decodePublicOutput
 +#endif
-+static bool disasmCanonicalIterator(cs_struct *handle, const uint8_t **code,
-+			       size_t *size, uint64_t *address, cs_insn *insn)
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
++#undef CS_DECODE_OUTPUT_MISS
+ 
+ /* Keep the admitted terminal's public ID and zero alias adjustment visible
+  * through output completion. Cold helpers can take the fallback result's
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..2803dec3 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -32,4 +32,18 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++/* The public iterator has already validated the length and handled scan mode. */
++CS_PRESERVE_MOST bool X86_decodePublicOutput(cs_struct *handle,
++					    const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *insn_size,
++					    bool batch)
 +{
-+	return cs_disasm_iter_valid(handle, code, size, address, insn, false);
++	if (handle->arch == CS_ARCH_X86 && !handle->no_text &&
++	    X86_trySimpleOutput(handle, code, size, insn, insn_size))
++		return true;
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 +}
 +#endif
-+
- CAPSTONE_EXPORT
- X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
- 				 uint64_t *address, cs_insn *insn)
- {
-+#ifdef CAPSTONE_X86_SHARED_TEXT_ITERATOR
-+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (*size == 0 || !handle)
-+		return false;
-+	if (handle->arch == CS_ARCH_X86) {
-+		if (!handle->no_text)
-+			return X86_disasmIter(ud, code, size, address, insn);
-+		if (!handle->detail_opt)
-+			return cs_disasm_iter_valid(handle, code, size, address, insn, true);
-+	}
-+	return disasmCanonicalIterator(handle, code, size, address, insn);
-+#else
- 	return cs_disasm_iter_core(ud, code, size, address, insn);
-+#endif
- }
- 
- X86_DECODE_ALIGN
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index f3dfc374..35caae41 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -179,14 +179,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 
- CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 					  const uint8_t **code, size_t *size,
--					  uint64_t *address, cs_insn *insn)
-+					  uint64_t *address, cs_insn *insn,
-+					  bool scan)
- {
- 	uint16_t insn_size;
- 	bool r;
- 
- 	handle->errnum = CS_ERR_OK;
- 
--	const bool scan = use_x86_scan(handle);
- 	insn->address = *address;
- #ifdef CAPSTONE_DIET
- 	// zero out mnemonic & op_str
-@@ -207,17 +207,14 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 	return true;
- }
- 
--CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
--					  size_t *size, uint64_t *address,
--					  cs_insn *insn)
-+CS_DECODE_INLINE bool cs_disasm_iter_valid(struct cs_struct *handle,
-+					   const uint8_t **code, size_t *size,
-+					   uint64_t *address, cs_insn *insn,
-+					   bool scan)
- {
--	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
- 	cs_detail *detail;
- 	bool r;
- 
--	if (*size == 0 || !handle)
--		return false;
--
- 	// An instruction cs_malloc() allocated while detail was on keeps its
- 	// detail after detail is turned off.  Much of the decoder tests only
- 	// whether that pointer is set, so a decode without detail hides it, as
-@@ -225,9 +222,20 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
- 	detail = insn->detail;
- 	if (CS_DECODE_LIKELY(!handle->detail_opt))
- 		insn->detail = NULL;
--	r = cs_disasm_iter_body(handle, code, size, address, insn);
-+	r = cs_disasm_iter_body(handle, code, size, address, insn, scan);
- 	insn->detail = detail;
- 	return r;
- }
- 
-+CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
-+					  size_t *size, uint64_t *address,
-+					  cs_insn *insn)
-+{
-+	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
-+	if (*size == 0 || !handle)
-+		return false;
-+	return cs_disasm_iter_valid(handle, code, size, address, insn,
-+				    use_x86_scan(handle));
-+}
-+
  #endif

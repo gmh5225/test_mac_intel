@@ -36,6 +36,19 @@ try:
         save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
         for symbol in ('cs_disasm_iter','disasmScanIterator','disasmCanonicalIterator'):
             cmd('assembly-'+symbol+'-'+k,['objdump','-d','--disassemble='+symbol,so])
+        decoder,=b.rglob('X86DisassemblerDecoder.c.o')
+        symbol,=[ln.split() for ln in sp.check_output(['objdump','-t',decoder],text=True).splitlines()if ln.split()[-1:]==['cs_disasm_iter']]
+        off=int(symbol[0],16);section=symbol[-3];length=int(symbol[-2],16)
+        output=t/'iterator-section.bin'
+        cmd('iterator-section-'+k,['objcopy','--dump-section',section+'='+str(output),decoder,t/'iterator.dump.o'])
+        body=output.read_bytes()[off:off+length];assert len(body)==length>40
+        relocs=sp.check_output(['objdump','-r','-j',section,decoder],text=True)
+        calls=[]
+        for line in relocs.splitlines():
+            z=line.split()
+            if len(z)==3 and z[1].startswith('R_') and off<=int(z[0],16)<off+length:
+                calls.append([int(z[0],16)-off,z[1],z[2]])
+        save('scan-bytes-'+k,dict(section=section,offset=off,size=length,sha256=hashlib.sha256(body).hexdigest(),relocations=calls))
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
         if cc=='clang':
