@@ -105,6 +105,10 @@ def main(w):
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'second.o'],'projected-reader')
             run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'secondary.cpp',w/'second.o',b/'libcapstone.a','-o',w/'secondary'],'build-secondary')
             run([w/'secondary'],'secondary-oracle')
+            run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'vex3.cpp',w/'second.o',b/'libcapstone.a','-o',w/'vex3'],'build-vex3')
+            run([w/'vex3'],'vex3-oracle')
+            run(['python3','-B',base/'suite/synctools/x86_operand_specializations.py','--check'],'operand-tables',base)
+
 
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
