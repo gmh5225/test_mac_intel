@@ -1,7 +1,7 @@
-name: Measure AMD64 register bit-test formatting and operand details against both iced formatters
+name: Measure all conditional move register forms on real i386 and AMD64 images against both iced formatters
 on:
   push:
-    branches: [codex/capstone-amd64-bit-register-output]
+    branches: [codex/capstone-conditional-move-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bit-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: cmov-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
