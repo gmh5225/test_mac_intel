@@ -43,11 +43,8 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         scores=out/('registers-'+variant+'.log');records=[v.split() for v in scores.read_text().splitlines()]
-        assert len(records)==12 and all(int(v[3])==int(v[4])==(16 if variant!='candidate' or v[0]=='64' else 8) for v in records)
+        assert len(records)==12 and all(int(v[3])==int(v[4])==16 for v in records)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=git(cs,'write-tree'),llvm=llvm,records=records)
-        src=t/'sum.c';src.write_text('#include <capstone/capstone.h>\n#include <stdio.h>\nint main(void){unsigned sum=0;for(unsigned i=8;i<16;++i)sum+=X86_REG_YMM0+i;printf("%u\\n",sum);}\n')
-        command(['clang','-O2','-I',cs/'include',src,'-o',t/'weight'],'register-weight')
-        per=int(sp.check_output([t/'weight']))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
@@ -64,13 +61,12 @@ try:
             single=execute('base',c,mode,1)
             n=max(1,round(65000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
-            delta=3*n*per if c['name']=='putty-32-0.85'and mode==2 else 0
+            delta=0
             for rep in range(13):
                 keys=['base','copy','correct','candidate'];rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k=='candidate':wanted[-1]-=delta
                     assert wanted==sample[1:],(c['name'],mode,k,expected,delta,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
