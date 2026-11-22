@@ -1,7 +1,7 @@
-name: Measure canonical EVEX immediate shift rows against forked iced
+name: Compare native Apple Intel ARM64 and Linux batch scanners on source-built iced and frozen real inputs
 on:
   push:
-    branches: [codex/capstone-batch-immediate-shifts]
+    branches: [codex/capstone-portable-real-batch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
+          - { host: macos-15-intel, cc: clang, replica: 1 }
+          - { host: macos-15, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -25,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
+          ref: 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: generated-vex3-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: portable-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
