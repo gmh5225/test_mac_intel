@@ -1,98 +1,2734 @@
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 8968a732..21414e7a 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -118,7 +118,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		if (plan == X86_PLAN_VECTOR) {
- #ifdef X86_FIXED_VEX2
- 			if (code[0] == 0xc5)
--				return X86_FIXED_VEX2(code, size, insn,
-+				return X86_FIXED_VEX2(handle, code, size, insn,
- 						      insn_size);
- #endif
- #ifdef X86_FIXED_ROUNDED
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 2bd24bc5..337e9879 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -14,7 +14,9 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#define X86_FIXED_VEX2 writeVex2Memory64
-+#define GET_INSTRINFO_ENUM
-+#include "X86GenInstrInfo.inc"
-+#define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
- #include "X86VectorRegisterOutput.h"
-@@ -181,9 +183,35 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+diff --git a/AliasPatternLookup.c b/AliasPatternLookup.c
+new file mode 100644
+index 00000000..16f4b767
+--- /dev/null
++++ b/AliasPatternLookup.c
+@@ -0,0 +1,111 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "AliasPatternLookup.h"
++
++#ifndef CAPSTONE_DIET
++#include "MathExtras.h"
++#include "utils.h"
++
++#if defined(__ELF__) && defined(__GNUC__)
++#define ALIAS_PATTERN_CODE __attribute__((section(".cs_alias_pattern_lookup")))
++#define ALIAS_PATTERN_DATA __attribute__((section(".cs_alias_pattern_rows")))
++#else
++#define ALIAS_PATTERN_CODE
++#define ALIAS_PATTERN_DATA
++#endif
++
++typedef struct {
++	uint16_t first_row;
++	uint16_t mask;
++} AliasOpcodeBlock;
++
++/* The matcher accepts a suffix of its sorted table and owns all operand,
++ * feature and alias-printing decisions. */
++static inline const char *matchAliasBlock(MCInst *MI, const AliasMatchingData *data,
++					  unsigned offset, const AliasOpcodeBlock *blocks,
++					  size_t block_count)
++{
++	const unsigned index = offset / 16;
++	if (index >= block_count)
++		return NULL;
++	const unsigned bit = 1u << (offset % 16);
++	const AliasOpcodeBlock block = blocks[index];
++	if (!(block.mask & bit))
++		return NULL;
++	AliasMatchingData suffix = *data;
++	suffix.OpToPatterns += block.first_row + CountPopulation_32(block.mask & (bit - 1));
++	return matchAliasPatterns(MI, &suffix);
++}
++
++#ifdef CAPSTONE_HAS_AARCH64
++#include "arch/AArch64/AArch64GenAliasPatternRows.inc"
++ALIAS_PATTERN_CODE
++const char *matchAArch64AliasPatterns(MCInst *MI, const AliasMatchingData *data)
++{
++	return matchAliasBlock(MI, data, MI->Opcode - AArch64_FIRST_ALIAS_OPCODE,
++			       AArch64_alias_blocks, ARR_SIZE(AArch64_alias_blocks));
++}
++#endif
++
++#ifdef CAPSTONE_HAS_MIPS
++#include "arch/Mips/MipsGenAliasPatternRows.inc"
++ALIAS_PATTERN_CODE
++const char *matchMipsAliasPatterns(MCInst *MI, const AliasMatchingData *data)
++{
++	return matchAliasBlock(MI, data, MI->Opcode - Mips_FIRST_ALIAS_OPCODE,
++			       Mips_alias_blocks, ARR_SIZE(Mips_alias_blocks));
++}
++#endif
++
++#ifdef CAPSTONE_HAS_ARM
++#include "arch/ARM/ARMGenAliasPatternRows.inc"
++ALIAS_PATTERN_CODE
++const char *matchARMAliasPatterns(MCInst *MI, const AliasMatchingData *data)
++{
++	return matchAliasBlock(MI, data, MI->Opcode - ARM_FIRST_ALIAS_OPCODE,
++			       ARM_alias_blocks, ARR_SIZE(ARM_alias_blocks));
++}
++#endif
++
++#ifdef CAPSTONE_HAS_POWERPC
++#include "arch/PowerPC/PPCGenAliasPatternRows.inc"
++ALIAS_PATTERN_CODE
++const char *matchPPCAliasPatterns(MCInst *MI, const AliasMatchingData *data)
++{
++	return matchAliasBlock(MI, data, MI->Opcode - PPC_FIRST_ALIAS_OPCODE,
++			       PPC_alias_blocks, ARR_SIZE(PPC_alias_blocks));
++}
++#endif
++
++#ifdef CAPSTONE_HAS_RISCV
++#include "arch/RISCV/RISCVGenAliasPatternRows.inc"
++ALIAS_PATTERN_CODE
++const char *matchRISCVAliasPatterns(MCInst *MI, const AliasMatchingData *data)
++{
++	return matchAliasBlock(MI, data, MI->Opcode - RISCV_FIRST_ALIAS_OPCODE,
++			       RISCV_alias_blocks, ARR_SIZE(RISCV_alias_blocks));
++}
++#endif
++
++#ifdef CAPSTONE_HAS_SPARC
++#include "arch/Sparc/SparcGenAliasPatternRows.inc"
++ALIAS_PATTERN_CODE
++const char *matchSparcAliasPatterns(MCInst *MI, const AliasMatchingData *data)
++{
++	return matchAliasBlock(MI, data, MI->Opcode - Sparc_FIRST_ALIAS_OPCODE,
++			       Sparc_alias_blocks, ARR_SIZE(Sparc_alias_blocks));
++}
++#endif
++
++#ifdef CAPSTONE_HAS_LOONGARCH
++#include "arch/LoongArch/LoongArchGenAliasPatternRows.inc"
++ALIAS_PATTERN_CODE
++const char *matchLoongArchAliasPatterns(MCInst *MI, const AliasMatchingData *data)
++{
++	return matchAliasBlock(MI, data, MI->Opcode - LoongArch_FIRST_ALIAS_OPCODE,
++			       LoongArch_alias_blocks, ARR_SIZE(LoongArch_alias_blocks));
++}
++#endif
++
++#endif
+diff --git a/AliasPatternLookup.h b/AliasPatternLookup.h
+new file mode 100644
+index 00000000..a6e22cb5
+--- /dev/null
++++ b/AliasPatternLookup.h
+@@ -0,0 +1,25 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_ALIAS_PATTERN_LOOKUP_H
++#define CS_ALIAS_PATTERN_LOOKUP_H
++
++#include "cs_priv.h"
++#include "MCInstPrinter.h"
++
++CAPSTONE_INTERNAL const char *
++matchAArch64AliasPatterns(MCInst *MI, const AliasMatchingData *data);
++CAPSTONE_INTERNAL const char *
++matchMipsAliasPatterns(MCInst *MI, const AliasMatchingData *data);
++CAPSTONE_INTERNAL const char *
++matchARMAliasPatterns(MCInst *MI, const AliasMatchingData *data);
++CAPSTONE_INTERNAL const char *
++matchPPCAliasPatterns(MCInst *MI, const AliasMatchingData *data);
++CAPSTONE_INTERNAL const char *
++matchRISCVAliasPatterns(MCInst *MI, const AliasMatchingData *data);
++CAPSTONE_INTERNAL const char *
++matchSparcAliasPatterns(MCInst *MI, const AliasMatchingData *data);
++CAPSTONE_INTERNAL const char *
++matchLoongArchAliasPatterns(MCInst *MI, const AliasMatchingData *data);
++
++#endif
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index bb89e64d..46b3184d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -273,6 +273,7 @@ set(SOURCES_ENGINE
+     cs.c
+     Mapping.c
+     AliasMapping.c
++    AliasPatternLookup.c
+     MCInst.c
+     MCInstrDesc.c
+     MCInstPrinter.c
+@@ -1055,26 +1056,30 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+     endif()
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
++    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+ endif()
  
- /* Only the bare VEX2 opcode plan enters here. Packed base-relative
-  * loads and stores share their address and detail construction with SSE. */
--static bool writeVex2Memory64(const uint8_t *code, size_t size, cs_insn *insn,
--			      uint16_t *insn_size)
-+static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size)
+ if(CAPSTONE_BUILD_STATIC_LIBS)
+     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
++    set(capstone_alias_patterns_tail)
+     if(TARGET capstone_x86_iter32)
+         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
+             # Backends reference the alias parser indirectly. Keep its hot code
+             # ahead of the optional native readers even when all are linked.
++            # Keep the opcode rows after the native scanner when both are linked.
++            set(capstone_alias_patterns_tail
++                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
+             set(capstone_static_objects
+-                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/AliasMapping[.]c[.]o$>"
++                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
+                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
+         else()
+             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+         endif()
+-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native>)
++        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+diff --git a/Makefile b/Makefile
+index ef85dbbc..da328571 100644
+--- a/Makefile
++++ b/Makefile
+@@ -278,7 +278,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+@@ -434,8 +434,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
+ LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
+ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
+ LIBOBJ += $(LIBOBJ_X86_NUMBERS)
+-LIBOBJ_SHARED := $(LIBOBJ)
+-LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT)
++LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
++LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
+ 
+ 
+ ifeq ($(PKG_EXTRA),)
+diff --git a/arch/AArch64/AArch64GenAliasPatternRows.inc b/arch/AArch64/AArch64GenAliasPatternRows.inc
+new file mode 100644
+index 00000000..2a49e8fb
+--- /dev/null
++++ b/arch/AArch64/AArch64GenAliasPatternRows.inc
+@@ -0,0 +1,424 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++#define AArch64_FIRST_ALIAS_OPCODE 1487u
++static const AliasOpcodeBlock AArch64_alias_blocks[] ALIAS_PATTERN_DATA = {
++	{ 0, 0x0001 },
++	{ 1, 0x03f8 },
++	{ 8, 0x017c },
++	{ 14, 0x0000 },
++	{ 14, 0x0000 },
++	{ 14, 0x0000 },
++	{ 14, 0x0000 },
++	{ 14, 0xe83e },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x4a00 },
++	{ 26, 0x0025 },
++	{ 29, 0x0000 },
++	{ 29, 0x0000 },
++	{ 29, 0x0000 },
++	{ 29, 0x0000 },
++	{ 29, 0x0000 },
++	{ 29, 0x0000 },
++	{ 29, 0x0000 },
++	{ 29, 0x0000 },
++	{ 29, 0x0036 },
++	{ 33, 0x0000 },
++	{ 33, 0x0000 },
++	{ 33, 0x0000 },
++	{ 33, 0x0000 },
++	{ 33, 0x0000 },
++	{ 33, 0x0020 },
++	{ 34, 0x8000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0000 },
++	{ 35, 0x0700 },
++	{ 38, 0x0008 },
++	{ 39, 0x0000 },
++	{ 39, 0x0000 },
++	{ 39, 0x0000 },
++	{ 39, 0x0000 },
++	{ 39, 0x0000 },
++	{ 39, 0xc000 },
++	{ 41, 0x3fff },
++	{ 55, 0x3f00 },
++	{ 61, 0x0ff0 },
++	{ 69, 0xc298 },
++	{ 75, 0x07ff },
++	{ 86, 0x6000 },
++	{ 88, 0x0200 },
++	{ 89, 0x00e8 },
++	{ 93, 0xbff8 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x0000 },
++	{ 105, 0x00e0 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0x0000 },
++	{ 108, 0xc000 },
++	{ 110, 0x0001 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x0000 },
++	{ 111, 0x1002 },
++	{ 113, 0x0409 },
++	{ 116, 0x48c2 },
++	{ 121, 0x0420 },
++	{ 123, 0x2102 },
++	{ 126, 0x0812 },
++	{ 129, 0x4884 },
++	{ 133, 0x0420 },
++	{ 135, 0x4102 },
++	{ 138, 0x01f0 },
++	{ 143, 0x0003 },
++	{ 145, 0x0ffc },
++	{ 155, 0x3ff0 },
++	{ 165, 0x0000 },
++	{ 165, 0x2d55 },
++	{ 173, 0xaad5 },
++	{ 182, 0x52aa },
++	{ 189, 0xaab5 },
++	{ 198, 0xffaa },
++	{ 210, 0xaaaa },
++	{ 218, 0xaaff },
++	{ 230, 0xaaaa },
++	{ 238, 0xaaaa },
++	{ 246, 0xaaaa },
++	{ 254, 0xd54a },
++	{ 262, 0xaffe },
++	{ 275, 0xaaaa },
++	{ 283, 0xaaaa },
++	{ 291, 0xaaaa },
++	{ 299, 0xaaaa },
++	{ 307, 0xaaaa },
++	{ 315, 0xaaaa },
++	{ 323, 0xaaaa },
++	{ 331, 0xaaaa },
++	{ 339, 0xaaaa },
++	{ 347, 0xe00a },
++	{ 352, 0xf01f },
++	{ 361, 0x03ff },
++	{ 371, 0xf000 },
++	{ 375, 0x00c3 },
++	{ 379, 0xffff },
++	{ 395, 0x01ff },
++	{ 404, 0xfffc },
++	{ 418, 0xd57f },
++	{ 430, 0xad56 },
++	{ 439, 0x7f6a },
++	{ 450, 0x4ed5 },
++	{ 459, 0xa492 },
++	{ 465, 0x8630 },
++	{ 470, 0x8631 },
++	{ 476, 0xc631 },
++	{ 483, 0x8618 },
++	{ 488, 0xb861 },
++	{ 495, 0x7e01 },
++	{ 502, 0xe018 },
++	{ 507, 0xe01f },
++	{ 515, 0x3fff },
++	{ 529, 0x3fc0 },
++	{ 537, 0xffc0 },
++	{ 547, 0x0fff },
++	{ 559, 0x0000 },
++	{ 559, 0x0000 },
++	{ 559, 0x0000 },
++	{ 559, 0x0000 },
++	{ 559, 0x0000 },
++	{ 559, 0x1800 },
++	{ 561, 0x0000 },
++	{ 561, 0x0000 },
++	{ 561, 0x0000 },
++	{ 561, 0x0000 },
++	{ 561, 0xfe00 },
++	{ 568, 0xffff },
++	{ 584, 0x1fff },
++	{ 597, 0x0000 },
++	{ 597, 0x0010 },
++	{ 598, 0x0068 },
++	{ 601, 0x0000 },
++	{ 601, 0x0000 },
++	{ 601, 0x8000 },
++	{ 602, 0xa80d },
++	{ 608, 0x10c3 },
++	{ 613, 0xaa80 },
++	{ 618, 0x0012 },
++	{ 620, 0x0022 },
++	{ 622, 0x4400 },
++	{ 624, 0x1289 },
++	{ 629, 0x4785 },
++	{ 636, 0x1f01 },
++	{ 642, 0x000e },
++	{ 645, 0x0000 },
++	{ 645, 0x0000 },
++	{ 645, 0x0000 },
++	{ 645, 0x0000 },
++	{ 645, 0x0000 },
++	{ 645, 0x0002 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x0000 },
++	{ 646, 0x1f80 },
++	{ 652, 0x0000 },
++	{ 652, 0x0000 },
++	{ 652, 0x0000 },
++	{ 652, 0x0000 },
++	{ 652, 0x0000 },
++	{ 652, 0x3c02 },
++	{ 657, 0x0000 },
++	{ 657, 0x0000 },
++	{ 657, 0x0000 },
++	{ 657, 0x0000 },
++	{ 657, 0x0000 },
++	{ 657, 0x0000 },
++	{ 657, 0x2000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0000 },
++	{ 658, 0x0800 },
++	{ 659, 0x0000 },
++	{ 659, 0x0000 },
++	{ 659, 0x0000 },
++	{ 659, 0x0000 },
++	{ 659, 0x0000 },
++	{ 659, 0x7f80 },
++	{ 667, 0x1c00 },
++	{ 670, 0x0000 },
++	{ 670, 0x0000 },
++	{ 670, 0x0000 },
++	{ 670, 0x0000 },
++	{ 670, 0x0000 },
++	{ 670, 0x0000 },
++	{ 670, 0xff00 },
++	{ 678, 0x3800 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x0000 },
++	{ 681, 0x8900 },
++	{ 684, 0x1040 },
++	{ 686, 0x020a },
++	{ 689, 0x0000 },
++	{ 689, 0x4000 },
++	{ 690, 0x4b55 },
++	{ 698, 0xaab5 },
++	{ 707, 0x54aa },
++	{ 714, 0xaaad },
++	{ 723, 0xaaaa },
++	{ 731, 0xaaaa },
++	{ 739, 0x552a },
++	{ 746, 0xbffb },
++	{ 760, 0x52aa },
++	{ 767, 0x5555 },
++	{ 775, 0x5555 },
++	{ 783, 0x5555 },
++	{ 791, 0x5555 },
++	{ 799, 0x5555 },
++	{ 807, 0x2155 },
++	{ 813, 0x0004 },
++	{ 814, 0x07fc },
++	{ 823, 0x6abe },
++	{ 833, 0x56ab },
++	{ 842, 0x55b5 },
++	{ 851, 0x493b },
++	{ 859, 0x3182 },
++	{ 864, 0x18c6 },
++	{ 870, 0x8c63 },
++	{ 877, 0xfffb },
++	{ 892, 0x2003 },
++	{ 895, 0x0002 },
++	{ 896, 0xf804 },
++	{ 902, 0x015b },
++	{ 908, 0x0000 },
++	{ 908, 0x0000 },
++	{ 908, 0x0000 },
++	{ 908, 0x0000 },
++	{ 908, 0x0000 },
++	{ 908, 0x0000 },
++	{ 908, 0x0180 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0000 },
++	{ 910, 0x0018 },
++	{ 912, 0x0000 },
++	{ 912, 0x0000 },
++	{ 912, 0x0000 },
++	{ 912, 0x0000 },
++	{ 912, 0x0000 },
++	{ 912, 0x0000 },
++	{ 912, 0x0002 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x0000 },
++	{ 913, 0x13c0 },
++	{ 918, 0x0000 },
++	{ 918, 0x0000 },
++	{ 918, 0x0000 },
++	{ 918, 0x7f80 },
++	{ 926, 0xfc00 },
++	{ 932, 0x001f },
++	{ 937, 0x0007 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x0000 },
++	{ 940, 0x2040 },
++};
+diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
+index 63f99807..7537d3f9 100644
+--- a/arch/AArch64/AArch64InstPrinter.c
++++ b/arch/AArch64/AArch64InstPrinter.c
+@@ -76,7 +76,12 @@ DECLARE_printComplexRotationOp(90, 0);
+ 
+ #define GET_INSTRUCTION_NAME
+ #define PRINT_ALIAS_INSTR
++#ifndef CAPSTONE_DIET
++#include "../../AliasPatternLookup.h"
++#define matchAliasPatterns matchAArch64AliasPatterns
++#endif
+ #include "AArch64GenAsmWriter.inc"
++#undef matchAliasPatterns
+ 
+ void printRegName(SStream *OS, unsigned Reg)
  {
-+	/* The bare vector clear instructions have no ModR/M or operands. */
-+	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
-+		const bool all = (code[1] & 4) != 0;
-+		insn->size = *insn_size = 3;
-+		memcpy(insn->bytes, code, 3);
-+		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+		if (all)
-+			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
-+		else
-+			memcpy(insn->mnemonic, "vzeroupper",
-+			       sizeof("vzeroupper"));
-+		memset(insn->op_str, 0, sizeof(insn->op_str));
-+		if (insn->detail) {
-+			cs_detail *detail = insn->detail;
-+			memset(detail, 0,
-+			       offsetof(cs_detail, x86) + sizeof(cs_x86));
-+			detail->x86.addr_size = 8;
-+			detail->x86.rex = 0x40;
-+			memcpy(detail->x86.opcode, code, 2);
-+			X86_get_insn_id(handle, insn,
-+					all ? X86_VZEROALL : X86_VZEROUPPER);
-+		} else {
-+			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
-+		}
-+		return true;
-+	}
- 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
- 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
- 		const uint8_t rex =
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 678bc384..7781ca39 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -570,6 +570,17 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
- 	return true;
+diff --git a/arch/ARM/ARMGenAliasPatternRows.inc b/arch/ARM/ARMGenAliasPatternRows.inc
+new file mode 100644
+index 00000000..c9b07831
+--- /dev/null
++++ b/arch/ARM/ARMGenAliasPatternRows.inc
+@@ -0,0 +1,227 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++#define ARM_FIRST_ALIAS_OPCODE 842u
++static const AliasOpcodeBlock ARM_alias_blocks[] ALIAS_PATTERN_DATA = {
++	{ 0, 0x0001 },
++	{ 1, 0x0001 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x0000 },
++	{ 2, 0x8fc0 },
++	{ 9, 0xcf1f },
++	{ 20, 0x0003 },
++	{ 22, 0x0000 },
++	{ 22, 0x0000 },
++	{ 22, 0x0000 },
++	{ 22, 0x0000 },
++	{ 22, 0x0000 },
++	{ 22, 0x0004 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0000 },
++	{ 23, 0x0036 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0000 },
++	{ 27, 0x0380 },
++	{ 30, 0x0011 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0004 },
++	{ 33, 0x0000 },
++	{ 33, 0x0000 },
++	{ 33, 0x0000 },
++	{ 33, 0x0000 },
++	{ 33, 0x4000 },
++};
+diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
+index afe37a02..37012242 100644
+--- a/arch/ARM/ARMInstPrinter.c
++++ b/arch/ARM/ARMInstPrinter.c
+@@ -1695,7 +1695,12 @@ static inline void printMveSaturateOp(MCInst *MI, unsigned OpNum, SStream *O)
  }
  
-+static bool check_vex_clear(csh handles[2])
+ #define PRINT_ALIAS_INSTR
++#ifndef CAPSTONE_DIET
++#include "../../AliasPatternLookup.h"
++#define matchAliasPatterns matchARMAliasPatterns
++#endif
+ #include "ARMGenAsmWriter.inc"
++#undef matchAliasPatterns
+ 
+ static void printInst(MCInst *MI, SStream *O, void *info)
+ {
+diff --git a/arch/LoongArch/LoongArchGenAliasPatternRows.inc b/arch/LoongArch/LoongArchGenAliasPatternRows.inc
+new file mode 100644
+index 00000000..055f1c7d
+--- /dev/null
++++ b/arch/LoongArch/LoongArchGenAliasPatternRows.inc
+@@ -0,0 +1,32 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++#define LoongArch_FIRST_ALIAS_OPCODE 296u
++static const AliasOpcodeBlock LoongArch_alias_blocks[] ALIAS_PATTERN_DATA = {
++	{ 0, 0x0039 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0010 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0001 },
++	{ 6, 0x0000 },
++	{ 6, 0x0000 },
++	{ 6, 0x0000 },
++	{ 6, 0x0080 },
++};
+diff --git a/arch/LoongArch/LoongArchInstPrinter.c b/arch/LoongArch/LoongArchInstPrinter.c
+index 4adf6c4b..50118554 100644
+--- a/arch/LoongArch/LoongArchInstPrinter.c
++++ b/arch/LoongArch/LoongArchInstPrinter.c
+@@ -48,7 +48,12 @@
+ 
+ // Include the auto-generated portion of the assembly writer.
+ #define PRINT_ALIAS_INSTR
++#ifndef CAPSTONE_DIET
++#include "../../AliasPatternLookup.h"
++#define matchAliasPatterns matchLoongArchAliasPatterns
++#endif
+ #include "LoongArchGenAsmWriter.inc"
++#undef matchAliasPatterns
+ 
+ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
+ 		      SStream *O)
+diff --git a/arch/Mips/MipsGenAliasPatternRows.inc b/arch/Mips/MipsGenAliasPatternRows.inc
+new file mode 100644
+index 00000000..64f1c070
+--- /dev/null
++++ b/arch/Mips/MipsGenAliasPatternRows.inc
+@@ -0,0 +1,168 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++#define Mips_FIRST_ALIAS_OPCODE 521u
++static const AliasOpcodeBlock Mips_alias_blocks[] ALIAS_PATTERN_DATA = {
++	{ 0, 0x3c0f },
++	{ 8, 0xc0f0 },
++	{ 14, 0x3003 },
++	{ 18, 0x0000 },
++	{ 18, 0x0000 },
++	{ 18, 0x0000 },
++	{ 18, 0x0000 },
++	{ 18, 0x0000 },
++	{ 18, 0x0000 },
++	{ 18, 0x0000 },
++	{ 18, 0x0006 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0570 },
++	{ 25, 0x0000 },
++	{ 25, 0x0000 },
++	{ 25, 0x0000 },
++	{ 25, 0x0000 },
++	{ 25, 0x0020 },
++	{ 26, 0x0000 },
++	{ 26, 0x0000 },
++	{ 26, 0x0000 },
++	{ 26, 0x0000 },
++	{ 26, 0xe000 },
++	{ 29, 0x001c },
++	{ 32, 0x1240 },
++	{ 35, 0x0000 },
++	{ 35, 0x0210 },
++	{ 37, 0x0000 },
++	{ 37, 0x0000 },
++	{ 37, 0x0000 },
++	{ 37, 0x0000 },
++	{ 37, 0x0090 },
++	{ 39, 0x0004 },
++	{ 40, 0x4400 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0x0000 },
++	{ 42, 0xfff8 },
++	{ 55, 0xffff },
++	{ 71, 0xffff },
++	{ 87, 0xffff },
++	{ 103, 0xffff },
++	{ 119, 0xffff },
++	{ 135, 0x0207 },
++	{ 139, 0x2000 },
++	{ 140, 0x8006 },
++	{ 143, 0x0803 },
++	{ 146, 0x0002 },
++	{ 147, 0x0000 },
++	{ 147, 0x0000 },
++	{ 147, 0x0000 },
++	{ 147, 0x3000 },
++	{ 149, 0x7e03 },
++	{ 157, 0x0180 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0000 },
++	{ 159, 0x0006 },
++	{ 161, 0x0000 },
++	{ 161, 0xc728 },
++	{ 168, 0x0360 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0000 },
++	{ 172, 0x0400 },
++	{ 173, 0x0020 },
++	{ 174, 0x0000 },
++	{ 174, 0x0000 },
++	{ 174, 0x0000 },
++	{ 174, 0x0080 },
++	{ 175, 0x0000 },
++	{ 175, 0x0000 },
++	{ 175, 0x0000 },
++	{ 175, 0x0000 },
++	{ 175, 0x0040 },
++	{ 176, 0x0004 },
++	{ 177, 0x0000 },
++	{ 177, 0x0000 },
++	{ 177, 0x0000 },
++	{ 177, 0x0000 },
++	{ 177, 0x0100 },
++	{ 178, 0x0000 },
++	{ 178, 0x4408 },
++	{ 181, 0x0000 },
++	{ 181, 0x0000 },
++	{ 181, 0x0000 },
++	{ 181, 0x0000 },
++	{ 181, 0x0000 },
++	{ 181, 0x03c0 },
++	{ 185, 0x3800 },
++	{ 188, 0x0100 },
++	{ 189, 0x0000 },
++	{ 189, 0x00c0 },
++	{ 191, 0x0000 },
++	{ 191, 0x0284 },
++	{ 194, 0x0000 },
++	{ 194, 0x0000 },
++	{ 194, 0x0000 },
++	{ 194, 0x0000 },
++	{ 194, 0x0000 },
++	{ 194, 0x0000 },
++	{ 194, 0x0180 },
++	{ 196, 0x0004 },
++	{ 197, 0x000c },
++	{ 199, 0x0000 },
++	{ 199, 0x0000 },
++	{ 199, 0x0000 },
++	{ 199, 0x0000 },
++	{ 199, 0x0080 },
++	{ 200, 0x0000 },
++	{ 200, 0x1000 },
++	{ 201, 0x6000 },
++	{ 203, 0x0005 },
++	{ 205, 0x0000 },
++	{ 205, 0x0400 },
++	{ 206, 0xbc10 },
++	{ 212, 0x0000 },
++	{ 212, 0x0a40 },
++	{ 215, 0x0007 },
++	{ 218, 0x0000 },
++	{ 218, 0x09e2 },
++	{ 224, 0x0000 },
++	{ 224, 0x3a00 },
++	{ 228, 0x0000 },
++	{ 228, 0x0018 },
++};
+diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
+index 1ee21fa0..77ae0309 100644
+--- a/arch/Mips/MipsInstPrinter.c
++++ b/arch/Mips/MipsInstPrinter.c
+@@ -47,7 +47,12 @@
+ #define DEBUG_TYPE "asm-printer"
+ 
+ #define PRINT_ALIAS_INSTR
++#ifndef CAPSTONE_DIET
++#include "../../AliasPatternLookup.h"
++#define matchAliasPatterns matchMipsAliasPatterns
++#endif
+ #include "MipsGenAsmWriter.inc"
++#undef matchAliasPatterns
+ 
+ static bool isReg(const MCInst *MI, unsigned OpNo, unsigned R)
+ {
+diff --git a/arch/PowerPC/PPCGenAliasPatternRows.inc b/arch/PowerPC/PPCGenAliasPatternRows.inc
+new file mode 100644
+index 00000000..76fa0f82
+--- /dev/null
++++ b/arch/PowerPC/PPCGenAliasPatternRows.inc
+@@ -0,0 +1,169 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++#define PPC_FIRST_ALIAS_OPCODE 394u
++static const AliasOpcodeBlock PPC_alias_blocks[] ALIAS_PATTERN_DATA = {
++	{ 0, 0x0063 },
++	{ 4, 0x0000 },
++	{ 4, 0x0008 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0000 },
++	{ 5, 0x0f5c },
++	{ 13, 0x0000 },
++	{ 13, 0x0000 },
++	{ 13, 0x0000 },
++	{ 13, 0x0000 },
++	{ 13, 0x33d8 },
++	{ 21, 0x001e },
++	{ 25, 0x22a1 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0000 },
++	{ 30, 0x0060 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0000 },
++	{ 32, 0x0401 },
++	{ 34, 0xa600 },
++	{ 38, 0xc0a2 },
++	{ 43, 0x8b90 },
++	{ 49, 0x0531 },
++	{ 54, 0x0242 },
++	{ 57, 0x0000 },
++	{ 57, 0x8000 },
++	{ 58, 0x4c3f },
++	{ 67, 0x0001 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0000 },
++	{ 68, 0x0002 },
++	{ 69, 0x0000 },
++	{ 69, 0x0000 },
++	{ 69, 0x0000 },
++	{ 69, 0x0000 },
++	{ 69, 0x0000 },
++	{ 69, 0x0000 },
++	{ 69, 0x0000 },
++	{ 69, 0x8800 },
++	{ 71, 0x0151 },
++	{ 75, 0x17f8 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0x0000 },
++	{ 84, 0xcc00 },
++	{ 88, 0x0049 },
++	{ 91, 0x0000 },
++	{ 91, 0x00e0 },
++	{ 94, 0xe000 },
++	{ 97, 0x410a },
++	{ 101, 0x0070 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x0000 },
++	{ 104, 0x8000 },
++	{ 105, 0x0001 },
++	{ 106, 0x0000 },
++	{ 106, 0x0000 },
++	{ 106, 0x0000 },
++	{ 106, 0x0000 },
++	{ 106, 0x0000 },
++	{ 106, 0x0000 },
++	{ 106, 0x0000 },
++	{ 106, 0x0183 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x0000 },
++	{ 110, 0x00c0 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x0000 },
++	{ 112, 0x3000 },
++	{ 114, 0xf800 },
++	{ 119, 0x007f },
++};
+diff --git a/arch/PowerPC/PPCInstPrinter.c b/arch/PowerPC/PPCInstPrinter.c
+index e3c06904..9ac02f0a 100644
+--- a/arch/PowerPC/PPCInstPrinter.c
++++ b/arch/PowerPC/PPCInstPrinter.c
+@@ -571,7 +571,12 @@ static inline void printTLSCall(MCInst *MI, unsigned OpNo, SStream *O)
+ }
+ 
+ #define PRINT_ALIAS_INSTR
++#ifndef CAPSTONE_DIET
++#include "../../AliasPatternLookup.h"
++#define matchAliasPatterns matchPPCAliasPatterns
++#endif
+ #include "PPCGenAsmWriter.inc"
++#undef matchAliasPatterns
+ 
+ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
+ 		      SStream *O)
+diff --git a/arch/RISCV/RISCVGenAliasPatternRows.inc b/arch/RISCV/RISCVGenAliasPatternRows.inc
+new file mode 100644
+index 00000000..eefd564d
+--- /dev/null
++++ b/arch/RISCV/RISCVGenAliasPatternRows.inc
+@@ -0,0 +1,118 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++#define RISCV_FIRST_ALIAS_OPCODE 11275u
++static const AliasOpcodeBlock RISCV_alias_blocks[] ALIAS_PATTERN_DATA = {
++	{ 0, 0x0017 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x0000 },
++	{ 4, 0x4800 },
++	{ 6, 0x00a2 },
++	{ 9, 0x0000 },
++	{ 9, 0x0fc0 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0000 },
++	{ 15, 0x0055 },
++	{ 19, 0x0000 },
++	{ 19, 0x0000 },
++	{ 19, 0x0000 },
++	{ 19, 0x0000 },
++	{ 19, 0x0000 },
++	{ 19, 0x0000 },
++	{ 19, 0x0001 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x0000 },
++	{ 20, 0x8000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0xfc00 },
++	{ 27, 0x39ff },
++	{ 39, 0x8000 },
++	{ 40, 0x0001 },
++	{ 41, 0x0000 },
++	{ 41, 0x0006 },
++	{ 43, 0x0000 },
++	{ 43, 0x0000 },
++	{ 43, 0x0000 },
++	{ 43, 0x0000 },
++	{ 43, 0x0000 },
++	{ 43, 0x0100 },
++	{ 44, 0x0000 },
++	{ 44, 0x01a0 },
++	{ 47, 0x0000 },
++	{ 47, 0x0006 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0000 },
++	{ 49, 0x0140 },
++	{ 51, 0x0000 },
++	{ 51, 0x0000 },
++	{ 51, 0x4440 },
++	{ 54, 0x0004 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x0000 },
++	{ 55, 0x8000 },
++	{ 56, 0x0000 },
++	{ 56, 0x0020 },
++	{ 57, 0x0000 },
++	{ 57, 0x0000 },
++	{ 57, 0x0060 },
++	{ 59, 0x0040 },
++	{ 60, 0x0000 },
++	{ 60, 0x0200 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0000 },
++	{ 61, 0x0220 },
++	{ 63, 0x0000 },
++	{ 63, 0x0040 },
++	{ 64, 0x0002 },
++};
+diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
+index f1e9ed89..f7778c5d 100644
+--- a/arch/RISCV/RISCVInstPrinter.c
++++ b/arch/RISCV/RISCVInstPrinter.c
+@@ -61,7 +61,12 @@ static inline void printRegName(SStream *O, MCRegister Reg);
+ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
+ // Include the auto-generated portion of the assembly writer.
+ #define PRINT_ALIAS_INSTR
++#ifndef CAPSTONE_DIET
++#include "../../AliasPatternLookup.h"
++#define matchAliasPatterns matchRISCVAliasPatterns
++#endif
+ #include "RISCVGenAsmWriter.inc"
++#undef matchAliasPatterns
+ 
+ // Print architectural register names rather than the ABI names (such as x2
+ // instead of sp).
+diff --git a/arch/Sparc/SparcGenAliasPatternRows.inc b/arch/Sparc/SparcGenAliasPatternRows.inc
+new file mode 100644
+index 00000000..48a1509b
+--- /dev/null
++++ b/arch/Sparc/SparcGenAliasPatternRows.inc
+@@ -0,0 +1,33 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++#define Sparc_FIRST_ALIAS_OPCODE 311u
++static const AliasOpcodeBlock Sparc_alias_blocks[] ALIAS_PATTERN_DATA = {
++	{ 0, 0x9983 },
++	{ 7, 0x1419 },
++	{ 12, 0x0000 },
++	{ 12, 0x0000 },
++	{ 12, 0x0000 },
++	{ 12, 0x0000 },
++	{ 12, 0xf300 },
++	{ 18, 0x0019 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0x0000 },
++	{ 21, 0xe000 },
++	{ 24, 0x2031 },
++	{ 28, 0x000c },
++	{ 30, 0x0838 },
++	{ 34, 0x0000 },
++	{ 34, 0x0000 },
++	{ 34, 0x0000 },
++	{ 34, 0x0000 },
++	{ 34, 0x0180 },
++	{ 36, 0x3000 },
++	{ 38, 0x030c },
++	{ 42, 0xff00 },
++	{ 50, 0x0007 },
++};
+diff --git a/arch/Sparc/SparcInstPrinter.c b/arch/Sparc/SparcInstPrinter.c
+index 980914ca..640c9b34 100644
+--- a/arch/Sparc/SparcInstPrinter.c
++++ b/arch/Sparc/SparcInstPrinter.c
+@@ -51,7 +51,12 @@ static void printOperand(MCInst *MI, int opNum, SStream *O);
+ 
+ #define GET_INSTRUCTION_NAME
+ #define PRINT_ALIAS_INSTR
++#ifndef CAPSTONE_DIET
++#include "../../AliasPatternLookup.h"
++#define matchAliasPatterns matchSparcAliasPatterns
++#endif
+ #include "SparcGenAsmWriter.inc"
++#undef matchAliasPatterns
+ 
+ static void printRegName(SStream *OS, MCRegister Reg)
+ {
+diff --git a/arch/X86/X86GenLegacyRegisterImmediates.inc b/arch/X86/X86GenLegacyRegisterImmediates.inc
+new file mode 100644
+index 00000000..e9c114f6
+--- /dev/null
++++ b/arch/X86/X86GenLegacyRegisterImmediates.inc
+@@ -0,0 +1,20 @@
++/* Generated by suite/synctools/x86_vector_output.cpp --legacy-register-immediates. */
++static const struct VectorOutputRow legacy_immediate_rows[] = {
++	{ X86_INS_PSHUFD, "pshufd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_PSRLW, "psrlw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSRAW, "psraw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSLLW, "psllw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSRLD, "psrld", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSRAD, "psrad", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSLLD, "pslld", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSRLQ, "psrlq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSRLDQ, "psrldq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSLLQ, "psllq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++	{ X86_INS_PSLLDQ, "pslldq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
++};
++static const uint8_t legacy_immediate_plans[4][8] = {
++	{ 1, 1, 1, 1, 1, 1, 1, 1, },
++	{ 0, 0, 2, 0, 3, 0, 4, 0, },
++	{ 0, 0, 5, 0, 6, 0, 7, 0, },
++	{ 0, 0, 8, 9, 0, 0, 10, 11, },
++};
+diff --git a/arch/X86/X86GenTest32Registers.inc b/arch/X86/X86GenTest32Registers.inc
+new file mode 100644
+index 00000000..7a2ad08c
+--- /dev/null
++++ b/arch/X86/X86GenTest32Registers.inc
+@@ -0,0 +1,29 @@
++/* Generated by suite/synctools/x86_simple_output.cpp --test32-registers. */
++
++static const struct X86SimpleOutput test32_rows[2] = {
++	{ 734, "test", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 0, 0, { { 0, 1, 1 }, { 0, 1, 1 } } },
++	{ 734, "test", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 0, 0, { { 0, 4, 1 }, { 0, 4, 1 } } },
++};
++
++static const struct X86SimpleRegister test32_regs[2][8] = {
++	{
++		{ 2, 2, "al" },
++		{ 10, 2, "cl" },
++		{ 16, 2, "dl" },
++		{ 5, 2, "bl" },
++		{ 1, 2, "ah" },
++		{ 9, 2, "ch" },
++		{ 13, 2, "dh" },
++		{ 4, 2, "bh" },
++	},
++	{
++		{ 19, 3, "eax" },
++		{ 22, 3, "ecx" },
++		{ 24, 3, "edx" },
++		{ 21, 3, "ebx" },
++		{ 30, 3, "esp" },
++		{ 20, 3, "ebp" },
++		{ 29, 3, "esi" },
++		{ 23, 3, "edi" },
++	},
++};
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index ab00f23f..45de9b87 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -46,38 +46,7 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 	}
+ }
+ 
+-static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+-			     const struct X86SimpleRegister *reg,
+-			     const uint8_t *code, uint8_t rex,
+-			     uint16_t *insn_size)
+-{
+-	const unsigned offset = 1 + (rex != 0);
+-	const uint8_t *raw = code + offset;
+-	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
+-			       ((uint32_t)raw[2] << 16) |
+-			       ((uint32_t)raw[3] << 24);
+-	insn->id = row->id;
+-	*insn_size = insn->size = (uint16_t)(offset + 4);
+-	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+-	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+-	char *out = insn->op_str + reg->length;
+-	memcpy(out, ", ", 2);
+-	writeUnsignedImmediate(out + 2, value);
+-	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex, 0,
+-				      reg->reg, 0);
+-		cs_x86 *x = &insn->detail->x86;
+-		x->encoding.modrm_offset = 0;
+-		x->encoding.imm_offset = (uint8_t)offset;
+-		x->encoding.imm_size = 4;
+-		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = value;
+-		x->operands[1].access = 0;
+-	}
+-}
++#include "X86RegisterImmediateOutput.h"
+ 
+ /* The /digit selects the same flags and register access as the corresponding
+  * ALU register pair. The immediate's public width follows the destination. */
+@@ -145,7 +114,8 @@ void X86_writeImmediateOutput(const uint8_t *code, cs_insn *insn,
+ 		writePushImmediate(insn, code, row, row->address_size == 8,
+ 				   insn_size);
+ 	else if ((opcode & 0xf8) == 0xb8)
+-		writeMovRegImm32(insn, row, reg, code, rex, insn_size);
++		writeUnsignedRegisterImmediate(insn, row, reg, code, rex, 0,
++					       1 + (rex != 0), 4, insn_size);
+ 	else
+ 		writeRegisterImmediate(insn, row, reg, code, rex,
+ 				       code[1 + (rex != 0)], opcode, insn_size);
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..22b4524e 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10296,6 +10296,39 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ 
+ #ifndef CAPSTONE_DIET
+ #include "X86GenMappingCounts.inc"
++
++static void set_implicit_writes(cs_detail *detail, unsigned int i, cs_mode mode)
 +{
-+	for (unsigned flags = 0; flags < 256; ++flags) {
-+		uint8_t bytes[] = { 0xc5, (uint8_t)flags, 0x77, 0xc0 };
-+		for (size_t length = 1; length <= sizeof(bytes); ++length)
-+			if (!compare(handles, bytes, length, flags))
-+				return false;
++	const insn_map_x86 *mapping = &insns[i];
++	if (mode != CS_MODE_64) {
++		switch (mapping->mapid) {
++		case X86_INS_RDTSC:
++		case X86_INS_RDTSCP: {
++			const bool serial = mapping->mapid == X86_INS_RDTSCP;
++			detail->regs_write[0] = X86_REG_EAX;
++			if (serial)
++				detail->regs_write[1] = X86_REG_ECX;
++			detail->regs_write[1 + serial] = X86_REG_EDX;
++			detail->regs_write_count = 2 + serial;
++			return;
++		}
++		case X86_INS_VZEROALL:
++		case X86_INS_VZEROUPPER: {
++			/* Only YMM0 through YMM7 exist outside long mode. */
++			const size_t bytes = 8 * sizeof(detail->regs_write[0]);
++			memcpy(detail->regs_write, mapping->regs_mod, bytes);
++			memset(detail->regs_write + 8, 0,
++			       sizeof(mapping->regs_mod) - bytes);
++			detail->regs_write_count = 8;
++			return;
++		}
++		default:
++			break;
++		}
++	}
++	memcpy(detail->regs_write, mapping->regs_mod, sizeof(mapping->regs_mod));
++	detail->regs_write_count = (x86_mapping_counts[i] >> 5) & 31;
++}
+ #endif
+ 
+ // given internal insn id, return public instruction info
+@@ -10322,50 +10355,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			insn->detail->regs_read_count =
+ 				(x86_mapping_counts[i] & 31);
+ 
+-			// special cases when regs_write[] depends on arch
+-			switch (id) {
+-			default:
+-				memcpy(insn->detail->regs_write,
+-				       insns[i].regs_mod,
+-				       sizeof(insns[i].regs_mod));
+-				insn->detail->regs_write_count =
+-					((x86_mapping_counts[i] >> 5) & 31);
+-				break;
+-			case X86_RDTSC:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 2;
+-				}
+-				break;
+-			case X86_RDTSCP:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_ECX;
+-					insn->detail->regs_write[2] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 3;
+-				}
+-				break;
+-			}
++			set_implicit_writes(insn->detail, i, mode);
+ 			/* The generator derives eligibility from the switches below. */
+ 			if (!(x86_mapping_counts[i] &
+ 			      X86_MAPPING_IMPLICIT_REPAIR))
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index 80382d85..ee57979d 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -28,9 +28,9 @@
+ #undef X86_MEMORY_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
+ 
+-#define X86_SEGMENT_LEA32 writeSegmentLea32
++#define X86_LEA32_OUTPUT writeLea32
+ #include "X86MemoryOutputImpl.h"
+-#undef X86_SEGMENT_LEA32
++#undef X86_LEA32_OUTPUT
+ #undef X86_MEMORY32_OUTPUT
+ 
+ /* The fixed-width iterator delegates uncommon encodings here. */
+@@ -79,23 +79,27 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 				return true;
+ 		}
+ 		break;
++	case 0x8d:
+ 	case 0x26:
+ 	case 0x2e:
+ 	case 0x36:
+ 	case 0x3e:
+ 	case 0x64:
+-	case 0x65:
+-		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
++	case 0x65: {
++		const unsigned lead = opcode != 0x8d;
++		if (size >= lead + 2 && code[lead] == 0x8d &&
++		    code[lead + 1] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+ 			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
+-			if (writeSegmentLea32(code, size, insn, insn_size,
++			if (writeLea32(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
+ 					      x86_simple_registers))
+ 				return true;
+ 		}
+ 		break;
+ 	}
+-	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	}
++	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
+ }
+ #endif
+ #endif
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index f75c3794..375fd4e2 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -7,8 +7,8 @@
+ #ifdef X86_MEMORY_IMMEDIATE
+ #include "X86UnsignedImmediate.h"
+ static bool X86_MEMORY_IMMEDIATE(
+-#elif defined(X86_SEGMENT_LEA32)
+-static bool X86_SEGMENT_LEA32(
++#elif defined(X86_LEA32_OUTPUT)
++static bool X86_LEA32_OUTPUT(
+ #elif defined(X86_EXTEND64_MEMORY)
+ static bool X86_EXTEND64_MEMORY(
+ #elif defined(X86_EXTEND32_MEMORY)
+@@ -34,8 +34,10 @@ bool X86_writeMemoryOutput(
+ 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
+ #ifdef X86_EXTEND64_MEMORY
+ 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
+-#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
+-	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
++#elif defined(X86_LEA32_OUTPUT)
++	const unsigned lead = code[0] != 0x8d;
++#elif defined(X86_EXTEND32_MEMORY)
++	const unsigned lead = 1; /* The caller consumed the escape. */
+ #else
+ 	const unsigned lead = rex != 0;
+ #endif
+@@ -70,19 +72,23 @@ bool X86_writeMemoryOutput(
+ 		const unsigned index_reg = ((rex & 2) << 2) |
+ 					   ((encoding >> 3) & 7);
+ 		base_reg = encoding & 7;
+-#ifdef X86_SEGMENT_LEA32
+-		/* A scale-one SIB without an index names only its base. */
+-		if ((!mod && base_reg == 5) ||
+-		    (index_reg == 4 && (encoding >> 6) != 0))
++#ifdef X86_LEA32_OUTPUT
++		if (!mod && base_reg == 5)
++			return false;
++		/* Intel text omits EIZ. Both public scale fields preserve the
++		 * encoded scale even when there is no index register. */
++		scale_bits = encoding >> 6;
++		if (index_reg != 4)
++			index = &regs[2][index_reg];
+ #else
+ 		if ((!mod && base_reg == 5) ||
+ 		    (index_reg == 4 && encoding != 0x24))
+-#endif
+ 			return false;
+ 		if (index_reg != 4) {
+ 			index = &regs[wide ? 3 : 2][index_reg];
+ 			scale_bits = encoding >> 6;
+ 		}
++#endif
+ 	}
+ 
+ #ifdef X86_EXTEND64_MEMORY
+@@ -92,7 +98,7 @@ bool X86_writeMemoryOutput(
+ 	const bool push = false, load = true;
+ 	const unsigned reg_width = 2; /* r32 destination */
+ #else
+-#ifdef X86_SEGMENT_LEA32
++#ifdef X86_LEA32_OUTPUT
+ 	const bool lea = true, load = true, push = false;
+ #elif defined(X86_MEMORY_IMMEDIATE)
+ 	const bool lea = false, load = false;
+@@ -138,7 +144,7 @@ bool X86_writeMemoryOutput(
+ 		out += 10;
+ 	}
+ #else
+-#ifdef X86_SEGMENT_LEA32
++#ifdef X86_LEA32_OUTPUT
+ 	static const struct X86SimpleRegister segments[] = {
+ 		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
+ 		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
+@@ -146,9 +152,11 @@ bool X86_writeMemoryOutput(
+ 	};
+ 	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
+ 						   (code[0] >> 3) & 3;
+-	memcpy(out, segments[segment].name, 2);
+-	out[2] = ':';
+-	out += 3;
++	if (lead) {
++		memcpy(out, segments[segment].name, 2);
++		out[2] = ':';
++		out += 3;
++	}
+ #endif
+ 	if (lea) {
+ 		*out++ = '[';
+@@ -226,10 +234,12 @@ bool X86_writeMemoryOutput(
+ 			x->opcode[1] = opcode;
+ 		}
+ 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
+-#elif defined(X86_SEGMENT_LEA32)
+-		x->prefix[1] = code[0];
+-		x->encoding.modrm_offset = 2;
+-		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
++#elif defined(X86_LEA32_OUTPUT)
++		if (lead) {
++			x->prefix[1] = code[0];
++			x->encoding.modrm_offset = 2;
++			x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
++		}
+ #elif defined(X86_EXTEND32_MEMORY)
+ 		x->opcode[0] = 0x0f;
+ 		x->opcode[1] = opcode;
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 8a294a41..62d4288a 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -16,6 +16,12 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 			cs_insn *insn, uint16_t *insn_size, bool batch);
+ 
++/* Called after the static i386 memory writer declines the encoding. */
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
++			     size_t size, cs_insn *insn, uint16_t *insn_size,
++			     bool batch);
++
+ /* Called by the static AMD64 iterator with at least one input byte. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+new file mode 100644
+index 00000000..ee9b645b
+--- /dev/null
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -0,0 +1,40 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_register_fallback32_text" rodata = \
++	".cs_x86_register_fallback32_rodata"
++#endif
++#include "../../cs_priv.h"
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86OutputOptions.h"
++#include "X86RegisterImmediateOutput.h"
++#include "X86GenTest32Registers.inc"
++#include "../../cs_disasm_internal.h"
++
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
++			     size_t size, cs_insn *insn, uint16_t *insn_size,
++			     bool batch)
++{
++	const unsigned opcode = code[0];
++	if ((opcode & 0xfe) == 0xf6) {
++		const unsigned form = opcode & 1;
++		const unsigned width = form ? 4 : 1;
++		if (size >= 2 + width && (code[1] & 0xf8) == 0xc0 &&
++		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			writeUnsignedRegisterImmediate(
++				insn, &test32_rows[form],
++				&test32_regs[form][code[1] & 7], code, 0,
++				code[1], 2, width, insn_size);
++			return true;
++		}
++	}
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
++#endif
++#endif
+diff --git a/arch/X86/X86RegisterImmediateOutput.h b/arch/X86/X86RegisterImmediateOutput.h
+new file mode 100644
+index 00000000..ac91ab9b
+--- /dev/null
++++ b/arch/X86/X86RegisterImmediateOutput.h
+@@ -0,0 +1,46 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_REGISTER_IMMEDIATE_OUTPUT_H
++#define CS_X86_REGISTER_IMMEDIATE_OUTPUT_H
++
++#include "X86SimpleOutput.h"
++#include "X86UnsignedImmediate.h"
++
++/* MOV opcode-register and TEST ModR/M-register forms have unsigned immediates.
++ * A register-direct ModR/M byte always has its top two bits set. */
++static inline void writeUnsignedRegisterImmediate(
++	cs_insn *insn, const struct X86SimpleOutput *row,
++	const struct X86SimpleRegister *reg, const uint8_t *code, uint8_t rex,
++	uint8_t modrm, unsigned offset, unsigned imm_size, uint16_t *insn_size)
++{
++	const uint8_t *raw = code + offset;
++	const uint32_t value =
++		imm_size == 1 ? raw[0] :
++				(uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
++					((uint32_t)raw[2] << 16) |
++					((uint32_t)raw[3] << 24);
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(offset + imm_size);
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	char *out = insn->op_str + reg->length;
++	memcpy(out, ", ", 2);
++	writeUnsignedImmediate(out + 2, value);
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex,
++				      modrm, reg->reg, 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->encoding.modrm_offset = modrm ? (uint8_t)(offset - 1) : 0;
++		x->encoding.imm_offset = (uint8_t)offset;
++		x->encoding.imm_size = (uint8_t)imm_size;
++		x->operands[1].type = X86_OP_IMM;
++		x->operands[1].imm = value;
++		x->operands[1].access = 0;
++	}
++}
++
++#endif
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 65f37273..b244bb4c 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -32,6 +32,35 @@
+ #undef X86_LEGACY_PACKED_MEMORY
+ #include "X86GenLegacyPackedMemory.inc"
+ 
++#include "X86GenLegacyRegisterImmediates.inc"
++
++/* The caller checked a complete 66 [REX] 0F 70..73 /r ib register form. */
++static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
++					 uint16_t *insn_size, unsigned offset,
++					 uint8_t rex)
++{
++	const unsigned opcode = code[offset - 2], mr = code[offset - 1];
++	const unsigned field = (mr >> 3) & 7;
++	const unsigned plan = legacy_immediate_plans[opcode - 0x70][field];
++	if (!plan)
++		return false;
++	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
++	const bool shuffle = opcode == 0x70;
++	const unsigned regs[] = { shuffle ? field | ((rex & 4) << 1) : rm, rm };
++	writeVectorRegisters(code, insn, insn_size,
++			     &legacy_immediate_rows[plan - 1], offset - 2, 0,
++			     rex, 0, regs, shuffle ? 2 : 1);
++	if (insn->detail) {
++		/* Legacy prefix and escaped opcode have separate public fields. */
++		cs_x86 *x = &insn->detail->x86;
++		x->prefix[2] = 0x66;
++		x->opcode[0] = 0x0f;
++		x->opcode[1] = (uint8_t)opcode;
++		x->opcode[2] = 0;
 +	}
 +	return true;
 +}
 +
- static bool check_vex_rip_loads(csh handles[2])
+ /* The fixed-width AMD64 iterator has already tried its common records. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -69,21 +98,29 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return true;
+ 	if (code[0] == 0xc4 &&
+ 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+-					   x86_simple_registers, true))
++					  x86_simple_registers, true))
+ 		return true;
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+ 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
+ 		const unsigned offset = 4 + (rex != 0);
+-		if (size >= offset && code[offset - 3] == 0x0f &&
+-		    code[offset - 1] < 0xc0) {
+-			const unsigned bank =
+-				code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
+-			const unsigned row =
+-				legacy_packed_plans[bank][code[offset - 2]];
+-			if (row && !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+-			    writePackedMemory(code, insn, insn_size,
+-					      &legacy_packed_rows[row], rex,
+-					      offset, size, false))
++		if (size >= offset && code[offset - 3] == 0x0f) {
++			const unsigned opcode = code[offset - 2];
++			if (code[offset - 1] < 0xc0) {
++				const unsigned bank =
++					code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
++				const unsigned row =
++					legacy_packed_plans[bank][opcode];
++				if (row &&
++				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++				    writePackedMemory(code, insn, insn_size,
++						      &legacy_packed_rows[row],
++						      rex, offset, size, false))
++					return true;
++			} else if (code[0] == 0x66 && opcode >= 0x70 &&
++				   opcode <= 0x73 && size > offset &&
++				   !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++				   writeLegacyRegisterImmediate(
++					   code, insn, insn_size, offset, rex))
+ 				return true;
+ 		}
+ 	}
+diff --git a/suite/synctools/alias_pattern_rows.py b/suite/synctools/alias_pattern_rows.py
+new file mode 100755
+index 00000000..bfed2b30
+--- /dev/null
++++ b/suite/synctools/alias_pattern_rows.py
+@@ -0,0 +1,70 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: BSD-3-Clause
++"""Index generated alias patterns by their instruction opcode."""
++
++import argparse
++import re
++from pathlib import Path
++
++
++def entries(directory):
++    arch = "PPC" if directory.name == "PowerPC" else directory.name
++    writer = (directory / f"{arch}GenAsmWriter.inc").read_text()
++    info = (directory / f"{arch}GenInstrInfo.inc").read_text()
++    body, = re.findall(
++        r"static const PatternsForOpcode OpToPatterns\[\] = \{([^;]*)\};", writer
++    )
++    entry = re.compile(r"\{\s*(\w+)\s*,\s*\d+\s*,\s*\d+\s*\}\s*,")
++    if not re.fullmatch(r"\s*\{\s*0\s*\}\s*,?\s*", entry.sub("", body)):
++        raise ValueError(f"Unrecognized {arch} alias table")
++    values = dict(re.findall(r"\b(" + arch + r"_\w+)\s*=\s*(\d+)\s*,", info))
++    opcodes = [int(values[name]) for name in entry.findall(body)]
++    if not opcodes or sorted(set(opcodes)) != opcodes:
++        raise ValueError(f"Expected distinct sorted opcodes in {arch} alias table")
++    return opcodes
++
++
++def generate(directory):
++    opcodes = entries(directory)
++    arch = "PPC" if directory.name == "PowerPC" else directory.name
++    first = opcodes[0]
++    if len(opcodes) > 65535:
++        raise ValueError("Alias row index exceeds uint16_t")
++    # Each entry records the table row of its first opcode and which of the
++    # next sixteen instruction IDs have a pattern.
++    masks = [0] * ((opcodes[-1] - first) // 16 + 1)
++    for opcode in opcodes:
++        block, bit = divmod(opcode - first, 16)
++        masks[block] |= 1 << bit
++
++    lines = [
++        "/* Generated by suite/synctools/alias_pattern_rows.py. */",
++        f"#define {arch}_FIRST_ALIAS_OPCODE {first}u",
++        f"static const AliasOpcodeBlock {arch}_alias_blocks[] ALIAS_PATTERN_DATA = {{",
++    ]
++    row = 0
++    for mask in masks:
++        lines.append(f"\t{{ {row}, 0x{mask:04x} }},")
++        row += bin(mask).count("1")
++    lines += ["};", ""]
++    return "\n".join(lines)
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--check", action="store_true")
++    args = parser.parse_args()
++    root = Path(__file__).resolve().parents[2] / "arch"
++    for arch in ("AArch64", "Mips", "ARM", "PowerPC", "RISCV", "Sparc", "LoongArch"):
++        name = "PPC" if arch == "PowerPC" else arch
++        path = root / arch / f"{name}GenAliasPatternRows.inc"
++        data = generate(path.parent)
++        if args.check:
++            if not path.is_file() or data != path.read_text():
++                raise SystemExit(f"Stale {path}; rerun {Path(__file__).name}")
++        else:
++            path.write_text(data)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index b14b02e3..cce3e23d 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -536,6 +536,31 @@ void add_rex_stack(Decoder &decoder, const RegisterTable &regs,
+ 	}
+ }
+ 
++void emit_register(const X86SimpleRegister &v)
++{
++	std::cout << "\t\t{ " << v.reg << ", " << unsigned(v.length) << ", \""
++		  << v.name << "\" },\n";
++}
++
++void emit_test32(const PlanTable &plans, const RegisterTable &regs,
++		 const std::vector<std::string> &rows)
++{
++	std::cout
++		<< "/* Generated by suite/synctools/x86_simple_output.cpp --test32-registers. */\n\n"
++		<< "static const struct X86SimpleOutput test32_rows[2] = {\n";
++	for (unsigned opcode : { 0x84u, 0x85u })
++		std::cout << '\t' << rows.at(plans[0][0][opcode] >> 2) << ",\n";
++	std::cout
++		<< "};\n\nstatic const struct X86SimpleRegister test32_regs[2][8] = {\n";
++	for (unsigned bank : { 0u, 2u }) {
++		std::cout << "\t{\n";
++		for (unsigned reg = 0; reg < 8; ++reg)
++			emit_register(regs[bank][reg]);
++		std::cout << "\t},\n";
++	}
++	std::cout << "};\n";
++}
++
+ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 		 const std::vector<std::string> &rows)
  {
- 	const uint32_t edges[] = {
-@@ -1230,7 +1241,8 @@ static bool check_mode(cs_mode mode)
- 		     (!check_vex_rip_loads(handles) ||
- 		      !check_sse_rip_memory(handles) ||
- 		      (private_iter == X86_disasmIterText &&
--		       (!check_sse_base_memory(handles) ||
-+		       (!check_vex_clear(handles) ||
-+			!check_sse_base_memory(handles) ||
- 			!check_vex_packed_memory(handles))))) ||
- 		    !check_rex_stack(handles) ||
- 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
+@@ -566,9 +591,7 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 	for (auto &names : regs) {
+ 		std::cout << "\t{\n";
+ 		for (auto &v : names)
+-			std::cout << "\t\t{ " << v.reg << ", "
+-				  << unsigned(v.length) << ", \"" << v.name
+-				  << "\" },\n";
++			emit_register(v);
+ 		std::cout << "\t},\n";
+ 	}
+ 	std::cout << "};\n";
+@@ -1167,9 +1190,10 @@ int main(int argc, char **argv)
+ 	}
+ 	const bool extend = argc == 2 &&
+ 			    std::strcmp(argv[1], "--extend32") == 0;
+-	if (argc != 1 && !indirect && !extend)
++	const bool test32 = argc == 2 && std::strcmp(argv[1], "--test32-registers") == 0;
++	if (argc != 1 && !indirect && !extend && !test32)
+ 		throw std::runtime_error(
+-			"expected no arguments, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32 or --extend64");
++			"expected no arguments, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32, --extend64 or --test32-registers");
+ 	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
+ 	RegisterTable regs{};
+ 	describe_registers(x64, regs);
+@@ -1293,6 +1317,10 @@ int main(int argc, char **argv)
+ 		}
+ 	}
+ 	add_rex_stack(x64, regs, plans, rows, checked, admitted);
++	if (test32) {
++		emit_test32(plans, regs, rows);
++		return 0;
++	}
+ 	emit_tables(plans, regs, rows);
+ 	std::cout << "\nstatic const uint16_t x86_shift_rows[2][3][8] = {\n";
+ 	for (const auto &mode : shifts) {
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 10e7c18d..5c2649f3 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -290,17 +290,22 @@ void emit_vex_indexed(Decoder &decoder)
+ 	std::puts("};");
+ }
+ 
+-// Describe only legacy 66 0F register pairs whose entire public x86 detail
++// Describe only legacy 66 0F register operations whose entire public x86 detail
+ // can be recovered from the prefix, opcode and ModR/M. Generate against
+ // the ordinary decoder so special encodings and aliases retain its behavior.
+ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+-				unsigned opcode, unsigned modrm, bool reverse)
++				unsigned opcode, unsigned modrm, bool reverse,
++				int immediate = -1)
+ {
+-	uint8_t bytes[5] = { 0x66, uint8_t(rex), 0x0f, uint8_t(opcode),
+-			     uint8_t(modrm) };
+-	const unsigned size = rex ? 5 : 4;
++	uint8_t bytes[6] = { 0x66,	     uint8_t(rex),
++			     0x0f,	     uint8_t(opcode),
++			     uint8_t(modrm), uint8_t(immediate) };
++	const unsigned header = rex ? 5 : 4;
++	const bool has_imm = immediate >= 0;
++	const unsigned size = header + has_imm;
++	const unsigned registers = has_imm && opcode != 0x70 ? 1 : 2;
+ 	if (!rex)
+-		std::memmove(bytes + 1, bytes + 2, 3);
++		std::memmove(bytes + 1, bytes + 2, 3 + has_imm);
+ 	const unsigned id = decoder.decode(bytes, size);
+ 	if (!id)
+ 		return {};
+@@ -309,7 +314,8 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+ 	const auto &x = d.x86;
+ 	if (insn.is_alias || insn.usesAliasDetails || insn.illegal ||
+ 	    std::strlen(insn.mnemonic) >= 16 || d.regs_read_count ||
+-	    d.regs_write_count || d.groups_count > 4 || x.op_count != 2)
++	    d.regs_write_count || d.groups_count > 4 ||
++	    x.op_count != registers + has_imm)
+ 		return {};
+ 	const unsigned reg = ((modrm >> 3) & 7) + ((rex & 4) << 1);
+ 	const unsigned rm = (modrm & 7) + ((rex & 1) << 3);
+@@ -321,11 +327,11 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+ 	expected.rex = uint8_t(rex);
+ 	expected.addr_size = wide ? 8 : 4;
+ 	expected.modrm = uint8_t(modrm);
+-	expected.encoding.modrm_offset = uint8_t(size - 1);
+-	expected.op_count = 2;
++	expected.encoding.modrm_offset = uint8_t(header - 1);
++	expected.op_count = uint8_t(registers + has_imm);
+ 	Bytes4 access{}, groups{};
+ 	std::copy_n(d.groups, d.groups_count, groups.begin());
+-	for (unsigned i = 0; i < 2; ++i) {
++	for (unsigned i = 0; i < registers; ++i) {
+ 		auto &op = expected.operands[i];
+ 		op.type = X86_OP_REG;
+ 		op.reg = x86_reg(X86_REG_XMM0 + nums[i]);
+@@ -333,13 +339,81 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+ 		op.access = x.operands[i].access;
+ 		access[i] = unsigned(op.access);
+ 	}
+-	const auto text = "xmm" + std::to_string(nums[0]) + ", xmm" +
+-			  std::to_string(nums[1]);
++	std::string text = "xmm" + std::to_string(nums[0]);
++	if (registers == 2)
++		text += ", xmm" + std::to_string(nums[1]);
++	if (has_imm) {
++		auto &op = expected.operands[registers];
++		op.type = X86_OP_IMM;
++		op.size = 1;
++		op.imm = immediate;
++		op.access = x.operands[registers].access;
++		access[registers] = unsigned(op.access);
++		expected.encoding.imm_offset = uint8_t(header);
++		expected.encoding.imm_size = 1;
++		char digits[12];
++		std::snprintf(digits, sizeof(digits),
++			      immediate <= 9 ? ", %u" : ", 0x%x",
++			      unsigned(immediate));
++		text += digits;
++	}
+ 	if (text != insn.op_str || std::memcmp(&expected, &x, sizeof(x)))
+ 		return {};
+ 	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
+ 	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
+-	       fields(access) + ", 0 }";
++	       fields(access) + (has_imm ? ", 1 }" : ", 0 }");
++}
++
++void emit_legacy_immediates(Decoder &decoder)
++{
++	std::vector<std::string> rows;
++	std::array<std::array<unsigned, 8>, 4> plans{};
++	for (unsigned opcode = 0x70; opcode <= 0x73; ++opcode) {
++		// PSHUFD selects its destination with ModR/M.reg. The shift groups
++		// use the same field as the opcode extension and update ModR/M.r/m.
++		const bool group_opcode = opcode != 0x70;
++		for (unsigned group = 0; group < 8; ++group) {
++			const unsigned mr = 0xc0 | (group << 3);
++			const auto row = legacy_register_row(
++				decoder, true, 0, opcode, mr, group_opcode, 0);
++			if (row.empty())
++				continue;
++			for (unsigned p = 0; p <= 16; ++p) {
++				const unsigned rex = p ? 0x3f + p : 0;
++				for (unsigned value = 0; value <= 255; ++value)
++					if (legacy_register_row(
++						    decoder, true, rex, opcode,
++						    mr | (value & 7),
++						    group_opcode, value) != row)
++						throw std::runtime_error(
++							"nonuniform legacy immediate operands");
++			}
++			auto i = std::find(rows.begin(), rows.end(), row);
++			plans[opcode - 0x70][group] =
++				unsigned(i - rows.begin()) + 1;
++			if (i == rows.end())
++				rows.push_back(row);
++		}
++	}
++	if (rows.size() != 11)
++		throw std::runtime_error(
++			"missing legacy shuffle or packed shift rows");
++	std::puts(
++		"/* Generated by suite/synctools/x86_vector_output.cpp --legacy-register-immediates. */");
++	std::puts(
++		"static const struct VectorOutputRow legacy_immediate_rows[] = {");
++	for (const auto &row : rows)
++		std::printf("\t%s,\n", row.c_str());
++	std::puts("};\nstatic const uint8_t legacy_immediate_plans[4][8] = {");
++	for (const auto &plan : plans) {
++		std::cout << "\t";
++		std::cout << "{ ";
++		for (auto n : plan)
++			std::cout << n << ", ";
++		std::cout << "}";
++		std::cout << ",\n";
++	}
++	std::puts("};");
+ }
+ 
+ void emit_legacy_registers(Decoder &wide)
+@@ -2083,6 +2157,11 @@ int main(int argc, char **argv)
+ 		emit_plain_evex_registers(decoder);
+ 		return 0;
+ 	}
++	if (argc == 2 && !std::strcmp(argv[1], "--legacy-register-immediates")) {
++		Decoder decoder;
++		emit_legacy_immediates(decoder);
++		return 0;
++	}
+ 	if (argc == 2 && !std::strcmp(argv[1], "--evex-shifts")) {
+ 		Decoder decoder;
+ 		std::puts("/* Generated by suite/synctools/x86_vector_output.cpp --evex-shifts. */");
+@@ -2119,7 +2198,7 @@ int main(int argc, char **argv)
+ 	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
+ 	if (argc > 1 && !scan_only)
+ 		throw std::runtime_error(
+-			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers]");
++			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers|--legacy-register-immediates]");
+ 	Decoder decoder;
+ 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
+ 	emit_output(decoder, scan_only);
+diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
+index d9dd18e2..71554e41 100644
+--- a/tests/unit/x86_reg_access.c
++++ b/tests/unit/x86_reg_access.c
+@@ -53,6 +53,54 @@ static bool check_implicit_copies(csh handle)
+ 	return true;
+ }
+ 
++static bool check_vector_clear_writes(void)
++{
++	if (cs_support(CS_SUPPORT_X86_REDUCE))
++		return true;
++
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
++	const uint8_t bytes[][4] = { { 0xc5, 0xf8, 0x77 },
++				     { 0xc5, 0xfc, 0x77 },
++				     { 0xc4, 0xe1, 0x78, 0x77 },
++				     { 0xc4, 0xe1, 0x7c, 0x77 } };
++	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
++		const unsigned expected = modes[m] == CS_MODE_64 ? 16 : 8;
++		csh h = 0;
++		if (cs_open(CS_ARCH_X86, modes[m], &h) != CS_ERR_OK)
++			return false;
++		bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
++		for (unsigned n = 0; n < sizeof(bytes) / sizeof(bytes[0]) && ok;
++		     ++n) {
++			cs_insn *insn = NULL;
++			size_t size = n < 2 ? 3 : 4;
++			size_t count =
++				cs_disasm(h, bytes[n], size, 0, 1, &insn);
++			cs_regs reads, writes;
++			uint8_t nr, nw;
++			ok = count == 1 && insn->size == size &&
++			     insn->id == (n % 2 ? X86_INS_VZEROALL :
++						  X86_INS_VZEROUPPER) &&
++			     insn->detail->regs_write_count == expected &&
++			     cs_regs_access(h, insn, reads, &nr, writes, &nw) ==
++				     CS_ERR_OK &&
++			     nw == expected;
++			for (unsigned i = 0; ok && i < expected; ++i)
++				ok = insn->detail->regs_write[i] ==
++					     X86_REG_YMM0 + i &&
++				     writes[i] == X86_REG_YMM0 + i;
++			cs_free(insn, count);
++			if (!ok)
++				fprintf(stderr,
++					"vector clear writes: mode=%u encoding=%u\n",
++					(unsigned)modes[m], n);
++		}
++		cs_close(&h);
++		if (!ok)
++			return false;
++	}
++	return true;
++}
++
+ static bool check_test_operands(void)
+ {
+ 	static const unsigned widths[] = { 1, 2, 4, 8 };
+@@ -772,6 +820,34 @@ static bool check_scalar_segment_reads(void)
+ 	return true;
+ }
+ 
++static bool check_timestamp_writes(csh handle)
++{
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_64, CS_MODE_32 };
++	const uint8_t bytes[] = { 0x0f, 0x31, 0x0f, 0x01, 0xf9 };
++	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
++		if (cs_option(handle, CS_OPT_MODE, modes[m]) != CS_ERR_OK)
++			return false;
++		const bool wide = modes[m] == CS_MODE_64;
++		const uint16_t expected[] = { wide ? X86_REG_RAX : X86_REG_EAX,
++					      wide ? X86_REG_RCX : X86_REG_ECX,
++					      wide ? X86_REG_RDX : X86_REG_EDX };
++		cs_insn *insn = NULL;
++		size_t count = cs_disasm(handle, bytes, sizeof(bytes), 0, 0, &insn);
++		bool ok = count == 2;
++		for (unsigned n = 0; ok && n < count; ++n) {
++			const cs_detail *detail = insn[n].detail;
++			ok = detail && detail->regs_write_count == 2 + n &&
++			     detail->regs_write[0] == expected[0] &&
++			     detail->regs_write[1 + n] == expected[2] &&
++			     (!n || detail->regs_write[1] == expected[1]);
++		}
++		cs_free(insn, count);
++		if (!ok)
++			return false;
++	}
++	return cs_option(handle, CS_OPT_MODE, CS_MODE_64) == CS_ERR_OK;
++}
++
+ int main(void)
+ {
+ 	if (cs_support(CS_SUPPORT_DIET))
+@@ -783,7 +859,9 @@ int main(void)
+ 		cs_close(&handle);
+ 		return 1;
+ 	}
+-	bool success = check_implicit_copies(handle) && check_test_operands() &&
++	bool success = check_implicit_copies(handle) &&
++		       check_timestamp_writes(handle) && check_test_operands() &&
++		       check_vector_clear_writes() &&
+ 		       check_scalar_move_flags() &&
+ 		       check_scalar_segment_reads() &&
+ 		       check_vector_compare_flags();
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index cb97fb2b..b9a6cb01 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -545,6 +545,33 @@ static bool check_plain_evex_registers(csh handles[2])
+ 				}
+ 	return true;
+ }
++static bool check_legacy_register_immediates(csh handles[2])
++{
++	static const uint8_t values[] = { 0, 9, 10, 15, 16, 127, 128, 255 };
++	for (unsigned p = 0; p <= 16; ++p)
++		for (unsigned opcode = 0x70; opcode <= 0x73; ++opcode)
++			for (unsigned mr = 0xc0; mr <= 0xff; ++mr)
++				for (unsigned k = 0; k < sizeof(values); ++k) {
++					uint8_t bytes[] = { 0x66,
++							    (uint8_t)(0x3f + p),
++							    0x0f,
++							    (uint8_t)opcode,
++							    (uint8_t)mr,
++							    values[k] };
++					if (!p)
++						bytes[1] = 0x66;
++					const uint8_t *start = bytes + !p;
++					const size_t length =
++						sizeof(bytes) - !p;
++					if (!compare(handles, start, length,
++						     mr ^ values[k]) ||
++					    !compare(handles, start, length - 1,
++						     values[k]))
++						return false;
++				}
++	return true;
++}
++
+ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
+ {
+ 	for (unsigned prefix = 0; prefix <= (mode == CS_MODE_64 ? 16u : 0u);
+@@ -1036,33 +1063,37 @@ static bool check_vex32_register_moves(csh handles[2])
+ 	return true;
+ }
+ 
+-static bool check_segment_lea32(csh handles[2])
++static bool check_lea32(csh handles[2])
+ {
+-	const uint8_t prefixes[] = { 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 };
++	const uint8_t prefixes[] = { 0, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 };
+ 	for (unsigned p = 0; p < sizeof(prefixes); ++p)
+ 		for (unsigned mr = 0; mr < 256; ++mr)
+ 			for (unsigned sib = 0; sib < ((mr & 7) == 4 ? 256u : 1u); ++sib) {
+ 				uint8_t code[] = { prefixes[p], 0x8d, mr, sib,
+ 						   0x80, 0xff, 0xff, 0xff };
+-				if (!compare(handles, code, sizeof(code), mr ^ sib))
++				const uint8_t *start = code + (p == 0);
++				const size_t size = sizeof(code) - (p == 0);
++				if (!compare(handles, start, size, mr ^ sib))
+ 					return false;
+ 				if ((mr & 0x38) == 0)
+-					for (size_t len = 1; len < sizeof(code); ++len)
+-						if (!compare(handles, code, len, mr ^ sib))
++					for (size_t len = 1; len < size; ++len)
++						if (!compare(handles, start, len, mr ^ sib))
+ 							return false;
+ 			}
+ 	return true;
+ }
+ 
+-static bool check_memory_compares(csh handles[2], cs_mode mode)
++static bool check_memory_flag_immediates(csh handles[2], cs_mode mode)
+ {
+ 	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
+ 	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
++	const uint8_t opcodes[] = { 0x80, 0x81, 0x82, 0x83, 0xf6, 0xf7 };
+ 	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
+ 	     ++prefix) {
+-		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
+-			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
+-				if ((mr & 0x30) != 0x30)
++		for (unsigned index = 0; index < sizeof(opcodes); ++index) {
++			const unsigned opcode = opcodes[index];
++			for (unsigned mr = 0; mr <= 0xff; ++mr) {
++				if ((mr & 0x30) != (opcode >= 0xf6 ? 0 : 0x30))
+ 					continue;
+ 				for (unsigned n = 0; n < sizeof(values); ++n) {
+ 					uint8_t code[12];
+@@ -1541,6 +1572,7 @@ static bool check_mode(cs_mode mode)
+ 			!check_evex_immediate_shifts(handles) ||
+ 			!check_vex_clear(handles) ||
+ 			!check_sse_base_memory(handles) ||
++			!check_legacy_register_immediates(handles) ||
+ 			!check_legacy_memory(handles, 0x66) ||
+ 			!check_legacy_memory(handles, 0xf2) ||
+ 			!check_legacy_memory(handles, 0xf3) ||
+@@ -1550,9 +1582,10 @@ static bool check_mode(cs_mode mode)
+ 		    !check_evex_memory_moves(handles) ||
+ 		    !check_padding(handles) ||
+ 		    (mode == CS_MODE_32 &&
+-		     (!check_segment_lea32(handles) ||
++		     (!check_vex_clear(handles) ||
++		      !check_lea32(handles) ||
+ 		      !check_vex32_register_moves(handles) ||
+-		      !check_memory_compares(handles, mode))) ||
++		      !check_memory_flag_immediates(handles, mode))) ||
+ 		    !check_alu_memory(handles, mode) ||
+ 		    !check_vex_register_immediates(handles, mode) ||
+ 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index fada617e..6723d788 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -65,6 +65,7 @@
+ 		0C6F07220265CCFEC8B56C6D /* MCInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = A147681900A859B6FF33B1C5 /* MCInstPrinter.c */; };
+ 		E06B2929F95A196300477770 /* Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 0757CC8E95E32C807B529D06 /* Mapping.c */; };
+ 		C9DC7E63CA75A68259E4017B /* AliasMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 9BDA55CDC1F7E174768F868D /* AliasMapping.c */; };
++		25A957FA86C6880D9D148DF7 /* AliasPatternLookup.c in Sources */ = {isa = PBXBuildFile; fileRef = 4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */; };
+ 		DC474F9019DE6FCD00BCA449 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
+ 		DC474F9119DE6FCD00BCA449 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
+ 		DC474F9219DE6FCD00BCA449 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
+@@ -74,6 +75,7 @@
+ 		03A4059C2E7F14C13B3E0635 /* MCInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = A147681900A859B6FF33B1C5 /* MCInstPrinter.c */; };
+ 		FE24CD259F3F09130FF97530 /* Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 0757CC8E95E32C807B529D06 /* Mapping.c */; };
+ 		02F390F5981CFD7244A2E5B1 /* AliasMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 9BDA55CDC1F7E174768F868D /* AliasMapping.c */; };
++		4943BF7544A4FC4167B58D57 /* AliasPatternLookup.c in Sources */ = {isa = PBXBuildFile; fileRef = 4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */; };
+ 		DC474F9619DE6FCD00BCA449 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
+ 		DC474F9719DE6FCD00BCA449 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
+ 		DC474F9819DE6FCD00BCA449 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
+@@ -236,6 +238,7 @@
+ 		A4A3B7006E0700D09BB99F2E /* X86VectorFallback64.c in Sources */ = {isa = PBXBuildFile; fileRef = 70E31C77770C0D60800C36FE /* X86VectorFallback64.c */; };
+ 		5816C41E14374534B361EF32 /* X86VexRegisterImmediate.c in Sources */ = {isa = PBXBuildFile; fileRef = 029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */; };
+ 		A9B7FA0C9D8900A243394458 /* X86PlainEvexOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */; };
++		70ABBD7F903AC493B372F180 /* X86RegisterFallback32.c in Sources */ = {isa = PBXBuildFile; fileRef = 5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */; };
+ 		3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */ = {isa = PBXBuildFile; fileRef = BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */; };
+ 		F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */; };
+ 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+@@ -259,6 +262,7 @@
+ 		08825505947F9FF38595CAA2 /* MCInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = A147681900A859B6FF33B1C5 /* MCInstPrinter.c */; };
+ 		99F6EE7BCF49E62584A33533 /* Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 0757CC8E95E32C807B529D06 /* Mapping.c */; };
+ 		31C3FEE2D3F44FFB70B747C4 /* AliasMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 9BDA55CDC1F7E174768F868D /* AliasMapping.c */; };
++		4D57DBEAAA2B68D04546A8CD /* AliasPatternLookup.c in Sources */ = {isa = PBXBuildFile; fileRef = 4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */; };
+ 		DCFE24A919DDCDEE00EF8EA9 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
+ 		DCFE24AB19DDCDEE00EF8EA9 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
+ 		DCFE24AD19DDCDEE00EF8EA9 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
+@@ -531,6 +535,7 @@
+ 		70E31C77770C0D60800C36FE /* X86VectorFallback64.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorFallback64.c; sourceTree = "<group>"; };
+ 		029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VexRegisterImmediate.c; sourceTree = "<group>"; };
+ 		98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86PlainEvexOutput.c; sourceTree = "<group>"; };
++		5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86RegisterFallback32.c; sourceTree = "<group>"; };
+ 		BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryFallback32.c; sourceTree = "<group>"; };
+ 		526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86ImmediateOutput.c; sourceTree = "<group>"; };
+ 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
+@@ -575,6 +580,7 @@
+ 		A147681900A859B6FF33B1C5 /* MCInstPrinter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCInstPrinter.c; path = ../MCInstPrinter.c; sourceTree = "<group>"; };
+ 		0757CC8E95E32C807B529D06 /* Mapping.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = Mapping.c; path = ../Mapping.c; sourceTree = "<group>"; };
+ 		9BDA55CDC1F7E174768F868D /* AliasMapping.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = AliasMapping.c; path = ../AliasMapping.c; sourceTree = "<group>"; };
++		4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = AliasPatternLookup.c; path = ../AliasPatternLookup.c; sourceTree = "<group>"; };
+ 		DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCRegisterInfo.c; path = ../MCRegisterInfo.c; sourceTree = "<group>"; };
+ 		DCFE24A119DDCDEE00EF8EA9 /* SStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = SStream.c; path = ../SStream.c; sourceTree = "<group>"; };
+ 		DCFE24A219DDCDEE00EF8EA9 /* utils.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = utils.c; path = ../utils.c; sourceTree = "<group>"; };
+@@ -820,6 +826,7 @@
+ 				A147681900A859B6FF33B1C5 /* MCInstPrinter.c */,
+ 				0757CC8E95E32C807B529D06 /* Mapping.c */,
+ 				9BDA55CDC1F7E174768F868D /* AliasMapping.c */,
++				4290B43E4BDED7AA01112F14 /* AliasPatternLookup.c */,
+ 				DCFE24B719DDCE1E00EF8EA9 /* MCInstrDesc.h */,
+ 				DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */,
+ 				DCFE24B819DDCE1E00EF8EA9 /* MCRegisterInfo.h */,
+@@ -1017,6 +1024,7 @@
+ 				70E31C77770C0D60800C36FE /* X86VectorFallback64.c */,
+ 				029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */,
+ 				98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */,
++				5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */,
+ 				BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */,
+ 				526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */,
+ 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
+@@ -1690,6 +1698,7 @@
+ 				03A4059C2E7F14C13B3E0635 /* MCInstPrinter.c in Sources */,
+ 				FE24CD259F3F09130FF97530 /* Mapping.c in Sources */,
+ 				02F390F5981CFD7244A2E5B1 /* AliasMapping.c in Sources */,
++				4943BF7544A4FC4167B58D57 /* AliasPatternLookup.c in Sources */,
+ 				DC474FD519DE6FDA00BCA449 /* SystemZMCTargetDesc.c in Sources */,
+ 				DC474F9719DE6FCD00BCA449 /* SStream.c in Sources */,
+ 				DC474FCE19DE6FDA00BCA449 /* SparcDisassembler.c in Sources */,
+@@ -1776,6 +1785,7 @@
+ 				08825505947F9FF38595CAA2 /* MCInstPrinter.c in Sources */,
+ 				99F6EE7BCF49E62584A33533 /* Mapping.c in Sources */,
+ 				31C3FEE2D3F44FFB70B747C4 /* AliasMapping.c in Sources */,
++				4D57DBEAAA2B68D04546A8CD /* AliasPatternLookup.c in Sources */,
+ 				DCFE246719DDCDA000EF8EA9 /* MipsDisassembler.c in Sources */,
+ 				DCFE245819DDCD9200EF8EA9 /* AArch64Mapping.c in Sources */,
+ 				DCFE247919DDCDAD00EF8EA9 /* SparcMapping.c in Sources */,
+@@ -1787,6 +1797,7 @@
+ 				A4A3B7006E0700D09BB99F2E /* X86VectorFallback64.c in Sources */,
+ 				5816C41E14374534B361EF32 /* X86VexRegisterImmediate.c in Sources */,
+ 				A9B7FA0C9D8900A243394458 /* X86PlainEvexOutput.c in Sources */,
++				70ABBD7F903AC493B372F180 /* X86RegisterFallback32.c in Sources */,
+ 				3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */,
+ 				F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */,
+ 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
+@@ -1851,6 +1862,7 @@
+ 				0C6F07220265CCFEC8B56C6D /* MCInstPrinter.c in Sources */,
+ 				E06B2929F95A196300477770 /* Mapping.c in Sources */,
+ 				C9DC7E63CA75A68259E4017B /* AliasMapping.c in Sources */,
++				25A957FA86C6880D9D148DF7 /* AliasPatternLookup.c in Sources */,
+ 				DC474FB119DE6FDA00BCA449 /* SystemZMCTargetDesc.c in Sources */,
+ 				DC474F9119DE6FCD00BCA449 /* SStream.c in Sources */,
+ 				DC474FAA19DE6FDA00BCA449 /* SparcDisassembler.c in Sources */,

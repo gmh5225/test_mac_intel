@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base', 'clear', 'grouped', 'correct', 'lea'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base', 'active', 'legacy', 'test32', 'lea', 'repair'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -40,7 +40,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base', 'clear', 'grouped', 'correct', 'lea'):
+    for variant in ('base', 'active', 'legacy', 'test32', 'lea', 'repair'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -69,7 +69,7 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==(8 if variant in ('clear','correct') and v[0]!='64' else 16) for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(8 if variant == 'repair' and v[0]!='64' else 16) for v in regs)
         if variant!='base':
             for unit in ('x86_simple_output','x86_reg_access'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
@@ -95,7 +95,10 @@ try:
         members=sp.check_output(['ar','t',archive],text=True).splitlines()
         assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86MemoryFallback32.c.o') < members.index('X86BatchScan.c.o'),members
 
-        assert 'AliasPatternLookup.c.o' not in members
+        if variant!='base':
+            assert members.index('AliasPatternLookup.c.o')>members.index('X86VectorFallback64.c.o')
+            command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
+        else:assert 'AliasPatternLookup.c.o' not in members
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
@@ -123,7 +126,7 @@ try:
         if variant !='base':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
             assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
-        if variant in ('clear','correct'):
+        if variant == 'repair':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
@@ -142,11 +145,11 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        if variant in ('clear', 'grouped', 'correct', 'lea'):
+        if variant in ('active', 'legacy', 'test32', 'lea', 'repair'):
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
             assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             assert sp.check_output([t/'table-producer','--evex-memory'])==(cs/'arch/X86/X86GenEvexMemoryOutput.inc').read_bytes()
-        if variant in ('clear','correct'):
+        if variant == 'repair':
             command(['python3','-B',cs/'suite/synctools/x86_mapping_counts.py','--check'],'check-mode-repair-'+variant,cs)
         if variant != 'base':
             assert sp.check_output([t/'table-producer','--plain-evex-registers'])==(cs/'arch/X86/X86GenPlainEvexRegisterOutput.inc').read_bytes()
@@ -156,7 +159,14 @@ try:
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'indexed.c','-o',t/'indexed.o'],'indexed-wrapper-'+variant)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'indexed.cpp',t/'indexed.o',archive,'-o',t/'indexed'],'indexed-link-'+variant)
         command([t/'indexed'],'indexed-records-'+variant)
-        if variant in ('base','lea'):
+        if variant in ('legacy','test32','lea','repair'):
+            assert sp.check_output([t/'table-producer','--legacy-register-immediates'])==(cs/'arch/X86/X86GenLegacyRegisterImmediates.inc').read_bytes()
+            command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'legacy.c','-o',t/'legacy.o'],'legacy-wrapper-'+variant)
+            command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'legacy.cpp',t/'legacy.o',archive,'-o',t/'legacy'],'legacy-link-'+variant)
+            command([t/'legacy'],'legacy-guard-'+variant)
+        if variant in ('test32','lea','repair'):
+            assert sp.check_output([t/'simple-generator','--test32-registers'])==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
+        if variant in ('base','test32','lea','repair'):
             from observe import install
             observed=t/'probe-source';arch=observed/'arch/X86';arch.mkdir(parents=True,exist_ok=True)
             sources=('X86MemoryFallback32','X86Vex32Output')
@@ -196,7 +206,7 @@ try:
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
-                    if k in ('clear','correct'):wanted[-1]-=delta*n
+                    if k == 'repair':wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)

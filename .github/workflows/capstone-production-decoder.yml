@@ -1,7 +1,7 @@
-name: Measure mode-specific vector and timestamp writes and the i386 LEA miss in the released NeverD product
+name: Qualify indexed aliases and four cumulative x86 decoder changes on two full NeverD builds
 on:
   push:
-    branches: [codex/product-grouped-implicit-writes-and-lea]
+    branches: [codex/integrated-decoder-product-ladder]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: grouped-mode-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: integrated-output-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
