@@ -1,7 +1,7 @@
-name: Measure direct AArch64 and MIPS alias pattern rows with public record and condition checks
+name: Measure known alias rows while preserving the common matcher binary
 on:
   push:
-    branches: [codex/capstone-direct-alias-pattern-rows]
+    branches: [codex/capstone-ordinary-matcher-alias-suffix]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alias-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: alias-suffix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

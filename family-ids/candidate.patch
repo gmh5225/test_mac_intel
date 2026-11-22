@@ -1,8 +1,8 @@
 diff --git a/AliasMapping.c b/AliasMapping.c
-index 77e2395c..e6b02324 100644
+index 77e2395c..37677b0f 100644
 --- a/AliasMapping.c
 +++ b/AliasMapping.c
-@@ -58,3 +58,46 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
+@@ -58,3 +58,56 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
  #endif
  
  #endif
@@ -20,6 +20,18 @@ index 77e2395c..e6b02324 100644
 +#define ALIAS_PATTERN_DATA
 +#endif
 +
++/* A table suffix starts with the exact generated opcode record and retains the
++ * original sentinel. Its static address can be cached by the ordinary matcher. */
++static inline const char *
++matchKnownAliasOpcode(MCInst *MI, const AliasMatchingData *data, unsigned row)
++{
++	if (!row)
++		return NULL;
++	AliasMatchingData suffix = *data;
++	suffix.OpToPatterns += row - 1;
++	return matchAliasPatterns(MI, &suffix);
++}
++
 +#ifdef CAPSTONE_HAS_AARCH64
 +#include "arch/AArch64/AArch64GenAliasPatternRows.inc"
 +ALIAS_PATTERN_CODE
@@ -29,8 +41,7 @@ index 77e2395c..e6b02324 100644
 +	if (offset >= ARR_SIZE(AArch64_alias_rows))
 +		return NULL;
 +	const unsigned row = AArch64_alias_rows[offset];
-+	return row ? matchAliasPatternRange(MI, data, &data->OpToPatterns[row - 1]) :
-+		     NULL;
++	return matchKnownAliasOpcode(MI, data, row);
 +}
 +#endif
 +
@@ -43,18 +54,17 @@ index 77e2395c..e6b02324 100644
 +	if (offset >= ARR_SIZE(Mips_alias_rows))
 +		return NULL;
 +	const unsigned row = Mips_alias_rows[offset];
-+	return row ? matchAliasPatternRange(MI, data, &data->OpToPatterns[row - 1]) :
-+		     NULL;
++	return matchKnownAliasOpcode(MI, data, row);
 +}
 +#endif
 +
 +#endif
 diff --git a/AliasPatternLookup.h b/AliasPatternLookup.h
 new file mode 100644
-index 00000000..718494cb
+index 00000000..7d9cc57c
 --- /dev/null
 +++ b/AliasPatternLookup.h
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,15 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -65,48 +75,11 @@ index 00000000..718494cb
 +#include "MCInstPrinter.h"
 +
 +CAPSTONE_INTERNAL const char *
-+matchAliasPatternRange(MCInst *MI, const AliasMatchingData *data,
-+		       const PatternsForOpcode *record);
-+CAPSTONE_INTERNAL const char *
 +matchAArch64AliasPatterns(MCInst *MI, const AliasMatchingData *data);
 +CAPSTONE_INTERNAL const char *
 +matchMipsAliasPatterns(MCInst *MI, const AliasMatchingData *data);
 +
 +#endif
-diff --git a/MCInstPrinter.c b/MCInstPrinter.c
-index 97d26582..cefa4fcb 100644
---- a/MCInstPrinter.c
-+++ b/MCInstPrinter.c
-@@ -2,6 +2,7 @@
- /* By Rot127 <unisono@quyllur.org>, 2023 */
- 
- #include "MCInstPrinter.h"
-+#include "AliasPatternLookup.h"
- #include "cs_priv.h"
- #include <capstone/platform.h>
- 
-@@ -165,12 +166,18 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
- 	if (i == count || M->OpToPatterns[i].Opcode != MIOpcode)
- 		return NULL;
- 
--	// // Try all patterns for this opcode.
-+	return matchAliasPatternRange(MI, M, &M->OpToPatterns[i]);
-+}
-+
-+const char *matchAliasPatternRange(MCInst *MI, const AliasMatchingData *M,
-+				  const PatternsForOpcode *record)
-+{
-+	// Try all patterns for this opcode.
- 	uint32_t AsmStrOffset = ~0U;
- 	const AliasPattern *Patterns =
--		M->Patterns + M->OpToPatterns[i].PatternStart;
-+		M->Patterns + record->PatternStart;
- 	for (const AliasPattern *P = Patterns;
--	     P != Patterns + M->OpToPatterns[i].NumPatterns; ++P) {
-+	     P != Patterns + record->NumPatterns; ++P) {
- 		// Check operand count first.
- 		if (MCInst_getNumOperands(MI) != P->NumOperands)
- 			return NULL;
 diff --git a/arch/AArch64/AArch64GenAliasPatternRows.inc b/arch/AArch64/AArch64GenAliasPatternRows.inc
 new file mode 100644
 index 00000000..b94f75cb

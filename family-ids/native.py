@@ -18,6 +18,19 @@ try:
             assert sha(d/'candidate.patch')==meta['sha256'];g('apply','--index',str(d/'candidate.patch'));assert g('write-tree')==meta['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
+        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name'}
+        syms={}
+        for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
+            fs=ln.split()
+            if len(fs)==4 and fs[-1] in names:syms[fs[-1]]=list(map(lambda x:int(x,16),fs[:2]))
+        assert 'matchAliasPatterns' in syms and 'cs_disasm_iter' in syms
+        printer,=b.rglob('MCInstPrinter.c.o')
+        cmd('common-code-'+k,['objcopy','--dump-section','.text='+str(t/'common.text'),printer])
+        regular_code=sha(t/'common.text')
+        if k=='base':original=regular_code
+        else:assert regular_code==original
+        sections=sp.check_output(['readelf','-SW',so],text=True)
+        save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
         if cc=='clang':
