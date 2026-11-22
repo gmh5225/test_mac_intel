@@ -1,7 +1,7 @@
-name: Measure the shipped register writers against iced in standalone and production configurations
+name: Compare released vector operand output directly with fork iced across four hosts
 on:
   push:
-    branches: [codex/shipped-registers-versus-iced]
+    branches: [codex/shipped-vector-families-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
+          ref: 771f67c4d5bbb9e3528279edea0518cdc2828bca
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ca2e130e157e120938018c5501042fb16d23bdfc
+          ref: c4849a70bbf9f1c1b99f91e211984613a2c6a446
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shipped-vector-families-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
