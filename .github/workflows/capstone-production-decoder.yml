@@ -1,7 +1,7 @@
-name: Measure canonical vector-clear repair and dense or compact alias lookup in real NeverD products
+name: Pair mode-correct AVX detail and active alias row indexes on top of the EVEX output tree
 on:
   push:
-    branches: [codex/current-alias-placement-and-vzero-repair]
+    branches: [codex/product-mode-repair-after-register-output]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 047971702df01268f32e3afb58cafce08cdfaa03
+          ref: 9f3cee5253cc0a0d469fa1afe493ee06364d61d9
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "047971702df01268f32e3afb58cafce08cdfaa03"
+          test "$(git rev-parse HEAD)" = "9f3cee5253cc0a0d469fa1afe493ee06364d61d9"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 76852fa6948d8e279083a907870b207c9a2aefdc
-          git -C third_party/capstone checkout --detach 76852fa6948d8e279083a907870b207c9a2aefdc
+          git -C third_party/capstone fetch --depth=1 origin 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
+          git -C third_party/capstone checkout --detach 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-repair-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: corrected-register-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
