@@ -1,98 +1,474 @@
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 8968a732..21414e7a 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -118,7 +118,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		if (plan == X86_PLAN_VECTOR) {
- #ifdef X86_FIXED_VEX2
- 			if (code[0] == 0xc5)
--				return X86_FIXED_VEX2(code, size, insn,
-+				return X86_FIXED_VEX2(handle, code, size, insn,
- 						      insn_size);
- #endif
- #ifdef X86_FIXED_ROUNDED
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 2bd24bc5..337e9879 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -14,7 +14,9 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#define X86_FIXED_VEX2 writeVex2Memory64
-+#define GET_INSTRINFO_ENUM
-+#include "X86GenInstrInfo.inc"
-+#define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
- #include "X86VectorRegisterOutput.h"
-@@ -181,9 +183,35 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
- 
- /* Only the bare VEX2 opcode plan enters here. Packed base-relative
-  * loads and stores share their address and detail construction with SSE. */
--static bool writeVex2Memory64(const uint8_t *code, size_t size, cs_insn *insn,
--			      uint16_t *insn_size)
-+static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size)
- {
-+	/* The bare vector clear instructions have no ModR/M or operands. */
-+	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
-+		const bool all = (code[1] & 4) != 0;
-+		insn->size = *insn_size = 3;
-+		memcpy(insn->bytes, code, 3);
-+		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+		if (all)
-+			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
-+		else
-+			memcpy(insn->mnemonic, "vzeroupper",
-+			       sizeof("vzeroupper"));
-+		memset(insn->op_str, 0, sizeof(insn->op_str));
-+		if (insn->detail) {
-+			cs_detail *detail = insn->detail;
-+			memset(detail, 0,
-+			       offsetof(cs_detail, x86) + sizeof(cs_x86));
-+			detail->x86.addr_size = 8;
-+			detail->x86.rex = 0x40;
-+			memcpy(detail->x86.opcode, code, 2);
-+			X86_get_insn_id(handle, insn,
-+					all ? X86_VZEROALL : X86_VZEROUPPER);
-+		} else {
-+			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
-+		}
-+		return true;
+diff --git a/arch/X86/X86GenPrinterQuick.inc b/arch/X86/X86GenPrinterQuick.inc
+index aa9fc2c1..7fe5bf9a 100644
+--- a/arch/X86/X86GenPrinterQuick.inc
++++ b/arch/X86/X86GenPrinterQuick.inc
+@@ -3,6 +3,241 @@
+ enum { X86_PRINTER_MAX_LENGTH = 392 };
+ typedef char X86PrinterExtentFits[
+     X86_PRINTER_MAX_LENGTH < SSTREAM_BUF_LEN ? 1 : -1];
++#elif defined(CAPSTONE_X86_DIET_BROADCAST)
++static const uint8_t x86_diet_broadcast_pages[][32] = {
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0 },
++	{ 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2 },
++	{ 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0 },
++	{ 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3 },
++	{ 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3 },
++	{ 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0 },
++	{ 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0 },
++	{ 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0 },
++	{ 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0 },
++	{ 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4 },
++	{ 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0 },
++	{ 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0 },
++	{ 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1 },
++	{ 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
++	{ 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 },
++	{ 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0 },
++	{ 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
++	{ 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4 },
++	{ 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
++	{ 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0 },
++	{ 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3 },
++	{ 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0 },
++	{ 0, 0, 0, 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 4, 4, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0 },
++	{ 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1 },
++	{ 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0 },
++	{ 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3 },
++	{ 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0 },
++	{ 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0 },
++	{ 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2 },
++	{ 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0 },
++	{ 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3 },
++	{ 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4 },
++	{ 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0 },
++	{ 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3 },
++	{ 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4 },
++	{ 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 4, 4, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 },
++	{ 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4 },
++	{ 4, 4, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4 },
++	{ 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0 },
++	{ 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 2, 2, 2 },
++	{ 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 2 },
++	{ 2, 2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4 },
++	{ 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0 },
++	{ 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1 },
++	{ 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2 },
++	{ 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0 },
++	{ 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3 },
++	{ 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0 },
++	{ 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2 },
++	{ 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0 },
++	{ 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0 },
++	{ 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3 },
++	{ 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0 },
++	{ 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0 },
++	{ 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3 },
++	{ 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0 },
++	{ 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3 },
++	{ 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0 },
++	{ 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0 },
++	{ 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 4, 4, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0 },
++	{ 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 3, 3, 0, 0, 0, 0, 4, 4, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 2, 2, 0, 0 },
++	{ 0, 0, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0 },
++	{ 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0 },
++	{ 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2 },
++	{ 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0 },
++	{ 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2 },
++	{ 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0 },
++	{ 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0 },
++	{ 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0 },
++	{ 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 2 },
++	{ 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0 },
++	{ 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0 },
++	{ 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3 },
++	{ 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2 },
++	{ 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0 },
++	{ 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3 },
++	{ 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0 },
++	{ 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0 },
++	{ 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0 },
++	{ 0, 0, 0, 3, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0, 0, 0, 0, 3, 3, 3, 0, 0, 0, 0 },
++};
++static const uint8_t x86_diet_broadcast_index[] = {
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 4,
++	5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 12, 13, 14, 0, 0, 0,
++	15, 16, 17, 18, 19, 20, 21, 0, 22, 23, 24, 25, 26, 27, 28, 29,
++	0, 0, 30, 31, 28, 32, 33, 34, 35, 36, 0, 0, 10, 37, 38, 39,
++	40, 41, 42, 0, 43, 0, 0, 0, 44, 9, 45, 46, 47, 1, 2, 3,
++	48, 49, 22, 0, 0, 23, 50, 6, 51, 52, 53, 54, 49, 22, 0, 23,
++	50, 0, 6, 51, 0, 52, 53, 55, 56, 57, 58, 59, 0, 6, 51, 0,
++	52, 53, 60, 61, 56, 62, 0, 30, 58, 59, 45, 46, 47, 1, 2, 3,
++	0, 63, 64, 0, 65, 66, 67, 68, 11, 69, 70, 71, 0, 0, 0, 72,
++	73, 74, 75, 76, 1, 77, 78, 79, 80, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 81, 7, 0, 18,
++	82, 0, 7, 23, 83, 84, 85, 0, 83, 86, 87, 0, 0, 0, 83, 88,
++	89, 90, 0, 0, 91, 92, 0, 0, 0, 0, 0, 0, 93, 94, 95, 71,
++	96, 97, 98, 99, 93, 100, 99, 0, 0, 0, 101, 102, 103, 104, 105, 80,
++	106, 107, 108, 109, 110, 0, 111, 112, 113, 114, 115, 116, 117, 83, 118, 119,
++	92, 0, 0, 0, 0, 0, 0, 101, 102, 120, 17, 8, 0, 0, 91, 121,
++	0, 122, 123, 124, 125, 126, 87, 127, 128, 129, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 130, 131, 0, 132, 133,
++	134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 8, 140, 134, 0,
++	125, 146, 147, 148, 0, 149, 150, 151, 44, 0, 0, 16, 0, 0, 152, 153,
++	154, 4, 155, 71, 0, 152, 156, 157, 16, 8, 0, 0, 158, 159, 152, 91,
++	160, 0, 0, 101, 161, 129, 0, 0, 0, 50, 162, 163, 164, 165, 166, 167,
++	168, 124, 169, 170, 171, 91, 92, 8, 80, 172, 173, 174, 175, 6, 50, 176,
++	177, 178, 179, 180, 181, 182, 18, 183, 0, 184, 185, 186, 187, 188, 75, 76,
++	24, 189, 190, 0, 176, 191, 192, 193, 194, 195, 175, 0, 0, 0,
++};
++static const x86_avx_bcast x86_diet_broadcast_kinds[] = {
++	X86_AVX_BCAST_INVALID, X86_AVX_BCAST_2, X86_AVX_BCAST_4,
++	X86_AVX_BCAST_8, X86_AVX_BCAST_16,
++};
+ #elif defined(CAPSTONE_X86_QUICK_PRINTER_TABLE)
+   static const uint8_t QuickRecipe[] = {
+     1, // PHI
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 8c5f511c..f9a7c85e 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12455,6 +12455,23 @@ static void repair_vector_mask_sizes(cs_x86 *x86, const SStream *assembly,
+ 	if (element_size == 0)
+ 		element_size =
+ 			vector_scalar_broadcast_element_size(instruction_id);
++#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++	/* DIET has no mnemonic suffix. VMOVDQU uses one mask bit per element. */
++	switch (instruction_id) {
++	case X86_INS_VMOVDQU8:
++		element_size = 1;
++		break;
++	case X86_INS_VMOVDQU16:
++		element_size = 2;
++		break;
++	case X86_INS_VMOVDQU32:
++		element_size = 4;
++		break;
++	case X86_INS_VMOVDQU64:
++		element_size = 8;
++		break;
 +	}
- 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
- 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
- 		const uint8_t rex =
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 678bc384..7781ca39 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -570,6 +570,17 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
- 	return true;
++#endif
+ 	if (element_size == 0)
+ 		element_size = vector_element_size(mnemonic, &scalar);
+ 	if (element_size == 0)
+@@ -12524,6 +12541,21 @@ static void repair_vfpclass_mask_access(cs_insn *insn)
+ 	detail->regs_write[detail->regs_write_count++] = destination_reg;
  }
  
-+static bool check_vex_clear(csh handles[2])
-+{
-+	for (unsigned flags = 0; flags < 256; ++flags) {
-+		uint8_t bytes[] = { 0xc5, (uint8_t)flags, 0x77, 0xc0 };
-+		for (size_t length = 1; length <= sizeof(bytes); ++length)
-+			if (!compare(handles, bytes, length, flags))
-+				return false;
-+	}
-+	return true;
-+}
++#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++#define CAPSTONE_X86_DIET_BROADCAST
++#include "X86GenPrinterQuick.inc"
++#undef CAPSTONE_X86_DIET_BROADCAST
 +
- static bool check_vex_rip_loads(csh handles[2])
++static x86_avx_bcast diet_broadcast(unsigned int opcode)
++{
++	const unsigned int page = opcode / 32;
++	if (page >= ARR_SIZE(x86_diet_broadcast_index))
++		return X86_AVX_BCAST_INVALID;
++	const unsigned int index = x86_diet_broadcast_index[page];
++	return x86_diet_broadcast_kinds[x86_diet_broadcast_pages[index][opcode % 32]];
++}
++#endif
++
+ static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
  {
- 	const uint32_t edges[] = {
-@@ -1230,7 +1241,8 @@ static bool check_mode(cs_mode mode)
- 		     (!check_vex_rip_loads(handles) ||
- 		      !check_sse_rip_memory(handles) ||
- 		      (private_iter == X86_disasmIterText &&
--		       (!check_sse_base_memory(handles) ||
-+		       (!check_vex_clear(handles) ||
-+			!check_sse_base_memory(handles) ||
- 			!check_vex_packed_memory(handles))))) ||
- 		    !check_rex_stack(handles) ||
- 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
+ 	x86_avx_bcast broadcast = X86_AVX_BCAST_INVALID;
+@@ -12785,8 +12817,15 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 		if (memory && has_mask)
+ 			break;
+ 	}
+-	if (memory)
+-		repair_avx_broadcast(memory, mnem);
++	if (memory) {
++#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++		const x86_avx_bcast broadcast = diet_broadcast(mci->Opcode);
++		if (broadcast != X86_AVX_BCAST_INVALID)
++			memory->avx_bcast = broadcast;
++		else
++#endif
++			repair_avx_broadcast(memory, mnem);
++	}
+ 	if (has_mask) {
+ 		uint8_t mask_operand_size =
+ 			mask_instruction_operand_size(insn->id, x86);
+diff --git a/suite/synctools/x86_printer_dispatch.py b/suite/synctools/x86_printer_dispatch.py
+index 04556c44..3e163ec6 100644
+--- a/suite/synctools/x86_printer_dispatch.py
++++ b/suite/synctools/x86_printer_dispatch.py
+@@ -240,6 +240,38 @@ def prechecked_writer(text, names, values, paths, quick, indices, sized):
+     return result
+ 
+ 
++def diet_broadcasts(paths, values, string_mask, strings):
++    """Recover static memory broadcast counts from the canonical printer actions."""
++    kinds = {None: 0, "2": 1, "4": 2, "8": 3, "16": 4}
++    broadcasts = []
++    for path, value in zip(paths, values):
++        offset = (value & string_mask) - 1
++        prefix = strings[offset:strings.index(b"\0", offset)].decode("ascii") if offset >= 0 else ""
++        counts = set(re.findall(r"\{1to(\d+)\}", prefix + "".join(path)))
++        require(len(counts) <= 1 and counts <= kinds.keys(), "Unexpected broadcast decorator")
++        broadcasts.append(kinds[next(iter(counts), None)])
++
++    # A page shared by instructions without broadcast needs just one index.
++    width = 32
++    broadcasts.extend([0] * (-len(broadcasts) % width))
++    pages = {}
++    indices = []
++    for start in range(0, len(broadcasts), width):
++        page = tuple(broadcasts[start:start + width])
++        indices.append(pages.setdefault(page, len(pages)))
++    require(len(pages) <= 256, "DIET broadcast page index overflow")
++    lines = ["static const uint8_t x86_diet_broadcast_pages[][32] = {"]
++    lines.extend("\t{ " + ", ".join(map(str, page)) + " }," for page in pages)
++    lines += ["};", "static const uint8_t x86_diet_broadcast_index[] = {"]
++    lines.extend("\t" + ", ".join(map(str, indices[i:i + 16])) + ","
++                 for i in range(0, len(indices), 16))
++    # Encode the output explicitly, independently of enum numeric values.
++    lines += ["};", "static const x86_avx_bcast x86_diet_broadcast_kinds[] = {",
++              "\tX86_AVX_BCAST_INVALID, X86_AVX_BCAST_2, X86_AVX_BCAST_4,",
++              "\tX86_AVX_BCAST_8, X86_AVX_BCAST_16,", "};", ""]
++    return "\n".join(lines)
++
++
+ def generate(text, enum_text):
+     # Reuse the original table owner's enum, bounds and packed-bit validation.
+     import x86_mnemonic_sizes as mnemonic
+@@ -323,6 +355,8 @@ def generate(text, enum_text):
+         + f"enum {{ X86_PRINTER_MAX_LENGTH = {maximum} }};\n"
+         + "typedef char X86PrinterExtentFits[\n"
+         + "    X86_PRINTER_MAX_LENGTH < SSTREAM_BUF_LEN ? 1 : -1];\n"
++        + "#elif defined(CAPSTONE_X86_DIET_BROADCAST)\n"
++        + diet_broadcasts(paths, values, int(sized[1]), mnemonic.string_bytes(text))
+         + "#elif defined(CAPSTONE_X86_QUICK_PRINTER_TABLE)\n"
+         + table
+         + "#elif defined(CAPSTONE_X86_PRECHECKED_PRINT)\n"
+diff --git a/tests/unit/x86_evex_detail.c b/tests/unit/x86_evex_detail.c
+index ebe6293c..4ae70514 100644
+--- a/tests/unit/x86_evex_detail.c
++++ b/tests/unit/x86_evex_detail.c
+@@ -66,6 +66,12 @@ static bool test_broadcast(csh handle)
+ 		size_t count = cs_disasm(handle, test->code, sizeof(test->code),
+ 					 0x1000, 1, &insn);
+ 
++		if (cs_support(CS_SUPPORT_X86_REDUCE)) {
++			success &= check(count == 0,
++					 "reduced table omits EVEX broadcast");
++			cs_free(insn, count);
++			continue;
++		}
+ 		if (count != 1) {
+ 			fprintf(stderr,
+ 				"EVEX public detail check failed (%s): instruction does not decode\n",
+@@ -75,8 +81,10 @@ static bool test_broadcast(csh handle)
+ 		}
+ 		success &= check(insn[0].id == test->id,
+ 				 "broadcast instruction ID is exact");
+-		success &= check(strstr(insn[0].op_str, test->text) != NULL,
+-				 "broadcast is present in operand text");
++		if (!cs_support(CS_SUPPORT_DIET))
++			success &= check(
++				strstr(insn[0].op_str, test->text) != NULL,
++				"broadcast is present in operand text");
+ 		success &= check(insn[0].detail != NULL,
+ 				 "broadcast detail is available");
+ 		if (insn[0].detail != NULL) {
+@@ -122,14 +130,21 @@ static bool test_mask_width(csh handle, const uint8_t *code, size_t code_size,
+ 	bool success = true;
+ 	size_t count = cs_disasm(handle, code, code_size, 0x1000, 1, &insn);
+ 
++	if (cs_support(CS_SUPPORT_X86_REDUCE)) {
++		cs_free(insn, count);
++		return check(count == 0, "reduced table omits masked VMOVDQU");
++	}
+ 	if (!check(count == 1, "masked VMOVDQU decodes"))
+ 		return false;
+ 	success &= check(insn[0].id == expected_id,
+ 			 "masked instruction ID matches its element width");
+-	success &= check(strstr(insn[0].op_str, "{k3}") != NULL,
+-			 "mask is present in operand text");
+-	success &= check((strstr(insn[0].op_str, "{z}") != NULL) == zeroing,
+-			 "zeroing text matches EVEX.z");
++	if (!cs_support(CS_SUPPORT_DIET)) {
++		success &= check(strstr(insn[0].op_str, "{k3}") != NULL,
++				 "mask is present in operand text");
++		success &= check((strstr(insn[0].op_str, "{z}") != NULL) ==
++					 zeroing,
++				 "zeroing text matches EVEX.z");
++	}
+ 	success &= check(insn[0].detail != NULL, "mask detail is available");
+ 	if (insn[0].detail != NULL) {
+ 		const cs_x86 *x86 = &insn[0].detail->x86;
+@@ -151,16 +166,25 @@ static bool test_mask_width(csh handle, const uint8_t *code, size_t code_size,
+ 			success &=
+ 				check(mask->size == expected_width,
+ 				      "writemask size matches the lane count");
+-			success &= check(mask->access == CS_AC_READ,
+-					 "writemask is read-only");
++			if (!cs_support(CS_SUPPORT_DIET))
++				success &= check(mask->access == CS_AC_READ,
++						 "writemask is read-only");
++		}
++		const cs_err err = cs_regs_access(handle, &insn[0], regs_read,
++						  &regs_read_count, regs_write,
++						  &regs_write_count);
++		if (cs_support(CS_SUPPORT_DIET)) {
++			success &= check(err == CS_ERR_DIET,
++					 "DIET register-access status");
++		} else {
++			success &=
++				check(err == CS_ERR_OK,
++				      "cs_regs_access succeeds for writemask");
++			success &=
++				check(has_register(regs_read, regs_read_count,
++						   X86_REG_K3),
++				      "K3 appears in the read set");
+ 		}
+-		success &= check(cs_regs_access(handle, &insn[0], regs_read,
+-						&regs_read_count, regs_write,
+-						&regs_write_count) == CS_ERR_OK,
+-				 "cs_regs_access succeeds for writemask");
+-		success &= check(has_register(regs_read, regs_read_count,
+-					      X86_REG_K3),
+-				 "K3 appears in the read set");
+ 	}
+ 	cs_free(insn, count);
+ 	return success;
+@@ -207,10 +231,12 @@ int main(void)
+ 
+ 	success &= test_broadcast(handle);
+ #ifndef CAPSTONE_X86_ATT_DISABLE
+-	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+-				 CS_ERR_OK,
+-			 "select AT&T syntax");
+-	success &= test_broadcast(handle);
++	if (!cs_support(CS_SUPPORT_DIET)) {
++		success &= check(cs_option(handle, CS_OPT_SYNTAX,
++					   CS_OPT_SYNTAX_ATT) == CS_ERR_OK,
++				 "select AT&T syntax");
++		success &= test_broadcast(handle);
++	}
+ #endif
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX,
+ 				   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,

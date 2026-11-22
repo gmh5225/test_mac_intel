@@ -1,50 +1,41 @@
 from pathlib import Path
-import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
-d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
-def load(p):return json.loads(p.read_text())
-def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def cmd(n,a,cwd=None):
-    with (out/(n+'.log')).open('w')as f:z=sp.run(a,cwd=cwd,stdout=f,stderr=sp.STDOUT)
-    if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2200:]);z.check_returncode()
-def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
+import hashlib,json,os,platform,shutil,subprocess as sp,sys,tempfile
+r=Path(__file__).resolve().parent;local=len(sys.argv)>1 and sys.argv[1]=='local'
+def read(f):return json.loads(f.read_text())
+out=r if local else r.parent/'evidence';out.mkdir(exist_ok=True)
+def save(k,v):(out/(k+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+def cmd(k,a,cwd=None,allow=False):
+    with (out/(k+'.log')).open('w')as f:z=sp.run(a,stdout=f,stderr=sp.STDOUT,cwd=cwd)
+    if not allow and z.returncode:print((out/(k+'.log')).read_text()[-1300:]);z.check_returncode()
+    return z.returncode
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
-meta=load(d/'revisions.json');ref=load(d/'reference.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['first']['parent']==meta['mode']['parent']
+q=read(r/'tree.json');t=Path(tempfile.mkdtemp(dir=r if local else None));s=t/'c' if local else r.parent/'source';b=t/'b'
+def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 try:
-    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
-    imgs={};ids={}
-    for k in ('base','first','mode'):
-        if k!='base':
-            if k=='mode':g('restore','--source',orig,'--staged','--worktree','--','.')
-            assert sha(d/(k+'.patch'))==meta[k]['sha256'];g('apply','--index',str(d/(k+'.patch')));assert g('write-tree')==meta[k]['tree']
-        cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
-        so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        ids[k]=sha(so);assert ids[k]==ref[osrel][k],(k,ids[k],ref[osrel])
-        imgs[k]=so.read_bytes()
-    imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
-    slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
-    cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
-    shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
-    import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','mips64el-ls')]
-    assert len(extra)==2
-    panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
-    panels.extend((q['name'],105 if q['name']=='riscv64-sort' else 103,Path(q['path']),0x100000,(0,1,2))for q in extra)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
-    save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output(['clang','--version'],text=True),images=ids,osrel=osrel))
-    def invoke(k,arch,mode,path,ip,n):
-        target.write_bytes(imgs[k]);return list(map(int,sp.check_output(['setarch','x86_64','-R',t/'time',str(arch),str(mode),path,str(ip),str(n)],text=True).split()))
-    for name,arch,path,ip,modes in panels:
-        for mode in modes:
-            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(85e6/one[0]));rows_=[]
-            for i in range(19):
-                order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
-                for k in order+order[::-1]:
-                    v=invoke(k,arch,mode,path,ip,n)
-                    expect=one[2]-(ref['pe32-score'] if name=='putty32'and mode==3 and k in ('first','mode') else 0)
-                    assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
-                rows_.append(cyc)
-            rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
-    save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
+    if local:
+        c=next(r.parent.glob('round579-*'))/'source';cmd('clone-diff',['git','clone','--shared','--no-checkout','-q',c,s]);g('checkout','--detach','-q',q['parent'])
+    assert g('rev-parse','HEAD')==q['parent'] and sha(r/'candidate.patch')==q['sha256']
+    imgs={};raw={};digests={};testcodes={};stages=('full','diet','newdiet','newfull')
+    for stage in stages:
+        diet=stage in ('diet','newdiet')
+        if stage=='newdiet':g('apply','--index',str(r/'candidate.patch'));assert g('write-tree')==q['tree']
+        args=['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_DIET='+('ON'if diet else 'OFF'),'-DCAPSTONE_BUILD_CSTEST=ON']
+        if not local:args+=['-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',*['-DCAPSTONE_'+v+'_SUPPORT=ON' for v in ('ARM','AARCH64','MIPS','RISCV','PPC')]]
+        cmd('diff-config-'+stage,args);cmd('diff-build-'+stage,['cmake','--build',b,'--parallel','4','--target','capstone_shared','x86_evex_detail'])
+        cand=[f for f in b.glob('libcapstone*') if f.is_file() and not f.is_symlink() and ('.so.'in f.name or f.suffix=='.dylib')];assert len(cand)==1,cand
+        target=t/(stage+cand[0].suffix);shutil.copy2(cand[0],target);imgs[stage]=target;digests[stage]=sha(target)
+        testcodes[stage]=cmd('diff-test-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_x86_evex_detail$'],allow=True);assert (testcodes[stage]!=0)==(stage=='diet')
+        if stage=='newfull' and not local:assert digests['full']==digests[stage],digests
+    cmd('diff-link',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',r/'diet.cpp','-ldl','-o',t/'compare'])
+    cases=[('encodings',bits,[])for bits in (32,64)]
+    if not local:
+        for n in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/n,t/n)
+        cmd('diff-pe',[sys.executable,'-B',t/'fetch.py']);cmd('diff-libmvec',[sys.executable,'-B',t/'libmvec.py'])
+        cases.extend([('putty32',32,[t/'putty-0.85-32.text']),('putty64',64,[t/'putty-0.85-64.text']),('libmvec',64,[t/'libmvec.text'])])
+    for name,n,paths in cases:
+        key=name+'-'+str(n);cmd('diff-records-'+key,[t/'compare',imgs['full'],imgs['diet'],imgs['newdiet'],str(n),*paths])
+        row=list(map(int,(out/('diff-records-'+key+'.log')).read_text().split()));assert len(row)==4 and row[0]>=row[1] and (name!='encodings' or (row[2]>100 and row[3]>100)),row
+        raw[key]=dict(count=row[0],accepted=row[1],broadcasts=row[2],mask_widths=row[3],files=[sha(p)for p in paths]);save('records',raw)
+    save('diff-review'if local else 'complete',dict(complete=True,source=q,tests=testcodes,raw=raw,images=digests,host=platform.platform()))
 finally:
-    count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
+    volume=sum(x.stat().st_size for x in t.rglob('*')if x.is_file()and not x.is_symlink());shutil.rmtree(t);save('diff-cleanup' if local else 'cleanup',dict(removed=not t.exists(),bytes=volume))
