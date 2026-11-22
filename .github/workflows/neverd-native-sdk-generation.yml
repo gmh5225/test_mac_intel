@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 5d90a9c2f4b910d0859e28d511120c157fcb21a6
+          ref: c3f407e6f1f207a9554b8990f58b3ad22963efb0
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -50,6 +50,8 @@ jobs:
           $libraries = @()
           $selected = @{}
           $expected = @{RDBSS=285; InternetControlMessage=9; TransactionManager=39; SensorUtilities=40; WebAuthentication=13; SNMPUtilities=26; WebAuthenticationRuntime=29; EventCollector=15; DeviceManagementRegistration=15; NetworkTrafficControl=20; ComputeStorage=14; WebSockets=13; RestartManager=11; FontEmbedding=14; PerformanceCounters=12; QoSTraffic=11; OverlayFiles=11}
+          $ordinalExpected = @{AccessControlUI=3; ActiveDirectoryHelpers=12; CabinetArchive=10; CabinetCompression=12; ColorModule=21; ColorProfileOrdinals=8; Direct2DUtilities=13; Direct3D9On12=2; DirectSound=9; DirectorySecurity=4; Hyperlinks=28; MAPIUtilities=66; NetworkProviderOrdinals=5; ODBCBulkCopy=27; OLEDialogOrdinals=12; OLEPictureProperties=12; PrintTicket=11; VideoForWindowsVersion=1; XInput=7}
+          foreach ($name in $ordinalExpected.Keys) { $expected[$name] = $ordinalExpected[$name] }
           foreach ($lib in $manifest.libraries) {
             $hash = (Get-FileHash "$out/$($lib.name).h").Hash.ToLower()
             if ($hash -ne $lib.sha256) { throw "Header digest for $($lib.name) differs" }
@@ -65,7 +67,7 @@ jobs:
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='5d90a9c2f4b910d0859e28d511120c157fcb21a6'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='c3f407e6f1f207a9554b8990f58b3ad22963efb0'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
