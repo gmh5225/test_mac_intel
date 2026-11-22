@@ -1,78 +1,76 @@
 from pathlib import Path
-import hashlib,json,os,platform,shutil,statistics,subprocess as sp,tempfile
-r=Path(__file__).resolve().parent;root=r.parent;s=root/'source';obs=root/'evidence';obs.mkdir(exist_ok=True)
-def write(f,x):(obs/(f+'.json')).write_text(json.dumps(x,indent=2)+'\n')
-def run(args,name,cwd=None):
-    with (obs/(name+'.log')).open('w') as f:sp.run(args,cwd=cwd,stdout=f,stderr=sp.STDOUT,check=True)
-def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-meta=json.loads((r/'tree.json').read_text())
-git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
-assert git('rev-parse','HEAD')==meta['parent'] and sha(r/'candidate.patch')==meta['sha256']
-units=['x86_scan_batch','x86_evex_vpcmp_id','x86_evex_vpcmp_mask_size','x86_evex_detail','x86_buffer_bounds','x86_simple_output','text_option','detail_option','x86_kmask_width']
-conf=os.environ.get('FLAVOR','full');cc=os.environ['CC'];diet=conf=='diet';reduce=conf=='reduce';att=conf!='intel'
-tmp=Path(tempfile.mkdtemp());b=tmp/'build';fixed=tmp/'selected';fixed.mkdir()
+import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
+import corpus
+r=Path(__file__).resolve().parent
+s=r.parent/'source';out=r.parent/'evidence';out.mkdir(exist_ok=True)
+def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+def run(args,n):
+    f=out/(n+'.log')
+    with f.open('w') as o:p=sp.run(args,stdout=o,stderr=sp.STDOUT)
+    if p.returncode:print(f.read_text(errors='replace')[-2600:],flush=True);p.check_returncode()
+def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
+def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
+q=json.loads((r/'tree.json').read_text());cc=os.environ['CC']
+assert g('rev-parse','HEAD')==q['parent'] and sha(r/'candidate.patch')==q['sha256']
+tests=['riscv_writeback_postprocess','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']
+t=Path(tempfile.mkdtemp());libs={};objects={};raw={};tim=[]
 try:
-    opts=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers')]
-    if conf=='full':opts.extend('-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('ARM','AARCH64','MIPS','RISCV','PPC'))
-    if diet:opts.append('-DCAPSTONE_BUILD_DIET=ON')
-    if reduce:opts.append('-DCAPSTONE_X86_REDUCE=ON')
-    if not att:opts.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
-    run(['cmake','-S',s,'-B',b,*opts],'configure');libs={}
-    objects={}
-    for variant in ('base','candidate'):
-        if variant=='candidate':
-            git('apply','--index',str(r/'candidate.patch'));assert git('write-tree')==meta['tree']
-        run(['cmake','--build',b,'--parallel','4','--target','capstone_shared'],'build-'+variant)
-        path=next(f for f in b.glob('libcapstone.so.*') if not f.is_symlink())
-        libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
-        objects[variant]={str(p.relative_to(b)):sha(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
-    changed=[k for k,v in objects['base'].items()if v!=objects['candidate'][k]]
-    assert len(objects['base'])>5 and objects['base'].keys()==objects['candidate'].keys() and ([Path(k).name for k in changed]==['RISCVDisassembler.c.o'] if conf=='full' else not changed)
-    write('member-changes',dict(changed=changed,total=len(objects['base'])))
-    if reduce:panels=[]
-    else:panels=[('matrix32',32,'matrix',0),('matrix64',64,'matrix',0)]
-    if conf=='full':
-        shutil.copy(r/'extract.py',tmp);shutil.copy(r/'fetch.py',tmp)
-        run(['python3','-B',tmp/'extract.py'],'debian');run(['python3','-B',tmp/'fetch.py'],'putty')
-        for n in (32,64):
-            panels.append(('putty'+str(n),n,tmp/('putty-0.85-'+str(n)+'.text'),0x401000 if n==32 else 0x140001000))
-        panels.append(('openssl',64,tmp/'libcrypto.text',json.loads((tmp/'openssl.json').read_text())['address']))
-    if conf=='full':
-        shutil.copy(r/'libmvec.py',tmp);shutil.copy(r/'libmvec.json',tmp)
-        run(['python3','-B',tmp/'libmvec.py'],'glibc-libmvec')
-        libm=json.loads((tmp/'libmvec.json').read_text());panels.append(('libmvec',64,tmp/'libmvec.text',libm['address']))
-    other_cases=[]
-    if conf=='full':
-        import corpus
-        raw=corpus.prepare(r,tmp,obs,run)
-        names={'arm-cp','arm64-ls','mips64el-ls','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}
-        maps={'arm-cp':101,'arm64-ls':102,'mips64el-ls':103,'ppc64el-ls':104,'riscv64-ls':105,'riscv64-cp':105,'riscv64-sort':105}
-        other_cases=[(c['name'],maps[c['name']],Path(c['path']),0x100000) for c in raw if c['name'] in names]
-        assert len(other_cases)==len(names)
-        target=fixed/'libcapstone.so.6'
-        target.write_bytes(libs['base'].read_bytes());(fixed/'libcapstone.so').symlink_to(target.name)
-        run(['c++','-O3','-std=c++17','-I',s/'include',r/'time.cpp','-L',fixed,'-Wl,-rpath,'+str(fixed),'-lcapstone','-o',tmp/'time'],'compile-time')
-        bind=['setarch',platform.machine(),'-R'];sp.run([*bind,'/bin/true'],check=True)
-        os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-        inputs={k:v.read_bytes() for k,v in libs.items()};inputs['copy']=inputs['base']
-        size=max(map(len,inputs.values()));inputs={k:v+bytes(size-len(v)) for k,v in inputs.items()}
-        def invoke(k,bits,mode,path,ip,reps):
-            with target.open('wb') as o:o.write(inputs[k])
-            return list(map(int,sp.check_output([*bind,tmp/'time',str(bits),str(mode),path,str(ip),str(reps)],text=True).split()))
-        timing=[]
-        for name,bits,path,ip in panels[2:]+other_cases:
-            if name not in {'putty32','putty64','libmvec','ppc64el-ls','riscv64-ls','riscv64-cp','riscv64-sort'}:continue
-            for mode in ((2,3) if bits in (32,64) else (0,1,2)):
-                first=invoke('base',bits,mode,path,ip,1);n=max(1,round(85e6/first[0]));cycles=[]
-                for i in range(25):
-                    keys=['base','copy','candidate'];o=keys[i%3:]+keys[:i%3];cyc={k:[] for k in keys}
-                    for k in o+o[::-1]:
-                        v=invoke(k,bits,mode,path,ip,n);assert v[2]==first[2];cyc[k].append(v[:2])
-                    cycles.append(cyc)
-                timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
-                write('timings',timing)
-    if cc=='clang' and platform.machine()=='x86_64':
-        run(['python3','-B',r/'identity.py'],'shipping-identity')
-    write('complete',dict(source=meta,panels=len(timing),compiler=sp.check_output([cc,'--version'],text=True),host=platform.platform(),arch=platform.machine()))
+    flavors=['dedicated','mixed','diet']
+    for label in ('base','candidate'):
+        if label=='candidate':
+            g('apply','--index',str(r/'candidate.patch'));assert g('write-tree')==q['tree']
+            run(['python3','-B',s/'suite/synctools/operand_writeback.py','--check'],'generate')
+        for f in flavors:
+            b=t/f;arches=('RISCV','ARM','AARCH64','MIPS','PPC','X86') if f=='mixed' else ('RISCV',)
+            opts=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arches]]
+            if f=='diet':opts.append('-DCAPSTONE_BUILD_DIET=ON')
+            if label=='base':run(['cmake','-S',s,'-B',b,'-G','Ninja',*opts],'configure-'+f)
+            chosen=tests if f!='diet' else ['riscv_writeback_postprocess']
+            run(['cmake','--build',b,'--target','capstone_shared',*chosen,'--parallel','4'],'build-'+f+'-'+label)
+            run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(chosen)+')$'],'tests-'+f+'-'+label)
+            so,=[p for p in b.glob('libcapstone.so.*')if not p.is_symlink()]
+            path=t/(f+'-'+label+'.so');shutil.copyfile(so,path);libs.setdefault(f,{})[label]=path
+            objects.setdefault(f,{})[label]={p.name:sha(p) for p in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+    for f,sets in objects.items():
+        a,b=sets.values();assert a.keys()==b.keys();changed=[k for k in a if a[k]!=b[k]]
+        assert changed==([] if f=='mixed' else ['RISCVDisassembler.c.o']),(f,changed)
+        assert (sha(libs[f]['base'])==sha(libs[f]['candidate']))==(f=='mixed')
+    save('objects',objects);save('images',{f:{k:sha(p)for k,p in v.items()}for f,v in libs.items()})
+    cases=[z for z in corpus.prepare(r,t,out,run) if z['name']in ('riscv64-cp','riscv64-ls','riscv64-sort')];assert len(cases)==3
+    run(['c++','-std=c++17','-O2','-I',s/'include',r/'riscv-states.cpp','-ldl','-o',t/'state'],'compile-states')
+    for k,opt in [('ordinary',[]),('callbacks',['custom'])]:
+        run([t/'state',*libs['dedicated'].values(),t/'corpus',*opt],'states-'+k)
+        raw[k]=json.loads((out/('states-'+k+'.log')).read_text().splitlines()[-1]);assert raw[k]['comparisons']>36000000
+    slot=t/'slot';slot.mkdir();so=slot/'libcapstone.so.6';shutil.copyfile(libs['dedicated']['base'],so);(slot/'libcapstone.so').symlink_to(so.name)
+    ld=['-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone']
+    run(['c++','-std=c++17','-O3','-I',s/'include',r/'time.cpp',*ld,'-o',t/'time'],'compile-time')
+    run([cc,'-O2','-I',s/'include',r/'diet-records.c',*ld,'-o',t/'diet-records'],'compile-diet-states')
+    bind=['setarch',platform.machine(),'-R'];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    for f in ('dedicated','diet'):
+        images={k:p.read_bytes()for k,p in libs[f].items()};images['copy']=images['base'];size=max(map(len,images.values()));images={k:v+bytes(size-len(v))for k,v in images.items()}
+        def once(k,path,mode,n):
+            so.write_bytes(images[k]);return list(map(int,sp.check_output([*bind,t/'time','105',str(mode),path,'1048576',str(n)],text=True).split()))
+        if f=='diet':
+            for k in ('base','candidate'):
+                so.write_bytes(images[k])
+                with sp.Popen([t/'diet-records'],stdout=sp.PIPE,stderr=sp.PIPE) as proc:
+                    digest=hashlib.sha256()
+                    while block:=proc.stdout.read(1<<20):digest.update(block)
+                    cnt=proc.stderr.read().decode().strip();assert proc.wait()==0 and cnt.startswith('262144 states, ')
+                    raw['diet-'+k]=[digest.hexdigest(),cnt]
+            assert raw['diet-base']==raw['diet-candidate']
+        for z in cases:
+            for mode in ((0,) if f=='diet' else (0,1,2)):
+                first=once('base',z['path'],mode,1);n=max(1,round(80e6/first[0]));assert first[2]>0
+                cycles=[];rng=random.Random(f+z['name']+str(mode))
+                for i in range(21):
+                    order=list(images);rng.shuffle(order);v={k:[]for k in order}
+                    for k in order+order[::-1]:
+                        x=once(k,z['path'],mode,n);assert x[2]==first[2];v[k].append(x[:2])
+                    cycles.append(v)
+                tim.append(dict(profile=f,sample=z['name'],sha=z['text_sha256'],mode=mode,reps=n,signature=first[2],cycles=cycles));save('timings',tim)
+    save('raw',raw)
+    if cc=='clang' and platform.machine()=='x86_64':run(['python3','-B',r/'identity.py'],'shipping-identity')
+    save('complete',dict(source=q,tests=tests,panels=len(tim),compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],machine=platform.machine()))
 finally:
-    size=sum(f.stat().st_size for f in tmp.rglob('*') if f.is_file());shutil.rmtree(tmp);write('cleanup',dict(bytes=size,removed=not tmp.exists()))
+    size=sum(p.stat().st_size for p in t.rglob('*')if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))

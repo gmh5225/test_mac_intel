@@ -1,137 +1,199 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 77d1aaa8..46e70924 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -183,7 +183,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+-    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_PROJECT_STACK_OPERANDS)
+     # Fixed-width implicit counts improve detailed decoding in this configuration.
+     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+diff --git a/Makefile b/Makefile
+index b8b582a0..afe325d2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -144,7 +144,7 @@ CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPAT
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+-CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_PROJECT_STACK_OPERANDS
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index 64ee3a95..135a86c8 100644
+index 64ee3a95..49a28540 100644
 --- a/arch/RISCV/RISCVDisassembler.c
 +++ b/arch/RISCV/RISCVDisassembler.c
-@@ -53,10 +53,6 @@
+@@ -53,9 +53,9 @@
  
  #define DEBUG_TYPE "riscv-disassembler"
  
--void addSPOperands(MCInst *MI);
++#ifndef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
+ void addSPOperands(MCInst *MI);
 -;
 -// end anonymous namespace
--
++#endif
+ 
  static DecodeStatus DecodeGPRRegisterClass(MCInst *Inst, uint32_t RegNo,
  					   uint64_t Address,
- 					   const void *Decoder)
-@@ -575,20 +571,26 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+@@ -575,6 +575,29 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
  	return MCDisassembler_Success;
  }
  
--// Add implied SP operand for C.*SP compressed instructions. The SP operand
--// isn't explicitly encoded in the instruction.
--void addSPOperands(MCInst *MI)
-+/* Insert the implied SP at each indicated operand position, in ascending
-+ * order so later indices refer to the instruction with earlier inserts. */
++#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++/* Positions refer to the final operand list. Inserting from lowest to highest
++ * keeps subsequent positions valid when an instruction implies SP twice. */
 +static void insertSPOperands(MCInst *MI, unsigned positions)
- {
--	const MCInstrDesc *MCID = MCInstrDesc_get(MCInst_getOpcode(MI),
--						  RISCVDescs.Insts,
--						  ARR_SIZE(RISCVDescs.Insts));
- 	MCOperand SPReg;
- 	SPReg.MachineOperandType = kRegister;
- 	SPReg.Kind = kRegister;
- 	SPReg.RegVal = RISCV_X2;
--	for (unsigned i = 0; i < MCID->NumOperands; i++)
--		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
--			MCInst_insert0(MI, i, &SPReg);
++{
++	MCOperand sp;
++	sp.MachineOperandType = kRegister;
++	sp.Kind = kRegister;
++	sp.RegVal = RISCV_X2;
 +	do {
-+		MCInst_insert0(MI, CountTrailingZeros_32(positions), &SPReg);
++		MCInst_insert0(MI, CountTrailingZeros_32(positions), &sp);
 +		positions &= positions - 1;
 +	} while (positions);
 +}
 +
 +static inline void addSPOperands(MCInst *MI)
 +{
-+	/* Bit zero records tied operands. */
-+	unsigned positions = RISCVWritebackFlags[MCInst_getOpcode(MI)] >> 1;
++	unsigned positions =
++		RISCV_getStackOperandPositions(MCInst_getOpcode(MI));
 +	if (positions)
 +		insertSPOperands(MI, positions);
++}
++#else
+ // Add implied SP operand for C.*SP compressed instructions. The SP operand
+ // isn't explicitly encoded in the instruction.
+ void addSPOperands(MCInst *MI)
+@@ -590,6 +613,7 @@ void addSPOperands(MCInst *MI)
+ 		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
+ 			MCInst_insert0(MI, i, &SPReg);
  }
++#endif
  
  DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
-@@ -773,7 +775,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
- 	DecodeStatus ret =
- 		RISCV_getInstruction(MI, Size, Bytes, ByteLen, Address, NULL);
- 
--	if (RISCVWritebackFlags[MCInst_getOpcode(MI)])
-+	if (RISCVWritebackFlags[MCInst_getOpcode(MI)] & 1)
- 		MCInst_handleWriteback(MI, RISCVDescs.Insts,
- 				       ARR_SIZE(RISCVDescs.Insts));
- 
+ 				  const uint8_t *Bytes, size_t BytesLen,
 diff --git a/arch/RISCV/RISCVGenWriteback.inc b/arch/RISCV/RISCVGenWriteback.inc
-index 34eec991..11725b17 100644
+index 34eec991..764f1626 100644
 --- a/arch/RISCV/RISCVGenWriteback.inc
 +++ b/arch/RISCV/RISCVGenWriteback.inc
-@@ -371,9 +371,9 @@ static const uint8_t RISCVWritebackFlags[] = {
- 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
- 	1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 	0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
--	0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--	0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1,
--	0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 1, 1, 7, 4, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 4, 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 4,
-+	0, 0, 0, 0, 0, 0, 0, 4, 1, 0, 0, 0, 0, 1, 1, 0, 0, 4, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1,
-+	0, 4, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -415,3 +415,16 @@ static const uint8_t RISCVWritebackFlags[] = {
  	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0,
+ };
++
++#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++static const uint8_t RISCVStackOperandPositions[] = {
++	3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
++	0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
++};
++static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)
++{
++	unsigned index = opcode - 11749U;
++	return index < sizeof(RISCVStackOperandPositions) ?
++		       RISCVStackOperandPositions[index] : 0;
++}
++#endif
 diff --git a/suite/synctools/operand_writeback.py b/suite/synctools/operand_writeback.py
-index 828785ee..3f2186e4 100644
+index 828785ee..9e35373c 100644
 --- a/suite/synctools/operand_writeback.py
 +++ b/suite/synctools/operand_writeback.py
-@@ -65,9 +65,12 @@ def generated_flags(arch, source):
+@@ -60,12 +60,18 @@ def generated_flags(arch, source):
+         f"{arch} opcode coverage changed",
+     )
+     flags = [0] * count
++    stack_positions = {}
+     for length, offset, uid, _ in descriptors:
+         length, offset, uid = int(length), int(offset), int(uid)
          require(
              offset + length <= len(operands), f"{arch} operand extent exceeds table"
          )
 -        for _, _, _, constraints in operands[offset : offset + length]:
-+        for index, (reg_class, _, _, constraints) in enumerate(operands[offset : offset + length]):
++        for index, (reg_class, _, _, constraints) in enumerate(
++            operands[offset : offset + length]
++        ):
 +            if arch == "RISCV" and reg_class == "RISCV_SPRegClassID":
-+                require(index < 7, "RISC-V implied SP position exceeds packed operand flags")
-+                flags[uid] |= 1 << (index + 1)
++                require(index < 8, "RISC-V implied SP position exceeds one byte")
++                stack_positions[uid] = stack_positions.get(uid, 0) | (1 << index)
              if re.fullmatch(r"CONSTRAINT_MCOI_TIED_TO\(\d+\)", constraints):
--                flags[uid] = 1
-+                flags[uid] |= 1
+                 flags[uid] = 1
              else:
-                 require(
-                     constraints in {"0", "CONSTRAINT_MCOI_EARLY_CLOBBER"},
-@@ -99,7 +102,8 @@ def integrated_source(arch, source):
-         anchor = f'#include "{arch}GenDirectDecoder.inc"'
-         require(source.count(anchor) == 1, f"Missing {arch} direct decoder include")
-         source = source.replace(anchor, anchor + "\n" + include)
--    guard = f"if ({arch}WritebackFlags[MCInst_getOpcode(MI)])"
-+    value = f"{arch}WritebackFlags[MCInst_getOpcode(MI)]"
-+    guard = f"if ({value} & 1)" if arch == "RISCV" else f"if ({value})"
-     if guard not in source:
-         calls = list(
-             re.finditer(
+@@ -84,6 +90,27 @@ def generated_flags(arch, source):
+     for index in range(0, count, 32):
+         lines.append("\t" + ", ".join(map(str, flags[index : index + 32])) + ",")
+     lines += ["};", ""]
++    if arch == "RISCV":
++        require(stack_positions, "No implied RISC-V SP operands found")
++        first, last = min(stack_positions), max(stack_positions)
++        positions = [stack_positions.get(opcode, 0) for opcode in range(first, last + 1)]
++        lines += [
++            "#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS",
++            "static const uint8_t RISCVStackOperandPositions[] = {",
++        ]
++        for index in range(0, len(positions), 32):
++            lines.append("\t" + ", ".join(map(str, positions[index : index + 32])) + ",")
++        lines += [
++            "};",
++            "static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)",
++            "{",
++            f"\tunsigned index = opcode - {first}U;",
++            "\treturn index < sizeof(RISCVStackOperandPositions) ?",
++            "\t\t       RISCVStackOperandPositions[index] : 0;",
++            "}",
++            "#endif",
++            "",
++        ]
+     return "\n".join(lines)
+ 
+ 
 diff --git a/tests/unit/writeback_postprocess.c b/tests/unit/writeback_postprocess.c
-index 1afe180d..83513d25 100644
+index 1afe180d..89e84951 100644
 --- a/tests/unit/writeback_postprocess.c
 +++ b/tests/unit/writeback_postprocess.c
-@@ -30,15 +30,23 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
- 	unsigned tied = 0;
- 	for (unsigned opcode = 0; opcode < count; ++opcode) {
- 		const MCInstrDesc *desc = &descs[count - 1 - opcode];
--		bool expected = false;
--		for (unsigned i = 0; i < desc->NumOperands; ++i)
-+		unsigned expected = 0;
-+		for (unsigned i = 0; i < desc->NumOperands; ++i) {
- 			expected |= MCOperandInfo_isTiedToOp(&desc->OpInfo[i]);
-+#ifdef WRITEBACK_TEST_RISCV
-+			if (desc->OpInfo[i].RegClass == RISCV_SPRegClassID) {
-+				if (i >= 7)
-+					return false;
-+				expected |= 2U << i;
-+			}
-+#endif
-+		}
- 		if (expected != flags[opcode]) {
- 			fprintf(stderr, "%s projection mismatch %u\n", arch,
- 				opcode);
- 			return false;
- 		}
--		tied += expected;
-+		tied += expected & 1;
- 	}
- 	printf("%s: %zu descriptors equal, %u tied\n", arch, count, tied);
+@@ -44,6 +44,30 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
  	return true;
+ }
+ 
++#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++static bool checkStackOperandPositions(void)
++{
++	size_t count = ARR_SIZE(RISCVDescs.Insts);
++	for (unsigned opcode = 0; opcode < count; ++opcode) {
++		const MCInstrDesc *desc = &RISCVDescs.Insts[count - 1 - opcode];
++		unsigned positions = 0;
++		for (unsigned index = 0; index < desc->NumOperands; ++index) {
++			if (desc->OpInfo[index].RegClass != RISCV_SPRegClassID)
++				continue;
++			if (index >= 8)
++				return false;
++			positions |= 1U << index;
++		}
++		if (positions != RISCV_getStackOperandPositions(opcode)) {
++			fprintf(stderr, "RISC-V stack operand mismatch %u\n",
++				opcode);
++			return false;
++		}
++	}
++	return true;
++}
++#endif
++
+ int main(void)
+ {
+ #ifdef WRITEBACK_TEST_ARM
+@@ -52,6 +76,10 @@ int main(void)
+ 		return 1;
+ #endif
+ #ifdef WRITEBACK_TEST_RISCV
++#ifdef CAPSTONE_RISCV_PROJECT_STACK_OPERANDS
++	if (!checkStackOperandPositions())
++		return 1;
++#endif
+ 	if (!check(RISCVDescs.Insts, RISCVWritebackFlags,
+ 		   ARR_SIZE(RISCVDescs.Insts), "RISCV"))
+ 		return 1;
