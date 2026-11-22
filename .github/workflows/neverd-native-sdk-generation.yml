@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 01809c4651337478d87daa8688881719a3bb2ad6
+          ref: a2ed2a8acc4a3d20b40dd005469221ce055b5db4
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -49,23 +49,23 @@ jobs:
           if ($manifest.architecture -ne 'arm64' -or $manifest.libraries.Count -ne 2) { throw 'Incomplete native catalog' }
           $libraries = @()
           $selected = @{}
+          $expected = @{RDBSS=285; InternetControlMessage=9; TransactionManager=39; SensorUtilities=40; WebAuthentication=13; SNMPUtilities=26; WebAuthenticationRuntime=29; EventCollector=15; DeviceManagementRegistration=15; NetworkTrafficControl=20; ComputeStorage=14; WebSockets=13; RestartManager=11; FontEmbedding=14; PerformanceCounters=12; QoSTraffic=11; OverlayFiles=11}
           foreach ($lib in $manifest.libraries) {
             $hash = (Get-FileHash "$out/$($lib.name).h").Hash.ToLower()
             if ($hash -ne $lib.sha256) { throw "Header digest for $($lib.name) differs" }
             $libraries += @{name=$lib.name; sha256=$hash; types=$lib.types; prototypes=$lib.prototypes}
             foreach ($provider in $lib.providers) {
               if ($provider.name -eq 'RDBSS') { $selected['RDBSS']=$provider.metadata.cpp_header_bridge.verified_functions.Count }
-              if ($provider.name -in @('InternetControlMessage','TransactionManager','SensorUtilities','WebAuthentication','SNMPUtilities','WebAuthenticationRuntime','EventCollector','DeviceManagementRegistration','NetworkTrafficControl','ComputeStorage')) {
+              elseif ($expected.ContainsKey($provider.name)) {
                 $bridge = if ($provider.name -eq 'WebAuthenticationRuntime') { $provider.metadata.sdk_runtime_bridge } else { $provider.metadata.sdk_import_bridge }
                 $selected[$provider.name]=$bridge.published_abi.verified_functions.Count
               }
             }
           }
-          $expected = @{RDBSS=285; InternetControlMessage=9; TransactionManager=39; SensorUtilities=40; WebAuthentication=13; SNMPUtilities=26; WebAuthenticationRuntime=29; EventCollector=15; DeviceManagementRegistration=15; NetworkTrafficControl=20; ComputeStorage=14}
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='01809c4651337478d87daa8688881719a3bb2ad6'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='a2ed2a8acc4a3d20b40dd005469221ce055b5db4'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
