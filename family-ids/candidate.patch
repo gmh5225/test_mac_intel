@@ -1,30 +1,54 @@
 diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index 64ee3a95..8e741a9c 100644
+index 64ee3a95..135a86c8 100644
 --- a/arch/RISCV/RISCVDisassembler.c
 +++ b/arch/RISCV/RISCVDisassembler.c
-@@ -579,15 +579,17 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
- // isn't explicitly encoded in the instruction.
- void addSPOperands(MCInst *MI)
+@@ -53,10 +53,6 @@
+ 
+ #define DEBUG_TYPE "riscv-disassembler"
+ 
+-void addSPOperands(MCInst *MI);
+-;
+-// end anonymous namespace
+-
+ static DecodeStatus DecodeGPRRegisterClass(MCInst *Inst, uint32_t RegNo,
+ 					   uint64_t Address,
+ 					   const void *Decoder)
+@@ -575,20 +571,26 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+ 	return MCDisassembler_Success;
+ }
+ 
+-// Add implied SP operand for C.*SP compressed instructions. The SP operand
+-// isn't explicitly encoded in the instruction.
+-void addSPOperands(MCInst *MI)
++/* Insert the implied SP at each indicated operand position, in ascending
++ * order so later indices refer to the instruction with earlier inserts. */
++static void insertSPOperands(MCInst *MI, unsigned positions)
  {
 -	const MCInstrDesc *MCID = MCInstrDesc_get(MCInst_getOpcode(MI),
 -						  RISCVDescs.Insts,
 -						  ARR_SIZE(RISCVDescs.Insts));
-+	/* Bit zero records tied operands. The remaining bits identify
-+	 * implied SP operands in insertion order. */
-+	unsigned positions = RISCVWritebackFlags[MCInst_getOpcode(MI)] >> 1;
-+	if (!positions)
-+		return;
  	MCOperand SPReg;
  	SPReg.MachineOperandType = kRegister;
  	SPReg.Kind = kRegister;
  	SPReg.RegVal = RISCV_X2;
 -	for (unsigned i = 0; i < MCID->NumOperands; i++)
 -		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
-+	for (unsigned i = 0; positions; ++i, positions >>= 1)
-+		if (positions & 1)
- 			MCInst_insert0(MI, i, &SPReg);
+-			MCInst_insert0(MI, i, &SPReg);
++	do {
++		MCInst_insert0(MI, CountTrailingZeros_32(positions), &SPReg);
++		positions &= positions - 1;
++	} while (positions);
++}
++
++static inline void addSPOperands(MCInst *MI)
++{
++	/* Bit zero records tied operands. */
++	unsigned positions = RISCVWritebackFlags[MCInst_getOpcode(MI)] >> 1;
++	if (positions)
++		insertSPOperands(MI, positions);
  }
  
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
 @@ -773,7 +775,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
  	DecodeStatus ret =
  		RISCV_getInstruction(MI, Size, Bytes, ByteLen, Address, NULL);

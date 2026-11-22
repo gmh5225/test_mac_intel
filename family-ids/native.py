@@ -121,7 +121,7 @@ try:
             stats={}
             for libname in ('base','candidate'):
                 target.write_bytes(inputs[libname]);profile=tmp/('callgrind-'+libname)
-                run([*bind,'valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(profile),tmp/'time',str(bits),'2' if cc=='gcc' else '0',path,str(ip),'1'],'trace-'+libname)
+                run([*bind,'valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(profile),tmp/'time',str(bits),'1' if cc=='gcc' else '0',path,str(ip),'1'],'trace-'+libname)
                 raw=profile.read_text();events=re.search(r'^events: (.+)$',raw,re.M)[1].split();totals=re.search(r'^totals: (.+)$',raw,re.M)[1].split()
                 stats[libname]=dict(zip(events,map(int,totals)))
                 run(['callgrind_annotate','--show=Ir,Bc,Bcm,D1mr,D1mw','--auto=no','--threshold=99.95',profile],'functions-'+libname)

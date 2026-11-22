@@ -1,7 +1,7 @@
-name: Qualify RISC-V stack operands on the published vector formatter in mixed and single architecture builds
+name: Measure sparse RISC-V stack insertion with complete state and GCC format attribution
 on:
   push:
-    branches: [codex/capstone-stack-operands-current-next]
+    branches: [codex/capstone-sparse-compressed-stack]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: release-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: sparse-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
