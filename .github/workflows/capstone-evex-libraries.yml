@@ -1,7 +1,7 @@
-name: Count actual scalar, VEX and EVEX batch admissions over the six exact measured real image extents
+name: Count remaining VEX3 and EVEX forms after the generated native classifier
 on:
   push:
-    branches: [codex/capstone-batch-fallback-attribution]
+    branches: [codex/capstone-vex3-remaining-work]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: actual-prefix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex3-remainder-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
