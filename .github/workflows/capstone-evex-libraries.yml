@@ -1,7 +1,7 @@
-name: Measure generated VEX register and immediate rows on actual SIMD libraries and PE images
+name: Compare VEX register immediates against the shipped indexed EVEX tree
 on:
   push:
-    branches: [codex/capstone-vex-reg-immediate-shapes]
+    branches: [codex/mixed-vex-on-shipped-indexed]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: bbba0e240053b9ad2897390bdc76f6f6115e3a55
+          ref: 76852fa6948d8e279083a907870b207c9a2aefdc
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-vex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: indexed-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
