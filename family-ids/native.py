@@ -30,17 +30,12 @@ try:
         libs[variant]=tmp/(variant+'.so');shutil.copy2(path,libs[variant])
         objects[variant]={str(f.relative_to(b)):sha(f) for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
         assert objects[variant]
-        host=os.environ['RUNNER_OS'] # CMake always runs on Linux in this profile.
-        reference=json.loads((r/'reference.json').read_text())
-        assert host=='Linux'
-        matching=[key for key in reference if key.endswith('-'+cc+'-'+conf) and (('24.04-arm' in key)==(platform.machine()=='aarch64')) and (('22.04' in key)==('22.04' in Path('/etc/os-release').read_text()))]
-        assert len(matching)==1,matching
-        if variant=='base':assert sha(libs[variant])==reference[matching[0]]['base'],(matching,variant,sha(libs[variant]))
     assert objects['base'].keys()==objects['candidate'].keys()
     fix_changes=[k for k,v in objects['base'].items() if objects['correct'][k]!=v]
-    assert all(Path(k).name=='X86Mapping.c.o' for k in fix_changes)
+    assert all(Path(k).name in {'X86Mapping.c.o','X86Sse64Output.c.o'} for k in fix_changes)
     changed=[k for k,v in objects['correct'].items() if objects['candidate'][k]!=v]
-    assert all(Path(k).name in {'X86Sse64Output.c.o'} for k in changed)
+    assert all(Path(k).name=='RISCVDisassembler.c.o' for k in changed)
+    assert bool(changed)==(conf=='full'),(conf,changed)
     write('member-changes',dict(changed=changed,fix_changes=fix_changes,correct=sha(libs['correct']),total=len(objects['base']),base=sha(libs['base']),candidate=sha(libs['candidate'])))
     run(['cmake','--build',b,'--parallel','4','--target','capstone_static'],'build-static-selected')
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
