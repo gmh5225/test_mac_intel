@@ -1,7 +1,7 @@
-name: Compare the repaired x86-only and production configurations against iced on four hosts
+name: Measure the shipped register writers against iced in standalone and production configurations
 on:
   push:
-    branches: [codex/shipped-optional-aliases-versus-iced]
+    branches: [codex/shipped-registers-versus-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 40125a7e11dcc4e9a5f43d2d11405212ed9d8184
+          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: fe646646b61403c18430bcfa9749e6a2d2ebad85
+          ref: ca2e130e157e120938018c5501042fb16d23bdfc
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shipped-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
