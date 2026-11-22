@@ -1,7 +1,7 @@
-name: Keep the NeverD caller machine code identical and compare plain, section-local and EVEX batches in real products
+name: Append batch code and data after both existing private writers in actual NeverD products
 on:
   push:
-    branches: [codex/capstone-single-call-width-products]
+    branches: [codex/capstone-tail-batch-products]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 8b84bc0b0d40491e9b54c351361b4ad84ddf4384
+          ref: c9570e03ec46bd82d06d082eb6292a076065e2a6
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "8b84bc0b0d40491e9b54c351361b4ad84ddf4384"
+          test "$(git rev-parse HEAD)" = "c9570e03ec46bd82d06d082eb6292a076065e2a6"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "989508842d378789f9d98465de059feb99913c96"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 34465fdeaea6988c753bde5de6ab93942f65de36
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-call-width-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: tail-batch-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

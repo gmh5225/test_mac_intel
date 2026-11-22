@@ -11,9 +11,12 @@ def command(args,label,cwd=None):
 def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).strip()
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
-assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['official_capstone']
+assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
 assert sha(r/'neverd.patch')==m['decoder_patch']
-for k in ('plain','separate','evex'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('ordered','packed','private'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+assert sha(r/'base-riscv.patch')==m['baseline_patch']
+command(['git','apply','--index',r/'base-riscv.patch'],'baseline-source',cs)
+assert git(cs,'write-tree')==m['base']['tree']
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
@@ -37,10 +40,10 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','plain','linked','separate','evex'):
+    for variant in ('base','ordered','linked','packed','private'):
         if variant!='base':
-            command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
-            filename='separate' if variant=='linked' else variant
+            command(['git','restore','--source',m['base']['tree'],'--staged','--worktree','--','.'],'restore-'+variant,cs)
+            filename='ordered' if variant=='linked' else variant
             command(['git','apply','--index',r/(filename+'.patch')],'apply-'+variant,cs)
             command(['git','restore','--source','HEAD','--',str(decoder.relative_to(nd))],'decoder-'+variant,nd)
             cmake_file.write_text(normal_cmake)
@@ -70,12 +73,21 @@ try:
             if name.startswith(('cs_decode_full_insn','cs_disasm_iter','X86_disasmIter','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
                 symbols[name]=[int(fields[0],16),int(fields[1],16)]
         assert 'cs_disasm_iter' in symbols and any('classifyX86Prefix' in n for n in symbols)
-        save('layout-'+variant,dict(symbols=symbols,decoder_executable_sections=sections))
-        if variant in ('plain','separate','evex'):
+        with binary.open('rb') as file:
+            elf=ELFFile(file)
+            linked_sections={s.name:[s['sh_addr'],s.data_size,hashlib.sha256(s.data()).hexdigest()] for s in elf.iter_sections() if s['sh_flags'] & 2 and s['sh_type']=='SHT_PROGBITS'}
+        members=sp.check_output(['ar','t',archive],text=True).splitlines()
+        if variant!='base':
+            assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('X86BatchScan.c.o'),members
+        save('layout-'+variant,dict(symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
+
+        if variant in ('ordered','packed','private'):
             for mode in ('32','64'):
                 command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/('native-guard'+mode+'.cpp'),archive,'-o',t/('guard'+mode)],'guard-link-'+mode+'-'+variant)
                 command([t/('guard'+mode)],'guard-'+mode+'-'+variant)
-        if variant=='separate':
+        if variant=='private':
+            command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
+            generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
         if variant=='base':
             import frozen_ssl64
@@ -110,7 +122,7 @@ try:
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             for rep in range(13):
-                keys=['base','copy','linked','plain','separate','evex'];rng.shuffle(keys);ticks={v:[] for v in keys}
+                keys=['base','copy','linked','ordered','packed','private'];rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     assert expected==sample[1:],(c['name'],mode,k,expected,sample)
