@@ -34,10 +34,10 @@ try:
         assert sha(plain)==sha(so)
         positions=[n for n,o in enumerate(link) if o.endswith('.o')]
         hit,=[n for n in positions if link[n].endswith('/SystemZInstPrinter.c.o')]
-        original=link[hit];assert hit<positions[-1];link.insert(positions[-1],link.pop(hit));assert link[positions[-1]]==original
+        moved_object=link[hit];assert hit<positions[-1];link.insert(positions[-1],link.pop(hit));assert link[positions[-1]]==moved_object
         moved=t/(k+'-reordered.so');link[output_arg]=str(moved);cmd('move-link-'+k,link,b)
         assert sha(moved)!=sha(so)
-        save('link-'+k,dict(object=original,before=hit,after=positions[-1],objects=len(positions),original=sha(so),relinked=sha(plain),moved=sha(moved)))
+        save('link-'+k,dict(object=moved_object,before=hit,after=positions[-1],objects=len(positions),original=sha(so),relinked=sha(plain),moved=sha(moved)))
         names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','SystemZ_LLVM_getRegisterName','printFormattedRegName'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
