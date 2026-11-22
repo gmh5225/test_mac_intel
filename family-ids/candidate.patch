@@ -1,71 +1,58 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index bb89e64d..bc6f3c6c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -491,6 +491,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86VectorOutput.c
+         arch/X86/X86EvexScan.c
+         arch/X86/X86EvexMemoryOutput.c
++        arch/X86/X86BatchScan.c
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+@@ -1055,7 +1056,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+     endif()
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
++    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+ endif()
+diff --git a/Makefile b/Makefile
+index ef85dbbc..3e4ede86 100644
+--- a/Makefile
++++ b/Makefile
+@@ -278,7 +278,8 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86BatchScan.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..7e23ace5 100644
+index b56826b0..8a2e24e7 100644
 --- a/arch/X86/X86BatchScan.c
 +++ b/arch/X86/X86BatchScan.c
-@@ -17,7 +17,7 @@
- #include "X86GenVexPublicPlans.inc"
- #undef X86_DEFINE_VEX2_PUBLIC_PLANS
- #undef X86_DEFINE_VEX3_PUBLIC_PLANS
--#include "X86GenBatchPrimary.inc"
-+#include "X86PrimaryScan.h"
- #include "X86FeatureExtension.h"
- #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-@@ -36,52 +36,6 @@
- #undef X86_SHIFT_SCAN_IDS
+@@ -350,4 +350,13 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
  #endif
- 
--/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
--static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
--			 unsigned *tail)
--{
--	if (size <= offset)
--		return false;
--	const uint8_t modrm = code[offset];
--	if (modrm >= 0xc0) {
--		*tail = 0;
--		return true;
--	}
--	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
--					       { 1, 1, 1, 1, 2, 1, 1, 1 },
--					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
--	unsigned length = lengths[modrm >> 6][modrm & 7];
--	if ((modrm & 0xc7) == 4) {
--		if (size <= offset + 1)
--			return false;
--		if ((code[offset + 1] & 7) == 5)
--			length += 4;
--	}
--	*tail = length;
--	return true;
--}
--
--static uint32_t readPrimary(const uint8_t *code, size_t size, unsigned plan)
--{
--	if (plan & X86_BATCH_REG_GROUP) {
--		if (size < 2)
--			return 0;
--		const uint8_t mr = code[1];
--		plan = x86BatchRegGroups[plan & ~X86_BATCH_REG_GROUP]
--					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
--		if (!plan)
--			return 0;
--	}
--	unsigned length = plan & 15;
--	if (plan & 0x10) {
--		unsigned tail;
--		if (!addressBytes(code, size, 1, &tail))
--			return 0;
--		length += tail;
--	}
--	return length <= size ? (plan & ~0xffu) | length : 0;
--}
--
- CS_DECODE_INLINE uint32_t finishVexPlan(const uint8_t *code, size_t size,
- 					unsigned modrm_offset, unsigned payload,
- 					unsigned plan)
+ 	return X86_scanBatch(ud, code, size, address, output, capacity);
+ }
++
++#if defined(CAPSTONE_X86_SHARED_TEXT_ITERATOR) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++/* The public iterator uses exactly the same validated ID and extent as the
++ * batch reader. Zero passes the original input to the canonical scanner. */
++uint32_t X86_readScanWord(const uint8_t *code, size_t size, bool wide)
++{
++	return wide ? readFirst64(code, size) : readFirst32(code, size);
++}
++#endif
+ #endif
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..5add0b34 100644
+index ae1554b0..ad9096fc 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
 @@ -30,6 +30,17 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
@@ -76,148 +63,163 @@ index ae1554b0..5add0b34 100644
 +	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+#include "../../cs_priv.h"
-+#define CAPSTONE_X86_PUBLIC_OUTPUT
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodePublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
-+		      cs_insn *insn, uint16_t *insn_size, bool batch);
++#define CAPSTONE_X86_SHARED_TEXT_ITERATOR
++#ifndef CAPSTONE_X86_SCAN_ADAPTER
++CAPSTONE_INTERNAL uint32_t X86_readScanWord(const uint8_t *code, size_t size,
++					  bool wide);
++#endif
 +#endif
 +
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..4fc3fc98 100644
+index 12428fff..4c254fc8 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,9 +3753,17 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch);
+@@ -3787,12 +3787,59 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
  
-+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#define CS_DECODE_OUTPUT_MISS X86_decodePublicOutput
++#ifdef CAPSTONE_X86_SHARED_TEXT_ITERATOR
++/* Only scan calls need the scan decoder's stack frame and mapping state. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
 +#endif
- #define CS_DECODE_SCAN_IMPL decodeIteratorScan
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_SCAN_IMPL
-+#undef CS_DECODE_OUTPUT_MISS
++static bool disasmScanIterator(cs_struct *handle, const uint8_t **code,
++			       size_t *size, uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_valid(handle, code, size, address, insn, true);
++}
++#endif
 +
-+#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+#include "X86PrimaryScan.h"
-+#endif
- 
- /* Keep the admitted terminal's public ID and zero alias adjustment visible
-  * through output completion. Cold helpers can take the fallback result's
-@@ -3765,6 +3773,28 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch)
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
  {
-+#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+	if ((handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
-+	    handle->insn_id == X86_get_insn_id &&
-+	    handle->disasm == X86_getInstruction) {
-+		const uint32_t *plans = handle->mode == CS_MODE_32 ?
-+						x86Batch32Primary :
-+						x86Batch64Primary;
-+		const unsigned plan = plans[code[0]];
-+		if (plan) {
-+			const uint32_t word = readPrimary(code, size, plan);
-+			if (word) {
-+				const X86ScanResult result = {
-+					0, word >> 8, (uint16_t)(word & 0xff), 0
-+				};
-+				*insn_size = result.length;
-+				finish_x86_scan(handle, insn, &result, code,
-+						batch, true);
-+				return true;
++#ifdef CAPSTONE_X86_SHARED_TEXT_ITERATOR
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (*size == 0 || !handle)
++		return false;
++	if (handle->arch == CS_ARCH_X86) {
++		if (!handle->no_text)
++			return X86_disasmIter(ud, code, size, address, insn);
++		if (!handle->detail_opt) {
++#ifndef CAPSTONE_X86_SCAN_ADAPTER
++			if ((handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
++			    handle->insn_id == X86_get_insn_id &&
++			    handle->disasm == X86_getInstruction) {
++				const uint32_t word = X86_readScanWord(
++					*code, *size, handle->mode == CS_MODE_64);
++				if (word) {
++					const X86ScanResult result = {
++						0, word >> 8, (uint16_t)(word & 0xff), 0
++					};
++					handle->errnum = CS_ERR_OK;
++					insn->address = *address;
++					finish_x86_scan(handle, insn, &result,
++							*code, false, true);
++					advance_iter(code, size, address, result.length);
++					return true;
++				}
 +			}
++#endif
++			return disasmScanIterator(handle, code, size, address, insn);
 +		}
 +	}
++	return cs_disasm_iter_valid(handle, code, size, address, insn, false);
++#else
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
 +#endif
- 	unsigned instructionID = 0;
- 	uint16_t length;
- 	int initial = tryInitialScanResult(handle, code, size, &instructionID,
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..2803dec3 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -32,4 +32,18 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- #endif
- 	return cs_disasm_iter(ud, code, size, address, insn);
  }
-+
-+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+/* The public iterator has already validated the length and handled scan mode. */
-+CS_PRESERVE_MOST bool X86_decodePublicOutput(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *insn_size,
-+					    bool batch)
+ 
+ X86_DECODE_ALIGN
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index f3dfc374..25d3d246 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -177,16 +177,24 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ }
+ #undef CS_DECODE_SCAN
+ 
++CS_DECODE_INLINE void advance_iter(const uint8_t **code, size_t *size,
++				   uint64_t *address, uint16_t length)
 +{
-+	if (handle->arch == CS_ARCH_X86 && !handle->no_text &&
-+	    X86_trySimpleOutput(handle, code, size, insn, insn_size))
-+		return true;
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	*code += length;
++	*size -= length;
++	*address += length;
 +}
-+#endif
- #endif
-diff --git a/arch/X86/X86PrimaryScan.h b/arch/X86/X86PrimaryScan.h
-new file mode 100644
-index 00000000..9e5396c5
---- /dev/null
-+++ b/arch/X86/X86PrimaryScan.h
-@@ -0,0 +1,55 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
 +
-+#ifndef CS_X86_PRIMARY_SCAN_H
-+#define CS_X86_PRIMARY_SCAN_H
-+
-+#include "X86GenBatchPrimary.inc"
-+
-+/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
-+static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
-+			 unsigned *tail)
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+-					  uint64_t *address, cs_insn *insn)
++					  uint64_t *address, cs_insn *insn,
++					  bool scan)
+ {
+ 	uint16_t insn_size;
+ 	bool r;
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
+-	const bool scan = use_x86_scan(handle);
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+@@ -196,9 +204,7 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
+ 	if (CS_DECODE_LIKELY(r)) {
+-		*code += insn_size;
+-		*size -= insn_size;
+-		*address += insn_size;
++		advance_iter(code, size, address, insn_size);
+ 	} else {
+ 		return cs_disasm_iter_skipdata(handle, code, size, address,
+ 					       insn);
+@@ -207,17 +213,14 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 	return true;
+ }
+ 
+-CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+-					  size_t *size, uint64_t *address,
+-					  cs_insn *insn)
++CS_DECODE_INLINE bool cs_disasm_iter_valid(struct cs_struct *handle,
++					   const uint8_t **code, size_t *size,
++					   uint64_t *address, cs_insn *insn,
++					   bool scan)
+ {
+-	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
+ 	cs_detail *detail;
+ 	bool r;
+ 
+-	if (*size == 0 || !handle)
+-		return false;
+-
+ 	// An instruction cs_malloc() allocated while detail was on keeps its
+ 	// detail after detail is turned off.  Much of the decoder tests only
+ 	// whether that pointer is set, so a decode without detail hides it, as
+@@ -225,9 +228,20 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+ 	detail = insn->detail;
+ 	if (CS_DECODE_LIKELY(!handle->detail_opt))
+ 		insn->detail = NULL;
+-	r = cs_disasm_iter_body(handle, code, size, address, insn);
++	r = cs_disasm_iter_body(handle, code, size, address, insn, scan);
+ 	insn->detail = detail;
+ 	return r;
+ }
+ 
++CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
 +{
-+	if (size <= offset)
++	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
++	if (*size == 0 || !handle)
 +		return false;
-+	const uint8_t modrm = code[offset];
-+	if (modrm >= 0xc0) {
-+		*tail = 0;
-+		return true;
-+	}
-+	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
-+					       { 1, 1, 1, 1, 2, 1, 1, 1 },
-+					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
-+	unsigned length = lengths[modrm >> 6][modrm & 7];
-+	if ((modrm & 0xc7) == 4) {
-+		if (size <= offset + 1)
-+			return false;
-+		if ((code[offset + 1] & 7) == 5)
-+			length += 4;
-+	}
-+	*tail = length;
-+	return true;
++	return cs_disasm_iter_valid(handle, code, size, address, insn,
++				    use_x86_scan(handle));
 +}
 +
-+static uint32_t readPrimary(const uint8_t *code, size_t size, unsigned plan)
-+{
-+	if (plan & X86_BATCH_REG_GROUP) {
-+		if (size < 2)
-+			return 0;
-+		const uint8_t mr = code[1];
-+		plan = x86BatchRegGroups[plan & ~X86_BATCH_REG_GROUP]
-+					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
-+		if (!plan)
-+			return 0;
-+	}
-+	unsigned length = plan & 15;
-+	if (plan & 0x10) {
-+		unsigned tail;
-+		if (!addressBytes(code, size, 1, &tail))
-+			return 0;
-+		length += tail;
-+	}
-+	return length <= size ? (plan & ~0xffu) | length : 0;
-+}
-+
-+#endif
+ #endif

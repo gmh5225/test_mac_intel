@@ -1,7 +1,7 @@
-name: Compare the public scanner using the batch primary records alone and with shared text output
+name: Measure the shared complete batch records for public scan and isolate architecture-specific text dispatch
 on:
   push:
-    branches: [codex/public-iterator-primary-records]
+    branches: [codex/public-iterator-complete-records]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-primary-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-complete-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
