@@ -34,6 +34,7 @@ endif()
         assert sha(data)==m[stage]['sha256'];patch=t/'input.patch';patch.write_bytes(data)
         g('apply','--index',str(patch));assert g('write-tree')==m[stage]['tree']
         for profile,flags in profiles.items():
+            if profile != os.environ['SCAN_PROFILE']:continue
             b=t/profile;units=['x86_mapping_counts','x86_scan_batch','x86_reg_access','x86_encoding_accuracy']
             if profile in ('full','no-att'):units+=['x86_evex_detail','x86_buffer_bounds']
             if stage=='oracle':

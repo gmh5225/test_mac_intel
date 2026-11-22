@@ -1,7 +1,7 @@
-name: Compare corrected x86 implicit effects across four native ABIs and four decoder configurations
+name: Complete Windows oracle checks for vector register effects
 on:
   push:
-    branches: [codex/capstone-portable-mode-effects]
+    branches: [codex/capstone-abi-by-profile-effects]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,10 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2022, arch: amd64 }
-          - { host: windows-2022, arch: amd64_x86 }
-          - { host: macos-15, arch: arm64 }
-          - { host: macos-15-intel, arch: x86_64 }
+          - { host: windows-2022, arch: amd64, profile: full }
+          - { host: windows-2022, arch: amd64, profile: no-att }
+          - { host: windows-2022, arch: amd64, profile: reduced }
+          - { host: windows-2022, arch: amd64, profile: diet }
+          - { host: windows-2022, arch: amd64_x86, profile: full }
+          - { host: windows-2022, arch: amd64_x86, profile: no-att }
+          - { host: windows-2022, arch: amd64_x86, profile: reduced }
+          - { host: windows-2022, arch: amd64_x86, profile: diet }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     steps:
@@ -33,10 +37,12 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
       - name: Compare original and candidate bytes and native tests
+        env:
+          SCAN_PROFILE: ${{ matrix.profile }}
         run: python -B portable-next/verify.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-effects-${{ matrix.host }}-${{ matrix.arch }}
+          name: portable-effects-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
