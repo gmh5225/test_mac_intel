@@ -1,0 +1,14 @@
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..d64b164e 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10299,6 +10299,9 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ #endif
+ 
+ // given internal insn id, return public instruction info
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_mapping_text")))
++#endif
+ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ {
+ 	unsigned int i;
