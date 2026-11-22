@@ -83,6 +83,9 @@ def main(w):
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
             assert sp.check_output([w/'verify-evex-memory'])==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
+        member,=b.rglob('X86VectorOutput.c.o')
+        table,=[line.split() for line in sp.check_output(['nm','-S','--defined-only',member],text=True).splitlines() if line.split()[-1:] == ['broadcast_rows']]
+        save('broadcast-table-'+label+'.json',dict(bytes=int(table[1],16),sha=sha(member)))
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
