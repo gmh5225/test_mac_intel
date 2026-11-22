@@ -1,88 +1,117 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bb89e64d..bc6f3c6c 100644
+index bcde9790..0733e473 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -491,6 +491,7 @@ if(CAPSTONE_X86_SUPPORT)
-         arch/X86/X86VectorOutput.c
-         arch/X86/X86EvexScan.c
-         arch/X86/X86EvexMemoryOutput.c
-+        arch/X86/X86BatchScan.c
-     )
-     # Use scalar/vector stores or libc for the fixed public output buffers.
-     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
-@@ -1055,7 +1056,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+@@ -1045,41 +1045,32 @@ target_include_directories(capstone PUBLIC
+ )
+ set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+-# The i386 iterator is an internal static-link entry used by NeverD.
+-if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
+-    add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+-    target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
+-    set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
+-    target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
++if(CAPSTONE_X86_SUPPORT)
++    target_sources(capstone PRIVATE
++        arch/X86/X86Vex32Output.c arch/X86/X86Sse64Output.c
++        arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c
++        arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c
++        arch/X86/X86PlainEvexOutput.c)
+     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+-        target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
++        set_property(SOURCE arch/X86/X86Sse64Output.c APPEND PROPERTY
++            COMPILE_DEFINITIONS CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
      endif()
-     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
 -    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
-+    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
-     target_link_libraries(capstone_x86_native PRIVATE capstone)
-     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    target_link_libraries(capstone_x86_native PRIVATE capstone)
+-    set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
  endif()
+ 
+ if(CAPSTONE_BUILD_STATIC_LIBS)
+     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
+-    set(capstone_alias_patterns_tail)
+-    if(TARGET capstone_x86_iter32)
+-        if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+-           AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
+-            # Backends reference the alias parser indirectly. Keep its hot code
+-            # ahead of the optional native readers even when all are linked.
+-            # Keep the opcode rows after the native scanner when both are linked.
+-            set(capstone_alias_patterns_tail
+-                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
+-            set(capstone_static_objects
+-                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
+-                $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+-                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
+-        else()
+-            list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+-        endif()
+-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
++    if(CAPSTONE_X86_SUPPORT AND CMAKE_SYSTEM_NAME STREQUAL "Linux"
++       AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++       AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
++        # Preserve the placement of alias parsing and the native readers.
++        set(iterators "X86Vex32Output|X86Sse64Output")
++        set(readers "X86MemoryFallback32|X86BatchScan|X86VectorFallback64|X86VexRegisterImmediate|X86PlainEvexOutput")
++        set(capstone_static_objects
++            "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(${iterators}|${readers}|AliasMapping|AliasPatternLookup)[.]c[.]o$>"
++            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(${iterators})[.]c[.]o$>"
++            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>"
++            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(${readers})[.]c[.]o$>"
++            "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
 diff --git a/Makefile b/Makefile
-index ef85dbbc..3e4ede86 100644
+index c52271d1..f1142574 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -278,7 +278,8 @@ endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
--	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o
-+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86BatchScan.o
-+	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o
- 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
- endif
+@@ -434,8 +434,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
+ LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
+ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
+ LIBOBJ += $(LIBOBJ_X86_NUMBERS)
+-LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
+ LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
++LIBOBJ_SHARED := $(LIBOBJ)
  
+ 
+ ifeq ($(PKG_EXTRA),)
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..67db82f5 100644
+index b56826b0..0e85164d 100644
 --- a/arch/X86/X86BatchScan.c
 +++ b/arch/X86/X86BatchScan.c
-@@ -350,4 +350,24 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
+@@ -350,4 +350,13 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
  #endif
  	return X86_scanBatch(ud, code, size, address, output, capacity);
  }
 +
-+#if defined(CAPSTONE_X86_SHARED_TEXT_ITERATOR) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+/* Commit a validated public record in the reader's frame. A rejected
-+ * encoding enters the ordinary iterator with untouched input and output. */
-+bool X86_disasmRecordIter(csh ud, const uint8_t **code, size_t *size,
-+			 uint64_t *address, cs_insn *insn, bool wide)
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++/* The public iterator uses exactly the same validated ID and extent as the
++ * batch reader. Zero passes the original input to the canonical scanner. */
++uint32_t X86_readScanWord(const uint8_t *code, size_t size, bool wide)
 +{
-+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	const uint32_t word = wide ? readFirst64(*code, *size) :
-+				     readFirst32(*code, *size);
-+	if (!word)
-+		return X86_disasmScanIterFallback(handle, code, size, address, insn);
-+	const X86ScanResult result = { 0, word >> 8, (uint16_t)(word & 0xff), 0 };
-+	handle->errnum = CS_ERR_OK;
-+	insn->address = *address;
-+	finish_x86_scan(handle, insn, &result, *code, false, true);
-+	advance_iter(code, size, address, result.length);
-+	return true;
++	return wide ? readFirst64(code, size) : readFirst32(code, size);
 +}
 +#endif
  #endif
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..1df09d4e 100644
+index ae1554b0..92196e8d 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,6 +30,22 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,6 +30,17 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
-+#if !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
++#if !defined(CAPSTONE_DIET) && \
 +	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+#define CAPSTONE_X86_SHARED_TEXT_ITERATOR
++#define CAPSTONE_X86_PUBLIC_OUTPUT
 +#ifndef CAPSTONE_X86_SCAN_ADAPTER
-+CAPSTONE_INTERNAL bool X86_disasmRecordIter(csh handle, const uint8_t **code,
-+					   size_t *size, uint64_t *address,
-+					   cs_insn *insn, bool wide);
-+CAPSTONE_INTERNAL bool X86_disasmScanIterFallback(struct cs_struct *handle,
-+						 const uint8_t **code,
-+						 size_t *size, uint64_t *address,
-+						 cs_insn *insn);
++CAPSTONE_INTERNAL uint32_t X86_readScanWord(const uint8_t *code, size_t size,
++					  bool wide);
 +#endif
 +#endif
 +
@@ -90,21 +119,21 @@ index ae1554b0..1df09d4e 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..81ac33fe 100644
+index 12428fff..e38dfd51 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3787,12 +3787,47 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3787,12 +3787,65 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  	return true;
  }
  
-+#ifdef CAPSTONE_X86_SHARED_TEXT_ITERATOR
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
 +/* Only scan calls need the scan decoder's stack frame and mapping state. */
 +#if defined(_MSC_VER)
 +__declspec(noinline)
 +#elif defined(__GNUC__)
 +__attribute__((noinline))
 +#endif
-+CAPSTONE_INTERNAL bool X86_disasmScanIterFallback(cs_struct *handle, const uint8_t **code,
++static bool disasmScanIterator(cs_struct *handle, const uint8_t **code,
 +			       size_t *size, uint64_t *address, cs_insn *insn)
 +{
 +	return cs_disasm_iter_valid(handle, code, size, address, insn, true);
@@ -116,22 +145,40 @@ index 12428fff..81ac33fe 100644
  bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
  				 uint64_t *address, cs_insn *insn)
  {
-+#ifdef CAPSTONE_X86_SHARED_TEXT_ITERATOR
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
 +	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
 +	if (*size == 0 || !handle)
 +		return false;
 +	if (handle->arch == CS_ARCH_X86) {
-+		if (!handle->no_text)
++		if (!handle->no_text) {
++			if (handle->mode == CS_MODE_64)
++				return X86_disasmIterText(ud, code, size, address, insn);
++			if (handle->mode == CS_MODE_32)
++				return X86_disasmIter32(ud, code, size, address, insn);
++#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
 +			return X86_disasmIter(ud, code, size, address, insn);
-+		if (!handle->detail_opt) {
++#endif
++		} else if (!handle->detail_opt) {
 +#ifndef CAPSTONE_X86_SCAN_ADAPTER
 +			if ((handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
 +			    handle->insn_id == X86_get_insn_id &&
-+			    handle->disasm == X86_getInstruction)
-+				return X86_disasmRecordIter(ud, code, size, address,
-+							   insn, handle->mode == CS_MODE_64);
++			    handle->disasm == X86_getInstruction) {
++				const uint32_t word = X86_readScanWord(
++					*code, *size, handle->mode == CS_MODE_64);
++				if (word) {
++					const X86ScanResult result = {
++						0, word >> 8, (uint16_t)(word & 0xff), 0
++					};
++					handle->errnum = CS_ERR_OK;
++					insn->address = *address;
++					finish_x86_scan(handle, insn, &result,
++							*code, false, true);
++					advance_iter(code, size, address, result.length);
++					return true;
++				}
++			}
 +#endif
-+			return X86_disasmScanIterFallback(handle, code, size, address, insn);
++			return disasmScanIterator(handle, code, size, address, insn);
 +		}
 +	}
 +	return cs_disasm_iter_valid(handle, code, size, address, insn, false);
@@ -227,3 +274,18 @@ index f3dfc374..25d3d246 100644
 +}
 +
  #endif
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 92e01e07..1e3e37ce 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -208,10 +208,6 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
+     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
+ endforeach()
+ 
+-if(TARGET x86_simple_output)
+-    target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
+-endif()
+-
+ if(CAPSTONE_X86_SUPPORT)
+     set_tests_properties(unit_x86_x87_environment unit_x86_bound_access unit_x86_printer_prechecked PROPERTIES SKIP_RETURN_CODE 77)
+     set_tests_properties(unit_x86_x87_environment_hardware PROPERTIES

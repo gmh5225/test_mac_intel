@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bb89e64d..bc6f3c6c 100644
+index bcde9790..1170b0a9 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -491,6 +491,7 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -492,6 +492,7 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86VectorOutput.c
          arch/X86/X86EvexScan.c
          arch/X86/X86EvexMemoryOutput.c
@@ -10,7 +10,7 @@ index bb89e64d..bc6f3c6c 100644
      )
      # Use scalar/vector stores or libc for the fixed public output buffers.
      # Generic x64 GCC otherwise emits REP STOS even for the short clears.
-@@ -1055,7 +1056,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+@@ -1056,7 +1057,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
          target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
      endif()
      set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
@@ -20,7 +20,7 @@ index bb89e64d..bc6f3c6c 100644
      set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
  endif()
 diff --git a/Makefile b/Makefile
-index ef85dbbc..3e4ede86 100644
+index c52271d1..e22d45ab 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -278,7 +278,8 @@ endif
