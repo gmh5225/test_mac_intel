@@ -50,7 +50,7 @@ def verify(source, output, cache, invoke, digest):
                                                "--output", call_dir])
     calls = json.loads((call_dir / "report.json").read_text(encoding="utf-8"))
     rows = calls["cases"]
-    assert calls["passed"] and len(rows) == 8
+    assert calls["passed"] and len(rows) == 10
     assert all(row["object_exit"] == row["link_exit"] == 0 and len(row["ordinal_imports"]) == 1 for row in rows)
 
     area = call_dir / "arm64"
@@ -65,7 +65,7 @@ def verify(source, output, cache, invoke, digest):
                             "/Fo" + str(obj)], check=True)
             objects.append(obj)
     program = area / "compression.exe"
-    libraries = [area / profiles[name]["library"] for name in ("CabinetCompression", "PrintTicket", "XInput")]
+    libraries = [area / profiles[name]["library"] for name in ("CabinetCompression", "PrintTicket", "XInput", "MAPIUtilities")]
     subprocess.run([*compiler, Path(__file__).with_name("native_ordinal_smoke.c"), *objects, *libraries,
                     "/Fe" + str(program)], check=True)
     observed = json.loads(subprocess.check_output([program], text=True, timeout=60))
