@@ -1,7 +1,7 @@
-name: Compare one-pass scalar, REX and VEX2 batch readers to released Capstone and iced on both widths
+name: Count actual scalar, VEX and EVEX batch admissions over the six exact measured real image extents
 on:
   push:
-    branches: [codex/capstone-unified-amd64-batch]
+    branches: [codex/capstone-batch-fallback-attribution]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,19 +25,19 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 77b7043a31582684a0234f104a1fc24d90f0a12d
+          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/trace.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: unified-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: actual-prefix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
