@@ -1,7 +1,7 @@
-name: Measure the cost of the existing text checksum with the same decoder, output, and inputs
+name: Compare the real NeverD Capstone build profile and the standalone profile to both iced formatters
 on:
   push:
-    branches: [codex/capstone-production-text-length]
+    branches: [codex/capstone-project-settings-versus-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -30,16 +30,26 @@ jobs:
           ref: ca73ea7f0c6aa0d618372481d6a29d9707c00d90
           path: source
           persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 4b281bc8327c4570e0c17c5f294bf5cbffc52a43
+          path: neverd-config
+          sparse-checkout: |
+            CMakeLists.txt
+            cmake/NeverDCapstoneCompilerOptions.inc
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
       - if: always()
-        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
+        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: text-length-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: project-profile-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

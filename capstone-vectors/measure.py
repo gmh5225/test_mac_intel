@@ -91,18 +91,38 @@ def main(w):
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
-        diff=r/(key+'.patch')
+        diff=r/'official.patch'
         assert sha(diff)==z['sha256'];run(['git','apply','--index',diff],'apply-'+key,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
-        build=w/'build';run(['cmake','-S',base,'-B',build,*cfg],'configure-'+key)
+        build=w/('build-'+key);project=base
+        if key=='project':
+            nd=r.parent/'neverd-config';record=m['neverd']
+            assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
+            for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
+            text=(nd/'CMakeLists.txt').read_text();a=text.index('# --- Capstone (our fork');end=text.index('# --- NeverD CMake helpers',a)
+            project=w/'project';(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
+            shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake')
+            (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+text[a:end])
+        run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
+        db=json.loads((build/'compile_commands.json').read_text());files={Path(u['file']).name for u in db}
+        near={Path(u['file']).name for u in db if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in u['command'].split()}
+        assert near==({'X86Sse64Output.c'}if key=='project'and not darwin else set()),near
+        assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(key=='project')
+        save('compile-'+key+'.json',dict(archive_profile=key,near_indirect=sorted(near),neverd=m['neverd'],compile_commands_sha256=sha(build/'compile_commands.json')))
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access']
-        run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*units],'build-'+key)
-        run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
-        lib=build/'libcapstone.a';exe=w/key
+        run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if key=='official' else [])],'build-'+key)
+        lib,=build.rglob('libcapstone.a')
+        if key=='official':
+            run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
+        else:
+            for name in units:
+                run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',base/('tests/unit/'+name+'.c'),lib,'-lm','-o',w/name],'link-'+name+'-'+key)
+                run([w/name],'unit-'+name+'-'+key)
+        exe=w/key
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
-        if key=='official':
+        if key=='project':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
                 run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/(name+'.cpp'),w/'plan.o',lib,'-o',w/name],'compile-'+name)
@@ -128,20 +148,20 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (1,2):
+        for mode in (0,1,2):
             def timed(label,count):
-                engine={'loop':'x86_iter','copy':'x86_iter','strlen':'x86_len_','iced':'iced____','fast':'fast____'}[label]
-                return list(map(int,sp.check_output([bins['official'],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('loop',1)[0])));cycles=[]
-            labels=['loop','strlen','copy','iced','fast']
+                key='official'if label=='official'else 'project'
+                engine={'iced':'iced____','fast':'fast____'}.get(label,'x86_len_' if mode else 'vecbatch')
+                return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
+            rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
+            labels=['official','project','copy','iced']+(['fast']if mode else [])
             for idx in range(13):
                 labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-        print(name,len(selected),flush=True)
-    assert {(k,md)for k in m['samples']for md in (1,2)}=={(x['case'],x['mode'])for x in results}
-    save('complete.json',dict(trees=trees,iced=iced,records=len(results),native=platform.platform(),machine=platform.machine(),positive_scanner_coverage=True))
+    assert len(results)==3*len(m['samples'])
+    save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
     if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
