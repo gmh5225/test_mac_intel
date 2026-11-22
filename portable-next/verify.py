@@ -1,7 +1,8 @@
 from pathlib import Path
 import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
-d=Path(__file__).resolve().parent;root=d.parent;s=root/'source';out=root/'evidence';out.mkdir(exist_ok=True)
-t=Path(tempfile.mkdtemp());tests=['mips_single', 'mips_scan', 'mips16_frames', 'mips16_immediates', 'mips16_memory_calls', 'mips16_shifts_hilo', 'mips16_word_order', 'mips16e2', 'mips_msa_control', 'mips_register_names', 'mips_reglist_offset']
+d=Path(__file__).resolve().parent;root=d.parent;s=root/'source';diet=os.environ.get('CS_TEST_DIET')=='1';out=root/'evidence'/('diet' if diet else 'full');out.mkdir(parents=True,exist_ok=True)
+t=Path(tempfile.mkdtemp());tests=['riscv_op_count_iter', 'riscv_instruction_groups', 'riscv_mapping_index', 'riscv_reg_access', 'riscv_sysreg', 'riscv_insn_name_segv', 'riscv_writeback_postprocess']
+if diet:tests=['riscv_writeback_postprocess']
 def run(args,n,cwd=None):
     with (out/(n+'.log')).open('w')as log:r=sp.run(list(map(str,args)),cwd=cwd,stdout=log,stderr=sp.STDOUT)
     if r.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2900:],flush=True);r.check_returncode()
@@ -12,12 +13,13 @@ try:
     m=json.loads((d/'tree.json').read_text());z=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/candidate.patch'])
     assert sha(z)==m['sha256'] and g('rev-parse','HEAD')==m['parent']
     patch=t/'current.patch';patch.write_bytes(z)
-    a=t/'harness';a.mkdir();shutil.copyfile(d/'records.c',a/'records.c')
+    a=t/'harness';a.mkdir();shutil.copyfile(d/('diet-records.c' if diet else 'records.c'),a/'records.c')
     (a/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(PortableRecords LANGUAGES C CXX)\nenable_testing()\nadd_subdirectory("'+s.as_posix()+'" capstone)\nadd_executable(records records.c)\ntarget_link_libraries(records PRIVATE capstone_static)\n')
     b=t/'b';windows=os.name=='nt'
-    opts=['cmake','-S',a,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON'for k in ['MIPS']]]
+    opts=['cmake','-S',a,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON']
+    if diet:opts.append('-DCAPSTONE_BUILD_DIET=ON')
     if windows:opts+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
-    run(opts,'configure');bins={};trees={}
+    run(opts,'configure');assert 'CAPSTONE_RISCV_SUPPORT:BOOL=ON' in (b/'CMakeCache.txt').read_text();bins={};trees={}
     for label in ('base','candidate'):
         if label=='candidate':
             g('apply','--index',str(patch));assert g('write-tree')==m['tree']
