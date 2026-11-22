@@ -1,7 +1,7 @@
-name: Measure AMD64 memory TEST and vector output on the published DIET fix in two source-built NeverD executables
+name: Compare AMD64 conditional moves and combined i386 AMD64 output in current LLVM source-built NeverD executables
 on:
   push:
-    branches: [codex/capstone-amd64-memory-products]
+    branches: [codex/capstone-cmov-shipping-products]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 58014c26001fc57a38cb27e3d2efc28de1d4a688
+          ref: 7dbd226c04c1232e30666f54526bc13e7999cc45
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -44,12 +44,12 @@ jobs:
       - name: Prepare ELF fixture reader
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-product-venv"
-          "$RUNNER_TEMP/capstone-product-venv/bin/python" -m pip install pyelftools==0.32
+          "$RUNNER_TEMP/capstone-product-venv/bin/python" -m pip install pyelftools==0.32 zstandard==0.23.0
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "58014c26001fc57a38cb27e3d2efc28de1d4a688"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "3458b2498e513a5c37d32f71db0909f8f75dd7c4"
+          test "$(git rev-parse HEAD)" = "7dbd226c04c1232e30666f54526bc13e7999cc45"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "77b7043a31582684a0234f104a1fc24d90f0a12d"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
@@ -62,6 +62,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: memory-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: conditional-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
