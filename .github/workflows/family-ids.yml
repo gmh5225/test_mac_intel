@@ -1,7 +1,7 @@
-name: Compare real alias users with bounded SystemZ and Xtensa register spelling in nine architectures
+name: Compare public x86 scan and format routing with two function layouts on seven native toolchains
 on:
   push:
-    branches: [codex/capstone-active-aliases-and-register-text]
+    branches: [codex/capstone-select-public-scan-frame]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: active-alias-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-scan-frame-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

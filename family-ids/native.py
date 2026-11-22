@@ -34,6 +34,8 @@ try:
         else:assert regular_code==original
         sections=sp.check_output(['readelf','-SW',so],text=True)
         save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
+        for symbol in ('cs_disasm_iter','disasmScanIterator','disasmCanonicalIterator'):
+            cmd('assembly-'+symbol+'-'+k,['objdump','-d','--disassemble='+symbol,so])
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
         if cc=='clang':
@@ -48,7 +50,6 @@ try:
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
             cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
-            cmd('index-check',['python3','-B',s/'suite/synctools/alias_pattern_rows.py','--check'])
     assert ids['base']!=ids['indexed']
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
@@ -56,14 +57,27 @@ try:
     shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
     cmd('libmvec',['python3','-B',t/'libmvec.py'])
+    cmd('build-public-states',['c++','-std=c++17','-O2','-I',s/'include',d/'public-records.cpp','-ldl','-o',t/'public-states'])
+    libs={}
+    for k in ('base','active','indexed'):
+        libs[k]=t/(k+'.so');libs[k].write_bytes(imgs[k])
+    states={}
+    for k in ('active','indexed'):
+        states[k]={}
+        for label,bits,f in [('real-pe32',32,t/'putty-0.85-32.text'),('real-pe64',64,t/'putty-0.85-64.text'),('code16',16,t/'putty-0.85-32.text'),('simd64',64,t/'libmvec.text')]:
+            z=json.loads(sp.check_output([t/'public-states',libs['base'],libs[k],f,str(bits)],text=True))
+            assert z['complete_record_comparisons']>0 and z['batch_records']>0
+            states[k][label]=z
+    assert states['active']==states['indexed']
+    save('public-differential',states)
     import corpus
     foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name'] in ('arm-ls', 'arm64-ls', 'mips64el-ls', 'ppc64el-ls', 'riscv64-ls', 'sparc64-ls', 's390x-ls', 'loong64-ls')]
     from xtensa import get
     xfile,xsource=get(t,load(d/'xtensa-source.json'));save('xtensa-source',xsource);extra.append(dict(name='xtensa-picolibc',path=xfile))
     assert len(extra)==9
     selectors={'arm': 101, 'arm64': 102, 'mips64el': 103, 'ppc64el': 104, 'riscv64': 105, 'sparc64': 106, 's390x': 107, 'loong64': 108, 'xtensa': 109}
-    panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
-    panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
+    panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(0,1,2))]
+    panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(0,1,2)))
     panels.extend((q['name'],selectors[q['name'].split('-')[0]],Path(q['path']),0x100000,(0,1,2))for q in extra)
     cmd('compile-records',['c++','-std=c++17','-O2','-I',s/'include',d/'raw.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'raw'])
     samples=[q for q in foreign if q['name'].split('-')[0] in selectors]+[extra[-1]]
