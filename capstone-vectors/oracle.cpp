@@ -64,11 +64,15 @@ int main() {
             }
             if (must_reject) return false;
             (wide ? hits64 : hits32)++;
+            const unsigned prefix = p[0] == 0xc5 ? 2 : 3;
+            const unsigned mod = p[prefix + 1] >> 6;
+            const unsigned rm = p[prefix + 1] & 7;
+            const unsigned ds = !mod && rm == 5 ? 4 : mod == 2 ? 4 : mod;
             const uint8_t *cursor = p;
             size_t left = n;
             uint64_t ip = reference.address;
             if (!cs_disasm_iter(ordinary, &cursor, &left, &ip, &reference) ||
-                length != (p[0] == 0xc5 ? 8 : 9) || cursor != p + length || left != n - length ||
+                length != prefix + 2 + ds || cursor != p + length || left != n - length ||
                 ip != actual.address + length || actual.id != reference.id ||
                 actual.size != length || reference.size != length ||
                 std::memcmp(actual.bytes, reference.bytes, sizeof(actual.bytes)) ||
@@ -101,6 +105,34 @@ int main() {
                         return 3;
                     }
                     if (f==0)for(unsigned end=0;end<n;++end)if(!check(bytes,end,true))return 4;
+                }
+        for (unsigned prefix : {2u, 3u}) for (unsigned map = 1; map <= (prefix == 2 ? 1u : 3u); ++map)
+            for (unsigned opcode = 0; opcode < 256; ++opcode) for (unsigned wl = 0; wl < (prefix == 2 ? 2u : 4u); ++wl)
+                for (unsigned addr = 0; addr < 32; ++addr) for (unsigned ext = 0; ext < 4; ++ext) {
+                    const unsigned mod = addr >> 3, rm = addr & 7;
+                    const unsigned ds = (!mod && rm == 5) || mod == 2 ? 4 : mod == 1 ? 1 : 0;
+                    const unsigned end = prefix + 2 + ds;
+                    const unsigned dst = (addr * 3 + ext + opcode) & 15, src = (dst ^ 15);
+                    unsigned rxb = ((dst >> 3) << 2) | ext;
+                    const unsigned values[] = {0,9,10,127,128,246,0xffffffffU,0x80000000U};
+                    const unsigned val=values[(addr + ext + opcode) & 7];
+                    std::array<uint8_t,11> b{};
+                    b[0] = uint8_t(prefix == 2 ? 0xc5 : 0xc4);
+                    b[1] = uint8_t(((~rxb & 7) << 5) | map);
+                    b[prefix - 1] = uint8_t((prefix == 2 ? ((~rxb & 4) << 5) : ((wl >> 1) << 7)) |
+                                            ((~src & 15) << 3) | ((wl & 1) << 2) | 1);
+                    b[prefix] = uint8_t(opcode);
+                    b[prefix + 1] = uint8_t((mod << 6) | ((dst & 7) << 3) | rm);
+                    for (unsigned n=0; n<ds; ++n) b[prefix+2+n] = uint8_t(val >> (8*n));
+                    const bool reject = !wide || mod==3 || rm==4;
+                    const auto hits = hits64;
+                    if (!check(b,end,reject) || !check(b,11,reject)) {
+                        std::fprintf(stderr,"base mismatch prefix=%u map=%u opcode=%02x wl=%u modrm=%02x ext=%u disp=%x\\n",prefix,map,opcode,wl,b[prefix+1],ext,val);
+                        return 8;
+                    }
+                    if (wide && !reject && map==1 && opcode==0xfe && hits64 && hits64!=hits+2)
+                        return 9;
+                    if (ext==0) for (unsigned n=0; n<end; ++n) if (!check(b,n,true)) return 10;
                 }
         std::array<uint8_t,11> supported{{0xc4,0x62,0xed,0xa8,0x05,0x36,0xc3,0x06,0,0x90,0x90}};
         if (!check(supported,11,false))return 5;

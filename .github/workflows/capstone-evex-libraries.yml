@@ -1,7 +1,7 @@
-name: Compare register-row VEX memory eligibility with released Capstone and iced on complete real inputs
+name: Measure VEX base-addressed packed memory output against the released fork and iced
 on:
   push:
-    branches: [codex/vex-rip-from-register-rows]
+    branches: [codex/vex-base-memory-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-rip-bits-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-base-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

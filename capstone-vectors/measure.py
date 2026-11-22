@@ -82,14 +82,14 @@ def main(w):
         save('direct-guard-'+label,dict(counts=counts))
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
-            assert sp.check_output([w/'verify-evex-memory','--vex-rip-memory'])==(base/'arch/X86/X86GenVexRipMemory.inc').read_bytes()
+            assert sp.check_output([w/'verify-evex-memory','--vex-base-memory'])==(base/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
         from elftools.elf.elffile import ELFFile
         vector_obj,=b.rglob('X86VectorOutput.c.o')
         with vector_obj.open('rb')as f:
             ef=ELFFile(f)
             sections={z.name:dict(bytes=z.data_size,sha256=hashlib.sha256(z.data()).hexdigest())for z in ef.iter_sections()if z['sh_flags']&4 and z.data_size and z['sh_type']=='SHT_PROGBITS'}
         syms=[line.split()for line in sp.check_output(['nm','-S','--defined-only',vector_obj],text=True).splitlines()]
-        flags=[int(line[1],16)for line in syms if line[-1]=='vex_rip_register_rows']
+        flags=[int(line[1],16)for line in syms if line[-1]=='vex_base_memory_rows']
         assert flags==([34]if label=='integrated' else [])
         save('shared-reader-code-'+label+'.json',dict(sections=sections,table=flags))
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
@@ -97,7 +97,7 @@ def main(w):
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
         if label=='integrated':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
-            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVexRipMemory',*libs,'-o',w/'coverage'],'link-counter')
+            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVexBaseMemory',*libs,'-o',w/'coverage'],'link-counter')
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
