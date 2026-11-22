@@ -103,10 +103,10 @@ index d9dd18e2..428aed88 100644
  		       check_scalar_segment_reads() &&
  		       check_vector_compare_flags();
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index cb97fb2b..0cce1008 100644
+index 6800a4e1..56132546 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -1550,7 +1550,8 @@ static bool check_mode(cs_mode mode)
+@@ -1580,7 +1580,8 @@ static bool check_mode(cs_mode mode)
  		    !check_evex_memory_moves(handles) ||
  		    !check_padding(handles) ||
  		    (mode == CS_MODE_32 &&
@@ -114,5 +114,5 @@ index cb97fb2b..0cce1008 100644
 +		     (!check_vex_clear(handles) ||
 +		      !check_segment_lea32(handles) ||
  		      !check_vex32_register_moves(handles) ||
- 		      !check_memory_compares(handles, mode))) ||
+ 		      !check_memory_flag_immediates(handles, mode))) ||
  		    !check_alu_memory(handles, mode) ||
