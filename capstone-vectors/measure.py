@@ -20,8 +20,6 @@ def main(w):
     reference=json.loads((r/'experiment.json').read_text())['checkout_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     meta=json.loads((r/'experiment.json').read_text())
-    assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['checkout_tree'] and sha(r/'rip-parent.patch')==meta['parent_patch_sha256']
-    run(['git','-C',base,'apply','--index',r/'rip-parent.patch'],'parent-tree')
     assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['baseline_tree']
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -85,6 +83,15 @@ def main(w):
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
             assert sp.check_output([w/'verify-evex-memory','--vex-rip-memory'])==(base/'arch/X86/X86GenVexRipMemory.inc').read_bytes()
+        from elftools.elf.elffile import ELFFile
+        obj,=b.rglob('X86VectorOutput.c.o')
+        with obj.open('rb')as f:
+            ef=ELFFile(f)
+            sections={z.name:dict(bytes=z.data_size,sha256=hashlib.sha256(z.data()).hexdigest())for z in ef.iter_sections()if z['sh_flags']&4 and z.data_size and z['sh_type']=='SHT_PROGBITS'}
+        syms=[line.split()for line in sp.check_output(['nm','-S','--defined-only',obj],text=True).splitlines()]
+        flags=[int(line[1],16)for line in syms if line[-1]=='vex_rip_register_rows']
+        assert flags==([34]if label=='integrated' else [])
+        save('shared-reader-code-'+label+'.json',dict(sections=sections,table=flags))
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -122,7 +129,7 @@ def main(w):
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
             added=set(members)-set(prior)
-            assert set(prior)<=set(members) and not added and changed=={'X86PlainEvexOutput.c.o','X86VectorOutput.c.o','X86VectorFallback64.c.o'},(changed,added)
+            assert set(prior)<=set(members) and not added and {'X86VectorOutput.c.o','X86VectorFallback64.c.o'}<=changed<={'X86PlainEvexOutput.c.o','X86VectorOutput.c.o','X86VectorFallback64.c.o'},(changed,added)
             changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target

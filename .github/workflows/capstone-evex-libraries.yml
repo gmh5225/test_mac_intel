@@ -1,7 +1,7 @@
-name: Measure full VEX RIP-relative memory records and count their actual use on six real programs
+name: Compare register-row VEX memory eligibility with released Capstone and iced on complete real inputs
 on:
   push:
-    branches: [codex/vex-rip-output-rows]
+    branches: [codex/vex-rip-from-register-rows]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
+          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-rip-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-rip-bits-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
