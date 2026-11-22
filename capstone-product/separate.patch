@@ -1,0 +1,921 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 77d1aaa8..5fdf3e07 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1046,7 +1046,7 @@ set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+ # The i386 iterator is an internal static-link entry used by NeverD.
+ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
+-    add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
++    add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c arch/X86/X86BatchScan.c)
+     target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
+diff --git a/Makefile b/Makefile
+index b8b582a0..336293f0 100644
+--- a/Makefile
++++ b/Makefile
+@@ -278,7 +278,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+new file mode 100644
+index 00000000..84c9d532
+--- /dev/null
++++ b/arch/X86/X86BatchScan.c
+@@ -0,0 +1,197 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++/* Keep the optional static iterator and its tables in their own ELF sections. */
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_native_batch_text" rodata = \
++	".cs_x86_native_batch_rodata"
++#endif
++#include "X86ScanAdapter.h"
++#include "../../cs_priv.h"
++
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++#include "../../cs_disasm_internal.h"
++#define X86_DEFINE_VEX2_PUBLIC_PLANS
++#include "X86GenVexPublicPlans.inc"
++#undef X86_DEFINE_VEX2_PUBLIC_PLANS
++#include "X86GenBatchPrimary.inc"
++
++/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
++static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
++			 unsigned *tail)
++{
++	if (size <= offset)
++		return false;
++	const uint8_t modrm = code[offset];
++	if (modrm >= 0xc0) {
++		*tail = 0;
++		return true;
++	}
++	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
++					       { 1, 1, 1, 1, 2, 1, 1, 1 },
++					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
++	unsigned length = lengths[modrm >> 6][modrm & 7];
++	if ((modrm & 0xc7) == 4) {
++		if (size <= offset + 1)
++			return false;
++		if ((code[offset + 1] & 7) == 5)
++			length += 4;
++	}
++	*tail = length;
++	return true;
++}
++
++static uint32_t readPrimary(const uint8_t *code, size_t size, unsigned plan)
++{
++	if (plan & X86_BATCH_REG_GROUP) {
++		if (size < 2)
++			return 0;
++		const uint8_t mr = code[1];
++		plan = x86BatchRegGroups[plan & ~X86_BATCH_REG_GROUP]
++					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
++		if (!plan)
++			return 0;
++	}
++	unsigned length = plan & 15;
++	if (plan & 0x10) {
++		unsigned tail;
++		if (!addressBytes(code, size, 1, &tail))
++			return 0;
++		length += tail;
++	}
++	return length <= size ? (plan & ~0xffu) | length : 0;
++}
++
++/* Every admitted plan has the same public ID, reserved-vvvv rule and
++ * immediate extent as all of its canonical ModR/M outcomes. */
++static uint32_t readVex2Plan(const uint8_t *code, size_t size)
++{
++	if (size < 3)
++		return 0;
++	const unsigned payload = code[1];
++	unsigned plan = x86Vex2PublicPlans[payload & 3][code[2]];
++	if (plan & (X86_VEX2_PUBLIC_LENGTH | X86_VEX2_PUBLIC_GROUP)) {
++#if X86_HAS_VEX2_LENGTH_PLANS
++		if (plan & X86_VEX2_PUBLIC_LENGTH)
++			plan = x86Vex2LengthPlans[plan &
++						  (X86_VEX2_PUBLIC_LENGTH - 1)]
++						 [(payload >> 2) & 1];
++#endif
++#if X86_HAS_VEX2_PUBLIC_GROUPS
++		if (plan & X86_VEX2_PUBLIC_GROUP) {
++			if (size < 4)
++				return 0;
++			const unsigned modrm = code[3];
++			plan = x86Vex2PublicGroups[plan &
++						   (X86_VEX2_PUBLIC_GROUP - 1)]
++						  [((modrm >> 3) & 7) +
++						   (modrm >= 0xc0 ? 8 : 0)];
++		}
++#endif
++	}
++	if (!plan)
++		return 0;
++	if ((plan & 2) && (payload & 0x78) != 0x78)
++		return 0;
++	unsigned end = 3;
++	if (plan & 4) {
++		unsigned tail;
++		if (!addressBytes(code, size, 3, &tail))
++			return 0;
++		end = 4 + tail;
++	}
++	end += plan & 1;
++	if (end > size)
++		return 0;
++	return ((plan >> 3) << 8) | end;
++}
++
++static uint32_t readFirst32(const uint8_t *code, size_t size)
++{
++	const unsigned plan = x86Batch32Primary[code[0]];
++	if (plan)
++		return readPrimary(code, size, plan);
++	if (code[0] == 0xc5 && size >= 3 && (code[1] & 0xc0) == 0xc0)
++		return readVex2Plan(code, size);
++	return 0;
++}
++
++static uint32_t readFirst64(const uint8_t *code, size_t size)
++{
++	const unsigned byte = code[0];
++	if ((byte & 0xf0) == 0x40) {
++		if (size < 2)
++			return 0;
++		const unsigned opcode = code[1];
++		/* getIDForMode repairs 90 with REX.B to XCHG. */
++		if (opcode == 0x90 && (byte & 1))
++			return 0;
++		const unsigned plan = (byte & 8 ? x86Batch64RexWPrimary :
++						  x86Batch64Primary)[opcode];
++		const uint32_t word =
++			plan ? readPrimary(code + 1, size - 1, plan) : 0;
++		return word ? word + 1 : 0;
++	}
++	const unsigned plan = x86Batch64Primary[byte];
++	if (plan)
++		return readPrimary(code, size, plan);
++	if (byte == 0xc5)
++		return readVex2Plan(code, size);
++	return 0;
++}
++
++static inline X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
++					   size_t size, uint64_t address,
++					   uint32_t *output, size_t capacity,
++					   bool wide)
++{
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	X86ScanBatchResult batch = { 0, 0 };
++	cs_insn insn = { 0 };
++	handle->errnum = CS_ERR_OK;
++	while (batch.count < capacity && size) {
++		uint32_t packed = wide ? readFirst64(code, size) :
++					 readFirst32(code, size);
++		if (!packed) {
++			insn.address = address;
++			X86ScanResult result;
++			if (!X86_getInstructionScanResult(ud, code, size, &insn,
++							  &result))
++				break;
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++			packed = (insn.id << 8) | result.length;
++		}
++		output[batch.count++] = packed;
++		const unsigned length = packed & 0xff;
++		batch.bytes += length;
++		code += length;
++		size -= length;
++		address += length;
++	}
++	return batch;
++}
++#endif
++
++CAPSTONE_INTERNAL
++X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
++				       uint64_t address, uint32_t *output,
++				       size_t capacity)
++{
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (handle && use_x86_scan(handle) && !handle->skipdata && code &&
++	    output && capacity && size && handle->insn_id == X86_get_insn_id &&
++	    handle->disasm == X86_getInstruction) {
++		if (handle->mode == CS_MODE_32)
++			return scanBatch(ud, code, size, address, output,
++					 capacity, false);
++		if (handle->mode == CS_MODE_64)
++			return scanBatch(ud, code, size, address, output,
++					 capacity, true);
++	}
++#endif
++	return X86_scanBatch(ud, code, size, address, output, capacity);
++}
++#endif
+diff --git a/arch/X86/X86GenBatchPrimary.inc b/arch/X86/X86GenBatchPrimary.inc
+new file mode 100644
+index 00000000..7ca45afd
+--- /dev/null
++++ b/arch/X86/X86GenBatchPrimary.inc
+@@ -0,0 +1,125 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++/* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */
++
++#ifdef CAPSTONE_X86_REDUCE
++/* The private primary batch entries uses the full decoder. */
++#else
++#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)
++static const uint32_t x86Batch32Primary[256] = {
++	0x00000812u, 0x00000812u, 0x00000812u, 0x00000812u, 0x00000802u, 0x00000805u, 0x00026101u, 0x00024901u,
++	0x00020012u, 0x00020012u, 0x00020012u, 0x00020012u, 0x00020002u, 0x00020005u, 0x00026101u, 0x00000000u,
++	0x00000612u, 0x00000612u, 0x00000612u, 0x00000612u, 0x00000602u, 0x00000605u, 0x00026101u, 0x00024901u,
++	0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c02u, 0x00028c05u, 0x00026101u, 0x00024901u,
++	0x00001812u, 0x00001812u, 0x00001812u, 0x00001812u, 0x00001802u, 0x00001805u, 0x00000000u, 0x00009001u,
++	0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb02u, 0x0002cb05u, 0x00000000u, 0x00009101u,
++	0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df02u, 0x0005df05u, 0x00000000u, 0x00000101u,
++	0x00006912u, 0x00006912u, 0x00006912u, 0x00006912u, 0x00006902u, 0x00006905u, 0x00000000u, 0x00000401u,
++	0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u, 0x0000e601u,
++	0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u, 0x00009301u,
++	0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u,
++	0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u,
++	0x00026301u, 0x00024b01u, 0x00000000u, 0x00001e12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026105u, 0x0000e416u, 0x00026102u, 0x0000e413u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00010d02u, 0x00010a02u, 0x00010102u, 0x0000fe02u, 0x00010402u, 0x00010902u, 0x00010002u, 0x0000ff02u,
++	0x00011002u, 0x00010c02u, 0x00010e02u, 0x00010b02u, 0x00010802u, 0x00010502u, 0x00010702u, 0x00010602u,
++	0x80000000u, 0x80000001u, 0x80000000u, 0x80000000u, 0x0002de12u, 0x0002de12u, 0x00000000u, 0x00000000u,
++	0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x00000000u, 0x80000002u, 0x00000000u, 0x00000000u,
++	0x0001fe01u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u,
++	0x00008f01u, 0x00004001u, 0x0000aa07u, 0x0005c601u, 0x00026501u, 0x00024e01u, 0x00028601u, 0x00014401u,
++	0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0002de02u, 0x0002de05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u,
++	0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u,
++	0x80000003u, 0x80000003u, 0x00027903u, 0x00027901u, 0x00000000u, 0x00000000u, 0x80000004u, 0x80000005u,
++	0x0000a604u, 0x00014d01u, 0x00015f03u, 0x00015f01u, 0x0000f001u, 0x0000ee02u, 0x0000f101u, 0x0000f901u,
++	0x80000006u, 0x80000006u, 0x80000006u, 0x80000006u, 0x00000302u, 0x00000000u, 0x00028801u, 0x0005de01u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00015e02u, 0x00015d02u, 0x00015c02u, 0x00010302u, 0x0000e502u, 0x0000e502u, 0x00020302u, 0x00020302u,
++	0x00003e05u, 0x0000ac05u, 0x0000ab07u, 0x0000ac02u, 0x0000e501u, 0x0000e501u, 0x00020301u, 0x00020301u,
++	0x00000000u, 0x0000ef01u, 0x00000000u, 0x00000000u, 0x0000df01u, 0x00004f01u, 0x80000007u, 0x80000008u,
++	0x00004401u, 0x0002bf01u, 0x00004a01u, 0x0002c201u, 0x00004501u, 0x0002c001u, 0x80000009u, 0x8000000au,
++};
++static const uint32_t x86Batch64Primary[256] = {
++	0x00000812u, 0x00000812u, 0x00000812u, 0x00000812u, 0x00000802u, 0x00000805u, 0x00000000u, 0x00000000u,
++	0x00020012u, 0x00020012u, 0x00020012u, 0x00020012u, 0x00020002u, 0x00020005u, 0x00000000u, 0x00000000u,
++	0x00000612u, 0x00000612u, 0x00000612u, 0x00000612u, 0x00000602u, 0x00000605u, 0x00000000u, 0x00000000u,
++	0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c02u, 0x00028c05u, 0x00000000u, 0x00000000u,
++	0x00001812u, 0x00001812u, 0x00001812u, 0x00001812u, 0x00001802u, 0x00001805u, 0x00000000u, 0x00000000u,
++	0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb02u, 0x0002cb05u, 0x00000000u, 0x00000000u,
++	0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df02u, 0x0005df05u, 0x00000000u, 0x00000000u,
++	0x00006912u, 0x00006912u, 0x00006912u, 0x00006912u, 0x00006902u, 0x00006905u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u,
++	0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x0001ed12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026105u, 0x0000e416u, 0x00026102u, 0x0000e413u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00010d02u, 0x00010a02u, 0x00010102u, 0x0000fe02u, 0x00010402u, 0x00010902u, 0x00010002u, 0x0000ff02u,
++	0x00011002u, 0x00010c02u, 0x00010e02u, 0x00010b02u, 0x00010802u, 0x00010502u, 0x00010702u, 0x00010602u,
++	0x80000000u, 0x80000001u, 0x00000000u, 0x80000000u, 0x0002de12u, 0x0002de12u, 0x00000000u, 0x00000000u,
++	0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x00000000u, 0x80000002u, 0x00000000u, 0x00000000u,
++	0x0001fe01u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u,
++	0x00008f01u, 0x00004001u, 0x00000000u, 0x0005c601u, 0x00026601u, 0x00024f01u, 0x00028601u, 0x00014401u,
++	0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0002de02u, 0x0002de05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u,
++	0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u, 0x0001cc05u,
++	0x80000003u, 0x80000003u, 0x00027903u, 0x00027901u, 0x00000000u, 0x00000000u, 0x80000004u, 0x80000005u,
++	0x0000a604u, 0x00014d01u, 0x00015f03u, 0x00015f01u, 0x0000f001u, 0x0000ee02u, 0x00000000u, 0x0000f901u,
++	0x80000006u, 0x80000006u, 0x80000006u, 0x80000006u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0005de01u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00015e02u, 0x00015d02u, 0x00015c02u, 0x00010f02u, 0x0000e502u, 0x0000e502u, 0x00020302u, 0x00020302u,
++	0x00003e05u, 0x0000ac05u, 0x00000000u, 0x0000ac02u, 0x0000e501u, 0x0000e501u, 0x00020301u, 0x00020301u,
++	0x00000000u, 0x0000ef01u, 0x00000000u, 0x00000000u, 0x0000df01u, 0x00004f01u, 0x80000007u, 0x80000008u,
++	0x00004401u, 0x0002bf01u, 0x00004a01u, 0x0002c201u, 0x00004501u, 0x0002c001u, 0x80000009u, 0x8000000au,
++};
++static const uint32_t x86Batch64RexWPrimary[256] = {
++	0x00000812u, 0x00000812u, 0x00000812u, 0x00000812u, 0x00000802u, 0x00000805u, 0x00000000u, 0x00000000u,
++	0x00020012u, 0x00020012u, 0x00020012u, 0x00020012u, 0x00020002u, 0x00020005u, 0x00000000u, 0x00000000u,
++	0x00000612u, 0x00000612u, 0x00000612u, 0x00000612u, 0x00000602u, 0x00000605u, 0x00000000u, 0x00000000u,
++	0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c12u, 0x00028c02u, 0x00028c05u, 0x00000000u, 0x00000000u,
++	0x00001812u, 0x00001812u, 0x00001812u, 0x00001812u, 0x00001802u, 0x00001805u, 0x00000000u, 0x00000000u,
++	0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb12u, 0x0002cb02u, 0x0002cb05u, 0x00000000u, 0x00000000u,
++	0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df12u, 0x0005df02u, 0x0005df05u, 0x00000000u, 0x00000000u,
++	0x00006912u, 0x00006912u, 0x00006912u, 0x00006912u, 0x00006902u, 0x00006905u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u, 0x00026101u,
++	0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u, 0x00024901u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x0001ed12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00026105u, 0x0000e416u, 0x00026102u, 0x0000e413u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00010d02u, 0x00010a02u, 0x00010102u, 0x0000fe02u, 0x00010402u, 0x00010902u, 0x00010002u, 0x0000ff02u,
++	0x00011002u, 0x00010c02u, 0x00010e02u, 0x00010b02u, 0x00010802u, 0x00010502u, 0x00010702u, 0x00010602u,
++	0x80000000u, 0x80000001u, 0x00000000u, 0x80000000u, 0x0002de12u, 0x0002de12u, 0x00000000u, 0x00000000u,
++	0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x0001cc12u, 0x00000000u, 0x80000002u, 0x00000000u, 0x00000000u,
++	0x0001fe01u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u, 0x0005d501u,
++	0x00004101u, 0x00007c01u, 0x00000000u, 0x0005c601u, 0x00026601u, 0x00024f01u, 0x00028601u, 0x00014401u,
++	0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0002de02u, 0x0002de05u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u, 0x0001cc02u,
++	0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u, 0x0001cd09u,
++	0x80000003u, 0x80000003u, 0x00027903u, 0x00027901u, 0x00000000u, 0x00000000u, 0x80000004u, 0x80000005u,
++	0x0000a604u, 0x00014d01u, 0x00016003u, 0x00016001u, 0x0000f001u, 0x0000ee02u, 0x00000000u, 0x0000fa01u,
++	0x80000006u, 0x80000006u, 0x80000006u, 0x80000006u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0005de01u,
++	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
++	0x00015e02u, 0x00015d02u, 0x00015c02u, 0x00010f02u, 0x0000e502u, 0x0000e502u, 0x00020302u, 0x00020302u,
++	0x00003e05u, 0x0000ac05u, 0x00000000u, 0x0000ac02u, 0x0000e501u, 0x0000e501u, 0x00020301u, 0x00020301u,
++	0x00000000u, 0x0000ef01u, 0x00000000u, 0x00000000u, 0x0000df01u, 0x00004f01u, 0x80000007u, 0x80000008u,
++	0x00004401u, 0x0002bf01u, 0x00004a01u, 0x0002c201u, 0x00004501u, 0x0002c001u, 0x80000009u, 0x8000000bu,
++};
++static const uint32_t x86BatchRegGroups[][16] = {
++	{ 0x00000813u, 0x00020013u, 0x00000613u, 0x00028c13u, 0x00001813u, 0x0002cb13u, 0x0005df13u, 0x00006913u, 0x00000813u, 0x00020013u, 0x00000613u, 0x00028c13u, 0x00001813u, 0x0002cb13u, 0x0005df13u, 0x00006913u },
++	{ 0x00000816u, 0x00020016u, 0x00000616u, 0x00028c16u, 0x00001816u, 0x0002cb16u, 0x0005df16u, 0x00006916u, 0x00000816u, 0x00020016u, 0x00000616u, 0x00028c16u, 0x00001816u, 0x0002cb16u, 0x0005df16u, 0x00006916u },
++	{ 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00014c12u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00027b13u, 0x00027c13u, 0x00026713u, 0x00026a13u, 0x0002ab13u, 0x0002ae13u, 0x00028713u, 0x00028913u, 0x00027b13u, 0x00027c13u, 0x00026713u, 0x00026a13u, 0x0002ab13u, 0x0002ae13u, 0x00028713u, 0x00028913u },
++	{ 0x0001cc13u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001cc13u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0001cc16u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0001cc16u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x00027b12u, 0x00027c12u, 0x00026712u, 0x00026a12u, 0x0002ab12u, 0x0002ae12u, 0x00028712u, 0x00028912u, 0x00027b12u, 0x00027c12u, 0x00026712u, 0x00026a12u, 0x0002ab12u, 0x0002ae12u, 0x00028712u, 0x00028912u },
++	{ 0x0002de13u, 0x0002de13u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u, 0x0002de13u, 0x0002de13u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u },
++	{ 0x0002de16u, 0x0002de16u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u, 0x0002de16u, 0x0002de16u, 0x0001ff12u, 0x0001fd12u, 0x0001f212u, 0x0000e412u, 0x00009412u, 0x0000e212u },
++	{ 0x0000e612u, 0x00009312u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0000e612u, 0x00009312u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u },
++	{ 0x0000e612u, 0x00009312u, 0x00003e12u, 0x00003e12u, 0x0000ac12u, 0x0000ac12u, 0x00026112u, 0x00000000u, 0x0000e612u, 0x00009312u, 0x00003e12u, 0x00000000u, 0x0000ac12u, 0x00000000u, 0x00026112u, 0x00000000u },
++	{ 0x0000e612u, 0x00009312u, 0x00003e12u, 0x0000aa12u, 0x0000ac12u, 0x0000ab12u, 0x00026112u, 0x00000000u, 0x0000e612u, 0x00009312u, 0x00003e12u, 0x00000000u, 0x0000ac12u, 0x00000000u, 0x00026112u, 0x00000000u },
++};
++#endif
+diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
+new file mode 100644
+index 00000000..7817a761
+--- /dev/null
++++ b/arch/X86/X86GenVexPublicPlans.inc
+@@ -0,0 +1,135 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++/* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */
++
++#ifdef CAPSTONE_X86_REDUCE
++#define X86_HAS_VEX2_PUBLIC_PLANS 0
++#define X86_HAS_VEX2_PUBLIC_GROUPS 0
++
++#else
++#define X86_HAS_VEX2_PUBLIC_PLANS 1
++#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS
++enum { X86_VEX2_PUBLIC_LENGTH = 16384, X86_VEX2_PUBLIC_GROUP = 32768 };
++/* Public plan, tagged L pair or ModR/M group by pp/opcode. */
++static const uint16_t x86Vex2PublicPlans[4][256] = {
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8414, 8414, 16384, 16385, 11788, 11772, 16386, 16387, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8190, 8190, 0, 32772, 0, 0, 11758, 6430,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32773, 11670, 11470, 11294, 6212, 6196, 8540, 11804, 6084, 8484, 6526, 6462, 11708, 8124, 6804, 8068,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 16388, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11653, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8406, 8406, 16389, 16390, 11780, 11764, 16391, 16392, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8182, 8182, 0, 32778, 0, 0, 11750, 6422,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32779, 11662, 0, 0, 6204, 6188, 8532, 11796, 6076, 8476, 6478, 6518, 11700, 8116, 6796, 8060,
++		11140, 11164, 11148, 8604, 8956, 8980, 8964, 8620, 11108, 11132, 11116, 8596, 11156, 11124, 16393, 8230,
++		10751, 32780, 32781, 32782, 8908, 8932, 8916, 0, 0, 0, 0, 0, 7900, 7916, 16393, 8230,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 16394, 16395, 11645, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6108, 10948, 10908, 10916, 8644, 10348, 16396, 32784, 10996, 11004, 9956, 8740, 8668, 8676, 9892, 8724,
++		8748, 10892, 10852, 8756, 10316, 10324, 6646, 32785, 10980, 10988, 9948, 10420, 8652, 8660, 9884, 11188,
++		0, 10844, 10804, 10812, 10364, 9836, 10532, 16397, 10956, 11012, 10964, 10972, 8628, 8684, 8636, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32787, 32787, 8390, 0, 0, 0, 8382, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6612, 0, 6726, 6630, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11684, 11476, 11300, 0, 0, 0, 0, 6100, 8500, 6620, 6678, 11724, 8140, 6820, 8084,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		10759, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16396, 8270,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6454, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32788, 32788, 8198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6604, 0, 6710, 6582, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11676, 0, 0, 0, 0, 0, 0, 6092, 8492, 6588, 0, 11716, 8132, 6812, 8076,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		10767, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7908, 7924, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6470, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		32789, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++};
++
++#define X86_HAS_VEX2_PUBLIC_GROUPS 1
++#define X86_HAS_VEX2_LENGTH_PLANS 1
++static const uint16_t x86Vex2LengthPlans[14][2] = {
++	{ 32768, 0 },
++	{ 32769, 0 },
++	{ 32770, 0 },
++	{ 32771, 0 },
++	{ 11818, 11810 },
++	{ 32774, 0 },
++	{ 32775, 0 },
++	{ 32776, 0 },
++	{ 32777, 0 },
++	{ 8206, 0 },
++	{ 9693, 0 },
++	{ 32783, 0 },
++	{ 8174, 0 },
++	{ 32786, 0 },
++};
++
++/* Register form and ModR/M.reg select an exact public plan. */
++static const uint16_t x86Vex2PublicGroups[22][16] = {
++	{ 8316, 8316, 8316, 8316, 8316, 8316, 8316, 8316, 8276, 8276, 8276, 8276, 8276, 8276, 8276, 8276 },
++	{ 8318, 8318, 8318, 8318, 8318, 8318, 8318, 8318, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8292, 8292, 8292, 8292, 8292, 8292, 8292, 8292, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300 },
++	{ 8294, 8294, 8294, 8294, 8294, 8294, 8294, 8294, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8366, 8366, 8366, 8366, 8366, 8366, 8366, 8366, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 8334, 8334, 8334, 8334, 8334, 8334, 8334, 8334 },
++	{ 8308, 8308, 8308, 8308, 8308, 8308, 8308, 8308, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8310, 8310, 8310, 8310, 8310, 8310, 8310, 8310, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8284, 8284, 8284, 8284, 8284, 8284, 8284, 8284, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8286, 8286, 8286, 8286, 8286, 8286, 8286, 8286, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 8358, 8358, 8358, 8358, 8358, 8358, 8358, 8358, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 8326, 8326, 8326, 8326, 8326, 8326, 8326, 8326 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10949, 0, 10893, 0, 10845, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10909, 0, 10853, 0, 10805, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10917, 10901, 0, 0, 10813, 10797 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 9455, 9455, 9455, 9455, 9455, 9455, 9455, 9455 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 10054, 10054, 10054, 10054, 10054, 10054, 10054, 10054 },
++	{ 8350, 8350, 8350, 8350, 8350, 8350, 8350, 8350, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 8038, 8038, 8038, 8038, 8038, 8038, 8038, 8038 },
++	{ 8398, 8398, 8398, 8398, 8398, 8398, 8398, 8398, 8396, 8396, 8396, 8396, 8396, 8396, 8396, 8396 },
++	{ 8374, 8374, 8374, 8374, 8374, 8374, 8374, 8374, 8372, 8372, 8372, 8372, 8372, 8372, 8372, 8372 },
++	{ 8022, 8022, 8022, 8022, 8022, 8022, 8022, 8022, 0, 0, 0, 0, 0, 0, 0, 0 },
++};
++#endif
++
++#endif
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index a1423650..246ee26c 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -25,6 +25,12 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
+ 				 uint64_t address, uint32_t *output,
+ 				 size_t capacity);
+ 
++/* Static batch reader with the X86_scanBatch contract. The handle selects
++ * the 32- or 64-bit primary tables once for each batch. */
++X86ScanBatchResult X86_scanNativeBatch(csh handle, const uint8_t *code,
++				      size_t size, uint64_t address,
++				      uint32_t *output, size_t capacity);
++
+ /* Decode a direct near CALL and write its absolute target using the same
+  * operand-size and wrapping rules as full operand detail. Returns its length,
+  * or zero with target untouched for invalid input or any other instruction.
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index cdc59ba3..ac121091 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -897,6 +897,106 @@ def emit_terminal_selection(target, modrm, entries, invalid):
+     ]
+ 
+ 
++def terminal_immediate_bytes(tail, size, address_size):
++    readers = {
++        f"readImmediateImpl(insn, {width}, false)": width
++        for width in IMMEDIATES.values()
++    }
++    total, immediate = 0, size
++    for call in tail:
++        if call == "readMemoryOffset(insn, false)":
++            total += address_size
++            immediate = 0
++        else:
++            width = readers[call]
++            immediate = immediate if width == "insn->immediateSize" else int(width)
++            tables.require(immediate > 0, "Invalid immediate extent")
++            total += immediate
++    return total
++
++
++def emit_batch_primary(suffix):
++    if suffix:
++        return "/* The private primary batch entries uses the full decoder. */"
++    groups, terminals, rows, _, _, _ = legacy_terminal_model(suffix, public=True)
++    mapping = public_instruction_ids(suffix)
++    widths = {}
++    modrm_call = "(!insn->consumedModRM && readModRMScan(insn))"
++    for (ops, _), handler in groups.items():
++        reads = read_operand_calls(ops, materialize=False)
++        modrm = bool(reads and reads[0] == modrm_call)
++        tail = reads[1:] if modrm else reads
++        tables.require(modrm_call not in tail, "Expected leading ModR/M")
++        widths[handler] = (modrm, terminal_immediate_bytes(tail, 4, 4),
++                           terminal_immediate_bytes(tail, 4, 8))
++
++    # Leave every prefix or escape with the existing classifier. REX bytes
++    # encode INC/DEC in i386 mode and use ordinary primary descriptors.
++    header = tables.uncomment((X86 / "X86FeatureExtension.h").read_text())
++    flags = header.split("feature_prefix_flags[256]", 1)[1].split("{", 1)[1].split("}", 1)[0]
++    flags = [int(v.strip(), 0) for v in flags.split(",") if v.strip()]
++    rex = int(re.search(r"\bFEATURE_REX_PREFIX\s*=\s*(\d+)", header)[1])
++    tables.require(len(flags) == 256 and flags[0x0F] != 0, "Invalid primary opcode classes")
++
++    indexed = []
++    group_bit = 1 << 31
++
++    def primary(context):
++        legacy = context == "X86_TERMINAL_32"
++        direct = []
++        index = next(i for i, row in enumerate(TERMINAL_ROWS) if row[0] == context)
++        for opcode, (first, kind) in enumerate(rows[index][0]):
++            if (flags[opcode] and not (legacy and flags[opcode] == rex)) or not first:
++                direct.append(0)
++                continue
++            values = []
++            for modrm in range(256):
++                uid, _, handler = tables.source_id(terminals, kind, first, modrm)
++                if not uid:
++                    values.append(0)
++                    continue
++                reads_modrm, legacy_tail, native_tail = widths[handler]
++                tail = legacy_tail if legacy else native_tail
++                reads_modrm |= kind != "MODRM_ONEENTRY"
++                fixed = 1 + int(reads_modrm) + tail
++                tables.require(fixed <= 15 and mapping[uid] < (group_bit >> 8), "Primary plan overflow")
++                values.append((mapping[uid] << 8) | (0x10 if reads_modrm else 0) | fixed)
++            if len(set(values)) == 1:
++                direct.append(values[0])
++                continue
++            by_reg = []
++            for register in (False, True):
++                for reg in range(8):
++                    outcomes = {v for mr, v in enumerate(values)
++                                if (mr >= 0xC0) == register and (mr >> 3) & 7 == reg}
++                    by_reg.append(outcomes.pop() if len(outcomes) == 1 else 0)
++            if not any(by_reg):
++                direct.append(0)
++                continue
++            if by_reg not in indexed:
++                indexed.append(by_reg)
++            direct.append(group_bit | indexed.index(by_reg))
++            for mr, expected in enumerate(values):
++                fast = by_reg[((mr >> 3) & 7) + (8 if mr >= 0xC0 else 0)]
++                tables.require(not fast or fast == expected, "Primary group changed a terminal")
++        tables.require(len(direct) == 256, "Incomplete primary opcode map")
++        return direct
++
++    lines = ["#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)"]
++    for name, context in (("x86Batch32Primary", "X86_TERMINAL_32"),
++                          ("x86Batch64Primary", "X86_TERMINAL_64"),
++                          ("x86Batch64RexWPrimary", "X86_TERMINAL_64_REXW")):
++        direct = primary(context)
++        lines.append(f"static const uint32_t {name}[256] = {{")
++        for start in range(0, 256, 8):
++            lines.append("\t" + ", ".join(f"0x{v:08x}u" for v in direct[start:start+8]) + ",")
++        lines.append("};")
++    lines.append("static const uint32_t x86BatchRegGroups[][16] = {")
++    for group in indexed or [[0] * 16]:
++        lines.append("\t{ " + ", ".join(f"0x{v:08x}u" for v in group) + " },")
++    return "\n".join(lines + ["};"])
++
++
+ def emit_terminal(suffix):
+     groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
+         suffix
+@@ -947,25 +1047,11 @@ def emit_terminal(suffix):
+     lines += emit_terminal_tables("Legacy", words, rows, kinds)
+     lines += emit_terminal_tables("LegacyPublic", public_words, public_rows, kinds)
+     lines.append("#ifdef X86_COMPACT_PUBLIC_HEADER")
+-    immediate_readers = {
+-        f"readImmediateImpl(insn, {width}, false)": width
+-        for width in IMMEDIATES.values()
+-    }
+     lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
+     for size, address_size in ((2, 2), (4, 4), (4, 8)):
+         extents = []
+         for tail in public_tails:
+-            total, immediate = 0, size
+-            for call in tail:
+-                if call == "readMemoryOffset(insn, false)":
+-                    total += address_size
+-                    immediate = 0
+-                else:
+-                    width = immediate_readers[call]
+-                    immediate = immediate if width == "insn->immediateSize" else int(width)
+-                    tables.require(immediate > 0, "Invalid immediate extent")
+-                    total += immediate
+-            extents.append(str(total))
++            extents.append(str(terminal_immediate_bytes(tail, size, address_size)))
+         lines.append("\t{ " + ", ".join(extents) + " },")
+     lines += [
+         "};",
+@@ -1158,7 +1244,130 @@ def vex_scan_form(operands, register_form):
+     return True
+ 
+ 
+-def emit_vex_scan_rows(suffix):
++def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
++                    metadata, patterns):
++    """Collapse identical ModR/M outcomes into one public ID and operand extent."""
++    ids = tables.parse_ids(source, contexts)
++    maps = tables.parse_maps(
++        (X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
++        names[:4] if suffix else names, len(contexts),
++    )
++    _, indices, rows = maps[1]
++    tails = {number: len(lengths) for lengths, number in patterns.items()
++             if not lengths or lengths == ("1",)}
++    out, groups = [], []
++    for selector in range(8):
++        attributes = attrs["ATTR_VEX"] | pp[selector & 3]
++        if selector & 4:
++            attributes |= attrs["ATTR_VEXL"]
++        index = indices[contexts.index(context_values[attributes])]
++        long_index = indices[contexts.index(context_values[attributes | attrs["ATTR_64BIT"]])]
++        tables.require(index == long_index, "VEX2 opcode map differs by bitness")
++        row = rows[index - 1] if index else [("MODRM_ONEENTRY", 0)] * 256
++        plans = []
++        for opcode, (kind, offset) in enumerate(row):
++            def plan(modrm):
++                uid = tables.source_id(ids, kind, offset, modrm)
++                if not uid or uid >= len(metadata) or not metadata[uid]:
++                    return 0
++                word = metadata[uid]
++                public_id, flags = word >> 8, word & 255
++                if not public_id or (flags >> 4) not in tails:
++                    return 0
++                has_modrm = kind != "MODRM_ONEENTRY" or bool(flags & 4)
++                form = 2 if modrm >= 0xc0 else 1
++                if has_modrm and not flags & form:
++                    return 0
++                tables.require(public_id < 2048, "VEX2 public ID overlaps the plan tags")
++                return ((public_id << 3) | (int(has_modrm) << 2)
++                        | (int(not flags & 8) << 1) | tails[flags >> 4])
++
++            # These opcodes retain the general ID and size repairs of tryVexTerminalScan.
++            if opcode == 0xae or 0x82 <= opcode <= 0x8f:
++                plans.append(0)
++                continue
++            candidate = plan(0)
++            if candidate and all(plan(mr) == candidate for mr in range(1, 256)):
++                plans.append(candidate)
++            else:
++                # ModR/M.mod selects the operand form, and ModR/M.reg selects
++                # a group opcode. Only uniform outcomes within each partition
++                # can use a public plan. Zero retains canonical decoding.
++                outcomes = [plan(mr) for mr in range(256)]
++                group = []
++                for register_form in (False, True):
++                    for reg in range(8):
++                        values = [outcomes[mr] for mr in range(256)
++                                  if (mr >= 0xc0) == register_form
++                                  and ((mr >> 3) & 7) == reg]
++                        group.append(values[0] if len(set(values)) == 1 else 0)
++                if not any(group):
++                    plans.append(0)
++                    continue
++                tables.require(all(not word or word & 4 for word in group),
++                               "VEX2 grouped outcome has no ModR/M")
++                group = tuple(group)
++                if group not in groups:
++                    groups.append(group)
++                index = groups.index(group)
++                tables.require(index < 32768, "VEX2 group index exceeds tag")
++                plans.append(32768 | index)
++        out.append(plans)
++    if not any(any(row) for row in out):
++        return ["#define X86_HAS_VEX2_PUBLIC_PLANS 0",
++                "#define X86_HAS_VEX2_PUBLIC_GROUPS 0", ""]
++    # L commonly selects only operand width, which the public scan result
++    # does not expose. Preserve differing validity or IDs through tagged pairs.
++    length_pairs, shared = [], []
++    for prefix in range(4):
++        row = []
++        for opcode in range(256):
++            pair = (out[prefix][opcode], out[prefix + 4][opcode])
++            if pair[0] == pair[1]:
++                row.append(pair[0])
++            else:
++                if pair not in length_pairs:
++                    length_pairs.append(pair)
++                index = length_pairs.index(pair)
++                tables.require(index < 16384, "VEX2 length index exceeds tag")
++                row.append(16384 | index)
++        shared.append(row)
++    # Check all original selectors before replacing the dense generated rows.
++    for selector in range(8):
++        for opcode in range(256):
++            plan = shared[selector & 3][opcode]
++            if plan & 16384:
++                plan = length_pairs[plan & 16383][selector >> 2]
++            tables.require(plan == out[selector][opcode], "VEX2 compact plan differs")
++    out = shared
++    lines = ["#define X86_HAS_VEX2_PUBLIC_PLANS 1",
++             "#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS",
++             "enum { X86_VEX2_PUBLIC_LENGTH = 16384, X86_VEX2_PUBLIC_GROUP = 32768 };",
++        "/* Public plan, tagged L pair or ModR/M group by pp/opcode. */",
++             "static const uint16_t x86Vex2PublicPlans[4][256] = {"]
++    for row in out:
++        lines.append("\t{")
++        for i in range(0, len(row), 16):
++            lines.append("\t\t" + ", ".join(map(str, row[i:i + 16])) + ",")
++        lines.append("\t},")
++    lines += ["};", "", f"#define X86_HAS_VEX2_PUBLIC_GROUPS {int(bool(groups))}"]
++    lines += [f"#define X86_HAS_VEX2_LENGTH_PLANS {int(bool(length_pairs))}"]
++    if length_pairs:
++        lines += [f"static const uint16_t x86Vex2LengthPlans[{len(length_pairs)}][2] = {{"]
++        for pair in length_pairs:
++            lines.append("\t{ " + ", ".join(map(str, pair)) + " },")
++        lines += ["};", ""]
++    if groups:
++        lines += [
++                  "/* Register form and ModR/M.reg select an exact public plan. */",
++                  f"static const uint16_t x86Vex2PublicGroups[{len(groups)}][16] = {{"]
++        for group in groups:
++            lines.append("\t{ " + ", ".join(map(str, group)) + " },")
++        lines += ["};"]
++    return lines + ["#endif", ""]
++
++
++def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
+     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+     contexts, kinds, names = tables.parse_common(common)
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+@@ -1204,15 +1413,23 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            # A two-byte VEX has map 1 and W=0. Its 32-bit reader uses
++            # these same entries with the address and operand sizes of its mode.
++            if name == names[1] and key < 8:
++                other = indices[contexts.index(context_values[attributes & ~attrs["ATTR_64BIT"]])]
++                tables.require(row == other, "VEX2 row differs between 32 and 64 bits")
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
+         lines.append("\t},")
+     lines += ["};", ""]
++    if public_plans:
++        return emit_vex2_plans(suffix, source, contexts, names, context_values,
++                              attrs, pp, metadata, patterns)
+     return lines
+ 
+ 
+-def emit_vex_scan(suffix):
++def emit_vex_scan(suffix, public_plans=False):
+     # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
+     # no gather, mask, register-limit or predicate-dependent opcode checks.
+     reads = dict(read_specializations(suffix))
+@@ -1279,7 +1496,7 @@ def emit_vex_scan(suffix):
+             ]
+         lines.append("\t\treturn X86_SCAN_COMPLETE;")
+     lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
+-    return "\n".join(emit_vex_scan_rows(suffix) + lines)
++    return "\n".join(emit_vex_scan_rows(suffix, metadata, patterns, public_plans) + ([] if public_plans else lines))
+ 
+ 
+ def emit_writemask_opcodes(suffix):
+@@ -1341,7 +1558,9 @@ def main():
+         (TRANSLATE_OUTPUT, emit_translation),
+         (SCAN_OUTPUT, emit_scan),
+         (TERMINAL_OUTPUT, emit_terminal),
++        (X86 / "X86GenBatchPrimary.inc", emit_batch_primary),
+         (X86 / "X86GenVexScan.inc", emit_vex_scan),
++        (X86 / "X86GenVexPublicPlans.inc", lambda suffix: emit_vex_scan(suffix, True)),
+         (X86 / "X86GenWritemask.inc", emit_writemask_opcodes),
+     ]
+     generated = [(path, generated_output(emit)) for path, emit in outputs]
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 7781ca39..f31ff384 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1212,6 +1212,39 @@ static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_primary_batches(csh handle)
++{
++	static const uint8_t code[] = {
++		0xb8, 0xc5, 0xfd, 0x6f, 0xc1, /* VEX-looking bytes in a MOV immediate */
++		0xc5, 0xfd, 0x6f, 0xc1,
++		0xc5, 0xfd, 0x6f, 0x84, 0x25, 0, 0, 0, 0,
++		0x83, 0x6c, 0x24, 0x08, 0xff, /* SUB dword ptr [esp+8],-1 */
++		0x8b, 0x04, 0x2d, 0xc5, 0, 0, 0, /* base-less SIB */
++		0x81, 0xf9, 0xc5, 0xfd, 0x77, 0, /* CMP ECX,imm32 */
++		0xc5, 0xf8, 0x77, 0x90, 0xc5, 0xf0, 0x77
++	};
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) ||
++	    cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF))
++		return false;
++	for (size_t start = 0; start < sizeof(code); ++start) {
++		for (size_t n = 0; n <= sizeof(code) - start; ++n) {
++			for (size_t cap = 0; cap <= 16; ++cap) {
++				uint32_t a[16], b[16];
++				memset(a, 0xa5, sizeof(a));
++				memcpy(b, a, sizeof(a));
++				X86ScanBatchResult x = X86_scanBatch(
++					handle, code + start, n, UINT64_MAX - 5, a, cap);
++				X86ScanBatchResult y = X86_scanNativeBatch(
++					handle, code + start, n, UINT64_MAX - 5, b, cap);
++				if (x.bytes != y.bytes || x.count != y.count ||
++				    memcmp(a, b, sizeof(a)))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1289,7 +1322,7 @@ static bool check_mode(cs_mode mode)
+ 			}
+ 		}
+ 	}
+-	ok = check_callbacks(handles);
++	ok = check_callbacks(handles) && check_primary_batches(handles[0]);
+ done:
+ 	for (unsigned i = 0; i < 2; ++i)
+ 		if (handles[i])
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index e3319a1d..5bd4e977 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -231,6 +231,7 @@
+ 		DCFE248A19DDCDC000EF8EA9 /* X86Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */; };
+ 		2577BA5E41DF2459B4D95926 /* X86OutputIterator.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B56000BA9634450923573AB /* X86OutputIterator.c */; };
+ 		7E0CD60EC1143E92BF232050 /* X86Vex32Output.c in Sources */ = {isa = PBXBuildFile; fileRef = BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */; };
++		E9B25ED2C244E92BE35AD7F0 /* X86BatchScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 9A62153712655DA2CA950D57 /* X86BatchScan.c */; };
+ 		F475C40E5319E61F44B33A21 /* X86Sse64Output.c in Sources */ = {isa = PBXBuildFile; fileRef = 33715F65E8AB5BCE857343EE /* X86Sse64Output.c */; };
+ 		F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */; };
+ 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+@@ -521,6 +522,7 @@
+ 		DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Disassembler.c; sourceTree = "<group>"; };
+ 		3B56000BA9634450923573AB /* X86OutputIterator.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86OutputIterator.c; sourceTree = "<group>"; };
+ 		BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Vex32Output.c; sourceTree = "<group>"; };
++		9A62153712655DA2CA950D57 /* X86BatchScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86BatchScan.c; sourceTree = "<group>"; };
+ 		33715F65E8AB5BCE857343EE /* X86Sse64Output.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Sse64Output.c; sourceTree = "<group>"; };
+ 		526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86ImmediateOutput.c; sourceTree = "<group>"; };
+ 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
+@@ -1002,6 +1004,7 @@
+ 				DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */,
+ 				3B56000BA9634450923573AB /* X86OutputIterator.c */,
+ 				BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */,
++				9A62153712655DA2CA950D57 /* X86BatchScan.c */,
+ 				33715F65E8AB5BCE857343EE /* X86Sse64Output.c */,
+ 				526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */,
+ 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
+@@ -1767,6 +1770,7 @@
+ 				DCFE248A19DDCDC000EF8EA9 /* X86Disassembler.c in Sources */,
+ 				2577BA5E41DF2459B4D95926 /* X86OutputIterator.c in Sources */,
+ 				7E0CD60EC1143E92BF232050 /* X86Vex32Output.c in Sources */,
++				E9B25ED2C244E92BE35AD7F0 /* X86BatchScan.c in Sources */,
+ 				F475C40E5319E61F44B33A21 /* X86Sse64Output.c in Sources */,
+ 				F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */,
+ 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,

@@ -1,7 +1,7 @@
-name: Test current MIPS16 next and both x86 batch readers in the source-built NeverD consumer
+name: Keep the NeverD caller machine code identical and compare plain, section-local and EVEX batches in real products
 on:
   push:
-    branches: [codex/capstone-current-width-products]
+    branches: [codex/capstone-single-call-width-products]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-width-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: single-call-width-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
