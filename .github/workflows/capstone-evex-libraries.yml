@@ -1,7 +1,7 @@
-name: Emit i386 packed move text and details from the validated register row
+name: Measure i386 TEST register and memory immediate formatting against complete dirty records and source-built iced
 on:
   push:
-    branches: [codex/capstone-i386-packed-move-output]
+    branches: [codex/capstone-i386-unsigned-test]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 34465fdeaea6988c753bde5de6ab93942f65de36
+          ref: 68ca96c3343b0a7c110b9db372a9ee2642d857ef
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
