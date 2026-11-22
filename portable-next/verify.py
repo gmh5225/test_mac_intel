@@ -66,7 +66,7 @@ endforeach()
        if label=='mixed':check_table('check-rows','--vex-register-immediates','X86GenVexRegisterImmediates.inc')
     alias_check=(s/'suite/synctools/alias_pattern_rows.py').is_file()
     if alias_check:cmd('alias-table',[sys.executable,'-B',s/'suite/synctools/alias_pattern_rows.py','--check'])
-    assert alias_check==(label not in ('mixed','indexed'))
+    assert alias_check==(label not in ('mixed',))
     save('checked',dict(stage=label,complete=True,source=q,profile=profile,tests=tests,machine=platform.machine(),generator=bool(full),alias_check=alias_check))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);out=d.parent/'evidence';save('cleanup',dict(removed=not t.exists(),bytes=n))
