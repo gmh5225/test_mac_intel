@@ -1,7 +1,7 @@
-name: Verify canonical i386 memory and packed move output on Apple Clang and MSVC in sixteen builds
+name: Reproduce release exchange-test failures and validate supported syntax and DIET API semantics
 on:
   push:
-    branches: [codex/capstone-i386-output-record-portability]
+    branches: [codex/capstone-exchange-supported-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-output-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: checked-output-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
