@@ -33,7 +33,7 @@ try:
     run([cc,'-O2','-std=c11','-I',s,'-I',s/'include',r/'selected.c',b/'libcapstone.a','-lm','-o',tmp/'check-static'],'compile-static-selected')
     run([tmp/'check-static'],'static-selected')
     if conf=='full':
-        selected=['mips_single','mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
+        selected=['riscv_writeback_postprocess','arm_writeback_postprocess','mips_single','mips_scan','mips16_frames','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_word_order','mips16e2','mips_msa_control','mips_register_names','mips_reglist_offset','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv']+units+['x86_exchange_access','x86_bound_access','x86_encoding_accuracy','x86_reg_access','x86_evex_move_access','x86_packed_move_access']
     elif conf=='intel':
         selected=units
     else:
@@ -44,6 +44,7 @@ try:
         assert sha(libs['base'])==sha(libs['candidate'])
         write('inactive-images',dict(identical=True,sha256=sha(libs['base'])))
     run(['python3','-B',s/'suite/synctools/fixed_len_decoder.py','--check'],'direct-generation')
+    run(['python3','-B',s/'suite/synctools/operand_writeback.py','--check'],'implied-operands-generation')
     run(['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'],'alias-generation')
     run(['cmake','--build',b,'--parallel','4','--target',*selected],'build-units')
     run(['ctest','--test-dir',b,'--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(selected)+')$'],'units')
@@ -114,6 +115,18 @@ try:
                     cycles.append(cyc)
                 timing.append(dict(sample=name,mode=mode,cycles=cycles,check=first[2],reps=n))
                 write('timings',timing)
+        if cc=='clang' and platform.machine()=='x86_64':
+            import re
+            name,bits,path,ip=next(z for z in other_cases if z[0]=='riscv64-sort')
+            stats={}
+            for libname in ('base','candidate'):
+                target.write_bytes(inputs[libname]);profile=tmp/('callgrind-'+libname)
+                run([*bind,'valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(profile),tmp/'time',str(bits),'0',path,str(ip),'1'],'trace-'+libname)
+                raw=profile.read_text();events=re.search(r'^events: (.+)$',raw,re.M)[1].split();totals=re.search(r'^totals: (.+)$',raw,re.M)[1].split()
+                stats[libname]=dict(zip(events,map(int,totals)))
+                run(['callgrind_annotate','--show=Ir,Bc,Bcm,D1mr,D1mw','--auto=no','--threshold=99.95',profile],'functions-'+libname)
+                profile.unlink()
+            write('profile',stats)
     write('complete',dict(tree=meta['tree'],config=conf,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],platform=platform.machine(),os=platform.platform(),tests=selected,records=sum(x['calls'] for x in rows),libs={k:sha(v) for k,v in libs.items()}))
 finally:
     size=sum(f.stat().st_size for f in tmp.rglob('*') if f.is_file());shutil.rmtree(tmp);write('cleanup',dict(bytes=size,removed=not tmp.exists()))

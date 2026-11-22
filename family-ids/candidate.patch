@@ -1,70 +1,113 @@
 diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index 4190862e..77d5f89f 100644
+index 4190862e..1726adaa 100644
 --- a/arch/RISCV/RISCVDisassembler.c
 +++ b/arch/RISCV/RISCVDisassembler.c
-@@ -752,6 +752,10 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
- 		2, !RISCV_getFeatureBits(MI->csh->mode, RISCV_Feature64Bit),
- 		DecoderTableRISCV32Only_16,
- 		"RISCV32Only_16 table (16-bit Instruction)");
-+	/* The 32-bit-only table above retains first chance. For other
-+	 * compressed extensions the top six bits can exclude every table. */
-+	if (!(RISCV_COMPRESSED_EXTENSIONS & (UINT64_C(1) << (Insn >> 10))))
-+		goto base16;
- 	TRY_TO_DECODE_FEATURE(2, RISCV_FeatureStdExtZicfiss,
- 			      DecoderTableZicfiss16,
- 			      "RVZicfiss table (Shadow Stack)");
-@@ -760,6 +764,7 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
- 	TRY_TO_DECODE_FEATURE(
- 		2, RISCV_FeatureStdExtZcmp, DecoderTableRVZcmp16,
- 		"Zcmp table (16-bit Push/Pop & Double Move Instructions)");
-+base16:
- 	TRY_TO_DECODE_AND_ADD_SP(2, true, DecoderTable16,
- 				 "RISCV_C table (16-bit Instruction)");
- 
-diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
-index 10c7f1f7..823f8b59 100644
---- a/arch/RISCV/RISCVGenDirectDecoder.inc
-+++ b/arch/RISCV/RISCVGenDirectDecoder.inc
-@@ -17212,6 +17212,8 @@ Decode:
- 
- #define RISCV_EXTENSION_MAJORS UINT32_C(0x405f0c04)
- 
-+#define RISCV_COMPRESSED_EXTENSIONS UINT64_C(0x0000c90001000000)
-+
- static DecodeStatus directInstruction_2(const uint8_t *Table, MCInst *MI, uint16_t insn, uint64_t Address, const void *Decoder)
- 
+@@ -581,15 +581,17 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+ // isn't explicitly encoded in the instruction.
+ void addSPOperands(MCInst *MI)
  {
-diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
-index ab09030b..d4e2b65c 100644
---- a/suite/synctools/fixed_len_decoder.py
-+++ b/suite/synctools/fixed_len_decoder.py
-@@ -332,6 +332,7 @@ def main():
-         ]
-         counts = []
-         extension_majors = 0
-+        compressed_extensions = 0
-         ppc_extension_majors = 0
-         for name, body in tables:
-             encoded_width = int(name[-2:])
-@@ -346,6 +347,11 @@ def main():
-             if arch == "RISCV" and encoded_width == 32 and name != "DecoderTable32":
-                 for opcode_prefix in observable_field_values(nodes, 0, 7):
-                     extension_majors |= 1 << (opcode_prefix >> 2)
-+            if arch == "RISCV" and encoded_width == 16 and name not in (
-+                "DecoderTable16", "DecoderTableRISCV32Only_16"
-+            ):
-+                for bits in observable_field_values(nodes, 10, 6):
-+                    compressed_extensions |= 1 << bits
-             if arch == "PowerPC" and name != "DecoderTable32":
-                 if encoded_width == 64:
-                     # The first word in memory occupies bits 63:32, for either endianness.
-@@ -366,6 +372,9 @@ def main():
-             output.append(
-                 f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
-             )
-+            output.append(
-+                f"#define RISCV_COMPRESSED_EXTENSIONS UINT64_C(0x{compressed_extensions:016x})"
-+            )
-         if arch == "PowerPC":
-             output.append(
-                 f"#define PPC_EXTENSION_MAJORS UINT64_C(0x{ppc_extension_majors:016x})"
+-	const MCInstrDesc *MCID = MCInstrDesc_get(MCInst_getOpcode(MI),
+-						  RISCVDescs.Insts,
+-						  ARR_SIZE(RISCVDescs.Insts));
++	/* Bit zero records tied operands. The remaining bits identify
++	 * implied SP operands in insertion order. */
++	unsigned positions = RISCVWritebackFlags[MCInst_getOpcode(MI)] >> 1;
++	if (!positions)
++		return;
+ 	MCOperand SPReg;
+ 	SPReg.MachineOperandType = kRegister;
+ 	SPReg.Kind = kRegister;
+ 	SPReg.RegVal = RISCV_X2;
+-	for (unsigned i = 0; i < MCID->NumOperands; i++)
+-		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
++	for (unsigned i = 0; positions; ++i, positions >>= 1)
++		if (positions & 1)
+ 			MCInst_insert0(MI, i, &SPReg);
+ }
+ 
+@@ -775,7 +777,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+ 	DecodeStatus ret =
+ 		RISCV_getInstruction(MI, Size, Bytes, ByteLen, Address, NULL);
+ 
+-	if (RISCVWritebackFlags[MCInst_getOpcode(MI)])
++	if (RISCVWritebackFlags[MCInst_getOpcode(MI)] & 1)
+ 		MCInst_handleWriteback(MI, RISCVDescs.Insts,
+ 				       ARR_SIZE(RISCVDescs.Insts));
+ 
+diff --git a/arch/RISCV/RISCVGenWriteback.inc b/arch/RISCV/RISCVGenWriteback.inc
+index 34eec991..11725b17 100644
+--- a/arch/RISCV/RISCVGenWriteback.inc
++++ b/arch/RISCV/RISCVGenWriteback.inc
+@@ -371,9 +371,9 @@ static const uint8_t RISCVWritebackFlags[] = {
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+ 	1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0,
+-	0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1,
+-	0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 1, 1, 7, 4, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 4, 0, 4, 0, 4, 0, 4, 0, 0, 0, 0, 0, 0, 4,
++	0, 0, 0, 0, 0, 0, 0, 4, 1, 0, 0, 0, 0, 1, 1, 0, 0, 4, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1,
++	0, 4, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/suite/synctools/operand_writeback.py b/suite/synctools/operand_writeback.py
+index 828785ee..3f2186e4 100644
+--- a/suite/synctools/operand_writeback.py
++++ b/suite/synctools/operand_writeback.py
+@@ -65,9 +65,12 @@ def generated_flags(arch, source):
+         require(
+             offset + length <= len(operands), f"{arch} operand extent exceeds table"
+         )
+-        for _, _, _, constraints in operands[offset : offset + length]:
++        for index, (reg_class, _, _, constraints) in enumerate(operands[offset : offset + length]):
++            if arch == "RISCV" and reg_class == "RISCV_SPRegClassID":
++                require(index < 7, "RISC-V implied SP position exceeds packed operand flags")
++                flags[uid] |= 1 << (index + 1)
+             if re.fullmatch(r"CONSTRAINT_MCOI_TIED_TO\(\d+\)", constraints):
+-                flags[uid] = 1
++                flags[uid] |= 1
+             else:
+                 require(
+                     constraints in {"0", "CONSTRAINT_MCOI_EARLY_CLOBBER"},
+@@ -99,7 +102,8 @@ def integrated_source(arch, source):
+         anchor = f'#include "{arch}GenDirectDecoder.inc"'
+         require(source.count(anchor) == 1, f"Missing {arch} direct decoder include")
+         source = source.replace(anchor, anchor + "\n" + include)
+-    guard = f"if ({arch}WritebackFlags[MCInst_getOpcode(MI)])"
++    value = f"{arch}WritebackFlags[MCInst_getOpcode(MI)]"
++    guard = f"if ({value} & 1)" if arch == "RISCV" else f"if ({value})"
+     if guard not in source:
+         calls = list(
+             re.finditer(
+diff --git a/tests/unit/writeback_postprocess.c b/tests/unit/writeback_postprocess.c
+index 1afe180d..83513d25 100644
+--- a/tests/unit/writeback_postprocess.c
++++ b/tests/unit/writeback_postprocess.c
+@@ -30,15 +30,23 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
+ 	unsigned tied = 0;
+ 	for (unsigned opcode = 0; opcode < count; ++opcode) {
+ 		const MCInstrDesc *desc = &descs[count - 1 - opcode];
+-		bool expected = false;
+-		for (unsigned i = 0; i < desc->NumOperands; ++i)
++		unsigned expected = 0;
++		for (unsigned i = 0; i < desc->NumOperands; ++i) {
+ 			expected |= MCOperandInfo_isTiedToOp(&desc->OpInfo[i]);
++#ifdef WRITEBACK_TEST_RISCV
++			if (desc->OpInfo[i].RegClass == RISCV_SPRegClassID) {
++				if (i >= 7)
++					return false;
++				expected |= 2U << i;
++			}
++#endif
++		}
+ 		if (expected != flags[opcode]) {
+ 			fprintf(stderr, "%s projection mismatch %u\n", arch,
+ 				opcode);
+ 			return false;
+ 		}
+-		tied += expected;
++		tied += expected & 1;
+ 	}
+ 	printf("%s: %zu descriptors equal, %u tied\n", arch, count, tied);
+ 	return true;
