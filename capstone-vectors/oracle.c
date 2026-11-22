@@ -1,16 +1,12 @@
 #include "cs_priv.h"
 #include "arch/X86/X86SimpleOutput.h"
-#include "arch/X86/X86GenSimpleOutput.inc"
 
-bool observed_mixed(csh handle, bool wide, const uint8_t *bytes, size_t size,
-                    cs_insn *out, uint16_t *length)
+bool observed_plain(csh h, bool wide, const uint8_t *p, size_t n, cs_insn *out, uint16_t *length)
 {
-#if __has_include("arch/X86/X86GenVexRegisterImmediates.inc")
-    return size && bytes[0] == 0xc4 &&
-           X86_writeVexRegisterImmediate((cs_struct *)(uintptr_t)handle,
-                                         bytes, size, out, length,
-                                         x86_simple_registers, wide);
+#if __has_include("arch/X86/X86GenPlainEvexRegisterOutput.inc")
+	return wide && n >= 6 && p[0] == 0x62 && p[5] >= 0xc0 &&
+		X86_writePlainEvexRegisters((cs_struct *)(uintptr_t)h,p,out,length);
 #else
-    return false;
+	return false;
 #endif
 }

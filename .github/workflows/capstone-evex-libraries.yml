@@ -1,7 +1,7 @@
-name: Compare VEX register immediates against the shipped indexed EVEX tree
+name: Measure plain EVEX register output and count real miss-path hits separately
 on:
   push:
-    branches: [codex/mixed-vex-on-shipped-indexed]
+    branches: [codex/capstone-unmasked-evex-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 76852fa6948d8e279083a907870b207c9a2aefdc
+          ref: 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: indexed-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: plain-evex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

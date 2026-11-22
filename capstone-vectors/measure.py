@@ -82,10 +82,13 @@ def main(w):
         save('direct-guard-'+label,dict(counts=counts))
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
-            assert sp.check_output([w/'verify-evex-memory','--vex-register-immediates'])==(base/'arch/X86/X86GenVexRegisterImmediates.inc').read_bytes()
+            assert sp.check_output([w/'verify-evex-memory','--plain-evex-registers'])==(base/'arch/X86/X86GenPlainEvexRegisterOutput.inc').read_bytes()
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
+        if label=='integrated':
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
+            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writePlainEvexRegisters',*libs,'-o',w/'coverage'],'link-counter')
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -116,8 +119,8 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            added=set(members)-set(prior);assert added=={'X86VexRegisterImmediate.c.o'} and set(prior)<=set(members)
-            assert {'X86VectorFallback64.c.o','X86MemoryFallback32.c.o'}<=changed
+            added=set(members)-set(prior)
+            assert set(prior)<=set(members) and added=={'X86PlainEvexOutput.c.o'} and changed=={'X86VectorFallback64.c.o'},(changed,added)
             changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
@@ -169,6 +172,21 @@ def main(w):
         sel=selected
         manifest[name]=dict(source=source,input_functions=len(spans),common_functions=len(common),timed_functions=len(sel),bytes=sum(v[1] for v in sel),selection=panel,extent_sha256=sha(intervals),text_sha256=sha(f),excluded_incompatible_extents=[a for a in trace if a[1]!=a[5]])
         save('provenance.json',manifest)
+        coverage={}
+        for mode in (1,2):
+            args=['x86_iter',str(mode),'1',f,intervals,str(bits)]
+            observed=sp.run([w/'coverage',*args],capture_output=True,text=True,check=True)
+            normal=sp.check_output([exe['integrated'],*args],text=True)
+            result=list(map(int,observed.stdout.split()))
+            assert result[2:]==list(map(int,normal.split()))[2:] and len(result)==6
+            prefix,attempt,accepted=observed.stderr.split()
+            attempt,accepted=int(attempt),int(accepted)
+            assert prefix=='evex' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
+            if bits==32:assert attempt==0
+            coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
+        assert coverage['1']==coverage['2']
+        save('coverage-'+name+'.json',coverage)
+
         for mode in (0,1,2):
             def measure(lib,n,launch):
                 engine=lib+'____' if lib in ('iced','fast') else 'x86_iter' if lib.startswith('private_') else 'capstone'
