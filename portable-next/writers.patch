@@ -1,0 +1,350 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 46b3184d..2fea6feb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1038,27 +1038,35 @@ set(ALL_HEADERS
+ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
+ 
+ ## targets
++add_library(capstone_build_settings INTERFACE)
+ add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
++target_link_libraries(capstone PUBLIC capstone_build_settings)
+ set_property(TARGET capstone PROPERTY C_STANDARD 99)
+-target_include_directories(capstone PUBLIC
++target_include_directories(capstone_build_settings INTERFACE
+     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+ )
+ set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+-# The i386 iterator is an internal static-link entry used by NeverD.
+-if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST))
++# The x86-only public iterator uses the fixed-mode readers in both library forms.
++if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_enabled_architectures STREQUAL "X86"))
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+-    target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
++    target_link_libraries(capstone_x86_iter32 PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
+-    target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
++    target_link_libraries(capstone_x86_iter64 PRIVATE capstone_build_settings)
+     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+     endif()
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+-    target_link_libraries(capstone_x86_native PRIVATE capstone)
++    target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++    if(capstone_enabled_architectures STREQUAL "X86")
++        set(capstone_x86_objects
++            $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
++            $<TARGET_OBJECTS:capstone_x86_native>)
++        target_sources(capstone INTERFACE ${capstone_x86_objects})
++    endif()
+ endif()
+ 
+ if(CAPSTONE_BUILD_STATIC_LIBS)
+@@ -1094,7 +1102,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+ endif()
+ 
+ if(CAPSTONE_BUILD_SHARED_LIBS)
+-    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone>)
++    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_shared.so
+     set_target_properties(capstone_shared PROPERTIES OUTPUT_NAME "capstone")
+     set_target_properties(capstone_shared PROPERTIES
+@@ -1104,7 +1112,7 @@ if(CAPSTONE_BUILD_SHARED_LIBS)
+     target_include_directories(capstone_shared PUBLIC
+         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+     )
+-    target_compile_definitions(capstone PUBLIC CAPSTONE_SHARED)
++    target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_SHARED)
+     # Build pdb file for dll on Windows
+     if(MSVC)
+         message("Enabling PDB for Windows")
+diff --git a/Makefile b/Makefile
+index da328571..c685d209 100644
+--- a/Makefile
++++ b/Makefile
+@@ -436,6 +436,9 @@ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $
+ LIBOBJ += $(LIBOBJ_X86_NUMBERS)
+ LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
+ LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
++ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++LIBOBJ_SHARED := $(LIBOBJ)
++endif
+ 
+ 
+ ifeq ($(PKG_EXTRA),)
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..ee5e32dd 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,6 +30,21 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
+ 
++#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
++	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_OUTPUT
++/* Fixed-mode writers receive a nonempty instruction span. A successful
++ * write fills one record. Cursor and skipdata handling belong to the caller. */
++CAPSTONE_INTERNAL bool X86_tryOutput32(struct cs_struct *handle,
++				      const uint8_t *code, size_t size,
++				      cs_insn *insn, uint16_t *insn_size);
++CAPSTONE_INTERNAL bool X86_tryOutput64(struct cs_struct *handle,
++				      const uint8_t *code, size_t size,
++				      cs_insn *insn, uint16_t *insn_size);
++#endif
++
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *info);
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 12428fff..0d9b1a76 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,9 +3753,15 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
++#endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
++#ifdef CS_DECODE_OUTPUT_MISS
++#undef CS_DECODE_OUTPUT_MISS
++#endif
+ 
+ /* Keep the admitted terminal's public ID and zero alias adjustment visible
+  * through output completion. Cold helpers can take the fallback result's
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..197311ab 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -32,4 +32,28 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
++					    const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *length,
++					    bool batch)
++{
++	if (!handle->no_text) {
++		if (handle->mode == CS_MODE_32) {
++			if (X86_tryOutput32(handle, code, size, insn, length))
++				return true;
++			return X86_decodeOutputMiss32(handle, code, size, insn,
++						      length, batch);
++		}
++		if (handle->mode == CS_MODE_64) {
++			if (X86_tryOutput64(handle, code, size, insn, length))
++				return true;
++			return X86_decodeOutputMiss64(handle, code, size, insn,
++						      length, batch);
++		}
++	}
++	return cs_decode_full_insn(handle, code, size, insn, length, batch);
++}
++#endif
++
+ #endif
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..b0e4a88e 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -37,7 +37,12 @@ static void writeRelativeHex(char *out, uint64_t value)
+ #include "X86GenIndirectMemory.inc"
+ #endif
+ #ifdef X86_FIXED_OUTPUT
+-static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++CAPSTONE_INTERNAL
++#else
++static
++#endif
++bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size)
+ #else
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..b4b9ea6f 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -249,17 +249,21 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ }
+ 
+ #define X86_FIXED_ROUNDED writeRoundedRegisters
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#define X86_FIXED_OUTPUT X86_tryOutput64
++#else
+ #define X86_FIXED_OUTPUT tryOutput64
++#endif
+ #define X86_FIXED_WIDE true
+ #define X86_OUTPUT_MISS writeExtraOutput64
+ #include "X86SimpleOutputImpl.h"
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+-#undef X86_FIXED_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
+-#define CS_DECODE_TRY_OUTPUT tryOutput64
++#define CS_DECODE_TRY_OUTPUT X86_FIXED_OUTPUT
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
++#undef X86_FIXED_OUTPUT
+ #endif
+ 
+ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..679fb3e1 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -188,17 +188,21 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#define X86_FIXED_OUTPUT X86_tryOutput32
++#else
+ #define X86_FIXED_OUTPUT tryOutput32
++#endif
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32
+ #include "X86SimpleOutputImpl.h"
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+-#undef X86_FIXED_OUTPUT
+-#define CS_DECODE_TRY_OUTPUT tryOutput32
++#define CS_DECODE_TRY_OUTPUT X86_FIXED_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
++#undef X86_FIXED_OUTPUT
+ #endif
+ 
+ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index f3dfc374..b0f4a6ce 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,6 +18,11 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 92e01e07..34635d83 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -208,7 +208,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
+     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
+ endforeach()
+ 
+-if(TARGET x86_simple_output)
++if(TARGET x86_simple_output AND NOT capstone_enabled_architectures STREQUAL "X86")
+     target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
+ endif()
+ 
+diff --git a/tests/unit/text_option.c b/tests/unit/text_option.c
+index 06510090..1f6a7212 100644
+--- a/tests/unit/text_option.c
++++ b/tests/unit/text_option.c
+@@ -373,6 +373,77 @@ static bool test_x86_scan_option_transition(void)
+ 	return success;
+ }
+ 
++static bool test_x86_iter_changes_mode(void)
++{
++	/* In 64-bit mode 48 is REX.W. In 16/32-bit modes it decrements AX/EAX. */
++	static const uint8_t code[] = { 0x48, 0x89, 0xc1 };
++	static const struct {
++		cs_mode mode;
++		cs_err option_result;
++		bool text;
++		unsigned size;
++		x86_reg destination;
++	} steps[] = {
++		{ CS_MODE_32, CS_ERR_OK, true, 1, X86_REG_EAX },
++		{ CS_MODE_64, CS_ERR_OK, true, 3, X86_REG_RCX },
++		{ CS_MODE_32 | CS_MODE_X86_INTEL | CS_MODE_X86_AMD,
++		  CS_ERR_OPTION, true, 3, X86_REG_RCX },
++		{ CS_MODE_16, CS_ERR_OK, true, 1, X86_REG_AX },
++		{ CS_MODE_64 | CS_MODE_X86_AMD, CS_ERR_OK, false, 3, X86_REG_RCX },
++		{ CS_MODE_64 | CS_MODE_X86_INTEL, CS_ERR_OK, true, 3, X86_REG_RCX },
++		{ CS_MODE_32, CS_ERR_OK, false, 1, X86_REG_EAX },
++		{ CS_MODE_32, CS_ERR_OK, true, 1, X86_REG_EAX },
++	};
++	csh handle;
++	if (!check(cs_open(CS_ARCH_X86, CS_MODE_16, &handle) == CS_ERR_OK,
++		   "open mode-transition decoder"))
++		return false;
++	cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
++	cs_insn *insn = cs_malloc(handle);
++	if (!check(insn != NULL, "allocate mode-transition instruction")) {
++		cs_close(&handle);
++		return false;
++	}
++	const bool diet = cs_support(CS_SUPPORT_DIET);
++	bool success = true;
++	for (size_t i = 0; i < sizeof(steps) / sizeof(steps[0]); ++i) {
++		const uint8_t *cursor = code;
++		size_t left = sizeof(code);
++		uint64_t address = 0x1000;
++		success &= check(cs_option(handle, CS_OPT_TEXT,
++					   steps[i].text ? CS_OPT_ON : CS_OPT_OFF) ==
++					 CS_ERR_OK,
++				 "change text on the retained handle");
++		success &= check(cs_option(handle, CS_OPT_MODE, steps[i].mode) ==
++					 steps[i].option_result,
++				 "accept a mode or retain the previous mode");
++		if (!check(cs_disasm_iter(handle, &cursor, &left, &address, insn),
++			   "decode after option changes")) {
++			success = false;
++			break;
++		}
++		const bool mov = steps[i].size == 3;
++		success &= check(insn->id == (mov ? X86_INS_MOV : X86_INS_DEC) &&
++					 insn->size == steps[i].size &&
++					 cursor == code + steps[i].size &&
++					 left == sizeof(code) - steps[i].size &&
++					 address == 0x1000 + steps[i].size,
++				 "use the current mode and advance by its length");
++		success &= check(strcmp(insn->mnemonic, steps[i].text && !diet ?
++							      (mov ? "mov" : "dec") : "") == 0,
++				 "use the current text option");
++		const cs_x86 *x86 = &insn->detail->x86;
++		success &= check(steps[i].text ?
++					 (x86->op_count == (mov ? 2 : 1) &&
++					  x86->operands[0].reg == steps[i].destination) :
++					 x86->op_count == 0,
++				 "use the current operand width and detail policy");
++	}
++	cs_free(insn, 1);
++	cs_close(&handle);
++	return success;
++}
++
+ static bool test_x86_scan_mode_priority(void)
+ {
+ 	/* Feature routing uses the 64-bit flag; decoding preserves the existing
+@@ -556,6 +627,7 @@ int main(void)
+ 		success &= test_x86();
+ 	success &= test_x86_scan_validation();
+ 	success &= test_x86_scan_option_transition();
++	success &= test_x86_iter_changes_mode();
+ 	success &= test_x86_scan_mode_priority();
+ 	success &= test_x86_scan_size_prefixes();
+ 	success &= test_aarch64();

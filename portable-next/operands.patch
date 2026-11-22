@@ -1,0 +1,28 @@
+diff --git a/arch/X86/X86VectorRegisterOutput.h b/arch/X86/X86VectorRegisterOutput.h
+index 1f238c20..663e3c25 100644
+--- a/arch/X86/X86VectorRegisterOutput.h
++++ b/arch/X86/X86VectorRegisterOutput.h
+@@ -42,7 +42,14 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	}
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		/* Each live register slot is fully initialized below. Clear the
++		 * common fields and unused slots, including ABI padding. */
++		memset(d, 0, offsetof(cs_detail, x86) +
++				     offsetof(cs_x86, operands));
++		const size_t after_registers = offsetof(cs_x86, operands) +
++					       reg_count * sizeof(cs_x86_op);
++		memset((unsigned char *)&d->x86 + after_registers, 0,
++		       sizeof(cs_x86) - after_registers);
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		d->groups_count = row->group_count;
+ 		cs_x86 *x = &d->x86;
+@@ -56,6 +63,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 						 X86_REG_ZMM0 };
+ 		for (unsigned n = 0; n != reg_count; ++n) {
+ 			cs_x86_op *op = &x->operands[n];
++			memset(op, 0, sizeof(*op));
+ 			op->type = X86_OP_REG;
+ 			const unsigned width = n == 0 ? first_ll : ll;
+ 			op->reg = (x86_reg)(bases[width] + regs[n]);

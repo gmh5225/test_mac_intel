@@ -1,7 +1,7 @@
-name: Build and verify compact block broadcasts and implicit-register repairs on Windows and macOS
+name: Verify VEX memory row bits, vector operand writes and public record writers on Windows and macOS
 on:
   push:
-    branches: [codex/portable-vector-broadcast-repair]
+    branches: [codex/portable-vector-writers-and-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: broadcast-implicit-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: vector-writer-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
