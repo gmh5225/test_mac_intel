@@ -1,7 +1,7 @@
-name: Check early i386 VEX2 escape dispatch against the shipping decoder and both real 32/64-bit scanner controls
+name: Measure cold i386 VEX2 routing with linked and object code attribution on both compilers
 on:
   push:
-    branches: [codex/capstone-vex2-mode-escape]
+    branches: [codex/capstone-cold-i386-vex2]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0fbbaa9ca1ab4eb9c390d08ff26a42384d052e82
+          ref: 9615f6450fb7c47dad85a76cd89ad246c6962de3
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mode-local-vex2-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: cold-vex2-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

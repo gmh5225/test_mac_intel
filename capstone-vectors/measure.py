@@ -94,6 +94,24 @@ def main(w):
             assert prior.keys()==members.keys() and changed=={'X86DisassemblerDecoder.c.o'},changed
             assert sha(ordinary)!=sha(w/'unselected-baseline')
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
+        # Record the actual linked addresses and the same functions in the object,
+        # where PC-relative external calls have not yet acquired link addresses.
+        from elftools.elf.elffile import ELFFile
+        def get_symbols(f):
+            wanted=('cs_disasm_iter','X86_scanBatch','decodeScanResultGeneric','decodeScanResultFallback','X86_getInstructionScanResult','decodeGenericScan','readVex2Scan32')
+            found={}
+            with f.open('rb')as stream:
+                elf=ELFFile(stream);table=elf.get_section_by_name('.symtab')
+                for sy in table.iter_symbols():
+                    name=sy.name.split('.llvm.')[0]
+                    if name not in wanted or not sy['st_size']:continue
+                    section=elf.get_section(sy['st_shndx']);start=sy['st_value']-section['sh_addr'];end=start+sy['st_size'];blob=section.data()[start:end]
+                    assert len(blob)==sy['st_size']
+                    found[name]=dict(bytes=len(blob),sha256=hashlib.sha256(blob).hexdigest(),address=sy['st_value'],section=section.name)
+            assert {'cs_disasm_iter','X86_scanBatch','decodeScanResultFallback','decodeScanResultGeneric'}<=set(found)
+            return found
+        scan_object,=b.rglob('X86DisassemblerDecoder.c.o')
+        save('scan-symbols-'+label+'.json',dict(object=get_symbols(scan_object),linked=get_symbols(target)))
         exe[label]=target
     save('tested-trees.json',data)
     exe['aa']=w/'copy';shutil.copy2(exe['baseline'],exe['aa'])
