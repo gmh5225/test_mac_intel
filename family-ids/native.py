@@ -13,9 +13,9 @@ t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==m
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
     imgs={};ids={}
-    for k in ('base','mode','placed','fixed'):
+    for k in ('base','mode','fixed'):
         if k!='base':
-            if k in ('placed','fixed'):g('restore','--source',orig,'--staged','--worktree','--','.')
+            if k=='fixed':g('restore','--source',orig,'--staged','--worktree','--','.')
             assert sha(d/(k+'.patch'))==meta[k]['sha256'];g('apply','--index',str(d/(k+'.patch')));assert g('write-tree')==meta[k]['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
@@ -28,8 +28,9 @@ try:
             if len(e)==4 and e[3] in ('X86_get_insn_id','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
         assert 'cs_disasm_iter' in syms and 'X86_get_insn_id' in syms
         save('layout-'+k,dict(symbols=syms,text_sha=sha(raw),size=raw.stat().st_size))
-        if k=='placed':placed_text=sha(raw)
-        if k=='fixed':assert placed_text==sha(raw)
+        cmd('build-tests-'+k,['cmake','--build',b,'--parallel','4','--target','x86_reg_access','x86_buffer_bounds','x86_scan_batch'])
+        cmd('test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(x86_reg_access|x86_buffer_bounds|x86_scan_batch)$'])
+        cmd('mapping-'+k,['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
         imgs[k]=so.read_bytes()
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
@@ -57,7 +58,7 @@ try:
             rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
     if os.environ['FLAVOR']=='first':
         stats={}
-        for k in ('base','mode','placed','fixed'):
+        for k in ('base','mode','fixed'):
             target.write_bytes(imgs[k]);f=t/'callgrind.out'
             args=['valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(f),t/'time','32','2',t/'putty-0.85-32.text',str(0x401000),'1']
             cmd('profile-'+k,args)
