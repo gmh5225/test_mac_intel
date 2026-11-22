@@ -1,7 +1,7 @@
-name: Check fixed public routing and RIP output independently in two source-built release products
+name: Measure legacy two-register and RIP-relative vector output in two real source-built NeverD products
 on:
   push:
-    branches: [codex/public-rip-shipping-pair]
+    branches: [codex/legacy-map38-rip-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-rip-shipping-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: map38-rip-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
