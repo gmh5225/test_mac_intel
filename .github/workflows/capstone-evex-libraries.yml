@@ -1,7 +1,7 @@
-name: Compare handle-selected public and private iterators with the released library and fork iced in two build configurations
+name: Measure initializing complete vector register operands at their writes against released Capstone and fork iced
 on:
   push:
-    branches: [codex/selected-public-iterator-real]
+    branches: [codex/complete-vector-operands]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: selected-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-op-writes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -119,8 +119,8 @@ def main(w):
             parent='release' if key=='project'else 'official'
             a,b=objects[parent],objects[key];assert a.keys()==b.keys()
             changed=[n for n in a if a[n]!=b[n]]
-            assert 'X86DisassemblerDecoder.c.o' in changed and 'cs.c.o' in changed
-            assert all(n not in changed for n in ('X86Vex32Output.c.o','X86Sse64Output.c.o','X86BatchScan.c.o')),changed
+            affected={'X86Sse64Output.c.o','X86VectorOutput.c.o','X86VectorFallback64.c.o','X86MemoryFallback32.c.o','X86PlainEvexOutput.c.o'}
+            assert changed and set(changed)<=affected,changed
             save('archive-'+key+'.json',dict(baseline=parent,all_members=len(a),changed=changed,objects=[a,b]))
         if key in ('single','official'):
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
@@ -133,6 +133,9 @@ def main(w):
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
         if key=='project':
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-DOBSERVE_WITH_SIZE','-I',base,'-I',base/'include','-c',r/'active-ops.c','-o',w/'active-ops.o'],'link-guard-ops')
+            run(['clang++','-std=c++17','-O2','-I',base/'include',r/'active-ops.cpp',w/'active-ops.o',lib,'-o',w/'active-ops'],'compile-guard-ops')
+            run([w/'active-ops'],'oracle-active-ops')
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
                 run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/(name+'.cpp'),w/'plan.o',lib,'-o',w/name],'compile-'+name)
