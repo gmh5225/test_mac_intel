@@ -80,10 +80,26 @@ def main(w):
             assert (('X86_disasmIter32' in symbols),('X86_disasmIterText' in symbols))==(selected,selected)
         members={name:hashlib.sha256(sp.check_output(['ar','p',libs[0],name])).hexdigest()for name in sp.check_output(['ar','t',libs[0]],text=True).splitlines()}
         save('members-'+label+'.json',members)
+        from elftools.elf.elffile import ELFFile
+        import io
+        contents=sp.check_output(['ar','p',libs[0],'X86Vex32Output.c.o'])
+        ef=ELFFile(io.BytesIO(contents))
+        exec_sections={se.name:hashlib.sha256(se.data()).hexdigest() for se in ef.iter_sections() if se.data_size and se['sh_flags']&4}
+        assert exec_sections
+        if label=='baseline':original_sections=exec_sections
+        else:assert original_sections==exec_sections,(original_sections,exec_sections)
+        names=('X86_disasmIter32','X86_disasmIterText','cs_decode_full_insn','X86_decodeOutputMiss32')
+        addrs={f[3]:[int(f[0],16),int(f[1],16)] for line in sp.check_output(['nm','-S','--defined-only',target],text=True).splitlines() if len(f:=line.split())==4 and f[3] in names}
+        with target.open('rb')as stream: es={z.name:[z['sh_addr'],z.data_size]for z in ELFFile(stream).iter_sections() if z['sh_flags']&2 and z['sh_type']=='SHT_PROGBITS'}
+        save('private-layout-'+label+'.json',dict(executable_sections=exec_sections,entrypoints=addrs,sections=es))
+        if label=='integrated':
+            (w/'extra.o').write_bytes(sp.check_output(['ar','p',libs[0],'X86MemoryFallback32.c.o']))
+            run(['objdump','-drw','--no-show-raw-insn',w/'extra.o'],'fallback-assembly')
+
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Vex32Output.c.o'},changed
+            assert set(members)-set(prior)=={'X86MemoryFallback32.c.o'} and changed=={'X86Vex32Output.c.o'},(changed,members.keys()-prior.keys())
             assert sha(w/'unselected-baseline')==sha(ordinary)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
@@ -111,7 +127,7 @@ def main(w):
     extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
     for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w),extra):
         if name not in data['samples']:continue
-        if name in ('putty-32-0.85','putty-64-0.85','libmvec-amd64'):
+        if name in data['samples']:
             states={}
             address=spans[0][2]-spans[0][0]
             for which in (0,1):

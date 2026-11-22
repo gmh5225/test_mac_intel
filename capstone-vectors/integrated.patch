@@ -1,5 +1,110 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 77d1aaa8..d41bec26 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1049,7 +1049,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+     target_link_libraries(capstone_x86_iter32 PRIVATE capstone)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c)
++    add_library(capstone_x86_iter64 OBJECT arch/X86/X86Sse64Output.c arch/X86/X86MemoryFallback32.c)
+     target_link_libraries(capstone_x86_iter64 PRIVATE capstone)
+     if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+diff --git a/Makefile b/Makefile
+index b8b582a0..376ae741 100644
+--- a/Makefile
++++ b/Makefile
+@@ -278,7 +278,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+new file mode 100644
+index 00000000..55855e22
+--- /dev/null
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -0,0 +1,73 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_memory_fallback32_text" rodata = \
++	".cs_x86_memory_fallback32_rodata"
++#endif
++#include "../../cs_priv.h"
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86OutputOptions.h"
++#include "X86SimpleOutput.h"
++#include "X86GenSimpleOutput.inc"
++#include "../../cs_disasm_internal.h"
++#define X86_MEMORY32_OUTPUT
++#define X86_MEMORY_IMMEDIATE writeCompare32
++#define X86_IMMEDIATE_WIDE 0
++#define X86_COMPARE_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_COMPARE_IMMEDIATE
++#undef X86_MEMORY_IMMEDIATE
++#undef X86_IMMEDIATE_WIDE
++
++#define X86_SEGMENT_LEA32 writeSegmentLea32
++#include "X86MemoryOutputImpl.h"
++#undef X86_SEGMENT_LEA32
++#undef X86_MEMORY32_OUTPUT
++
++/* Favor a direct tail call for every form outside these two memory writers.
++ * Their output descriptors come from the existing canonical scalar rows. */
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	const unsigned opcode = code[0];
++	switch (opcode) {
++	case 0x80:
++	case 0x81:
++	case 0x83:
++		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const unsigned row =
++				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
++				2;
++			if (writeCompare32(code, size, insn, insn_size,
++					   &x86_simple_outputs[row],
++					   x86_simple_registers))
++				return true;
++		}
++		break;
++	case 0x26:
++	case 0x2e:
++	case 0x36:
++	case 0x3e:
++	case 0x64:
++	case 0x65:
++		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
++		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
++			if (writeSegmentLea32(code, size, insn, insn_size,
++					      &x86_simple_outputs[row],
++					      x86_simple_registers))
++				return true;
++		}
++		break;
++	}
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
++#endif
++#endif
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 7ccad787..090d5ae5 100644
+index 7ccad787..044bbd10 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
 @@ -7,6 +7,8 @@
@@ -22,7 +127,19 @@ index 7ccad787..090d5ae5 100644
  #else
  	const unsigned lead = rex != 0;
  #endif
-@@ -64,8 +66,14 @@ bool X86_writeMemoryOutput(
+@@ -43,7 +45,11 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
++#ifdef X86_COMPARE_IMMEDIATE
++	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
++#else
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
++#endif
+ 	const unsigned imm_offset = offset + disp_size;
+ 	const unsigned length = imm_offset + imm_size;
+ #else
+@@ -64,8 +70,14 @@ bool X86_writeMemoryOutput(
  		const unsigned index_reg = ((rex & 2) << 2) |
  					   ((encoding >> 3) & 7);
  		base_reg = encoding & 7;
@@ -37,7 +154,7 @@ index 7ccad787..090d5ae5 100644
  			return false;
  		if (index_reg != 4) {
  			index = &regs[wide ? 3 : 2][index_reg];
-@@ -80,7 +88,9 @@ bool X86_writeMemoryOutput(
+@@ -80,7 +92,9 @@ bool X86_writeMemoryOutput(
  	const bool push = false, load = true;
  	const unsigned reg_width = 2; /* r32 destination */
  #else
@@ -48,7 +165,7 @@ index 7ccad787..090d5ae5 100644
  	const bool lea = false, load = false;
  #else
  	const bool push = opcode == 0xff, lea = opcode == 0x8d;
-@@ -124,6 +134,18 @@ bool X86_writeMemoryOutput(
+@@ -124,6 +138,18 @@ bool X86_writeMemoryOutput(
  		out += 10;
  	}
  #else
@@ -67,7 +184,35 @@ index 7ccad787..090d5ae5 100644
  	if (lea) {
  		*out++ = '[';
  	} else if (row->ops[0].size == 1) {
-@@ -194,6 +216,10 @@ bool X86_writeMemoryOutput(
+@@ -168,6 +194,19 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
++#ifdef X86_COMPARE_IMMEDIATE
++	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
++	int64_t value = encoded;
++	if (opcode == 0x83)
++		value = (int8_t)encoded;
++	else if (imm_size == 4 && row->ops[0].size == 8)
++		value = (int32_t)encoded;
++	memcpy(out, ", ", 2);
++	out += 2;
++	if (value < 0)
++		*out++ = '-';
++	writeUnsignedImmediate(out, (uint64_t)(value < 0 ? -value : value));
++#else
+ 	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
+ #if X86_IMMEDIATE_WIDE
+ 	const uint64_t value = row->ops[0].size == 8 ?
+@@ -178,6 +217,7 @@ bool X86_writeMemoryOutput(
+ #endif
+ 	memcpy(out, ", ", 2);
+ 	writeUnsignedImmediate(out + 2, value);
++#endif
+ #else
+ 	if (!load && !push) {
+ 		memcpy(out, ", ", 2);
+@@ -194,6 +234,10 @@ bool X86_writeMemoryOutput(
  			x->opcode[1] = opcode;
  		}
  		x->encoding.modrm_offset = (uint8_t)(lead + 1);
@@ -78,48 +223,57 @@ index 7ccad787..090d5ae5 100644
  #elif defined(X86_EXTEND32_MEMORY)
  		x->opcode[0] = 0x0f;
  		x->opcode[1] = opcode;
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 2a81d96f..fcd4800c 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -11,6 +11,11 @@
+ #include "X86InstPrinterCommon.h"
+ #include "X86Mapping.h"
+ 
++/* Called by the static i386 iterator with at least one input byte. */
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
++			cs_insn *insn, uint16_t *insn_size, bool batch);
++
+ /* Keep the mode, option and callback checks in a single short-circuit chain
+  * in both instantiations of the scalar writer. */
+ #define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 5dcd5dda..fac737aa 100644
+index 5dcd5dda..443b2f86 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -24,6 +24,10 @@
- #undef X86_MEMORY_IMMEDIATE
- #include "X86MemoryOutputImpl.h"
+@@ -196,7 +196,9 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
++#define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
++#undef CS_DECODE_OUTPUT_MISS
+ #endif
  
-+#define X86_SEGMENT_LEA32 writeSegmentLea32
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_SEGMENT_LEA32
-+
- #define X86_EXTEND32_MEMORY writeExtendMemory32
- #include "X86MemoryOutputImpl.h"
- #undef X86_EXTEND32_MEMORY
-@@ -152,11 +156,20 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- 			       size_t size, cs_insn *insn, uint16_t *insn_size)
- {
- 	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
--	if ((code[0] & 0xfc) != 0xc4)
-+	if ((code[0] & 0xfc) != 0xc4) {
-+		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
-+		    ((code[0] & 0xe7) == 0x26 || (code[0] & 0xfe) == 0x64) &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
-+			return writeSegmentLea32(code, size, insn, insn_size,
-+						 &x86_simple_outputs[row],
-+						 x86_simple_registers);
-+		}
- 		return code[0] == 0x0f && size >= 3 &&
- 		       (code[1] & 0xf6) == 0xb6 &&
- 		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
- 		       writeExtend32(code, size, insn, insn_size);
-+	}
- 	if (X86_OUTPUT_UNSUPPORTED(handle, false))
- 		return false;
- 	if (code[0] & 2) {
+ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..a0e2ebc0 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -163,7 +163,11 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
++#ifdef CS_DECODE_OUTPUT_MISS
++	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
++#else
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++#endif
+ }
+ #undef CS_DECODE_SCAN
+ 
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 7781ca39..6de1afd3 100644
+index 7781ca39..a9b7ecee 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -930,6 +930,26 @@ static bool check_absolute_addresses32(csh handles[2])
+@@ -930,6 +930,59 @@ static bool check_absolute_addresses32(csh handles[2])
  	return true;
  }
  
@@ -143,14 +297,84 @@ index 7781ca39..6de1afd3 100644
 +	return true;
 +}
 +
++static bool check_memory_compares(csh handles[2], cs_mode mode)
++{
++	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
++	const uint8_t sibs[] = { 0x24, 0x08, 0x4d, 0xa5, 0xfc, 0xff };
++	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
++	     ++prefix) {
++		for (unsigned opcode = 0x80; opcode <= 0x83; ++opcode) {
++			for (unsigned mr = 0x30; mr <= 0xff; ++mr) {
++				if ((mr & 0x30) != 0x30)
++					continue;
++				for (unsigned n = 0; n < sizeof(values); ++n) {
++					uint8_t code[12];
++					memset(code, values[n], sizeof(code));
++					code[0] = (uint8_t)(0x3f + prefix);
++					code[1] = (uint8_t)opcode;
++					code[2] = (uint8_t)mr;
++					if ((mr & 7) == 4)
++						code[3] = sibs[n];
++					const uint8_t *start = code + !prefix;
++					for (size_t length = 1;
++					     length <= sizeof(code) - !prefix;
++					     ++length)
++						if (!compare(handles, start,
++							     length,
++							     prefix + mr + n))
++							return false;
++				}
++			}
++		}
++	}
++	return true;
++}
++
  static bool check_alu_memory(csh handles[2], cs_mode mode)
  {
  	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
-@@ -1248,6 +1268,7 @@ static bool check_mode(cs_mode mode)
+@@ -1248,6 +1301,8 @@ static bool check_mode(cs_mode mode)
  		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
  		    !check_evex_memory_moves(handles) ||
  		    !check_padding(handles) ||
-+		    (mode == CS_MODE_32 && !check_segment_lea32(handles)) ||
++		    (mode == CS_MODE_32 && (!check_segment_lea32(handles) ||
++					 !check_memory_compares(handles, mode))) ||
  		    !check_alu_memory(handles, mode) ||
  		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&
  		     (!check_absolute_addresses32(handles) ||
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index e3319a1d..0c16e7ba 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -232,6 +232,7 @@
+ 		2577BA5E41DF2459B4D95926 /* X86OutputIterator.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B56000BA9634450923573AB /* X86OutputIterator.c */; };
+ 		7E0CD60EC1143E92BF232050 /* X86Vex32Output.c in Sources */ = {isa = PBXBuildFile; fileRef = BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */; };
+ 		F475C40E5319E61F44B33A21 /* X86Sse64Output.c in Sources */ = {isa = PBXBuildFile; fileRef = 33715F65E8AB5BCE857343EE /* X86Sse64Output.c */; };
++		3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */ = {isa = PBXBuildFile; fileRef = BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */; };
+ 		F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */; };
+ 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+ 		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+@@ -522,6 +523,7 @@
+ 		3B56000BA9634450923573AB /* X86OutputIterator.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86OutputIterator.c; sourceTree = "<group>"; };
+ 		BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Vex32Output.c; sourceTree = "<group>"; };
+ 		33715F65E8AB5BCE857343EE /* X86Sse64Output.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Sse64Output.c; sourceTree = "<group>"; };
++		BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryFallback32.c; sourceTree = "<group>"; };
+ 		526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86ImmediateOutput.c; sourceTree = "<group>"; };
+ 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
+ 		CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86InstPrinterCommon.c; sourceTree = "<group>"; };
+@@ -1003,6 +1005,7 @@
+ 				3B56000BA9634450923573AB /* X86OutputIterator.c */,
+ 				BC21E02D020A8DF941776FF3 /* X86Vex32Output.c */,
+ 				33715F65E8AB5BCE857343EE /* X86Sse64Output.c */,
++				BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */,
+ 				526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */,
+ 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
+ 				CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */,
+@@ -1768,6 +1771,7 @@
+ 				2577BA5E41DF2459B4D95926 /* X86OutputIterator.c in Sources */,
+ 				7E0CD60EC1143E92BF232050 /* X86Vex32Output.c in Sources */,
+ 				F475C40E5319E61F44B33A21 /* X86Sse64Output.c in Sources */,
++				3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */,
+ 				F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */,
+ 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
+ 				9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */,
