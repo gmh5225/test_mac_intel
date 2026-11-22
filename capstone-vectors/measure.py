@@ -82,13 +82,13 @@ def main(w):
         save('direct-guard-'+label,dict(counts=counts))
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
-            assert sp.check_output([w/'verify-evex-memory'])==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
+            assert sp.check_output([w/'verify-evex-memory','--legacy-map38-registers'])==(base/'arch/X86/X86GenLegacyMap38Registers.inc').read_bytes()
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
         if label=='integrated':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
-            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVectorOutput',*libs,'-o',w/'coverage'],'link-counter')
+            run(['clang++',obj,w/'coverage.o',w/'observed.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_decodeOutputMiss64',*libs,'-o',w/'coverage'],'link-counter')
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -120,7 +120,7 @@ def main(w):
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
             added=set(members)-set(prior)
-            assert set(prior)<=set(members) and not added and changed=={'X86VectorOutput.c.o'},(changed,added)
+            assert set(prior)<=set(members) and not added and changed=={'X86VectorFallback64.c.o'},(changed,added)
             changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
@@ -181,7 +181,8 @@ def main(w):
             assert result[2:]==list(map(int,normal.split()))[2:] and len(result)==6
             prefix,attempt,accepted=observed.stderr.split()
             attempt,accepted=int(attempt),int(accepted)
-            assert prefix=='padding' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
+            assert prefix=='map38' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
+            if bits==32:assert attempt==0
             coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
         assert coverage['1']==coverage['2']
         save('coverage-'+name+'.json',coverage)

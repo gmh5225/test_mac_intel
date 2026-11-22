@@ -27,7 +27,7 @@ int main() {
             return 1;
         if (detail && (cs_option(fast, CS_OPT_DETAIL, CS_OPT_ON) ||
                        cs_option(ordinary, CS_OPT_DETAIL, CS_OPT_ON))) return 1;
-        auto check = [&](const std::array<uint8_t, 17>& bytes, unsigned n,
+        auto check = [&](const std::array<uint8_t, 7>& bytes, unsigned n,
                          bool must_reject) {
             auto *p = area + page - n;
             std::memcpy(p, bytes.data(), n);
@@ -54,7 +54,7 @@ int main() {
             size_t left = n;
             uint64_t ip = reference.address;
             if (!cs_disasm_iter(ordinary, &cursor, &left, &ip, &reference) ||
-                (length < 10 || length > 15) || cursor != p + length || left != n - length ||
+                length != 5 + ((bytes[1] & 0xf0) == 0x40) || cursor != p + length || left != n - length ||
                 ip != actual.address + length || actual.id != reference.id ||
                 actual.size != length || reference.size != length ||
                 std::memcmp(actual.bytes, reference.bytes, sizeof(actual.bytes)) ||
@@ -64,35 +64,22 @@ int main() {
                 return false;
             return true;
         };
-        constexpr uint8_t suffix[] = {0x2e,0x0f,0x1f,0x84,0,0,0,0,0};
-        for (unsigned count=1;count<=8;++count) {
-            std::array<uint8_t,17> bytes{};
-            std::memset(bytes.data(),0x66,count);
-            std::memcpy(bytes.data()+count,suffix,sizeof(suffix));
-            const unsigned limit=count+sizeof(suffix);
-            for (unsigned pos=0;pos<limit;++pos) {
-                const uint8_t save=bytes[pos];
-                for (unsigned val=0;val<256;++val) {
-                    bytes[pos]=uint8_t(val);
-                    for (unsigned n=0;n<=limit;++n) {
-                        unsigned prefixes=0;
-                        while (prefixes<n && bytes[prefixes]==0x66) ++prefixes;
-                        const bool valid=prefixes>=1 && prefixes<=6 &&
-                            n-prefixes>=sizeof(suffix) && !std::memcmp(bytes.data()+prefixes,suffix,sizeof(suffix));
-                        if (!check(bytes,n,!valid))return 4;
-                    }
+        for (unsigned prefix=0;prefix<=16;++prefix) for (unsigned opcode=0;opcode<256;++opcode)
+            for (unsigned mr=0;mr<256;++mr) {
+                std::array<uint8_t,7> bytes{{0x66,static_cast<uint8_t>(0x3f+prefix),0x0f,0x38,
+                                          static_cast<uint8_t>(opcode),static_cast<uint8_t>(mr),0}};
+                const unsigned n=5+(prefix!=0);
+                if (!prefix) std::memmove(bytes.data()+1,bytes.data()+2,4);
+                if (!check(bytes,n,!wide || mr<192)) {
+                    std::fprintf(stderr,"mismatch prefix=%u op=%x mr=%x\n",prefix,opcode,mr);
+                    return 3;
                 }
-                bytes[pos]=save;
+                if ((mr&15)==0) for (unsigned end=0;end<n;++end)
+                    if (!check(bytes,end,true)) return 4;
             }
-        }
-        std::array<uint8_t,17> supported{{0x66,0x2e,0x0f,0x1f,0x84}};
-        for (auto opt : {CS_OPT_UNSIGNED,CS_OPT_TEXT}) {
-            const auto on = opt==CS_OPT_TEXT ? CS_OPT_OFF : CS_OPT_ON;
-            const auto off = opt==CS_OPT_TEXT ? CS_OPT_ON : CS_OPT_OFF;
-            if (cs_option(fast,opt,on) || !check(supported,10,true) || cs_option(fast,opt,off))return 6;
-        }
+        std::array<uint8_t,7> supported{{0x66,0x44,0x0f,0x38,0xdc,0xe4,0}};
         if (cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) ||
-            !check(supported,10,true))return 7;
+            !check(supported,6,true)) return 5;
         cs_close(&ordinary);
         cs_close(&fast);
     }
