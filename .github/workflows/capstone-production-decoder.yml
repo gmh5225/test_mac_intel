@@ -1,7 +1,7 @@
-name: Measure table-owned EVEX source validity and AVX mode effects in complete NeverD binaries
+name: Verify isolated VEX scans and short x86 immediate output in complete NeverD binaries
 on:
   push:
-    branches: [codex/capstone-source-reservation-and-mode-effects]
+    branches: [codex/capstone-verified-scan-and-scalar-formats]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 359a30178db985ce8c6d1445a558b22e637fe426
+          ref: 67c462e5a0baac1f730b19cbf9bdad169122fdb3
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "359a30178db985ce8c6d1445a558b22e637fe426"
+          test "$(git rev-parse HEAD)" = "67c462e5a0baac1f730b19cbf9bdad169122fdb3"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "68ca96c3343b0a7c110b9db372a9ee2642d857ef"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-effects-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: scalar-vector-products-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
