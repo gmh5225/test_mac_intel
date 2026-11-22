@@ -75,10 +75,47 @@ index da328571..470de3c8 100644
  
  ifeq ($(PKG_EXTRA),)
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..2367c484 100644
+index b56826b0..c8c91c8c 100644
 --- a/arch/X86/X86BatchScan.c
 +++ b/arch/X86/X86BatchScan.c
-@@ -350,4 +350,40 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
+@@ -26,6 +26,9 @@
+ #define X86_EVEX_SCAN_RODATA ".cs_x86_native_batch_rodata"
+ #define X86_EVEX_TRANSFER_RODATA X86_EVEX_SCAN_RODATA
+ #define X86_EVEX_BATCH_PACKED
++/* Keep the vector subdecoders in the fixed-width consumers. */
++CS_DECODE_INLINE bool X86_readEvexScanPlan(const uint8_t *code, size_t size,
++					   unsigned *id, unsigned *length);
+ #include "X86EvexScanPlan.h"
+ #define X86_ROUNDED_SCAN_IDS
+ #include "X86RoundedRegisterPlan.h"
+@@ -133,7 +136,7 @@ static uint32_t readVex2Plan(const uint8_t *code, size_t size)
+ 	return finishVexPlan(code, size, 3, payload, plan);
+ }
+ 
+-static uint32_t readVex3Plan(const uint8_t *code, size_t size)
++CS_DECODE_INLINE uint32_t readVex3Plan(const uint8_t *code, size_t size)
+ {
+ 	if (size < 4)
+ 		return 0;
+@@ -158,7 +161,7 @@ static uint32_t readVex3Plan(const uint8_t *code, size_t size)
+ 	return finishVexPlan(code, size, 4, payload, plan);
+ }
+ 
+-static uint32_t readFirst32(const uint8_t *code, size_t size)
++CS_DECODE_INLINE uint32_t readFirst32(const uint8_t *code, size_t size)
+ {
+ 	const unsigned plan = x86Batch32Primary[code[0]];
+ 	if (plan)
+@@ -189,7 +192,7 @@ static uint32_t readSecondary64(const uint8_t *code, size_t size,
+ 	return word ? word + offset : 0;
+ }
+ 
+-static uint32_t readFirst64(const uint8_t *code, size_t size)
++CS_DECODE_INLINE uint32_t readFirst64(const uint8_t *code, size_t size)
+ {
+ 	const unsigned byte = code[0];
+ 	if ((byte & 0xf0) == 0x40) {
+@@ -350,4 +353,40 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
  #endif
  	return X86_scanBatch(ud, code, size, address, output, capacity);
  }

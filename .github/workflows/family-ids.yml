@@ -1,7 +1,7 @@
-name: Check public and private scan consumer changes across nine other architectures with timed and full-record controls
+name: Trace direct record construction and inlined scan effects on nine other architecture backends
 on:
   push:
-    branches: [codex/scan-consumers-nine-architectures]
+    branches: [codex/native-nine-isa-public-record]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: shared-scan-consumers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: native-public-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
