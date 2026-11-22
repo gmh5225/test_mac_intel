@@ -1,7 +1,7 @@
-name: Profile mode-dependent x86 register writes and repeat PE32 on four runners
+name: Compare mode-selected vector clear rows with per-instruction dispatch and dirty full mapper records
 on:
   push:
-    branches: [codex/capstone-projected-legacy-writes]
+    branches: [codex/capstone-handle-vector-mapping]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0fbbaa9ca1ab4eb9c390d08ff26a42384d052e82
+          ref: 9615f6450fb7c47dad85a76cd89ad246c6962de3
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: write-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: handle-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

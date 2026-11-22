@@ -8,7 +8,7 @@ def cmd(n,a,cwd=None):
     if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2200:]);z.check_returncode()
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
-meta=load(d/'revisions.json');ref=load(d/'reference.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
+meta=load(d/'revisions.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
 t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['projected']['parent']==meta['mode']['parent']
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
@@ -20,8 +20,21 @@ try:
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
         ids[k]=sha(so)
-        if k!='projected':assert ids[k]==ref[osrel][k],(k,ids[k],ref[osrel])
         imgs[k]=so.read_bytes()
+        if k!='base':
+            names=['x86_reg_access','x86_mapping_counts','x86_evex_detail','x86_scan_batch']
+            cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
+            cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
+            cmd('gen-'+k,['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
+            cmd('compile-map-'+k,['cc','-O2','-DCAPSTONE_HAS_X86','-I',s,'-I',s/'include',d/'mapper.c',b/'libcapstone.a','-o',t/'map'])
+            digest=hashlib.sha256();length=0
+            with (out/('mapper-'+k+'.log')).open('w')as obs,sp.Popen([t/'map'],stdout=sp.PIPE,stderr=obs)as proc:
+                while data:=proc.stdout.read(4194304):length+=len(data);digest.update(data)
+                assert proc.wait()==0 and length>450000000
+            if k=='mode':reference=(length,digest.hexdigest())
+            else:assert (length,digest.hexdigest())==reference
+            save('raw-'+k,dict(bytes=length,sha256=digest.hexdigest()))
+
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
