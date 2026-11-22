@@ -1,8 +1,8 @@
 diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
-index 00348e68..8344d742 100644
+index 00348e68..eeff67e0 100644
 --- a/arch/RISCV/RISCVDisassembler.h
 +++ b/arch/RISCV/RISCVDisassembler.h
-@@ -11,12 +11,13 @@
+@@ -11,12 +11,15 @@
  #include "../../MCDisassembler.h"
  #include "../../SStream.h"
  
@@ -13,12 +13,14 @@ index 00348e68..8344d742 100644
 -	 (defined(__linux__) && defined(__clang__) && \
 -	  (defined(__x86_64__) || defined(__aarch64__))))
 +/* The compact SP positions are also profitable in mixed x86-64 Linux
-+ * builds with Clang 18 and later. */
++ * builds with Clang 18 and later. The combined AArch64 decoder keeps its
++ * measured instruction and data layout. */
 +#if (defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && defined(CAPSTONE_DIET)) || \
 +	(defined(__linux__) && defined(__clang__) && !defined(CAPSTONE_DIET) && \
 +	 (defined(__x86_64__) || defined(__aarch64__)) && \
 +	 (defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) || \
-+	  (defined(CAPSTONE_HAS_X86) && defined(__x86_64__) && __clang_major__ >= 18)))
++	  (defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_HAS_AARCH64) && \
++	   defined(__x86_64__) && __clang_major__ >= 18)))
  #define RISCV_USE_STACK_OPERAND_POSITIONS
  #endif
  

@@ -11,11 +11,25 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
 t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['parent']
 try:
-    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
+    cfg=['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]]
+    # Compare the ordinary six-backend bytes separately from the five-backend
+    # mixed configuration that uses the new stack operand table.
+    broad=t/'six'
+    fullcfg=[str(broad) if x==b else x for x in cfg]
+    cmd('six-configure',fullcfg)
+    cfg.remove('-DCAPSTONE_AARCH64_SUPPORT=ON')
+    cmd('configure',cfg)
+
     imgs={};ids={}
     for k in ('base','stack'):
         if k!='base':
             assert sha(d/'candidate.patch')==meta['sha256'];g('apply','--index',str(d/'candidate.patch'));assert g('write-tree')==meta['tree']
+        cmd('six-build-'+k,['cmake','--build',broad,'--parallel','4','--target','capstone_shared'])
+        six,=[x for x in broad.glob('libcapstone.so.*') if not x.is_symlink()]
+        if k=='base':original_six=sha(six)
+        else:
+            assert sha(six)==original_six
+            save('six-identities',dict(base=original_six,candidate=sha(six)))
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
         ids[k]=sha(so)
@@ -44,11 +58,11 @@ try:
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
     cmd('libmvec',['python3','-B',t/'libmvec.py'])
     import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','riscv64-cp','riscv64-ls','mips64el-ls','arm64-ls')]
+    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','riscv64-cp','riscv64-ls','mips64el-ls','arm-ls')]
     assert len(extra)==5
     panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
     panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
-    panels.extend((q['name'],{'riscv64-sort':105,'riscv64-cp':105,'riscv64-ls':105,'mips64el-ls':103,'arm64-ls':102}[q['name']],Path(q['path']),0x100000,(0,1,2))for q in extra)
+    panels.extend((q['name'],{'riscv64-sort':105,'riscv64-cp':105,'riscv64-ls':105,'mips64el-ls':103,'arm-ls':101}[q['name']],Path(q['path']),0x100000,(0,1,2))for q in extra)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
     save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output([cc,'--version'],text=True),images=ids,osrel=osrel,machine=platform.machine(),cc=cc))
     def invoke(k,arch,mode,path,ip,n):

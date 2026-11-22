@@ -1,7 +1,7 @@
-name: Select measured mixed RISC-V operand layout on x86 hosts and verify native ARM, GCC and four-backend images
+name: Keep AArch64 mixed images byte-identical and time RISC-V, ARM32, MIPS64 and PE on seven hosts
 on:
   push:
-    branches: [codex/capstone-riscv-host-qualified]
+    branches: [codex/capstone-riscv-keep-aarch64-image]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: host-qualified-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: aarch64-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
