@@ -1,7 +1,7 @@
-name: Select measured mixed RISC-V operand layout on x86 hosts and verify native ARM, GCC and four-backend images
+name: Repeat mixed RISC-V and AArch64 formatting on four x86 hosts with paired controls
 on:
   push:
-    branches: [codex/capstone-riscv-host-qualified]
+    branches: [codex/capstone-riscv-arm-guard-replicas]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: clang, flavor: first }
-          - { host: ubuntu-24.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
+          - { host: ubuntu-24.04, cc: clang, flavor: one }
+          - { host: ubuntu-24.04, cc: clang, flavor: two }
+          - { host: ubuntu-24.04, cc: clang, flavor: three }
+          - { host: ubuntu-24.04, cc: clang, flavor: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: host-qualified-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: repeat-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

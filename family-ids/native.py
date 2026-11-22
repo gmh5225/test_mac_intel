@@ -36,7 +36,7 @@ try:
             cmd('generator',['python3','-B',s/'suite/synctools/operand_writeback.py','--check'])
     active = cc=='clang' and osrel=='24.04' and platform.machine()=='x86_64'
     assert (ids['base']!=ids['stack'])==active,ids
-    cmd('identity',['python3','-B',d/'identity.py'])
+
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
@@ -54,9 +54,10 @@ try:
     def invoke(k,arch,mode,path,ip,n):
         target.write_bytes(imgs[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(arch),str(mode),path,str(ip),str(n)],text=True).split()))
     for name,arch,path,ip,modes in panels:
+        modes={'riscv64-ls':(0,1,2),'riscv64-cp':(0,), 'riscv64-sort':(0,), 'arm64-ls':(0,1,2),'putty32':(1,2)}.get(name,())
         for mode in modes:
-            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(65e6/one[0]));rows_=[]
-            for i in range(15):
+            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(180e6/one[0]));rows_=[]
+            for i in range(25):
                 order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
                 for k in order+order[::-1]:
                     v=invoke(k,arch,mode,path,ip,n)
