@@ -9,7 +9,7 @@ def run(n,args):
 q=json.loads((d/'stages.json').read_text())[stage];assert g('rev-parse','HEAD')==q['checkout'];t=Path(tempfile.mkdtemp());win=os.name=='nt'
 try:
     patch=t/'candidate.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+stage+'.patch']));assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['checkout_sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-    h=t/'h';h.mkdir();shutil.copy2(d/'guard.cpp',h/'guard.cpp');shutil.copy2(d/'secondary.cpp',h/'secondary.cpp');shutil.copy2(d/'second.c',h/'second.c')
+    h=t/'h';h.mkdir();shutil.copy2(d/'guard.cpp',h/'guard.cpp');shutil.copy2(d/'secondary.cpp',h/'secondary.cpp');shutil.copy2(d/'second.c',h/'second.c');shutil.copy2(d/'vex3.cpp',h/'vex3.cpp')
     cmake='''cmake_minimum_required(VERSION 3.22)
 project(BatchGuard LANGUAGES C CXX)
 enable_testing()
@@ -20,12 +20,17 @@ target_link_libraries(batchguard PRIVATE capstone_static)
 target_include_directories(batchguard PRIVATE "CAP_SRC")
 if(CHECK_SECONDARY)
   add_library(observed OBJECT second.c)
+  target_compile_definitions(observed PRIVATE CAPSTONE_HAS_X86 CAPSTONE_USE_SYS_DYN_MEM)
   target_link_libraries(observed PRIVATE capstone)
   target_include_directories(observed PRIVATE "CAP_SRC" "CAP_SRC/include")
   add_executable(secondaryguard secondary.cpp $<TARGET_OBJECTS:observed>)
   target_compile_features(secondaryguard PRIVATE cxx_std_17)
   target_include_directories(secondaryguard PRIVATE "CAP_SRC")
   target_link_libraries(secondaryguard PRIVATE capstone_static)
+  add_executable(vex3guard vex3.cpp $<TARGET_OBJECTS:observed>)
+  target_compile_features(vex3guard PRIVATE cxx_std_17)
+  target_include_directories(vex3guard PRIVATE "CAP_SRC")
+  target_link_libraries(vex3guard PRIVATE capstone_static)
 endif()
 if(CAPSTONE_X86_SCAN_ADAPTER)
   target_compile_definitions(batchguard PRIVATE CHECK_ADAPTER)
@@ -37,14 +42,16 @@ endif()
         if prof != os.environ['SCAN_PROFILE']:continue
         b=t/prof;units=['x86_scan_batch','x86_encoding_accuracy','text_option','detail_option']
         cmd=['cmake','-G','Ninja','-S',h,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*flags]
-        secondary=(stage=='private' and prof=='full')
+        secondary=(stage=='packed' and prof=='full')
         if secondary:cmd+=['-DCHECK_SECONDARY=ON']
         if win:cmd+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
         run('configure-'+prof,cmd);run('build-'+prof,['cmake','--build',b,'--parallel','4','--target','batchguard',*units]);run('units-'+prof,['ctest','--test-dir',b,'-C','Release','--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$'])
         exe,=[x for x in b.rglob('batchguard.exe'if win else 'batchguard')if x.is_file()];run('guard-'+prof,[exe])
         if secondary:
-            run('build-secondary',['cmake','--build',b,'--target','secondaryguard','--parallel','4'])
+            run('build-secondary',['cmake','--build',b,'--target','secondaryguard','vex3guard','--parallel','4'])
             oracle,=[x for x in b.rglob('secondaryguard.exe'if win else 'secondaryguard')if x.is_file()]
+            vex,=[x for x in b.rglob('vex3guard.exe'if win else 'vex3guard')if x.is_file()]
+            run('vex3-oracle',[vex]);assert (out/'vex3-oracle.log').read_text().split()==['18874368','1074938']
             run('secondary-oracle',[oracle]);assert (out/'secondary-oracle.log').read_text().split()==['13369344','7521547']
         counts=(out/('guard-'+prof+'.log')).read_text().split();assert int(counts[0])>10000000 and int(counts[1])>0
         answers[prof]=dict(states=int(counts[0]),accepted=int(counts[1]),digest=counts[2],tests=units);save('progress',answers);shutil.rmtree(b)
