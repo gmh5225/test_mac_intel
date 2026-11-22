@@ -15,9 +15,9 @@ try:
     a=t/'harness';a.mkdir();shutil.copyfile(d/'records.c',a/'records.c')
     (a/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(PortableRecords LANGUAGES C CXX)\nenable_testing()\nadd_subdirectory("'+s.as_posix()+'" capstone)\nadd_executable(records records.c)\ntarget_link_libraries(records PRIVATE capstone_static)\n')
     b=t/'b';windows=os.name=='nt'
-    opts=['cmake','-S',a,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON'for k in ['MIPS']]]
+    opts=['cmake','-S',a,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON']
     if windows:opts+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
-    run(opts,'configure');bins={};trees={}
+    run(opts,'configure');assert 'CAPSTONE_RISCV_SUPPORT:BOOL=ON' in (b/'CMakeCache.txt').read_text();bins={};trees={}
     for label in ('base','candidate'):
         if label=='candidate':
             g('apply','--index',str(patch));assert g('write-tree')==m['tree']
