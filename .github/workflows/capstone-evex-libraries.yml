@@ -1,7 +1,7 @@
-name: Measure i386 TEST register and memory immediate formatting against complete dirty records and source-built iced
+name: Verify indexed EVEX moves against full memory records and six source-built x86 workloads
 on:
   push:
-    branches: [codex/capstone-i386-unsigned-test]
+    branches: [codex/capstone-scaled-index-evex-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 68ca96c3343b0a7c110b9db372a9ee2642d857ef
+          ref: af384642900fb1cf8cdf4ae370d34c0ab59f41af
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: short-disp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scaled-index-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

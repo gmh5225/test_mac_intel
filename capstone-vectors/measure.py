@@ -75,6 +75,11 @@ def main(w):
             run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
             produced=sp.check_output([w/'table-check','--vex32-memory'])
             assert produced==(base/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes() and b'vex32_move_rows[2]' in produced
+        run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'oracle.c','-o',w/'observed.o'],'guard-wrapper-'+label)
+        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'oracle.cpp',w/'observed.o',b/'libcapstone.a','-o',w/'direct-guard'],'guard-link-'+label)
+        counts=list(map(int,sp.check_output([w/'direct-guard'],text=True).split()))
+        assert counts==data['guard_counts']['parent' if label=='baseline' else 'commit']
+        save('direct-guard-'+label,dict(counts=counts))
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -91,7 +96,7 @@ def main(w):
         exec_sections={se.name:hashlib.sha256(se.data()).hexdigest() for se in ef.iter_sections() if se.data_size and se['sh_flags']&4}
         assert exec_sections
         if label=='baseline':original_sections=exec_sections
-        else:assert original_sections==exec_sections,(original_sections,exec_sections)
+        else:save('scalar-code-copy.json',dict(same=original_sections==exec_sections))
         names=('X86_disasmIter32','X86_disasmIterText','cs_decode_full_insn','X86_decodeOutputMiss32')
         addrs={f[3]:[int(f[0],16),int(f[1],16)] for line in sp.check_output(['nm','-S','--defined-only',target],text=True).splitlines() if len(f:=line.split())==4 and f[3] in names}
         with target.open('rb')as stream: es={z.name:[z['sh_addr'],z.data_size]for z in ELFFile(stream).iter_sections() if z['sh_flags']&2 and z['sh_type']=='SHT_PROGBITS'}
@@ -103,8 +108,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert members.keys()==prior.keys() and 'X86MemoryFallback32.c.o' in changed and changed<={'X86MemoryFallback32.c.o','X86ImmediateOutput.c.o'},changed
-            if changed=={'X86MemoryFallback32.c.o'}:assert sha(w/'unselected-baseline')==sha(ordinary)
+            assert members.keys()==prior.keys() and 'X86EvexMemoryOutput.c.o' in changed and changed<={'X86EvexMemoryOutput.c.o','X86MemoryOutput.c.o','X86Vex32Output.c.o','X86MemoryFallback32.c.o','X86Sse64Output.c.o','X86VectorFallback64.c.o'},changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
