@@ -1,7 +1,7 @@
-name: Compare the released mixed VEX output with iced on four native hosts
+name: Compare the released plain EVEX register output with iced on four native hosts
 on:
   push:
-    branches: [codex/shipped-mixed-vex-versus-iced]
+    branches: [codex/shipped-plain-evex-versus-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6969f77c5e9dfdb897a80b0d0c3482a86c1d4c2d
+          ref: 22ff038a78971a4414930e602bff1e469c52a619
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 047971702df01268f32e3afb58cafce08cdfaa03
+          ref: 48ecdc46cf427dcd9df8000b49a3ed67d73b2c75
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shipped-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
