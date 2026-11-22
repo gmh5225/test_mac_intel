@@ -74,10 +74,10 @@ index ae1554b0..ad9096fc 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..bf3cca75 100644
+index 12428fff..4c254fc8 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3787,12 +3787,57 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3787,12 +3787,59 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  	return true;
  }
  
@@ -105,7 +105,9 @@ index 12428fff..bf3cca75 100644
 +	if (*size == 0 || !handle)
 +		return false;
 +	if (handle->arch == CS_ARCH_X86) {
-+		if (handle->no_text && !handle->detail_opt) {
++		if (!handle->no_text)
++			return X86_disasmIter(ud, code, size, address, insn);
++		if (!handle->detail_opt) {
 +#ifndef CAPSTONE_X86_SCAN_ADAPTER
 +			if ((handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
 +			    handle->insn_id == X86_get_insn_id &&

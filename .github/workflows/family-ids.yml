@@ -1,7 +1,7 @@
-name: Measure the shared complete batch records for public scan and isolate architecture-specific text dispatch
+name: Keep the public scan result and its output in the same reader frame
 on:
   push:
-    branches: [codex/public-iterator-complete-records]
+    branches: [codex/public-iterator-owned-records]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-complete-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-owned-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
