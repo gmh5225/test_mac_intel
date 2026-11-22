@@ -85,6 +85,8 @@ def main(w):
     inc=once(inc,pair,alt+pair)
     inc=once(inc,'engine!="x86_iter" &&','engine!="x86_iter" && engine!="x86_len_" &&')
     inc='#include <cstring>\n'+inc
+    inc='#include <valgrind/callgrind.h>\n'+inc
+    inc=once(inc,'Result timed=run(reps);','CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT; Result timed=run(reps); CALLGRIND_TOGGLE_COLLECT;')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={}
@@ -128,20 +130,20 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (1,2):
-            def timed(label,count):
-                engine={'loop':'x86_iter','copy':'x86_iter','strlen':'x86_len_','iced':'iced____','fast':'fast____'}[label]
-                return list(map(int,sp.check_output([bins['official'],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('loop',1)[0])));cycles=[]
-            labels=['loop','strlen','copy','iced','fast']
-            for idx in range(13):
-                labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
-                cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
+        save(name+'-input.json',dict(extent_sha256=sha(intervals),text_sha256=sha(f),extents=len(selected)))
+        from costs import profile
+        for mode in (1,2,4):
+            labels=['x86_len_','fast____'] if mode!=4 else ['x86_len_']
+            seen=[]
+            for engine in labels:
+                target=evidence/engine;target.mkdir(exist_ok=True)
+                row=profile(bins['official'],engine,mode,bits,f,intervals,w,target,name)
+                results.append(row);seen.append(row['raw_signature'][:3])
+            assert len({tuple(v)for v in seen})==1
+            save('profile.json',results)
         print(name,len(selected),flush=True)
-    assert {(k,md)for k in m['samples']for md in (1,2)}=={(x['case'],x['mode'])for x in results}
-    save('complete.json',dict(trees=trees,iced=iced,records=len(results),native=platform.platform(),machine=platform.machine(),positive_scanner_coverage=True))
+    assert len(results)==5*len(m['samples'])
+    save('complete.json',dict(trees=trees,iced=iced,records=len(results),native=platform.platform()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
     if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
