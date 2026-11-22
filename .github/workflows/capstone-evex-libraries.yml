@@ -1,7 +1,7 @@
-name: Measure fixed scan readers in both the real batch loop and the public record consumer on four hosts
+name: Measure fixed-mode public record construction with the original scan and iterator state on four hosts
 on:
   push:
-    branches: [codex/inline-both-fixed-scan-consumers]
+    branches: [codex/public-text-record-decoding]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: inlined-reader-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-record-decoder-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
