@@ -97,9 +97,9 @@ def main(w):
             patch=r/(('project' if key=='single' else key)+'.patch');assert sha(patch)==z['sha256']
             run(['git','apply','--index',patch],'apply-'+key,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
-        build=w/('single-config-build' if key in ('official','single') else 'mixed-config-build');project=base
+        build=w/('single-config-build' if key in ('official','single','word') else 'mixed-config-build');project=base
         if build.exists():shutil.rmtree(build)
-        if key not in ('official','single'):
+        if key not in ('official','single','word'):
             nd=r.parent/'neverd-config';record=m['neverd']
             assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
             for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
@@ -111,16 +111,29 @@ def main(w):
         run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
         db=json.loads((build/'compile_commands.json').read_text());files={Path(u['file']).name for u in db}
         near={Path(u['file']).name for u in db if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in u['command'].split()}
-        assert near==({'X86Sse64Output.c'}if key not in ('official','single')and not darwin else set()),near
-        assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(key not in ('official','single'))
+        assert near==({'X86Sse64Output.c'}if key not in ('official','single','word')and not darwin else set()),near
+        assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(key not in ('official','single','word'))
         save('compile-'+key+'.json',dict(archive_profile=key,near_indirect=sorted(near),neverd=m['neverd'],compile_commands_sha256=sha(build/'compile_commands.json')))
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access']
-        run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if key in ('official','single') else [])],'build-'+key)
+        run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if key in ('official','single','word') else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
         objects=[(v.relative_to(build).as_posix(),sha(v)) for v in build.rglob('*.c.o')]
         members=sp.check_output(['ar','t',lib],text=True).splitlines()
         archives[key]=dict(objects=dict(sorted(objects)),members=members)
         assert members and len(objects)>20
+        if not darwin and key in ('official','word','single'):
+            decoder,=build.rglob('X86DisassemblerDecoder.c.o')
+            sym,=[line.split()for line in sp.check_output(['objdump','-t',decoder],text=True).splitlines()if line.split()[-1:]==['cs_disasm_iter']]
+            offset,section,length=int(sym[0],16),sym[-3],int(sym[-2],16)
+            dump=w/'decoder-section.bin'
+            run(['objcopy','--dump-section',section+'='+str(dump),decoder,w/'copy-decoder.o'],'iterator-bytes-'+key)
+            op=dump.read_bytes()[offset:offset+length];assert len(op)==length>40
+            refs=[]
+            for line in sp.check_output(['objdump','-r','-j',section,decoder],text=True).splitlines():
+                words=line.split()
+                if len(words)==3 and words[1].startswith('R_') and offset<=int(words[0],16)<offset+length:
+                    refs.append([int(words[0],16)-offset,words[1],words[2]])
+            save('iterator-'+key+'.json',dict(length=length,sha256=hashlib.sha256(op).hexdigest(),section=section,refs=refs))
         if key in ('project','single'):
             ref='release' if key=='project' else 'official'
             src=archives[ref];dst=archives[key]
@@ -129,7 +142,7 @@ def main(w):
             save('archive-'+key+'.json',dict(reference=ref,raw_members=members,changed=changed,hashes=[src['objects'],dst['objects']]))
             if key=='project':assert not changed,changed
             else:assert {Path(f).name for f in changed}=={'X86DisassemblerDecoder.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'},changed
-        if key in ('official','single'):
+        if key in ('official','single','word'):
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
             for name in units:
@@ -167,11 +180,11 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
             def timed(label,count):
-                key={'official':'official','public_release':'release','public_word':'word','public_single':'single','single_release':'official','single_fixed':'single'}.get(label,'project')
+                key={'official':'official','public_release':'release','public_word':'word','public_single':'single','single_release':'official','single_fixed':'single','word_fixed':'word'}.get(label,'project')
                 engine={'iced':'iced____','fast':'fast____','public':'capstone','public_release':'capstone','public_word':'capstone','public_single':'capstone','single_release':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
                 return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
-            labels=['official','project','copy','public','public_word','public_release','public_single','single_release','single_fixed','iced']+(['fast']if mode else [])
+            labels=['official','project','copy','public','public_word','public_release','public_single','single_release','single_fixed','word_fixed','iced']+(['fast']if mode else [])
             for idx in range(13):
                 labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public','public_word','public_release','public_single','single_release')})==1

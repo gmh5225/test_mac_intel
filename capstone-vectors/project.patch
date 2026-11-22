@@ -77,10 +77,10 @@ index da328571..c685d209 100644
  
  ifeq ($(PKG_EXTRA),)
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..cf8de52b 100644
+index ae1554b0..13ecc8ca 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,6 +30,23 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,6 +30,19 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -91,10 +91,6 @@ index ae1554b0..cf8de52b 100644
 +#define CAPSTONE_X86_PUBLIC_OUTPUT
 +/* Input and handle were checked by the public iterator. These readers
 + * construct one record; its caller owns cursor advancement and skipdata. */
-+CAPSTONE_INTERNAL bool X86_decodeTextRecord32(struct cs_struct *handle,
-+					      const uint8_t *code, size_t size,
-+					      cs_insn *insn, uint16_t *length,
-+					      bool batch);
 +CAPSTONE_INTERNAL bool X86_decodeTextRecord64(struct cs_struct *handle,
 +					      const uint8_t *code, size_t size,
 +					      cs_insn *insn, uint16_t *length,
@@ -105,52 +101,33 @@ index ae1554b0..cf8de52b 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..3c62ba94 100644
+index 12428fff..0d9b1a76 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,9 +3753,34 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3753,9 +3753,15 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  					  cs_insn *insn, uint16_t *insn_size,
  					  bool batch);
  
 +#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+X86_DECODE_INLINE bool decodeIteratorOutput(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch);
-+#define CS_DECODE_OUTPUT_MISS decodeIteratorOutput
++#define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
 +#endif
  #define CS_DECODE_SCAN_IMPL decodeIteratorScan
  #include "../../cs_disasm_internal.h"
  #undef CS_DECODE_SCAN_IMPL
 +#ifdef CS_DECODE_OUTPUT_MISS
 +#undef CS_DECODE_OUTPUT_MISS
-+X86_DECODE_INLINE bool decodeIteratorOutput(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch)
-+{
-+	if (handle->arch == CS_ARCH_X86 && !handle->no_text) {
-+		if (handle->mode == CS_MODE_64)
-+			return X86_decodeTextRecord64(handle, code, size, insn,
-+						      length, batch);
-+		if (handle->mode == CS_MODE_32)
-+			return X86_decodeTextRecord32(handle, code, size, insn,
-+						      length, batch);
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, length, batch);
-+}
 +#endif
  
  /* Keep the admitted terminal's public ID and zero alias adjustment visible
   * through output completion. Cold helpers can take the fallback result's
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..7a01f09b 100644
+index 96ce9f72..0d176480 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -260,6 +260,15 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- #define CS_DECODE_TRY_OUTPUT tryOutput64
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
+@@ -274,4 +274,13 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
 +
 +#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
 +bool X86_decodeTextRecord64(struct cs_struct *handle, const uint8_t *code,
@@ -161,28 +138,51 @@ index 96ce9f72..7a01f09b 100644
 +}
 +#endif
  #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..ed98a248 100644
+index 443b2f86..8f68962d 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -199,6 +199,15 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
+@@ -213,4 +213,24 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter(ud, code, size, address, insn);
+ }
 +
 +#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+bool X86_decodeTextRecord32(struct cs_struct *handle, const uint8_t *code,
-+			    size_t size, cs_insn *insn, uint16_t *length,
-+			    bool batch)
++/* The public iterator owns cursor advancement. A scan miss or an unsupported
++ * mode can tail-call the ordinary decoder using the same calling convention. */
++CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
++					    const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *length,
++					    bool batch)
 +{
-+	return decode_insn(handle, code, size, insn, length, false, batch);
++	if (handle->arch == CS_ARCH_X86 && !handle->no_text) {
++		if (handle->mode == CS_MODE_32)
++			return decode_insn(handle, code, size, insn, length,
++					   false, batch);
++		if (handle->mode == CS_MODE_64)
++			return X86_decodeTextRecord64(handle, code, size, insn,
++						      length, batch);
++	}
++	return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +}
 +#endif
  #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index f3dfc374..b0f4a6ce 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,6 +18,11 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 92e01e07..34635d83 100644
 --- a/tests/unit/CMakeLists.txt

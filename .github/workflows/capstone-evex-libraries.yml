@@ -1,7 +1,7 @@
-name: Measure x86-only public output against iced and verify unchanged mixed library objects
+name: Compare public records at the existing x86 decode call boundary with iced and the released iterator
 on:
   push:
-    branches: [codex/four-host-x86-only-public-records]
+    branches: [codex/x86-only-public-call-boundary]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-only-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: record-boundary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
