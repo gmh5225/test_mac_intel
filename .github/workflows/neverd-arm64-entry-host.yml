@@ -1,0 +1,67 @@
+name: Identify Windows ARM64 kernel-entry observation facilities
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - '.github/workflows/neverd-arm64-entry-host.yml'
+permissions:
+  contents: read
+jobs:
+  native-windows:
+    runs-on: windows-11-arm
+    timeout-minutes: 10
+    steps:
+      - name: Identify the native OS, guest facilities and kernel debugger
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $processor = Get-CimInstance Win32_Processor | Select-Object -First 1
+          $machine = Get-CimInstance Win32_ComputerSystem
+          $os = Get-CimInstance Win32_OperatingSystem
+          $features = @()
+          foreach ($feature in @('Microsoft-Hyper-V-All','HypervisorPlatform','Containers-DisposableClientVM')) {
+            $item = Get-WindowsOptionalFeature -Online -FeatureName $feature -ErrorAction SilentlyContinue
+            if ($item) { $features += @{name=$feature; state=[string]$item.State} }
+          }
+          $kd = @(Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers" -Filter kd.exe -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object FullName)
+          $bcd = @(bcdedit /enum '{current}')
+          if ($processor.Architecture -ne 12) { throw 'Runner is not native ARM64' }
+          [ordered]@{architecture='ARM64'; processor=$processor.Name; virtualization_extensions=$processor.VMMonitorModeExtensions;
+            firmware_virtualization=$processor.VirtualizationFirmwareEnabled; hypervisor_present=$machine.HypervisorPresent;
+            host_model=$machine.Model; os=$os.Caption; build=$os.BuildNumber; features=$features; debugger=$kd;
+            boot_debug_settings=@($bcd | Where-Object { $_ -match '^debug\s|^hypervisorlaunchtype' });
+            vm_host_command=[bool](Get-Command Get-VMHost -ErrorAction SilentlyContinue);
+            scope='Capabilities of this ephemeral runner. No kernel-entry observation is claimed.'
+          } | ConvertTo-Json -Depth 5 | Tee-Object -FilePath windows-arm64.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: windows-arm64-entry-host
+          path: windows-arm64.json
+  native-linux:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Confirm ARM64 host and whether ARM64 guests can use hardware virtualization
+        run: |
+          python3 - <<'PY'
+          import fcntl, json, os, platform
+          from pathlib import Path
+          assert platform.machine() == 'aarch64'
+          kvm = Path('/dev/kvm')
+          result = {'architecture': platform.machine(), 'device': kvm.exists(), 'kvm_api_version': None}
+          if kvm.exists():
+              try:
+                  fd=os.open(kvm,os.O_RDWR)
+                  try:
+                      result['kvm_api_version']=fcntl.ioctl(fd,0xae00)
+                  finally:
+                      os.close(fd)
+              except OSError as error:
+                  result['kvm_error']=str(error)
+          print(result)
+          Path('linux-arm64.json').write_text(json.dumps(result, indent=2))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: linux-arm64-entry-host
+          path: linux-arm64.json
