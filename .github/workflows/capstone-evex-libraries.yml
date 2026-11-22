@@ -1,7 +1,7 @@
-name: Measure complete EVEX RIP-relative records and count their contribution on six fixed applications
+name: Measure full VEX RIP-relative memory records and count their actual use on six real programs
 on:
   push:
-    branches: [codex/rip-relative-evex-memory-rows]
+    branches: [codex/vex-rip-output-rows]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 22ff038a78971a4414930e602bff1e469c52a619
+          ref: 8b7c01a0d88cb64d1754662ffcca70ca16d2839e
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-rip-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-rip-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
