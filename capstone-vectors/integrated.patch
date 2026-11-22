@@ -1,10 +1,10 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 12428fff..f52c715c 100644
+index 12428fff..13c624d8 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3292,6 +3292,83 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
- X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 					 uint8_t prefix, X86ScanResult *result);
+@@ -3651,6 +3651,83 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
+ 				   instructionID, size, true, readerFlags);
+ }
  
 +#ifndef CAPSTONE_X86_REDUCE
 +#if defined(__ELF__) && defined(__clang__)
@@ -83,33 +83,41 @@ index 12428fff..f52c715c 100644
 +#endif
 +#endif
 +
- /* Only generic and extension decoding need an MCInst in the core scan path. */
- #if defined(_MSC_VER)
- __declspec(noinline)
-@@ -3333,6 +3410,23 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 			if (status != X86_SCAN_NOT_HANDLED)
- 				return status == X86_SCAN_COMPLETE;
- 		}
+ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 					   const uint8_t *code, size_t code_len,
+ 					   unsigned *instructionID,
+@@ -3666,10 +3743,30 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_16,
+ 					       feature64, instructionID, length,
+ 					       readerFlags);
+-	else
++	else {
+ 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
+ 					       feature64, instructionID, length,
+ 					       readerFlags);
 +#ifndef CAPSTONE_X86_REDUCE
-+		/* The adapter and feature-extension decoder have had their turn.
-+		 * Only a bare i386 VEX2 with a canonical instruction map can
-+		 * return a public ID without constructing an internal opcode. */
-+		if (opcode == 0xc5 && handle->mode == CS_MODE_32 && code_len &&
-+		    code[0] == 0xc5 && handle->insn_id == X86_get_insn_id &&
++		/* A bare VEX2 uses opcode map 1. When a user adapter owns
++		 * these encodings, leave its original fallback in charge. */
++		if (initial == X86_SCAN_NOT_HANDLED && code_len &&
++		    code[0] == 0xc5 && handle->mode == CS_MODE_32 &&
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++		    !(handle->x86_scan_adapter &&
++		      handle->x86_scan_adapter_mode == handle->mode) &&
++#endif
++		    handle->insn_id == X86_get_insn_id &&
 +		    handle->disasm == X86_getInstruction) {
-+			const uint32_t packed = readVex2Scan32(code, code_len);
++			uint32_t packed = readVex2Scan32(code, code_len);
 +			if (packed) {
-+				result->opcode = 0;
-+				result->opcode_pub = packed >> 8;
-+				result->length = (uint16_t)(packed & 0xff);
-+				result->popcode_adjust = 0;
-+				return true;
++				*instructionID = packed >> 8;
++				*length = (uint16_t)(packed & 0xff);
++				return X86_SCAN_COMPLETE;
 +			}
 +		}
 +#endif
- 		bool decoded = opcode == 0x62 ?
- 				       X86_getInstructionAfterExtensions(
- 					       ud, code, code_len, &instr,
++	}
+ 	return initial;
+ }
+ 
 diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
 new file mode 100644
 index 00000000..7817a761

@@ -1,7 +1,7 @@
-name: Measure cold i386 VEX2 routing with linked and object code attribution on both compilers
+name: Compare i386 VEX2 after legacy rejection with mode-isolated scan symbols on two compilers
 on:
   push:
-    branches: [codex/capstone-cold-i386-vex2]
+    branches: [codex/capstone-legacy-miss-i386-vector]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: cold-vex2-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-escape-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
