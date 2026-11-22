@@ -1,24 +1,35 @@
-diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
-index 00348e68..8344d742 100644
---- a/arch/RISCV/RISCVDisassembler.h
-+++ b/arch/RISCV/RISCVDisassembler.h
-@@ -11,12 +11,13 @@
- #include "../../MCDisassembler.h"
- #include "../../SStream.h"
+diff --git a/MappingAlias.h b/MappingAlias.h
+index d6575cb9..c5b29186 100644
+--- a/MappingAlias.h
++++ b/MappingAlias.h
+@@ -7,11 +7,16 @@
+ #include "Mapping.h"
+ #include "utils.h"
  
--/* Select the position table in dedicated builds where scanning and detail
-- * construction both benefit. GCC's full decoder keeps the descriptor walk. */
--#if defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && \
--	(defined(CAPSTONE_DIET) || \
--	 (defined(__linux__) && defined(__clang__) && \
--	  (defined(__x86_64__) || defined(__aarch64__))))
-+/* The compact SP positions are also profitable in mixed x86-64 Linux
-+ * builds with Clang 18 and later. */
-+#if (defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && defined(CAPSTONE_DIET)) || \
-+	(defined(__linux__) && defined(__clang__) && !defined(CAPSTONE_DIET) && \
-+	 (defined(__x86_64__) || defined(__aarch64__)) && \
-+	 (defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) || \
-+	  (defined(CAPSTONE_HAS_X86) && defined(__x86_64__) && __clang_major__ >= 18)))
- #define RISCV_USE_STACK_OPERAND_POSITIONS
++static inline bool char_ends_default_mnem(const char c)
++{
++	return !c || c == ' ' || c == '\t' || c == '.';
++}
++
+ static inline bool char_ends_mnem(const char c, cs_arch arch)
+ {
+ 	switch (arch) {
+ 	default:
+-		return (!c || c == ' ' || c == '\t' || c == '.');
++		return char_ends_default_mnem(c);
+ 	case CS_ARCH_PPC:
+ 	case CS_ARCH_RISCV:
+ 		return (!c || c == ' ' || c == '\t');
+@@ -40,7 +45,12 @@ static inline
+ #pragma clang loop unroll(disable)
  #endif
- 
+ 		for (size_t i = 0; i < 15; ++i) {
++#ifdef CAPSTONE_ALIAS_ROLLED_LOOP
++			/* The shared AArch64 and MIPS tables both use the default delimiters. */
++			if (char_ends_default_mnem(name[i]))
++#else
+ 			if (char_ends_mnem(name[i], MI->csh->arch))
++#endif
+ 				break;
+ 			unsigned int next =
+ 				trie[state].offset + (unsigned char)name[i];

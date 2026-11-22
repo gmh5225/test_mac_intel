@@ -20,23 +20,17 @@ try:
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
-        cmd('compile-riscv-'+k,['cc','-O2','-I',s/'include',d/'records.c','-L',b,'-Wl,-rpath,'+str(b),'-lcapstone','-o',t/'riscv-records'])
-        hd=hashlib.sha256();length=0
-        with (out/('riscv-'+k+'.log')).open('w')as log,sp.Popen([t/'riscv-records'],stdout=sp.PIPE,stderr=log)as cp:
-            while buf:=cp.stdout.read(4194304):hd.update(buf);length+=len(buf)
-            assert cp.wait()==0
-        if k=='base':rv_reference=(hd.hexdigest(),length)
-        else:assert rv_reference==(hd.hexdigest(),length)
-        assert (out/('riscv-'+k+'.log')).read_text().startswith('262144 states, ')
-        save('riscv-bytes-'+k,dict(bytes=length,sha256=hd.hexdigest()))
+        if cc=='clang':
+            cmd('alias-static-'+k,['cmake','--build',b,'--target','capstone_static','--parallel','4'])
+            cmd('alias-compile-'+k,[cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_AARCH64','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'alias.c',b/'libcapstone.a','-o',t/'alias'])
+            cmd('alias-oracle-'+k,[t/'alias'])
+            assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
         if k=='stack':
-            names=['x86_reg_access','x86_mapping_counts','x86_evex_detail','x86_scan_batch','riscv_op_count_iter','riscv_instruction_groups','riscv_mapping_index','riscv_reg_access','riscv_sysreg','riscv_insn_name_segv','riscv_writeback_postprocess','mips_single']
+            names=['aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
-            cmd('generator',['python3','-B',s/'suite/synctools/operand_writeback.py','--check'])
-    active = cc=='clang' and osrel=='24.04' and platform.machine()=='x86_64'
-    assert (ids['base']!=ids['stack'])==active,ids
-    cmd('identity',['python3','-B',d/'identity.py'])
+            cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
+    if cc!='clang':assert ids['base']==ids['stack']
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
@@ -44,11 +38,11 @@ try:
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
     cmd('libmvec',['python3','-B',t/'libmvec.py'])
     import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','riscv64-cp','riscv64-ls','mips64el-ls','arm64-ls')]
-    assert len(extra)==5
+    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('arm-ls','riscv64-ls','mips64el-ls','arm64-ls')]
+    assert len(extra)==4
     panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
     panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
-    panels.extend((q['name'],{'riscv64-sort':105,'riscv64-cp':105,'riscv64-ls':105,'mips64el-ls':103,'arm64-ls':102}[q['name']],Path(q['path']),0x100000,(0,1,2))for q in extra)
+    panels.extend((q['name'],{'arm-ls':101,'riscv64-ls':105,'mips64el-ls':103,'arm64-ls':102}[q['name']],Path(q['path']),0x100000,(0,1,2))for q in extra)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
     save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output([cc,'--version'],text=True),images=ids,osrel=osrel,machine=platform.machine(),cc=cc))
     def invoke(k,arch,mode,path,ip,n):

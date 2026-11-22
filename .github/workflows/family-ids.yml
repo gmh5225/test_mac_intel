@@ -1,7 +1,7 @@
-name: Select measured mixed RISC-V operand layout on x86 hosts and verify native ARM, GCC and four-backend images
+name: Verify shared AArch64 and MIPS alias semantics and real multi-backend performance
 on:
   push:
-    branches: [codex/capstone-riscv-host-qualified]
+    branches: [codex/capstone-shared-alias-delimiters]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: host-qualified-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: alias-delimiters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
