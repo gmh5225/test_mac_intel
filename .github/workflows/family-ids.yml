@@ -1,7 +1,7 @@
-name: Qualify selected RISC-V stack projection with matched binaries for every active and inactive Linux configuration
+name: Verify full, no-ATT, reduced and DIET x86 conditional moves with linked NeverD rebase identities
 on:
   push:
-    branches: [codex/capstone-qualified-riscv-stack-positions]
+    branches: [codex/capstone-cmov64-configurations]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: selected-sp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: cmov64-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

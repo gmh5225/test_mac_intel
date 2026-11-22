@@ -1,0 +1,201 @@
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 64ee3a95..947fd2d2 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -53,9 +53,9 @@
+ 
+ #define DEBUG_TYPE "riscv-disassembler"
+ 
++#ifndef RISCV_USE_STACK_OPERAND_POSITIONS
+ void addSPOperands(MCInst *MI);
+-;
+-// end anonymous namespace
++#endif
+ 
+ static DecodeStatus DecodeGPRRegisterClass(MCInst *Inst, uint32_t RegNo,
+ 					   uint64_t Address,
+@@ -575,6 +575,29 @@ static DecodeStatus decodeZcmpSpimm(MCInst *Inst, unsigned Imm,
+ 	return MCDisassembler_Success;
+ }
+ 
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++/* Positions refer to the final operand list. Inserting from lowest to highest
++ * keeps subsequent positions valid when an instruction implies SP twice. */
++static void insertSPOperands(MCInst *MI, unsigned positions)
++{
++	MCOperand sp;
++	sp.MachineOperandType = kRegister;
++	sp.Kind = kRegister;
++	sp.RegVal = RISCV_X2;
++	do {
++		MCInst_insert0(MI, CountTrailingZeros_32(positions), &sp);
++		positions &= positions - 1;
++	} while (positions);
++}
++
++static inline void addSPOperands(MCInst *MI)
++{
++	unsigned positions =
++		RISCV_getStackOperandPositions(MCInst_getOpcode(MI));
++	if (positions)
++		insertSPOperands(MI, positions);
++}
++#else
+ // Add implied SP operand for C.*SP compressed instructions. The SP operand
+ // isn't explicitly encoded in the instruction.
+ void addSPOperands(MCInst *MI)
+@@ -590,6 +613,7 @@ void addSPOperands(MCInst *MI)
+ 		if (MCID->OpInfo[i].RegClass == RISCV_SPRegClassID)
+ 			MCInst_insert0(MI, i, &SPReg);
+ }
++#endif
+ 
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 				  const uint8_t *Bytes, size_t BytesLen,
+diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
+index e36ec509..00348e68 100644
+--- a/arch/RISCV/RISCVDisassembler.h
++++ b/arch/RISCV/RISCVDisassembler.h
+@@ -11,6 +11,15 @@
+ #include "../../MCDisassembler.h"
+ #include "../../SStream.h"
+ 
++/* Select the position table in dedicated builds where scanning and detail
++ * construction both benefit. GCC's full decoder keeps the descriptor walk. */
++#if defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS) && \
++	(defined(CAPSTONE_DIET) || \
++	 (defined(__linux__) && defined(__clang__) && \
++	  (defined(__x86_64__) || defined(__aarch64__))))
++#define RISCV_USE_STACK_OPERAND_POSITIONS
++#endif
++
+ void RISCV_init(MCRegisterInfo *MRI);
+ 
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+diff --git a/arch/RISCV/RISCVGenWriteback.inc b/arch/RISCV/RISCVGenWriteback.inc
+index 34eec991..a49228cc 100644
+--- a/arch/RISCV/RISCVGenWriteback.inc
++++ b/arch/RISCV/RISCVGenWriteback.inc
+@@ -415,3 +415,16 @@ static const uint8_t RISCVWritebackFlags[] = {
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0,
+ };
++
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++static const uint8_t RISCVStackOperandPositions[] = {
++	3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 2, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
++	0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
++};
++static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)
++{
++	unsigned index = opcode - 11749U;
++	return index < sizeof(RISCVStackOperandPositions) ?
++		       RISCVStackOperandPositions[index] : 0;
++}
++#endif
+diff --git a/suite/synctools/operand_writeback.py b/suite/synctools/operand_writeback.py
+index 828785ee..9ae08504 100644
+--- a/suite/synctools/operand_writeback.py
++++ b/suite/synctools/operand_writeback.py
+@@ -60,12 +60,18 @@ def generated_flags(arch, source):
+         f"{arch} opcode coverage changed",
+     )
+     flags = [0] * count
++    stack_positions = {}
+     for length, offset, uid, _ in descriptors:
+         length, offset, uid = int(length), int(offset), int(uid)
+         require(
+             offset + length <= len(operands), f"{arch} operand extent exceeds table"
+         )
+-        for _, _, _, constraints in operands[offset : offset + length]:
++        for index, (reg_class, _, _, constraints) in enumerate(
++            operands[offset : offset + length]
++        ):
++            if arch == "RISCV" and reg_class == "RISCV_SPRegClassID":
++                require(index < 8, "RISC-V implied SP position exceeds one byte")
++                stack_positions[uid] = stack_positions.get(uid, 0) | (1 << index)
+             if re.fullmatch(r"CONSTRAINT_MCOI_TIED_TO\(\d+\)", constraints):
+                 flags[uid] = 1
+             else:
+@@ -84,6 +90,27 @@ def generated_flags(arch, source):
+     for index in range(0, count, 32):
+         lines.append("\t" + ", ".join(map(str, flags[index : index + 32])) + ",")
+     lines += ["};", ""]
++    if arch == "RISCV":
++        require(stack_positions, "No implied RISC-V SP operands found")
++        first, last = min(stack_positions), max(stack_positions)
++        positions = [stack_positions.get(opcode, 0) for opcode in range(first, last + 1)]
++        lines += [
++            "#ifdef RISCV_USE_STACK_OPERAND_POSITIONS",
++            "static const uint8_t RISCVStackOperandPositions[] = {",
++        ]
++        for index in range(0, len(positions), 32):
++            lines.append("\t" + ", ".join(map(str, positions[index : index + 32])) + ",")
++        lines += [
++            "};",
++            "static inline unsigned RISCV_getStackOperandPositions(unsigned opcode)",
++            "{",
++            f"\tunsigned index = opcode - {first}U;",
++            "\treturn index < sizeof(RISCVStackOperandPositions) ?",
++            "\t\t       RISCVStackOperandPositions[index] : 0;",
++            "}",
++            "#endif",
++            "",
++        ]
+     return "\n".join(lines)
+ 
+ 
+diff --git a/tests/unit/writeback_postprocess.c b/tests/unit/writeback_postprocess.c
+index 1afe180d..e983ed2f 100644
+--- a/tests/unit/writeback_postprocess.c
++++ b/tests/unit/writeback_postprocess.c
+@@ -15,6 +15,7 @@
+ 
+ #ifdef WRITEBACK_TEST_RISCV
+ #include "../../arch/RISCV/RISCVBaseInfo.h"
++#include "../../arch/RISCV/RISCVDisassembler.h"
+ #include "../../arch/RISCV/RISCVMapping.h"
+ #define GET_REGINFO_ENUM
+ #include "../../arch/RISCV/RISCVGenRegisterInfo.inc"
+@@ -44,6 +45,30 @@ static bool check(const MCInstrDesc *descs, const uint8_t *flags, size_t count,
+ 	return true;
+ }
+ 
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++static bool checkStackOperandPositions(void)
++{
++	size_t count = ARR_SIZE(RISCVDescs.Insts);
++	for (unsigned opcode = 0; opcode < count; ++opcode) {
++		const MCInstrDesc *desc = &RISCVDescs.Insts[count - 1 - opcode];
++		unsigned positions = 0;
++		for (unsigned index = 0; index < desc->NumOperands; ++index) {
++			if (desc->OpInfo[index].RegClass != RISCV_SPRegClassID)
++				continue;
++			if (index >= 8)
++				return false;
++			positions |= 1U << index;
++		}
++		if (positions != RISCV_getStackOperandPositions(opcode)) {
++			fprintf(stderr, "RISC-V stack operand mismatch %u\n",
++				opcode);
++			return false;
++		}
++	}
++	return true;
++}
++#endif
++
+ int main(void)
+ {
+ #ifdef WRITEBACK_TEST_ARM
+@@ -52,6 +77,10 @@ int main(void)
+ 		return 1;
+ #endif
+ #ifdef WRITEBACK_TEST_RISCV
++#ifdef RISCV_USE_STACK_OPERAND_POSITIONS
++	if (!checkStackOperandPositions())
++		return 1;
++#endif
+ 	if (!check(RISCVDescs.Insts, RISCVWritebackFlags,
+ 		   ARR_SIZE(RISCVDescs.Insts), "RISCV"))
+ 		return 1;
