@@ -49,7 +49,7 @@ jobs:
         working-directory: neverd
         run: |
           test "$(git rev-parse HEAD)" = "359a30178db985ce8c6d1445a558b22e637fe426"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "68ca96c3343b0a7c110b9db372a9ee2642d857ef"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
           git -C third_party/capstone checkout --detach 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
