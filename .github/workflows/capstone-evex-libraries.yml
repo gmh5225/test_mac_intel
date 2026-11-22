@@ -1,7 +1,7 @@
-name: Count actual scalar, VEX and EVEX batch admissions over the six exact measured real image extents
+name: Attribute real format and detail fallbacks by decoded operand shape in both private iterators
 on:
   push:
-    branches: [codex/capstone-batch-fallback-attribution]
+    branches: [codex/capstone-actual-output-misses]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: actual-prefix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: actual-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

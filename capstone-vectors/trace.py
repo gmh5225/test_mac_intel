@@ -8,15 +8,16 @@ def save(n,q):(out/(n+'.json')).write_text(json.dumps(q,indent=2)+'\n')
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 q=read(r/'attribution-source.json');prior=read(r/'samples.json')
 def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
-assert git('rev-parse','HEAD')==q['parent'] and sha(r/'integrated.patch')==q['sha256']
-git('apply','--index',str(r/'integrated.patch'));assert git('write-tree')==q['tree']
+assert git('rev-parse','HEAD')==q['commit'] and git('write-tree')==q['tree']
+for bits,unit in [(64,'X86Sse64Output.c'),(32,'X86Vex32Output.c')]:
+    file=s/'arch/X86'/unit
+    with file.open('a') as f:
+        f.write('\nbool observedOutput%d(csh h,const uint8_t *p,size_t n,cs_insn *insn,uint16_t *length){return tryOutput%d((cs_struct *)(uintptr_t)h,p,n,insn,length);}\n'%(bits,bits))
 w=Path(tempfile.mkdtemp());b=w/'build'
 try:
-    run(['cmake','-G','Ninja','-S',s,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'])
+    run(['cmake','-G','Ninja','-S',s,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'])
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-    (w/'first.c').write_text('#define X86_scanBatch32 observed_batch32\n#define X86_scanBatch64 observed_batch64\n#include "arch/X86/X86BatchScan.c"\nuint32_t first_word(int bits,const uint8_t *p,size_t n){return bits==64?readFirst64(p,n):readFirst32(p,n);}\n')
-    run(['clang','-O2','-DCAPSTONE_HAS_X86','-I',s,'-I',s/'include','-c',w/'first.c','-o',w/'first.o'])
-    run(['clang++','-O2','-std=c++17','-I',s,'-I',s/'include',r/'trace.cpp',w/'first.o',b/'libcapstone.a','-o',w/'trace'])
+    run(['clang++','-O2','-std=c++17','-I',s,'-I',s/'include',r/'trace.cpp',b/'libcapstone.a','-o',w/'trace'])
     run(['clang++','-O2','-I',s/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'])
     for file in ('libmvec.json','libmvec.py'):shutil.copy2(r/file,w/file)
     run(['python3','-B',w/'libmvec.py']);glibc=read(w/'libmvec.json')
@@ -34,11 +35,12 @@ try:
         else:used=[v for v in spans if tuple(v)not in excluded]
         sf.write_text(''.join('%d %d %d\n'%v for v in used))
         assert len(used)==p['timed_functions'] and sha(sf)==p['extent_sha256']
-        lines=sp.check_output([w/'trace',str(bits),f,sf],text=True)
+        with (out/(name+'-comparison.log')).open('w') as log:
+            lines=sp.check_output([w/'trace',str(bits),f,sf],text=True,stderr=log)
         (out/(name+'.tsv')).write_text(lines)
         records=[list(map(int,l.split()))for l in lines.splitlines()]
-        counts=[sum(l[-1]for l in records if l[0]==k)for k in range(3)]
-        assert sum(counts)>0 and counts[2]>0
+        counts=[sum(l[-1]for l in records if l[0]==k)for k in range(5)]
+        assert sum(counts)>0 and counts[4]>0
         summary[name]=dict(source=p,counts=counts,histogram_sha256=hashlib.sha256(lines.encode()).hexdigest())
     assert len(summary)==6
     save('checked',dict(complete=True,source=q,samples=summary))
