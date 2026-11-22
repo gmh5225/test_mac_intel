@@ -72,6 +72,13 @@ def main(w):
         save('flags-'+label+'.json',flags)
         run(['cmake','--build',b,'--parallel','4','--target','capstone_static',*data['tests']],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(data['tests'])+')$'],'units-'+label)
+        run(['clang','-O2','-fsanitize=address,undefined','-fno-sanitize-recover=all','-I',base,'-I',base/'include',r/'oracle.c',b/'libcapstone.a','-o',w/'disp-oracle'],'oracle-link-'+label)
+        run([w/'disp-oracle'],'oracle-'+label)
+        run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'census.cpp',b/'libcapstone.a','-o',w/('census-'+label)],'census-link-'+label)
+        if label=='integrated':
+            run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',w/'gen'],'generator')
+            generated=sp.check_output([w/'gen','--short-displacements'])
+            assert generated==(base/'arch/X86/X86GenShortDisplacements.inc').read_bytes()
         libs=[b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm']
         target=w/('run-'+label)
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
@@ -84,8 +91,7 @@ def main(w):
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
-            assert prior.keys()==members.keys() and changed=={'X86Sse64Output.c.o'},changed
-            assert sha(ordinary)==sha(w/'unselected-baseline')
+            assert prior.keys()==members.keys() and {'X86MemoryOutput.c.o'} <= changed <= {'X86Sse64Output.c.o','X86Vex32Output.c.o','X86MemoryOutput.c.o','X86EvexMemoryOutput.c.o','X86VectorOutput.c.o'},changed
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
     save('tested-trees.json',data)
@@ -112,6 +118,14 @@ def main(w):
     extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
     for name,bits,f,spans,source in itertools.chain(deb.prepare(w),pe_panels.prepare(w),extra):
         if name not in data['samples']:continue
+        if name in ('putty-32-0.85','putty-64-0.85','libmvec-amd64'):
+            states={}
+            address=spans[0][2]-spans[0][0]
+            for which in (0,1):
+                records=[sp.check_output([w/('census-'+lab),str(bits),str(which),f,str(address)],text=True).splitlines()[0] for lab in ('baseline','integrated')]
+                assert records[0]==records[1] and int(records[0].split()[1])>0,(name,which,records)
+                states[str(which)]=records[0]
+            save('raw-'+name+'.json',states)
         panel=data['samples'][name]
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))

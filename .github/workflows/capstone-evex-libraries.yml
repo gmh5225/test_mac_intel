@@ -1,7 +1,7 @@
-name: Measure shared AMD64 conditional move operands against fixed rows and the two iced formatters
+name: Measure bounded signed byte displacement tokens on real PE and SIMD operands against both iced formatters
 on:
   push:
-    branches: [codex/capstone-shared-cmov-operands]
+    branches: [codex/capstone-short-displacement-tokens]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-cmov-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: short-disp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
