@@ -1,7 +1,7 @@
-name: Check the isolated scan update and composed register effects in 16 static and shared configurations
+name: Test complete vector and i386 output against ordinary records on four build hosts
 on:
   push:
-    branches: [codex/capstone-scan-validation-and-regs-profiles]
+    branches: [codex/capstone-vex-and-scalar-output-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 68ca96c3343b0a7c110b9db372a9ee2642d857ef
+          ref: af384642900fb1cf8cdf4ae370d34c0ab59f41af
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scan-register-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: scalar-output-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
