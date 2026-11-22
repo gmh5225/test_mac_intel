@@ -1,7 +1,7 @@
-name: Compare native batch and formatted operand readers together in complete NeverD builds
+name: Isolate private batch EVEX data and code layout against the verified native output in NeverD
 on:
   push:
-    branches: [codex/capstone-integrated-native-readers]
+    branches: [codex/capstone-batch-owned-evex-tables]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 21075b116d1a4e8486e1d234a809ac41fba46e5c
+          ref: f431b98d60823977535c06e65a6a66d6a66ad140
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "21075b116d1a4e8486e1d234a809ac41fba46e5c"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "34465fdeaea6988c753bde5de6ab93942f65de36"
+          test "$(git rev-parse HEAD)" = "f431b98d60823977535c06e65a6a66d6a66ad140"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 34465fdeaea6988c753bde5de6ab93942f65de36
-          git -C third_party/capstone checkout --detach 34465fdeaea6988c753bde5de6ab93942f65de36
+          git -C third_party/capstone fetch --depth=1 origin 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
+          git -C third_party/capstone checkout --detach 62d7ccde3dddf516671bcc8cadd5fcc9a3ca87eb
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-readers-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: evex-data-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

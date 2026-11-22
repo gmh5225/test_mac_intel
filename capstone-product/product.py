@@ -12,9 +12,8 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-assert sha(r/'neverd.patch')==m['decoder_patch']
-for k in ('output','ordered','packed','private'):assert sha(r/(k+'.patch'))==m[k]['sha256']
-assert git(cs,'write-tree')==m['base']['tree']
+for k in ('base','full','vex','scoped'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
 t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
@@ -38,22 +37,17 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','output','ordered','packed','private'):
-        if variant!='base':
-            command(['git','restore','--source',m['base']['tree'],'--staged','--worktree','--','.'],'restore-'+variant,cs)
-            filename=variant
-            command(['git','apply','--index',r/(filename+'.patch')],'apply-'+variant,cs)
-            command(['git','restore','--source','HEAD','--',str(decoder.relative_to(nd))],'decoder-'+variant,nd)
-            cmake_file.write_text(normal_cmake)
-            if variant!='output':command(['git','apply',r/'neverd.patch'],'call-'+variant,nd)
-        actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and ('return X86_scanNativeBatch(' in decoder.read_text())==(variant not in ('base','output'))
+    for variant in ('base','full','vex','scoped'):
+        command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
+        command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
+        actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
-        assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())==(variant not in ('base','output'))
+        assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
         obj,=build.rglob('X86Decoder.cpp.o')
         with obj.open('rb') as f:
@@ -73,20 +67,22 @@ try:
             elf=ELFFile(file)
             linked_sections={s.name:[s['sh_addr'],s.data_size,hashlib.sha256(s.data()).hexdigest()] for s in elf.iter_sections() if s['sh_flags'] & 2 and s['sh_type']=='SHT_PROGBITS'}
         members=sp.check_output(['ar','t',archive],text=True).splitlines()
-        if variant not in ('base','output'):
-            assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86MemoryFallback32.c.o') < members.index('X86BatchScan.c.o'),members
+        assert members.index('X86Vex32Output.c.o') < members.index('X86Sse64Output.c.o') < members.index('AliasMapping.c.o') < members.index('X86MemoryFallback32.c.o') < members.index('X86BatchScan.c.o'),members
 
-        save('layout-'+variant,dict(symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
+        member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
+        save('layout-'+variant,dict(member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
 
-        if variant in ('ordered','packed','private'):
+        if variant!='base':
             for mode in ('32','64'):
                 command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/('native-guard'+mode+'.cpp'),archive,'-o',t/('guard'+mode)],'guard-link-'+mode+'-'+variant)
                 command([t/('guard'+mode)],'guard-'+mode+'-'+variant)
-        if variant in ('packed','private'):
+        if variant!='base':
             command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'second.c','-o',t/'observed.o'],'projection-compile-'+variant)
             command(['clang++','-std=c++17','-O2','-I',cs,'-I',cs/'include',r/'vex3.cpp',t/'observed.o',archive,'-o',t/'vex3'],'vex3-link-'+variant)
             command([t/'vex3'],'vex3-oracle-'+variant)
-        if variant=='private':
+            command(['clang++','-std=c++17','-O2','-I',cs,'-I',cs/'include',r/'mandatory.cpp',t/'observed.o',archive,'-o',t/'mandatory'],'mandatory-link-'+variant)
+            command([t/'mandatory'],'mandatory-oracle-'+variant)
+        if variant=='scoped':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
