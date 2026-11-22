@@ -75,16 +75,16 @@ def main(w):
     def once(v,a,b):
         assert v.count(a)==1,(a,v.count(a))
         return v.replace(a,b)
-    inc=once(inc,'static void text_value(', 'template<bool NativeLength>\\nstatic void text_value(')
-    inc=once(inc,'  while (s[n])\\n    ++n;', '  if constexpr (NativeLength) n=std::strlen(s); else while (s[n]) ++n;')
-    inc=once(inc,'template <auto Next>\\nstatic Result cs_span', 'template <auto Next, bool NativeLength=false>\\nstatic Result cs_span')
+    inc=once(inc,'static void text_value(', 'template<bool NativeLength>\nstatic void text_value(')
+    inc=once(inc,'  while (s[n])\n    ++n;', '  if constexpr (NativeLength) n=std::strlen(s); else while (s[n]) ++n;')
+    inc=once(inc,'template <auto Next>\nstatic Result cs_span', 'template <auto Next, bool NativeLength=false>\nstatic Result cs_span')
     inc=inc.replace('text_value(result,','text_value<NativeLength>(result,')
     assert inc.count('text_value<NativeLength>')==2
     pair='else if(engine=="x86_iter" && bits==32 && X86_disasmIter32)'
-    alt='else if(engine=="x86_len_" && bits==32) row=cs_span<X86_disasmIter32,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\\n        else if(engine=="x86_len_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\\n        '
+    alt='else if(engine=="x86_len_" && bits==32) row=cs_span<X86_disasmIter32,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        else if(engine=="x86_len_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\n        '
     inc=once(inc,pair,alt+pair)
     inc=once(inc,'engine!="x86_iter" &&','engine!="x86_iter" && engine!="x86_len_" &&')
-    inc='#include <cstring>\\n'+inc
+    inc='#include <cstring>\n'+inc
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={}
