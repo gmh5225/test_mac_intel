@@ -1,7 +1,7 @@
-name: Compare protected-page batches on MSVC and Apple Clang with the final static archive order
+name: Build the independent x86 projection oracle with the same architecture definitions on MSVC and macOS
 on:
   push:
-    branches: [codex/capstone-final-batch-portability]
+    branches: [codex/capstone-cross-platform-projection-oracle]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -12,21 +12,9 @@ jobs:
       matrix:
         include:
           - { host: windows-2022, arch: amd64, profile: full }
-          - { host: windows-2022, arch: amd64, profile: adapter }
-          - { host: windows-2022, arch: amd64, profile: reduced }
-          - { host: windows-2022, arch: amd64, profile: diet }
           - { host: windows-2022, arch: amd64_x86, profile: full }
-          - { host: windows-2022, arch: amd64_x86, profile: adapter }
-          - { host: windows-2022, arch: amd64_x86, profile: reduced }
-          - { host: windows-2022, arch: amd64_x86, profile: diet }
           - { host: macos-15, arch: arm64, profile: full }
-          - { host: macos-15, arch: arm64, profile: adapter }
-          - { host: macos-15, arch: arm64, profile: reduced }
-          - { host: macos-15, arch: arm64, profile: diet }
           - { host: macos-15-intel, arch: x86_64, profile: full }
-          - { host: macos-15-intel, arch: x86_64, profile: adapter }
-          - { host: macos-15-intel, arch: x86_64, profile: reduced }
-          - { host: macos-15-intel, arch: x86_64, profile: diet }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 85
     steps:
