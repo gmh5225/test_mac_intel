@@ -1,7 +1,7 @@
-name: Measure i386 TEST register and memory immediate formatting against complete dirty records and source-built iced
+name: Compare canonical accumulator and byte register output on real x86 PE and ELF functions
 on:
   push:
-    branches: [codex/capstone-i386-unsigned-test]
+    branches: [codex/capstone-short-opcode-register-immediates]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: short-disp-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: accumulator-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
