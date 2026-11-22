@@ -1,7 +1,7 @@
-name: Measure mode-specific repair dispatch with full dirty state and fixed-image Clang 14/18 replicated controls
+name: Verify compressed stack operands and x86 mode-specific effects together in mixed libraries on four independent runners
 on:
   push:
-    branches: [codex/capstone-variable-effects-only]
+    branches: [codex/capstone-mixed-riscv-mode-effects]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: variable-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mixed-effect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
