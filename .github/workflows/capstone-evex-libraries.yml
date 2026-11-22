@@ -1,7 +1,7 @@
-name: Compare mode-specific register writes and AMD64 formatting with iced
+name: Measure AMD64 TEST memory and immediate output against iced on six real programs
 on:
   push:
-    branches: [codex/capstone-mode-writes-iced]
+    branches: [codex/capstone-amd64-test-memory-immediate]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 958b98cbbeb217ab3e8babe1de7175546ec82748
+          ref: 0fbbaa9ca1ab4eb9c390d08ff26a42384d052e82
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mode-vector-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: test-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
