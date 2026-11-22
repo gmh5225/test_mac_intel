@@ -1,7 +1,7 @@
-name: Time validated map 0F 38 register output on real AMD64 and i386 workloads
+name: Measure i386 memory TEST in six real corpora with separate hit counts and full canonical records
 on:
   push:
-    branches: [codex/late-register-pairs-map38]
+    branches: [codex/byte-test-i386-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-map38-pairs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-byte-test-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
