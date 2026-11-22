@@ -22,6 +22,11 @@ try:
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
+        candidate_objs=list(b.rglob('X86Mapping.c.o'));assert candidate_objs
+        nm=sp.check_output(['nm','-S','--size-sort','--defined-only',candidate_objs[0]],text=True)
+        tables={fields[-1]:int(fields[1],16) for l in nm.splitlines() if len(fields:=l.split())==4 and fields[-1] in ('insns','x86_implicit_effects','x86_mapping_counts')}
+        assert 'insns' in tables and ('x86_implicit_effects' in tables)==(k=='projected')
+        save('tables-'+k,dict(tables=tables,shared_bytes=len(imgs[k]),shared_sha256=ids[k]))
         if k!='base':
             names=['x86_reg_access','x86_mapping_counts','x86_evex_detail','x86_scan_batch']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
@@ -40,11 +45,14 @@ try:
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
     shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
+    for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
+    cmd('libmvec',['python3','-B',t/'libmvec.py'])
     import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','mips64el-ls')]
-    assert len(extra)==2
+    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','mips64el-ls','arm64-ls')]
+    assert len(extra)==3
     panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
-    panels.extend((q['name'],105 if q['name']=='riscv64-sort' else 103,Path(q['path']),0x100000,(0,1,2))for q in extra)
+    panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
+    panels.extend((q['name'],{'riscv64-sort':105,'mips64el-ls':103,'arm64-ls':102}[q['name']],Path(q['path']),0x100000,(0,1,2))for q in extra)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
     save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output(['clang','--version'],text=True),images=ids,osrel=osrel))
     def invoke(k,arch,mode,path,ip,n):
