@@ -1,102 +1,265 @@
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..5f7682dd 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -30,12 +30,21 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
- 					 uint16_t *insn_size);
- #endif
- 
--#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
--	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
--	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
--	!defined(_WIN32_WCE)
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#ifdef CAPSTONE_X86_ONLY
- #define CAPSTONE_X86_PUBLIC_OUTPUT
- #endif
-+#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
-+#include "../../cs_priv.h"
-+/* Dedicated Linux builds already try this writer in the common decoder. */
-+#define CAPSTONE_X86_BULK_OUTPUT
-+CAPSTONE_INTERNAL bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code,
-+					size_t size, cs_insn *insn,
-+					uint16_t *insn_size);
-+#endif
-+#endif
- 
- bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			MCInst *instr, uint16_t *size, uint64_t address,
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..07fa8e88 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -15,6 +15,16 @@
- 
- #include "X86SimpleOutputImpl.h"
- 
-+#ifdef CAPSTONE_X86_BULK_OUTPUT
-+bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code, size_t size,
-+		       cs_insn *insn, uint16_t *insn_size)
-+{
-+	/* A custom detail allocator may change the option mid-record. */
-+	return (!insn->detail || handle->detail_opt) &&
-+	       X86_trySimpleOutput(handle, code, size, insn, insn_size);
-+}
-+#endif
+diff --git a/arch/X86/X86OpcodeImmediateOutput.h b/arch/X86/X86OpcodeImmediateOutput.h
+new file mode 100644
+index 00000000..2aaa16fd
+--- /dev/null
++++ b/arch/X86/X86OpcodeImmediateOutput.h
+@@ -0,0 +1,36 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
 +
- #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
- #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
- #endif
++#ifndef CS_X86_OPCODE_IMMEDIATE_OUTPUT_H
++#define CS_X86_OPCODE_IMMEDIATE_OUTPUT_H
++
++#include "X86RegisterImmediateOutput.h"
++
++/* Bare accumulator CMP/TEST and opcode-register MOV use the same immediate
++ * record as a register pair, with neither a ModR/M nor a displacement. */
++static bool writeOpcodeImmediate(cs_struct *handle, const uint8_t *code,
++				 size_t size, cs_insn *insn, uint16_t *insn_size,
++				 bool wide, uint8_t rex, uint8_t op)
++{
++	const bool mov = (op & 0xf8) == 0xb0;
++	const unsigned family = op & 0xfe;
++	if (!mov && family != 0x3c && family != 0xa8)
++		return false;
++	const bool dword = !mov && (op & 1);
++	const unsigned offset = 1 + (rex != 0);
++	const unsigned imm_size = dword ? 4 : 1;
++	if (size < offset + imm_size || (dword && (rex & 8)) ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	const unsigned pair = mov ? 0x88 : (family == 0xa8 ? 0x84 : 0x38) + dword;
++	const unsigned prefix = rex ? 1 + ((rex >> 3) & 1) : 0;
++	const unsigned row = x86_simple_plans[wide][prefix][pair] >> 2;
++	const unsigned reg = mov ? ((rex & 1) << 3) | (op & 7) : 0;
++	writeUnsignedRegisterImmediate(
++		insn, &x86_simple_outputs[row],
++		&x86_simple_registers[dword ? 2 : (rex != 0)][reg],
++		code, rex, 0, offset, imm_size, insn_size);
++	return true;
++}
++
++#endif
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..41086743 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -19,6 +19,7 @@
+ #define X86_FIXED_VEX2 writeVex2Output64
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
++#include "X86OpcodeImmediateOutput.h"
+ #include "X86VectorRegisterOutput.h"
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
+ #define X86_IMMEDIATE_WIDE 1
+@@ -158,8 +159,12 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 				     rex_byte, code[length - 2]);
+ 	}
+ 	if (primary != 0x0f) {
++		if ((primary & 0xfe) != 0xc6)
++			return writeOpcodeImmediate(handle, code, size, insn,
++						    insn_size, true, rex_byte,
++						    primary);
+ 		const uint8_t mr = code[has_rex + 1];
+-		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
++		if (mr >= 0xc0 || (mr & 0x38) ||
+ 		    X86_OUTPUT_UNSUPPORTED(handle, false))
+ 			return false;
+ 		const unsigned prefix_class =
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..26ff5ea5 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -15,6 +15,7 @@
+ #include "X86OutputOptions.h"
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
++#include "X86OpcodeImmediateOutput.h"
+ #include "X86VectorRegisterWriter.h"
+ #define X86_MEMORY32_OUTPUT writeMemory32
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
+@@ -152,11 +153,15 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 			       size_t size, cs_insn *insn, uint16_t *insn_size)
+ {
+ 	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
+-	if ((code[0] & 0xfc) != 0xc4)
+-		return code[0] == 0x0f && size >= 3 &&
++	if ((code[0] & 0xfc) != 0xc4) {
++		if (code[0] != 0x0f)
++			return writeOpcodeImmediate(handle, code, size, insn,
++						    insn_size, false, 0, code[0]);
++		return size >= 3 &&
+ 		       (code[1] & 0xf6) == 0xb6 &&
+ 		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+ 		       writeExtend32(code, size, insn, insn_size);
++	}
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, false))
+ 		return false;
+ 	if (code[0] & 2) {
 diff --git a/cs.c b/cs.c
-index ede7c2aa..04f5d701 100644
+index ede7c2aa..e04247d0 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -996,7 +996,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -1381,12 +1381,11 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		return CS_ERR_OK;
  
- #ifndef CAPSTONE_DIET
- 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
--	memset(insn->op_str, '\0', sizeof(insn->op_str));
+ 	case CS_OPT_DETAIL:
+-		// CS_OPT_OFF turns detail off.  Any other value adds its flags
+-		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
++		// A requested detail format enables detail, including when set first.
+ 		if (value == CS_OPT_OFF)
+ 			handle->detail_opt = CS_OPT_OFF;
+ 		else
+-			handle->detail_opt |= (cs_opt_value)value;
++			handle->detail_opt |= (cs_opt_value)(value | CS_OPT_ON);
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
+ #endif
+diff --git a/include/capstone/capstone.h b/include/capstone/capstone.h
+index 80f8ce9e..6da7468b 100644
+--- a/include/capstone/capstone.h
++++ b/include/capstone/capstone.h
+@@ -384,7 +384,7 @@ typedef struct cs_opt_mnem {
+ typedef enum cs_opt_type {
+ 	CS_OPT_INVALID = 0, ///< No option specified
+ 	CS_OPT_SYNTAX, ///< Assembly output syntax
+-	CS_OPT_DETAIL, ///< Break down instruction structure into details
++	CS_OPT_DETAIL, ///< A nonzero detail flag enables instruction details. CS_OPT_OFF clears all detail flags.
+ 	CS_OPT_MODE, ///< Change engine's mode at run-time
+ 	CS_OPT_MEM, ///< User-defined dynamic memory related functions
+ 	CS_OPT_SKIPDATA, ///< Skip data when disassembling. Then engine is in SKIPDATA mode.
+diff --git a/tests/unit/api.c b/tests/unit/api.c
+index 0a86e462..d0fb371d 100644
+--- a/tests/unit/api.c
++++ b/tests/unit/api.c
+@@ -3,6 +3,7 @@
+ 
+ #include "../../include/capstone/capstone.h"
+ #include "unit_test.h"
++#include <stddef.h>
+ #include <stdio.h>
+ #include <string.h>
+ 
+@@ -197,12 +198,78 @@ static bool test_iterator_results(void)
+ 	return true;
+ }
+ 
++static bool test_detail_modifiers(cs_arch arch, cs_mode mode,
++				  const uint8_t *code, size_t size,
++				  size_t detail_size)
++{
++	if (!cs_support(arch))
++		return true;
++	csh handle;
++	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = true;
++	for (unsigned flags = 2; ok && flags < 16; flags += 2) {
++		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
++		cs_option(handle, CS_OPT_DETAIL, flags | CS_OPT_ON);
++		cs_insn *expected = NULL;
++		if (cs_disasm(handle, code, size, 0x1000, 1, &expected) != 1) {
++			ok = false;
++			break;
++		}
++		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
++		cs_option(handle, CS_OPT_DETAIL, flags);
++		cs_insn *actual = cs_malloc(handle);
++		ok = actual && actual->detail && expected->detail;
++		if (ok) {
++			// Reusing a record must clear counts from its last instruction.
++			memset(actual->detail, 0, sizeof(*actual->detail));
++			actual->detail->groups_count = 1;
++			const uint8_t *cursor = code;
++			size_t left = size;
++			uint64_t address = 0x1000;
++			ok = cs_disasm_iter(handle, &cursor, &left, &address,
++					    actual) &&
++			     left == 0 && actual->id == expected->id &&
++			     actual->alias_id == expected->alias_id &&
++			     actual->usesAliasDetails ==
++				     expected->usesAliasDetails &&
++			     !memcmp(actual->detail, expected->detail,
++				     detail_size);
++		}
++		if (!ok)
++			fprintf(stderr,
++				"Detail modifiers: arch=%u flags=0x%x\n",
++				(unsigned)arch, flags);
++		if (actual)
++			cs_free(actual, 1);
++		cs_free(expected, 1);
++	}
++	cs_close(&handle);
++	return ok;
++}
 +
- 	size_t off = 0;
- 	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
- 	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
-@@ -1011,6 +1011,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 		off++;
- 	const char *operands = OS->buffer + off;
- 	if (stream_length_valid) {
-+		memset(insn->op_str, '\0', sizeof(insn->op_str));
- #ifdef CS_MIPS_VISIBLE_OPERANDS
- 		/* MIPS can remove the MIPS16 comment or a '$' after printing.
- 		 * Both edits shorten the visible string without moving the cursor. */
-@@ -1041,9 +1042,9 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 			insn->op_str[0] = operands[0];
- 		}
- 	} else {
--		for (off = 0; operands[off] && off < sizeof(insn->op_str) - 1;
--		     off++)
--			insn->op_str[off] = operands[off];
-+		/* Copy and zero-pad the visible string, including a truncated record. */
-+		strncpy(insn->op_str, operands, sizeof(insn->op_str) - 1);
-+		insn->op_str[sizeof(insn->op_str) - 1] = '\0';
- 	}
+ int main()
+ {
+ 	bool result = true;
+ 	result &= test_cs_mem_setup_fail();
+ 	result &= test_iterator_allocation();
+ 	result &= test_iterator_results();
++	static const uint8_t bl[] = { 0x00, 0x00, 0x00, 0x94 };
++	static const uint8_t mov[] = { 0x01, 0x00, 0xa0, 0xe1 };
++	static const uint8_t addiu[] = { 0x01, 0x00, 0x82, 0x24 };
++	static const uint8_t c_nop[] = { 0x01, 0x00 };
++	result &= test_detail_modifiers(
++		CS_ARCH_AARCH64, CS_MODE_ARM, bl, sizeof(bl),
++		offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
++	result &= test_detail_modifiers(
++		CS_ARCH_ARM, CS_MODE_ARM, mov, sizeof(mov),
++		offsetof(cs_detail, arm) + sizeof(cs_arm));
++	result &= test_detail_modifiers(
++		CS_ARCH_MIPS, CS_MODE_MIPS32, addiu, sizeof(addiu),
++		offsetof(cs_detail, mips) + sizeof(cs_mips));
++	result &= test_detail_modifiers(
++		CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C, c_nop,
++		sizeof(c_nop), offsetof(cs_detail, riscv) + sizeof(cs_riscv));
  
- 	// we might have customized mnemonic
-@@ -1107,9 +1108,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- #endif
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
--	if (handle->arch == CS_ARCH_X86)
-+	if (handle->arch == CS_ARCH_X86) {
-+#ifdef CAPSTONE_X86_BULK_OUTPUT
-+		if (size && !handle->no_text &&
-+		    X86_tryBulkOutput(handle, code, size, insn, insn_size))
-+			return true;
-+#endif
- 		MCInst_InitX86(&mci);
--	else
-+	} else
- #endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
+ 	if (result) {
+ 		printf("All tests passed.\n");
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 19e16b16..f36acb90 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -212,6 +212,31 @@ static bool check_sib_base_mov(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_opcode_immediates(csh handles[2], cs_mode mode)
++{
++	static const uint8_t opcodes[] = { 0x3c, 0x3d, 0xa8, 0xa9, 0xb0, 0xb1,
++					   0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7 };
++	for (unsigned p = 0; p < (mode == CS_MODE_64 ? 17u : 1u); ++p) {
++		for (unsigned i = 0; i < sizeof(opcodes); ++i) {
++			const uint8_t op = opcodes[i];
++			const unsigned width = op == 0x3d || op == 0xa9 ? 4 : 1;
++			for (unsigned v = 0; v < 256; ++v) {
++				uint8_t bytes[] = { (uint8_t)(0x3f + p), op,
++						    (uint8_t)v, (uint8_t)(v * 163),
++						    (uint8_t)(v * 57), (uint8_t)v };
++				const unsigned length = !!p + 1 + width;
++				if (!compare(handles, bytes + !p, length, v))
++					return false;
++				if (!v)
++					for (unsigned n = 0; n < length; ++n)
++						if (!compare(handles, bytes + !p, n, op))
++							return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_shift_immediate(csh handles[2], cs_mode mode)
+ {
+ 	for (unsigned p = 0; p < (mode == CS_MODE_64 ? 17u : 1u); ++p) {
+@@ -1624,6 +1649,7 @@ static bool check_mode(cs_mode mode)
+ 		    !check_mov_disp32(handles, mode) ||
+ 		    !check_group1(handles, mode) ||
+ 		    !check_push_immediates(handles) ||
++		    !check_opcode_immediates(handles, mode) ||
+ 		    !check_shift_immediate(handles, mode) ||
+ 		    !check_mov_imm32(handles, mode) ||
+ 		    !check_sib_base_mov(handles, mode) ||

@@ -1,72 +1,123 @@
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..5f7682dd 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -30,12 +30,21 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
- 					 uint16_t *insn_size);
- #endif
- 
--#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
--	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
--	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
--	!defined(_WIN32_WCE)
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#ifdef CAPSTONE_X86_ONLY
- #define CAPSTONE_X86_PUBLIC_OUTPUT
- #endif
-+#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
-+#include "../../cs_priv.h"
-+/* Dedicated Linux builds already try this writer in the common decoder. */
-+#define CAPSTONE_X86_BULK_OUTPUT
-+CAPSTONE_INTERNAL bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code,
-+					size_t size, cs_insn *insn,
-+					uint16_t *insn_size);
-+#endif
-+#endif
- 
- bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			MCInst *instr, uint16_t *size, uint64_t address,
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..07fa8e88 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -15,6 +15,16 @@
- 
- #include "X86SimpleOutputImpl.h"
- 
-+#ifdef CAPSTONE_X86_BULK_OUTPUT
-+bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code, size_t size,
-+		       cs_insn *insn, uint16_t *insn_size)
-+{
-+	/* A custom detail allocator may change the option mid-record. */
-+	return (!insn->detail || handle->detail_opt) &&
-+	       X86_trySimpleOutput(handle, code, size, insn, insn_size);
-+}
-+#endif
-+
- #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
- #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
- #endif
 diff --git a/cs.c b/cs.c
-index ede7c2aa..d31bf34d 100644
+index ede7c2aa..e04247d0 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1107,9 +1107,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1381,12 +1381,11 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_DETAIL:
+-		// CS_OPT_OFF turns detail off.  Any other value adds its flags
+-		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
++		// A requested detail format enables detail, including when set first.
+ 		if (value == CS_OPT_OFF)
+ 			handle->detail_opt = CS_OPT_OFF;
+ 		else
+-			handle->detail_opt |= (cs_opt_value)value;
++			handle->detail_opt |= (cs_opt_value)(value | CS_OPT_ON);
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
  #endif
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
--	if (handle->arch == CS_ARCH_X86)
-+	if (handle->arch == CS_ARCH_X86) {
-+#ifdef CAPSTONE_X86_BULK_OUTPUT
-+		if (size && !handle->no_text &&
-+		    X86_tryBulkOutput(handle, code, size, insn, insn_size))
-+			return true;
-+#endif
- 		MCInst_InitX86(&mci);
--	else
-+	} else
- #endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
+diff --git a/include/capstone/capstone.h b/include/capstone/capstone.h
+index 80f8ce9e..6da7468b 100644
+--- a/include/capstone/capstone.h
++++ b/include/capstone/capstone.h
+@@ -384,7 +384,7 @@ typedef struct cs_opt_mnem {
+ typedef enum cs_opt_type {
+ 	CS_OPT_INVALID = 0, ///< No option specified
+ 	CS_OPT_SYNTAX, ///< Assembly output syntax
+-	CS_OPT_DETAIL, ///< Break down instruction structure into details
++	CS_OPT_DETAIL, ///< A nonzero detail flag enables instruction details. CS_OPT_OFF clears all detail flags.
+ 	CS_OPT_MODE, ///< Change engine's mode at run-time
+ 	CS_OPT_MEM, ///< User-defined dynamic memory related functions
+ 	CS_OPT_SKIPDATA, ///< Skip data when disassembling. Then engine is in SKIPDATA mode.
+diff --git a/tests/unit/api.c b/tests/unit/api.c
+index 0a86e462..d0fb371d 100644
+--- a/tests/unit/api.c
++++ b/tests/unit/api.c
+@@ -3,6 +3,7 @@
+ 
+ #include "../../include/capstone/capstone.h"
+ #include "unit_test.h"
++#include <stddef.h>
+ #include <stdio.h>
+ #include <string.h>
+ 
+@@ -197,12 +198,78 @@ static bool test_iterator_results(void)
+ 	return true;
+ }
+ 
++static bool test_detail_modifiers(cs_arch arch, cs_mode mode,
++				  const uint8_t *code, size_t size,
++				  size_t detail_size)
++{
++	if (!cs_support(arch))
++		return true;
++	csh handle;
++	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = true;
++	for (unsigned flags = 2; ok && flags < 16; flags += 2) {
++		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
++		cs_option(handle, CS_OPT_DETAIL, flags | CS_OPT_ON);
++		cs_insn *expected = NULL;
++		if (cs_disasm(handle, code, size, 0x1000, 1, &expected) != 1) {
++			ok = false;
++			break;
++		}
++		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
++		cs_option(handle, CS_OPT_DETAIL, flags);
++		cs_insn *actual = cs_malloc(handle);
++		ok = actual && actual->detail && expected->detail;
++		if (ok) {
++			// Reusing a record must clear counts from its last instruction.
++			memset(actual->detail, 0, sizeof(*actual->detail));
++			actual->detail->groups_count = 1;
++			const uint8_t *cursor = code;
++			size_t left = size;
++			uint64_t address = 0x1000;
++			ok = cs_disasm_iter(handle, &cursor, &left, &address,
++					    actual) &&
++			     left == 0 && actual->id == expected->id &&
++			     actual->alias_id == expected->alias_id &&
++			     actual->usesAliasDetails ==
++				     expected->usesAliasDetails &&
++			     !memcmp(actual->detail, expected->detail,
++				     detail_size);
++		}
++		if (!ok)
++			fprintf(stderr,
++				"Detail modifiers: arch=%u flags=0x%x\n",
++				(unsigned)arch, flags);
++		if (actual)
++			cs_free(actual, 1);
++		cs_free(expected, 1);
++	}
++	cs_close(&handle);
++	return ok;
++}
++
+ int main()
+ {
+ 	bool result = true;
+ 	result &= test_cs_mem_setup_fail();
+ 	result &= test_iterator_allocation();
+ 	result &= test_iterator_results();
++	static const uint8_t bl[] = { 0x00, 0x00, 0x00, 0x94 };
++	static const uint8_t mov[] = { 0x01, 0x00, 0xa0, 0xe1 };
++	static const uint8_t addiu[] = { 0x01, 0x00, 0x82, 0x24 };
++	static const uint8_t c_nop[] = { 0x01, 0x00 };
++	result &= test_detail_modifiers(
++		CS_ARCH_AARCH64, CS_MODE_ARM, bl, sizeof(bl),
++		offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
++	result &= test_detail_modifiers(
++		CS_ARCH_ARM, CS_MODE_ARM, mov, sizeof(mov),
++		offsetof(cs_detail, arm) + sizeof(cs_arm));
++	result &= test_detail_modifiers(
++		CS_ARCH_MIPS, CS_MODE_MIPS32, addiu, sizeof(addiu),
++		offsetof(cs_detail, mips) + sizeof(cs_mips));
++	result &= test_detail_modifiers(
++		CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C, c_nop,
++		sizeof(c_nop), offsetof(cs_detail, riscv) + sizeof(cs_riscv));
+ 
+ 	if (result) {
+ 		printf("All tests passed.\n");
