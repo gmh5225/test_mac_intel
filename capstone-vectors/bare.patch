@@ -1,142 +1,15 @@
-diff --git a/arch/X86/X86OpcodeImmediateOutput.h b/arch/X86/X86OpcodeImmediateOutput.h
-new file mode 100644
-index 00000000..2aaa16fd
---- /dev/null
-+++ b/arch/X86/X86OpcodeImmediateOutput.h
-@@ -0,0 +1,36 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifndef CS_X86_OPCODE_IMMEDIATE_OUTPUT_H
-+#define CS_X86_OPCODE_IMMEDIATE_OUTPUT_H
-+
-+#include "X86RegisterImmediateOutput.h"
-+
-+/* Bare accumulator CMP/TEST and opcode-register MOV use the same immediate
-+ * record as a register pair, with neither a ModR/M nor a displacement. */
-+static bool writeOpcodeImmediate(cs_struct *handle, const uint8_t *code,
-+				 size_t size, cs_insn *insn, uint16_t *insn_size,
-+				 bool wide, uint8_t rex, uint8_t op)
-+{
-+	const bool mov = (op & 0xf8) == 0xb0;
-+	const unsigned family = op & 0xfe;
-+	if (!mov && family != 0x3c && family != 0xa8)
-+		return false;
-+	const bool dword = !mov && (op & 1);
-+	const unsigned offset = 1 + (rex != 0);
-+	const unsigned imm_size = dword ? 4 : 1;
-+	if (size < offset + imm_size || (dword && (rex & 8)) ||
-+	    X86_OUTPUT_UNSUPPORTED(handle, false))
-+		return false;
-+	const unsigned pair = mov ? 0x88 : (family == 0xa8 ? 0x84 : 0x38) + dword;
-+	const unsigned prefix = rex ? 1 + ((rex >> 3) & 1) : 0;
-+	const unsigned row = x86_simple_plans[wide][prefix][pair] >> 2;
-+	const unsigned reg = mov ? ((rex & 1) << 3) | (op & 7) : 0;
-+	writeUnsignedRegisterImmediate(
-+		insn, &x86_simple_outputs[row],
-+		&x86_simple_registers[dword ? 2 : (rex != 0)][reg],
-+		code, rex, 0, offset, imm_size, insn_size);
-+	return true;
-+}
-+
-+#endif
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..41086743 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -19,6 +19,7 @@
- #define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-+#include "X86OpcodeImmediateOutput.h"
- #include "X86VectorRegisterOutput.h"
- #define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
- #define X86_IMMEDIATE_WIDE 1
-@@ -158,8 +159,12 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
- 				     rex_byte, code[length - 2]);
- 	}
- 	if (primary != 0x0f) {
-+		if ((primary & 0xfe) != 0xc6)
-+			return writeOpcodeImmediate(handle, code, size, insn,
-+						    insn_size, true, rex_byte,
-+						    primary);
- 		const uint8_t mr = code[has_rex + 1];
--		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
-+		if (mr >= 0xc0 || (mr & 0x38) ||
- 		    X86_OUTPUT_UNSUPPORTED(handle, false))
- 			return false;
- 		const unsigned prefix_class =
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..26ff5ea5 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -15,6 +15,7 @@
- #include "X86OutputOptions.h"
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-+#include "X86OpcodeImmediateOutput.h"
- #include "X86VectorRegisterWriter.h"
- #define X86_MEMORY32_OUTPUT writeMemory32
- #define X86_MEMORY_IMMEDIATE writeMemoryImmediate32
-@@ -152,11 +153,15 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- 			       size_t size, cs_insn *insn, uint16_t *insn_size)
- {
- 	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
--	if ((code[0] & 0xfc) != 0xc4)
--		return code[0] == 0x0f && size >= 3 &&
-+	if ((code[0] & 0xfc) != 0xc4) {
-+		if (code[0] != 0x0f)
-+			return writeOpcodeImmediate(handle, code, size, insn,
-+						    insn_size, false, 0, code[0]);
-+		return size >= 3 &&
- 		       (code[1] & 0xf6) == 0xb6 &&
- 		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
- 		       writeExtend32(code, size, insn, insn_size);
-+	}
- 	if (X86_OUTPUT_UNSUPPORTED(handle, false))
- 		return false;
- 	if (code[0] & 2) {
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 19e16b16..f36acb90 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -212,6 +212,31 @@ static bool check_sib_base_mov(csh handles[2], cs_mode mode)
- 	return true;
- }
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index 7b8535ac..a4c4277c 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -4,7 +4,10 @@
+ #ifdef CAPSTONE_HAS_X86
+ #include "X86FeatureExtension.h"
+ #ifdef X86_EVEX_REGISTER_SCAN
++/* The extension reader already established the EVEX mode and input bounds. */
++#define X86_EVEX_BATCH_PACKED
+ #include "X86EvexScanPlan.h"
++#undef X86_EVEX_BATCH_PACKED
  
-+static bool check_opcode_immediates(csh handles[2], cs_mode mode)
-+{
-+	static const uint8_t opcodes[] = { 0x3c, 0x3d, 0xa8, 0xa9, 0xb0, 0xb1,
-+					   0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7 };
-+	for (unsigned p = 0; p < (mode == CS_MODE_64 ? 17u : 1u); ++p) {
-+		for (unsigned i = 0; i < sizeof(opcodes); ++i) {
-+			const uint8_t op = opcodes[i];
-+			const unsigned width = op == 0x3d || op == 0xa9 ? 4 : 1;
-+			for (unsigned v = 0; v < 256; ++v) {
-+				uint8_t bytes[] = { (uint8_t)(0x3f + p), op,
-+						    (uint8_t)v, (uint8_t)(v * 163),
-+						    (uint8_t)(v * 57), (uint8_t)v };
-+				const unsigned length = !!p + 1 + width;
-+				if (!compare(handles, bytes + !p, length, v))
-+					return false;
-+				if (!v)
-+					for (unsigned n = 0; n < length; ++n)
-+						if (!compare(handles, bytes + !p, n, op))
-+							return false;
-+			}
-+		}
-+	}
-+	return true;
-+}
-+
- static bool check_shift_immediate(csh handles[2], cs_mode mode)
- {
- 	for (unsigned p = 0; p < (mode == CS_MODE_64 ? 17u : 1u); ++p) {
-@@ -1624,6 +1649,7 @@ static bool check_mode(cs_mode mode)
- 		    !check_mov_disp32(handles, mode) ||
- 		    !check_group1(handles, mode) ||
- 		    !check_push_immediates(handles) ||
-+		    !check_opcode_immediates(handles, mode) ||
- 		    !check_shift_immediate(handles, mode) ||
- 		    !check_mov_imm32(handles, mode) ||
- 		    !check_sib_base_mov(handles, mode) ||
+ /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
+  * The ordinary output generator owns the admitted IDs and widths. */

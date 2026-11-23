@@ -1,7 +1,7 @@
-name: Compare opcode-register MOV and accumulator immediate formatting against iced on real PE32 PE64 and ELF
+name: Compare EVEX scan handling and ordinary x86 output with both iced formatters
 on:
   push:
-    branches: [codex/accumulator-and-byte-mov-records]
+    branches: [codex/evex-scan-packed-moves-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: opcode-immediates-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-scan-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
