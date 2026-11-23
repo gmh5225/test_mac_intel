@@ -168,11 +168,20 @@ def main(w):
         if kind=='bare':
             assert changed==['X86Mapping.c.o'],(key,changed)
         mapper,=build.rglob('X86Mapping.c.o')
-        disasm=(sp.check_output(['otool','-tvV',mapper],text=True) if darwin else sp.check_output(['objdump','-d','--disassemble=find_insn',mapper],text=True))
+        disasm=(sp.check_output(['otool','-tvV',mapper],text=True) if darwin else sp.check_output(['objdump','-d','--disassemble=X86_lockrep_full',mapper],text=True))
         if darwin:
-            start=disasm.index('_find_insn:\n');disasm=disasm[start:].split('\n_',1)[0]
-        else:assert '<find_insn>:' in disasm
-        (evidence/('find-'+key+'.s')).write_text(disasm+'\n')
+            start=disasm.index('_X86_lockrep_full:\n');disasm=disasm[start:].split('\n_',1)[0]
+        else:assert '<X86_lockrep_full>:' in disasm
+        (evidence/('prefix-'+key+'.s')).write_text(disasm+'\n')
+        run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',r/'prefix-check.c',lib,'-lm','-o',w/'prefix-check'],'build-prefix-'+key)
+        check_hash=hashlib.sha256()
+        measured=0
+        with sp.Popen([w/'prefix-check'],stdout=sp.PIPE)as proc:
+            for block in iter(lambda:proc.stdout.read(1048576),b''):
+                check_hash.update(block);measured+=len(block)
+            assert proc.wait()==0
+        result=dict(size=measured,sha256=check_hash.hexdigest());assert result==json.loads((r/'prefix-checks.json').read_text())['full'],(key,result)
+        save('prefix-check-'+key+'.json',result)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
