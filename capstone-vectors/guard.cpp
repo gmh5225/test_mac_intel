@@ -66,6 +66,19 @@ int main(int argc,char **) {
                 }
             }
         }
+        for (unsigned value : {0u,1u,0x7fu,0x80u,0xffu,0x7fffffffU,0x80000000U,0xffffffffU}) {
+            const uint8_t a=uint8_t(value),b=uint8_t(value>>8),c=uint8_t(value>>16),d=uint8_t(value>>24);
+            for (unsigned op=0x70;op<=0x7f;++op) {
+                std::array<uint8_t,9> short_branch={uint8_t(op),a};
+                std::array<uint8_t,9> long_branch={0x0f,uint8_t(op+0x10),a,b,c,d};
+                for(unsigned n=0;n<=2;++n)if(!check(short_branch,n))return 13;
+                for(unsigned n=0;n<=6;++n)if(!check(long_branch,n))return 14;
+            }
+            for(unsigned op : {0xe8u,0xe9u,0xebu,0x50u,0x58u,0x90u,0xc3u}) {
+                std::array<uint8_t,9> plain={uint8_t(op),a,b,c,d};
+                for(unsigned n=0;n<=5;++n)if(!check(plain,n))return 15;
+            }
+        }
         cs_close(&reader);cs_close(&reference);
     }
     munmap(mem,2*page);

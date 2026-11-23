@@ -1,68 +1,81 @@
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..f37aba42 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -11,6 +11,12 @@
- #include "X86InstPrinterCommon.h"
- #include "X86Mapping.h"
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..96dca208 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -173,11 +173,10 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+ 	return out + length;
+ }
  
-+/* The caller has selected an x86 handle with 32-bit mode and text enabled. */
-+CAPSTONE_INTERNAL bool X86_disasmIterSelected32(csh handle,
-+					       const uint8_t **code,
-+					       size_t *size, uint64_t *address,
-+					       cs_insn *insn);
-+
- /* Called by the static i386 iterator with at least one input byte. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..7ce32142 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -268,10 +268,15 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+-static inline void X86_writeSimpleDetail(cs_detail *detail,
+-					 const struct X86SimpleOutput *row,
+-					 uint8_t opcode, uint8_t rex,
+-					 uint8_t modrm, uint16_t first,
+-					 uint16_t second)
++static inline cs_x86 *X86_initSimpleDetail(cs_detail *detail,
++					  const struct X86SimpleOutput *row,
++					  uint8_t opcode, uint8_t rex,
++					  uint8_t modrm)
  {
- #ifdef CS_DECODE_TRY_OUTPUT
- 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
--	if (handle && handle->arch == CS_ARCH_X86 &&
--	    handle->mode == CS_MODE_64 && !handle->no_text)
--		return cs_disasm_iter_core(ud, code, size, address, insn);
--#endif
-+	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
-+		if (handle->mode == CS_MODE_64)
-+			return cs_disasm_iter_core(ud, code, size, address, insn);
-+		if (handle->mode == CS_MODE_32)
-+			return X86_disasmIterSelected32(ud, code, size, address, insn);
-+	}
-+	return X86_disasmIter(ud, code, size, address, insn);
-+#else
- 	return X86_disasmIter32(ud, code, size, address, insn);
-+#endif
- }
- #endif
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..14e3c21c 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -199,6 +199,13 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
-+
-+CAPSTONE_INTERNAL bool X86_disasmIterSelected32(csh ud, const uint8_t **code,
-+					       size_t *size, uint64_t *address,
-+					       cs_insn *insn)
-+{
-+	return cs_disasm_iter_core(ud, code, size, address, insn);
+ 	memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 	memcpy(detail->regs_read, row->reads, sizeof(row->reads));
+@@ -196,7 +195,15 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	x86->encoding.imm_offset = row->imm_offset;
+ 	x86->encoding.imm_size = row->imm_size;
+ 	x86->op_count = row->operand_count;
+-	for (unsigned i = 0; i < x86->op_count; ++i) {
++	return x86;
 +}
- #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
-@@ -209,7 +216,7 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
- 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
- 	if (handle && handle->arch == CS_ARCH_X86 &&
- 	    handle->mode == CS_MODE_32 && !handle->no_text)
--		return cs_disasm_iter_core(ud, code, size, address, insn);
-+		return X86_disasmIterSelected32(ud, code, size, address, insn);
- #endif
- 	return X86_disasmIter(ud, code, size, address, insn);
++
++static inline void X86_writeSimpleRegisters(cs_x86 *x86,
++					    const struct X86SimpleOutput *row,
++					    unsigned count, uint16_t first,
++					    uint16_t second)
++{
++	for (unsigned i = 0; i < count; ++i) {
+ 		cs_x86_op *op = &x86->operands[i];
+ 		op->type = X86_OP_REG;
+ 		op->reg = (x86_reg)(i ? second : first);
+@@ -205,4 +212,14 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	}
  }
+ 
++static inline void X86_writeSimpleDetail(cs_detail *detail,
++					 const struct X86SimpleOutput *row,
++					 uint8_t opcode, uint8_t rex,
++					 uint8_t modrm, uint16_t first,
++					 uint16_t second)
++{
++	cs_x86 *x86 = X86_initSimpleDetail(detail, row, opcode, rex, modrm);
++	X86_writeSimpleRegisters(x86, row, row->operand_count, first, second);
++}
++
+ #endif
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..734a1202 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -252,16 +252,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		*insn_size = insn->size = 2 + has_rex;
+ 	}
+ 	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+-				      first, second);
++		cs_x86 *x = X86_initSimpleDetail(insn->detail, row, opcode, rex, modrm);
+ 		if (relative) {
+-			cs_x86 *x = &insn->detail->x86;
+ 			if (escaped) {
+ 				x->opcode[0] = 0x0f;
+ 				x->opcode[1] = opcode;
+ 			}
+ 			x->operands[0].type = X86_OP_IMM;
+ 			x->operands[0].imm = (int64_t)target;
++			x->operands[0].size = row->ops[0].size;
++			x->operands[0].access = (cs_ac_type)row->ops[0].access;
++		} else {
++			/* ModR/M register forms are generated from two-register
++			 * records. Fixed instructions carry their own count. */
++			unsigned count = form == X86_SIMPLE_FIXED ? row->operand_count : 2;
++			X86_writeSimpleRegisters(x, row, count, first, second);
+ 		}
+ 	}
+ 	return true;

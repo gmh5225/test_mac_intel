@@ -126,10 +126,15 @@ def main(w):
         current=(evidence/('targets-'+key+'.log')).read_text().splitlines()
         assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
         run(['clang++','-std=c++17','-O2','-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'build-dispatch-guard-'+key)
-        run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='860160'
+        run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='882784'
         if kind=='bare':
             ref=('mixed_' if mixed else '')+'base'
             assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
+        if kind=='bare':
+            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator'],'build-generator-'+key)
+            generated=sp.check_output([w/'generator'])
+            assert generated==(base/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
+            save('rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -146,7 +151,7 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert set(changed)<={'X86Sse64Output.c.o','X86Vex32Output.c.o'},(key,changed)
+            assert changed and all(n.startswith('X86') for n in changed),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

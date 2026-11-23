@@ -1,7 +1,7 @@
-name: Measure width selection at the Capstone text entry actually called by NeverD
+name: Compare final scalar detail construction with fork iced at the NeverD text entry
 on:
   push:
-    branches: [codex/shared-i386-neverd-text-entry]
+    branches: [codex/scalar-operands-final-types]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6de392819bbc0d468ad7c30531271823416f655e
+          ref: 8835df03f81c2011e14511446686a6b68eabdd68
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 5f94ab1b84695ee25584f81f198df6000a8ebbd1
+          ref: 6a8c36481bf169dea633c5fc72069a69e8b67efb
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-text-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: final-scalar-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
