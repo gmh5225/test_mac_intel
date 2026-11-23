@@ -1,123 +1,84 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 1aae4f9a..d6f3ff5f 100644
+index 1aae4f9a..ccba0b9b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -478,6 +478,14 @@ if(CAPSTONE_X86_SUPPORT)
-     set(CSTOOL_SRC
-         ${CSTOOL_SRC}
-         cstool/cstool_x86.c)
-+    # Only mixed ELF shared-library builds use the scalar post-printer.
-+    if(CAPSTONE_BUILD_SHARED_LIBS AND NOT CAPSTONE_BUILD_DIET
-+       AND NOT CAPSTONE_X86_REDUCE AND NOT capstone_enabled_architectures STREQUAL "X86"
-+       AND CMAKE_EXECUTABLE_FORMAT STREQUAL "ELF" AND CMAKE_C_COMPILER_ID MATCHES "^(Clang|GNU)$")
-+        set(capstone_x86_postprinter arch/X86/X86PostPrinter.c)
-+        set_property(SOURCE arch/X86/X86Mapping.c ${capstone_x86_postprinter} APPEND
-+                     PROPERTY COMPILE_DEFINITIONS CAPSTONE_X86_SHARED_POSTPRINTER)
-+    endif()
-     set(SOURCES_X86
-         arch/X86/X86Disassembler.c
-         arch/X86/X86DisassemblerDecoder.c
-@@ -485,6 +493,7 @@ if(CAPSTONE_X86_SUPPORT)
-         arch/X86/X86IntelInstPrinterPrechecked.c
-         arch/X86/X86InstPrinterCommon.c
-         arch/X86/X86Mapping.c
-+        ${capstone_x86_postprinter}
-         arch/X86/X86Module.c
-         arch/X86/X86ImmediateOutput.c
-         arch/X86/X86MemoryOutput.c
+@@ -1061,7 +1061,13 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    if(capstone_enabled_architectures STREQUAL "X86")
++    # Static-only libraries already contain both fixed x86 text readers.
++    if(capstone_enabled_architectures STREQUAL "X86" OR
++       (CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
++        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
++        if(NOT capstone_enabled_architectures STREQUAL "X86")
++            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_MIXED_STATIC_OUTPUT)
++        endif()
+         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
 diff --git a/Makefile b/Makefile
-index b3a012fa..8118f71d 100644
+index b3a012fa..7c714ef8 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -271,6 +271,14 @@ ifeq (,$(findstring yes,$(CAPSTONE_X86_ATT_DISABLE)))
+@@ -281,6 +281,9 @@ endif
+ 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
++else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
++	CFLAGS += -DCAPSTONE_X86_MIXED_STATIC_OUTPUT
++	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
  endif
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
-+ifneq ($(sort $(CAPSTONE_ARCHS)),x86)
-+ifeq ($(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no)
-+ifneq (,$(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c /dev/null 2>/dev/null | grep -w __ELF__))
-+	CFLAGS += -DCAPSTONE_X86_SHARED_POSTPRINTER
-+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86PostPrinter.o
-+endif
-+endif
-+endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..79adee8d 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -12788,7 +12788,11 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..304b19dc 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,7 +30,8 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
  
- /// The post-printer function. Used to fixup flaws in the disassembly information
- /// of certain instructions.
-+#ifdef X86_SEPARATE_POSTPRINTER
-+void X86_postprinter_full(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
-+#else
- void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
-+#endif
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_X86_MIXED_STATIC_OUTPUT)) && \
++	!defined(CAPSTONE_DIET) && \
+ 	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
+index 732c4004..7f2ac90f 100644
+--- a/arch/X86/X86PublicOutput.c
++++ b/arch/X86/X86PublicOutput.c
+@@ -13,6 +13,10 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+ 					    cs_insn *insn, uint16_t *length,
+ 					    bool batch)
  {
- 	cs_x86_op *memory = NULL;
- 	bool has_mask = false;
-@@ -12805,7 +12809,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
- 	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
- 	 * Other encodings can only need the first memory operand's broadcast
- 	 * repair, including decorators introduced by a custom formatter. */
--	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
-+	if (X86_ONLY_REPAIRS_BROADCAST(x86->opcode[0])) {
- 		for (i = 0; i < x86->op_count; ++i) {
- 			cs_x86_op *operand = &x86->operands[i];
- 			if (operand->type == X86_OP_MEM) {
-diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..380faa79 100644
---- a/arch/X86/X86Mapping.h
-+++ b/arch/X86/X86Mapping.h
-@@ -122,6 +122,17 @@ void X86_build_lookup_tables(cs_struct *h);
++#ifdef CAPSTONE_X86_MIXED_STATIC_OUTPUT
++	if (handle->arch != CS_ARCH_X86)
++		return cs_decode_full_insn(handle, code, size, insn, length, batch);
++#endif
+ 	/* The caller owns skipdata callbacks, bulk boundaries and the public
+ 	 * cursors. A fixed iterator can fill this one record using local cursors. */
+ 	if (!batch && !handle->skipdata && !handle->no_text &&
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 60ec4b72..b93ffe8d 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -88,7 +88,7 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
  
- void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci);
- 
-+#if defined(CAPSTONE_X86_SHARED_POSTPRINTER) && defined(__ELF__) && defined(__GNUC__)
-+#define X86_SEPARATE_POSTPRINTER
-+CAPSTONE_INTERNAL void X86_postprinter_full(csh handle, cs_insn *insn,
-+					    SStream *mnem, MCInst *mci);
-+#endif
-+
-+/* These opcodes can only need the printed broadcast decorator repaired.
-+ * VEX/EVEX, x87 environment and rotate forms take the full repair path. */
-+#define X86_ONLY_REPAIRS_BROADCAST(opcode) \
-+	(((opcode) & 0xe0) != 0xc0 && (opcode) != 0x62)
-+
- static inline bool x86_has_feature(cs_mode mode, int flag)
- {
- 	return (mode & flag) == flag;
-diff --git a/arch/X86/X86PostPrinter.c b/arch/X86/X86PostPrinter.c
-new file mode 100644
-index 00000000..1202e088
---- /dev/null
-+++ b/arch/X86/X86PostPrinter.c
-@@ -0,0 +1,24 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifdef CAPSTONE_HAS_X86
-+#include "X86Mapping.h"
-+
-+#ifdef X86_SEPARATE_POSTPRINTER
-+#include <string.h>
-+
-+/* Preserve custom broadcast spellings, which may appear on a scalar operand. */
-+__attribute__((section(".cs_x86_postprinter_text")))
-+void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
-+{
-+	if (insn && insn->id != X86_INS_VPCMP) {
-+		if (!insn->detail)
-+			return;
-+		if (X86_ONLY_REPAIRS_BROADCAST(insn->detail->x86.opcode[0]) &&
-+		    !strchr(mnem->buffer, '{'))
-+			return;
-+	}
-+	X86_postprinter_full(handle, insn, mnem, mci);
-+}
-+#endif
-+#endif
+ /* This writer belongs to the private mixed-library reader. In dedicated
+  * builds the public iterator shares the same fallback object. */
+-#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifndef CAPSTONE_X86_ONLY
+ /* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
+  * Insert the writemask after its destination. Only a register destination
+  * can request zeroing or read through the mask. */
+@@ -184,7 +184,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
+ 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
+ 		return true;
+-#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifndef CAPSTONE_X86_ONLY
+ 	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
+ 	    (code[4] | 0x10) == 0x7f &&
+ 	    writeMaskedByteMove(handle, code, size, insn, insn_size))

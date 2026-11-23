@@ -1,7 +1,7 @@
-name: Verify GCC and Clang use the existing pure scalar predicate with isolated mixed shared repair
+name: Verify Make public records under static, dual, reduced, diet and custom allocations
 on:
   push:
-    branches: [codex/shared-detail-inlined-condition]
+    branches: [codex/make-static-public-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-predicate-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-make-configurations-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
