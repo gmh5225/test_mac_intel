@@ -1,7 +1,7 @@
-name: Compare final scalar detail construction with fork iced at the NeverD text entry
+name: Measure a 16-byte x86 formatter split and count its real PE and ELF hits
 on:
   push:
-    branches: [codex/scalar-operands-final-types]
+    branches: [codex/known-length-x86-mnemonic]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: final-scalar-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-mnemonic-boundary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -151,7 +151,7 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed and all(n.startswith('X86') for n in changed),(key,changed)
+            assert changed==(['cs.c.o'] if platform.machine().lower() in ('x86_64','amd64') else []),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
@@ -169,6 +169,23 @@ def main(w):
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
+        native_x86=platform.machine().lower() in ('x86_64','amd64')
+        # Capture the exact archive above for timing. Count splitter calls in
+        # a second cs.c object with the same compiler flags and input extents.
+        symbols=[]
+        if kind=='bare' and native_x86:
+            source=base/'cs.c';real=source.read_text()
+            anchor='static inline bool copy_x86_mnemonic16'
+            marked=once(real,anchor,'unsigned long long split_probes,split_hits;\n'+anchor)
+            anchor='\tconst __m128i text = _mm_loadu_si128'
+            marked=once(marked,anchor,'\t++split_probes;\n'+anchor)
+            anchor='\t*end = length;'
+            marked=once(marked,anchor,'\t++split_hits;\n'+anchor)
+            source.write_text(marked)
+            run(['cmake','--build',build,'--parallel','4','--target','capstone_static'],'build-split-census-'+key)
+            symbols=['-DCOUNT_SPLITS']
+        run(['clang++','-O2','-std=c++17',*symbols,'-I',base/'include',r/'trace.cpp',lib,'-o',w/('trace-'+key)],'link-split-census-'+key)
+        if symbols:source.write_text(real)
         shutil.rmtree(build)
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
@@ -207,6 +224,16 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
+        sigs={k:[list(map(int,line.split()))for line in sp.check_output([w/('trace-'+k),str(bits),f,intervals],text=True).splitlines()]for k in trees}
+        expected_counts=json.loads((r/'expected.json').read_text())[name]
+        for k,lines in sigs.items():
+            ref=sigs['mixed_base'if k.startswith('mixed_')else 'base']
+            assert len(lines)==4 and all(a[:5]==b[:5] and a[2:4]==expected_counts for a,b in zip(lines,ref)),(name,k,lines,ref)
+            for row in lines:
+                probes,hits=row[-2:]
+                if native_x86 and k.endswith('bare'):assert 0<hits<=probes,(name,k,row)
+                else:assert probes==hits==0
+        save('split-census-'+name+'.json',sigs)
         for mode in (0,1,2):
             targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
             if mode:targets['fast']=('base','fast____')
