@@ -11,7 +11,7 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
 t=Path(tempfile.mkdtemp());b=t/'build';assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}')
 try:
-    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
+    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
     for k in ('base','active','indexed'):
         if k!='base':
@@ -21,7 +21,7 @@ try:
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','SystemZ_LLVM_getRegisterName','printFormattedRegName'}
+        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','X86_postprinter','repair_avx_broadcast'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
@@ -58,14 +58,20 @@ try:
         imgs[k]=so.read_bytes()
         if cc=='clang':
             cmd('alias-static-'+k,['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-            cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/('spans.c' if k=='base' else 'spans-fixed.c'),b/'libcapstone.a','-o',t/'spans'])
+            cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'spans.c',b/'libcapstone.a','-o',t/'spans'])
             cmd('spans-'+k,[t/'spans'])
             cmd('alias-compile-'+k,[cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_AARCH64','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'alias.c',b/'libcapstone.a','-o',t/'alias'])
             cmd('alias-oracle-'+k,[t/'alias'])
             assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
-        if k!='base':
-            cmd('regression-build-'+k,['cmake','--build',b,'--parallel','4','--target','systemz_register_dialects'])
-            cmd('regression-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_systemz_register_dialects$'])
+        import shlex
+        units=['x86_x87_environment', 'x86_kmask_width', 'x86_kmask_access', 'x86_gfni_broadcast_detail', 'x86_apx_evex_shift_rotate', 'x86_evex_convert_mask_size', 'x86_evex_mask_conversion_access', 'x86_vfpclass_memory_mask_detail', 'x86_evex_narrow_memory_mask_size', 'x86_vpbroadcast_mask_source_size']
+        cmd('regression-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*units])
+        cmd('regression-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
+        tu=next(v for v in load(b/'compile_commands.json') if Path(v['file']).name=='MCInst.c')
+        defs=[v for v in shlex.split(tu['command']) if v.startswith('-D')]
+        cmd('decorator-link-'+k,[cc,'-O2',*defs,'-I',s,'-I',s/'include',d/'decorators.c',b/'libcapstone.a','-lm','-o',t/'decorators'])
+        cmd('decorators-'+k,[t/'decorators'])
+        if k!='base':assert (out/('decorators-'+k+'.log')).read_bytes()==(out/'decorators-base.log').read_bytes()
         if k=='indexed':
             cmd('register-static',['cmake','--build',b,'--target','capstone_static','--parallel','4'])
         if k=='indexed':
@@ -73,7 +79,7 @@ try:
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
             cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
-    assert ids['active']==ids['indexed'] and ids['base']!=ids['indexed']
+    assert len(set(ids.values()))==3
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])

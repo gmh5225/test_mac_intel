@@ -1,119 +1,14 @@
-diff --git a/MCInst.h b/MCInst.h
-index e0409109..7e239309 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -220,6 +220,8 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
- static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
- 				      bool clear_operands)
- {
-+	/* The zero-initialized SystemZ dialect is GNU. */
-+	(void)arch;
- 	if (clear_operands) {
- 		memset(inst, 0, sizeof(*inst));
- 	} else {
-@@ -233,14 +235,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
- 	/* All zero-valued defaults are established by the clear above. */
- 	memset(inst->tied_op_idx, -1, sizeof(inst->tied_op_idx));
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..db4e2c0c 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12801,7 +12801,8 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 		return;
  
--	// Set default assembly dialect.
--	switch (arch) {
--	default:
--		break;
--	case CS_ARCH_SYSTEMZ:
--		inst->MAI.assemblerDialect = SYSTEMZASMDIALECT_AD_HLASM;
--		break;
--	}
- }
- 
- /* Private x86 decode state constructs operands before reading them. It does
-diff --git a/arch/SystemZ/SystemZInstPrinter.c b/arch/SystemZ/SystemZInstPrinter.c
-index ee9eb18e..b242ccd6 100644
---- a/arch/SystemZ/SystemZInstPrinter.c
-+++ b/arch/SystemZ/SystemZInstPrinter.c
-@@ -149,12 +149,16 @@ static void printMCOperand(const MCInst *MI, const MCOperand *MO, SStream *O)
- void printFormattedRegName(const MCAsmInfo *MAI, MCRegister Reg, SStream *O)
- {
- 	const char *RegName = getRegisterName(Reg);
--	if (MAI->assemblerDialect == SYSTEMZASMDIALECT_AD_ATT) {
--		// Skip register prefix so that only register number is left
--		CS_ASSERT((isalpha(RegName[0]) && isdigit(RegName[1])));
--		SStream_concat0(markup_OS(O, Markup_Register), (RegName + 1));
--	} else
-+	if (MAI->assemblerDialect == SYSTEMZASMDIALECT_AD_HLASM) {
-+#ifndef CAPSTONE_DIET
-+		/* HLASM prints the number without its register class. */
-+		CS_ASSERT(isalpha((unsigned char)RegName[0]) &&
-+			  isdigit((unsigned char)RegName[1]));
-+		++RegName;
-+#endif
-+	} else {
- 		SStream_concat1(markup_OS(O, Markup_Register), '%');
-+	}
- 	SStream_concat0(markup_OS(O, Markup_Register), RegName);
- }
- 
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 34635d83..9c9d3650 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -13,6 +13,9 @@ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
-             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_mapping_diet_types.py")
-     endif()
- endif()
-+if(CAPSTONE_SYSTEMZ_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
-+    list(APPEND UNIT_TEST_SOURCES systemz_register_dialects.c)
-+endif()
- if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
-    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
-diff --git a/tests/unit/systemz_register_dialects.c b/tests/unit/systemz_register_dialects.c
-new file mode 100644
-index 00000000..3a4e8176
---- /dev/null
-+++ b/tests/unit/systemz_register_dialects.c
-@@ -0,0 +1,45 @@
-+// SPDX-License-Identifier: BSD-3-Clause
-+#include "../../arch/SystemZ/SystemZInstPrinter.h"
-+
-+#define GET_REGINFO_ENUM
-+#include "../../arch/SystemZ/SystemZGenRegisterInfo.inc"
-+
-+int main(void)
-+{
-+	const struct {
-+		MCRegister reg;
-+		const char *gnu;
-+		const char *hlasm;
-+	} cases[] = {
-+		{ SystemZ_R2D, "%r2", "2" },
-+		{ SystemZ_R10D, "%r10", "10" },
-+		{ SystemZ_F12D, "%f12", "12" },
-+		{ SystemZ_V31, "%v31", "31" },
-+	};
-+	MCInst mi;
-+	MCInst_Init(&mi, CS_ARCH_SYSTEMZ);
-+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-+		for (unsigned mode = 0; mode < 4; ++mode) {
-+			MCAsmInfo info = mi.MAI;
-+			if (mode == 1)
-+				info.assemblerDialect =
-+					SYSTEMZASMDIALECT_AD_ATT;
-+			else if (mode == 2)
-+				info.assemblerDialect =
-+					SYSTEMZASMDIALECT_AD_HLASM;
-+			else if (mode == 3)
-+				info = (MCAsmInfo){ 0 };
-+			SStream stream;
-+			SStream_Init(&stream);
-+			printFormattedRegName(&info, cases[i].reg, &stream);
-+			const char *wanted = mode == 2 ? cases[i].hlasm :
-+							 cases[i].gnu;
-+			if (strcmp(stream.buffer, wanted)) {
-+				fprintf(stderr, "mode %u expected %s, got %s\n",
-+					mode, wanted, stream.buffer);
-+				return 1;
-+			}
-+		}
-+	}
-+	return 0;
-+}
+ 	cs_x86 *x86 = &insn->detail->x86;
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
++#if (defined(CAPSTONE_X86_ONLY) && defined(__linux__)) || \
++	(!defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET))
+ 	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
+ 	 * Other encodings can only need the first memory operand's broadcast
+ 	 * repair, including decorators introduced by a custom formatter. */
