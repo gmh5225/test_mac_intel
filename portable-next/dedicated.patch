@@ -1,0 +1,142 @@
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index f75c3794..f784561b 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -70,7 +70,8 @@ bool X86_writeMemoryOutput(
+ 		const unsigned index_reg = ((rex & 2) << 2) |
+ 					   ((encoding >> 3) & 7);
+ 		base_reg = encoding & 7;
+-#ifdef X86_SEGMENT_LEA32
++#if defined(X86_SEGMENT_LEA32) || \
++	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
+ 		/* A scale-one SIB without an index names only its base. */
+ 		if ((!mod && base_reg == 5) ||
+ 		    (index_reg == 4 && (encoding >> 6) != 0))
+@@ -195,9 +196,15 @@ bool X86_writeMemoryOutput(
+ 		value = (int32_t)encoded;
+ 	memcpy(out, ", ", 2);
+ 	out += 2;
+-	if (value < 0)
++	uint32_t magnitude = encoded;
++	if (value < 0) {
+ 		*out++ = '-';
+-	writeUnsignedImmediate(out, (uint64_t)(value < 0 ? -value : value));
++		/* Negate in the encoded unsigned width, including its sign bit. */
++		magnitude = 0u - encoded;
++		if (imm_size == 1)
++			magnitude &= UINT8_MAX;
++	}
++	writeUnsignedImmediate(out, magnitude);
+ #else
+ 	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
+ #if X86_IMMEDIATE_WIDE
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..e7a294e6 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -104,8 +104,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const bool single = opcode == 0xff &&
+ 					    (modrm & 0x38) == 0x30;
+ #endif
+-			if (!alu && !test_or_mov && opcode != 0x8d && !single)
++			if (!alu && !test_or_mov && opcode != 0x8d && !single) {
++#ifdef X86_FIXED_GROUP1_COMPARE
++				if (plan == X86_PLAN_GROUP1_IMMEDIATE)
++					return X86_FIXED_GROUP1_COMPARE(
++						handle, code, size, insn, insn_size,
++						prefix_class, opcode, modrm);
++#endif
+ 				return false;
++			}
+ 			base_memory = true;
+ 		} else if (opcode == 0x8d || opcode == 0xff) {
+ 			return false;
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..76afb7b8 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -26,6 +26,29 @@
+ #undef X86_IMMEDIATE_WIDE
+ #undef X86_MEMORY_IMMEDIATE
+ 
++#ifdef CAPSTONE_X86_ONLY
++#define X86_MEMORY_IMMEDIATE writeCompareMemory64
++#define X86_IMMEDIATE_WIDE 1
++#define X86_COMPARE_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_COMPARE_IMMEDIATE
++#undef X86_IMMEDIATE_WIDE
++#undef X86_MEMORY_IMMEDIATE
++
++/* Both group-1 dispatchers already have the opcode and ModR/M byte. */
++static bool writeGroup1Compare64(cs_struct *handle, const uint8_t *code,
++				 size_t size, cs_insn *insn, uint16_t *length,
++				 unsigned prefix, uint8_t opcode, uint8_t modrm)
++{
++	if (modrm >= 0xc0 || (modrm & 0x38) != 0x38 ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	const unsigned row = x86_simple_plans[1][prefix][0x38 | (opcode & 1)] >> 2;
++	return writeCompareMemory64(code, size, insn, length,
++				    &x86_simple_outputs[row], x86_simple_registers);
++}
++#endif
++
+ #include "X86PackedMemoryOutput.h"
+ #include "X86GenSse64RegisterOutput.inc"
+ #include "X86GenVex64PackedMemory.inc"
+@@ -159,11 +182,17 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 	}
+ 	if (primary != 0x0f) {
+ 		const uint8_t mr = code[has_rex + 1];
++		const unsigned prefix_class =
++			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
++#ifdef CAPSTONE_X86_ONLY
++		if (primary == 0x80)
++			return writeGroup1Compare64(handle, code, size, insn,
++						    insn_size, prefix_class,
++						    primary, mr);
++#endif
+ 		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+ 		    X86_OUTPUT_UNSUPPORTED(handle, false))
+ 			return false;
+-		const unsigned prefix_class =
+-			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
+ 		/* The MOV store row carries its operand width and access. */
+ 		const unsigned row = x86_simple_plans[1][prefix_class]
+ 						     [0x88 | (primary & 1)] >>
+@@ -249,6 +278,9 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ }
+ 
+ #define X86_FIXED_ROUNDED writeRoundedRegisters
++#ifdef CAPSTONE_X86_ONLY
++#define X86_FIXED_GROUP1_COMPARE writeGroup1Compare64
++#endif
+ #define X86_FIXED_OUTPUT tryOutput64
+ #define X86_FIXED_WIDE true
+ #define X86_OUTPUT_MISS writeExtraOutput64
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 1c7944f4..215e6a57 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -338,6 +338,20 @@ static bool check_group1(csh handles[2], cs_mode mode)
+ 					return false;
+ 			}
+ 	}
++	static const struct {
++		uint8_t bytes[12];
++		unsigned length;
++	} memory[] = {
++		{ { 0x80, 0x7d, 0, 0 }, 4 },
++		{ { 0x49, 0x83, 0x7d, 0x70, 0x80 }, 5 },
++		{ { 0x48, 0x81, 0x3d, 0xff, 0xff, 0xff, 0xff,
++		    0, 0, 0, 0x80 }, 11 },
++		{ { 0x43, 0x83, 0x7c, 0x88, 0xf0, 0xff }, 6 },
++	};
++	for (size_t i = 0; i < sizeof(memory) / sizeof(memory[0]); ++i)
++		for (unsigned n = 1; n <= memory[i].length; ++n)
++			if (!compare(handles, memory[i].bytes, n, (unsigned)i + n))
++				return false;
+ 	return true;
+ }
+ 

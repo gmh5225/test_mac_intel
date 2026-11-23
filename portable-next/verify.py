@@ -25,8 +25,11 @@ try:
         cmd(v/'build.log',['cmake','--build',b,'--parallel','4','--target','fields'])
         executable,=[f for f in b.rglob('fields.exe') if f.is_file()]
         cmd(v/'fields.log',[executable])
-        fields=(v/'fields.log').read_text().splitlines();prefix,n,tag,total=fields[-1].split()
-        assert prefix=='tested' and tag=='differences' and int(n)==324 and len(fields)==326
+        if name in ('late','unsigned_late'):
+            obj,=b.rglob('X86VectorFallback64.c.obj')
+            cmd(v/'compare-disassembly.log',['dumpbin','/DISASM:NOBYTES',obj])
+        fields=(v/'fields.log').read_bytes().decode('ascii','backslashreplace').splitlines();prefix,n,tag,total=fields[-1].split()
+        assert prefix=='tested' and tag=='differences' and int(n)==9720 and len(fields)==2+int(total)
         save(v/'checked.json',dict(source=q,records=int(n),differences=int(total),abi=fields[0]))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file()and not f.is_symlink());shutil.rmtree(t);save(out/'cleanup.json',dict(removed=not t.exists(),bytes=n))

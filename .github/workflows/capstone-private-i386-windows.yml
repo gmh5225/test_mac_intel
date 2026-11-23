@@ -1,7 +1,7 @@
-name: Compare individual AMD64 immediate fields on Win32 and Win64
+name: Verify unsigned magnitude spelling at every byte value and signed dword boundaries on both Windows hosts
 on:
   push:
-    branches: [codex/observe-cmp-record-fields-by-host-width]
+    branches: [codex/unsigned-encoded-compare-boundaries]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: cmp-field-probe-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: unsigned-compare-probe-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
