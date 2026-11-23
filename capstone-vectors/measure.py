@@ -104,7 +104,7 @@ def main(w):
         mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
         patches=[kind] if kind!='base' else []
         for name in patches:
-            patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
+            patch=r/(name+'.patch');assert sha(patch)==z['sha256']
             run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/('build-'+key);project=base
@@ -130,7 +130,7 @@ def main(w):
         run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'build-verify-vectors')
         members=sp.check_output(['ar','t',lib],text=True).splitlines()
         assert len(members)>=49 and 'X86VectorOutput.c.o' in members
-        save('archive.json',dict(members=members,sha256=sha(lib)))
+        save('archive-'+key+'.json',dict(members=members,sha256=sha(lib)))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
@@ -147,6 +147,19 @@ def main(w):
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
+        if kind!='base':
+            if kind=='fixed':
+                named=base/'arch/X86/X86Vex32Output.c'
+                anchor='\tconst struct X86SimpleOutput *row =\n\t\t&x86_simple_outputs[x86_simple_plans[0][0][opcode] >> 2];'
+            else:
+                named=base/'arch/X86/X86VexBaseMemory.h'
+                anchor='\treturn writeVectorMemory(code, insn, insn_size, &vex_base_rows[index],'
+            original=named.read_text();assert original.count(anchor)==1
+            named.write_text(original.replace(anchor,'\textern void note_writer(void);\n\tnote_writer();\n'+anchor))
+            run(['cmake','--build',build,'--parallel','4','--target','capstone_static'],'build-count-'+key)
+            count_exe=w/('count-'+kind)
+            run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',count_exe],'link-count-'+key)
+            named.write_text(original)
         shutil.rmtree(build)
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
@@ -171,7 +184,18 @@ def main(w):
         assert len(counts)==10 and tags.stat().st_size==9*sum(counts)
         modes={}
         for mode in (1,2):
-            modes[mode]=measure(bins['mixed_base'],mode,bits,f,intervals,tags,counts,w,evidence,name)
+            kind='fixed' if bits==32 else 'memory'
+            engine='x86_all_'; args=[engine,str(mode),'1',f,intervals,str(bits)]
+            env=dict(os.environ,CG_COHORT='10',CG_COHORT_FILE=str(tags),MEASURE_WRITER_HITS='1')
+            counted=sp.run([w/('count-'+kind),*args],env=env,capture_output=True,text=True,check=True)
+            seq=next(l.split()[1:]for l in counted.stderr.splitlines()if l.startswith('writer-hits '))
+            hits=list(map(int,seq));assert len(hits)==len(counts) and all(0<=n<=got for n,got in zip(hits,counts)) and sum(hits)>0
+            checks=list(map(int,counted.stdout.split()))[2:]
+            controlled={}
+            for key in ('mixed_base','mixed_'+kind):
+                controlled[key]=measure(bins[key],mode,bits,f,intervals,tags,counts,w,evidence,name+'-'+key)
+                assert controlled[key][engine]['checksum']==checks
+            modes[mode]=dict(counted=hits,stages=controlled)
         results.append((name,dict(input=sha(f),extent=sha(intervals),counts=counts,mask=sha(tags),modes=modes)))
         save('regions.json',dict(results))
         tags.unlink()

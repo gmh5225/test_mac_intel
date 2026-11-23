@@ -10,6 +10,13 @@ static const uint8_t *image_start;
 static size_t position;
 static unsigned selected;
 static bool collecting,armed;
+static uint64_t hits[10];
+extern "C" void note_writer() {
+    if(armed) {
+        if(!position || position>cohorts.size())std::abort();
+        ++hits[cohorts[position-1].kind];
+    }
+}
 static unsigned long long selected_visits;
 static void profile_begin(const uint8_t *start) {
     const char *path=std::getenv("CG_COHORT_FILE");
@@ -36,5 +43,10 @@ static void profile_end() {
     if(!armed)return;
     if(collecting){CALLGRIND_TOGGLE_COLLECT;collecting=false;}
     if(position!=cohorts.size())std::abort();
+    if(std::getenv("MEASURE_WRITER_HITS")) {
+        std::fprintf(stderr,"writer-hits");
+        for(auto value:hits)std::fprintf(stderr," %llu",static_cast<unsigned long long>(value));
+        std::fprintf(stderr,"\n");
+    }
     armed=false;std::fprintf(stderr,"cohort-visits %zu %llu\n",position,selected_visits);
 }

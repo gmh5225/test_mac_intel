@@ -1,0 +1,59 @@
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..826433e9 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -114,6 +114,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+ 		return false;
+ 
++#ifdef X86_FIXED_EMPTY32
++	if (form == X86_SIMPLE_FIXED && !escaped) {
++		if (opcode == 0x90)
++			return X86_FIXED_EMPTY32(insn, insn_size, 0x90);
++		if (opcode == 0xcc)
++			return X86_FIXED_EMPTY32(insn, insn_size, 0xcc);
++	}
++#endif
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR) {
+ #ifdef X86_FIXED_VEX2
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..611aa1be 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -188,6 +188,27 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
++/* The bare NOP and INT3 have complete, constant records. The generated
++ * row supplies the text and implicit effects used by the general writer. */
++static inline bool writeFixedEmpty32(cs_insn *insn, uint16_t *insn_size,
++				     uint8_t opcode)
++{
++	const struct X86SimpleOutput *row =
++		&x86_simple_outputs[x86_simple_plans[0][0][opcode] >> 2];
++	*insn_size = insn->size = 1;
++	insn->id = row->id;
++	insn->bytes[0] = opcode;
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, row->operands, sizeof(row->operands));
++	if (insn->detail)
++		X86_writeSimpleDetail(insn->detail, row, opcode, 0, 0,
++				      row->ops[0].reg, row->ops[1].reg);
++	return true;
++}
++
++#define X86_FIXED_EMPTY32 writeFixedEmpty32
+ #define X86_FIXED_OUTPUT tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32
+@@ -195,6 +216,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#undef X86_FIXED_EMPTY32
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"

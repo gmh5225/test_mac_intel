@@ -1,7 +1,7 @@
-name: Verify exclusive formatter costs and restore compressed evidence on both Linux Python runtimes
+name: Measure work removed by canonical NOP, INT3 and VEX memory writers at actual real-program instruction offsets
 on:
   push:
-    branches: [codex/x86-verified-formatter-self-costs]
+    branches: [codex/x86-writer-effects-real-instruction-stream]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-checked-self-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-writer-effects-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

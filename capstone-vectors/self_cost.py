@@ -31,7 +31,7 @@ def read(path,out,prefix):
                 dest=by_symbol.setdefault(sym,Counter())
                 for event,num in zip(events,nums):dest[event]+=num
     assert events and totals
-    whole=dict(zip(events,totals));accounted={e:sum(v[e]for v in by_symbol.values())for e in events}
+    whole=dict(zip(events,totals+[0]*(len(events)-len(totals))));accounted={e:sum(v[e]for v in by_symbol.values())for e in events}
     order=sorted(by_symbol.items(),key=lambda v:-v[1]['Ir'])
     names=[v[0][1]for v in order if v[1]['Ir']]
     compressed=out/(prefix+'-events.gz')
