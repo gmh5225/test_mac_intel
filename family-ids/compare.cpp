@@ -193,7 +193,31 @@ static void verify_iter(Session &a,Session &b,const std::vector<uint8_t> &bytes,
 }
 
 static void configure(Session &s,int m) {s.set(CS_OPT_TEXT,m?CS_OPT_ON:CS_OPT_OFF);s.set(CS_OPT_DETAIL,m==2?CS_OPT_ON:CS_OPT_OFF);}
+static int single(char **argv) {
+  Api api(argv[1]);
+  std::ifstream stream(argv[3],std::ios::binary);
+  std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(stream),{}};
+  check(!bytes.empty(),"input");
+  std::string target=argv[4],op=argv[6];
+  uint64_t ip=std::strtoull(argv[5],nullptr,10);
+  cs_arch arch=target=="arm64"?CS_ARCH_AARCH64:target=="mips64el"?CS_ARCH_MIPS:CS_ARCH_X86;
+  cs_mode width=arch==CS_ARCH_AARCH64?CS_MODE_LITTLE_ENDIAN:arch==CS_ARCH_MIPS?CS_MODE_MIPS64:target=="64"?CS_MODE_64:CS_MODE_32;
+  Session session(api,arch,width);int mode=std::atoi(argv[7]);configure(session,mode);
+  unsigned reps=unsigned(std::strtoul(argv[8],nullptr,10));check(reps,"reps");
+  size_t stride=arch==CS_ARCH_X86?1:4,records=0,seen=0;
+  auto work=op=="iter"?iter_work:visit;
+  auto want=work(session,bytes,ip,mode,stride,records);
+  uint64_t sum=0,wall=clk(CLOCK_MONOTONIC),cpu=clk(CLOCK_PROCESS_CPUTIME_ID);
+  for(unsigned i=0;i<reps;++i) sum+=work(session,bytes,ip,mode,stride,seen);
+  auto took=clk(CLOCK_PROCESS_CPUTIME_ID)-cpu, elapsed=clk(CLOCK_MONOTONIC)-wall;
+  check(seen==records&&sum==want*reps,"result");Dl_info loc{};
+  check(dladdr(reinterpret_cast<const void *>(api.next),&loc)&&loc.dli_fbase,"mapping");
+  std::printf("%" PRIu64 " %" PRIu64 " %zu %" PRIu64 " %" PRIuPTR " %" PRIuPTR "\n",took,elapsed,seen,want,reinterpret_cast<uintptr_t>(loc.dli_fbase),reinterpret_cast<uintptr_t>(api.next)-reinterpret_cast<uintptr_t>(loc.dli_fbase));
+  return 0;
+}
+
 int main(int argc,char **argv) {
+  if(argc==9 && std::string(argv[2])=="single")return single(argv);
   if(argc<4)return 2;
   Api a(argv[1]),b(argv[2]);check(a.disasm!=b.disasm,"distinct array decoders");
   std::string op=argv[3];if(op=="options"){options(a,b);return 0;}

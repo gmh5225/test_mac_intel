@@ -17,7 +17,7 @@ try:
     arch=['X86','ARM','AARCH64','MIPS']
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
     libs={};images={}
-    for k in ('base','padded','bounded','constructed'):
+    for k in ('base','all','padded'):
         apply(k);b=t/'build'
         run('cmake-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
         units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option']
@@ -27,7 +27,7 @@ try:
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=sha(b/'libcapstone.a'),bytes=path.stat().st_size,
                        object={a:sha(next(b.rglob(a)))for a in('cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','AArch64Disassembler.c.o')})
-    assert len({v['shared']for v in images.values()})==4;put('images',images)
+    assert len({v['shared']for v in images.values()})==3;put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
     for f in ('fetch.py','libmvec.py'):run(f,'python3','-B',t/f)
@@ -43,22 +43,60 @@ try:
         cases[n]=(f,arch,sect[3])
     put('inputs',{n:dict(hash=sha(f),arch=arch,ip=ip,bytes=f.stat().st_size)for n,(f,arch,ip) in cases.items()})
     verify={}
-    for k in ('padded','bounded','constructed'):
+    for k in ('all','padded'):
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
         snapshot['options']=json.loads(get(*args,'options'))
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
     if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     launch=[]if darwin else['setarch',platform.machine(),'-R'];timings={}
-    # Pair each implementation and a repeated control on both sides. Include
-    # untouched scan and foreign public array/iterator paths for every stage.
+    import random,math
+    image=t/('timed.dylib' if darwin else 'timed.so')
+    images={k:f.read_bytes()for k,f in libs.items()};maxlen=max(map(len,images.values()))
+    if not darwin:
+        # Every process maps the same pathname, inode, length and load base.
+        loads={};spans={}
+        for k,v in images.items():
+            assert v[:6]==bytes((127,69,76,70,2,1))
+            phoff=struct.unpack_from('<Q',v,32)[0];ent,num=struct.unpack_from('<HH',v,54)
+            last=max((struct.unpack_from('<IIQQQQQQ',v,pos)[3],pos)for pos in range(phoff,phoff+ent*num,ent)if struct.unpack_from('<I',v,pos)[0]==1)[1]
+            pva,psize=struct.unpack_from('<Q',v,last+16)[0],struct.unpack_from('<Q',v,last+40)[0]
+            loads[k]=(last,pva,psize);spans[k]=(pva+psize+4095)//4096
+        data={};pad={}
+        for k,v in images.items():
+            buf=bytearray(v+bytes(maxlen-len(v)));off,va,sz=loads[k]
+            extra=(max(spans.values())-spans[k])*4096
+            if extra:struct.pack_into('<Q',buf,off+40,sz+extra)
+            data[k]=buf;pad[k]=extra
+        put('load-spans',dict(pages=spans,extra_zero_fill=pad))
+        image.write_bytes(data['base']);image.chmod(0o755)
+    curr=None;addresses={};offsets={}
+    def take(stage,args,reps):
+        global curr
+        src='base'if stage=='copy'else stage
+        if src!=curr:
+            if darwin:
+                if image.is_symlink():image.unlink()
+                image.symlink_to(libs[src])
+            else:
+                with image.open('r+b')as out_file:assert out_file.write(data[src])==maxlen
+            curr=src
+        vals=list(map(int,get(*launch,driver,image,'single',*args,str(reps)).split()))
+        assert len(vals)==6 and min(vals[0:3])>0
+        addresses.setdefault(src,set()).add(vals[4]);assert offsets.setdefault(src,vals[5])==vals[5]
+        if not darwin:assert len(set.union(*addresses.values()))==1,addresses
+        return vals[:4]
     for n,(f,arch,ip) in cases.items():
         for mode in (0,1,2):
-            for workload in ('time','iter'):
-                for k in ('padded','bounded','constructed'):
-                    key='/'.join((k,n,workload,str(mode)))
-                    timings[key]=json.loads(get(*launch,driver,libs['base'],libs[k],workload,f,arch,str(ip),str(mode)))
-                put('timings',timings)
+            for api in ('time','iter'):
+                key='/'.join((n,api,str(mode)));args=[f,arch,str(ip),api,str(mode)]
+                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*q];rng=random.Random(key)
+                for _ in range(17):
+                    rng.shuffle(keys);obs=[(k,take(k,args,reps))for k in keys+keys[::-1]]
+                    assert all(v[2:]==t0[2:]for k,v in obs)
+                    cycles.append({k:[sum(o[i]for l,o in obs if k==l)for i in (0,1)]for k in keys})
+                timings[key]=dict(cycles=cycles,reps=reps,records=t0[2],value=t0[3]);put('timings',timings)
+        put('mappings',dict(sets={k:sorted(v)for k,v in addresses.items()},offsets=offsets,fixed=not darwin,inode=image.stat().st_ino if not darwin else None))
     put('complete',dict(source=q,panels=len(timings),compiler=get('clang','--version'),cpu=get('sysctl','-n','machdep.cpu.brand_string')if darwin else get('lscpu')))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);put('cleanup',dict(removed=not t.exists(),bytes=size))

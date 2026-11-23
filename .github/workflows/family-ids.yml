@@ -1,7 +1,7 @@
-name: Measure public operand copies and ARM constructed-operand initialization with x86 scalar writers
+name: Check public output with one library per process and identical mapping addresses on Linux
 on:
   push:
-    branches: [codex/public-operand-copy-and-padding]
+    branches: [codex/scalar-output-canonical-mapped-library]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-operand-copy-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: single-library-public-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
