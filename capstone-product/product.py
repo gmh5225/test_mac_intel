@@ -43,9 +43,12 @@ try:
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         caller='lib/decode/Decoder.cpp'
         command(['git','restore','--source','HEAD','--worktree','--',caller],'restore-caller-'+variant,nd)
-        assert sha(r/'neverd.patch')==m['neverd_patch_sha256']
-        if variant=='tail':command(['git','apply',r/'neverd.patch'],'apply-caller-'+variant,nd)
-        assert ('X86_disasmOneText(Handle' in (nd/caller).read_text())==(variant=='tail')
+        entry={'base':'X86_disasmIterText','memory':'X86_disasmOneText','tail':'X86_decodeOneText'}[variant]
+        if variant!='base':
+            patch=r/(variant+'-caller.patch')
+            assert sha(patch)==m['caller_patches'][variant]
+            command(['git','apply',patch],'apply-caller-'+variant,nd)
+        assert entry+'(Handle' in (nd/caller).read_text()
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
@@ -100,7 +103,7 @@ try:
             fields=ln.split(maxsplit=3)
             if len(fields)!=4 or fields[2].lower()!='t':continue
             name=fields[3]
-            if name.startswith(('cs_decode_full_insn','cs_decode_public_insn','cs_disasm_iter','X86_disasmIter','X86_disasmOneText','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','matchAArch64AliasPatterns','matchAliasPatterns','AArch64_LLVM_printInstruction','X86_decodeVexMemoryOrFull','neverd::Decoder::classifyX86Prefix')):
+            if name.startswith(('cs_decode_full_insn','cs_decode_public_insn','cs_disasm_iter','X86_disasmIter','X86_decodeOneText','X86_disasmOneText','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','matchAArch64AliasPatterns','matchAliasPatterns','AArch64_LLVM_printInstruction','X86_decodeVexMemoryOrFull','neverd::Decoder::classifyX86Prefix')):
                 symbols[name]=[int(fields[0],16),int(fields[1],16)]
         assert 'cs_disasm_iter' in symbols and any('classifyX86Prefix' in n for n in symbols)
         with binary.open('rb') as file:
@@ -116,9 +119,9 @@ try:
         assert 'X86PublicOutput.c.o' not in members and 'X86PostPrinter.c.o' not in members
         owner,=build.rglob('NeverDDecode.dir/Decoder.cpp.o')
         refs=sp.check_output(['nm','-u',owner],text=True)
-        assert ('X86_disasmOneText' in refs)==(variant=='tail')
-        assert ('X86_disasmIterText' in refs)==(variant!='tail')
-        save('caller-'+variant,dict(source=sha(nd/caller),object=sha(owner),one=variant=='tail',undefined=refs))
+        relevant={ln.split()[-1]for ln in refs.splitlines()if ln.split()[-1] in ('X86_disasmIterText','X86_disasmOneText','X86_decodeOneText')}
+        assert relevant=={entry},(variant,relevant)
+        save('caller-'+variant,dict(source=sha(nd/caller),object=sha(owner),entry=entry,undefined=refs))
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
@@ -145,7 +148,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert identities['memory']['archive']==identities['tail']['archive']!=identities['base']['archive']
+    assert len({z['archive']for z in identities.values()})==3 and len({z['binary']for z in identities.values()})==3
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))

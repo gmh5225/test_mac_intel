@@ -1,7 +1,7 @@
-name: Measure one-record x86 integration with the full source-built NeverD decoder and two Capstone-only controls
+name: Compare the full NeverD decoder calling the iterator, consumed-length and status-only x86 ABIs
 on:
   push:
-    branches: [codex/neverd-single-text-record-consumer]
+    branches: [codex/neverd-x86-record-abi-comparison]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-record-entry-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: three-record-entries-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
