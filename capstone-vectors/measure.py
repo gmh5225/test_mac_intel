@@ -140,6 +140,10 @@ def main(w):
             generated=sp.check_output([w/'vector-generator'])
             assert generated==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
             save('vector-rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
+            if (base/'arch/X86/X86GenVexBaseMemory.inc').is_file():
+                special=sp.check_output([w/'vector-generator','--vex-base-memory'])
+                assert special==(base/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
+                save('memory-rows-'+key+'.json',dict(bytes=len(special),sha256=hashlib.sha256(special).hexdigest()))
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -156,7 +160,7 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed==['X86VectorOutput.c.o'],(key,changed)
+            assert changed==['X86VectorFallback64.c.o'],(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

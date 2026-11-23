@@ -1,7 +1,7 @@
-name: Compare local vector register names across PE and ELF readers and fork iced
+name: Measure isolated AMD64 VEX memory records on six ELF and PE executables against fork iced
 on:
   push:
-    branches: [codex/vector-register-names-one-writer]
+    branches: [codex/x86-private-vex-base-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-register-table-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: private-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
