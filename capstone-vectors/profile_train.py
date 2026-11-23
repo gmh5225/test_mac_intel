@@ -38,7 +38,7 @@ def train(exe,w,recipes,tool,raw,out):
         entries={}
         for heading,data in re.findall(r'^  (\S[^\n]*):\n((?:    [^\n]+\n)+)',shown,re.M):
             # Clang versions emit either an object path plus semicolon or a bare symbol.
-            symbol=heading.rsplit(';',1)[-1].split('.')[0]
+            symbol=re.split(r'[;:]',heading)[-1].split('.')[0]
             if symbol not in names:continue
             counters=[int(n) for line in data.splitlines() if 'Block counts:' in line or 'Function count:' in line for n in re.findall(r'[0-9]+',line.split(':',1)[1])]
             if counters:entries[heading]=max(counters)
