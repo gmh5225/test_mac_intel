@@ -1,7 +1,7 @@
-name: Repeat PuTTY32 on Intel Macs with fixed executable path and duplicate controls
+name: Repeat isolated PE32 and i386 public timings with two copies per library on Linux and Intel Macs
 on:
   push:
-    branches: [codex/pe32-paired-scan-images]
+    branches: [codex/pe32-fused-prefix-public-repeat]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,6 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
+          - { host: ubuntu-22.04, cc: clang, replica: 1 }
           - { host: macos-15-intel, cc: clang, replica: 1 }
           - { host: macos-15-intel, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
@@ -26,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
+          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 83dc20e512ed43a9fcf5994ba585f85c7d9b2f20
+          ref: deb20b49abc68cea5368ce6f7724fdfea01f05be
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: paired-pe32-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fused-prefix-pe32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

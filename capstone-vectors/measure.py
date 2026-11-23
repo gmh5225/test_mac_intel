@@ -222,9 +222,9 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in m['cases'][name]:
             for link,images in available.items():
-                engine='x86_all_' if mode else 'vecbatch'
+                engine='capstone' if name in m['public_controls'] else ('x86_all_' if mode else 'vecbatch')
                 def timed(k,count):return list(map(int,invoke(images[k],[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-                rep=max(1,math.ceil(115e6/max(1,timed('base1',1)[0])));cycles=[]
+                rep=max(1,math.ceil(70e6/max(1,timed('base1',1)[0])));cycles=[]
                 order=random.Random(str((name,mode,link,'repeated scan')))
                 for _ in range(21):
                     labels=list(images);order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
