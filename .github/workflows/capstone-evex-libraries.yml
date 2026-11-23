@@ -1,7 +1,7 @@
-name: Measure AMD64 comparisons at group-1 dispatch on top of dedicated i386 addressing
+name: Measure dedicated scalar comparisons with width-safe unsigned magnitudes in ordinary readers
 on:
   push:
-    branches: [codex/scalar-group-amd64-compare-readers]
+    branches: [codex/pure-unsigned-amd64-compare]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-group-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: dedicated-unsigned-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -125,7 +125,7 @@ def main(w):
         run(['clang++','-std=c++17','-O2','-I',base/'include',r/'scalar-guard.cpp',w/'scalar.o',lib,'-o',w/'scalar-guard'],'scalar-link-'+key)
         run([w/'scalar-guard'],'scalar-guard-'+key)
         counts=list(map(int,(evidence/('scalar-guard-'+key+'.log')).read_text().split()))
-        assert counts==[1777646,0,506856 if kind=='cmp' else 0],(key,counts)
+        assert counts==[1777646,0,506856 if key=='cmp' else 0],(key,counts)
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -141,7 +141,9 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='cmp':assert changed==['X86Sse64Output.c.o'],changed
+        if kind=='cmp':
+            assert set(changed)<={'X86Sse64Output.c.o','X86MemoryFallback32.c.o'},(key,changed)
+            if not mixed:assert 'X86Sse64Output.c.o' in changed,(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
