@@ -1,3 +1,45 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4c125e67..48ae85a8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1060,8 +1060,13 @@ target_include_directories(capstone_build_settings INTERFACE
+ )
+ set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+-# The x86-only public iterator uses the fixed-mode readers in both library forms.
+-if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_enabled_architectures STREQUAL "X86"))
++# Formatted public records reuse the fixed-mode readers in both library forms.
++set(capstone_public_fixed_readers OFF)
++if(capstone_enabled_architectures STREQUAL "X86" OR
++   (CAPSTONE_USE_DEFAULT_ALLOC AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
++    set(capstone_public_fixed_readers ON)
++endif()
++if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_public_fixed_readers))
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+     target_link_libraries(capstone_x86_iter32 PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+@@ -1076,6 +1081,8 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86")
+         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++    endif()
++    if(capstone_public_fixed_readers)
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+             $<TARGET_OBJECTS:capstone_x86_native>)
+diff --git a/Makefile b/Makefile
+index 0fe49035..c22f2fe3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -453,6 +453,8 @@ LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
+ LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ LIBOBJ_SHARED := $(LIBOBJ)
++else ifeq ($(CAPSTONE_USE_SYS_DYN_MEM):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no)
++LIBOBJ_SHARED := $(LIBOBJ)
+ endif
+ 
+ 
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index 8d827a97..7d940a22 100644
 --- a/arch/X86/X86Disassembler.h
@@ -116,3 +158,16 @@ index ede7c2aa..d31bf34d 100644
  #endif
  #ifdef CAPSTONE_HAS_MIPS
  	if (handle->arch == CS_ARCH_MIPS)
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 8b413445..9a1f6d0d 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -212,7 +212,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
+     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
+ endforeach()
+ 
+-if(TARGET x86_simple_output AND NOT capstone_enabled_architectures STREQUAL "X86")
++if(TARGET x86_simple_output AND NOT capstone_x86_objects)
+     target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
+ endif()
+ 
