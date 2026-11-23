@@ -32,12 +32,39 @@ try:
     cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
     if profile=='diet':cfg.append('-DCAPSTONE_BUILD_DIET=ON')
-    variants={}
+    def decoder_code():
+        import struct
+        objects={}
+        for obj in b.rglob('*'):
+            if obj.name not in ('RISCVDisassembler.c.o','RISCVDisassembler.c.obj','RISCVDisassembler.obj'):continue
+            if win:
+                raw=obj.read_bytes()
+                if raw[:4]==b'\x00\x00\xff\xff':
+                    count=struct.unpack_from('<I',raw,44)[0];start=56
+                else:
+                    count=struct.unpack_from('<H',raw,2)[0];start=20+struct.unpack_from('<H',raw,16)[0]
+                text=[]
+                for i in range(count):
+                    rec=start+40*i
+                    length,offset=struct.unpack_from('<II',raw,rec+16)
+                    flags=struct.unpack_from('<I',raw,rec+36)[0]
+                    if length and flags & 0x20:
+                        assert offset and offset+length<=len(raw)
+                        text.append(sha(raw[offset:offset+length]))
+                assert text
+                objects[str(obj.relative_to(b))]=text
+            else:
+                data=sp.check_output(['otool','-s','__TEXT','__text',obj]).splitlines()
+                assert len(data)>2
+                objects[str(obj.relative_to(b))]=sha(b'\n'.join(data[2:]))
+        assert objects
+        return objects
+    machine_code={};variants={}
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
         units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_instruction_groups', 'riscv_op_count_iter'] if profile=='full' else []
-        if profile=='full' and stage=='candidate':units.append('riscv_scan_options')
+        if profile=='full':units.append('riscv_scan_options')
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*units])
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
@@ -54,6 +81,8 @@ try:
             outputs[suffix]=rows
         assert outputs['static']==outputs['shared']
         variants[stage]=outputs
+        machine_code[stage]=decoder_code()
+    assert machine_code['base']==machine_code['candidate'];save('decoder-code',machine_code)
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))
