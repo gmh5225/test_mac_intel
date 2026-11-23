@@ -1,7 +1,7 @@
-name: Separate x86 public dispatch from pulling fixed readers into normal ten-architecture executables
+name: Measure selecting the x86 public iterator on option changes across ten architectures
 on:
   push:
-    branches: [codex/isolate-static-reader-admission-and-linkage]
+    branches: [codex/cache-x86-public-iterator-policy]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: static-reader-link-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: cached-iterator-selection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

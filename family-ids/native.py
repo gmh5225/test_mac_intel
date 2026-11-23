@@ -24,7 +24,7 @@ try:
         assert len(order)==len(obj)>55 and 'XtensaDisassembler.c.o' in order
         if k=='base':base_obj=obj;base_order=order
         else:
-            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86DisassemblerDecoder.c.o'}
+            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'cs.c.o','X86DisassemblerDecoder.c.o'}
             assert [n for n in obj if n in base_obj]==base_order
         save('objects-'+k,dict(members=obj,order=order))
         stages=[k,'forced'] if k=='base' else [k]
@@ -59,6 +59,8 @@ try:
         assert result['complete_record_comparisons']>0 and result['batch_records']>0
         states[label]=result
     save('public-differential',states)
+    cmd('build-transitions',['c++','-O2','-std=c++17','-I',s/'include',d/'transitions.cpp','-ldl','-o',t/'transitions'])
+    cmd('transitions',[t/'transitions',libs['base'],libs['candidate']])
     cmd('build-guard',['c++','-std=c++17','-O2','-I',s/'include',d/'primary-guard.cpp','-ldl','-o',t/'guard'])
     cmd('guard',[t/'guard',libs['base'],libs['candidate']]);assert (out/'guard.log').read_text().split()==['14255104','10945975']
     import corpus
