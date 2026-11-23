@@ -1,7 +1,7 @@
-name: Compare x86 public output with an unchanged scan call site across ten real architectures
+name: Measure public x86 formatting and the original full decoder in nine other architectures
 on:
   push:
-    branches: [codex/public-full-record-scan-code]
+    branches: [codex/mixed-public-record-readers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8835df03f81c2011e14511446686a6b68eabdd68
+          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-full-record-call-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: shared-full-record-target-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

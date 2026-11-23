@@ -25,7 +25,7 @@ try:
         assert len(order)==len(obj)>55 and 'XtensaDisassembler.c.o' in order
         if k=='base':base_obj=obj;base_order=order
         else:
-            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'cs.c.o','X86PublicOutput.c.o','X86DisassemblerDecoder.c.o'}
+            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86PublicOutput.c.o','X86DisassemblerDecoder.c.o'}
             assert [n for n in obj if n in base_obj]==base_order
         save('objects-'+k,dict(members=obj,order=order))
         member=t/('decoder-'+k+'.o')
@@ -57,7 +57,7 @@ try:
         imgs[k]=probe_bins[k].read_bytes();ids[k]=sha(probe_bins[k])
         if k=='candidate':
             canonical=t/'canonical-call'
-            cmd('link-call-target',['c++','-std=c++17','-O3','-no-pie','-Wl,--wrap=cs_decode_public_insn,--defsym=__wrap_cs_decode_public_insn=cs_decode_full_insn','-I',s/'include',d/'time.cpp',lib,'-lm','-o',canonical])
+            cmd('link-call-target',['c++','-std=c++17','-O3','-no-pie','-Wl,-u,X86_decodePublicRecord,--wrap=cs_decode_public_insn,--defsym=__wrap_cs_decode_public_insn=cs_decode_full_insn','-I',s/'include',d/'time.cpp',lib,'-lm','-o',canonical])
             def alloc_sections(exe):
                 sections={}
                 for line in sp.check_output(['readelf','-SW',exe],text=True).splitlines():
@@ -85,6 +85,7 @@ try:
             selected={v[-1]:int(v[0],16) for line in symbols if len(v:=line.split())==3 and v[-1] in ('__wrap_cs_decode_public_insn','cs_decode_full_insn')}
             assert len(selected)==2 and len(set(selected.values()))==1
             save('call-target-image',dict(same_layout_and_only_iterator_changed=exact,sections=sections,caller=[caller,extent],canonical=selected,public_entry=left['cs_decode_public_insn'],sha256=[hashlib.sha256(img).hexdigest()for img in simgs]))
+        if k=='candidate':cmd('dispatch-disassembly',['objdump','-d','--disassemble=cs_decode_public_insn',probe_bins[k]])
         so=t/(k+'.so')
         cmd('loadable-'+k,[cc,'-shared','-Wl,-Bsymbolic','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',so]);libs[k]=so
     assert ids['base']!=ids['candidate']
