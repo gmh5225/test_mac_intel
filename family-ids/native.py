@@ -2,7 +2,7 @@ from pathlib import Path
 from statistics import median
 from math import ceil
 import hashlib, json, os, platform, random, shutil, subprocess as sp, tempfile
-import corpus
+import corpus, shlex
 r=Path(__file__).resolve().parent; source=r.parent/'source'; out=r.parent/'evidence';out.mkdir()
 rd=lambda f:json.loads(f.read_text());meta=rd(r/'tree.json');stages=rd(r/'stages.json')
 cc=os.environ['CC']; flavor=os.environ['FLAVOR']; mixed=flavor=='second'
@@ -34,7 +34,7 @@ def measure(t):
     run('guard-link',['c++','-std=c++17','-O2','-I',source/'include',r/'guard.cpp','-ldl','-o',t/'guard'])
     flags='-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'
     def config(b,arch,extra):
-        return ['cmake','-S',source,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF',*['-DCAPSTONE_'+n+'_SUPPORT=ON' for n in arch],*extra]
+        return ['cmake','-S',source,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags+' -fstack-usage','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF',*['-DCAPSTONE_'+n+'_SUPPORT=ON' for n in arch],*extra]
     arches=['RISCV']+(['ARM','AARCH64','MIPS','X86']if mixed else [])
     info={};libs={};units=checks['tests']
     for profile,arch,extra in [('full',arches,[]),('diet',['RISCV'],['-DCAPSTONE_BUILD_DIET=ON']),('neverd',['ARM','AARCH64','MIPS','X86'],[])]:
@@ -50,6 +50,37 @@ def measure(t):
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
             variants[k]=dict(so=sha(so),archive=sha(b/'libcapstone.a'),objects=files)
             if profile=='full':libs[k]=t/(k+'.so');shutil.copy2(so,libs[k])
+            if profile=='full':
+                obj,=b.rglob('RISCVInstPrinter.c.o')
+                if k=='base':
+                    shutil.copy2(b/'libcapstone.a',t/'baseline.a')
+                    item=next(row for row in rd(b/'compile_commands.json') if row['file'].endswith('/RISCVModule.c'))
+                    argv=shlex.split(item['command']);argv.extend(['-I',str(source)]);argv[argv.index('-o')+1]=str(t/'select.o');argv[argv.index('-c')+1]=str(r/'select.c')
+                    run('compile-selector',argv)
+                renamed='copy' if k=='base' else k
+                nm=sp.check_output(['nm','--defined-only','--extern-only',obj],text=True).splitlines()
+                names=[line.split()[-1] for line in nm if len(line.split())==3]
+                assert 'RISCV_LLVM_printInstruction' in names
+                symbols=t/(renamed+'.txt');symbols.write_text(''.join(n+' '+renamed+'_'+n+'\\n' for n in names))
+                run('rename-'+renamed,['objcopy','--redefine-syms='+str(symbols),obj,t/(renamed+'.o')])
+                functions={}
+                for line in sp.check_output(['nm','-n','-S',so],text=True).splitlines():
+                    cols=line.split()
+                    if len(cols)==4 and (cols[3].startswith('RISCV_') or cols[3] in ('cs_disasm_iter','printOperandForms','printCompressedOperandForms','cs_decode_full_insn')):
+                        functions[cols[3]]=[int(cols[0],16),int(cols[1],16)]
+                assert all(n in functions for n in ('cs_disasm_iter','RISCV_LLVM_getInstruction','RISCV_LLVM_printInstruction'))
+                su={}
+                for f in obj.parent.glob('*.su'):
+                    if 'RISCVInstPrinter' in f.name:
+                        for line in f.read_text().splitlines():
+                            cols=line.split('\\t')
+                            if len(cols)>=2:
+                                n=cols[0].split(':')[-1].split('.')[0]
+                                if n in ('RISCV_LLVM_printInstruction','printOperandForms','printCompressedOperandForms','uncompressInst'):su[n]=int(cols[1])
+                assert 'RISCV_LLVM_printInstruction' in su
+                if k=='width': assert 'printCompressedOperandForms' in su,su
+                save('layout-'+k,dict(built=functions,stack=su))
+
         if profile=='neverd':assert variants['base']==variants['width']
         else:
             for k,row in variants.items():
@@ -65,6 +96,14 @@ def measure(t):
     lib=t/'libcapstone.so.6';(t/'libcapstone.so').symlink_to(lib.name)
     images={k:f.read_bytes() for k,f in libs.items()};length=max(map(len,images.values()));images={k:v+bytes(length-len(v))for k,v in images.items()};images['copy']=images['base'];lib.write_bytes(images['base'])
     for f in ('time','raw'):run(f,['c++','-O3','-std=c++17','-I',source/'include',r/(f+'.cpp'),'-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/f])
+    run('fixed-image-link',['c++','-O3','-std=c++17','-I',source/'include',r/'time.cpp',t/'select.o',*[t/(k+'.o')for k in ('copy','lazy','width')],t/'baseline.a','-Wl,--wrap=cs_open','-o',t/'fixed'])
+    fixed_syms={}
+    for line in sp.check_output(['nm','-n','-S',t/'fixed'],text=True).splitlines():
+        cols=line.split()
+        if len(cols)==4 and (cols[3].endswith('RISCV_LLVM_printInstruction') or cols[3] in ('cs_disasm_iter','RISCV_LLVM_getInstruction')):
+            fixed_syms[cols[3]]=[int(cols[0],16),int(cols[1],16)]
+    assert len(fixed_syms)==6
+    save('fixed-image',dict(sha=sha(t/'fixed'),symbols=fixed_syms))
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     run('fixed',['setarch',platform.machine(),'-R','true'])
     current=None
@@ -91,6 +130,18 @@ def measure(t):
                 rng.shuffle(keys);obs=[(k,sample(k,mode,reps))for k in keys+keys[::-1]];assert len(set(y[2]for _,y in obs))==1
                 cycles.append({k:[sum(a[i]for n,a in obs if n==k)for i in (0,1)]for k in keys})
             rows[name+'/'+str(mode)]=dict(cycles=cycles,reps=reps,checksum=obs[0][1][2]);save('timings',rows)
+    paired={};selectors=dict(base='0',copy='1',lazy='2',width='3')
+    for name,bits in cases.items():
+        def fixed(k,mode,reps):
+            env=dict(os.environ,RV_PRINTER=selectors[k])
+            return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'fixed',str(bits),str(mode),t/(name+'.text'),'1048576',str(reps)],env=env).split()))
+        for mode in (0,1,2):
+            v=fixed('base',mode,1);assert v[2]==rows[name+'/'+str(mode)]['checksum']
+            reps=max(1,ceil(32e6/max(1,v[0])));cycles=[];keys=list(selectors)
+            for _ in range(17):
+                rng.shuffle(keys);obs=[(k,fixed(k,mode,reps))for k in keys+keys[::-1]];assert all(y[2]==v[2] for _,y in obs)
+                cycles.append({k:[sum(a[i]for n,a in obs if n==k)for i in (0,1)]for k in keys})
+            paired[name+'/'+str(mode)]=dict(cycles=cycles,reps=reps,checksum=v[2]);save('fixed-timings',paired)
     save('complete',dict(source=meta,mixed=mixed,cases=cases,cc=cc,clock=platform.platform(),cpu=sp.check_output(['lscpu'],text=True),fixed_inode=lib.stat().st_ino))
 t=Path(tempfile.mkdtemp())
 try:measure(t)
