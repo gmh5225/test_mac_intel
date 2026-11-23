@@ -1,81 +1,159 @@
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..96dca208 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -173,11 +173,10 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
- 	return out + length;
+diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
+index 37b02959..196ec35f 100644
+--- a/arch/X86/X86InstPrinterCommon.h
++++ b/arch/X86/X86InstPrinterCommon.h
+@@ -7,8 +7,6 @@
+ #include "../../MCInst.h"
+ #include "../../SStream.h"
+ 
+-#define CS_X86_MAXIMUM_OPERAND_SIZE 6
+-
+ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
+ 						uint16_t length,
+ 						uint64_t displacement,
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..731fe6bf 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -456,33 +456,17 @@ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  }
  
--static inline void X86_writeSimpleDetail(cs_detail *detail,
--					 const struct X86SimpleOutput *row,
--					 uint8_t opcode, uint8_t rex,
--					 uint8_t modrm, uint16_t first,
--					 uint16_t second)
-+static inline cs_x86 *X86_initSimpleDetail(cs_detail *detail,
-+					  const struct X86SimpleOutput *row,
-+					  uint8_t opcode, uint8_t rex,
-+					  uint8_t modrm)
+ #ifndef CAPSTONE_DIET
+-// copy & normalize access info
+-static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
+-			  uint64_t *eflags)
++static const uint8_t *get_intel_operand_access(MCInst *MI)
  {
- 	memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
- 	memcpy(detail->regs_read, row->reads, sizeof(row->reads));
-@@ -196,7 +195,15 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
- 	x86->encoding.imm_offset = row->imm_offset;
- 	x86->encoding.imm_size = row->imm_size;
- 	x86->op_count = row->operand_count;
--	for (unsigned i = 0; i < x86->op_count; ++i) {
-+	return x86;
+-#ifndef CAPSTONE_DIET
+-	uint8_t i;
+-	const uint8_t *arr = X86_get_op_access(h, id, eflags);
+-
+-	// initialize access
+-	memset(access, 0, CS_X86_MAXIMUM_OPERAND_SIZE * sizeof(access[0]));
+-
+-	if (!arr) {
+-		access[0] = 0;
+-		return;
+-	}
+-
+-	// copy to access but zero out CS_AC_IGNORE
+-	for (i = 0; arr[i]; i++) {
+-		if (arr[i] != CS_AC_IGNORE)
+-			access[i] = arr[i];
+-		else
+-			access[i] = 0;
+-	}
++	static const uint8_t empty[CS_X86_MAXIMUM_OPERAND_SIZE];
++	const uint8_t *access = X86_get_op_access(
++		MI->csh, MCInst_getOpcode(MI), &MI->flat_insn->detail->x86.eflags);
++	return access ? access : empty;
 +}
-+
-+static inline void X86_writeSimpleRegisters(cs_x86 *x86,
-+					    const struct X86SimpleOutput *row,
-+					    unsigned count, uint16_t first,
-+					    uint16_t second)
+ 
+-	// mark the end of array
+-	access[i] = 0;
+-#endif
++static inline uint8_t explicit_operand_access(uint8_t access)
 +{
-+	for (unsigned i = 0; i < count; ++i) {
- 		cs_x86_op *op = &x86->operands[i];
- 		op->type = X86_OP_REG;
- 		op->reg = (x86_reg)(i ? second : first);
-@@ -205,4 +212,14 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
- 	}
++	return access == CS_AC_IGNORE ? 0 : access;
  }
  
-+static inline void X86_writeSimpleDetail(cs_detail *detail,
-+					 const struct X86SimpleOutput *row,
-+					 uint8_t opcode, uint8_t rex,
-+					 uint8_t modrm, uint16_t first,
-+					 uint16_t second)
-+{
-+	cs_x86 *x86 = X86_initSimpleDetail(detail, row, opcode, rex, modrm);
-+	X86_writeSimpleRegisters(x86, row, row->operand_count, first, second);
-+}
-+
+ static inline void set_early_operand_access(MCInst *MI)
+@@ -493,11 +477,12 @@ static inline void set_early_operand_access(MCInst *MI)
+ 	if (cs_vsnprintf == cs_default_vsnprintf)
+ 		return;
  #endif
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..734a1202 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -252,16 +252,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		*insn_size = insn->size = 2 + has_rex;
+-	uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+-	get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-		      &MI->flat_insn->detail->x86.eflags);
+-	MI->flat_insn->detail->x86.operands[MI->flat_insn->detail->x86.op_count]
+-		.access = access[MI->flat_insn->detail->x86.op_count];
++	cs_x86 *x86 = &MI->flat_insn->detail->x86;
++	const uint8_t *access = get_intel_operand_access(MI);
++	const unsigned i = x86->op_count;
++	x86->operands[i].access = i < CS_X86_MAXIMUM_OPERAND_SIZE ?
++					  explicit_operand_access(access[i]) :
++					  0;
+ }
+ #endif
+ 
+@@ -857,10 +842,6 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
  	}
- 	if (insn->detail) {
--		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
--				      first, second);
-+		cs_x86 *x = X86_initSimpleDetail(insn->detail, row, opcode, rex, modrm);
- 		if (relative) {
--			cs_x86 *x = &insn->detail->x86;
- 			if (escaped) {
- 				x->opcode[0] = 0x0f;
- 				x->opcode[1] = opcode;
- 			}
- 			x->operands[0].type = X86_OP_IMM;
- 			x->operands[0].imm = (int64_t)target;
-+			x->operands[0].size = row->ops[0].size;
-+			x->operands[0].access = (cs_ac_type)row->ops[0].access;
-+		} else {
-+			/* ModR/M register forms are generated from two-register
-+			 * records. Fixed instructions carry their own count. */
-+			unsigned count = form == X86_SIMPLE_FIXED ? row->operand_count : 2;
-+			X86_writeSimpleRegisters(x, row, count, first, second);
- 		}
+ 
+ 	if (MI->csh->detail_opt) {
+-#ifndef CAPSTONE_DIET
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE] = { 0 };
+-#endif
+-
+ 		// first op can be embedded in the asm by llvm.
+ 		// so we have to add the missing register as the first operand
+ 		reg = X86_insn_reg_intel_h(MI->csh, MCInst_getOpcode(MI),
+@@ -907,14 +888,11 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ 
+ #ifndef CAPSTONE_DIET
+ 		// Assign access once the implicit operands have their final positions.
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		for (uint8_t i = 0; i < MI->flat_insn->detail->x86.op_count &&
+-				    i < ARR_SIZE(access);
+-		     i++) {
+-			MI->flat_insn->detail->x86.operands[i].access =
+-				access[i];
+-		}
++		cs_x86 *x86 = &MI->flat_insn->detail->x86;
++		const uint8_t *access = get_intel_operand_access(MI);
++		for (unsigned i = 0; i < x86->op_count &&
++				     i < CS_X86_MAXIMUM_OPERAND_SIZE; ++i)
++			x86->operands[i].access = explicit_operand_access(access[i]);
+ #endif
  	}
- 	return true;
+ 
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..7800f3a3 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11929,7 +11929,7 @@ void op_addAvxBroadcast(MCInst *MI, x86_avx_bcast v)
+ // map instruction to its characteristics
+ typedef struct insn_op {
+ 	uint64_t flags; // how this instruction update EFLAGS(arithmetic instructions) of FPU FLAGS(for FPU instructions)
+-	uint8_t access[6];
++	uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+ } insn_op;
+ 
+ static const insn_op insn_ops[] = {
+@@ -11946,7 +11946,7 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ {
+ 	/* Match the explicit UD1 descriptor in readOperands, including reduce
+ 	 * builds whose generated access table has no operands for UD1. */
+-	static const uint8_t ud1_access[] = { CS_AC_READ, CS_AC_READ, 0 };
++	static const uint8_t ud1_access[CS_X86_MAXIMUM_OPERAND_SIZE] = { CS_AC_READ, CS_AC_READ, 0 };
+ 	if (id == X86_UD1) {
+ 		*eflags = 0;
+ 		return ud1_access;
+@@ -11956,10 +11956,10 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 		*eflags = insn_ops[i].flags;
+ 		/* Compare-exchange reads and conditionally replaces its destination;
+ 		 * memory destinations receive a write cycle even on mismatch. */
+-		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
++		static const uint8_t compare_access[CS_X86_MAXIMUM_OPERAND_SIZE] = { CS_AC_READ_WRITE,
+ 							  CS_AC_READ, 0 };
+-		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
+-		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
++		static const uint8_t pair_access[CS_X86_MAXIMUM_OPERAND_SIZE] = { CS_AC_READ_WRITE, 0 };
++		static const uint8_t bound_access[CS_X86_MAXIMUM_OPERAND_SIZE] = { CS_AC_READ, CS_AC_READ, 0 };
+ 		switch (insns[i].mapid) {
+ 		case X86_INS_BOUND:
+ 			/* BOUND compares the index without modifying it or EFLAGS. */
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index 380faa79..a733ac25 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -103,6 +103,9 @@ void op_addAvxSae(MCInst *MI);
+ 
+ void op_addAvxRoundingMode(MCInst *MI, int v);
+ 
++/* Access rows end at the first zero and the remaining slots are zero. */
++#define CS_X86_MAXIMUM_OPERAND_SIZE 6
++
+ // given internal insn id, return operand access info
+ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 				 uint64_t *eflags);
