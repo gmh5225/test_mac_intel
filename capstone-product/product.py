@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','memory','both'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','sib','ordered'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -40,7 +40,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','memory','both'):
+    for variant in ('base','sib','ordered'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -166,7 +166,7 @@ try:
             command([t/'legacy'],'legacy-guard-'+variant)
         if variant!='base':
             assert sp.check_output([t/'simple-generator','--test32-registers'])==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
-        if variant in ('base','memory','both'):
+        if variant in ('base','sib','ordered'):
             from observe import install
             observed=t/'probe-source';arch=observed/'arch/X86';arch.mkdir(parents=True,exist_ok=True)
             sources=('X86MemoryFallback32','X86Vex32Output')
@@ -188,7 +188,7 @@ try:
         command([t/'map38'],'map38-guard-'+variant)
         if variant!='base':
             command(['python3','-B',cs/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-writes-'+variant)
-        if variant!='base':
+        if variant=='ordered':
             assert sp.check_output([t/'table-producer','--vex-base-memory'])==(cs/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
             assert sp.check_output([t/'table-producer'])==(cs/'arch/X86/X86GenVectorOutput.inc').read_bytes()
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'vexrip.c','-o',t/'vexrip.o'],'vexrip-wrap-'+variant)
