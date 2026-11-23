@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','public','scalar'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','public','access'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -38,7 +38,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','public','scalar'):
+    for variant in ('base','public','access'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -86,7 +86,7 @@ try:
             fields=ln.split(maxsplit=3)
             if len(fields)!=4 or fields[2].lower()!='t':continue
             name=fields[3]
-            if name.startswith(('cs_decode_full_insn','cs_disasm_iter','X86_disasmIter','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
+            if name.startswith(('cs_decode_full_insn','cs_decode_public_insn','cs_disasm_iter','X86_disasmIter','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
                 symbols[name]=[int(fields[0],16),int(fields[1],16)]
         assert 'cs_disasm_iter' in symbols and any('classifyX86Prefix' in n for n in symbols)
         with binary.open('rb') as file:
