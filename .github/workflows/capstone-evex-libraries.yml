@@ -1,7 +1,7 @@
-name: Repeat dedicated x86 VEX memory throughput and verify unchanged mixed readers on real programs
+name: Measure PuTTY32 scan with duplicate executables and fixed placement on Intel Macs
 on:
   push:
-    branches: [codex/x86-only-vex-memory-records]
+    branches: [codex/pe32-scan-identical-paths]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,8 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
           - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
+          - { host: macos-15-intel, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -50,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scan-duplicate-images-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

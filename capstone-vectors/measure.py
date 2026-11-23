@@ -166,6 +166,11 @@ def main(w):
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
+        from scan_regions import capture
+        if darwin:
+            fixed=w/('no-pie-'+key)
+            run(['clang++','-Wl,-no_pie',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',fixed],'link-fixed-'+key)
+            save('scan-regions-'+key+'.json',{'pie':capture(exe,True),'fixed':capture(fixed,False)})
         names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
@@ -180,25 +185,23 @@ def main(w):
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
     import random
-    images={k:v.read_bytes() for k,v in bins.items()}
-    hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
     image=w/'timed-runner'
-    n=max(map(len,images.values()))
-    padded={k:v+bytes(n-len(v)) for k,v in images.items()}
-    active=None
-    if not darwin:
-        run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
-        image.write_bytes(padded['base']);image.chmod(0o755)
-        active=hashes['base']
-    save('launch.json',dict(linked=hashes,same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
-    def invoke(key,tail):
-        nonlocal active
-        if darwin:
-            return sp.check_output([image,*tail],executable=bins[key])
-        if active!=hashes[key]:
-            with image.open('r+b')as out:assert out.write(padded[key])==n
-            active=hashes[key]
-        return sp.check_output(['setarch',platform.machine(),'-R',image,*tail])
+    available={}
+    for link in ('pie','fixed') if darwin else ('pie',):
+        available[link]={}
+        for k in trees:
+            origin=bins[k] if link=='pie' else w/('no-pie-'+k)
+            hashes={}
+            for number in (1,2):
+                slot=w/(link+'-'+k+str(number))
+                shutil.copyfile(origin,slot);slot.chmod(0o755)
+                hashes[number]=sha(slot);available[link][k+str(number)]=slot
+            assert hashes[1]==hashes[2]
+    save('launch.json',dict(canonical_argv=True,canonical_image=True,images={link:{k:sha(f)for k,f in z.items()}for link,z in available.items()}))
+    def invoke(path,tail):
+        fresh=w/'fresh-runner';os.link(path,fresh);os.replace(fresh,image)
+        args=[image,*tail] if darwin else ['setarch',platform.machine(),'-R',image,*tail]
+        return sp.check_output(args)
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
@@ -216,27 +219,18 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (0,1,2):
-            targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
-            for k in trees:
-                targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
-                targets['public_'+k]=(k,'capstone')
-                if bits==32 and mode:targets['width_'+k]=(k,'x86_len_')
-            def timed(label,count):
-                key,engine=targets[label]
-                return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'product-text-width-selection')))
-            for idx in range(13):
-                order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1
-                for kind in ('public_','private_'):
-                    assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
-                cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
+        for mode in m['cases'][name]:
+            for link,images in available.items():
+                engine='x86_all_' if mode else 'vecbatch'
+                def timed(k,count):return list(map(int,invoke(images[k],[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
+                rep=max(1,math.ceil(115e6/max(1,timed('base1',1)[0])));cycles=[]
+                order=random.Random(str((name,mode,link,'repeated scan')))
+                for _ in range(21):
+                    labels=list(images);order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
+                    assert len({tuple(z[2:])for _,z in obs})==1
+                    cycles.append(dict(raw=obs))
+                results.append(dict(case=name,mode=mode,link=link,bits=bits,extent_sha256=sha(intervals),rep=rep,cycles=cycles));save('timings.json',results)
+    assert len(results)==sum(map(len,m['cases'].values()))*len(available)
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
