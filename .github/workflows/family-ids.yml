@@ -1,7 +1,7 @@
-name: Compare standard MIPS scan records, visible text and details against unchanged public outputs
+name: Measure option-selected MIPS decoding and unchanged text callbacks on four real ELF programs
 on:
   push:
-    branches: [codex/mips-standard-primary-records]
+    branches: [codex/mips-standard-scan-options]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-primary-and-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-option-decoder-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

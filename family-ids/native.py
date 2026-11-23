@@ -13,6 +13,7 @@ assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}
 
 try:
     images={};profiles={}
+    cmd('cpu',['lscpu'])
     cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
     for profile,architectures in [('mixed',mixed),('diet',['MIPS']),('systemz',['SYSTEMZ']),('loongarch',['LOONGARCH']),('sparc',['SPARC']),('pure',['MIPS'])]:
         b=t/profile;variants={}
@@ -36,7 +37,7 @@ try:
             if profile=='pure':
                 images[k]=so.read_bytes()
                 cmd('symbols-'+k,['nm','-S','-n','--defined-only',so])
-                for sym in ('cs_decode_full_insn','cs_disasm_iter','Mips_printer'):
+                for sym in ('cs_decode_full_insn','cs_disasm_iter','Mips_printer','Mips_getInstruction','getScanInstruction'):
                     cmd('code-'+k+'-'+sym,['objdump','-d','--disassemble='+sym,so])
                 cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
                 if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
