@@ -16,7 +16,7 @@ try:
     cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
     for profile,architectures in [('mixed',mixed),('diet',['SYSTEMZ']),('pure',['SYSTEMZ'])]:
         b=t/profile;variants={}
-        for k in ('base','length','candidate'):
+        for k in ('base','inline','candidate'):
             g('restore','--source',baseline,'--staged','--worktree','--','.')
             if k!='base':
                 target=meta if k=='candidate' else json.loads((d/'active-tree.json').read_text())
@@ -35,16 +35,19 @@ try:
                 assert modes in (1,2) and trials==57344*modes and accepted>0
             if profile=='pure':
                 images[k]=so.read_bytes()
+                cmd('symbols-'+k,['nm','-S','-n','--defined-only',so])
+                for sym in ('cs_decode_full_insn','cs_disasm_iter','systemz_print_record'):
+                    cmd('code-'+k+'-'+sym,['objdump','-d','--disassemble='+sym,so])
                 cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
                 if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
-        a,bv=variants['length'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
+        a,bv=variants['inline'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
         changed=[p for p in a['objects']if a['objects'][p]!=bv['objects'][p]]
         if profile=='pure':
-            for name in ('length','candidate'):
+            for name in ('inline','candidate'):
                 diff=[f for f,v in variants['base']['objects'].items() if variants[name]['objects'][f]!=v]
                 assert diff==['cs.c.o'],(profile,name,diff)
         else:
-            assert variants['base']==variants['length']==variants['candidate'],profile
+            assert variants['base']==variants['inline']==variants['candidate'],profile
 
         profiles[profile]=dict(changed=changed,variants=variants)
     save('profiles',profiles)
@@ -63,7 +66,7 @@ try:
     for name in samples:
         for opt in range(5):
             observed=[]
-            for k in ('base','length','candidate'):
+            for k in ('base','inline','candidate'):
                 target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','107',t/(name+'.text'),str(opt)]).split())))
             assert observed[0]==observed[1]==observed[2] and observed[0][0]>0
             signatures[name+'/'+str(opt)]=observed[0]
@@ -79,6 +82,6 @@ try:
                     v=sample(k,name,mode,n);assert v[2]==one[2];observed[k].append(v[0])
                 cycles.append(observed)
             rows.append(dict(case=name,mode=mode,pairs=cycles))
-    save('timings',rows);save('complete',dict(done=True,source=meta,cc=cc,host=platform.machine(),platform=platform.platform(),tests=20,spans=30880,panels=len(rows)))
+    save('timings',rows);save('complete',dict(done=True,source=meta,cc=cc,host=platform.machine(),platform=platform.platform(),tests=20,callbacks=192,panels=len(rows)))
 finally:
     amount=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=amount))
