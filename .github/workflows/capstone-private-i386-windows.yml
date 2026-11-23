@@ -1,7 +1,7 @@
-name: Verify dense lookup and mode-correct VZERO using both MSVC targets and native Mac ABIs
+name: Verify both single-record APIs with real PE code, callbacks and registered tests on native Windows and macOS configurations
 on:
   push:
-    branches: [codex/ordinal-vzero-native-ports]
+    branches: [codex/single-record-native-configuration]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
+          ref: 6fbeffec215f3c7c79169c655b0928c616b46152
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-ordinal-register-bank-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: portable-single-record-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

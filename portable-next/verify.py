@@ -12,6 +12,15 @@ try:
         lines += [f'add_executable(probe_{suffix} "{(d/"registers.c").as_posix()}")',f'target_link_libraries(probe_{suffix} PRIVATE capstone_{suffix})',f'target_include_directories(probe_{suffix} PRIVATE "{(s/"include").as_posix()}")']
     lines += [f'add_executable(vector_rows "{(s/"suite/synctools/x86_vector_output.cpp").as_posix()}")','target_compile_features(vector_rows PRIVATE cxx_std_17)','target_link_libraries(vector_rows PRIVATE capstone_static)',f'target_include_directories(vector_rows PRIVATE "{(s/"include").as_posix()}")']
     lines += [f'add_executable(scalar_rows "{(s/"suite/synctools/x86_simple_output.cpp").as_posix()}")','target_compile_features(scalar_rows PRIVATE cxx_std_17)','target_link_libraries(scalar_rows PRIVATE capstone_static)',f'target_include_directories(scalar_rows PRIVATE "{s.as_posix()}" "{(s/"include").as_posix()}")']
+    lines += ['add_executable(one_check check.cpp)','target_compile_features(one_check PRIVATE cxx_std_17)','target_link_libraries(one_check PRIVATE capstone_static)',f'target_include_directories(one_check PRIVATE "{s.as_posix()}" "{(s/"include").as_posix()}")']
+    if profile=='noatt':lines.append('target_compile_definitions(one_check PRIVATE VERIFY_NO_ATT)')
+    import struct
+    shutil.copyfile(d/'fetch.py',t/'fetch.py');cmd(out/'fetch-pe.log',[sys.executable,'-B',t/'fetch.py'])
+    inputs={}
+    for bits in (32,64):
+        file=t/('putty-0.85-'+str(bits)+'.text')
+        assert hashlib.sha256(file.read_bytes()).hexdigest()==json.loads((d/'inputs.json').read_text())['putty'+str(bits)]['sha256']
+        inputs[bits]=file
     (proj/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
     cfg=['cmake','-S',proj,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     cfg+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'])[profile]
@@ -22,8 +31,8 @@ try:
         assert g('rev-parse','HEAD')==q['parent']
         patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+name+'.patch']))
         assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-        cmd(v/'configure.log',[*cfg,'-DCAPSTONE_AARCH64_SUPPORT='+('ON' if name=='mixed' else 'OFF')])
-        assert ('CAPSTONE_AARCH64_SUPPORT:BOOL=ON' in (b/'CMakeCache.txt').read_text())==(name=='mixed')
+        shutil.copyfile(d/(name+'.cpp'),proj/'check.cpp')
+        cmd(v/'configure.log',cfg)
         names={z['name']for z in json.loads(sp.check_output(['ctest','--test-dir',b,'-C','Release','--show-only=json-v1'],text=True))['tests']}
         possible=['x86_scan_batch','x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy','x86_evex_move_access','detail_option','text_option','x86_x87_environment']
         targets=[a for a in possible if 'unit_'+a in names]
@@ -32,6 +41,14 @@ try:
         if full:assert 'x86_simple_output'in targets
         cmd(v/'build.log',['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*targets, *(['probe_static','probe_shared','vector_rows','scalar_rows']if full else [])])
         cmd(v/'tests.log',['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(targets)+')$'])
+        cmd(v/'build-record-check.log',['cmake','--build',b,'--parallel','4','--target','one_check','capstone_shared'])
+        checker,=[p for p in b.rglob('one_check'+('.exe'if win else ''))if p.is_file()]
+        snapshots={}
+        for bits in (16,32,64):
+            result=json.loads(sp.check_output([checker,str(bits),inputs[32 if bits==16 else bits]],text=True))
+            assert result['records']>1000000 and result['tails']==128 and result['callback_bytes']==70000
+            snapshots[str(bits)]=result
+        save(v/'single-record.json',snapshots)
         cmd(v/'mapping.log',[sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
         if full:
             dll_dirs=[str(p.parent)for p in b.rglob('*.dll')]
@@ -52,7 +69,7 @@ try:
                 exe,=[f for f in b.rglob('probe_'+suffix+('.exe' if win else '')) if f.is_file()]
                 obs=[ln.split()for ln in sp.check_output([exe],text=True,env=env).splitlines()];assert len(obs)==12
                 for bits,instr,vex,num,write,first,last in obs:
-                    count=8 if name=='mixed' and bits!='64' else 16
+                    count=16
                     assert int(num)==int(write)==count and first=='ymm0' and last=='ymm'+str(count-1)
                 rows.append(obs)
             assert rows[0]==rows[1];save(v/'vzero.json',rows[0])
