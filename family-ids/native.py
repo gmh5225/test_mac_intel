@@ -25,8 +25,13 @@ try:
         syms={}
         for line in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             e=line.split()
-            if len(e)==4 and e[3] in ('X86_get_insn_id','X86_map_full_register_bank','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
+            if len(e)==4 and e[3] in ('X86_get_insn_id','X86_map_full_register_bank','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst','insns','x86_implicit_details','x86_mapping_counts'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
         assert 'cs_disasm_iter' in syms and 'X86_get_insn_id' in syms
+        assert syms['insns'][1]==15143*(8 if k=='fixed' else 80)
+        if k=='fixed': assert 'x86_implicit_details' in syms and syms['x86_implicit_details'][1]<30000
+        else: assert 'x86_mapping_counts' in syms
+        cmd('class-tests-build-'+k,['cmake','--build',b,'--target','x86_mapping_counts','--parallel','4'])
+        cmd('class-tests-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_x86_mapping_counts'])
         cmd('mapper-disassembly-'+k,['objdump','-d','--disassemble=X86_get_insn_id',so])
         save('layout-'+k,dict(symbols=syms,text_sha=sha(raw),size=raw.stat().st_size))
         cmd('build-tests-'+k,['cmake','--build',b,'--parallel','4','--target','x86_reg_access','x86_buffer_bounds','x86_scan_batch'])

@@ -1,7 +1,7 @@
-name: Check legacy vector writes with a shared implicit-repair flag on PE32 and cross-architecture workloads
+name: Measure shared x86 implicit records with corrected legacy writes and compare PE and cross-architecture output
 on:
   push:
-    branches: [codex/shared-implicit-register-repair-test]
+    branches: [codex/x86-implicit-detail-classes]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: unified-implicit-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: shared-implicit-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
