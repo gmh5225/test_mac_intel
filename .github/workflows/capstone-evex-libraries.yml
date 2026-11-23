@@ -1,7 +1,7 @@
-name: Measure masked EVEX fallback records against their exact unmasked canonical counterparts
+name: Measure actual fallback opcode and operand forms on six released PE and ELF text sections
 on:
   push:
-    branches: [codex/measure-real-evex-mask-records]
+    branches: [codex/remaining-format-fallback-forms]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
+          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-mask-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: remaining-scalar-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

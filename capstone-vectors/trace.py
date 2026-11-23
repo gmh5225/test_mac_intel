@@ -9,7 +9,7 @@ def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 q=read(r/'attribution-source.json');prior=read(r/'samples.json')
 def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 assert git('rev-parse','HEAD')==q['checkout']
-assert git('write-tree')==q['tree']
+patch=r/'base.patch';assert sha(patch)==q['patch_sha256'];git('apply','--index',str(patch));assert git('write-tree')==q['tree']
 w=Path(tempfile.mkdtemp());b=w/'build'
 try:
     run(['cmake','-G','Ninja','-S',s,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'])

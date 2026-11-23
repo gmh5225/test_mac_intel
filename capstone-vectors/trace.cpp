@@ -12,70 +12,35 @@
 extern "C" void census_reset();
 extern "C" int census_calls();
 #include <sstream>
-using Reader = bool (*)(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
 struct Bucket { size_t count{}; std::string first; };
-static void compare_mask(csh normal, csh fast, Reader next, unsigned bits, const uint8_t *p,
-                         const cs_insn &ref, std::map<std::string, Bucket> &totals)
+
+static void observe_miss(const cs_insn &insn, std::map<std::string, Bucket> &counts)
 {
-    if (bits != 64 || ref.size < 6 || ref.size > 15 || p[0] != 0x62 || !(p[3] & 7))
-        return;
-    uint8_t unmasked[15]{};
-    std::memcpy(unmasked,p,ref.size); unmasked[3] &= 0x78;
-    const auto decode = [&](Reader reader,csh h,cs_insn &rec,cs_detail &d) {
-        const uint8_t *begin=unmasked;
-        size_t left=ref.size;
-        uint64_t ip=ref.address;
-        rec.detail=&d;
-        return reader(h,&begin,&left,&ip,&rec) && !left;
-    };
-    cs_insn oracle{},actual{};cs_detail od{},ad{};
-    const bool valid=decode(cs_disasm_iter,normal,oracle,od);
-    census_reset();
-    const bool other=decode(next,fast,actual,ad);
-    const int generic=census_calls();
-    if (other!=valid || generic>1) std::abort();
-    if(valid) {
-        actual.detail=oracle.detail;
-        if(std::memcmp(&oracle,&actual,sizeof(oracle)) || std::memcmp(&od,&ad,sizeof(od))) std::abort();
+    const cs_x86 &x = insn.detail->x86;
+    std::ostringstream shape;
+    shape << insn.mnemonic << '\t';
+    const bool scalar = x.opcode[0] != 0x62 && x.opcode[0] != 0xc4 && x.opcode[0] != 0xc5;
+    const unsigned first = x.opcode[0], second = first == 0x0f ? x.opcode[1] : 0;
+    shape << first << '/' << second << '\t';
+    for (auto p : x.prefix) shape << unsigned(p) << '.';
+    shape << '\t' << unsigned(x.addr_size) << '/' << (x.rex ? (x.rex & 8 ? 2 : 1) : 0) << '\t';
+    if (x.encoding.modrm_offset) {
+        const unsigned mr=x.modrm, mod=mr>>6, rm=mr&7;
+        const char *kind=mod==3 ? "reg" : (rm==4 && x.addr_size!=2 ? "sib" : (mod==0 && rm==5 && x.addr_size!=2 ? "disp32" : "base"));
+        shape << kind << '/' << unsigned(x.encoding.disp_size);
+        if (scalar && (first==0x80 || first==0x81 || first==0x83 || first==0xf6 || first==0xf7 || first==0xff || first==0xc0 || first==0xc1))
+            shape << '/' << ((mr>>3)&7);
+    } else shape << "none";
+    shape << '\t' << unsigned(x.encoding.imm_size) << '\t';
+    for (unsigned i=0;i<x.op_count;i++) {
+        const auto &op=x.operands[i];
+        shape << unsigned(op.type) << '.' << unsigned(op.size) << '.' << unsigned(op.access) << '/';
     }
-    const auto &x=ref.detail->x86;
-    std::string mask=" {k"+std::to_string(p[3]&7)+"}";
-    if(p[3]&0x80)mask+=" {z}";
-    std::string text=ref.op_str;
-    const auto pos=text.find(mask);
-    if(pos!=std::string::npos)text.erase(pos,mask.size());
-    const bool text_match=valid && pos!=std::string::npos && text==oracle.op_str;
-    cs_detail normalized;std::memcpy(&normalized,ref.detail,sizeof(normalized));
-    auto &nx=normalized.x86;
-    const unsigned mask_reg=X86_REG_K0+(p[3]&7);
-    unsigned k=0;
-    while(k<x.op_count && !(x.operands[k].type==X86_OP_REG && unsigned(x.operands[k].reg)==mask_reg))++k;
-    const int mask_pos=k<x.op_count?int(k):-1;
-    const int ma=mask_pos<0?-1:int(x.operands[k].access);
-    const int ms=mask_pos<0?-1:int(x.operands[k].size);
-    const bool mz=mask_pos>=0 && x.operands[k].avx_zero_opmask;
-    nx.opcode[3]=unmasked[3];
-    if(mask_pos>=0) {
-        std::memmove(nx.operands+k,nx.operands+k+1,(nx.op_count-k-1)*sizeof(nx.operands[0]));
-        std::memset(&nx.operands[--nx.op_count],0,sizeof(nx.operands[0]));
-    }
-    const auto original_dst=nx.operands[0].access;
-    for(unsigned i=0;i<nx.op_count;i++)nx.operands[i].avx_zero_opmask=false;
-    const bool raw=valid && ref.id==oracle.id && !std::memcmp(&normalized,&od,sizeof(od));
-    nx.operands[0].access=od.x86.operands[0].access;
-    const bool adjusted=valid && ref.id==oracle.id && !std::memcmp(&normalized,&od,sizeof(od));
-    const bool reg=(p[5]>>6)==3;
-    std::string addr=reg?"reg":"mem";
-    for(unsigned i=0;i<x.op_count;i++)if(x.operands[i].type==X86_OP_MEM){
-        const auto &mem=x.operands[i].mem;
-        addr=mem.base==X86_REG_RIP?"rip":mem.index!=X86_REG_INVALID?"indexed":mem.base==X86_REG_INVALID?"absolute":"base";break;
-    }
-    std::ostringstream key,first;
-    key<<ref.mnemonic<<'\t'<<unsigned(p[4])<<'\t'<<addr<<'\t'<<bool(p[3]&0x80)<<'\t'<<valid<<'\t'<<(valid && !generic)<<'\t'<<text_match<<'\t'<<raw<<'\t'<<adjusted<<'\t'<<mask_pos<<'\t'<<ma<<'\t'<<ms<<'\t'<<mz<<'\t'<<unsigned(original_dst)<<'\t'<<unsigned(od.x86.operands[0].access);
-    auto &b=totals[key.str()];if(!b.count){
-        static constexpr char digit[]="0123456789abcdef";
-        for(unsigned i=0;i<ref.size;i++)first<<digit[p[i]>>4]<<digit[p[i]&15];
-        first<<'\t'<<ref.op_str<<'\t'<<(valid?oracle.op_str:"(invalid)");b.first=first.str();
+    auto &b=counts[shape.str()];
+    if (!b.count) {
+        static const char digits[]="0123456789abcdef";
+        for (unsigned i=0;i<insn.size;i++) {const unsigned v=insn.bytes[i];b.first+=digits[v>>4];b.first+=digits[v&15];}
+        b.first+='\t';b.first+=insn.op_str;
     }
     ++b.count;
 }
@@ -124,7 +89,7 @@ int main(int argc, char **argv)
 					return 6;
 				}
 				valid++; misses += full; records++;
-				if(full) compare_mask(normal,fast,next,bits,p,ref,masks);
+				if(full) observe_miss(ref,masks);
 				p=after; n=left; ip=address;
 			} else { ++invalid; ++p; --n; ++ip; }
 		}
