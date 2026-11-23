@@ -219,29 +219,13 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         freq={k:list(map(int,sp.check_output([w/('counts-'+k),str(bits),f,intervals]).split()))for k in trees}
         save('real-counts-'+name+'.json',freq)
-        assert len({v[0]for v in freq.values()})==1 and freq['bare'][2:]==freq['plain'][2:] and freq['base'][2:]==[0,0]
-        assert freq['bare'][1]<=freq['plain'][1]==freq['base'][1], (name,freq)
-        if bits==64:assert all(v[1:]==[0,0,0]for v in freq.values())
-        for mode in (0,1,2):
-            targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
-            for k in trees:
-                targets['private_'+k]=(k,'x86_len_' if mode else 'vecbatch')
-                targets['public_'+k]=(k,'capstone')
-            def timed(label,count):
-                key,engine=targets[label]
-                return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'escaped-double-shift-check')))
-            for idx in range(13):
-                order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1
-                for kind in ('public_','private_'):
-                    assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
-                cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
+        expected_counts=json.loads((r/'expected.json').read_text())[name]
+        assert all([v[0],v[4]]==expected_counts for v in freq.values()),(name,freq)
+        assert freq['bare'][2:]==freq['plain'][2:] and freq['base'][2:4]==[0,0]
+        assert freq['bare'][1]<=freq['plain'][1]==freq['base'][1]
+        if bits==64:assert all(v[1:4]==[0,0,0]for v in freq.values())
+        results.append(name)
+    assert len(results)==len(m['samples'])
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:

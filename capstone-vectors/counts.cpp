@@ -17,16 +17,28 @@ int main(int argc,char **argv) {
     if(cs_open(CS_ARCH_X86,wide?CS_MODE_64:CS_MODE_32,&h))return 3;
     cs_insn *insn=cs_malloc(h);
     if(!insn)return 4;
-    unsigned long long records=0;
+    unsigned long long records=0, invalid=0;
     size_t offset,len;
     uint64_t ip;
     auto next=wide?X86_disasmIterText:X86_disasmIter32;
     while(spans>>offset>>len>>ip) {
         if(offset>text.size() || len>text.size()-offset)return 5;
         const uint8_t *cursor=text.data()+offset;
-        while(len && next(h,&cursor,&len,&ip,insn))++records;
+        while (len) {
+            const uint8_t *start=cursor;
+            const size_t available=len;
+            const uint64_t address=ip;
+            if (next(h,&cursor,&len,&ip,insn)) {
+                ++records;
+            } else {
+                cursor=start+1;
+                len=available-1;
+                ip=address+1;
+                ++invalid;
+            }
+        }
     }
     cs_free(insn,1);
     if(cs_close(&h) || !records)return 6;
-    std::printf("%llu %llu %llu %llu\n",records,helper_calls,bare_opcode_hits[0xa4],bare_opcode_hits[0xac]);
+    std::printf("%llu %llu %llu %llu %llu\n",records,helper_calls,bare_opcode_hits[0xa4],bare_opcode_hits[0xac],invalid);
 }
