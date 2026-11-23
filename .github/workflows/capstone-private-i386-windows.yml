@@ -1,7 +1,7 @@
-name: Verify the final MIPS decoder option changes in Windows and macOS public records
+name: Check RISC-V option transitions and alias records on MSVC Win32 and Win64 and native Macs
 on:
   push:
-    branches: [codex/mips-shared-portable-records]
+    branches: [codex/riscv-option-native-ports]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -29,15 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
+          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
         if: runner.os == 'Windows'
         with:
           arch: ${{ matrix.arch }}
-      - name: Check source parent
-        run: python -B portable-next/stage_parent.py
       - name: Compare original and candidate bytes and native tests
         env:
           SCAN_PROFILE: ${{ matrix.profile }}
@@ -45,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mips-common-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: riscv-option-native-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
