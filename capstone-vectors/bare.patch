@@ -1,185 +1,59 @@
-diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 7d3a6e84..7a48c8a3 100644
---- a/arch/X86/X86GenVectorOutput.inc
-+++ b/arch/X86/X86GenVectorOutput.inc
-@@ -803,3 +803,107 @@ static const uint8_t legacy_register_plans[256] = {
- 	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
- 	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
- };
-+static const char vector_register_names[3][32][6] = {
-+	{
-+		"xmm0",
-+		"xmm1",
-+		"xmm2",
-+		"xmm3",
-+		"xmm4",
-+		"xmm5",
-+		"xmm6",
-+		"xmm7",
-+		"xmm8",
-+		"xmm9",
-+		"xmm10",
-+		"xmm11",
-+		"xmm12",
-+		"xmm13",
-+		"xmm14",
-+		"xmm15",
-+		"xmm16",
-+		"xmm17",
-+		"xmm18",
-+		"xmm19",
-+		"xmm20",
-+		"xmm21",
-+		"xmm22",
-+		"xmm23",
-+		"xmm24",
-+		"xmm25",
-+		"xmm26",
-+		"xmm27",
-+		"xmm28",
-+		"xmm29",
-+		"xmm30",
-+		"xmm31",
-+	},
-+	{
-+		"ymm0",
-+		"ymm1",
-+		"ymm2",
-+		"ymm3",
-+		"ymm4",
-+		"ymm5",
-+		"ymm6",
-+		"ymm7",
-+		"ymm8",
-+		"ymm9",
-+		"ymm10",
-+		"ymm11",
-+		"ymm12",
-+		"ymm13",
-+		"ymm14",
-+		"ymm15",
-+		"ymm16",
-+		"ymm17",
-+		"ymm18",
-+		"ymm19",
-+		"ymm20",
-+		"ymm21",
-+		"ymm22",
-+		"ymm23",
-+		"ymm24",
-+		"ymm25",
-+		"ymm26",
-+		"ymm27",
-+		"ymm28",
-+		"ymm29",
-+		"ymm30",
-+		"ymm31",
-+	},
-+	{
-+		"zmm0",
-+		"zmm1",
-+		"zmm2",
-+		"zmm3",
-+		"zmm4",
-+		"zmm5",
-+		"zmm6",
-+		"zmm7",
-+		"zmm8",
-+		"zmm9",
-+		"zmm10",
-+		"zmm11",
-+		"zmm12",
-+		"zmm13",
-+		"zmm14",
-+		"zmm15",
-+		"zmm16",
-+		"zmm17",
-+		"zmm18",
-+		"zmm19",
-+		"zmm20",
-+		"zmm21",
-+		"zmm22",
-+		"zmm23",
-+		"zmm24",
-+		"zmm25",
-+		"zmm26",
-+		"zmm27",
-+		"zmm28",
-+		"zmm29",
-+		"zmm30",
-+		"zmm31",
-+	},
-+};
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..9f4f0dcf 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -21,6 +21,7 @@ struct PaddingOutput {
- };
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..826433e9 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -114,6 +114,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+ 		return false;
  
- #include "X86GenVectorOutput.inc"
-+#define X86_USE_VECTOR_REGISTER_NAMES
- #include "X86VectorRegisterOutput.h"
- 
- #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
-diff --git a/arch/X86/X86VectorRegisterWriter.h b/arch/X86/X86VectorRegisterWriter.h
-index 9c434eac..28aa0ec3 100644
---- a/arch/X86/X86VectorRegisterWriter.h
-+++ b/arch/X86/X86VectorRegisterWriter.h
-@@ -7,6 +7,12 @@
- static char *writeVectorRegister(char *out, unsigned length_code,
- 				 unsigned number)
- {
-+#ifdef X86_USE_VECTOR_REGISTER_NAMES
-+	/* This writer appends to the initialized operand string. */
-+	memcpy(out, vector_register_names[length_code][number],
-+	       sizeof(vector_register_names[0][0]));
-+	return out + 4 + (number >= 10);
-+#else
- 	*out++ = "xyz"[length_code];
- 	*out++ = 'm';
- 	*out++ = 'm';
-@@ -14,6 +20,7 @@ static char *writeVectorRegister(char *out, unsigned length_code,
- 		*out++ = (char)('0' + number / 10);
- 	*out++ = (char)('0' + number % 10);
- 	return out;
-+#endif
- }
- 
- #endif
-diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 91426243..48836058 100644
---- a/suite/synctools/x86_vector_output.cpp
-+++ b/suite/synctools/x86_vector_output.cpp
-@@ -2297,6 +2297,23 @@ void emit_evex_shifts(Decoder &decoder)
- 	std::puts("};");
- }
- 
-+void emit_register_names(Decoder &decoder)
-+{
-+	const x86_reg banks[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
-+	std::puts("static const char vector_register_names[3][32][6] = {");
-+	for (auto bank : banks) {
-+		std::puts("\t{");
-+		for (unsigned n = 0; n < 32; ++n) {
-+			const char *name = cs_reg_name(decoder.handle, bank + n);
-+			if (!name || std::strlen(name) != 4 + (n >= 10))
-+				throw std::runtime_error("unexpected vector register name");
-+			std::printf("\t\t\"%s\",\n", name);
-+		}
-+		std::puts("\t},");
++#ifdef X86_FIXED_EMPTY32
++	if (form == X86_SIMPLE_FIXED && !escaped) {
++		if (opcode == 0x90)
++			return X86_FIXED_EMPTY32(insn, insn_size, 0x90);
++		if (opcode == 0xcc)
++			return X86_FIXED_EMPTY32(insn, insn_size, 0xcc);
 +	}
-+	std::puts("};");
++#endif
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR) {
+ #ifdef X86_FIXED_VEX2
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..611aa1be 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -188,6 +188,27 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
++/* The bare NOP and INT3 have complete, constant records. The generated
++ * row supplies the text and implicit effects used by the general writer. */
++static inline bool writeFixedEmpty32(cs_insn *insn, uint16_t *insn_size,
++				     uint8_t opcode)
++{
++	const struct X86SimpleOutput *row =
++		&x86_simple_outputs[x86_simple_plans[0][0][opcode] >> 2];
++	*insn_size = insn->size = 1;
++	insn->id = row->id;
++	insn->bytes[0] = opcode;
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, row->operands, sizeof(row->operands));
++	if (insn->detail)
++		X86_writeSimpleDetail(insn->detail, row, opcode, 0, 0,
++				      row->ops[0].reg, row->ops[1].reg);
++	return true;
 +}
 +
- void emit_output(Decoder &decoder, bool scan_only)
- {
- 	std::vector<std::string> records;
-@@ -2355,6 +2372,7 @@ void emit_output(Decoder &decoder, bool scan_only)
- 	Decoder padding32(CS_MODE_32);
- 	emit_padding_rows(padding32, decoder);
- 	emit_legacy_registers(decoder);
-+	emit_register_names(decoder);
- }
- }
- 
++#define X86_FIXED_EMPTY32 writeFixedEmpty32
+ #define X86_FIXED_OUTPUT tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32
+@@ -195,6 +216,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#undef X86_FIXED_EMPTY32
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
