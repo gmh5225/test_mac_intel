@@ -1,7 +1,7 @@
-name: Measure matched native AArch64 Linux and macOS branch formatting profiles
+name: Measure bounded SIMD hexadecimal operands in the full Intel printer on ARM64
 on:
   push:
-    branches: [codex/arm64-native-relative-branches]
+    branches: [codex/arm64-intel-bounded-hex]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-arm64-relative-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm64-intel-bounded-hex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

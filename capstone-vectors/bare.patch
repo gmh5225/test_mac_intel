@@ -1,38 +1,56 @@
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..18fed986 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -31,6 +31,33 @@ static void writeRelativeHex(char *out, uint64_t value)
- 	memcpy(out + 2, digits + CountLeadingZeros_64(value) / 4, 16);
- }
- #define X86_FIXED_RELATIVE_HEX writeRelativeHex
-+#elif defined(X86_FIXED_OUTPUT) && defined(__aarch64__) && \
-+	defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
-+	!defined(__KERNEL__) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE)
+diff --git a/arch/X86/X86IntelInstPrinterNumbers.c b/arch/X86/X86IntelInstPrinterNumbers.c
+index 2d0665a0..7434f40b 100644
+--- a/arch/X86/X86IntelInstPrinterNumbers.c
++++ b/arch/X86/X86IntelInstPrinterNumbers.c
+@@ -5,6 +5,12 @@
+ #include "../../MathExtras.h"
+ 
+ #if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_X86_PRECHECKED_PRINTER)
++#if defined(__aarch64__) && defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
++	!defined(__KERNEL__)
 +#include <arm_neon.h>
-+#include "../../MathExtras.h"
++#define X86_VECTOR_HEX_DIGITS
++#endif
 +
-+static void writeRelativeHex(char *out, uint64_t value)
-+{
-+	static const uint8_t positions[16] = {
-+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-+	};
+ // The private printer entry proves a plain open stream, default formatter and
+ // capacity for the complete generated output. A signed uint64 hexadecimal
+ // spelling needs at most 19 bytes, already included in that generated bound.
+@@ -21,9 +27,38 @@ void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
+ 	*out = 'x';
+ 	*end = '\0';
+ 
++#ifdef X86_VECTOR_HEX_DIGITS
++	static const char alphabet[] = "0123456789abcdef";
++	if (digits == 1) {
++		out[1] = alphabet[value];
++		return;
++	}
++	/* Expand the nibbles in print order. The first and last chunks may
++	 * overlap, keeping every destination store inside this number. */
 +	const uint8x8_t bytes = vrev64_u8(vcreate_u8(value));
 +	const uint8x16_t both = vcombine_u8(bytes, bytes);
 +	const uint8x16_t nibbles = vandq_u8(
 +		vzip1q_u8(vshrq_n_u8(both, 4), both), vdupq_n_u8(15));
-+	const uint8x16_t digits = vqtbl1q_u8(
-+		vld1q_u8((const uint8_t *)"0123456789abcdef"), nibbles);
-+	/* TBL clears lanes beyond digit 15, including the string terminator
-+	 * for short targets. A full-width target uses the cleared op_str tail. */
-+	const unsigned leading = CountLeadingZeros_64(value) / 4;
-+	const uint8x16_t indices =
-+		vaddq_u8(vld1q_u8(positions), vdupq_n_u8((uint8_t)leading));
-+	memcpy(out, "0x", 2);
-+	vst1q_u8((uint8_t *)out + 2, vqtbl1q_u8(digits, indices));
-+}
-+#define X86_FIXED_RELATIVE_HEX writeRelativeHex
++	uint8_t ascii[16];
++	vst1q_u8(ascii, vqtbl1q_u8(vld1q_u8((const uint8_t *)alphabet),
++				    nibbles));
++	const uint8_t *first = ascii + sizeof(ascii) - digits;
++	++out;
++	if (digits >= 8) {
++		memcpy(out, first, 8);
++		memcpy(end - 8, ascii + 8, 8);
++	} else if (digits >= 4) {
++		memcpy(out, first, 4);
++		memcpy(end - 4, ascii + 12, 4);
++	} else {
++		memcpy(out, first, 2);
++		memcpy(end - 2, ascii + 14, 2);
++	}
++#else
+ 	do {
+ 		*--end = "0123456789abcdef"[value & 15];
+ 		value >>= 4;
+ 	} while (value);
++#endif
+ }
  #endif
- 
- #ifdef X86_MEMORY32_OUTPUT

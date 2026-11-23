@@ -119,9 +119,15 @@ def main(w):
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
         db=json.loads((build/'compile_commands.json').read_text())
-        run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'targets.cpp',lib,'-o',w/'targets'],'link-targets-'+key)
+        run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'records.cpp',lib,'-o',w/'targets'],'link-targets-'+key)
         run([w/'targets'],'targets-'+key)
-        assert (evidence/('targets-'+key+'.log')).read_text().strip()=='382340 complete public/private records and independent target strings agree'
+        current=(evidence/('targets-'+key+'.log')).read_text().splitlines()
+        assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
+        run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',r/'hex.c',lib,'-o',w/'hex'],'link-hex-'+key)
+        run([w/'hex'],'hex-'+key);assert (evidence/('hex-'+key+'.log')).read_text().split()[0]=='1340192'
+        if kind=='bare':
+            ref=('mixed_' if mixed else '')+'base'
+            assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -138,14 +144,13 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            expected=('X86Sse64Output.c.o','X86Vex32Output.c.o') if platform.machine().lower() in ('arm64','aarch64') else ()
-            assert changed==sorted(expected),(key,changed,expected)
+            assert changed==['X86IntelInstPrinterNumbers.c.o'],(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
-        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
+        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','X86_Intel_printHexPrechecked','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
             cols=line.split()
