@@ -1,7 +1,7 @@
-name: Measure shared x86 implicit records with corrected legacy writes and compare PE and cross-architecture output
+name: Measure ordinal lookup with pooled x86 records and corrected VZERO effects on two compiler families
 on:
   push:
-    branches: [codex/x86-implicit-details-owned-table]
+    branches: [codex/ordinal-implicit-register-mapping]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: shared-implicit-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: ordinal-implicit-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

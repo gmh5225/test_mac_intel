@@ -33826,7 +33826,7 @@ index 00000000..1602fc02
 +	{ X86_MOVSX16rr32, X86_INS_MOVSXD, 1, 0, 64 },
 +#endif
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..be127a72 100644
+index 79adee8d..45c80171 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10224,19 +10224,19 @@ const char *X86_group_name(csh handle, unsigned int id)
@@ -33856,7 +33856,73 @@ index 79adee8d..be127a72 100644
  
  #ifndef CAPSTONE_DIET
  // in arr, replace r1 = r2
-@@ -10317,27 +10317,30 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10253,45 +10253,34 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
+ }
+ #endif
+ 
+-// look for @id in @insns
+-// return -1 if not found
+-unsigned int find_insn(unsigned int id)
++static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ {
+-	// binary searching since the IDs are sorted in order
+-	unsigned int left, right, m;
+-	unsigned int max = ARR_SIZE(insns);
+-
+-	right = max - 1;
+-
+-	if (id < insns[0].id || id > insns[right].id)
+-		// not found
+-		return -1;
+-
+-	left = 0;
++	const unsigned int count = ARR_SIZE(insns);
++	const unsigned int first = insns[0].id;
++	/* The generator orders distinct IDs. If the endpoints span exactly
++	 * count entries, subtraction indexes every opcode in the table. */
++	if (insns[count - 1].id - first == count - 1) {
++		const unsigned int row = id - first;
++		return row < count ? row : (unsigned int)-1;
++	}
+ 
+-	while (left <= right) {
+-		m = (left + right) / 2;
+-		if (id == insns[m].id) {
+-			return m;
+-		}
++	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
++		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
+ 
+-		if (id < insns[m].id)
+-			right = m - 1;
++	unsigned int lo = 0, hi = count;
++	while (lo < hi) {
++		const unsigned int mid = lo + (hi - lo) / 2;
++		if (insns[mid].id < id)
++			lo = mid + 1;
+ 		else
+-			left = m + 1;
++			hi = mid;
+ 	}
+-
+-	// not found
+-	// printf("NOT FOUNDDDDDDDDDDDDDDD id = %u\n", id);
+-	return -1;
++	return lo < count && insns[lo].id == id ? lo : (unsigned int)-1;
+ }
+ 
+-static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
++unsigned int find_insn(unsigned int id)
+ {
+-	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
+-		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
+-
+-	return find_insn(id);
++	return find_insn_h(NULL, id);
+ }
+ 
+ #ifndef CAPSTONE_DIET
+@@ -10317,27 +10306,30 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  		if (h->detail_opt) {
  #ifndef CAPSTONE_DIET
  			cs_mode mode = x86_get_bit_mode(h->mode);
@@ -33896,7 +33962,7 @@ index 79adee8d..be127a72 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10350,10 +10353,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10350,10 +10342,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			case X86_RDTSCP:
  				if (mode == CS_MODE_64) {
  					memcpy(insn->detail->regs_write,
@@ -33910,7 +33976,7 @@ index 79adee8d..be127a72 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10367,7 +10370,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10367,7 +10359,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  				break;
  			}
  			/* The generator derives eligibility from the switches below. */
@@ -33919,7 +33985,7 @@ index 79adee8d..be127a72 100644
  			      X86_MAPPING_IMPLICIT_REPAIR))
  				goto implicit_registers_done;
  
-@@ -10796,12 +10799,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10796,12 +10788,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			}
  
  implicit_registers_done:

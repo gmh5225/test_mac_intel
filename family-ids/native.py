@@ -36,6 +36,7 @@ try:
         else: assert 'x86_mapping_counts' in syms
         cmd('class-tests-build-'+k,['cmake','--build',b,'--target','x86_mapping_counts','--parallel','4'])
         cmd('class-tests-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_x86_mapping_counts'])
+        cmd('find-insn-'+k,['objdump','-d','--disassemble=find_insn',mapper])
         cmd('mapper-disassembly-'+k,['objdump','-d','--disassemble=X86_get_insn_id',so])
         save('layout-'+k,dict(symbols=syms,text_sha=sha(raw),size=raw.stat().st_size))
         cmd('build-tests-'+k,['cmake','--build',b,'--parallel','4','--target','x86_reg_access','x86_buffer_bounds','x86_scan_batch'])
