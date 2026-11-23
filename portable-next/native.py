@@ -44,7 +44,10 @@ try:
                 for mode in range(3):
                     key=f.stem+'/'+api+'/'+str(mode)
                     def take(k,num):
-                        selected.write_bytes(programs[k]);return list(map(int,call(*invoke,f,str(sect['address']),str(mode),api,str(num)).split()))
+                        if sys.platform.startswith('linux'):
+                            selected.write_bytes(programs[k]);args=invoke
+                        else:args=[t/(('base' if k=='copy' else k)+'time')]
+                        return list(map(int,call(*args,f,str(sect['address']),str(mode),api,str(num)).split()))
                     n=max(1,ceil(30e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random(key+os.environ.get("REPEAT",""));cycles=[]
                     for cycle in range(31):
                         order=keys.copy();rng.shuffle(order);obs={k:[]for k in keys}
