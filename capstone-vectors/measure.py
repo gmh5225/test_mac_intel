@@ -16,7 +16,7 @@ try:
     profiles={}
     for profile in ('project','ten','dual','pure','mixed-diet','mixed-reduced','pure-noatt'):
         b=t/('build-'+profile);receipts={}
-        expected='reference' if profile.startswith('pure') else 'base'
+        expected='reference' if profile in ('ten','dual') and platform.system()=='Linux' else 'base'
         variants=('base','reference','candidate') if expected=='reference' else ('base','candidate')
         pair={}
         for stage in variants:
@@ -26,7 +26,7 @@ try:
                 if stage!='base':
                     patch=d/(stage+'.patch');assert sha(patch)==m[stage]['sha256'];g('apply','--index',str(patch))
                 assert g('write-tree')==tree
-                cfg=['cmake','-G','Ninja','-S',project if profile=='project'else s,'-B',b,'-DCMAKE_C_COMPILER=clang','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON']
+                cfg=['cmake','-G','Ninja','-S',project if profile=='project'else s,'-B',b,'-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON']
                 if profile!='project':
                     cfg+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
                     arches=('ARM','AARCH64','MIPS','LOONGARCH','SYSTEMZ','RISCV','PPC','SPARC','XTENSA') if profile=='ten' else (() if profile.startswith('pure') else ('MIPS',))
@@ -52,14 +52,39 @@ try:
                 pair[stage]=dict(objects=objects,members=list(zip(members,digests)),shared=shared,probes=executables)
         assert pair[expected]==pair['candidate'],(profile,expected)
         a,z=pair['base'],pair['candidate']
-        changed=sorted(k for k in a['objects'] if a['objects'][k]!=z['objects'][k])
-        assert a['objects'].keys()==z['objects'].keys()
+        changed=sorted(k for k in z['objects'] if z['objects'][k]!=a['objects'].get(k))
         names={Path(f).name for f in changed}
-        if expected=='reference':assert 'X86Vex32Output.c.o' in names and names<={'X86Vex32Output.c.o','X86MemoryFallback32.c.o'},names
-        else:assert not changed and a['shared']==z['shared']
-        if profile in ('ten','dual'):assert a['probes']['normal']==z['probes']['normal']
+        if expected=='reference':
+            assert names=={'X86Mapping.c.o','X86PostPrinter.c.o'} and a['shared']!=z['shared'],(profile,names)
+        else:assert not changed and a==z,profile
         receipts=dict(expected=expected,changed=changed,trees={k:m[k]['tree'] for k in variants},objects=len(a['objects']),members=len(a['members']),shared=z['shared'],probes=z['probes'],member_sha256=hashlib.sha256(json.dumps(z['members']).encode()).hexdigest())
         profiles[profile]=receipts;save('profiles',profiles)
+    make_checks={}
+    for form in ('static','shared'):
+        active=platform.system()=='Linux' and form=='shared'
+        chunks={}
+        for variant in ('reference' if active else 'base','candidate'):
+            label='make-'+form+'-'+variant
+            g('restore','--source','HEAD','--staged','--worktree','--','.')
+            if variant!='base':g('apply','--index',str(d/(variant+'.patch')))
+            assert g('write-tree')==m[variant]['tree']
+            b=t/'make-output'
+            if b.exists():shutil.rmtree(b)
+            b.mkdir()
+            args=['make','-C',s,'-j4','all','BUILDDIR='+str(b),'CC='+os.environ['CC'],'CAPSTONE_ARCHS=x86 aarch64','CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_STATIC=yes','CAPSTONE_SHARED='+('yes' if form=='shared' else 'no')]
+            run(label,args)
+            lib=b/'libcapstone.a';members=[n for n in sp.check_output(['ar','t',lib],text=True).splitlines() if n and not n.startswith('__.SYMDEF')]
+            assert len(members)>20 and len(members)==len(set(members)),members
+            objects={n:hashlib.sha256(sp.check_output(['ar','p',lib,n])).hexdigest()for n in members}
+            images=sorted(sha(f)for f in b.glob('libcapstone.*') if f.is_file() and not f.is_symlink() and ('.so' in f.name or '.dylib' in f.name))
+            assert bool(images)==(form=='shared') and ('X86PostPrinter.o' in objects)==active
+            exe=t/'make-public-probe'
+            run('make-link-'+form+'-'+variant,[os.environ['CC'],'-O2','-I',s/'include',public_test,lib,'-lm','-o',exe])
+            assert sp.check_output([exe],text=True).strip()=='verified'
+            chunks[variant]=dict(members=members,objects=objects,shared=images,probe=sha(exe))
+        assert len(chunks)==2 and len(set(json.dumps(z,sort_keys=True) for z in chunks.values()))==1,(form,active)
+        make_checks[form]=dict(active=active,objects=len(members),images=images,probe=sha(exe))
+    save('make',make_checks)
     save('complete',dict(complete=True,source=m,profiles=profiles,machine=platform.machine(),platform=platform.platform()))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))

@@ -1,7 +1,7 @@
-name: Verify dedicated i386 address writers and byte-identical mixed archives and readers
+name: Verify exact shared scalar detail results and unchanged other builds with Make and CMake
 on:
   push:
-    branches: [codex/dedicated-i386-sib-object-identity]
+    branches: [codex/verify-shared-scalar-repair-products]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,6 +12,8 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
           - { host: macos-15-intel, cc: clang, replica: 1 }
           - { host: macos-15, cc: clang, replica: 1 }
@@ -27,13 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: aa095ef5688bfc49b8ba0c5e5a7648faa7ed6877
+          ref: 372fbd2d967c5023371a12e0e406f8be2ec84ae5
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: e93da2b1d89e79cb9b884b4844d7b7695e597af9
+          ref: 30c94d8e3eda73dbcf459130262ba347a33712eb
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -47,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-i386-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-repair-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

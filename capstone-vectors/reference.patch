@@ -1,15 +1,104 @@
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index f75c3794..c5d400c5 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -70,8 +70,8 @@ bool X86_writeMemoryOutput(
- 		const unsigned index_reg = ((rex & 2) << 2) |
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
--#ifdef X86_SEGMENT_LEA32
--		/* A scale-one SIB without an index names only its base. */
-+#ifdef X86_MEMORY32_OUTPUT
-+		/* Every scale-one i386 SIB without an index names only its base. */
- 		if ((!mod && base_reg == 5) ||
- 		    (index_reg == 4 && (encoding >> 6) != 0))
- #else
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1aae4f9a..081fedb3 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -485,6 +485,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86IntelInstPrinterPrechecked.c
+         arch/X86/X86InstPrinterCommon.c
+         arch/X86/X86Mapping.c
++        arch/X86/X86PostPrinter.c
+         arch/X86/X86Module.c
+         arch/X86/X86ImmediateOutput.c
+         arch/X86/X86MemoryOutput.c
+diff --git a/Makefile b/Makefile
+index b3a012fa..a679fb35 100644
+--- a/Makefile
++++ b/Makefile
+@@ -271,6 +271,7 @@ ifeq (,$(findstring yes,$(CAPSTONE_X86_ATT_DISABLE)))
+ endif
+ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86PostPrinter.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..9a225757 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12788,7 +12788,11 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
+ 
+ /// The post-printer function. Used to fixup flaws in the disassembly information
+ /// of certain instructions.
++#ifdef X86_SEPARATE_POSTPRINTER
++void X86_postprinter_full(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++#else
+ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++#endif
+ {
+ 	cs_x86_op *memory = NULL;
+ 	bool has_mask = false;
+@@ -12805,7 +12809,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
+ 	 * Other encodings can only need the first memory operand's broadcast
+ 	 * repair, including decorators introduced by a custom formatter. */
+-	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
++	if (X86_onlyRepairsBroadcast(x86->opcode[0])) {
+ 		for (i = 0; i < x86->op_count; ++i) {
+ 			cs_x86_op *operand = &x86->operands[i];
+ 			if (operand->type == X86_OP_MEM) {
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index a2677cb8..abdf3b41 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -122,6 +122,20 @@ void X86_build_lookup_tables(cs_struct *h);
+ 
+ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci);
+ 
++#if defined(__ELF__) && defined(__GNUC__) && !defined(CAPSTONE_X86_ONLY) && \
++	!defined(CAPSTONE_DIET)
++#define X86_SEPARATE_POSTPRINTER
++CAPSTONE_INTERNAL void X86_postprinter_full(csh handle, cs_insn *insn,
++					    SStream *mnem, MCInst *mci);
++#endif
++
++/* These opcodes can only need the printed broadcast decorator repaired.
++ * VEX/EVEX, x87 environment and rotate forms take the full repair path. */
++static inline bool X86_onlyRepairsBroadcast(uint8_t opcode)
++{
++	return (opcode & 0xe0) != 0xc0 && opcode != 0x62;
++}
++
+ static inline bool x86_has_feature(cs_mode mode, int flag)
+ {
+ 	return (mode & flag) == flag;
+diff --git a/arch/X86/X86PostPrinter.c b/arch/X86/X86PostPrinter.c
+new file mode 100644
+index 00000000..bca09178
+--- /dev/null
++++ b/arch/X86/X86PostPrinter.c
+@@ -0,0 +1,24 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "X86Mapping.h"
++
++#ifdef X86_SEPARATE_POSTPRINTER
++#include <string.h>
++
++/* Preserve custom broadcast spellings, which may appear on a scalar operand. */
++__attribute__((section(".cs_x86_postprinter_text")))
++void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++{
++	if (insn && insn->id != X86_INS_VPCMP) {
++		if (!insn->detail)
++			return;
++		if (X86_onlyRepairsBroadcast(insn->detail->x86.opcode[0]) &&
++		    !strchr(mnem->buffer, '{'))
++			return;
++	}
++	X86_postprinter_full(handle, insn, mnem, mci);
++}
++#endif
++#endif
