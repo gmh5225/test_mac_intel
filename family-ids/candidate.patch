@@ -187,21 +187,21 @@ index 00000000..89e916ca
 +	{ 4, "$fs7" },
 +};
 diff --git a/arch/LoongArch/LoongArchInstPrinter.c b/arch/LoongArch/LoongArchInstPrinter.c
-index 50118554..4b2a2422 100644
+index 50118554..8007c052 100644
 --- a/arch/LoongArch/LoongArchInstPrinter.c
 +++ b/arch/LoongArch/LoongArchInstPrinter.c
 @@ -85,9 +85,24 @@ const char *LoongArch_LLVM_getRegisterName(unsigned RegNo, unsigned AltIdx)
  	return getRegisterName(RegNo, AltIdx);
  }
  
-+#ifndef CAPSTONE_DIET
++#if defined(CAPSTONE_LOONGARCH_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
 +#include "LoongArchGenRegisterSpellings.inc"
 +#endif
 +
  static void printRegName(MCInst *MI, SStream *O, MCRegister Reg)
  {
  	int syntax_opt = MI->csh->syntax;
-+#ifndef CAPSTONE_DIET
++#if defined(CAPSTONE_LOONGARCH_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
 +	/* Keep the two original appends for an open markup token. */
 +	if (Reg && Reg <= ARR_SIZE(loongarch_register_spellings) &&
 +	    !(O->markup_stream && O->prefixed_by_markup)) {

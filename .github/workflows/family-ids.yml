@@ -1,7 +1,7 @@
-name: Compare LoongArch register spellings across nine ISAs in normal and matched object orders
+name: Measure dedicated LoongArch output across four real coreutils and verify mixed and DIET images
 on:
   push:
-    branches: [codex/loongarch-formatter-address-control]
+    branches: [codex/dedicated-loongarch-coreutils]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: loong-register-orders-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: pure-loongarch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
