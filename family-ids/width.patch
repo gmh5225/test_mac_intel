@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d36460a3..d806354c 100644
+index d36460a3..4c125e67 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -187,7 +187,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
@@ -7,12 +7,12 @@ index d36460a3..d806354c 100644
  
  if(capstone_enabled_architectures STREQUAL "RISCV")
 -    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
-+    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_SCAN_BY_OPTION)
++    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_ONLY)
      # Fixed-width implicit counts improve detailed decoding in this configuration.
      if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
         AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
 diff --git a/Makefile b/Makefile
-index f225ca2c..680809fb 100644
+index f225ca2c..0fe49035 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -148,7 +148,7 @@ CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPAT
@@ -20,12 +20,12 @@ index f225ca2c..680809fb 100644
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
 -CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
-+CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_SCAN_BY_OPTION
++CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_ONLY
  endif
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index 947fd2d2..8986ea81 100644
+index 947fd2d2..e1790f39 100644
 --- a/arch/RISCV/RISCVDisassembler.c
 +++ b/arch/RISCV/RISCVDisassembler.c
 @@ -803,3 +803,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
@@ -33,32 +33,60 @@ index 947fd2d2..8986ea81 100644
  	return ret != MCDisassembler_Fail;
  }
 +
-+#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#ifdef CAPSTONE_RISCV_ONLY
 +#include "RISCVScan.h"
 +#endif
+diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
+index f7778c5d..eae45d5c 100644
+--- a/arch/RISCV/RISCVInstPrinter.c
++++ b/arch/RISCV/RISCVInstPrinter.c
+@@ -418,14 +418,21 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 	MI->flat_insn->usesAliasDetails = usesAliasDetails;
+ 
+ 	MCInst Uncompressed;
+-	MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
++#ifdef CAPSTONE_RISCV_ONLY
++	/* Only the 16-bit decoder can produce an opcode with an expansion. */
++	const bool can_expand = MI->flat_insn->size == 2;
++#else
++	const bool can_expand = true;
++#endif
++	if (can_expand)
++		MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
+ 	MCInst *MIUncompressed = MI;
+ 	bool is_uncompressed = false;
+ 
+ 	bool textReal = isRealSyntax(MI);
+ 	bool detailReal = isRealDetail(MI);
+ 
+-	if (!textReal || (detail_is_set(MI) && !detailReal)) {
++	if (can_expand && (!textReal || (detail_is_set(MI) && !detailReal))) {
+ 		// Side-effectful check for compressed instructions that also creates the equivalent
+ 		// uncompressed instruction in case of returning true
+ 		// False means no side effect happened
 diff --git a/arch/RISCV/RISCVModule.c b/arch/RISCV/RISCVModule.c
-index 426d755a..08a84d26 100644
+index 426d755a..4105553b 100644
 --- a/arch/RISCV/RISCVModule.c
 +++ b/arch/RISCV/RISCVModule.c
 @@ -42,6 +42,9 @@ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value)
  		handle->syntax |= (int)value;
  	} else if (type == CS_OPT_MODE) {
  		handle->mode = (cs_mode)value;
-+#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#ifdef CAPSTONE_RISCV_ONLY
 +		RISCV_selectScanDecoder(handle);
 +#endif
  	}
  
  	return CS_ERR_OK;
 diff --git a/arch/RISCV/RISCVModule.h b/arch/RISCV/RISCVModule.h
-index df2f2431..aa664a2c 100644
+index df2f2431..9d154c2d 100644
 --- a/arch/RISCV/RISCVModule.h
 +++ b/arch/RISCV/RISCVModule.h
 @@ -7,6 +7,9 @@
  #include "../../utils.h"
  
  cs_err RISCV_global_init(cs_struct *ud);
-+#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#ifdef CAPSTONE_RISCV_ONLY
 +void RISCV_selectScanDecoder(cs_struct *handle);
 +#endif
  cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value);
@@ -126,7 +154,7 @@ index 00000000..4f02638a
 +
 +#endif
 diff --git a/cs.c b/cs.c
-index 1375ad41..b806ecbc 100644
+index 1375ad41..ede7c2aa 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -1374,6 +1374,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
@@ -134,7 +162,7 @@ index 1375ad41..b806ecbc 100644
  #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
  		Mips_selectScanDecoder(handle);
 +#endif
-+#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#ifdef CAPSTONE_RISCV_ONLY
 +		RISCV_selectScanDecoder(handle);
  #endif
  		return CS_ERR_OK;
@@ -144,7 +172,7 @@ index 1375ad41..b806ecbc 100644
  #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
  		Mips_selectScanDecoder(handle);
 +#endif
-+#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#ifdef CAPSTONE_RISCV_ONLY
 +		RISCV_selectScanDecoder(handle);
  #endif
  		return CS_ERR_OK;

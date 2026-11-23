@@ -57,7 +57,7 @@ def measure(t):
                 assert set(row['objects'])==set(variants['base']['objects'])
                 changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
                 actual={Path(f).name for f in changed}
-                allowed={'RISCVInstPrinter.c.o'} if k=='lazy' else {'cs.c.o','RISCVDisassembler.c.o','RISCVModule.c.o'} if k=='width' else set()
+                allowed={'RISCVInstPrinter.c.o'} if k=='lazy' else {'RISCVInstPrinter.c.o','cs.c.o','RISCVDisassembler.c.o','RISCVModule.c.o'} if k=='width' else set()
                 if profile=='full' and mixed and k=='width':
                     allowed=set()
                     assert row==variants['base']

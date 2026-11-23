@@ -1,7 +1,7 @@
-name: Isolate RISC-V scan throughput from printer and mixed-library layout on four real programs
+name: Measure the dedicated RISC-V scanner and skip full-width expansion with mixed ELF byte-identity checks
 on:
   push:
-    branches: [codex/riscv-standalone-scan-only]
+    branches: [codex/riscv-dedicated-fullwidth-print]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-standalone-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-dedicated-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
