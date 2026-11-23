@@ -45,7 +45,7 @@ def measure(t):
                 patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
             run(profile+k+'-config',config(b,arch,extra))
             run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else []),*(['riscv_scan_options'] if profile=='full' else [])])
-            if profile=='full' and k=='width':run('fixed-len-generator',[source/'suite/synctools/fixed_len_decoder.py','--check']);run('generated-aliases',[source/'suite/synctools/alias_pattern_rows.py','--check'])
+            if profile=='full' and k=='width':run('fixed-len-generator',['python3','-B',source/'suite/synctools/fixed_len_decoder.py','--check']);run('generated-aliases',[source/'suite/synctools/alias_pattern_rows.py','--check'])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
