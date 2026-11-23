@@ -34,23 +34,13 @@ try:
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
-    cmake_file=nd/'CMakeLists.txt'
-    normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
     for variant in ('base','tail','memory'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         caller='lib/decode/Decoder.cpp'
-        command(['git','restore','--source','HEAD','--worktree','--',caller],'restore-caller-'+variant,nd)
-        entry='X86_disasmIterText' if variant=='base'else 'X86_decodeOneText'
-        first='foreach(capstone_object IN ITEMS capstone capstone_x86_iter32 capstone_x86_iter64)'
-        assert normal_cmake.count(first)==1
-        cmake_file.write_text(normal_cmake if variant=='base'else normal_cmake.replace(first,first[:-1]+' capstone_x86_single)'))
-        if variant!='base':
-            patch=r/(variant+'-caller.patch')
-            assert sha(patch)==m['caller_patches'][variant]
-            command(['git','apply',patch],'apply-caller-'+variant,nd)
+        entry='X86_disasmIterText'
         assert entry+'(Handle' in (nd/caller).read_text()
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
@@ -61,26 +51,6 @@ try:
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
-        if variant!='base':
-            command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'status.cpp',archive,'-o',t/'single'],'link-single-'+variant)
-            results={}
-            for case in cases:
-                if case['name'] not in ('putty-32-0.85','putty-64-0.85'):continue
-                for bits in ((16,32)if case['selector']==32 else(64,)):
-                    results[str(bits)]=json.loads(sp.check_output([t/'single',str(bits),case['path']]))
-            assert set(results)=={'16','32','64'} and all(v['callback_bytes']==70000 for v in results.values())
-            save('single-'+variant,results)
-        consumers={}
-        for num,fn in [(0,'cs_disasm_iter'),(1,'X86_disasmIterText')]:
-            app=t/'previous-consumer';src=t/'previous-consumer.c'
-            src.write_text('#include "arch/X86/X86ScanAdapter.h"\nint main(void){csh h=0;const uint8_t data[]={0x90};const uint8_t *p=data;size_t n=1;uint64_t a=0;if(cs_open(CS_ARCH_X86,CS_MODE_32,&h))return 1;cs_insn *i=cs_malloc(h);int ok='+fn+'(h,&p,&n,&a,i);cs_free(i,1);cs_close(&h);return !ok;}\n')
-            command(['clang','-O2','-fno-pie','-no-pie','-Wl,--build-id=sha1','-I',cs,'-I',cs/'include',src,archive,'-lm','-o',app],'link-old-'+str(num)+'-'+variant)
-            command([app],'run-old-'+str(num)+'-'+variant);names=sp.check_output(['nm','--defined-only',app],text=True)
-            assert 'X86_decodeOneText'not in names
-            with app.open('rb')as inp:
-                elf=ELFFile(inp);loaded={z.name:hashlib.sha256(z.data()).hexdigest()for z in elf.iter_sections()if z['sh_flags'] & 2 and z['sh_type']=='SHT_PROGBITS'}
-            consumers[str(num)]=dict(executable=sha(app),sections=loaded)
-        save('old-consumers-'+variant,consumers)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
         for z in foreign:

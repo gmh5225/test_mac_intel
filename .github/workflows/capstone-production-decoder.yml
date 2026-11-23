@@ -1,7 +1,7 @@
-name: Measure independent and shared single-record writers in the complete NeverD product
+name: Measure public scalar output and operand copies in full NeverD with the stock caller
 on:
   push:
-    branches: [codex/neverd-optional-record-writers]
+    branches: [codex/neverd-public-readers-full-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: linked-record-writers-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: public-reader-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
