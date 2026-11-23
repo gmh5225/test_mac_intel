@@ -1,7 +1,7 @@
-name: Measure AMD64 memory compares in two library profiles and six real x86 programs
+name: Measure AMD64 comparisons at group-1 dispatch on top of dedicated i386 addressing
 on:
   push:
-    branches: [codex/measure-amd64-compare-readers]
+    branches: [codex/scalar-group-amd64-compare-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: amd64-compare-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-group-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

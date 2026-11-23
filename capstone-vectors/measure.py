@@ -94,7 +94,7 @@ def main(w):
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
         mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
-        patches=[kind] if kind!='base' else []
+        patches=['base']+([kind] if kind!='base' else [])
         for name in patches:
             patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
             run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
@@ -118,6 +118,14 @@ def main(w):
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access','text_option']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
+        db=json.loads((build/'compile_commands.json').read_text())
+        entry,=[z for z in db if z['file'].endswith('/X86Sse64Output.c')]
+        defs=[v for v in shlex.split(entry['command'])if v.startswith('-D')]
+        run(['clang','-O2',*defs,'-I',base,'-I',base/'include','-c',r/'scalar-guard.c','-o',w/'scalar.o'],'scalar-probe-'+key)
+        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'scalar-guard.cpp',w/'scalar.o',lib,'-o',w/'scalar-guard'],'scalar-link-'+key)
+        run([w/'scalar-guard'],'scalar-guard-'+key)
+        counts=list(map(int,(evidence/('scalar-guard-'+key+'.log')).read_text().split()))
+        assert counts==[1777646,0,506856 if kind=='cmp' else 0],(key,counts)
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -133,7 +141,7 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='cmp':assert changed==['X86VectorFallback64.c.o'],changed
+        if kind=='cmp':assert changed==['X86Sse64Output.c.o'],changed
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
