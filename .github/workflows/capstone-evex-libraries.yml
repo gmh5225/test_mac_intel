@@ -1,7 +1,7 @@
-name: Compare i386 segment override output and complete records on real ELF and PE
+name: Measure direct i386 accumulator records and validate the predicted real PE and ELF coverage
 on:
   push:
-    branches: [codex/i386-absolute-segment-output]
+    branches: [codex/measure-i386-accumulator-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: absolute-segment-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-opcode-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

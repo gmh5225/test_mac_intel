@@ -75,7 +75,7 @@ def main(w):
             run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
             produced=sp.check_output([w/'table-check','--vex32-memory'])
             assert produced==(base/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes() and b'vex32_move_rows[2]' in produced
-        run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'oracle.c','-o',w/'observed.o'],'guard-wrapper-'+label)
+        run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',*(['-DOBSERVED_OPCODE'] if label=='integrated' else []),'-c',r/'oracle.c','-o',w/'observed.o'],'guard-wrapper-'+label)
         run(['clang++','-O2','-std=c++17','-I',base/'include',r/'oracle.cpp',w/'observed.o',b/'libcapstone.a','-o',w/'direct-guard'],'guard-link-'+label)
         counts=list(map(int,sp.check_output([w/'direct-guard'],text=True).split()))
         assert counts==data['guard_counts']['parent' if label=='baseline' else 'commit']
@@ -178,9 +178,8 @@ def main(w):
             assert result[2:]==list(map(int,normal.split()))[2:] and len(result)==6
             prefix,attempt,accepted=observed.stderr.split()
             attempt,accepted=int(attempt),int(accepted)
-            assert prefix=='segment' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
-            if bits==64:assert attempt==accepted==0
-            if name in ('libssl3t64-i386','putty-32-0.85'):assert accepted>0
+            assert prefix=='i386-opcode' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
+            assert attempt//2 == accepted//2 == data['expected_hits'][name],(name,mode,attempt,accepted)
             coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
         assert coverage['1']==coverage['2']
         save('coverage-'+name+'.json',coverage)
