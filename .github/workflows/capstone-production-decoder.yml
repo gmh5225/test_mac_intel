@@ -1,7 +1,7 @@
-name: Qualify i386 shift records and AMD64 VEX option placement through the NeverD decoder
+name: Measure linked public routing and scalar details in the source-built NeverD decoder
 on:
   push:
-    branches: [codex/neverd-shift32-vex64-real-decoder]
+    branches: [codex/neverd-public-and-final-scalar-details]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: f33e57e48b3ed221f14bc66acdf54af74f6cb34a
+          ref: 6a8c36481bf169dea633c5fc72069a69e8b67efb
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "f33e57e48b3ed221f14bc66acdf54af74f6cb34a"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "6de392819bbc0d468ad7c30531271823416f655e"
+          test "$(git rev-parse HEAD)" = "6a8c36481bf169dea633c5fc72069a69e8b67efb"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "8835df03f81c2011e14511446686a6b68eabdd68"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 6de392819bbc0d468ad7c30531271823416f655e
-          git -C third_party/capstone checkout --detach 6de392819bbc0d468ad7c30531271823416f655e
+          git -C third_party/capstone fetch --depth=1 origin 8835df03f81c2011e14511446686a6b68eabdd68
+          git -C third_party/capstone checkout --detach 8835df03f81c2011e14511446686a6b68eabdd68
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shift32-vex64-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: public-scalar-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

@@ -1,0 +1,81 @@
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..96dca208 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -173,11 +173,10 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+ 	return out + length;
+ }
+ 
+-static inline void X86_writeSimpleDetail(cs_detail *detail,
+-					 const struct X86SimpleOutput *row,
+-					 uint8_t opcode, uint8_t rex,
+-					 uint8_t modrm, uint16_t first,
+-					 uint16_t second)
++static inline cs_x86 *X86_initSimpleDetail(cs_detail *detail,
++					  const struct X86SimpleOutput *row,
++					  uint8_t opcode, uint8_t rex,
++					  uint8_t modrm)
+ {
+ 	memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 	memcpy(detail->regs_read, row->reads, sizeof(row->reads));
+@@ -196,7 +195,15 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	x86->encoding.imm_offset = row->imm_offset;
+ 	x86->encoding.imm_size = row->imm_size;
+ 	x86->op_count = row->operand_count;
+-	for (unsigned i = 0; i < x86->op_count; ++i) {
++	return x86;
++}
++
++static inline void X86_writeSimpleRegisters(cs_x86 *x86,
++					    const struct X86SimpleOutput *row,
++					    unsigned count, uint16_t first,
++					    uint16_t second)
++{
++	for (unsigned i = 0; i < count; ++i) {
+ 		cs_x86_op *op = &x86->operands[i];
+ 		op->type = X86_OP_REG;
+ 		op->reg = (x86_reg)(i ? second : first);
+@@ -205,4 +212,14 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	}
+ }
+ 
++static inline void X86_writeSimpleDetail(cs_detail *detail,
++					 const struct X86SimpleOutput *row,
++					 uint8_t opcode, uint8_t rex,
++					 uint8_t modrm, uint16_t first,
++					 uint16_t second)
++{
++	cs_x86 *x86 = X86_initSimpleDetail(detail, row, opcode, rex, modrm);
++	X86_writeSimpleRegisters(x86, row, row->operand_count, first, second);
++}
++
+ #endif
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..734a1202 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -252,16 +252,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		*insn_size = insn->size = 2 + has_rex;
+ 	}
+ 	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+-				      first, second);
++		cs_x86 *x = X86_initSimpleDetail(insn->detail, row, opcode, rex, modrm);
+ 		if (relative) {
+-			cs_x86 *x = &insn->detail->x86;
+ 			if (escaped) {
+ 				x->opcode[0] = 0x0f;
+ 				x->opcode[1] = opcode;
+ 			}
+ 			x->operands[0].type = X86_OP_IMM;
+ 			x->operands[0].imm = (int64_t)target;
++			x->operands[0].size = row->ops[0].size;
++			x->operands[0].access = (cs_ac_type)row->ops[0].access;
++		} else {
++			/* ModR/M register forms are generated from two-register
++			 * records. Fixed instructions carry their own count. */
++			unsigned count = form == X86_SIMPLE_FIXED ? row->operand_count : 2;
++			X86_writeSimpleRegisters(x, row, count, first, second);
+ 		}
+ 	}
+ 	return true;
