@@ -1,7 +1,7 @@
-name: Compare ordinal x86 mapping in complete and NeverD profiles on PE32 PE64 and ELF
+name: Compare the single-record x86 ABI with existing public and private iterators and both iced formatters
 on:
   push:
-    branches: [codex/ordinal-x86-instruction-lookup]
+    branches: [codex/x86-single-record-physical-input]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
+          ref: 6fbeffec215f3c7c79169c655b0928c616b46152
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: deb20b49abc68cea5368ce6f7724fdfea01f05be
+          ref: 138a38bdb4f0866040e14196e88a4ac32b3f9553
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ordinal-x86-lookup-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-record-physical-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

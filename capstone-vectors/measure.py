@@ -31,7 +31,7 @@ def main(w):
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=(sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip() if platform.system()=='Darwin' else Path('/proc/cpuinfo').read_text()),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
-    save('entrypoints.json',dict(scan='X86_scanNativeBatch with canonical iterator fallback',format='X86_disasmIterText (both widths)',detail='X86_disasmIterText (both widths)',consumer='Public iterator benchmark plus the private static-link text entry called by NeverD; both consume the same output fields'))
+    save('entrypoints.json',dict(scan='X86_scanNativeBatch with canonical iterator fallback',format='X86_disasmIterText and X86_disasmOneText at the same workload',detail='Both entries with cs_regs_access and full operand consumption',consumer='Public iterator benchmark plus the private static-link text entry called by NeverD; both consume the same output fields'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -88,6 +88,9 @@ def main(w):
     inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
     inc=once(inc,'else if(engine=="x86_len_" && bits==32)', 'else if(engine=="x86_all_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode); else if(engine=="x86_len_" && bits==32)')
     inc=once(inc,'engine!="x86_len_" &&','engine!="x86_all_" && engine!="x86_len_" &&')
+    inc=once(inc,'extern "C" void *iced_create',(r/'adapter.inc').read_text()+'\nextern "C" void *iced_create')
+    inc=once(inc,'engine!="x86_all_" &&','engine!="one_text" && engine!="x86_all_" &&')
+    inc=once(inc,'else if(engine=="x86_all_") row=', 'else if(engine=="one_text") row=cs_span<single_text,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode); else if(engine=="x86_all_") row=')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={};objects={};base_orders={}
@@ -166,19 +169,19 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed==['X86Mapping.c.o'],(key,changed)
-        mapper,=build.rglob('X86Mapping.c.o')
-        disasm=(sp.check_output(['otool','-tvV',mapper],text=True) if darwin else sp.check_output(['objdump','-d','--disassemble=find_insn',mapper],text=True))
-        if darwin:
-            start=disasm.index('_find_insn:\n');disasm=disasm[start:].split('\n_',1)[0]
-        else:assert '<find_insn>:' in disasm
-        (evidence/('find-'+key+'.s')).write_text(disasm+'\n')
+            assert changed==['X86Sse64Output.c.o','X86Vex32Output.c.o'],(key,changed)
+            for bits,member,sym in [(32,'X86Vex32Output.c.o','X86_disasmOneText32'),(64,'X86Sse64Output.c.o','X86_disasmOneText')]:
+                obj,=build.rglob(member)
+                listing=sp.check_output(['otool','-tvV',obj] if darwin else ['objdump','-d','--disassemble='+sym,obj],text=True)
+                if darwin:listing=listing.split('_'+sym+':\n',1)[1].split('\n_',1)[0]
+                else:assert '<'+sym+'>:' in listing
+                (evidence/('record-'+str(bits)+'-'+key+'.s')).write_text(listing)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
-        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
+        names={'X86_disasmOneText','X86_disasmOneText32','X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
             cols=line.split()
@@ -231,9 +234,13 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
             targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
+            targets['mixed_copy']=('mixed_base','x86_all_' if mode else 'vecbatch')
             if mode:targets['fast']=('base','fast____')
             for k in trees:
                 targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
+                if mode and k.endswith('bare'):
+                    targets['iter_'+k]=targets['private_'+k]
+                    targets['private_'+k]=(k,'one_text')
                 targets['public_'+k]=(k,'capstone')
                 if bits==32 and mode:targets['width_'+k]=(k,'x86_len_')
             def timed(label,count):
