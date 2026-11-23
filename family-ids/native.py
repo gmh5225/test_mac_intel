@@ -36,12 +36,12 @@ try:
             if profile=='pure':
                 images[k]=so.read_bytes()
                 cmd('symbols-'+k,['nm','-S','-n','--defined-only',so])
-                for sym in ('cs_decode_full_insn','cs_disasm_iter','Mips_printer'):
+                for sym in ('cs_decode_full_insn','cs_disasm_iter','Mips_printer','mips_print_record'):
                     cmd('code-'+k+'-'+sym,['objdump','-d','--disassemble='+sym,so])
                 cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
                 if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
                 if k=='candidate':
-                    original=(s/'cs.c').read_text();line="if (known_length) {\n\t\t\t\tss.buffer[0] = '\\0';";assert original.count(line)==1
+                    original=(s/'cs.c').read_text();line="if (builtin) {\n\t\tss.buffer[0] = '\\0';";assert original.count(line)==1
                     for pattern in (0xa5,0x5a):
                         test=line+' memset(ss.buffer + 1, '+str(pattern)+', sizeof(ss.buffer) - 1);'
                         (s/'cs.c').write_text(original.replace(line,test))

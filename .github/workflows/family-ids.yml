@@ -1,7 +1,7 @@
-name: Measure built-in MIPS operand strings after comment and register-name edits
+name: Measure the built-in MIPS print frame separately from the scan path
 on:
   push:
-    branches: [codex/mips-private-visible-operands]
+    branches: [codex/mips-private-print-frame]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-visible-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-private-print-frame-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

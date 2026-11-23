@@ -1,21 +1,19 @@
 diff --git a/cs.c b/cs.c
-index 65ae1a9d..a2a654c2 100644
+index 65ae1a9d..5e321d4b 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -93,6 +93,12 @@
+@@ -93,6 +93,10 @@
  #define CS_PRIVATE_DECODER LoongArch_getInstruction
  #define CS_PRIVATE_PRINTER LoongArch_printer
  #define CS_KNOWN_PRINTER_EXTENT
 +#elif defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#include "arch/Mips/MipsMapping.h"
-+#define CS_PRIVATE_PRINTER Mips_printer
 +#define CS_MIPS_VISIBLE_OPERANDS
  #elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
  	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
  	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-@@ -1005,9 +1011,14 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -1005,9 +1009,14 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  		off++;
  	const char *operands = OS->buffer + off;
  	if (stream_length_valid) {
@@ -33,23 +31,57 @@ index 65ae1a9d..a2a654c2 100644
  		if (length > 32) {
  			memcpy(insn->op_str, operands, length);
  		} else if (length >= 16) {
-@@ -1169,8 +1180,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		} else
+@@ -1063,6 +1072,35 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  #endif
- 		{
--#ifdef CS_KNOWN_PRINTER_EXTENT
--			/* The built-in printer only appends to this stream. A custom
-+#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
-+			/* The built-in printer owns this stream. A custom
- 			 * formatter may return a count beyond its first NUL. */
- 			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
- 						  !handle->post_printer &&
-@@ -1178,7 +1189,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- #else
- 			const bool known_length = false;
- #endif
--#ifdef CS_KNOWN_PRINTER_EXTENT
-+#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
- 			if (known_length) {
- 				ss.buffer[0] = '\0';
- 				ss.index = 0;
+ }
+ 
++#ifdef CS_MIPS_VISIBLE_OPERANDS
++/* Keep the printer's buffer off the no-text path. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static void mips_print_record(cs_struct *handle, cs_insn *insn, MCInst *mci,
++			      const uint8_t *code)
++{
++	SStream ss;
++	const bool builtin = handle->printer == Mips_printer &&
++			     !handle->post_printer &&
++			     cs_vsnprintf == cs_default_vsnprintf;
++	if (builtin) {
++		ss.buffer[0] = '\0';
++		ss.index = 0;
++		ss.is_closed = false;
++		ss.markup_stream = false;
++		ss.prefixed_by_markup = false;
++	} else {
++		SStream_Init(&ss);
++	}
++	SStream_opt_unum(&ss, handle->imm_unsigned);
++	handle->printer(mci, &ss, handle->printer_info);
++	fill_insn(handle, insn, &ss, mci, handle->post_printer, code, builtin);
++}
++#endif
++
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+@@ -1145,6 +1183,9 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		fill_insn_without_text(insn, MCInst_getOpcodePub(&mci), code,
+ 				       false);
+ 	} else {
++#ifdef CS_MIPS_VISIBLE_OPERANDS
++		mips_print_record(handle, insn, &mci, code);
++#else
+ 		SStream ss;
+ #if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+@@ -1193,6 +1234,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+ 				  code, known_length);
+ 		}
++#endif
+ 	}
+ 	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
+ 		insn->id += mci.popcode_adjust;
