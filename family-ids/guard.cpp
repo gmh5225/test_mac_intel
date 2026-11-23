@@ -24,12 +24,13 @@ int main(int argc,char **argv) {
     uint8_t *memory=(uint8_t*)mmap(nullptr,page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
     if(memory==MAP_FAILED || mprotect(memory+page,page,PROT_NONE))return 3;
     unsigned checks=0,okays=0,open_modes=0;
-    for(cs_mode mode:{CS_MODE_32, CS_MODE_64, CS_MODE_V9, cs_mode(CS_MODE_32|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_64|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_V9|CS_MODE_BIG_ENDIAN)}) {
-        csh a=0,b=0;auto err=old.open(CS_ARCH_SPARC,mode,&a);
-        if(err!=updated.open(CS_ARCH_SPARC,mode,&b))return 4;
+    for(cs_mode mode:{CS_MODE_MIPS16, CS_MODE_MIPS32, CS_MODE_MIPS64, CS_MODE_MIPS1, CS_MODE_MIPS2, CS_MODE_MIPS3, CS_MODE_MIPS4, CS_MODE_MIPS5, CS_MODE_MIPS32R2, CS_MODE_MIPS32R3, CS_MODE_MIPS32R5, CS_MODE_MIPS32R6, CS_MODE_MIPS64R2, CS_MODE_MIPS64R3, CS_MODE_MIPS64R5, CS_MODE_MIPS64R6, CS_MODE_MICRO32R3, CS_MODE_MICRO32R6, CS_MODE_NANOMIPS, CS_MODE_I7200, CS_MODE_OCTEON, CS_MODE_OCTEONP, cs_mode(CS_MODE_MIPS16|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS32|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS64|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS1|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS2|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS3|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS4|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS5|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS32R2|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS32R3|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS32R5|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS32R6|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS64R2|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS64R3|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS64R5|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MIPS64R6|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MICRO32R3|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_MICRO32R6|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_NANOMIPS|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_I7200|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_OCTEON|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_OCTEONP|CS_MODE_BIG_ENDIAN)}) {
+        csh a=0,b=0;auto err=old.open(CS_ARCH_MIPS,mode,&a);
+        if(err!=updated.open(CS_ARCH_MIPS,mode,&b))return 4;
         if(err!=CS_ERR_OK)return 5;
         ++open_modes;
-        for(bool detail:{false,true})for(bool text:{false,true}) {
+        for(bool dollar:{true,false})for(bool detail:{false,true})for(bool text:{false,true}) {
+            if(!dollar && (old.option(a,CS_OPT_SYNTAX,CS_OPT_SYNTAX_NO_DOLLAR)||updated.option(b,CS_OPT_SYNTAX,CS_OPT_SYNTAX_NO_DOLLAR))) return 10;
             for (auto [opt,value]:{std::pair{CS_OPT_DETAIL,detail},std::pair{CS_OPT_TEXT,text}}) {
                 if(old.option(a,opt,value?CS_OPT_ON:CS_OPT_OFF)||updated.option(b,opt,value?CS_OPT_ON:CS_OPT_OFF))return 6;
             }
@@ -51,5 +52,5 @@ int main(int argc,char **argv) {
         old.close(&a);updated.close(&b);
     }
     munmap(memory,page*2);printf("%u %u %u\n",open_modes,checks,okays);
-    return checks==open_modes*256u*8*7*4 && okays>0 ? 0:8;
+    return checks==open_modes*256u*8*7*8 && okays>0 ? 0:8;
 }

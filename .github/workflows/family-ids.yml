@@ -1,7 +1,7 @@
-name: Check SPARC operand construction and printer extents with real V9 coreutils
+name: Measure built-in MIPS operand strings after comment and register-name edits
 on:
   push:
-    branches: [codex/sparc-private-operands]
+    branches: [codex/mips-private-visible-operands]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: sparc-private-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-visible-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

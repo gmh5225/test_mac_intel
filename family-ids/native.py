@@ -14,7 +14,7 @@ assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}
 try:
     images={};profiles={}
     cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
-    for profile,architectures in [('mixed',mixed),('diet',['SPARC']),('systemz',['SYSTEMZ']),('loongarch',['LOONGARCH']),('pure',['SPARC'])]:
+    for profile,architectures in [('mixed',mixed),('diet',['MIPS']),('systemz',['SYSTEMZ']),('loongarch',['LOONGARCH']),('sparc',['SPARC']),('pure',['MIPS'])]:
         b=t/profile;variants={}
         for k in ('base','storage','candidate'):
             g('restore','--source',baseline,'--staged','--worktree','--','.')
@@ -24,29 +24,26 @@ try:
             config=['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in architectures]]
             if profile=='diet':config.append('-DCAPSTONE_BUILD_DIET=ON')
             cmd(profile+'-config-'+k,config)
-            cmd(profile+'-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*(['register_descriptors','mcinst']if profile!='diet'else [])])
-            if profile!='diet':cmd(profile+'-test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
+            cmd(profile+'-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*((['register_descriptors','mcinst','mips_scan','mips_single'] if profile=='pure' else ['register_descriptors','mcinst'])if profile!='diet'else [])])
+            if profile!='diet':cmd(profile+'-test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst|mips_scan|mips_single)$' if profile=='pure' else '^unit_(register_descriptors|mcinst)$'])
             so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
             variants[k]=dict(shared=sha(so),objects={str(f.relative_to(b/'CMakeFiles/capstone.dir')):sha(f)for f in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')},archive=sha(b/'libcapstone.a'))
             target=t/(profile+'-'+k+'.so');shutil.copy2(so,target)
-            if k!='base' and profile not in ('systemz','loongarch'):
+            if k!='base' and profile not in ('systemz','loongarch','sparc'):
                 cmd('boundary-'+profile+'-'+k,[t/'guard',t/(profile+'-base.so'),target])
                 modes,trials,accepted=map(int,(out/('boundary-'+profile+'-'+k+'.log')).read_text().split())
-                assert modes==6 and trials==57344*modes and accepted>0
+                assert modes==44 and trials==114688*modes and accepted>0
             if profile=='pure':
                 images[k]=so.read_bytes()
                 cmd('symbols-'+k,['nm','-S','-n','--defined-only',so])
-                for sym in ('cs_decode_full_insn','cs_disasm_iter','Sparc_printer'):
+                for sym in ('cs_decode_full_insn','cs_disasm_iter','Mips_printer'):
                     cmd('code-'+k+'-'+sym,['objdump','-d','--disassemble='+sym,so])
                 cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
                 if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
                 if k=='candidate':
-                    original=(s/'cs.c').read_text();line='MCInst_InitStorage(&mci, CS_PRIVATE_ARCH, false);';assert original.count(line)==1
+                    original=(s/'cs.c').read_text();line="if (known_length) {\n\t\t\t\tss.buffer[0] = '\\0';";assert original.count(line)==1
                     for pattern in (0xa5,0x5a):
-                        # Change only the private operand slots the decoder is allowed to leave unused.
-                        start='offsetof(MCInst, Operands) + sizeof(mci.Operands[0])'
-                        length='sizeof(mci.Operands) - sizeof(mci.Operands[0])'
-                        test='{ '+line+' memset((char *)&mci + '+start+', '+str(pattern)+', '+length+'); }'
+                        test=line+' memset(ss.buffer + 1, '+str(pattern)+', sizeof(ss.buffer) - 1);'
                         (s/'cs.c').write_text(original.replace(line,test))
                         cmd('poison-build-'+str(pattern),['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
                         cmd('poison-boundary-'+str(pattern),[t/'guard',t/'pure-base.so',so])
@@ -65,7 +62,7 @@ try:
         profiles[profile]=dict(changed=changed,variants=variants)
     save('profiles',profiles)
     # The package digest binds every extracted member. Check the established ls digest as well.
-    manifest=json.loads((d/'manifest.json').read_text());ls,=[x for x in manifest['inputs']if x['name']=='sparc64-ls']
+    manifest=json.loads((d/'manifest.json').read_text());ls,=[x for x in manifest['inputs']if x['name']=='mips64el-ls']
     pkg=t/'coreutils.deb';cmd('download',['curl','--retry','2','-fsSL',ls['url'],'-o',pkg]);assert sha(pkg)==ls['package_sha256']
     samples={}
     for name in ('ls','cat','sort','cp'):
@@ -80,17 +77,17 @@ try:
         for opt in range(5):
             observed=[]
             for k in ('base','storage','candidate'):
-                target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','106',t/(name+'.text'),str(opt)]).split())))
+                target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','103',t/(name+'.text'),str(opt)]).split())))
             assert observed[0]==observed[1]==observed[2] and observed[0][0]>0
             for pattern in (0xa5,0x5a):
                 img=(t/('poison-'+str(pattern)+'.so')).read_bytes()
                 target.write_bytes(img)
-                result=list(map(int,sp.check_output([t/'raw','106',t/(name+'.text'),str(opt)]).split()))
+                result=list(map(int,sp.check_output([t/'raw','103',t/(name+'.text'),str(opt)]).split()))
                 assert result==observed[0]
             signatures[name+'/'+str(opt)]=observed[0]
     save('raw',signatures);rng=random.Random(2044);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     def sample(k,name,mode,n):
-        target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time','106',str(mode),t/(name+'.text'),'1048576',str(n)]).split()))
+        target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time','103',str(mode),t/(name+'.text'),'1048576',str(n)]).split()))
     for name in samples:
         for mode in range(3):
             one=sample('base',name,mode,1);n=max(1,round(65e6/one[0]));cycles=[]

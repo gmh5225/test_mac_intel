@@ -1,48 +1,51 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6f3ff5f..d36460a3 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -174,6 +174,10 @@ if(capstone_enabled_architectures STREQUAL "SYSTEMZ")
-     add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING)
- endif()
- 
-+if(capstone_enabled_architectures STREQUAL "SPARC")
-+    add_compile_definitions(CAPSTONE_SPARC_ONLY)
-+endif()
-+
- if(capstone_enabled_architectures STREQUAL "LOONGARCH")
-     add_compile_definitions(CAPSTONE_LOONGARCH_DEDICATED_MAPPING)
- endif()
-diff --git a/Makefile b/Makefile
-index 8118f71d..f225ca2c 100644
---- a/Makefile
-+++ b/Makefile
-@@ -135,6 +135,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),systemz)
- CFLAGS += -DCAPSTONE_SYSTEMZ_DEDICATED_MAPPING
- endif
- 
-+ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
-+CFLAGS += -DCAPSTONE_SPARC_ONLY
-+endif
-+
- ifeq ($(sort $(CAPSTONE_ARCHS)),loongarch)
- CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
- endif
 diff --git a/cs.c b/cs.c
-index b84486e0..b37899ad 100644
+index 65ae1a9d..8e95eebe 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -93,6 +93,13 @@
+@@ -93,6 +93,12 @@
  #define CS_PRIVATE_DECODER LoongArch_getInstruction
  #define CS_PRIVATE_PRINTER LoongArch_printer
  #define CS_KNOWN_PRINTER_EXTENT
-+#elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
++#elif defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#include "arch/Sparc/SparcMapping.h"
-+#define CS_PRIVATE_ARCH CS_ARCH_SPARC
-+#define CS_PRIVATE_DECODER Sparc_getInstruction
-+#define CS_PRIVATE_PRINTER Sparc_printer
++#include "arch/Mips/MipsMapping.h"
++#define CS_PRIVATE_PRINTER Mips_printer
++#define CS_MIPS_VISIBLE_OPERANDS
+ #elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+ 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+@@ -1169,8 +1175,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else
  #endif
- #include "arch/TMS320C64x/TMS320C64xModule.h"
- #include "arch/TriCore/TriCoreModule.h"
+ 		{
+-#ifdef CS_KNOWN_PRINTER_EXTENT
+-			/* The built-in printer only appends to this stream. A custom
++#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
++			/* The built-in printer owns this stream. A custom
+ 			 * formatter may return a count beyond its first NUL. */
+ 			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
+ 						  !handle->post_printer &&
+@@ -1178,7 +1184,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #else
+ 			const bool known_length = false;
+ #endif
+-#ifdef CS_KNOWN_PRINTER_EXTENT
++#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
+ 			if (known_length) {
+ 				ss.buffer[0] = '\0';
+ 				ss.index = 0;
+@@ -1191,7 +1197,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 			SStream_opt_unum(&ss, handle->imm_unsigned);
+ 			handle->printer(&mci, &ss, handle->printer_info);
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+-				  code, known_length);
++				  code,
++#ifdef CS_MIPS_VISIBLE_OPERANDS
++				  false);
++#else
++				  known_length);
++#endif
+ 		}
+ 	}
+ 	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
