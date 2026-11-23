@@ -1,7 +1,7 @@
-name: Measure the mixed AMD64 fallback at the full decode boundary in the current NeverD product
+name: Compare the prefix-gated mixed x86 reader in two complete NeverD source builds
 on:
   push:
-    branches: [codex/published-mixed-vex-call-boundary]
+    branches: [codex/prefix-gated-full-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-tail-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex-prefix-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

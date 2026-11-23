@@ -109,7 +109,7 @@ try:
             command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         else:raise AssertionError(('missing shipped alias member',variant))
         assert 'X86PublicOutput.c.o' not in members and 'X86PostPrinter.c.o' not in members
-        if variant=='tail':
+        if variant!='base':
             assert members.index('X86VexBaseMemory.c.o')>members.index('AliasPatternLookup.c.o')
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
