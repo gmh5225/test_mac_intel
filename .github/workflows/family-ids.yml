@@ -1,7 +1,7 @@
-name: Measure static x86 mapping details and the legacy VZERO fix with two Clang generations
+name: Measure static x86 details with an outlined register and group repair
 on:
   push:
-    branches: [codex/static-x86-details-before-repairs]
+    branches: [codex/outline-x86-special-mapping-details]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: static-mapping-details-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: outlined-special-details-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

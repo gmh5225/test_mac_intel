@@ -25,7 +25,8 @@ try:
         syms={}
         for line in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             e=line.split()
-            if len(e)==4 and e[3] in ('X86_get_insn_id','X86_map_full_register_bank','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
+            if len(e)==4 and e[3] in ('X86_get_insn_id','X86_map_full_register_bank','map_special_detail','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
+        if k=='fixed':assert 'map_special_detail' in syms and syms['map_special_detail'][1]>syms['X86_get_insn_id'][1]
         assert 'cs_disasm_iter' in syms and 'X86_get_insn_id' in syms
         cmd('mapper-disassembly-'+k,['objdump','-d','--disassemble=X86_get_insn_id',so])
         save('layout-'+k,dict(symbols=syms,text_sha=sha(raw),size=raw.stat().st_size))
@@ -69,6 +70,27 @@ try:
             cmd('functions-'+k,['callgrind_annotate','--show=Ir,Bc,Bcm,D1mr,D1mw','--auto=no','--threshold=99.95',f])
             f.unlink()
         save('profile',stats)
+    measured=so
+    f=s/'arch/X86/X86Mapping.c'
+    text=f.read_text()
+    anchor='\n{\n\t// special cases when regs_write[]'
+    assert text.count(anchor)==1
+    head='#include <stdint.h>\nstatic uint64_t special_calls;\nCAPSTONE_EXPORT unsigned long long cs_bench_special_calls(void) { return special_calls; }\n'
+    pos=text.index('#if defined(_MSC_VER)',text.index('map_special_detail(insn, id, i, counts,'))
+    text=text[:pos]+head+text[pos:]
+    f.write_text(text.replace(anchor,'\n{\n\t++special_calls;\n\t// special cases when regs_write[]'))
+    cmd('counted-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
+    target.write_bytes(measured.read_bytes())
+    code=(d/'time.cpp').read_text().replace('int main(int argc','extern "C" unsigned long long cs_bench_special_calls();\nint main(int argc').replace(' cs_free(i,1);',' std::printf("%llu\\n",cs_bench_special_calls());\n cs_free(i,1);')
+    (t/'count.cpp').write_text(code)
+    cmd('count-time',['c++','-std=c++17','-O3','-I',s/'include',t/'count.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'count'])
+    calls={}
+    for name,arch,path,ip,modes in panels:
+        for mode in modes:
+            v=list(map(int,sp.check_output(['setarch','x86_64','-R',t/'count',str(arch),str(mode),path,str(ip),'1']).split()))
+            assert len(v)==4 and v[3]%2==0 and (v[3]>0)==(arch in (32,64) and mode>=2)
+            calls[name+'/'+str(mode)]=v[3]//2
+    save('calls',dict(calls=calls,untimed_library=sha(measured),timed_library=ids['fixed']))
     save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
 finally:
     count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
