@@ -25,11 +25,11 @@ try:
         fields=source['programs'][name];raw=corpus.elf_text(elf);assert sha(elf)==fields['elf_sha256'] and sha(raw)==fields['section_sha256']
         text=t/(name+'.text');text.write_bytes(raw);texts[name]=text
     project=t/'project';project.mkdir();b=t/'build'
-    lines=['cmake_minimum_required(VERSION 3.22)','project(SystemZRecords LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)']
+    lines=['cmake_minimum_required(VERSION 3.22)','project(LoongArchRecords LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)']
     for suffix in ('static','shared'):
         lines.extend([f'add_executable(records_{suffix} "{(d/"raw.cpp").as_posix()}")',f'target_compile_features(records_{suffix} PRIVATE cxx_std_17)',f'target_link_libraries(records_{suffix} PRIVATE capstone_{suffix})'])
     (project/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
-    cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SYSTEMZ_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_LOONGARCH_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
     if profile=='diet':cfg.append('-DCAPSTONE_BUILD_DIET=ON')
     variants={}
@@ -48,7 +48,7 @@ try:
             rows={}
             for name,path in texts.items():
                 for opt in range(5):
-                    v=list(map(int,sp.check_output([exe,'107',path,str(opt)],text=True,env=env).split()));assert v[0]>0
+                    v=list(map(int,sp.check_output([exe,'108',path,str(opt)],text=True,env=env).split()));assert v[0]>0
                     rows[name+'/'+str(opt)]=v
             outputs[suffix]=rows
         assert outputs['static']==outputs['shared']
