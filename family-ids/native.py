@@ -21,24 +21,24 @@ try:
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        # Reproduce the real link, moving only SystemZInstPrinter.c.o for
+        # Reproduce the real link, moving only LoongArchInstPrinter.c.o for
         # the second image. Both links consume the same compiled objects.
         commands=sp.check_output(['ninja','-C',b,'-t','commands','capstone_shared'],text=True)
         chunks=[]
         for line in commands.splitlines():
-            if 'SystemZInstPrinter.c.o' in line and ' -shared ' in line:
+            if 'LoongArchInstPrinter.c.o' in line and ' -shared ' in line:
                 chunks.extend(part for part in line.split('&&') if ' -shared ' in part)
         line,=chunks
         link=shlex.split(line);output_arg=link.index('-o')+1
         plain=t/(k+'-normal.so');link[output_arg]=str(plain);cmd('repeat-link-'+k,link,b)
         assert sha(plain)==sha(so)
         positions=[n for n,o in enumerate(link) if o.endswith('.o')]
-        hit,=[n for n in positions if link[n].endswith('/SystemZInstPrinter.c.o')]
+        hit,=[n for n in positions if link[n].endswith('/LoongArchInstPrinter.c.o')]
         moved_object=link[hit];assert hit<positions[-1];link.insert(positions[-1],link.pop(hit));assert link[positions[-1]]==moved_object
         moved=t/(k+'-reordered.so');link[output_arg]=str(moved);cmd('move-link-'+k,link,b)
         assert sha(moved)!=sha(so)
         save('link-'+k,dict(object=moved_object,before=hit,after=positions[-1],objects=len(positions),original=sha(so),relinked=sha(plain),moved=sha(moved)))
-        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','SystemZ_LLVM_getRegisterName','printFormattedRegName'}
+        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','SystemZ_LLVM_getRegisterName','LoongArch_LLVM_getRegisterName'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
@@ -88,18 +88,24 @@ try:
         imgs[k]=so.read_bytes()
         if cc=='clang':
             cmd('alias-static-'+k,['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-            cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/('spans.c' if k=='base' else 'spans-fixed.c'),b/'libcapstone.a','-o',t/'spans'])
-            cmd('spans-'+k,[t/'spans'])
+            source_printer=s/'arch/LoongArch/LoongArchInstPrinter.c'
+            observed=t/'observed-printer.c';observed.write_text(source_printer.read_text()+'\nvoid observed_loong_name(MCInst *m,SStream *o,MCRegister reg) { printRegName(m,o,reg); }\n')
+            cmd('spans-object-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_LOONGARCH','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'arch/LoongArch','-I',s/'include','-c',observed,'-o',t/'loong-spans.o'])
+            cmd('spans-build-'+k,[cc,'-DNDEBUG','-O2','-DCAPSTONE_HAS_LOONGARCH','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'loong-streams.c',t/'loong-spans.o',b/'libcapstone.a','-o',t/'spans'])
+            cmd('spans-'+k,[t/'spans']);assert int((out/('spans-'+k+'.log')).read_text())==28160
             cmd('alias-compile-'+k,[cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_AARCH64','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'alias.c',b/'libcapstone.a','-o',t/'alias'])
             cmd('alias-oracle-'+k,[t/'alias'])
             assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
         if k!='base':
-            cmd('regression-build-'+k,['cmake','--build',b,'--parallel','4','--target','systemz_register_dialects'])
-            cmd('regression-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_systemz_register_dialects$'])
+            cmd('regression-build-'+k,['cmake','--build',b,'--parallel','4','--target','register_descriptors'])
+            cmd('regression-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_register_descriptors$'])
         if k=='indexed':
             cmd('register-static',['cmake','--build',b,'--target','capstone_static','--parallel','4'])
         if k=='indexed':
             names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
+            cmd('spelling-generator',[cc,'-O2',s/'suite/synctools/loongarch_register_spellings.c',b/'libcapstone.a','-o',t/'spellings'])
+            encoded=sp.check_output([t/'spellings']);assert encoded==(s/'arch/LoongArch/LoongArchGenRegisterSpellings.inc').read_bytes()
+            save('register-spellings',dict(count=encoded.count(b' },'),sha256=hashlib.sha256(encoded).hexdigest()))
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
             cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])

@@ -1,7 +1,7 @@
-name: Test SystemZ spillover with byte-identical relinking and a two-by-two object order comparison
+name: Compare LoongArch register spellings across nine ISAs in normal and matched object orders
 on:
   push:
-    branches: [codex/systemz-link-order-control]
+    branches: [codex/loongarch-formatter-address-control]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-link-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: loong-register-orders-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
