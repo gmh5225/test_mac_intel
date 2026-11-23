@@ -1,7 +1,7 @@
-name: Compare option-selected RISC-V scans and alias formatting with fully decoded records on seven hosts
+name: Measure RISC-V aliases and standalone scan selection, with identity controls for shared ARM and MIPS decoding
 on:
   push:
-    branches: [codex/riscv-no-text-major-reader]
+    branches: [codex/riscv-standalone-option-and-alias]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-bounded-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-option-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
