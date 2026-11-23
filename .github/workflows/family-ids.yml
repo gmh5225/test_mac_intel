@@ -1,7 +1,7 @@
-name: Verify combined RISC-V dispatch through the source generator and measure the full output path
+name: Qualify RISC-V compressed dispatch twice on native AArch64 Linux and verify unchanged libraries on other builds
 on:
   push:
-    branches: [codex/riscv-quadrant-and-funct3]
+    branches: [codex/riscv-aarch64-compressed-qualification]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -17,6 +17,8 @@ jobs:
           - { host: ubuntu-24.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
+          - { host: ubuntu-24.04-arm, cc: clang, flavor: repeat }
+          - { host: ubuntu-24.04-arm, cc: gcc, flavor: control }
           - { host: ubuntu-24.04, cc: gcc, flavor: first }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
@@ -41,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-quadrant-function-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-aarch64-compressed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

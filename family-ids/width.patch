@@ -1,12 +1,30 @@
+diff --git a/arch/RISCV/RISCVDisassembler.h b/arch/RISCV/RISCVDisassembler.h
+index 00348e68..a70d583a 100644
+--- a/arch/RISCV/RISCVDisassembler.h
++++ b/arch/RISCV/RISCVDisassembler.h
+@@ -20,6 +20,13 @@
+ #define RISCV_USE_STACK_OPERAND_POSITIONS
+ #endif
+ 
++/* The combined compressed dispatch is profitable in the native AArch64
++ * Clang decoder. Keep the ordinary tables in mixed and DIET builds. */
++#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET) && \
++	defined(__linux__) && defined(__clang__) && defined(__aarch64__)
++#define RISCV_USE_COMPRESSED_DISPATCH
++#endif
++
+ void RISCV_init(MCRegisterInfo *MRI);
+ 
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
 diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
-index 10c7f1f7..8d012afa 100644
+index 10c7f1f7..718e9a33 100644
 --- a/arch/RISCV/RISCVGenDirectDecoder.inc
 +++ b/arch/RISCV/RISCVGenDirectDecoder.inc
 @@ -22,6 +22,36 @@ static DecodeStatus direct_DecoderTable16(MCInst *MI, uint16_t insn, uint64_t Ad
  	unsigned Opc, DecodeIdx;
  	bool DecodeComplete;
  	(void)CurFieldValue;
-+#ifdef CAPSTONE_RISCV_ONLY
++#ifdef RISCV_USE_COMPRESSED_DISPATCH
 +	CurFieldValue = fieldFromInstruction_2(insn, 0, 2);
 +	switch ((fieldFromInstruction_2(insn, 13, 3) << 2) | CurFieldValue) {
 +	case 0: goto L16;
@@ -40,13 +58,14 @@ index 10c7f1f7..8d012afa 100644
  L0:;
  	CurFieldValue = fieldFromInstruction_2(insn, 13, 3);
 diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
-index 4f02638a..4439581c 100644
+index 4f02638a..a2f30f32 100644
 --- a/arch/RISCV/RISCVScan.h
 +++ b/arch/RISCV/RISCVScan.h
-@@ -5,13 +5,77 @@
+@@ -5,13 +5,84 @@
  
  #include "RISCVModule.h"
  
++#ifdef RISCV_USE_COMPRESSED_DISPATCH
 +/* The ordinary decoder retains reserved immediates, zero-register hints
 + * and encodings whose operation differs between RV32 and RV64. */
 +static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
@@ -97,13 +116,15 @@ index 4f02638a..4439581c 100644
 +	}
 +}
 +
++#endif
++
  /* The scanner is selected for little-endian, non-E modes without output.
   * These major opcodes admit every destination register and immediate. */
  static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
  			       MCInst *inst, uint16_t *size, uint64_t address,
  			       void *info)
  {
--	if (length >= 4 && !inst->flat_insn->detail) {
++#ifdef RISCV_USE_COMPRESSED_DISPATCH
 +	if (length < 2 || inst->flat_insn->detail)
 +		goto full;
 +	if ((code[0] & 3) != 3) {
@@ -119,11 +140,14 @@ index 4f02638a..4439581c 100644
 +		goto full;
 +	}
 +	if (length >= 4) {
++#else
+ 	if (length >= 4 && !inst->flat_insn->detail) {
++#endif
  		unsigned opcode;
  		const unsigned major = code[0] & 0x7f;
  		switch (major) {
 diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
-index ab09030b..00bd2e7d 100644
+index ab09030b..3f07b760 100644
 --- a/suite/synctools/fixed_len_decoder.py
 +++ b/suite/synctools/fixed_len_decoder.py
 @@ -211,7 +211,44 @@ def primary_opcode_mask(nodes):
@@ -158,7 +182,7 @@ index ab09030b..00bd2e7d 100644
 +            cases.append(f"\tcase {key}: goto L{nodes[position].end};")
 +    # Targets see the same last extracted value as in the two original filters.
 +    return [
-+        "#ifdef CAPSTONE_RISCV_ONLY",
++        "#ifdef RISCV_USE_COMPRESSED_DISPATCH",
 +        "\tCurFieldValue = fieldFromInstruction_2(insn, 0, 2);",
 +        "\tswitch ((fieldFromInstruction_2(insn, 13, 3) << 2) | CurFieldValue) {",
 +        *cases,

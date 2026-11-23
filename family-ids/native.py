@@ -57,9 +57,10 @@ def measure(t):
                 assert set(row['objects'])==set(variants['base']['objects'])
                 changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
                 actual={Path(f).name for f in changed}
-                allowed={'RISCVDisassembler.c.o'} if k!='base' and (profile=='diet' or not mixed) else set()
+                active=profile=='full' and not mixed and platform.machine()=='aarch64' and 'clang' in cc
+                allowed={'RISCVDisassembler.c.o'} if k!='base' and active else set()
                 assert actual<=allowed and (profile!='full' or actual==allowed),(profile,k,actual,allowed)
-                if profile=='full' and mixed:assert row==variants['base']
+                if not active:assert row==variants['base'],(profile,k)
         info[profile]=variants;shutil.rmtree(b)
     save('profiles',info)
     for k in ('lazy','width'):
@@ -107,7 +108,7 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('riscv-combined-field-2325-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('riscv-qualified-compressed-2329-'+flavor)
     del images['lazy']
     images['candidate_copy']=images['width']
     for name,bits in cases.items():
