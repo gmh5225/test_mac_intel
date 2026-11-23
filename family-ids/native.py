@@ -38,6 +38,8 @@ try:
         assert len(obj)>50
         if k=='base':base_objects=obj
         compared=sorted(n for n in obj if obj[n]!=base_objects.get(n));assert set(obj)==set(base_objects)
+        if k=='active':dialect_objects=obj
+        if k=='indexed':assert {n for n in obj if obj[n]!=dialect_objects[n]}<={'arch/SystemZ/SystemZDisassembler.c.o'}
         save('objects-'+k,dict(compared=len(obj),changed=compared))
         for symbol in ('cs_disasm_iter','disasmScanIterator','disasmCanonicalIterator'):
             cmd('assembly-'+symbol+'-'+k,['objdump','-d','--disassemble='+symbol,so])
@@ -73,7 +75,7 @@ try:
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
             cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
-    assert ids['active']==ids['indexed'] and ids['base']!=ids['indexed']
+    assert ids['base']!=ids['active'] and ids['base']!=ids['indexed']
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])

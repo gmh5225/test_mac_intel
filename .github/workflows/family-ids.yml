@@ -1,7 +1,7 @@
-name: Check the SystemZ length dispatcher and register spelling in a ten-architecture library
+name: Measure mixed SystemZ decoder and dialect updates with the exact changed decoder object
 on:
   push:
-    branches: [codex/systemz-width-real-cross-arch]
+    branches: [codex/compare-mixed-systemz-decoder-width]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-width-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: qualified-width-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
