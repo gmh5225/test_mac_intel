@@ -137,7 +137,7 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='memory':assert 'X86MemoryOutput.c.o' in changed and 'X86Vex32Output.c.o' in changed and all(n.startswith('X86') for n in changed),changed
+        if kind=='sib':assert changed==['X86DisassemblerDecoder.c.o'],changed
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

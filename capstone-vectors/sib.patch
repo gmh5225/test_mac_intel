@@ -1,15 +1,73 @@
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index f75c3794..c5d400c5 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -70,8 +70,8 @@ bool X86_writeMemoryOutput(
- 		const unsigned index_reg = ((rex & 2) << 2) |
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
--#ifdef X86_SEGMENT_LEA32
--		/* A scale-one SIB without an index names only its base. */
-+#ifdef X86_MEMORY32_OUTPUT
-+		/* Every scale-one i386 SIB without an index names only its base. */
- 		if ((!mod && base_reg == 5) ||
- 		    (index_reg == 4 && (encoding >> 6) != 0))
- #else
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..dafbdd52 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1645,7 +1645,7 @@ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
+  * @return      - 0 if the SIB byte was successfully read; nonzero otherwise.
+  */
+ X86_DECODE_INLINE int readSIB(struct InternalInstruction *insn,
+-			      bool materialize)
++			      bool materialize, bool modZero)
+ {
+ 	SIBBase sibBaseBase = SIB_BASE_NONE;
+ 	uint8_t index, base;
+@@ -1692,34 +1692,14 @@ X86_DECODE_INLINE int readSIB(struct InternalInstruction *insn,
+ 
+ 	base = baseFromSIB(insn->sib) | (bFromREX(insn->rexPrefix) << 3);
+ 
+-	switch (base) {
+-	case 0x5:
+-	case 0xd:
+-		switch (modFromModRM(insn->modRM)) {
+-		case 0x0:
+-			insn->eaDisplacement = EA_DISP_32;
+-			if (materialize)
+-				insn->sibBase = SIB_BASE_NONE;
+-			break;
+-		case 0x1:
+-			insn->eaDisplacement = EA_DISP_8;
+-			if (materialize)
+-				insn->sibBase = (SIBBase)(sibBaseBase + base);
+-			break;
+-		case 0x2:
+-			insn->eaDisplacement = EA_DISP_32;
+-			if (materialize)
+-				insn->sibBase = (SIBBase)(sibBaseBase + base);
+-			break;
+-		case 0x3:
+-			// debug("Cannot have Mod = 0b11 and a SIB byte");
+-			return -1;
+-		}
+-		break;
+-	default:
++	/* ModR/M already selected the displacement. Only a missing SIB
++	 * base in mod 00 introduces a displacement of its own. */
++	if (modZero && (base & 7) == 5) {
++		insn->eaDisplacement = EA_DISP_32;
+ 		if (materialize)
+-			insn->sibBase = (SIBBase)(sibBaseBase + base);
+-		break;
++			insn->sibBase = SIB_BASE_NONE;
++	} else if (materialize) {
++		insn->sibBase = (SIBBase)(sibBaseBase + base);
+ 	}
+ 
+ 	return 0;
+@@ -1929,7 +1909,7 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+ 								EA_BASE_sib :
+ 								EA_BASE_sib64);
+ 				}
+-				if (readSIB(insn, materialize) ||
++				if (readSIB(insn, materialize, true) ||
+ 				    readDisplacement(insn, materialize))
+ 					return -1;
+ 				break;
+@@ -1962,7 +1942,7 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+ 				if (materialize) {
+ 					insn->eaBase = EA_BASE_sib;
+ 				}
+-				if (readSIB(insn, materialize) ||
++				if (readSIB(insn, materialize, false) ||
+ 				    readDisplacement(insn, materialize))
+ 					return -1;
+ 				break;
