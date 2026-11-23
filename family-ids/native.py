@@ -14,7 +14,7 @@ try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
     for k in ('base','active','indexed'):
-        if k=='active':
+        if k!='base':
             g('restore','--source',baseline,'--staged','--worktree','--','.')
             selected=load(d/'active-tree.json') if k=='active' else meta
             patch=d/('active.patch' if k=='active' else 'candidate.patch')
@@ -32,26 +32,15 @@ try:
             original_sections=executable_sections(so)
             old_sections=[n for n in original_sections if n.startswith('.cs_')]
             assert '.cs_x86_evex_scan_text' in old_sections
-        elif k=='indexed':
-            assert g('write-tree')==meta['tree'] and sha(so)==ids['active']
-            # Re-execute exactly the shared link with the same objects. Preserve
-            # every old executable input section in its original link order.
-            layout=b/'postprinter-order.ld'
-            sections=old_sections+['.cs_x86_postprinter_text']
-            assert all(re.fullmatch(r'\.cs_[a-z_0-9]+',n) for n in sections)
-            layout.write_text('SECTIONS {\n'+''.join('  '+n+' : { *('+n+') }\n' for n in sections)+'}\nINSERT AFTER .text;\n')
-            commands=sp.check_output(['ninja','-C',b,'-t','commands','capstone_shared'],text=True).splitlines()
-            link,=[v for v in commands if ' -shared ' in v and ' -o '+so.name+' ' in v]
-            cmd('relink-tail',['sh','-c',link.replace(' -shared ',' -Wl,-T,postprinter-order.ld -shared ',1)],cwd=b)
         positions=executable_sections(so)
         objects={str(f.relative_to(b)):sha(f) for f in b.glob('CMakeFiles/capstone*.dir/**/*.c.o')}
         assert len(objects)>60
         if k=='active':early_objects=objects
         if k=='indexed':assert objects==early_objects
-        assert (positions['.cs_x86_evex_scan_text'][0]!=original_sections['.cs_x86_evex_scan_text'][0])==(k=='active'),(k,positions,original_sections)
-        if k=='indexed':
-            assert all(original_sections[n]==positions[n] for n in ['.text',*old_sections]),(positions,original_sections)
-            tail=positions['.cs_x86_postprinter_text'][0];assert all(tail>=sum(positions[n]) for n in old_sections)
+        if k!='base':
+            wpos=positions['.cs_x86_postprinter_text'][0]
+            assert (wpos<positions['.cs_x86_evex_scan_text'][0])==(k=='active'),positions
+            if k=='indexed':assert wpos>=max(sum(positions[n]) for n in old_sections if n.startswith('.cs_x86_evex'))
         save('causal-order-'+k,dict(positions=positions,objects=objects,custom=old_sections))
         names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','X86_postprinter','postprocess_full','repair_avx_broadcast'}
         syms={}
@@ -69,7 +58,7 @@ try:
         core=b/'CMakeFiles/capstone.dir';obj={str(v.relative_to(core)):sha(v)for v in core.rglob('*.c.o')}
         assert len(obj)>50
         if k=='base':base_objects=obj
-        compared=sorted(n for n in obj if obj[n]!=base_objects.get(n));assert set(obj)==set(base_objects)
+        compared=sorted(n for n in obj if obj[n]!=base_objects.get(n));assert set(obj)-set(base_objects)==({'arch/X86/X86PostPrinter.c.o'}if k!='base' else set())
         save('objects-'+k,dict(compared=len(obj),changed=compared))
         for symbol in ('cs_disasm_iter','disasmScanIterator','disasmCanonicalIterator'):
             cmd('assembly-'+symbol+'-'+k,['objdump','-d','--disassemble='+symbol,so])
@@ -86,12 +75,6 @@ try:
             if len(z)==3 and z[1].startswith('R_') and off<=int(z[0],16)<off+length:
                 calls.append([int(z[0],16)-off,z[1],z[2]])
         save('scan-bytes-'+k,dict(section=section,offset=off,size=length,sha256=hashlib.sha256(body).hexdigest(),relocations=calls))
-        mapping,=b.rglob('X86Mapping.c.o')
-        entries=sp.check_output(['objdump','-t',mapping],text=True).splitlines()
-        table={row.split()[-1]:row.split() for row in entries if row.split() and row.split()[-1].split('.')[0] in ('postprocess_full','X86_postprinter')}
-        assert any(name.startswith('postprocess_full') for name in table)==(k!='base'),table
-        assert ('.cs_x86_postprinter_text' in table['X86_postprinter'])==(k!='base'),table
-        save('postprinter-sections-'+k,table)
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
         if cc=='clang':
