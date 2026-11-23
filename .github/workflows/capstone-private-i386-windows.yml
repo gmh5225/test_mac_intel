@@ -1,7 +1,7 @@
-name: Verify MIPS option changes and all public records on Windows and macOS for four ELF programs
+name: Verify the final MIPS decoder option changes in Windows and macOS public records
 on:
   push:
-    branches: [codex/mips-option-portable]
+    branches: [codex/mips-shared-portable-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -38,11 +38,13 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Compare original and candidate bytes and native tests
         env:
+      - name: Check source parent
+        run: python -B portable-next/stage_parent.py
           SCAN_PROFILE: ${{ matrix.profile }}
         run: python -B portable-next/verify.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mips-option-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mips-common-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
