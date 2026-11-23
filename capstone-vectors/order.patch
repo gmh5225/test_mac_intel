@@ -1,0 +1,55 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d6f3ff5f..c46dfb46 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1070,11 +1070,19 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++    # Keep the batch scanner before the variable-size fixed text readers.
++    # Preserve the compile settings of each native object target.
++    set(capstone_batch_object "/X86BatchScan([.]c)?[.](o|obj)$")
++    set(capstone_x86_scan_and_text
++        "$<FILTER:$<TARGET_OBJECTS:capstone_x86_native>,INCLUDE,${capstone_batch_object}>"
++        $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
++    set(capstone_x86_output_helpers
++        "$<FILTER:$<TARGET_OBJECTS:capstone_x86_native>,EXCLUDE,${capstone_batch_object}>")
+     if(capstone_enabled_architectures STREQUAL "X86")
+         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+         set(capstone_x86_objects
+-            $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+-            $<TARGET_OBJECTS:capstone_x86_native>)
++            ${capstone_x86_scan_and_text}
++            ${capstone_x86_output_helpers})
+         target_sources(capstone INTERFACE ${capstone_x86_objects})
+     endif()
+ endif()
+@@ -1092,12 +1100,12 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
+             set(capstone_static_objects
+                 "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
+-                $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
++                ${capstone_x86_scan_and_text}
+                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
+         else()
+-            list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
++            list(APPEND capstone_static_objects ${capstone_x86_scan_and_text})
+         endif()
+-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
++        list(APPEND capstone_static_objects ${capstone_x86_output_helpers} ${capstone_alias_patterns_tail})
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+diff --git a/Makefile b/Makefile
+index 8118f71d..90d5fd3f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -286,7 +286,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+ endif

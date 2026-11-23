@@ -1,7 +1,7 @@
-name: Time fixed text admission on PE and ELF with matched public and private readers
+name: Compare exact native scanner addresses with unchanged project compiler targets
 on:
   push:
-    branches: [codex/fixed-text-iterator-options]
+    branches: [codex/scan-member-order-fixed-text]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-text-admission-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scan-member-order-fixed-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
