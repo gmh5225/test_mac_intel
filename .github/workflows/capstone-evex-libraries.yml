@@ -1,7 +1,7 @@
-name: Isolate i386 double shifts after the existing public record reader
+name: Retest i386 double shifts without sending unrelated decoder misses through the new helper
 on:
   push:
-    branches: [codex/outlined-i386-shift-fallback]
+    branches: [codex/i386-double-shift-escaped-opcodes]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-i386-shift-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: escaped-i386-shifts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

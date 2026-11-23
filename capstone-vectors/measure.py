@@ -139,23 +139,27 @@ def main(w):
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
-        extra=['X86DoubleShift32.c.o'] if key=='bare' else []
+        extra=['X86DoubleShift32.c.o'] if key!='base' else []
         assert [n for n in members if n not in extra]==expected
         if extra:assert members.index(extra[0])>members.index('X86PublicOutput.c.o')
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
-        assert changed==sorted((['X86RegisterFallback32.c.o']if key!='base' else [])+extra),(key,changed)
+        assert changed==sorted((['X86RegisterFallback32.c.o']if key=='plain'else ['X86Vex32Output.c.o']if key=='bare'else [])+extra),(key,changed)
         # Link an independently instrumented copy of the exact terminal source
         # to count admission while the ordinary binary retains its original code.
-        path=base/'arch/X86'/('X86DoubleShift32.c' if key=='bare' else 'X86RegisterFallback32.c')
+        path=base/'arch/X86'/('X86DoubleShift32.c' if key!='base' else 'X86RegisterFallback32.c')
         sample=path.read_text();entry='writeDoubleShift32(code, insn, insn_size);'
         if key!='base':
             assert sample.count(entry)==1
             sample=sample.replace(entry,'++bare_opcode_hits[code[1]]; '+entry)
-        probe=w/'counts.c';probe.write_text('unsigned long long bare_opcode_hits[256];'+chr(10)+sample)
+        entry_start={'base':'const unsigned opcode = code[0];','plain':'if (code[0] == 0x0f && size >= 4','bare':'if (size < 4 || code[2] < 0xc0'}[key]
+        assert sample.count(entry_start)==1
+        sample=sample.replace(entry_start,'++helper_calls; '+entry_start)
+        probe=w/'counts.c';probe.write_text('unsigned long long bare_opcode_hits[256], helper_calls;'+chr(10)+sample)
         tu,=[row for row in db if Path(row['file'])==path]
         defs=[v for v in shlex.split(tu['command']) if v.startswith('-D')]
         run(['clang','-O2',*defs,'-iquote',path.parent,'-I',base,'-I',base/'include','-c',probe,'-o',w/'probe.o'],'build-guard-'+key)
         run(['clang++','-O2','-std=c++17','-I',base/'include',r/'guard.cpp',w/'probe.o',lib,'-o',w/'guard'],'link-guard-'+key)
+        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'counts.cpp',w/'probe.o',lib,'-o',w/('counts-'+key)],'link-real-counts-'+key)
         run([w/'guard',*(['candidate']if key!='base'else[])],'guard-'+key)
         assert list(map(int,(evidence/('guard-'+key+'.log')).read_text().split()))==[817152,100644 if key!='base'else 0,0]
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
@@ -213,6 +217,11 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
+        freq={k:list(map(int,sp.check_output([w/('counts-'+k),str(bits),f,intervals]).split()))for k in trees}
+        assert len({v[0]for v in freq.values()})==1 and freq['bare'][2:]==freq['plain'][2:] and freq['base'][2:]==[0,0]
+        assert freq['bare'][1]<=freq['plain'][1]==freq['base'][1]
+        if bits==64:assert all(v[1:]==[0,0,0]for v in freq.values())
+        save('real-counts-'+name+'.json',freq)
         for mode in (0,1,2):
             targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}
             if mode:targets['fast']=('base','fast____')
@@ -223,7 +232,7 @@ def main(w):
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'released-public-reader')))
+            labels=list(targets);order=random.Random(str((name,mode,'escaped-double-shift-check')))
             for idx in range(13):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1
