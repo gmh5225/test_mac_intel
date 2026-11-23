@@ -114,7 +114,7 @@ def main(w):
         assert near==({'X86Sse64Output.c'}if mixed and not darwin else set()),near
         assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(mixed )
         save('compile-'+key+'.json',dict(archive_profile=key,near_indirect=sorted(near),neverd=m['neverd'],compile_commands_sha256=sha(build/'compile_commands.json')))
-        assert ('X86PublicOutput.c' in files)==(not mixed)
+        assert ('X86PublicOutput.c' in files)==(not mixed or kind=='static')
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access','text_option']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
@@ -135,9 +135,12 @@ def main(w):
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
-        assert members==expected
-        changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='sib':assert changed==['X86DisassemblerDecoder.c.o'],changed
+        if key=='mixed_static':
+            assert [n for n in members if n!='X86PublicOutput.c.o']==expected and members.count('X86PublicOutput.c.o')==1
+        else:assert members==expected
+        changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
+        if kind=='static':
+            assert set(changed)==({'X86PublicOutput.c.o','X86DisassemblerDecoder.c.o'} if mixed else set()),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
