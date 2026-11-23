@@ -99,6 +99,8 @@ try:
             assert members.index('AliasPatternLookup.c.o')>members.index('X86VectorFallback64.c.o')
             command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         else:raise AssertionError(('missing shipped alias member',variant))
+        if variant=='post':
+            assert members.index('X86EvexMemoryOutput.c.o')<members.index('X86PostPrinter.c.o')
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
@@ -198,7 +200,7 @@ try:
             command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/(name+'.c'),'-o',t/'observed.o'],'wrap-'+name+'-'+variant)
             command(['clang++','-O2','-std=c++17','-I',cs/'include',r/(name+'.cpp'),t/'observed.o',archive,'-o',t/'observed'],'link-'+name+'-'+variant)
             command([t/'observed'],'guard-'+name+'-'+variant)
-        command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',*(['-DOBSERVED_CMP64'] if variant=='cmp' else []),'-c',r/'cmp.c','-o',t/'cmp.o'],'cmp-wrap-'+variant)
+        command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'cmp.c','-o',t/'cmp.o'],'cmp-wrap-'+variant)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'cmp.cpp',t/'cmp.o',archive,'-o',t/'cmp'],'cmp-link-'+variant)
         command([t/'cmp'],'cmp-records-'+variant)
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',r/'decorators.c',archive,'-lm','-o',t/'decorators'],'compile-decorators-'+variant)
