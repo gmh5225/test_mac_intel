@@ -1,7 +1,7 @@
-name: Measure the legacy vector bank with mode lookup confined to cache misses and mode transitions
+name: Compare the generated legacy write-set classification with both existing mapping implementations
 on:
   push:
-    branches: [codex/uncached-legacy-register-banks]
+    branches: [codex/classify-mode-specific-implicit-writes]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: cold-register-bank-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: legacy-write-flags-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
