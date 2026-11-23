@@ -26,6 +26,59 @@ index e0409109..7e239309 100644
  }
  
  /* Private x86 decode state constructs operands before reading them. It does
+diff --git a/arch/SystemZ/SystemZDisassembler.c b/arch/SystemZ/SystemZDisassembler.c
+index 43c2d62f..fbf29dfc 100644
+--- a/arch/SystemZ/SystemZDisassembler.c
++++ b/arch/SystemZ/SystemZDisassembler.c
+@@ -375,36 +375,24 @@ static DecodeStatus getInstruction(MCInst *MI, uint16_t *Size,
+ 	if (BytesLen < 2)
+ 		return MCDisassembler_Fail;
+ 
+-	// The top 2 bits of the first byte specify the size.
+-	const uint8_t *Table;
+-	uint64_t Inst = 0;
++	/* The length bits select both the input width and its decoder table. */
+ 	if (Bytes[0] < 0x40) {
+ 		*Size = 2;
+-		Table = DecoderTable16;
+-		Inst = readBytes16(MI, Bytes);
+-	} else if (Bytes[0] < 0xc0) {
+-		if (BytesLen < 4) {
++		return decodeInstruction_8(DecoderTable16, MI, readBytes16(MI, Bytes),
++					   Address, NULL);
++	}
++	if (Bytes[0] < 0xc0) {
++		if (BytesLen < 4)
+ 			return MCDisassembler_Fail;
+-		}
+ 		*Size = 4;
+-		Table = DecoderTable32;
+-		Inst = readBytes32(MI, Bytes);
+-	} else {
+-		if (BytesLen < 6) {
+-			return MCDisassembler_Fail;
+-		}
+-		*Size = 6;
+-		Table = DecoderTable48;
+-		Inst = readBytes48(MI, Bytes);
++		return decodeInstruction_8(DecoderTable32, MI, readBytes32(MI, Bytes),
++					   Address, NULL);
+ 	}
+-
+-	// Read any remaining bytes.
+-	if (BytesLen < *Size) {
+-		*Size = BytesLen;
++	if (BytesLen < 6)
+ 		return MCDisassembler_Fail;
+-	}
+-
+-	return decodeInstruction_8(Table, MI, Inst, Address, NULL);
++	*Size = 6;
++	return decodeInstruction_8(DecoderTable48, MI, readBytes48(MI, Bytes),
++				   Address, NULL);
+ }
+ 
+ DecodeStatus SystemZ_LLVM_getInstruction(csh handle, const uint8_t *Bytes,
 diff --git a/arch/SystemZ/SystemZInstPrinter.c b/arch/SystemZ/SystemZInstPrinter.c
 index ee9eb18e..33ef9e6c 100644
 --- a/arch/SystemZ/SystemZInstPrinter.c

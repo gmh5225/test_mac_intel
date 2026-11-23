@@ -13,6 +13,7 @@ assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}
 
 try:
     images={};profiles={}
+    cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
     for profile,architectures in [('mixed',mixed),('diet',['SYSTEMZ']),('pure',['SYSTEMZ'])]:
         b=t/profile;variants={}
         for k in ('base','dialects','candidate'):
@@ -27,6 +28,11 @@ try:
             if profile!='diet':cmd(profile+'-test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
             so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
             variants[k]=dict(shared=sha(so),objects={str(f.relative_to(b)):sha(f)for f in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')},archive=sha(b/'libcapstone.a'))
+            target=t/(profile+'-'+k+'.so');shutil.copy2(so,target)
+            if k!='base':
+                cmd('boundary-'+profile+'-'+k,[t/'guard',t/(profile+'-base.so'),target])
+                modes,trials,accepted=map(int,(out/('boundary-'+profile+'-'+k+'.log')).read_text().split())
+                assert modes in (1,2) and trials==57344*modes and accepted>0
             if profile=='pure':
                 images[k]=so.read_bytes()
                 flags=['-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include']
@@ -37,8 +43,7 @@ try:
                     cmd('dialect-unit-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_systemz_register_dialects$'])
         a,bv=variants['dialects'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
         changed=[p for p in a['objects']if a['objects'][p]!=bv['objects'][p]]
-        if profile=='pure':assert len(changed)==1 and changed[0].endswith('/SystemZInstPrinter.c.o'),changed
-        else:assert a==bv,(profile,changed)
+        assert set(changed)<={'arch/SystemZ/SystemZDisassembler.c.o'},(profile,changed)
         profiles[profile]=dict(changed=changed,variants=variants)
     save('profiles',profiles)
     # The package digest binds every extracted member. Check the established ls digest as well.
