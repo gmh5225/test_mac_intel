@@ -1,7 +1,7 @@
-name: Validate the release tree with executable generator and four shuffled images on RISC-V and foreign ELF workloads
+name: Verify compressed RISC-V scan records and time real ELF with cross-architecture controls
 on:
   push:
-    branches: [codex/riscv-final-dedicated-four-copies]
+    branches: [codex/riscv-compressed-base-scan]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
+          ref: 6fbeffec215f3c7c79169c655b0928c616b46152
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-final-dedicated-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-compressed-base-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

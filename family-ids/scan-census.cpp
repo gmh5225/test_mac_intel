@@ -13,16 +13,16 @@ int main(int argc,char **argv) {
     cs_option(h,CS_OPT_TEXT,CS_OPT_OFF);cs_insn *i=cs_malloc(h);
     if(!i) return 3;
     const uint8_t *p=bytes.data();size_t n=bytes.size();uint64_t address=1048576;
-    unsigned count=0,miss=0,auipc=0,lui=0,jal=0;
+    unsigned count=0,miss=0,branches=0,memory=0;
     while(n) {
         const uint8_t *start=p;
         if(!cs_disasm_iter(h,&p,&n,&address,i)){size_t skip=std::min<size_t>(2,n);p+=skip;n-=skip;address+=skip;++miss;continue;}
-        ++count;if(i->size!=4)continue;
-        switch(start[0]&127) {
-        case 0x17: if(i->id!=RISCV_INS_AUIPC)return 4; ++auipc;break;
-        case 0x37: if(i->id!=RISCV_INS_LUI)return 5; ++lui;break;
-        case 0x6f: if(i->id!=RISCV_INS_JAL)return 6; ++jal;break;
-        }
+        ++count;if(i->size!=2)continue;
+        const unsigned key=((start[1]>>5)<<2)|(start[0]&3);
+        const unsigned ids[32] = {0,0,0,0,0,0,0,0,RISCV_INS_C_LW,0,0,0,
+            0,0,0,0,0,0,0,0,0,RISCV_INS_C_J,0,0,RISCV_INS_C_SW,
+            RISCV_INS_C_BEQZ,RISCV_INS_C_SWSP,0,0,RISCV_INS_C_BNEZ,0,0};
+        if(ids[key]){if(i->id!=ids[key])return 4;if((key&3)==1)++branches;else ++memory;}
     }
-    cs_free(i,1);cs_close(&h);std::printf("%u %u %u %u %u\n",count,miss,auipc,lui,jal);
+    cs_free(i,1);cs_close(&h);std::printf("%u %u %u %u\n",count,miss,branches,memory);
 }

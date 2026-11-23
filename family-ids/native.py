@@ -44,7 +44,7 @@ def measure(t):
             if k!='base':
                 patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
             run(profile+k+'-config',config(b,arch,extra))
-            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else []),*(['riscv_scan_options'] if profile=='full' and k=='width' else [])])
+            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else []),*(['riscv_scan_options'] if profile=='full' else [])])
             if profile=='full' and k=='width':run('generated-aliases',[source/'suite/synctools/alias_pattern_rows.py','--check'])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
@@ -57,11 +57,9 @@ def measure(t):
                 assert set(row['objects'])==set(variants['base']['objects'])
                 changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
                 actual={Path(f).name for f in changed}
-                allowed={'RISCVInstPrinter.c.o'} if k=='lazy' else {'RISCVInstPrinter.c.o','cs.c.o','RISCVDisassembler.c.o','RISCVModule.c.o'} if k=='width' else set()
-                if profile=='full' and mixed and k=='width':
-                    allowed=set()
-                    assert row==variants['base']
+                allowed={'RISCVDisassembler.c.o'} if k!='base' and (profile=='diet' or not mixed) else set()
                 assert actual<=allowed and (profile!='full' or actual==allowed),(profile,k,actual,allowed)
+                if profile=='full' and mixed:assert row==variants['base']
         info[profile]=variants;shutil.rmtree(b)
     save('profiles',info)
     for k in ('lazy','width'):
@@ -72,6 +70,11 @@ def measure(t):
         counts=list(map(int,sp.check_output([t/'scan-guard',libs['base'],libs[k]]).split()))
         assert counts==[1489920,338432,1151488],counts
         save('scan-proof-'+k,counts)
+    run('compressed-guard-build',['c++','-std=c++17','-O2','-I',source/'include',r/'compressed-guard.cpp','-ldl','-o',t/'compressed-guard'])
+    for k in ('lazy','width'):
+        counts=list(map(int,sp.check_output([t/'compressed-guard',libs['base'],libs[k]]).split()))
+        assert counts[0]==2*7*65536*3 and counts[1]+counts[2]==counts[0] and min(counts)>0
+        save('compressed-'+k,counts)
     lib=t/'libcapstone.so.6';(t/'libcapstone.so').symlink_to(lib.name)
     images={k:f.read_bytes() for k,f in libs.items()};length=max(map(len,images.values()));images={k:v+bytes(length-len(v))for k,v in images.items()};images['copy']=images['base'];lib.write_bytes(images['base'])
     for f in ('time','raw'):run(f,['c++','-O3','-std=c++17','-I',source/'include',r/(f+'.cpp'),'-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/f])
@@ -101,7 +104,7 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-four-final-images-2297-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('RISCV-compressed-scan-2316-'+flavor)
     del images['lazy']
     images['candidate_copy']=images['width']
     for name,bits in cases.items():
