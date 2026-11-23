@@ -1,7 +1,7 @@
-name: Verify option-selected MIPS scanner against the original linked NeverD and mixed-architecture consumers
+name: Verify original mixed GCC and Clang binaries with the final MIPS primary opcode list
 on:
   push:
-    branches: [codex/mips-option-consumers]
+    branches: [codex/mips-shared-opcode-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,8 @@ jobs:
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
           persist-credentials: false
+      - name: Check source parent
+        run: python -B capstone-vectors/stage_parent.py
       - name: Build all profiles and verify linked consumers
         run: python3 capstone-vectors/measure.py
       - if: always()
@@ -49,6 +51,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-option-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-common-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
