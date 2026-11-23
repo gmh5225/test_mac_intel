@@ -1,70 +1,46 @@
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..2511bdb0 100644
+index 79adee8d..52e26c1f 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10253,45 +10253,34 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
+@@ -10253,10 +10253,31 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
  }
  #endif
  
--// look for @id in @insns
--// return -1 if not found
--unsigned int find_insn(unsigned int id)
-+static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
++/* Mixed libraries can index a contiguous opcode range without the handle's
++ * lookup table. The generated rows have strictly increasing IDs. */
++static inline bool has_dense_insn_ids(void)
++{
++#ifdef CAPSTONE_X86_ONLY
++	return false;
++#else
++	return insns[ARR_SIZE(insns) - 1].id - insns[0].id ==
++	       ARR_SIZE(insns) - 1;
++#endif
++}
++
++static inline unsigned int dense_insn_index(unsigned int id)
++{
++	const unsigned int row = id - insns[0].id;
++	return row < ARR_SIZE(insns) ? row : (unsigned int)-1;
++}
++
+ // look for @id in @insns
+ // return -1 if not found
+ unsigned int find_insn(unsigned int id)
  {
--	// binary searching since the IDs are sorted in order
--	unsigned int left, right, m;
--	unsigned int max = ARR_SIZE(insns);
--
--	right = max - 1;
--
--	if (id < insns[0].id || id > insns[right].id)
--		// not found
--		return -1;
--
--	left = 0;
-+	const unsigned int count = ARR_SIZE(insns);
-+	const unsigned int first = insns[0].id;
-+	/* The generator orders distinct IDs. If the endpoints span exactly
-+	 * count entries, subtraction indexes every opcode in the table. */
-+	if (insns[count - 1].id - first == count - 1) {
-+		const unsigned int row = id - first;
-+		return row < count ? row : (unsigned int)-1;
-+	}
++	if (has_dense_insn_ids())
++		return dense_insn_index(id);
++
+ 	// binary searching since the IDs are sorted in order
+ 	unsigned int left, right, m;
+ 	unsigned int max = ARR_SIZE(insns);
+@@ -10288,6 +10309,9 @@ unsigned int find_insn(unsigned int id)
  
--	while (left <= right) {
--		m = (left + right) / 2;
--		if (id == insns[m].id) {
--			return m;
--		}
-+	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
-+		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
- 
--		if (id < insns[m].id)
--			right = m - 1;
-+	unsigned int lo = 0, hi = count;
-+	while (lo < hi) {
-+		const unsigned int mid = lo + (hi - lo) / 2;
-+		if (insns[mid].id < id)
-+			lo = mid + 1;
- 		else
--			left = m + 1;
-+			hi = mid;
- 	}
--
--	// not found
--	// printf("NOT FOUNDDDDDDDDDDDDDDD id = %u\n", id);
--	return -1;
-+	return lo < count && insns[lo].id == id ? lo : (unsigned int)-1;
- }
- 
--static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
-+unsigned int find_insn(unsigned int id)
+ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
  {
--	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
--		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
--
--	return find_insn(id);
-+	return find_insn_h(NULL, id);
- }
++	if (has_dense_insn_ids())
++		return dense_insn_index(id);
++
+ 	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
+ 		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
  
- #ifndef CAPSTONE_DIET

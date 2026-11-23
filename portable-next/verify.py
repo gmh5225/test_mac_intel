@@ -47,12 +47,16 @@ try:
             memory=sp.check_output([exe,'--vex-base-memory'],env=env).replace(bytes([13,10]),bytes([10]))
             assert memory==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenVexBaseMemory.inc'])
             save(v/'memory-table.json',dict(bytes=len(memory),sha256=hashlib.sha256(memory).hexdigest()))
+            if name=='mixed':
+                mask=sp.check_output([exe,'--vex-memory-register-mask'],env=env).replace(bytes([13,10]),bytes([10]))
+                assert mask==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenVexMemoryRegisterMask.inc'])
+                save(v/'shared-mask.json',dict(sha256=hashlib.sha256(mask).hexdigest(),bytes=len(mask)))
             rows=[]
             for suffix in ('static','shared'):
                 exe,=[f for f in b.rglob('probe_'+suffix+('.exe' if win else '')) if f.is_file()]
                 obs=[ln.split()for ln in sp.check_output([exe],text=True,env=env).splitlines()];assert len(obs)==12
                 for bits,instr,vex,num,write,first,last in obs:
-                    count=8 if name=='mixed' and bits!='64' else 16
+                    count=16
                     assert int(num)==int(write)==count and first=='ymm0' and last=='ymm'+str(count-1)
                 rows.append(obs)
             assert rows[0]==rows[1];save(v/'vzero.json',rows[0])
