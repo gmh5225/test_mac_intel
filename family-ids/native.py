@@ -16,7 +16,7 @@ try:
     cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
     for profile,architectures in [('mixed',mixed),('diet',['SYSTEMZ']),('pure',['SYSTEMZ'])]:
         b=t/profile;variants={}
-        for k in ('base','inline','candidate'):
+        for k in ('base','storage','candidate'):
             g('restore','--source',baseline,'--staged','--worktree','--','.')
             if k!='base':
                 target=meta if k=='candidate' else json.loads((d/'active-tree.json').read_text())
@@ -40,14 +40,27 @@ try:
                     cmd('code-'+k+'-'+sym,['objdump','-d','--disassemble='+sym,so])
                 cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
                 if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
-        a,bv=variants['inline'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
+                if k=='candidate':
+                    original=(s/'cs.c').read_text();line='MCInst_InitStorage(&mci, CS_ARCH_SYSTEMZ, false);';assert original.count(line)==1
+                    for pattern in (0xa5,0x5a):
+                        # Change only the private operand slots the decoder is allowed to leave unused.
+                        start='offsetof(MCInst, Operands) + sizeof(mci.Operands[0])'
+                        length='sizeof(mci.Operands) - sizeof(mci.Operands[0])'
+                        test='{ '+line+' memset((char *)&mci + '+start+', '+str(pattern)+', '+length+'); }'
+                        (s/'cs.c').write_text(original.replace(line,test))
+                        cmd('poison-build-'+str(pattern),['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
+                        cmd('poison-boundary-'+str(pattern),[t/'guard',t/'pure-base.so',so])
+                        cmd('poison-callbacks-'+str(pattern),[t/'callbacks',t/'pure-base.so',so])
+                        shutil.copy2(so,t/('poison-'+str(pattern)+'.so'))
+                    (s/'cs.c').write_text(original)
+        a,bv=variants['storage'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
         changed=[p for p in a['objects']if a['objects'][p]!=bv['objects'][p]]
         if profile=='pure':
-            for name in ('inline','candidate'):
+            for name in ('storage','candidate'):
                 diff=[f for f,v in variants['base']['objects'].items() if variants[name]['objects'][f]!=v]
                 assert diff==['cs.c.o'],(profile,name,diff)
         else:
-            assert variants['base']==variants['inline']==variants['candidate'],profile
+            assert variants['base']==variants['storage']==variants['candidate'],profile
 
         profiles[profile]=dict(changed=changed,variants=variants)
     save('profiles',profiles)
@@ -66,9 +79,14 @@ try:
     for name in samples:
         for opt in range(5):
             observed=[]
-            for k in ('base','inline','candidate'):
+            for k in ('base','storage','candidate'):
                 target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','107',t/(name+'.text'),str(opt)]).split())))
             assert observed[0]==observed[1]==observed[2] and observed[0][0]>0
+            for pattern in (0xa5,0x5a):
+                img=(t/('poison-'+str(pattern)+'.so')).read_bytes()
+                target.write_bytes(img)
+                result=list(map(int,sp.check_output([t/'raw','107',t/(name+'.text'),str(opt)]).split()))
+                assert result==observed[0]
             signatures[name+'/'+str(opt)]=observed[0]
     save('raw',signatures);rng=random.Random(2044);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     def sample(k,name,mode,n):
@@ -82,6 +100,6 @@ try:
                     v=sample(k,name,mode,n);assert v[2]==one[2];observed[k].append(v[0])
                 cycles.append(observed)
             rows.append(dict(case=name,mode=mode,pairs=cycles))
-    save('timings',rows);save('complete',dict(done=True,source=meta,cc=cc,host=platform.machine(),platform=platform.platform(),tests=20,callbacks=192,panels=len(rows)))
+    save('timings',rows);save('complete',dict(done=True,source=meta,cc=cc,host=platform.machine(),platform=platform.platform(),tests=20,poison_patterns=[165,90],callbacks=192,panels=len(rows)))
 finally:
     amount=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=amount))

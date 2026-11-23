@@ -1,7 +1,7 @@
-name: Separate the built-in SystemZ text frame from scanning on four real programs
+name: Verify SystemZ decoded operand initialization with two stack patterns and real workloads
 on:
   push:
-    branches: [codex/systemz-separate-print-frame]
+    branches: [codex/systemz-construct-operands-on-demand]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-print-frame-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-constructed-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

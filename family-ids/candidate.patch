@@ -1,5 +1,5 @@
 diff --git a/cs.c b/cs.c
-index c87f3f47..61130913 100644
+index c87f3f47..0a820fbe 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -77,6 +77,12 @@
@@ -15,68 +15,50 @@ index c87f3f47..61130913 100644
  #include "arch/TMS320C64x/TMS320C64xModule.h"
  #include "arch/TriCore/TriCoreModule.h"
  #include "arch/WASM/WASMModule.h"
-@@ -980,7 +986,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 		off++;
- 	const char *operands = OS->buffer + off;
- 	if (stream_length_valid) {
--		/* The private x86 stream's index is its terminating NUL. */
-+		/* The private stream's index is its terminating NUL. */
- 		const size_t length =
- 			MIN(OS->index - off, sizeof(insn->op_str) - 1);
- 		if (length > 32) {
-@@ -1038,6 +1044,37 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -1091,6 +1097,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #elif defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+ 	/* The RISC-V decoder constructs each operand before reading it. */
+ 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
++#elif defined(CAPSTONE_SYSTEMZ_PRIVATE_TEXT)
++	/* The SystemZ decoder constructs each operand before the built-in
++	 * printer reads it. Other callbacks retain the full initialization. */
++	if (handle->disasm == SystemZ_getInstruction &&
++	    handle->printer == SystemZ_printer && !handle->post_printer)
++		MCInst_InitStorage(&mci, CS_ARCH_SYSTEMZ, false);
++	else
++		MCInst_Init(&mci, handle->arch);
+ #elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
+ 	(defined(__clang__) || (defined(__GNUC__) && defined(__aarch64__)))
+ 	/* AArch64 constructs its operands as it decodes. On x86 hosts GCC
+@@ -1136,11 +1150,29 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else
  #endif
- }
- 
+ 		{
+-			SStream_Init(&ss);
 +#ifdef CAPSTONE_SYSTEMZ_PRIVATE_TEXT
-+/* Keep the print stream outside the frame used to scan without text. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+static void systemz_print_record(cs_struct *handle, cs_insn *insn, MCInst *mci,
-+				const uint8_t *code)
-+{
-+	SStream ss;
-+	/* A formatter can restore the default callback during printing. */
-+	const bool known_length = handle->printer == SystemZ_printer &&
-+				  !handle->post_printer &&
-+				  cs_vsnprintf == cs_default_vsnprintf;
-+	if (known_length) {
-+		ss.buffer[0] = '\0';
-+		ss.index = 0;
-+		ss.is_closed = false;
-+		ss.markup_stream = false;
-+		ss.prefixed_by_markup = false;
-+	} else {
-+		SStream_Init(&ss);
-+	}
-+	SStream_opt_unum(&ss, handle->imm_unsigned);
-+	handle->printer(mci, &ss, handle->printer_info);
-+	fill_insn(handle, insn, &ss, mci, handle->post_printer, code,
-+		  known_length);
-+}
-+#endif
-+
- /* Keep the full decoder's stack frame off generated-output hits, while
-  * retaining the public iterator's scan code and private calling convention. */
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
-@@ -1112,6 +1149,9 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		fill_insn_without_text(insn, MCInst_getOpcodePub(&mci), code,
- 				       false);
- 	} else {
-+#ifdef CAPSTONE_SYSTEMZ_PRIVATE_TEXT
-+		systemz_print_record(handle, insn, &mci, code);
++			/* The built-in printer only appends to this stream. A custom
++			 * formatter may return a count beyond its first NUL. */
++			const bool known_length = handle->printer == SystemZ_printer &&
++						  !handle->post_printer &&
++						  cs_vsnprintf == cs_default_vsnprintf;
 +#else
- 		SStream ss;
- #if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-@@ -1142,6 +1182,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
- 				  code, false);
- 		}
++			const bool known_length = false;
 +#endif
++#ifdef CAPSTONE_SYSTEMZ_PRIVATE_TEXT
++			if (known_length) {
++				ss.buffer[0] = '\0';
++				ss.index = 0;
++				ss.is_closed = false;
++				ss.markup_stream = false;
++				ss.prefixed_by_markup = false;
++			} else
++#endif
++				SStream_Init(&ss);
+ 			SStream_opt_unum(&ss, handle->imm_unsigned);
+ 			handle->printer(&mci, &ss, handle->printer_info);
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+-				  code, false);
++				  code, known_length);
+ 		}
  	}
  	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
- 		insn->id += mci.popcode_adjust;
