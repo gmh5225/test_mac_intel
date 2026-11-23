@@ -75,7 +75,7 @@ def main(w):
             run(['clang++','-std=c++17','-O2','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'table-check'],'generator-link')
             produced=sp.check_output([w/'table-check','--vex32-memory'])
             assert produced==(base/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes() and b'vex32_move_rows[2]' in produced
-        run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'oracle.c','-o',w/'observed.o'],'guard-wrapper-'+label)
+        run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',*(['-DOBSERVED_MASKED'] if label=='integrated' else []),'-c',r/'oracle.c','-o',w/'observed.o'],'guard-wrapper-'+label)
         run(['clang++','-O2','-std=c++17','-I',base/'include',r/'oracle.cpp',w/'observed.o',b/'libcapstone.a','-o',w/'direct-guard'],'guard-link-'+label)
         counts=list(map(int,sp.check_output([w/'direct-guard'],text=True).split()))
         assert counts==data['guard_counts']['parent' if label=='baseline' else 'commit']
@@ -85,7 +85,7 @@ def main(w):
         run(['clang++',obj,'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32',*libs,'-o',target],'link-'+label)
         if label=='integrated':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
-            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_decodeOutputMiss32','-Wl,--wrap=X86_decodeRegisterFallback32',*libs,'-o',w/'coverage'],'link-counter')
+            run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_decodeOutputMiss64','-Wl,--wrap=cs_decode_full_insn',*libs,'-o',w/'coverage'],'link-counter')
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -105,19 +105,19 @@ def main(w):
         assert exec_sections
         if label=='baseline':original_sections=exec_sections
         else:save('scalar-code-copy.json',dict(same=original_sections==exec_sections))
-        names=('X86_disasmIter32','X86_disasmIterText','cs_decode_full_insn','X86_decodeOutputMiss32')
+        names=('X86_disasmIter32','X86_disasmIterText','cs_decode_full_insn','X86_decodeOutputMiss32','X86_decodeOutputMiss64')
         addrs={f[3]:[int(f[0],16),int(f[1],16)] for line in sp.check_output(['nm','-S','--defined-only',target],text=True).splitlines() if len(f:=line.split())==4 and f[3] in names}
         with target.open('rb')as stream: es={z.name:[z['sh_addr'],z.data_size]for z in ELFFile(stream).iter_sections() if z['sh_flags']&2 and z['sh_type']=='SHT_PROGBITS'}
         save('private-layout-'+label+'.json',dict(executable_sections=exec_sections,entrypoints=addrs,sections=es))
         if label=='integrated':
-            (w/'extra.o').write_bytes(sp.check_output(['ar','p',libs[0],'X86MemoryFallback32.c.o']))
+            (w/'extra.o').write_bytes(sp.check_output(['ar','p',libs[0],'X86VectorFallback64.c.o']))
             run(['objdump','-drw','--no-show-raw-insn',w/'extra.o'],'fallback-assembly')
 
         if label=='baseline':prior=members
         else:
             changed={k for k in prior if members.get(k)!=prior[k]}
             added=set(members)-set(prior)
-            assert set(prior)<=set(members) and not added and changed=={'X86MemoryFallback32.c.o'}
+            assert set(prior)<=set(members) and not added and changed=={'X86VectorFallback64.c.o'}
             changed.update(added)
             save('isolation.json',dict(unchanged=len(prior)-len(changed),changed=sorted(changed),baseline=sha(w/'unselected-baseline'),unselected=sha(ordinary)))
         exe[label]=target
@@ -178,9 +178,8 @@ def main(w):
             assert result[2:]==list(map(int,normal.split()))[2:] and len(result)==6
             prefix,attempt,accepted=observed.stderr.split()
             attempt,accepted=int(attempt),int(accepted)
-            assert prefix=='segment' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
-            if bits==64:assert attempt==accepted==0
-            if name in ('libssl3t64-i386','putty-32-0.85'):assert accepted>0
+            assert prefix=='masked' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
+            assert accepted//2 == (1507 if name=='libssl3t64-amd64' else 0),(name,mode,attempt,accepted)
             coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
         assert coverage['1']==coverage['2']
         save('coverage-'+name+'.json',coverage)

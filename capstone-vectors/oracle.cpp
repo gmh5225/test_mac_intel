@@ -68,7 +68,7 @@ int main() {
             size_t left = n;
             uint64_t ip = reference.address;
             if (!cs_disasm_iter(ordinary, &cursor, &left, &ip, &reference) ||
-                length != 7 || cursor != p + length || left != n - length ||
+                length < 6 || length > n || cursor != p + length || left != n - length ||
                 ip != actual.address + length || actual.id != reference.id ||
                 actual.size != length || reference.size != length ||
                 std::memcmp(actual.bytes, reference.bytes, sizeof(actual.bytes)) ||
@@ -81,25 +81,25 @@ int main() {
                 std::memcmp(&act, &ref, sizeof(act))) return false;
             return true;
         };
-        const uint8_t segments[]={0x26,0x2e,0x36,0x3e,0x64,0x65,0x66,0x67,0xf2,0xf3};
-        const unsigned disps[]={0U,1U,9U,10U,255,0x7fffffffU,0x80000000U,0xfffffff6U,0xffffffffU};
-        for (unsigned prefix=0;prefix<sizeof(segments);++prefix) for (unsigned op : {0x2bu,0x89u,0x8bu,0x8au,0x8fu})
-            for (unsigned mr=0;mr<256;++mr) for(unsigned disp:disps) {
-                std::array<uint8_t,11> b{{segments[prefix],uint8_t(op),uint8_t(mr)}};
-                for(unsigned i=0;i<4;++i)b[3+i]=uint8_t(disp>>(8*i));
-                const bool admit=!wide && prefix<6 && (mr&0xc7)==5 && (op==0x2b || op==0x89 || op==0x8b);
-                for (unsigned n : {0u,1u,2u,3u,4u,5u,6u,7u,8u,11u}) {
-                    if (!check(b,n,!admit||n<7)) {
-                        std::fprintf(stderr,"i386 segment=%02x op=%02x mr=%02x disp=%x n=%u detail=%u\\n",segments[prefix],op,mr,disp,n,detail);return 8;
-                    }
-                }
+// Sweep the register-extension bits, every mask/width and ModR/M,
+        // plus truncations, invalid EVEX fields and all scales on indexed memory.
+        for (unsigned ext=0;ext<16;++ext) for(unsigned ll=0;ll<4;++ll)
+            for(unsigned mask=0;mask<8;++mask) for(unsigned zero:{0u,1u})
+            for(unsigned op:{0x6fu,0x7fu}) for(unsigned mr=0;mr<256;++mr) {
+                std::array<uint8_t,11>b{0x62,uint8_t((ext<<4)|1),0x7f,
+                    uint8_t((zero<<7)|(ll<<5)|8|mask),uint8_t(op),uint8_t(mr),
+                    uint8_t((mr*3+ext*17+mask)&255),0x81,0xef,0xfe,0x80};
+                const bool reject=!wide || !mask ||ll==3 || (op==0x7f && ((mr>>6)==3||zero));
+                if(!check(b,11,reject)){std::fprintf(stderr,"ext=%x ll=%u mask=%u z=%u op=%x mr=%x sib=%x\n",ext,ll,mask,zero,op,mr,b[6]);return 3;}
+                if((mr&0x38)==0 && ext==0)for(unsigned n=0;n<11;++n)
+                    if(!check(b,n,reject||n<6)){std::fprintf(stderr,"trunc %u mr %x\n",n,mr);return 4;}
             }
-        std::array<uint8_t,11> b{{0x65,0x2b,0x05,0x14,0,0,0}};
-        for(auto opt:{CS_OPT_UNSIGNED,CS_OPT_TEXT}){
-            if(cs_option(fast,opt,opt==CS_OPT_TEXT?CS_OPT_OFF:CS_OPT_ON)||!check(b,7,true)||
-               cs_option(fast,opt,opt==CS_OPT_TEXT?CS_OPT_ON:CS_OPT_OFF))return 6;
+        for(unsigned idx=0;idx<6;++idx)for(unsigned v=0;v<256;++v)for(unsigned sib=0;sib<256;sib+=3){
+            std::array<uint8_t,11>b{0x62,0xf1,0x7f,0x49,0x6f,0x44,uint8_t(sib),0x80,0,0,0};
+            b[idx]=uint8_t(v);if(!check(b,11,!wide)){std::fprintf(stderr,"field %u value %x sib %x\n",idx,v,sib);return 5;}
         }
-        if(cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names))||!check(b,7,true))return 7;
+        std::array<uint8_t,11>b{0x62,0xf1,0x7f,0xc9,0x6f,0xc0};
+        if(cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) || !check(b,6,true))return 6;
         cs_close(&ordinary);
         cs_close(&fast);
     }

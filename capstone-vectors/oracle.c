@@ -1,16 +1,13 @@
-#define X86_decodeOutputMiss32 test_memory_miss
-#define X86_decodeRegisterFallback32 test_register_miss
-#include "arch/X86/X86MemoryFallback32.c"
+#define X86_decodeOutputMiss64 observed_miss64
+#include "arch/X86/X86VectorFallback64.c"
 
-CS_PRESERVE_MOST bool test_register_miss(cs_struct *handle, const uint8_t *code,
-		size_t size, cs_insn *insn, uint16_t *length, bool batch)
+bool observed_plain(csh h, bool wide, const uint8_t *p, size_t n,
+                    cs_insn *out, uint16_t *len)
 {
-	return false;
-}
-
-bool observed_plain(csh h, bool wide, const uint8_t *code, size_t size,
-		    cs_insn *insn, uint16_t *length)
-{
-	return !wide && size && test_memory_miss((cs_struct *)(uintptr_t)h,
-				code, size, insn, length, false);
+#ifdef OBSERVED_MASKED
+    return wide && n >= 6 && p[0] == 0x62 && (p[4] | 0x10) == 0x7f &&
+           writeMaskedByteMove((cs_struct *)(uintptr_t)h, p, n, out, len);
+#else
+    return false;
+#endif
 }

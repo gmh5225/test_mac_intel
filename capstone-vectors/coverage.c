@@ -2,30 +2,30 @@
 #include <inttypes.h>
 #include <stdio.h>
 
-static uint64_t attempts, accepted;
 static bool probing;
+static uint64_t attempts, accepted;
 
-CS_PRESERVE_MOST bool __real_X86_decodeOutputMiss32(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
-CS_PRESERVE_MOST bool __real_X86_decodeRegisterFallback32(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
+CS_PRESERVE_MOST bool __real_X86_decodeOutputMiss64(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
+CS_PRESERVE_MOST bool __real_cs_decode_full_insn(cs_struct *, const uint8_t *, size_t, cs_insn *, uint16_t *, bool);
 
-CS_PRESERVE_MOST bool __wrap_X86_decodeRegisterFallback32(cs_struct *h, const uint8_t *p, size_t n, cs_insn *i, uint16_t *z, bool bulk)
+CS_PRESERVE_MOST bool __wrap_cs_decode_full_insn(cs_struct *handle, const uint8_t *p, size_t size, cs_insn *insn, uint16_t *len, bool batch)
 {
-	probing = false;
-	return __real_X86_decodeRegisterFallback32(h, p, n, i, z, bulk);
+    probing = false;
+    return __real_cs_decode_full_insn(handle, p, size, insn, len, batch);
 }
 
-CS_PRESERVE_MOST bool __wrap_X86_decodeOutputMiss32(cs_struct *h, const uint8_t *p, size_t n, cs_insn *i, uint16_t *z, bool bulk)
+CS_PRESERVE_MOST bool __wrap_X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *p, size_t size, cs_insn *insn, uint16_t *len, bool batch)
 {
-	const bool seg = p[0] == 0x26 || p[0] == 0x2e || p[0] == 0x36 || p[0] == 0x3e || p[0] == 0x64 || p[0] == 0x65;
-	probing = n >= 7 && seg && (p[1] == 0x2b || p[1] == 0x89 || p[1] == 0x8b) && (p[2] & 0xc7) == 5;
-	attempts += probing;
-	bool ok = __real_X86_decodeOutputMiss32(h, p, n, i, z, bulk);
-	accepted += probing && ok;
-	probing = false;
-	return ok;
+    probing = size >= 6 && p[0] == 0x62 && (p[1] & 15) == 1 &&
+              p[2] == 0x7f && (p[3] & 7) && (p[4] | 0x10) == 0x7f;
+    attempts += probing;
+    bool ok = __real_X86_decodeOutputMiss64(handle, p, size, insn, len, batch);
+    accepted += probing && ok;
+    probing = false;
+    return ok;
 }
 
 __attribute__((destructor)) static void report(void)
 {
-	fprintf(stderr, "segment %" PRIu64 " %" PRIu64 "\n", attempts, accepted);
+    fprintf(stderr, "masked %" PRIu64 " %" PRIu64 "\n", attempts, accepted);
 }
