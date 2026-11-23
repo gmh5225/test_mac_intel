@@ -1,7 +1,7 @@
-name: Repeat isolated PE32 and i386 public timings with two copies per library on Linux and Intel Macs
+name: Confirm compact VEX pages against two equivalent PE32 public controls and both Linux SIMD samples
 on:
   push:
-    branches: [codex/pe32-fused-prefix-public-repeat]
+    branches: [codex/compact-vex-public-pe32-confirm]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fused-prefix-pe32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: paged-vex-pe32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
