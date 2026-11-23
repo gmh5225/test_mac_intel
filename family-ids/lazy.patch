@@ -1,8 +1,8 @@
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index f7778c5d..07d82db7 100644
+index f7778c5d..1c91e3fc 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
-@@ -418,7 +418,6 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+@@ -418,14 +418,16 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
  	MI->flat_insn->usesAliasDetails = usesAliasDetails;
  
  	MCInst Uncompressed;
@@ -10,10 +10,13 @@ index f7778c5d..07d82db7 100644
  	MCInst *MIUncompressed = MI;
  	bool is_uncompressed = false;
  
-@@ -426,6 +425,7 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 	bool textReal = isRealSyntax(MI);
  	bool detailReal = isRealDetail(MI);
  
- 	if (!textReal || (detail_is_set(MI) && !detailReal)) {
+-	if (!textReal || (detail_is_set(MI) && !detailReal)) {
++	/* The uncompression table accepts only two-byte instructions. */
++	if (MI->flat_insn->size == 2 &&
++	    (!textReal || (detail_is_set(MI) && !detailReal))) {
 +		MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
  		// Side-effectful check for compressed instructions that also creates the equivalent
  		// uncompressed instruction in case of returning true
