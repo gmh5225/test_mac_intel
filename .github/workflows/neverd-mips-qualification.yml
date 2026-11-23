@@ -145,6 +145,11 @@ jobs:
           build-check/bin/NeverDMIPSFlowTests --gtest_output=xml:evidence/flow.xml
           python qualification-driver/neverd-mips-qualification/native-benchmark.py build-check/bin/neverd-mips-bench evidence/performance.json
           cp build-check/neverd-dependency-inputs.json build-check/neverd-build-receipt.json evidence/
+      - name: Measure both edges in the published hardware waveforms
+        if: env.REQUIRED_TEST == 'MIPSHistoricalScheduling.R4300AndR4600BootFetchesMatchBusCaptures'
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: PyMuPDF==1.25.5
+          python qualification-driver/neverd-mips-qualification/measure-boot.py
       - name: Retain configuration diagnostics for a failed build
         if: failure()
         run: |
