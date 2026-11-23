@@ -46,16 +46,22 @@ index ea9309f4..a7b81d3f 100644
  	1024, // X86_WBINVD
  	0, // X86_WBNOINVD
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..d0bd4c96 100644
+index bc463d2b..a03b6f00 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10299,6 +10299,37 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+@@ -10299,6 +10299,43 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
  #endif
  
  // given internal insn id, return public instruction info
 +#ifndef CAPSTONE_DIET
 +/* The mapping generator marks these opcodes. All other implicit writes
 + * use the table unchanged in every execution mode. */
++/* Four mode-dependent write lists are the only callers of this slow path. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline, cold))
++#endif
 +static void set_legacy_writes(cs_detail *detail, const insn_map_x86 *mapping)
 +{
 +	switch (mapping->mapid) {
@@ -87,7 +93,7 @@ index bc463d2b..d0bd4c96 100644
  void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  {
  	unsigned int i;
-@@ -10322,49 +10353,15 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10322,49 +10359,15 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			insn->detail->regs_read_count =
  				(x86_mapping_counts[i] & 31);
  

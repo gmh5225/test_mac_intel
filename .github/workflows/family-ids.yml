@@ -1,7 +1,7 @@
-name: Compare the generated legacy write-set classification with both existing mapping implementations
+name: Compare isolated legacy write lists and inline mode dispatch on PuTTY and foreign architectures
 on:
   push:
-    branches: [codex/classify-mode-specific-implicit-writes]
+    branches: [codex/cold-legacy-write-lists]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: legacy-write-flags-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: outlined-legacy-writes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
