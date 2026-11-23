@@ -1,7 +1,7 @@
-name: Train both decoders and explicitly export the instrumented Rust profile for each input
+name: Use matched Clang compilers to build the fork profile tool and compare both trained decoders
 on:
   push:
-    branches: [codex/explicit-rust-profile-counters]
+    branches: [codex/matched-source-profile-tool]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: exported-profile-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: paired-compiler-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

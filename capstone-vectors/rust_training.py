@@ -11,7 +11,16 @@ def fork_profdata(w,out):
     sp.run(['git','-C',src,'sparse-checkout','set','--no-cone','/llvm/','!/llvm/test/','!/llvm/unittests/','/cmake/','/third-party/'],check=True)
     sp.run(['git','-C',src,'checkout','--quiet','--detach','HEAD'],check=True)
     head=sp.check_output(['git','-C',src,'rev-parse','HEAD'],text=True).strip()
-    sp.run(['cmake','-S',src/'llvm','-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DLLVM_TARGETS_TO_BUILD=Native','-DLLVM_INCLUDE_TESTS=OFF','-DLLVM_INCLUDE_EXAMPLES=OFF','-DLLVM_INCLUDE_BENCHMARKS=OFF','-DLLVM_BUILD_TOOLS=ON','-DLLVM_ENABLE_PROJECTS=','-DLLVM_ENABLE_TERMINFO=OFF'],check=True)
+    (out/'llvm-source-at-configure.json').write_text(json.dumps(dict(repository=uri,branch='main',commit=head))+'\n')
+    try:
+        sp.run(['cmake','-S',src/'llvm','-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DLLVM_TARGETS_TO_BUILD=Native','-DLLVM_INCLUDE_TESTS=OFF','-DLLVM_INCLUDE_EXAMPLES=OFF','-DLLVM_INCLUDE_BENCHMARKS=OFF','-DLLVM_BUILD_TOOLS=ON','-DLLVM_ENABLE_PROJECTS=','-DLLVM_ENABLE_TERMINFO=OFF'],check=True)
+    except sp.CalledProcessError:
+        for name in ('CMakeConfigureLog.yaml','CMakeError.log'):
+            log=build/'CMakeFiles'/name
+            if log.is_file():
+                import gzip
+                (out/(name+'.gz')).write_bytes(gzip.compress(log.read_bytes(),mtime=0))
+        raise
     sp.run(['cmake','--build',build,'--target','llvm-profdata','--parallel','4'],check=True)
     tool=w/'fork-llvm-profdata';shutil.copy2(build/'bin/llvm-profdata',tool)
     version=sp.check_output([tool,'--version'],text=True)
