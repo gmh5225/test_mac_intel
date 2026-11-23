@@ -1,13 +1,77 @@
-diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
-index 8c4e4e839b..745a3a8ce9 100644
---- a/lib/decode/Decoder.cpp
-+++ b/lib/decode/Decoder.cpp
-@@ -384,7 +384,7 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
-   size_t Remaining = Len;
-   uint64_t PC = Addr;
-   if (Text && X86) {
--    if (X86_disasmIter(Handle, &Code, &Remaining, &PC, InsnBuf))
-+    if (X86_disasmIterText(Handle, &Code, &Remaining, &PC, InsnBuf))
-       return true;
-   } else if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf)) {
-     return true;
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d6f3ff5f..adfa7583 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1070,8 +1070,15 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    if(capstone_enabled_architectures STREQUAL "X86")
+-        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++    if(capstone_enabled_architectures STREQUAL "X86" OR
++       (CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
++        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
++        if(capstone_enabled_architectures STREQUAL "X86")
++            target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++        else()
++            set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY
++                COMPILE_DEFINITIONS CAPSTONE_X86_LINKED_TEXT_ITERATORS)
++        endif()
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+             $<TARGET_OBJECTS:capstone_x86_native>)
+diff --git a/Makefile b/Makefile
+index 8118f71d..7576144f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -289,6 +289,8 @@ endif
+ 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
++else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
++$(OBJDIR)/arch/X86/X86DisassemblerDecoder.o: CFLAGS += -DCAPSTONE_X86_LINKED_TEXT_ITERATORS
+ endif
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..c4d4f137 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,11 +30,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
+ 
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
+-	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#if defined(CAPSTONE_X86_ONLY)
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
++#elif defined(CAPSTONE_X86_LINKED_TEXT_ITERATORS)
++#define CAPSTONE_X86_DIRECT_PUBLIC_TEXT
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..165a3089 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3798,6 +3798,14 @@ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+ {
++#ifdef CAPSTONE_X86_DIRECT_PUBLIC_TEXT
++	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
++	/* A fixed-mode iterator owns this entire record, including skipdata and
++	 * the caller's cursors. Its mode and text guards must accept the handle. */
++	if (*size && handle && handle->arch == CS_ARCH_X86 && !handle->no_text &&
++	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64))
++		return X86_disasmIterText(ud, code, size, address, insn);
++#endif
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 

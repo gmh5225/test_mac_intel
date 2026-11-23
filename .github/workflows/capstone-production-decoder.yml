@@ -1,7 +1,7 @@
-name: Compare the default NeverD decoder with mixed static public readers and early scalar detail repair
+name: Measure VEX register output and direct public dispatch through the NeverD decoder
 on:
   push:
-    branches: [codex/neverd-linked-readers-early-scalar-details]
+    branches: [codex/neverd-vector-forms-and-public-dispatch]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 30c94d8e3eda73dbcf459130262ba347a33712eb
+          ref: 9095c0b4c63803478122b18099f0c75bdeee4e56
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "30c94d8e3eda73dbcf459130262ba347a33712eb"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "372fbd2d967c5023371a12e0e406f8be2ec84ae5"
+          test "$(git rev-parse HEAD)" = "9095c0b4c63803478122b18099f0c75bdeee4e56"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "76395023380f346cd58f166905c5be77afede197"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 372fbd2d967c5023371a12e0e406f8be2ec84ae5
-          git -C third_party/capstone checkout --detach 372fbd2d967c5023371a12e0e406f8be2ec84ae5
+          git -C third_party/capstone fetch --depth=1 origin 76395023380f346cd58f166905c5be77afede197
+          git -C third_party/capstone checkout --detach 76395023380f346cd58f166905c5be77afede197
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: linked-reader-scalar-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex-dispatch-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

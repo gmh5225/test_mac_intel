@@ -1,0 +1,210 @@
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 7d3a6e84..5a7aedff 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -357,6 +357,21 @@ static const struct VectorOutputRow vex_register_rows[] = {
+ 	{ X86_INS_VPCLMULQDQ, "vpclmulqdq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 1 }, 1 },
+ 	{ X86_INS_VPERM2I128, "vperm2i128", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+ 	{ X86_INS_VGF2P8AFFINEQB, "vgf2p8affineqb", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VMOVHLPS, "vmovhlps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VUNPCKLPS, "vunpcklps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VUNPCKHPS, "vunpckhps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMOVLHPS, "vmovlhps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VANDPS, "vandps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VANDNPS, "vandnps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VORPS, "vorps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VXORPS, "vxorps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VADDPS, "vaddps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMULPS, "vmulps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VSUBPS, "vsubps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMINPS, "vminps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VDIVPS, "vdivps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMAXPS, "vmaxps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VSHUFPS, "vshufps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+ };
+ static const uint16_t vex_register_widths[][4] = {
+ 	{ 0, 0, 0, 0 },
+@@ -515,8 +530,23 @@ static const uint16_t vex_register_widths[][4] = {
+ 	{ 261, 262, 261, 262 },
+ 	{ 0, 263, 0, 0 },
+ 	{ 0, 0, 264, 264 },
++	{ 265, 0, 265, 0 },
++	{ 266, 266, 266, 266 },
++	{ 267, 267, 267, 267 },
++	{ 268, 0, 268, 0 },
++	{ 269, 269, 269, 269 },
++	{ 270, 270, 270, 270 },
++	{ 271, 271, 271, 271 },
++	{ 272, 272, 272, 272 },
++	{ 273, 273, 273, 273 },
++	{ 274, 274, 274, 274 },
++	{ 275, 275, 275, 275 },
++	{ 276, 276, 276, 276 },
++	{ 277, 277, 277, 277 },
++	{ 278, 278, 278, 278 },
++	{ 279, 279, 279, 279 },
+ };
+-static const uint8_t vex_register_plans[3][256] = {
++static const uint8_t vex_register_plans[4][256] = {
+ 	{
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -571,6 +601,24 @@ static const uint8_t vex_register_plans[3][256] = {
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 156, 0, 157, 158, 159, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 160, 161, 162, 163, 164, 165, 0, 0, 166, 167, 168, 169,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 170, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
+ };
+ static const struct VectorOutputRow vex_shift_rows[] = { { 0 },
+ 	{ X86_INS_VPSRLW, "vpsrlw", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index dceebc42..f51fc257 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -397,14 +397,19 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ {
+ 	const unsigned flags = code[prefix - 1];
+ 	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
+-	if ((flags & 3) != 1 || !map || map > 3)
++	unsigned bank;
++	if ((flags & 3) == 1 && map - 1 < 3)
++		bank = map - 1;
++	else if (!(flags & 3) && map == 1)
++		bank = 3;
++	else
+ 		return false;
+ 	const unsigned ll = (flags >> 2) & 1;
+ 	const unsigned w = prefix == 3 && (flags & 0x80);
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & (prefix == 2 ? 4 : 7);
+ 	const unsigned modrm = code[prefix + 1];
+ 	const unsigned opcode = code[prefix];
+-	if (map == 1 && opcode >= 0x71 && opcode <= 0x73) {
++	if (bank == 0 && opcode >= 0x71 && opcode <= 0x73) {
+ 		unsigned index = vex_shift_plans[opcode - 0x71]
+ 						[(modrm >> 3) & 7][w * 2 + ll];
+ 		if (!index || size < prefix + 3)
+@@ -415,7 +420,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 					    &vex_shift_rows[index], prefix, ll,
+ 					    0x40 | (w << 3) | rxb, ll, regs, 2);
+ 	}
+-	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
++	const unsigned plan = vex_register_plans[bank][opcode];
+ 	const unsigned index = vex_register_widths[plan][w * 2 + ll];
+ 	if (!index)
+ 		return false;
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 91426243..08070e33 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -1038,14 +1038,14 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+ 			     unsigned w, unsigned ll, unsigned rxb,
+ 			     unsigned dst, unsigned src, unsigned rm,
+ 			     bool short_prefix, bool immediate, unsigned value,
+-			     bool group_shift = false, bool mode32 = false)
++			     bool group_shift = false, bool mode32 = false, unsigned pp = 1)
+ {
+ 	const unsigned prefix = short_prefix ? 2 : 3;
+ 	uint8_t bytes[6] = {};
+ 	bytes[0] = short_prefix ? 0xc5 : 0xc4;
+ 	bytes[1] = uint8_t((~rxb & 7) << 5 | map);
+ 	bytes[prefix - 1] = uint8_t((short_prefix ? (~rxb & 4) << 5 : w << 7) |
+-				    (~src & 15) << 3 | ll << 2 | 1);
++				    (~src & 15) << 3 | ll << 2 | pp);
+ 	bytes[prefix] = uint8_t(opcode);
+ 	bytes[prefix + 1] = uint8_t(0xc0 | dst << 3 | rm);
+ 	bytes[prefix + 2] = uint8_t(value);
+@@ -1133,8 +1133,12 @@ void emit_vex_registers(Decoder &decoder)
+ 	Decoder decoder32(CS_MODE_32);
+ 	std::vector<std::string> rows;
+ 	std::vector<Bytes4> widths(1);
+-	std::array<std::array<unsigned, 256>, 3> plans{};
+-	for (unsigned map = 1; map <= 3; ++map) {
++	// The first three banks are the 66 forms of 0F, 0F38 and 0F3A.
++	// A bare 0F map uses the same NDS register encoding with pp=0.
++	std::array<std::array<unsigned, 256>, 4> plans{};
++	for (unsigned bank = 0; bank < plans.size(); ++bank) {
++		const unsigned map = bank == 3 ? 1 : bank + 1;
++		const unsigned pp = bank == 3 ? 0 : 1;
+ 		for (unsigned opcode = 0; opcode < 256; ++opcode) {
+ 			Bytes4 by_width{};
+ 			for (unsigned wl = 0; wl < 4; ++wl) {
+@@ -1146,7 +1150,7 @@ void emit_vex_registers(Decoder &decoder)
+ 					return vex_register_row(
+ 						decoder, map, opcode, w, ll,
+ 						rxb, dst, src, rm, short_prefix,
+-						imm, value);
++						imm, value, false, false, pp);
+ 				};
+ 				bool imm = false;
+ 				auto row = probe(0, 3, 2, 1, false, false, 0);
+@@ -1178,7 +1182,7 @@ void emit_vex_registers(Decoder &decoder)
+ 							    (k >> 6) & 7,
+ 							    (k >> 3) & 7, k & 7,
+ 							    true, imm, k & 255,
+-							    false, true) != row)
++							    false, true, pp) != row)
+ 							throw std::runtime_error(
+ 								"32-bit VEX register row differs");
+ 				}
+@@ -1203,12 +1207,14 @@ void emit_vex_registers(Decoder &decoder)
+ 					"too many VEX register plans");
+ 			if (it == widths.end())
+ 				widths.push_back(by_width);
+-			plans[map - 1][opcode] = plan;
++			plans[bank][opcode] = plan;
+ 		}
+ 	}
+ 	if (!plans[0][0xef] || !plans[1][0xdc] || !plans[2][0x44])
+ 		throw std::runtime_error(
+ 			"missing the common VEX xor, AES or carry-less multiply form");
++	if (!plans[3][0x58] || !plans[3][0x59])
++		throw std::runtime_error("missing VEX packed single-precision arithmetic");
+ 	std::puts(
+ 		"static const struct VectorOutputRow vex_register_rows[] = {\n\t{ 0 },");
+ 	for (const auto &row : rows)
+@@ -1217,7 +1223,7 @@ void emit_vex_registers(Decoder &decoder)
+ 		    rows.size() <= UINT8_MAX ? "uint8_t" : "uint16_t");
+ 	for (const auto &row : widths)
+ 		std::printf("\t%s,\n", fields(row).c_str());
+-	std::puts("};\nstatic const uint8_t vex_register_plans[3][256] = {");
++	std::puts("};\nstatic const uint8_t vex_register_plans[4][256] = {");
+ 	for (const auto &map : plans) {
+ 		std::puts("\t{");
+ 		for (unsigned i = 0; i < map.size(); i += 16) {
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 1c7944f4..43eb26e0 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -982,6 +982,15 @@ static bool check_vex_register_forms(csh handles[2])
+ 			}
+ 		}
+ 	}
++	/* The bare 0F map and the 66 group shifts have separate opcode rows. */
++	static const uint8_t bare[][6] = {
++		{ 0xc5, 0x5c, 0x59, 0xc4 }, { 0xc5, 0x44, 0x58, 0xf7 },
++		{ 0xc4, 0x41, 0x1c, 0x59, 0xec }, { 0xc5, 0xfc, 0x72, 0xf0, 3 },
++	};
++	for (unsigned i = 0; i < sizeof(bare) / sizeof(bare[0]); ++i)
++		for (unsigned n = 1; n <= sizeof(bare[i]); ++n)
++			if (!compare(handles, bare[i], n, i + n))
++				return false;
+ 	return true;
+ }
+ 
