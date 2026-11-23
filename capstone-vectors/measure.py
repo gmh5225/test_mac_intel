@@ -162,17 +162,18 @@ def main(w):
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
-        active_tail=mixed and not darwin and kind=='bare'
+        active_tail=(mixed or darwin) and kind=='bare'
         assert members==expected,(key,members,expected)
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
+        save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert changed==(['X86VectorFallback64.c.o','X86VectorOutput.c.o'] if active_tail else []),(key,changed)
+            assert set(changed)==({'cs.c.o','X86OutputIterator.c.o'} if active_tail else set()),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
-        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodeVexMemoryOrFull','X86_decodePublicRecord','X86_scanNativeBatch'}
+        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_tryBulkOutput','X86_decodePublicRecord','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
             cols=line.split()
@@ -181,7 +182,7 @@ def main(w):
             if name in names:linked[name]=int(cols[0],16)
         assert ('X86_decodePublicRecord' in linked)==(not mixed)
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
-        assert ('X86_decodeVexMemoryOrFull' in linked)==active_tail
+        assert ('X86_tryBulkOutput' in linked)==active_tail,(key,linked)
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
@@ -189,8 +190,8 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    assert hashes['bare']==hashes['base']
-    assert (hashes['mixed_bare']==hashes['mixed_base'])==darwin
+    assert (hashes['bare']==hashes['base'])==(not darwin)
+    assert hashes['mixed_bare']!=hashes['mixed_base']
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}

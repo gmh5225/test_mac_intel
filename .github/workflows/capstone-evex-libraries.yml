@@ -1,7 +1,7 @@
-name: Measure the VEX memory predicate using existing register rows while preserving the pure x86 address expression
+name: Benchmark public and specialized iterators against both iced formatters using six real x86 inputs
 on:
   push:
-    branches: [codex/vex-shared-row-operands]
+    branches: [codex/public-scalar-format-vs-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
+          ref: 6fbeffec215f3c7c79169c655b0928c616b46152
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: deb20b49abc68cea5368ce6f7724fdfea01f05be
+          ref: beaa8ca552ff8e8e4c9376d27d9305a3c51a17cb
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: same-operands-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-public-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
