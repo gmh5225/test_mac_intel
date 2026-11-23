@@ -1,7 +1,7 @@
-name: Verify SystemZ decoder object, guarded instruction lengths and four real programs
+name: Measure SystemZ empty and single-register effects on four real s390x programs
 on:
   push:
-    branches: [codex/time-systemz-decode-by-width]
+    branches: [codex/systemz-sparse-register-effects]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 372fbd2d967c5023371a12e0e406f8be2ec84ae5
+          ref: 76395023380f346cd58f166905c5be77afede197
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-width-profiles-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-effect-shapes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

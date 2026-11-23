@@ -36,14 +36,20 @@ try:
             if profile=='pure':
                 images[k]=so.read_bytes()
                 flags=['-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include']
-                cmd('spans-build-'+k,[cc,*flags,d/('spans.c' if k=='base' else 'spans-fixed.c'),b/'libcapstone.a','-o',t/'spans'])
+                cmd('spans-build-'+k,[cc,*flags,d/'spans.c',b/'libcapstone.a','-o',t/'spans'])
                 assert int(sp.check_output([t/'spans']))==30880
-                if k!='base':
-                    cmd('dialect-unit-build-'+k,['cmake','--build',b,'--target','systemz_register_dialects'])
-                    cmd('dialect-unit-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_systemz_register_dialects$'])
+                cmd('effect-build-'+k,[cc,*flags,d/'effects.c',b/'libcapstone.a','-lm','-o',t/'effects'])
+                cmd('effect-run-'+k,[t/'effects'])
+                assert (out/('effect-run-'+k+'.log')).read_text().split()==['12420']
         a,bv=variants['dialects'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
         changed=[p for p in a['objects']if a['objects'][p]!=bv['objects'][p]]
-        assert set(changed)<={'arch/SystemZ/SystemZDisassembler.c.o'},(profile,changed)
+        if profile=='pure':
+            for name in ('dialects','candidate'):
+                diff=[f for f,v in variants['base']['objects'].items() if variants[name]['objects'][f]!=v]
+                assert diff==['arch/SystemZ/SystemZMapping.c.o'],(profile,name,diff)
+        else:
+            assert variants['base']==variants['dialects']==variants['candidate'],profile
+
         profiles[profile]=dict(changed=changed,variants=variants)
     save('profiles',profiles)
     # The package digest binds every extracted member. Check the established ls digest as well.
