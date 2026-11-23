@@ -1,7 +1,7 @@
-name: Verify both single-record APIs with real PE code, callbacks and registered tests on native Windows and macOS configurations
+name: Validate complete x86 public records for shared scalar writers on four native platforms and four build profiles
 on:
   push:
-    branches: [codex/single-record-native-configuration]
+    branches: [codex/public-x86-array-output-ports]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-single-record-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: portable-public-arrays-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

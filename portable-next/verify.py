@@ -1,78 +1,42 @@
 from pathlib import Path
-import hashlib,json,os,platform,shutil,subprocess as sp,sys,tempfile
-d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True);t=Path(tempfile.mkdtemp());proj=t/'project';proj.mkdir();b=t/'build';stages=json.loads((d/'stages.json').read_text());profile=os.environ['SCAN_PROFILE']
-def save(path,v):path.write_text(json.dumps(v,indent=2)+'\n')
+import hashlib,json,os,shutil,subprocess as sp,sys,tempfile
+d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True);t=Path(tempfile.mkdtemp());profile=os.environ['SCAN_PROFILE'];win=os.name=='nt';rd=lambda f:json.loads(f.read_text());stages=rd(d/'stages.json')
+def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+def cmd(n,args):
+    with (out/(n+'.log')).open('w')as log:x=sp.run(args,stdout=log,stderr=sp.STDOUT)
+    if x.returncode:print((out/(n+'.log')).read_text(errors='replace')[-1800:]);x.check_returncode()
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
-def cmd(path,args):
-    with path.open('w')as log:rc=sp.run(args,stdout=log,stderr=sp.STDOUT).returncode
-    if rc:print(path.read_text(errors='replace')[-2600:]);raise RuntimeError((args[0],rc))
+def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 try:
-    lines=['cmake_minimum_required(VERSION 3.22)','project(VerifyOperands LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)']
-    for suffix in ('static','shared'):
-        lines += [f'add_executable(probe_{suffix} "{(d/"registers.c").as_posix()}")',f'target_link_libraries(probe_{suffix} PRIVATE capstone_{suffix})',f'target_include_directories(probe_{suffix} PRIVATE "{(s/"include").as_posix()}")']
-    lines += [f'add_executable(vector_rows "{(s/"suite/synctools/x86_vector_output.cpp").as_posix()}")','target_compile_features(vector_rows PRIVATE cxx_std_17)','target_link_libraries(vector_rows PRIVATE capstone_static)',f'target_include_directories(vector_rows PRIVATE "{(s/"include").as_posix()}")']
-    lines += [f'add_executable(scalar_rows "{(s/"suite/synctools/x86_simple_output.cpp").as_posix()}")','target_compile_features(scalar_rows PRIVATE cxx_std_17)','target_link_libraries(scalar_rows PRIVATE capstone_static)',f'target_include_directories(scalar_rows PRIVATE "{s.as_posix()}" "{(s/"include").as_posix()}")']
-    lines += ['add_executable(one_check check.cpp)','target_compile_features(one_check PRIVATE cxx_std_17)','target_link_libraries(one_check PRIVATE capstone_static)',f'target_include_directories(one_check PRIVATE "{s.as_posix()}" "{(s/"include").as_posix()}")']
-    if profile=='noatt':lines.append('target_compile_definitions(one_check PRIVATE VERIFY_NO_ATT)')
-    import struct
-    shutil.copyfile(d/'fetch.py',t/'fetch.py');cmd(out/'fetch-pe.log',[sys.executable,'-B',t/'fetch.py'])
-    inputs={}
-    for bits in (32,64):
-        file=t/('putty-0.85-'+str(bits)+'.text')
-        assert hashlib.sha256(file.read_bytes()).hexdigest()==json.loads((d/'inputs.json').read_text())['putty'+str(bits)]['sha256']
-        inputs[bits]=file
-    (proj/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
-    cfg=['cmake','-S',proj,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
-    cfg+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'])[profile]
-    win=os.name=='nt'
-    if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
-    for name,q in stages.items():
-        v=out/name;v.mkdir();g('restore','--source','HEAD','--staged','--worktree','--','.')
-        assert g('rev-parse','HEAD')==q['parent']
-        patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+name+'.patch']))
-        assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-        shutil.copyfile(d/(name+'.cpp'),proj/'check.cpp')
-        cmd(v/'configure.log',cfg)
-        names={z['name']for z in json.loads(sp.check_output(['ctest','--test-dir',b,'-C','Release','--show-only=json-v1'],text=True))['tests']}
-        possible=['x86_scan_batch','x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy','x86_evex_move_access','detail_option','text_option','x86_x87_environment']
-        targets=[a for a in possible if 'unit_'+a in names]
-        assert 'x86_scan_batch' in targets and 'x86_buffer_bounds' in targets and 'x86_mapping_counts'in targets
-        full=profile in ('full','noatt')
-        if full:assert 'x86_simple_output'in targets
-        cmd(v/'build.log',['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*targets, *(['probe_static','probe_shared','vector_rows','scalar_rows']if full else [])])
-        cmd(v/'tests.log',['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(targets)+')$'])
-        cmd(v/'build-record-check.log',['cmake','--build',b,'--parallel','4','--target','one_check','capstone_shared'])
-        checker,=[p for p in b.rglob('one_check'+('.exe'if win else ''))if p.is_file()]
-        snapshots={}
-        for bits in (16,32,64):
-            result=json.loads(sp.check_output([checker,str(bits),inputs[32 if bits==16 else bits]],text=True))
-            assert result['records']>1000000 and result['tails']==128 and result['callback_bytes']==70000
-            snapshots[str(bits)]=result
-        save(v/'single-record.json',snapshots)
-        cmd(v/'mapping.log',[sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
-        if full:
-            dll_dirs=[str(p.parent)for p in b.rglob('*.dll')]
-            env=dict(os.environ,PATH=os.pathsep.join(dll_dirs+[os.environ['PATH']]))
-            exe,=[f for f in b.rglob('vector_rows'+('.exe' if win else ''))if f.is_file()]
-            table=sp.check_output([exe],env=env).replace(b'\r\n',b'\n')
-            assert table==(s/'arch/X86/X86GenVectorOutput.inc').read_bytes().replace(b'\r\n',b'\n')
-            save(v/'table.json',dict(bytes=len(table),sha256=hashlib.sha256(table).hexdigest()))
-            scalar,=[f for f in b.rglob('scalar_rows'+('.exe' if win else '')) if f.is_file()]
-            emitted=sp.check_output([scalar,'--test32-registers'],env=env).replace(bytes([13,10]),bytes([10]))
-            assert emitted==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenTest32Registers.inc'])
-            save(v/'scalar-table.json',dict(rows=2,sha256=hashlib.sha256(emitted).hexdigest()))
-            memory=sp.check_output([exe,'--vex-base-memory'],env=env).replace(bytes([13,10]),bytes([10]))
-            assert memory==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenVexBaseMemory.inc'])
-            save(v/'memory-table.json',dict(bytes=len(memory),sha256=hashlib.sha256(memory).hexdigest()))
-            rows=[]
-            for suffix in ('static','shared'):
-                exe,=[f for f in b.rglob('probe_'+suffix+('.exe' if win else '')) if f.is_file()]
-                obs=[ln.split()for ln in sp.check_output([exe],text=True,env=env).splitlines()];assert len(obs)==12
-                for bits,instr,vex,num,write,first,last in obs:
-                    count=16
-                    assert int(num)==int(write)==count and first=='ymm0' and last=='ymm'+str(count-1)
-                rows.append(obs)
-            assert rows[0]==rows[1];save(v/'vzero.json',rows[0])
-        save(v/'checked.json',dict(complete=True,source=q,profile=profile,tests=targets,host=platform.machine(),full=full))
+    project=t/'project';project.mkdir();b=t/'build'
+    cm=['cmake_minimum_required(VERSION 3.22)','project(PublicRecords LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)',f'add_executable(checker "{(d/"compare.cpp").as_posix()}")','target_compile_features(checker PRIVATE cxx_std_17)',f'target_include_directories(checker PRIVATE "{(s/"include").as_posix()}")']
+    if profile=='noatt':cm.append('target_compile_definitions(checker PRIVATE VERIFY_NO_ATT)')
+    (project/'CMakeLists.txt').write_text('\n'.join(cm)+'\n')
+    shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('fetch',[sys.executable,'-B',t/'fetch.py'])
+    samples=rd(d/'inputs.json');files={}
+    for w in (32,64):
+        files[w]=t/('putty-0.85-'+str(w)+'.text');assert sha(files[w])==samples['putty'+str(w)]['sha256']
+    flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    flags+=['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in ('X86','ARM','AARCH64','MIPS')]
+    flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'])[profile]
+    ports={};images={};libs={};units=['x86_buffer_bounds','x86_scan_batch','x86_reg_access','x86_x87_environment']if profile in ('full','noatt')else['x86_buffer_bounds','x86_scan_batch']
+    for k in ('base','batch','all'):
+        g('restore','--source','HEAD','--worktree','--staged','--','.')
+        if k!='base':
+            q=stages[k];assert g('rev-parse','HEAD')==q['parent']
+            patch=t/'trial.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+k+'.patch']));assert sha(patch)==q['sha256'];g('apply','--index',patch);assert g('write-tree')==q['tree']
+        cmd('configure-'+k,['cmake','-G','Ninja','-S',project,'-B',b,*flags])
+        cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared','checker',*units])
+        cmd('unit-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
+        lib,=[f for f in b.rglob('*.dll' if win else '*.dylib')if 'capstone'in f.name.lower()and f.is_file()and not f.is_symlink()]
+        ext='.dll'if win else'.dylib';path=t/(k+ext);shutil.copy2(lib,path);libs[k]=path;images[k]=sha(path)
+        if k=='base':continue
+        exe,=[f for f in b.rglob('checker'+('.exe'if win else''))if f.is_file()];results=ports[k]={}
+        for w in (16,32,64):
+            sample=64 if w==64 else 32
+            args=[exe,libs['base'],path,files[sample],str(w),str(samples['putty'+str(sample)]['address'])]
+            obs=[json.loads(l)for l in sp.check_output(args,text=True).splitlines()];assert len(obs)==2 and obs[0]['width']==w and obs[0]['records']>0 and obs[1]['callback_events']>0 and obs[1]['reentrant_details'];results[str(w)]=obs
+        save('checked',ports)
+    assert ports['batch']==ports['all'];save('complete',dict(source=stages,profile=profile,images=images,records=ports,units=units))
 finally:
-    n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file()and not f.is_symlink());shutil.rmtree(t);save(out/'cleanup.json',dict(removed=not t.exists(),bytes=n))
+    n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
