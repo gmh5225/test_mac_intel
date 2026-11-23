@@ -1,9 +1,243 @@
+diff --git a/arch/XCore/XCoreGenAsmWriter.inc b/arch/XCore/XCoreGenAsmWriter.inc
+index 24e1130a..0add9e76 100644
+--- a/arch/XCore/XCoreGenAsmWriter.inc
++++ b/arch/XCore/XCoreGenAsmWriter.inc
+@@ -424,9 +424,7 @@ static void printInstruction(MCInst *MI, SStream *O, MCRegisterInfo *MRI)
+ #endif
+ 
+ 
+-  if (strchr((const char *)AsmStrs+(Bits & 2047)-1, '[')) {
+-    set_mem_access(MI, true, 0);
+-  }
++  extract_literal_operands(MI, AsmStrs + (Bits & 2047) - 1);
+ 
+   // Fragment 0 encoded into 2 bits for 4 unique commands.
+   //printf(">>%s\n", AsmStrs+(Bits & 2047)-1);
+@@ -435,8 +433,6 @@ static void printInstruction(MCInst *MI, SStream *O, MCRegisterInfo *MRI)
+   default:   // unreachable.
+   case 0:
+     // DBG_VALUE, BUNDLE, LIFETIME_START, LIFETIME_END, CLRE_0R, DCALL_0R, DE...
+-    // already done. this means we have to extract details out ourself.
+-    XCore_insn_extract(MI, (const char *)AsmStrs+(Bits & 2047)-1);
+     return;
+     break;
+   case 1:
+@@ -561,6 +557,8 @@ static void printInstruction(MCInst *MI, SStream *O, MCRegisterInfo *MRI)
+     // SETEV_1r, SETV_1r
+     SStream_concat0(O, "], r11"); 
+     set_mem_access(MI, false, 0);
++    if (MI->csh->detail_opt)
++      add_literal_register(MI, XCORE_REG_R11);
+     return;
+     break;
+   case 16:
 diff --git a/arch/XCore/XCoreInstPrinter.c b/arch/XCore/XCoreInstPrinter.c
-index cdeb5b9f..32e67aa9 100644
+index cdeb5b9f..661cbcec 100644
 --- a/arch/XCore/XCoreInstPrinter.c
 +++ b/arch/XCore/XCoreInstPrinter.c
-@@ -240,9 +240,10 @@ void XCore_insn_extract(MCInst *MI, const char *code)
+@@ -39,210 +39,12 @@ void XCore_post_printer(csh ud, cs_insn *insn, SStream *insn_asm, MCInst *mci)
+ 	 */
+ }
  
+-// stw sed, sp[3]
+-void XCore_insn_extract(MCInst *MI, const char *code)
+-{
+-	int id;
+-	char *p, *p2;
+-	char tmp[128];
+-
+-	strncpy(tmp, code,
+-		sizeof(tmp) -
+-			1); // safe because code is way shorter than 128 bytes
+-
+-	// find the first space
+-	p = strchr(tmp, ' ');
+-	if (p) {
+-		p++;
+-		// find the next ','
+-		p2 = strchr(p, ',');
+-		if (p2) {
+-			*p2 = '\0';
+-			id = XCore_reg_id(p);
+-			if (id) {
+-				// register
+-				if (MI->csh->detail_opt) {
+-					MI->flat_insn->detail->xcore
+-						.operands[MI->flat_insn->detail
+-								  ->xcore
+-								  .op_count]
+-						.type = XCORE_OP_REG;
+-					MI->flat_insn->detail->xcore
+-						.operands[MI->flat_insn->detail
+-								  ->xcore
+-								  .op_count]
+-						.reg = id;
+-					MI->flat_insn->detail->xcore.op_count++;
+-				}
+-			}
+-			// next should be register, or memory?
+-			// skip space
+-			p2++;
+-			while (*p2 && *p2 == ' ')
+-				p2++;
+-			if (*p2) {
+-				// find '['
+-				p = p2;
+-				while (*p && *p != '[')
+-					p++;
+-				if (*p) {
+-					// this is '['
+-					*p = '\0';
+-					id = XCore_reg_id(p2);
+-					if (id) {
+-						// base register
+-						if (MI->csh->detail_opt) {
+-							MI->flat_insn->detail
+-								->xcore
+-								.operands
+-									[MI->flat_insn
+-										 ->detail
+-										 ->xcore
+-										 .op_count]
+-								.type =
+-								XCORE_OP_MEM;
+-							MI->flat_insn->detail
+-								->xcore
+-								.operands
+-									[MI->flat_insn
+-										 ->detail
+-										 ->xcore
+-										 .op_count]
+-								.mem.base =
+-								(uint8_t)id;
+-							MI->flat_insn->detail
+-								->xcore
+-								.operands
+-									[MI->flat_insn
+-										 ->detail
+-										 ->xcore
+-										 .op_count]
+-								.mem.index =
+-								XCORE_REG_INVALID;
+-							MI->flat_insn->detail
+-								->xcore
+-								.operands
+-									[MI->flat_insn
+-										 ->detail
+-										 ->xcore
+-										 .op_count]
+-								.mem.disp = 0;
+-							MI->flat_insn->detail
+-								->xcore
+-								.operands
+-									[MI->flat_insn
+-										 ->detail
+-										 ->xcore
+-										 .op_count]
+-								.mem.direct = 1;
+-						}
+-
+-						p++;
+-						p2 = p;
+-						// until ']'
+-						while (*p && *p != ']')
+-							p++;
+-						if (*p) {
+-							*p = '\0';
+-							// p2 is either index, or disp
+-							id = XCore_reg_id(p2);
+-							if (id) {
+-								// index register
+-								if (MI->csh->detail_opt) {
+-									MI->flat_insn
+-										->detail
+-										->xcore
+-										.operands
+-											[MI->flat_insn
+-												 ->detail
+-												 ->xcore
+-												 .op_count]
+-										.mem
+-										.index =
+-										(uint8_t)
+-											id;
+-								}
+-							} else {
+-								// a number means disp
+-								if (MI->csh->detail_opt) {
+-									MI->flat_insn
+-										->detail
+-										->xcore
+-										.operands
+-											[MI->flat_insn
+-												 ->detail
+-												 ->xcore
+-												 .op_count]
+-										.mem
+-										.disp =
+-										atoi(p2);
+-								}
+-							}
+-						}
+-
+-						if (MI->csh->detail_opt) {
+-							MI->flat_insn->detail
+-								->xcore
+-								.op_count++;
+-						}
+-					}
+-				} else {
+-					// a register?
+-					id = XCore_reg_id(p2);
+-					if (id) {
+-						// register
+-						if (MI->csh->detail_opt) {
+-							MI->flat_insn->detail
+-								->xcore
+-								.operands
+-									[MI->flat_insn
+-										 ->detail
+-										 ->xcore
+-										 .op_count]
+-								.type =
+-								XCORE_OP_REG;
+-							MI->flat_insn->detail
+-								->xcore
+-								.operands
+-									[MI->flat_insn
+-										 ->detail
+-										 ->xcore
+-										 .op_count]
+-								.reg = id;
+-							MI->flat_insn->detail
+-								->xcore
+-								.op_count++;
+-						}
+-					}
+-				}
+-			}
+-		} else {
+-			id = XCore_reg_id(p);
+-			if (id) {
+-				// register
+-				if (MI->csh->detail_opt) {
+-					MI->flat_insn->detail->xcore
+-						.operands[MI->flat_insn->detail
+-								  ->xcore
+-								  .op_count]
+-						.type = XCORE_OP_REG;
+-					MI->flat_insn->detail->xcore
+-						.operands[MI->flat_insn->detail
+-								  ->xcore
+-								  .op_count]
+-						.reg = id;
+-					MI->flat_insn->detail->xcore.op_count++;
+-				}
+-			}
+-		}
+-	}
+-}
+-
  static void set_mem_access(MCInst *MI, bool status, int reg)
  {
 -	if (MI->csh->detail_opt != CS_OPT_ON)
@@ -14,7 +248,7 @@ index cdeb5b9f..32e67aa9 100644
  	MI->csh->doing_mem = status;
  	if (status) {
  		if (reg != 0xffff && reg != -0xffff) {
-@@ -303,14 +304,13 @@ static void set_mem_access(MCInst *MI, bool status, int reg)
+@@ -303,14 +105,59 @@ static void set_mem_access(MCInst *MI, bool status, int reg)
  							  .op_count]
  					.mem.direct = -1;
  		}
@@ -28,10 +262,65 @@ index cdeb5b9f..32e67aa9 100644
 -			MI->flat_insn->detail->xcore.op_count++;
  		}
 +		++MI->flat_insn->detail->xcore.op_count;
++	}
++}
++
++static void add_literal_register(MCInst *MI, xcore_reg reg)
++{
++	cs_xcore *detail = &MI->flat_insn->detail->xcore;
++	cs_xcore_op *op = &detail->operands[detail->op_count++];
++	op->type = XCORE_OP_REG;
++	op->reg = reg;
++}
++
++/* The initial assembly fragment can contain complete operands, or end
++ * inside a memory operand that the encoded fields finish printing. */
++static void extract_literal_operands(MCInst *MI, const char *text)
++{
++	if (!MI->csh->detail_opt)
++		return;
++	const char *p = strchr(text, ' ');
++	if (!p)
++		return;
++
++	++p;
++	while (*p) {
++		const char *end = p + strcspn(p, ",[");
++		xcore_reg reg = XCore_reg_id(p, (size_t)(end - p));
++		if (*end == '[') {
++			set_mem_access(MI, true, reg);
++			p = end + 1;
++			end = strchr(p, ']');
++			if (!end)
++				return;
++			cs_xcore *detail = &MI->flat_insn->detail->xcore;
++			xcore_op_mem *mem = &detail->operands[detail->op_count].mem;
++			mem->index = (uint8_t)XCore_reg_id(p, (size_t)(end - p));
++			if (!mem->index)
++				mem->disp = (int32_t)strtol(p, NULL, 0);
++			set_mem_access(MI, false, 0);
++			++end;
++		} else if (reg) {
++			add_literal_register(MI, reg);
++		}
++		if (*end != ',')
++			return;
++		p = end + 1;
++		while (*p == ' ')
++			++p;
  	}
  }
  
-@@ -399,7 +399,8 @@ static void printInlineJT32(MCInst *MI, int OpNum, SStream *O)
+@@ -327,7 +174,7 @@ static void _printOperand(MCInst *MI, MCOperand *MO, SStream *O)
+ 				if (MI->flat_insn->detail->xcore
+ 					    .operands[MI->flat_insn->detail
+ 							      ->xcore.op_count]
+-					    .mem.base == ARM_REG_INVALID)
++					    .mem.base == XCORE_REG_INVALID)
+ 					MI->flat_insn->detail->xcore
+ 						.operands[MI->flat_insn->detail
+ 								  ->xcore
+@@ -399,7 +246,8 @@ static void printInlineJT32(MCInst *MI, int OpNum, SStream *O)
  void XCore_printInst(MCInst *MI, SStream *O, void *Info)
  {
  	printInstruction(MI, O, Info);
@@ -41,8 +330,61 @@ index cdeb5b9f..32e67aa9 100644
  }
  
  #endif
+diff --git a/arch/XCore/XCoreInstPrinter.h b/arch/XCore/XCoreInstPrinter.h
+index 4d5a5e0a..642e5175 100644
+--- a/arch/XCore/XCoreInstPrinter.h
++++ b/arch/XCore/XCoreInstPrinter.h
+@@ -12,7 +12,4 @@ void XCore_printInst(MCInst *MI, SStream *O, void *Info);
+ 
+ void XCore_post_printer(csh ud, cs_insn *insn, SStream *insn_asm, MCInst *mci);
+ 
+-// extract details from assembly code @code
+-void XCore_insn_extract(MCInst *MI, const char *code);
+-
+ #endif
+diff --git a/arch/XCore/XCoreMapping.c b/arch/XCore/XCoreMapping.c
+index 7e8cc5e4..ca1ceeae 100644
+--- a/arch/XCore/XCoreMapping.c
++++ b/arch/XCore/XCoreMapping.c
+@@ -37,7 +37,7 @@ static const name_map reg_name_maps[] = {
+ 	// pseudo registers
+ 	{ XCORE_REG_PC, "pc" },
+ 
+-	{ XCORE_REG_SCP, "scp" },
++	{ XCORE_REG_SCP, "spc" },
+ 	{ XCORE_REG_SSR, "ssr" },
+ 	{ XCORE_REG_ET, "et" },
+ 	{ XCORE_REG_ED, "ed" },
+@@ -59,12 +59,13 @@ const char *XCore_reg_name(csh handle, unsigned int reg)
+ #endif
+ }
+ 
+-xcore_reg XCore_reg_id(char *name)
++xcore_reg XCore_reg_id(const char *name, size_t length)
+ {
+ 	int i;
+ 
+ 	for (i = 1; i < ARR_SIZE(reg_name_maps); i++) {
+-		if (!strcmp(name, reg_name_maps[i].name))
++		if (strlen(reg_name_maps[i].name) == length &&
++		    !memcmp(name, reg_name_maps[i].name, length))
+ 			return reg_name_maps[i].id;
+ 	}
+ 
+diff --git a/arch/XCore/XCoreMapping.h b/arch/XCore/XCoreMapping.h
+index ff4c75da..5408899a 100644
+--- a/arch/XCore/XCoreMapping.h
++++ b/arch/XCore/XCoreMapping.h
+@@ -23,6 +23,6 @@ const char *XCore_group_name(csh handle, unsigned int id);
+ xcore_reg XCore_map_register(unsigned int r);
+ 
+ // map register name to register ID
+-xcore_reg XCore_reg_id(char *name);
++xcore_reg XCore_reg_id(const char *name, size_t length);
+ 
+ #endif
 diff --git a/tests/details/xcore.yaml b/tests/details/xcore.yaml
-index bf5a348f..e7753e3d 100644
+index bf5a348f..b2bd5030 100644
 --- a/tests/details/xcore.yaml
 +++ b/tests/details/xcore.yaml
 @@ -35,6 +35,9 @@ test_cases:
@@ -78,7 +420,7 @@ index bf5a348f..e7753e3d 100644
        -
          asm_text: "lmul r11, r0, r2, r5, r8, r10"
          details:
-@@ -125,4 +137,28 @@ test_cases:
+@@ -125,4 +137,49 @@ test_cases:
                -
                  type: XCORE_OP_REG
                  reg: r8
@@ -107,4 +449,25 @@ index bf5a348f..e7753e3d 100644
 +              -
 +                type: XCORE_OP_MEM
 +                mem_base: r0
++                mem_direct: 1
++  -
++    input:
++      bytes: [ 0x00, 0xf0, 0x49, 0x7f ]
++      arch: "xcore"
++      options: [ CS_OPT_DETAIL ]
++      address: 0x4016c
++    expected:
++      insns:
++      -
++        asm_text: "ldaw r11, cp[9]"
++        details:
++          xcore:
++            operands:
++              -
++                type: XCORE_OP_REG
++                reg: r11
++              -
++                type: XCORE_OP_MEM
++                mem_base: cp
++                mem_disp: 9
 +                mem_direct: 1

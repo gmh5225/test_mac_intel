@@ -14,7 +14,7 @@ def stage(name,q):
     patch.write_bytes(sp.check_output(['git','-C',r.parent,'cat-file','blob','HEAD:portable-next/'+name+'.patch']))
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['sha256'];git('apply','--index',patch);assert git('write-tree')==q['tree']
 try:
-    core,q=rd(r/'core.json'),rd(r/'tree.json');assert q['parent']==core['commit']and git('rev-parse','HEAD')==core['parent'];stage('fix',core)
+    q=rd(r/'tree.json');assert git('rev-parse','HEAD')==q['parent']
     results={};units=['api','mcinst','sstream','instruction_bytes'];b=t/'build';sample=t/'op.bin';sample.write_bytes(bytes((0,0)))
     for k in ('base','candidate'):
         if k=='candidate':stage(k,q)
@@ -39,7 +39,10 @@ try:
             if k=='candidate':
                 assert metrics[2]==121907 and results['base'][str(flags)][3]==metrics[3]and metrics==rows['1']
                 if profile=='full':assert run('single-'+str(flags),exe,str(flags),sample)=='stw r0, r0[0]\tR,r0;M,r0,,0,1;'
+                if profile=='full':
+                    literal=t/'literal.bin';literal.write_bytes(bytes((0x00,0xf0,0x49,0x7f)))
+                    assert run('literal-'+str(flags),exe,str(flags),literal)=='ldaw r11, cp[9]\tR,r11;M,cp,,9,1;' 
         if k=='base':assert rows['1'][2]==2920
-    put('complete',dict(source=q,core=core,units=units,profile=profile,static=True,shared=True,official_fixture=fixture_target,rows=results))
+    put('complete',dict(source=q,units=units,profile=profile,static=True,shared=True,official_fixture=fixture_target,rows=results))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);put('cleanup',dict(removed=not t.exists(),bytes=n))

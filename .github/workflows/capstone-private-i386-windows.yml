@@ -1,7 +1,7 @@
-name: Check XCore memory operands across detail flags and target ABIs
+name: Check fixed XCore register operands and memory finalization across native platforms
 on:
   push:
-    branches: [codex/xcore-memory-records]
+    branches: [codex/xcore-literal-registers-and-memory]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-memory-details-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-literal-operands-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
