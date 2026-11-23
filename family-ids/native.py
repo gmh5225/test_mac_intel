@@ -16,7 +16,7 @@ try:
     cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
     for profile,architectures in [('mixed',mixed),('diet',['SYSTEMZ']),('pure',['SYSTEMZ'])]:
         b=t/profile;variants={}
-        for k in ('base','dialects','candidate'):
+        for k in ('base','length','candidate'):
             g('restore','--source',baseline,'--staged','--worktree','--','.')
             if k!='base':
                 target=meta if k=='candidate' else json.loads((d/'active-tree.json').read_text())
@@ -35,20 +35,16 @@ try:
                 assert modes in (1,2) and trials==57344*modes and accepted>0
             if profile=='pure':
                 images[k]=so.read_bytes()
-                flags=['-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include']
-                cmd('spans-build-'+k,[cc,*flags,d/'spans.c',b/'libcapstone.a','-o',t/'spans'])
-                assert int(sp.check_output([t/'spans']))==30880
-                cmd('effect-build-'+k,[cc,*flags,d/'effects.c',b/'libcapstone.a','-lm','-o',t/'effects'])
-                cmd('effect-run-'+k,[t/'effects'])
-                assert (out/('effect-run-'+k+'.log')).read_text().split()==['12420']
-        a,bv=variants['dialects'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
+                cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
+                if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
+        a,bv=variants['length'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
         changed=[p for p in a['objects']if a['objects'][p]!=bv['objects'][p]]
         if profile=='pure':
-            for name in ('dialects','candidate'):
+            for name in ('length','candidate'):
                 diff=[f for f,v in variants['base']['objects'].items() if variants[name]['objects'][f]!=v]
-                assert diff==['arch/SystemZ/SystemZMapping.c.o'],(profile,name,diff)
+                assert diff==['cs.c.o'],(profile,name,diff)
         else:
-            assert variants['base']==variants['dialects']==variants['candidate'],profile
+            assert variants['base']==variants['length']==variants['candidate'],profile
 
         profiles[profile]=dict(changed=changed,variants=variants)
     save('profiles',profiles)
@@ -67,7 +63,7 @@ try:
     for name in samples:
         for opt in range(5):
             observed=[]
-            for k in ('base','dialects','candidate'):
+            for k in ('base','length','candidate'):
                 target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','107',t/(name+'.text'),str(opt)]).split())))
             assert observed[0]==observed[1]==observed[2] and observed[0][0]>0
             signatures[name+'/'+str(opt)]=observed[0]
