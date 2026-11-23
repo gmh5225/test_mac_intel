@@ -1,7 +1,7 @@
-name: Use the same raw-format-compatible Rust compiler for both iced builds against fork LLVM main
+name: Train both formatting engines with complete Rust indirect-call profiles and fork LLVM main
 on:
   push:
-    branches: [codex/matched-rust-raw-profile]
+    branches: [codex/rust-profile-value-stream]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: raw10-trained-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: complete-value-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

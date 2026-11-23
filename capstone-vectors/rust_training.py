@@ -50,6 +50,8 @@ def optimize(ad,w,out,counts):
     versions={struct.unpack_from('<Q',f.read_bytes(),8)[0]&0xffffffff for f in frozen}
     if versions!={10}:raise RuntimeError(('unexpected raw profile versions',versions))
     (out/'input-counter-files.json').write_text(json.dumps({f.name:{'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()} for f in frozen},indent=2)+'\n')
+    import gzip
+    (out/'one-input.profraw.gz').write_bytes(gzip.compress(frozen[0].read_bytes(),mtime=0))
     tool=fork_profdata(w,out);merged=w/'iced.profdata';sp.run([tool,'merge','-o',merged,*frozen],check=True)
     shown=sp.check_output([tool,'show','--all-functions','--counts',merged],text=True)
     import gzip
