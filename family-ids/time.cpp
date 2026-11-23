@@ -12,10 +12,11 @@ uint64_t ns(clockid_t id){timespec t{};clock_gettime(id,&t);return uint64_t(t.tv
 extern "C" bool X86_disasmIter32(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
 extern "C" bool X86_disasmIterText(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
 #endif
-#ifdef HEX_COUNTS
-extern "C" unsigned long long observed_hex_lengths[16];
-#endif
+extern "C" unsigned hex_variant;
 int main(int argc,char **argv){
+ const char *variant=std::getenv("FORMAT_SELECT");
+ if(!variant || (variant[0]!='0'&&variant[0]!='1') || variant[1])return 8;
+ hex_variant=unsigned(variant[0]-'0');
  if(argc!=6)return 2;
  auto bits=std::atoi(argv[1]),mode=std::atoi(argv[2]),reps=std::atoi(argv[5]);
  auto ip=std::strtoull(argv[4],nullptr,0);
@@ -74,13 +75,6 @@ int main(int argc,char **argv){
    }
    return count*0x10001+values;
  };
-#ifdef HEX_COUNTS
- uint64_t signature=go();
- std::printf("%llu",(unsigned long long)signature);
- for(auto n : observed_hex_lengths) std::printf(" %llu",n);
- std::putchar('\n');
- cs_free(i,1);cs_close(&handle);return 0;
-#endif
  uint64_t warm=go(), total=0, c=ns(CLOCK_PROCESS_CPUTIME_ID),t=ns(CLOCK_MONOTONIC);
  for(int n=0;n<reps;++n)total+=go();
  t=ns(CLOCK_MONOTONIC)-t;c=ns(CLOCK_PROCESS_CPUTIME_ID)-c;
