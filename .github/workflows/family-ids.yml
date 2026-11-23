@@ -1,7 +1,7 @@
-name: Compare shared x86 scalar output in public array and iterator APIs on real x86 MIPS and ARM64 files
+name: Measure public operand copies and ARM constructed-operand initialization with x86 scalar writers
 on:
   push:
-    branches: [codex/x86-public-array-scalar-readers]
+    branches: [codex/public-operand-copy-and-padding]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-array-scalar-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-operand-copy-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

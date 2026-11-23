@@ -17,10 +17,10 @@ try:
     arch=['X86','ARM','AARCH64','MIPS']
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
     libs={};images={}
-    for k in ('base','array','batch','all'):
+    for k in ('base','padded','bounded','constructed'):
         apply(k);b=t/'build'
         run('cmake-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
-        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch']
+        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option']
         run('build-'+k,'cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
         run('unit-'+k,'ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$')
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
@@ -43,7 +43,7 @@ try:
         cases[n]=(f,arch,sect[3])
     put('inputs',{n:dict(hash=sha(f),arch=arch,ip=ip,bytes=f.stat().st_size)for n,(f,arch,ip) in cases.items()})
     verify={}
-    for k in ('array','batch','all'):
+    for k in ('padded','bounded','constructed'):
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
         snapshot['options']=json.loads(get(*args,'options'))
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
@@ -55,7 +55,7 @@ try:
     for n,(f,arch,ip) in cases.items():
         for mode in (0,1,2):
             for workload in ('time','iter'):
-                for k in ('array','batch','all'):
+                for k in ('padded','bounded','constructed'):
                     key='/'.join((k,n,workload,str(mode)))
                     timings[key]=json.loads(get(*launch,driver,libs['base'],libs[k],workload,f,arch,str(ip),str(mode)))
                 put('timings',timings)
