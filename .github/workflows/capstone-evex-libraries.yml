@@ -1,7 +1,7 @@
-name: Count AMD64 VEX reader hits separately from real iced throughput measurements
+name: Measure AArch64 branch target formatting against iced and stable x86 host objects
 on:
   push:
-    branches: [codex/record-amd64-vector-fallback-hits]
+    branches: [codex/arm64-format-relative-targets]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,8 +12,8 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
           - { host: macos-15, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: counted-bare-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm64-relative-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
