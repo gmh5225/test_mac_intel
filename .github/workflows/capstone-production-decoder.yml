@@ -1,7 +1,7 @@
-name: Compare the prefix-gated mixed x86 reader in two complete NeverD source builds
+name: Measure shared VEX register and memory rows plus AArch64 alias placement in complete NeverD builds
 on:
   push:
-    branches: [codex/prefix-gated-full-neverd]
+    branches: [codex/shared-vex-rows-source-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: deb20b49abc68cea5368ce6f7724fdfea01f05be
+          ref: 29a0e0a7217e3ff177cc16722076a48ea3476f43
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "deb20b49abc68cea5368ce6f7724fdfea01f05be"
+          test "$(git rev-parse HEAD)" = "29a0e0a7217e3ff177cc16722076a48ea3476f43"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "6977f9ad6412b1ed3a4431700ebdb989580efe46"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 6977f9ad6412b1ed3a4431700ebdb989580efe46
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-prefix-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: shared-vex-rows-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

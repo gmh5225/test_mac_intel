@@ -95,7 +95,7 @@ try:
             fields=ln.split(maxsplit=3)
             if len(fields)!=4 or fields[2].lower()!='t':continue
             name=fields[3]
-            if name.startswith(('cs_decode_full_insn','cs_decode_public_insn','cs_disasm_iter','X86_disasmIter','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','neverd::Decoder::classifyX86Prefix')):
+            if name.startswith(('cs_decode_full_insn','cs_decode_public_insn','cs_disasm_iter','X86_disasmIter','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','matchAArch64AliasPatterns','matchAliasPatterns','AArch64_LLVM_printInstruction','X86_decodeVexMemoryOrFull','neverd::Decoder::classifyX86Prefix')):
                 symbols[name]=[int(fields[0],16),int(fields[1],16)]
         assert 'cs_disasm_iter' in symbols and any('classifyX86Prefix' in n for n in symbols)
         with binary.open('rb') as file:
@@ -109,8 +109,13 @@ try:
             command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         else:raise AssertionError(('missing shipped alias member',variant))
         assert 'X86PublicOutput.c.o' not in members and 'X86PostPrinter.c.o' not in members
-        if variant!='base':
+        if variant=='memory':
             assert members.index('X86VexBaseMemory.c.o')>members.index('AliasPatternLookup.c.o')
+        else:assert 'X86VexBaseMemory.c.o' not in members
+        if variant=='tail':
+            mask=sp.check_output([t/'vector-generator','--vex-memory-register-mask'])
+            assert mask==(cs/'arch/X86/X86GenVexMemoryRegisterMask.inc').read_bytes()
+            save('row-mask',dict(sha256=hashlib.sha256(mask).hexdigest(),bitmap_bytes=34))
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
