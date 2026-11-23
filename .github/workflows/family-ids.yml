@@ -1,7 +1,7 @@
-name: Qualify RISC-V compressed dispatch twice on native AArch64 Linux and verify unchanged libraries on other builds
+name: Validate compressed RISC-V with two native AArch64 Clang versions
 on:
   push:
-    branches: [codex/riscv-aarch64-compressed-qualification]
+    branches: [codex/riscv-compressed-arm-clang-versions]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,15 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: clang, flavor: first }
-          - { host: ubuntu-24.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: repeat }
-          - { host: ubuntu-24.04-arm, cc: gcc, flavor: control }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
+          - { host: ubuntu-24.04-arm, cc: clang-14, flavor: first }
+          - { host: ubuntu-24.04-arm, cc: clang-14, flavor: repeat }
+          - { host: ubuntu-24.04-arm, cc: clang-18, flavor: first }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -36,6 +30,13 @@ jobs:
           ref: 6fbeffec215f3c7c79169c655b0928c616b46152
           path: source
           persist-credentials: false
+      - name: Select native distribution Clang
+        run: |
+          if ! command -v "$CC" >/dev/null; then
+            sudo apt-get -o Acquire::Retries=3 update -qq
+            sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends "$CC"
+          fi
+          "$CC" --version
       - run: python3 -B family-ids/native.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
@@ -43,5 +44,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-aarch64-compressed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-native-clang-versions-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
