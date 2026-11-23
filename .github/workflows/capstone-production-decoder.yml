@@ -1,7 +1,7 @@
-name: Measure the production impact of natural postprinter ordering and width-safe scalar writes
+name: Compare the default NeverD decoder with mixed static public readers and early scalar detail repair
 on:
   push:
-    branches: [codex/neverd-natural-scalar-writer-qualification]
+    branches: [codex/neverd-linked-readers-early-scalar-details]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: natural-writer-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: linked-reader-scalar-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
