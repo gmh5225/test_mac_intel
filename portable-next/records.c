@@ -1,66 +1,72 @@
 #include <capstone/capstone.h>
 #include <inttypes.h>
-#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
-#endif
 
-int main(void)
+static uint64_t mix(uint64_t h, const void *p, size_t n)
 {
-#ifdef _WIN32
-	if (_setmode(_fileno(stdout), _O_BINARY) == -1)
+	const uint8_t *bytes = p;
+	for (size_t i = 0; i < n; ++i)
+		h = (h ^ bytes[i]) * UINT64_C(1099511628211);
+	return h;
+}
+
+int main(int argc, char **argv)
+{
+	if (argc < 2)
 		return 2;
-#endif
-	unsigned states = 0, valid = 0;
-	uint32_t rng = UINT32_C(0x1cb4a82d);
-	const cs_mode modes[] = {
-		(cs_mode)(CS_MODE_RISCV32 | CS_MODE_RISCV_C),
-		(cs_mode)(CS_MODE_RISCV64 | CS_MODE_RISCV_C),
-		(cs_mode)(CS_MODE_RISCV32 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD),
-		(cs_mode)(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD)
-	};
-	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
-		csh h;
-		if (cs_open(CS_ARCH_RISCV, modes[m], &h) != CS_ERR_OK ||
-		    cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
-			return 3;
-		cs_insn *insn = cs_malloc(h);
-		if (!insn || !insn->detail)
-			return 4;
-		cs_detail *detail = insn->detail;
-		for (unsigned i = 0; i < 65536; ++i) {
-			rng = rng * UINT32_C(1664525) + UINT32_C(1013904223);
-			uint32_t first = (rng & UINT32_C(0xffff0000)) | i;
-			uint32_t second = rng * UINT32_C(69069) + 1;
-			uint8_t bytes[8];
-			for (unsigned j = 0; j < 4; ++j) {
-				const unsigned shift = j * 8;
-				bytes[j] = (uint8_t)(first >> shift);
-				bytes[j+4] = (uint8_t)(second >> shift);
+	csh h;
+	if (cs_open(CS_ARCH_XCORE, CS_MODE_LITTLE_ENDIAN, &h))
+		return 3;
+	cs_option(h, CS_OPT_DETAIL, strtoul(argv[1], NULL, 0));
+	cs_insn *i = cs_malloc(h);
+	if (!i || !i->detail)
+		return 3;
+	if (argc == 3) {
+		FILE *f = fopen(argv[2], "rb");
+		if (!f) return 2;
+		uint8_t data[256]; size_t left = fread(data, 1, sizeof(data), f); fclose(f);
+		const uint8_t *p = data; uint64_t ip = 0;
+		while (left) {
+			if (!cs_disasm_iter(h, &p, &left, &ip, i)) return 4;
+			printf("%s %s\t", i->mnemonic, i->op_str);
+			cs_xcore *x = &i->detail->xcore;
+			for (uint8_t j = 0; j < x->op_count; ++j) {
+				const cs_xcore_op *op = x->operands + j;
+				if (op->type == XCORE_OP_REG) printf("R,%s;",cs_reg_name(h,op->reg));
+				else if (op->type == XCORE_OP_IMM) printf("I,%d;",op->imm);
+				else if (op->type == XCORE_OP_MEM) printf("M,%s,%s,%d,%d;",op->mem.base ? cs_reg_name(h,op->mem.base) : "",op->mem.index ? cs_reg_name(h,op->mem.index) : "",op->mem.disp,op->mem.direct);
+				else return 5;
 			}
-			size_t length = 8;
-			const uint8_t *cursor = bytes;
-			uint64_t address = UINT64_C(0x100000) + i * 4u;
-			memset(insn, (i >> 4) & 255, sizeof(*insn));
-			memset(detail, (i >> 5) & 255, sizeof(*detail));
-			insn->detail = detail;
-			bool decoded = cs_disasm_iter(h, &cursor, &length, &address, insn);
-			if (insn->detail != detail) return 5;
-			const uint32_t header[] = { decoded, (uint32_t)cs_errno(h),
-				(uint32_t)(cursor - bytes), (uint32_t)length, (uint32_t)address };
-			if (fwrite(header, sizeof(header), 1, stdout) != 1 ||
-			    fwrite(insn, offsetof(cs_insn, detail), 1, stdout) != 1 ||
-			    fwrite(detail, sizeof(*detail), 1, stdout) != 1)
-				return 6;
-			states++;
-			valid += decoded;
+			puts("");
 		}
-		cs_free(insn, 1);
-		cs_close(&h);
+	} else {
+		uint64_t counts[3] = {0}, text = 3, details = 7;
+		for (unsigned word=0; word<65536; ++word) {
+			for (unsigned tail=0; tail<7; ++tail) {
+				uint32_t suffix=tail<3 ? (0x7fffu*tail) : (word*15991u+tail*46261u);
+				unsigned n=tail < 4 ? tail : 4;
+				uint8_t code[]={word,word>>8,suffix,suffix>>8};
+				const uint8_t *p=code; size_t size=n; uint64_t ip=0x7fff1000+4u*word;
+				if (!cs_disasm_iter(h,&p,&size,&ip,i)) {counts[0]++;continue;}
+				if (p!=code+i->size || size!=n-i->size) return 6;
+				counts[1]++;text=mix(mix(mix(text,&i->id,sizeof(i->id)),i->mnemonic,strlen(i->mnemonic)+1),i->op_str,strlen(i->op_str)+1);
+				cs_xcore *x=&i->detail->xcore;
+				if (x->op_count>sizeof(x->operands)/sizeof(*x->operands)) return 7;
+				details=mix(details,&x->op_count,1);
+				for(unsigned j=0;j<x->op_count;++j){
+					const cs_xcore_op *op=x->operands+j;
+					if(op->type!=XCORE_OP_REG && op->type!=XCORE_OP_MEM && op->type!=XCORE_OP_IMM) return 8;
+					counts[2]+=op->type==XCORE_OP_MEM;
+					details=mix(details,op,sizeof(*op));
+				}
+			}
+		}
+		printf("%" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n",counts[0],counts[1],counts[2],text,details);
 	}
-	fprintf(stderr, "%u states, %u decoded\n", states, valid);
-	return valid == 0;
+	cs_free(i,1);
+	cs_close(&h);
+	return 0;
 }

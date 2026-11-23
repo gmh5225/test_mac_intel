@@ -1,7 +1,7 @@
-name: Check standalone detail formats on native Linux macOS and both Windows ABIs
+name: Check XCore memory operands across detail flags and target ABIs
 on:
   push:
-    branches: [codex/verify-detail-format-initialization]
+    branches: [codex/xcore-memory-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -21,8 +21,8 @@ jobs:
           - { host: macos-15-intel, arch: x86_64, profile: diet }
           - { host: ubuntu-22.04, arch: x86_64, profile: full }
           - { host: ubuntu-24.04, arch: x86_64, profile: full }
-          - { host: ubuntu-24.04, arch: x86_64, profile: reduced }
-          - { host: ubuntu-24.04, arch: x86_64, profile: noatt }
+          - { host: ubuntu-24.04, arch: x86_64, profile: diet }
+          - { host: ubuntu-22.04, arch: x86_64, profile: diet }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 85
     steps:
@@ -47,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: detail-format-initialization-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-memory-details-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
