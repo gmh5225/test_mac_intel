@@ -1,7 +1,7 @@
-name: Repeat option-selected MIPS throughput on four new Ubuntu Clang 18 hosts
+name: Compare MIPS option dispatch with the former per instruction branch on the same CPU
 on:
   push:
-    branches: [codex/mips-option-clang18-repeat]
+    branches: [codex/mips-option-head-to-head]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: focused-mips-option-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-option-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
