@@ -1,0 +1,15 @@
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index 7b8535ac..a4c4277c 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -4,7 +4,10 @@
+ #ifdef CAPSTONE_HAS_X86
+ #include "X86FeatureExtension.h"
+ #ifdef X86_EVEX_REGISTER_SCAN
++/* The extension reader already established the EVEX mode and input bounds. */
++#define X86_EVEX_BATCH_PACKED
+ #include "X86EvexScanPlan.h"
++#undef X86_EVEX_BATCH_PACKED
+ 
+ /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
+  * The ordinary output generator owns the admitted IDs and widths. */

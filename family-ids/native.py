@@ -26,9 +26,12 @@ try:
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=sha(b/'libcapstone.a'),bytes=path.stat().st_size,
-                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','X86OutputIterator.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','AArch64Disassembler.c.o')})
+                       object={a:sha(next(b.rglob(a)))for a in('X86EvexScan.c.o','cs.c.o','X86OutputIterator.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','AArch64Disassembler.c.o')})
     assert len({v['shared']for v in images.values()})==len(q)+1;put('images',images)
     assert len({v['object']['X86BatchScan.c.o']for v in images.values()})==1
+    changed=[n for n in images['base']['object']if images['moves']['object'][n]!=images['base']['object'][n]]
+    assert changed==['X86EvexScan.c.o'],changed
+    run('guard-moves','clang++','-O2','-std=c++17','-I',s/'include',r/'guard-packed.cpp','-ldl','-o',t/'moves')
     run('guard-driver','clang++','-O2','-std=c++17','-I',s/'include',r/'guard.cpp','-ldl','-o',t/'guard')
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
@@ -51,6 +54,8 @@ try:
         trials,valid=map(int,get(t/'guard',libs['base'],libs[k]).split())
         assert (trials,valid)==(2293830,1239462)
         snapshot['guard']={'trials':trials,'valid':valid}
+        count,hits=map(int,get(t/'moves',libs['base'],libs[k]).split());assert count==5308416 and 0<hits<count
+        snapshot['packed_moves']=dict(trials=count,accepted=hits)
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
     if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
