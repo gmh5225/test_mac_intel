@@ -1,7 +1,7 @@
-name: Count AMD64 VEX reader hits separately from real iced throughput measurements
+name: Verify VEX option checks after row selection with counted matched readers
 on:
   push:
-    branches: [codex/record-amd64-vector-fallback-hits]
+    branches: [codex/late-vex-option-admission]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: counted-bare-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: late-vex-option-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

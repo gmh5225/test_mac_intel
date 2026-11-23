@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
-extern "C" bool observed_bare(const uint8_t *, size_t, bool);
+extern "C" bool observed_bare(const uint8_t *, size_t, bool, csh);
 extern "C" bool X86_disasmIterText(csh, const uint8_t **, size_t *, uint64_t *, cs_insn *);
 int main(int argc, char **)
 {
@@ -44,7 +44,7 @@ int main(int argc, char **)
             got.illegal=false;got.is_alias=false;got.usesAliasDetails=false;got.alias_id=0;
             std::memcpy(&ref,&got,sizeof(ref));std::memcpy(&dr,&dg,sizeof(dr));
             got.detail=detail?&dg:nullptr;ref.detail=detail?&dr:nullptr;
-            bool hit=observed_bare(input,n,wide);
+            bool hit=observed_bare(input,n,wide,target);
             bool accepted=X86_disasmIterText(target,&a,&na,&ip,&got);
             bool expected=cs_disasm_iter(normal,&b,&nb,&ref_ip,&ref);
             if (got.detail!=(detail?&dg:nullptr) || ref.detail!=(detail?&dr:nullptr)) return false;
@@ -77,7 +77,7 @@ int main(int argc, char **)
             // checked at all 256 values in the canonical table generator.
             for (unsigned op=0;op<256;++op)for(unsigned wl=0;wl<4;++wl) {
                 std::array<uint8_t,7> v={0xc4,0xe1,uint8_t((wl>>1)<<7 | 0x68 | ((wl&1)<<2)),uint8_t(op),0xd9,0x80,0};
-                if (!observed_bare(v.data(),6,true)) continue;
+                if (!observed_bare(v.data(),6,true,target)) continue;
                 for (unsigned k=0;k<8192;++k) {
                     v[1]=uint8_t(((k>>10)^7)<<5|1);v[2]=uint8_t((wl>>1)<<7 | ((~k>>6)&15)<<3 | ((wl&1)<<2));
                     v[4]=uint8_t(0xc0|((k>>3)&7)<<3|(k&7));v[5]=uint8_t(k);

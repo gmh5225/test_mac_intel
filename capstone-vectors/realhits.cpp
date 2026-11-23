@@ -7,7 +7,7 @@
 #include <vector>
 extern "C" bool X86_disasmIter32(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
 extern "C" bool X86_disasmIterText(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
-extern "C" unsigned long long bare_opcode_hits[256];
+extern "C" unsigned long long bare_opcode_hits[256], bare_option_checks;
 int main(int argc, char **argv) {
     if (argc!=6) return 1;
     const bool wide=argv[1][0]=='6', private_reader=argv[2][0]=='1', detail=argv[3][0]=='1';
@@ -31,5 +31,5 @@ int main(int argc, char **argv) {
     if(!ranges.eof() || !spans || !ok) return 5;
     std::printf("%llu %llu %u",static_cast<unsigned long long>(ok),static_cast<unsigned long long>(invalid),spans);
     for(auto n:bare_opcode_hits) std::printf(" %llu",n);
-    std::putchar('\n');cs_free(out,1);cs_close(&handle);
+    std::printf(" %llu\n",bare_option_checks);cs_free(out,1);cs_close(&handle);
 }

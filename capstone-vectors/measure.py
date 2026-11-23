@@ -121,11 +121,11 @@ def main(w):
         db=json.loads((build/'compile_commands.json').read_text())
         entry,=[z for z in db if z['file'].endswith('/X86Sse64Output.c')]
         defs=[v for v in shlex.split(entry['command'])if v.startswith('-D')]
-        run(['clang','-O2',*defs,'-I',base,'-I',base/'include','-c',r/'scalar-guard.c','-o',w/'scalar.o'],'scalar-probe-'+key)
+        run(['clang','-O2',*defs,*(['-DEARLY_CHECKS'] if kind=='early' else []),'-I',base,'-I',base/'include','-c',r/'scalar-guard.c','-o',w/'scalar.o'],'scalar-probe-'+key)
         run(['clang++','-std=c++17','-O2','-I',base/'include',r/'scalar-guard.cpp',w/'scalar.o',lib,'-o',w/'scalar-guard'],'scalar-link-'+key)
-        run([w/'scalar-guard',*(['candidate'] if kind=='bare' else [])],'scalar-guard-'+key)
+        run([w/'scalar-guard',*(['candidate'] if kind!='base' else [])],'scalar-guard-'+key)
         counts=list(map(int,(evidence/('scalar-guard-'+key+'.log')).read_text().split()))
-        assert counts==([2162688, 0, 468798] if kind=='bare' else [1703936, 0, 0]),(key,counts)
+        assert counts==([2162688, 0, 468798] if kind!='base' else [1703936, 0, 0]),(key,counts)
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -141,7 +141,7 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='bare':assert changed==['X86VectorFallback64.c.o'],(key,changed)
+        if kind!='base':assert changed==['X86VectorFallback64.c.o'],(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
@@ -159,14 +159,23 @@ def main(w):
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
-        if kind=='bare':
+        if kind!='base':
             # Build an independent copy of the real static reader with a hit counter.
             # Timed executables above link the unmodified library.
             unit,=[u for u in db if u['file'].endswith('/X86VectorFallback64.c')]
             source_file=Path(unit['file']).resolve();body=source_file.read_text()
             marker='return writeVectorRegisters(code, insn, insn_size, row, prefix, ll,'
             assert body.count(marker)==1
-            body='unsigned long long bare_opcode_hits[256];'+chr(10)+body.replace(marker,'++bare_opcode_hits[code[prefix]];'+chr(10)+chr(9)+marker)
+            symbol='X86_OUTPUT_UNSUPPORTED(handle, false)'
+            if kind=='early':
+                check='if (!'+symbol+' &&'+chr(10)+chr(9)*2+'    writeBareVexRegisters64'
+                assert body.count(check)==1
+                body=body.replace(check,check.replace('!'+symbol,'(++bare_option_checks, !'+symbol+')'))
+            else:
+                check='row->immediate ||'+chr(10)+chr(9)+'    '+symbol
+                assert body.count(check)==1
+                body=body.replace(check,check.replace(symbol,'(++bare_option_checks, '+symbol+')'))
+            body='unsigned long long bare_option_checks, bare_opcode_hits[256];'+chr(10)+body.replace(marker,'++bare_opcode_hits[code[prefix]];'+chr(10)+chr(9)+marker)
             counted=w/'actual-fallback.c';counted.write_text(body)
             command=shlex.split(unit['command']);command[command.index('-o')+1]=str(w/'instrumented.o')
             command[command.index('-c')+1]=str(counted)
@@ -211,13 +220,19 @@ def main(w):
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         reached={}
-        for stage in ('bare','mixed_bare'):
+        for stage in ('early','bare','mixed_early','mixed_bare'):
             for private in (0,1):
                 for details in (0,1):
                     v=list(map(int,sp.check_output([w/('hits-'+stage),str(bits),str(private),str(details),f,intervals]).split()))
-                    assert len(v)==259 and v[2]==len(selected) and (bits!=32 or sum(v[3:])==0)
-                    reached[f'{stage}/{private}/{details}']=dict(valid=v[0],invalid=v[1],spans=v[2],hits=sum(v[3:]),opcodes={format(k,'02x'):n for k,n in enumerate(v[3:]) if n})
+                    assert len(v)==260 and v[2]==len(selected) and v[-1]>=sum(v[3:-1]) and (bits!=32 or v[-1]==0)
+                    reached[f'{stage}/{private}/{details}']=dict(valid=v[0],invalid=v[1],spans=v[2],hits=sum(v[3:-1]),checks=v[-1],opcodes={format(k,'02x'):n for k,n in enumerate(v[3:-1]) if n})
         assert len({(v['valid'],v['invalid'],v['spans'])for v in reached.values()})==1
+        for pre in ('','mixed_'):
+            for public in (0,1):
+                for detail in (0,1):
+                    early=reached[f'{pre}early/{public}/{detail}'];late=reached[f'{pre}bare/{public}/{detail}']
+                    assert {k:v for k,v in early.items() if k!='checks'}=={k:v for k,v in late.items() if k!='checks'}
+                    assert early['checks']>=late['checks']==late['hits']
         save('reach-'+name+'.json',reached)
         for mode in (0,1,2):
             targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}

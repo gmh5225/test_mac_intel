@@ -58,16 +58,17 @@ index 00000000..12177014
 +	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
 +};
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 60ec4b72..05382af6 100644
+index 60ec4b72..93593cbc 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -34,6 +34,33 @@
+@@ -34,6 +34,35 @@
  
  #include "X86GenLegacyRegisterImmediates.inc"
  #include "X86GenLegacyMap38Registers.inc"
 +#include "X86GenBareVexRegisters64.inc"
 +
-+static bool writeBareVexRegisters64(const uint8_t *code, size_t size,
++static bool writeBareVexRegisters64(cs_struct *handle, const uint8_t *code,
++				    size_t size,
 +				    cs_insn *insn, uint16_t *insn_size,
 +				    unsigned prefix)
 +{
@@ -82,7 +83,8 @@ index 60ec4b72..05382af6 100644
 +	if (!index)
 +		return false;
 +	const struct VectorOutputRow *row = &bare_vex_rows[index];
-+	if (size < prefix + 2 + row->immediate)
++	if (size < prefix + 2 + row->immediate ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
 +		return false;
 +	const unsigned w = prefix == 3 && (flags & 0x80);
 +	const unsigned rxb = (~(unsigned)code[1] >> 5) & (prefix == 2 ? 4 : 7);
@@ -95,7 +97,7 @@ index 60ec4b72..05382af6 100644
  
  static void setLegacyRegisterOpcode(cs_insn *insn, const uint8_t *opcode,
  				    unsigned count)
-@@ -193,10 +220,16 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -193,10 +222,16 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
  	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
  		return true;
@@ -105,8 +107,8 @@ index 60ec4b72..05382af6 100644
 -		return true;
 +	if ((code[0] & 0xfe) == 0xc4) {
 +		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-+		if (!X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		    writeBareVexRegisters64(code, size, insn, insn_size, prefix))
++		if (writeBareVexRegisters64(handle, code, size, insn,
++					    insn_size, prefix))
 +			return true;
 +		if (prefix == 3 && X86_writeVexRegisterImmediate(
 +			    handle, code, size, insn, insn_size,
