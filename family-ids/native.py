@@ -44,7 +44,10 @@ try:
                     original=(s/'cs.c').read_text();line="if (known_length) {\n\t\t\t\tss.buffer[0] = '\\0';";assert original.count(line)==1
                     for pattern in (0xa5,0x5a):
                         test=line+' memset(ss.buffer + 1, '+str(pattern)+', sizeof(ss.buffer) - 1);'
-                        (s/'cs.c').write_text(original.replace(line,test))
+                        mci_anchor="\t\t\tMCInst_InitCoreFields(&mci);"
+                        assert original.count(mci_anchor)==1
+                        dirty=original.replace(mci_anchor,"\t\t\tmemset(&mci, "+str(pattern)+", sizeof(mci));\n"+mci_anchor)
+                        (s/'cs.c').write_text(dirty.replace(line,test))
                         cmd('poison-build-'+str(pattern),['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
                         cmd('poison-boundary-'+str(pattern),[t/'guard',t/'pure-base.so',so])
                         cmd('poison-callbacks-'+str(pattern),[t/'callbacks',t/'pure-base.so',so])

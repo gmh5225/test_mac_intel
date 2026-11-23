@@ -1,5 +1,25 @@
+diff --git a/MCInst.h b/MCInst.h
+index e0409109..395bb69f 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -243,11 +243,10 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+ 	}
+ }
+ 
+-/* Private x86 decode state constructs operands before reading them. It does
+- * not use tied-operand indices or the EVM, WASM and HPPA payloads. Initialize
+- * all common and x86 metadata; MCInst_InitStorage retains every default for
+- * other callers. */
+-static inline void MCInst_InitX86(MCInst *inst)
++/* Initialize common and x86 metadata for a decoder that constructs its
++ * operands and does not use the EVM, WASM or HPPA payloads. Callers using
++ * generic operand-access mapping must also initialize tied_op_idx. */
++static inline void MCInst_InitCoreFields(MCInst *inst)
+ {
+ 	memset(inst, 0, offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
+ 	memset((char *)inst + offsetof(MCInst, flat_insn), 0,
 diff --git a/cs.c b/cs.c
-index 65ae1a9d..a2a654c2 100644
+index 65ae1a9d..907f09b6 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -93,6 +93,12 @@
@@ -33,7 +53,37 @@ index 65ae1a9d..a2a654c2 100644
  		if (length > 32) {
  			memcpy(insn->op_str, operands, length);
  		} else if (length >= 16) {
-@@ -1169,8 +1180,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1097,15 +1108,23 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+ 	if (handle->arch == CS_ARCH_X86)
+-		MCInst_InitX86(&mci);
++		MCInst_InitCoreFields(&mci);
+ 	else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+-	if (handle->arch == CS_ARCH_MIPS)
+-		/* MIPS constructs each MCOperand before reading it. The public
+-		 * detail and alias records are reset by the MIPS decoder. */
+-		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
+-	else
++	if (handle->arch == CS_ARCH_MIPS) {
++#ifdef CS_MIPS_VISIBLE_OPERANDS
++		if (handle->disasm == Mips_getInstruction &&
++		    handle->printer == Mips_printer && !handle->post_printer &&
++		    handle->insn_id == Mips_get_insn_id &&
++		    cs_vsnprintf == cs_default_vsnprintf) {
++			MCInst_InitCoreFields(&mci);
++			/* Generic mapping queries each operand's tying index. */
++			memset(mci.tied_op_idx, -1, sizeof(mci.tied_op_idx));
++		} else
++#endif
++			MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
++	} else
+ #endif
+ #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
+ 		/* ARM constructs each operand before reading or inserting it. */
+@@ -1169,8 +1188,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  		} else
  #endif
  		{
@@ -44,7 +94,7 @@ index 65ae1a9d..a2a654c2 100644
  			 * formatter may return a count beyond its first NUL. */
  			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
  						  !handle->post_printer &&
-@@ -1178,7 +1189,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1178,7 +1197,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  #else
  			const bool known_length = false;
  #endif
@@ -53,3 +103,38 @@ index 65ae1a9d..a2a654c2 100644
  			if (known_length) {
  				ss.buffer[0] = '\0';
  				ss.index = 0;
+diff --git a/tests/unit/mcinst.c b/tests/unit/mcinst.c
+index e2d16749..5d900ef6 100644
+--- a/tests/unit/mcinst.c
++++ b/tests/unit/mcinst.c
+@@ -192,7 +192,7 @@ static bool check_x86_init_metadata(void)
+ 		MCInst full, partial;
+ 		MCInst_Init(&full, CS_ARCH_X86);
+ 		memset(&partial, pattern, sizeof(partial));
+-		MCInst_InitX86(&partial);
++		MCInst_InitCoreFields(&partial);
+ 		memcpy(&full.Operands[1], &partial.Operands[1],
+ 		       sizeof(full.Operands) - sizeof(full.Operands[0]));
+ 		memcpy(full.tied_op_idx, partial.tied_op_idx,
+@@ -215,7 +215,7 @@ static bool check_operands(bool registers_first, bool x86_private)
+ 	MCInst inst;
+ 	memset(&inst, 0xa5, sizeof(inst));
+ 	if (x86_private)
+-		MCInst_InitX86(&inst);
++		MCInst_InitCoreFields(&inst);
+ 	else
+ 		MCInst_InitStorage(&inst, CS_ARCH_X86, false);
+ 	MCInst_setOpcode(&inst, UINT_MAX);
+diff --git a/tests/unit/x86_printer_prechecked.c b/tests/unit/x86_printer_prechecked.c
+index ef91bdc6..d29d6b16 100644
+--- a/tests/unit/x86_printer_prechecked.c
++++ b/tests/unit/x86_printer_prechecked.c
+@@ -109,7 +109,7 @@ int main(void)
+ 					Result seed = { 0 }, expected, actual;
+ 					seed.handle =
+ 						*(cs_struct *)(uintptr_t)handle;
+-					MCInst_InitX86(&seed.internal);
++					MCInst_InitCoreFields(&seed.internal);
+ 					seed.internal.csh = &seed.handle;
+ 					seed.internal.flat_insn = &seed.public;
+ 					seed.public.detail =

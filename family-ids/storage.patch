@@ -1,5 +1,5 @@
 diff --git a/cs.c b/cs.c
-index 65ae1a9d..8e95eebe 100644
+index 65ae1a9d..a2a654c2 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -93,6 +93,12 @@
@@ -15,7 +15,25 @@ index 65ae1a9d..8e95eebe 100644
  #elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
  	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
  	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-@@ -1169,8 +1175,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1005,9 +1011,14 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 		off++;
+ 	const char *operands = OS->buffer + off;
+ 	if (stream_length_valid) {
+-		/* The private x86 stream's index is its terminating NUL. */
+-		const size_t length =
+-			MIN(OS->index - off, sizeof(insn->op_str) - 1);
++#ifdef CS_MIPS_VISIBLE_OPERANDS
++		/* MIPS can remove the MIPS16 comment or a '$' after printing.
++		 * Both edits shorten the visible string without moving the cursor. */
++		const size_t extent = strlen(operands);
++#else
++		const size_t extent = OS->index - off;
++#endif
++		const size_t length = MIN(extent, sizeof(insn->op_str) - 1);
+ 		if (length > 32) {
+ 			memcpy(insn->op_str, operands, length);
+ 		} else if (length >= 16) {
+@@ -1169,8 +1180,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  		} else
  #endif
  		{
@@ -26,7 +44,7 @@ index 65ae1a9d..8e95eebe 100644
  			 * formatter may return a count beyond its first NUL. */
  			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
  						  !handle->post_printer &&
-@@ -1178,7 +1184,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1178,7 +1189,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  #else
  			const bool known_length = false;
  #endif
@@ -35,17 +53,3 @@ index 65ae1a9d..8e95eebe 100644
  			if (known_length) {
  				ss.buffer[0] = '\0';
  				ss.index = 0;
-@@ -1191,7 +1197,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 			SStream_opt_unum(&ss, handle->imm_unsigned);
- 			handle->printer(&mci, &ss, handle->printer_info);
- 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
--				  code, known_length);
-+				  code,
-+#ifdef CS_MIPS_VISIBLE_OPERANDS
-+				  false);
-+#else
-+				  known_length);
-+#endif
- 		}
- 	}
- 	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
