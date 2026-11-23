@@ -46,6 +46,9 @@ def instrument(ad,w,out,flags,capstone,syslibs):
     return exe
 def optimize(ad,w,out,counts):
     raw=w/'rust-raw';frozen=sorted(raw.glob('training-*.profraw'));assert len(frozen)==36 and all(f.stat().st_size>128 for f in frozen),(len(frozen),[f.stat().st_size for f in frozen])
+    import struct
+    versions={struct.unpack_from('<Q',f.read_bytes(),8)[0]&0xffffffff for f in frozen}
+    if versions!={10}:raise RuntimeError(('unexpected raw profile versions',versions))
     (out/'input-counter-files.json').write_text(json.dumps({f.name:{'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()} for f in frozen},indent=2)+'\n')
     tool=fork_profdata(w,out);merged=w/'iced.profdata';sp.run([tool,'merge','-o',merged,*frozen],check=True)
     shown=sp.check_output([tool,'show','--all-functions','--counts',merged],text=True)
@@ -64,4 +67,7 @@ def optimize(ad,w,out,counts):
     keep={k:dict(sorted(z.items(),key=lambda t:-t[1])[:5])for k,z in groups.items()}
     trained=rust_build(ad,w,out,'-Cprofile-use='+str(merged))
     (out/'rust-profile.json').write_text(json.dumps(dict(rust=sp.check_output(['rustc','-vV'],text=True),training=counts,active_functions=keep,raw_files=len(frozen),profile_sha256=hashlib.sha256(merged.read_bytes()).hexdigest(),library_sha256=hashlib.sha256(trained.read_bytes()).hexdigest()),indent=2)+'\n')
+    usage=(out/'rust-use.log').read_text(errors='replace')
+    assert not any(z in usage.lower() for z in ('invalid instrumentation profile','malformed instrumentation profile','unsupported instrumentation profile','failed to load profile'))
+    assert 'release: 1.97.1' in sp.check_output(['rustc','-vV'],text=True)
     return trained

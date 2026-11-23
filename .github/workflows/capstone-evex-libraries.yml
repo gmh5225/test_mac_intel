@@ -1,7 +1,7 @@
-name: Compare both trained readers with the fork LLVM source build configured as in NeverD
+name: Use the same raw-format-compatible Rust compiler for both iced builds against fork LLVM main
 on:
   push:
-    branches: [codex/source-trained-decoder-comparison]
+    branches: [codex/matched-rust-raw-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 105
     env:
       CC: ${{ matrix.cc }}
+      RUSTUP_TOOLCHAIN: 1.97.1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -39,6 +40,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -47,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: source-trained-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: raw10-trained-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
