@@ -1,7 +1,7 @@
-name: Qualify common vector memory output and segmented i386 records in source-built NeverD
+name: Measure masked AMD64 and accumulator i386 records independently in two source-built NeverD products
 on:
   push:
-    branches: [codex/product-shared-vector-and-segment-memory]
+    branches: [codex/product-masked-and-i386-immediate-records]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-memory-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: masked-opcode-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

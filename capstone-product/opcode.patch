@@ -1,0 +1,99 @@
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..bca2e962 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -12,6 +12,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
++#include "X86RegisterImmediateOutput.h"
+ #include "X86SimpleOutput.h"
+ #include "X86VectorRegisterOutput.h"
+ #define X86_VEX32_REGISTER_MOVES
+@@ -33,6 +34,33 @@
+ #undef X86_SEGMENT_LEA32
+ #undef X86_MEMORY32_OUTPUT
+ 
++/* Accumulator and MOV r8 immediate opcodes use the flags and access of
++ * their ordinary register pair. They encode the destination in the opcode. */
++static bool writeOpcodeImmediate32(cs_struct *handle, const uint8_t *code,
++				   size_t size, cs_insn *insn,
++				   uint16_t *insn_size)
++{
++	const unsigned opcode = code[0];
++	const bool move = (opcode & 0xf8) == 0xb0;
++	const bool alu = (opcode & 0xc6) == 4;
++	if (!move && !alu && (opcode & 0xfe) != 0xa8)
++		return false;
++
++	const bool byte = move || !(opcode & 1);
++	const unsigned width = byte ? 1 : 4;
++	if (size < 1 + width || X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	const unsigned pair = move ? 0x8a :
++			      alu  ? opcode & 0x39 :
++				     0x84 | (opcode & 1);
++	const unsigned row = x86_simple_plans[0][0][pair] >> 2;
++	const struct X86SimpleRegister *reg =
++		&x86_simple_registers[byte ? 0 : 2][move ? opcode & 7 : 0];
++	writeUnsignedRegisterImmediate(insn, &x86_simple_outputs[row], reg,
++				       code, 0, 0, 1, width, insn_size);
++	return true;
++}
++
+ /* The fixed-width iterator delegates uncommon encodings here. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -95,6 +123,8 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 		}
+ 		break;
+ 	}
++	if (writeOpcodeImmediate32(handle, code, size, insn, insn_size))
++		return true;
+ 	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
+ }
+ #endif
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 586b3c09..05a9ab60 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1123,6 +1123,31 @@ static bool check_segment_lea32(csh handles[2])
+ 	return true;
+ }
+ 
++static bool check_opcode_immediates(csh handles[2], cs_mode mode)
++{
++	static const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
++	const unsigned prefixes = mode == CS_MODE_64 ? 17 : 1;
++	for (unsigned p = 0; p < prefixes; ++p) {
++		for (unsigned opcode = 0; opcode < 256; ++opcode) {
++			if ((opcode & 0xc6) != 4 && (opcode & 0xfe) != 0xa8 &&
++			    (opcode & 0xf8) != 0xb0)
++				continue;
++			for (unsigned i = 0; i < sizeof(values); ++i) {
++				uint8_t code[6];
++				memset(code, values[i], sizeof(code));
++				code[0] = (uint8_t)(0x3f + p);
++				code[1] = (uint8_t)opcode;
++				for (unsigned n = 1; n <= sizeof(code) - !p;
++				     ++n)
++					if (!compare(handles, code + !p, n,
++						     p + opcode + i))
++						return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_memory_flag_immediates(csh handles[2], cs_mode mode)
+ {
+ 	const uint8_t values[] = { 0, 9, 10, 0x7f, 0x80, 0xff };
+@@ -1626,6 +1651,7 @@ static bool check_mode(cs_mode mode)
+ 		     (!check_segment_lea32(handles) ||
+ 		      !check_vex32_register_moves(handles) ||
+ 		      !check_memory_flag_immediates(handles, mode))) ||
++		    !check_opcode_immediates(handles, mode) ||
+ 		    !check_alu_memory(handles, mode) ||
+ 		    !check_vex_register_immediates(handles, mode) ||
+ 		    (mode == CS_MODE_32 && private_iter != X86_disasmIter &&

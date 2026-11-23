@@ -1,0 +1,115 @@
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index f417cdc9..4771eeae 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -86,6 +86,65 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+ 	return true;
+ }
+ 
++/* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
++ * Insert the writemask after its destination. Only a register destination
++ * can request zeroing or read through the mask. */
++static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
++				size_t size, cs_insn *insn, uint16_t *insn_size)
++{
++	const unsigned mask = code[3] & 7, ll = (code[3] >> 5) & 3;
++	const bool zero = (code[3] & 0x80) != 0;
++	const bool memory = code[5] < 0xc0, store = code[4] == 0x7f;
++	if (!mask || ll == 3 || (code[1] & 15) != 1 || code[2] != 0x7f ||
++	    (code[3] & 0x18) != 8 || (store && (!memory || zero)) ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	/* The longest transfer uses a SIB and a four-byte displacement. */
++	uint8_t plain[11];
++	const size_t available = memory ? MIN(size, sizeof(plain)) : 6;
++	memcpy(plain, code, available);
++	plain[3] &= 0x78;
++	if (memory) {
++#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
++		if (!X86_writeEvexMemoryOutput(plain, available, insn, insn_size,
++					       x86_simple_registers[3]) &&
++		    !writeIndexedEvexMemory(plain, available, insn, insn_size,
++					    x86_simple_registers[3]))
++			return false;
++#else
++		return false;
++#endif
++	} else if (!X86_writePlainEvexRegisters(handle, plain, available, insn,
++						insn_size)) {
++		return false;
++	}
++	insn->bytes[3] = code[3];
++	/* The underlying writer emitted exactly two operands. Their longest
++	 * address and vector name leave room for both decorators. */
++	char *comma = strchr(insn->op_str, ',');
++	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
++	memcpy(comma, " {k0}", 5);
++	comma[3] = (char)('0' + mask);
++	if (zero)
++		memcpy(comma + 5, " {z}", 4);
++	if (insn->detail) {
++		cs_x86 *x = &insn->detail->x86;
++		x->opcode[3] = code[3];
++		x->operands[2] = x->operands[1];
++		cs_x86_op *k = &x->operands[1];
++		memset(k, 0, sizeof(*k));
++		k->type = X86_OP_REG;
++		k->reg = (x86_reg)(X86_REG_K0 + mask);
++		k->size = (uint8_t)(2u << ll);
++		k->access = CS_AC_READ;
++		k->avx_zero_opmask = zero;
++		x->op_count = 3;
++		if (!store && !zero)
++			x->operands[0].access = (cs_ac_type)(CS_AC_READ | CS_AC_WRITE);
++	}
++	return true;
++}
++
+ /* The fixed-width AMD64 iterator has already tried its common records. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -121,6 +180,10 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
+ 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
+ 		return true;
++	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
++	    (code[4] | 0x10) == 0x7f &&
++	    writeMaskedByteMove(handle, code, size, insn, insn_size))
++		return true;
+ 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 586b3c09..1c7944f4 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -705,6 +705,21 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_masked_byte_moves(csh handles[2])
++{
++	static const uint8_t forms[][11] = {
++		{ 0x62, 0xf1, 0x7f, 0xc9, 0x6f, 0xc0 },
++		{ 0x62, 0xd1, 0x7f, 0x49, 0x6f, 0x57, 1 },
++		{ 0x62, 0xa1, 0x7f, 0xa9, 0x6f, 0x5c, 0x19, 2 },
++		{ 0x62, 0x91, 0x7f, 0x0f, 0x7f, 0x5c, 0x1a, 4 },
++	};
++	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
++		for (size_t n = 0; n <= sizeof(forms[i]); ++n)
++			if (!compare(handles, forms[i], n, i))
++				return false;
++	return true;
++}
++
+ static bool check_vex_clear(csh handles[2])
+ {
+ 	for (unsigned flags = 0; flags < 256; ++flags) {
+@@ -1610,6 +1625,7 @@ static bool check_mode(cs_mode mode)
+ 		      (private_iter == X86_disasmIterText &&
+ 		       (!check_plain_evex_registers(handles) ||
+ 			!check_evex_immediate_shifts(handles) ||
++			!check_masked_byte_moves(handles) ||
+ 			!check_vex_clear(handles) ||
+ 			!check_sse_base_memory(handles) ||
+ 			!check_legacy_register_immediates(handles) ||
