@@ -166,7 +166,7 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed==['X86Mapping.c.o'],(key,changed)
+            assert changed==(['X86Mapping.c.o'] if mixed else []),(key,changed)
         mapper,=build.rglob('X86Mapping.c.o')
         disasm=(sp.check_output(['otool','-tvV',mapper],text=True) if darwin else sp.check_output(['objdump','-d','--disassemble=find_insn',mapper],text=True))
         if darwin:
@@ -194,7 +194,7 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    assert hashes['mixed_base']!=hashes['mixed_bare'] and hashes['base']!=hashes['bare']
+    assert hashes['mixed_base']!=hashes['mixed_bare'] and hashes['base']==hashes['bare']
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}

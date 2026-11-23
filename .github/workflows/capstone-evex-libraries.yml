@@ -1,7 +1,7 @@
-name: Compare ordinal x86 mapping in complete and NeverD profiles on PE32 PE64 and ELF
+name: Measure dense opcode mapping for mixed-architecture libraries with an unchanged standalone reader
 on:
   push:
-    branches: [codex/ordinal-x86-instruction-lookup]
+    branches: [codex/mixed-only-ordinal-x86-mapping]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ordinal-x86-lookup-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mixed-ordinal-lookup-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
