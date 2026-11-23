@@ -1,7 +1,7 @@
-name: Measure selecting the x86 public iterator on option changes across ten architectures
+name: Validate cached x86 dispatch using allocated caches through mode and option changes
 on:
   push:
-    branches: [codex/cache-x86-public-iterator-policy]
+    branches: [codex/allocated-x86-iterator-selection]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: cached-iterator-selection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: allocated-iterator-selection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
