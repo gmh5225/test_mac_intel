@@ -1,7 +1,7 @@
-name: Check SPARC private operands in stock, mixed and NeverD static builds
+name: Verify MIPS primary scan and visible text leave the real NeverD Capstone archives and linked consumers identical
 on:
   push:
-    branches: [codex/sparc-release-consumers]
+    branches: [codex/mips-standard-release-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,13 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: b8c025b2c666124865954de188b11a4ad00c7a4e
+          ref: 31e13b6a67022716c58e5dfe4cb6702b01b8a633
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: sparc-release-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-standard-release-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
