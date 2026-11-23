@@ -1,146 +1,116 @@
-diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
-index ea9309f4..de20a05a 100644
---- a/arch/X86/X86GenMappingCounts.inc
-+++ b/arch/X86/X86GenMappingCounts.inc
-@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
- 	0, // X86_VXORPSZrrkz
- 	2048, // X86_VXORPSrm
- 	2048, // X86_VXORPSrr
--	1536, // X86_VZEROALL
--	1536, // X86_VZEROUPPER
-+	17664, // X86_VZEROALL
-+	17664, // X86_VZEROUPPER
- 	1024, // X86_WAIT
- 	1024, // X86_WBINVD
- 	0, // X86_WBNOINVD
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..3b325045 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -338,7 +338,8 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
+ #if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+ 	if (handle && use_x86_scan(handle) && !handle->skipdata && code &&
+-	    output && capacity && size && handle->insn_id == X86_get_insn_id &&
++	    output && capacity && size &&
++	    handle->insn_id == X86_mapper_for_mode(handle->mode) &&
+ 	    handle->disasm == X86_getInstruction) {
+ 		if (handle->mode == CS_MODE_32)
+ 			return scanBatch32(ud, code, size, address, output,
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..96990a8f 100644
+index 79adee8d..6b7efadb 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10298,6 +10298,17 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
- #include "X86GenMappingCounts.inc"
+@@ -10299,7 +10299,11 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
  #endif
  
-+#ifndef CAPSTONE_DIET
-+static inline void copy_implicit_writes(cs_detail *detail, const insn_map_x86 *row)
+ // given internal insn id, return public instruction info
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++void X86_map_full_register_bank(cs_struct *h, cs_insn *insn, unsigned int id)
++#else
+ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
++#endif
+ {
+ 	unsigned int i;
+ 
+@@ -12872,4 +12876,21 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 	}
+ }
+ 
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 +{
-+	/* The public mapper replaces the first twenty slots even if the caller
-+	 * reuses nonzero detail storage. The compact row supplies the first twelve. */
-+	memcpy(detail->regs_write, row->regs_mod, sizeof(row->regs_mod));
-+	memset(detail->regs_write + ARR_SIZE(row->regs_mod), 0,
-+	       (20 - ARR_SIZE(row->regs_mod)) * sizeof(detail->regs_write[0]));
++	if ((id == X86_VZEROALL || id == X86_VZEROUPPER) && h->detail_opt &&
++	    x86_get_bit_mode(h->mode) != CS_MODE_64) {
++		X86_map_full_register_bank(h, insn, id);
++		/* The legacy register file ends at YMM7. Clear only the eight
++		 * unavailable entries written by the full mapping row. */
++		cs_detail *detail = insn->detail;
++		memset(detail->regs_write + 8, 0, 8 * sizeof(detail->regs_write[0]));
++		detail->regs_write_count = 8;
++		return;
++	}
++	X86_map_full_register_bank(h, insn, id);
 +}
 +#endif
 +
- // given internal insn id, return public instruction info
- void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- {
-@@ -10325,17 +10336,13 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 			// special cases when regs_write[] depends on arch
- 			switch (id) {
- 			default:
--				memcpy(insn->detail->regs_write,
--				       insns[i].regs_mod,
--				       sizeof(insns[i].regs_mod));
-+				copy_implicit_writes(insn->detail, &insns[i]);
- 				insn->detail->regs_write_count =
- 					((x86_mapping_counts[i] >> 5) & 31);
- 				break;
- 			case X86_RDTSC:
- 				if (mode == CS_MODE_64) {
--					memcpy(insn->detail->regs_write,
--					       insns[i].regs_mod,
--					       sizeof(insns[i].regs_mod));
-+					copy_implicit_writes(insn->detail, &insns[i]);
- 					insn->detail->regs_write_count =
- 						((x86_mapping_counts[i] >> 5) &
- 						 31);
-@@ -10349,9 +10356,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 				break;
- 			case X86_RDTSCP:
- 				if (mode == CS_MODE_64) {
--					memcpy(insn->detail->regs_write,
--					       insns[i].regs_mod,
--					       sizeof(insns[i].regs_mod));
-+					copy_implicit_writes(insn->detail, &insns[i]);
- 					insn->detail->regs_write_count =
- 						((x86_mapping_counts[i] >> 5) &
- 						 31);
-@@ -10374,6 +10379,20 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 			switch (insn->id) {
- 			default:
- 				break;
-+			case X86_INS_VZEROALL:
-+			case X86_INS_VZEROUPPER:
-+				if (mode == CS_MODE_64) {
-+					static const uint16_t upper[] = {
-+						X86_REG_YMM8, X86_REG_YMM9,
-+						X86_REG_YMM10, X86_REG_YMM11,
-+						X86_REG_YMM12, X86_REG_YMM13,
-+						X86_REG_YMM14, X86_REG_YMM15,
-+					};
-+					memcpy(insn->detail->regs_write + 8, upper,
-+					       sizeof(upper));
-+					insn->detail->regs_write_count = 16;
-+				}
-+				break;
- 			case X86_INS_XADD:
- 				insn->detail->regs_write[0] = X86_REG_EFLAGS;
- 				insn->detail->regs_write_count = 1;
+ #endif
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..196d53ef 100644
+index 380faa79..6251d75a 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -15,7 +15,7 @@ typedef struct insn_map_x86 {
- #ifndef CAPSTONE_DIET
- 	uint16_t regs_use[12]; // list of implicit registers used by this instruction
- 	uint16_t regs_mod
--		[20]; // list of implicit registers modified by this instruction
-+		[12]; // includes the low vector bank for VZERO
- 	unsigned char groups[8]; // list of group this instruction belong to
- 	bool branch; // branch instruction?
- 	bool indirect_branch; // indirect branch instruction?
-diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
-index 7e5e7f51..97359b70 100644
---- a/arch/X86/X86MappingInsn.inc
-+++ b/arch/X86/X86MappingInsn.inc
-@@ -105244,14 +105244,14 @@
- {
- 	X86_VZEROALL, X86_INS_VZEROALL, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, X86_REG_YMM8, X86_REG_YMM9, X86_REG_YMM10, X86_REG_YMM11, X86_REG_YMM12, X86_REG_YMM13, X86_REG_YMM14, X86_REG_YMM15, 0 }, { X86_GRP_AVX, 0 }, 0, 0
-+	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, 0 }, { X86_GRP_AVX, 0 }, 0, 0
- #endif
- },
+@@ -143,6 +143,19 @@ static inline int x86_get_bit_mode(cs_mode mode)
+ 	return mode & (CS_MODE_64 | CS_MODE_32 | CS_MODE_16);
+ }
  
- {
- 	X86_VZEROUPPER, X86_INS_VZEROUPPER, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, X86_REG_YMM8, X86_REG_YMM9, X86_REG_YMM10, X86_REG_YMM11, X86_REG_YMM12, X86_REG_YMM13, X86_REG_YMM14, X86_REG_YMM15, 0 }, { X86_GRP_AVX, 0 }, 0, 0
-+	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, 0 }, { X86_GRP_AVX, 0 }, 0, 0
- #endif
- },
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++void X86_map_full_register_bank(cs_struct *h, cs_insn *insn, unsigned int id);
++#endif
++
++static inline GetID_t X86_mapper_for_mode(cs_mode mode)
++{
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++	if (x86_get_bit_mode(mode) == CS_MODE_64)
++		return X86_map_full_register_bank;
++#endif
++	return X86_get_insn_id;
++}
++
+ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+ 					       bool operand_override,
+ 					       bool rex_w, bool registers)
+diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
+index 6fcbe3f4..b4e066ae 100644
+--- a/arch/X86/X86Module.c
++++ b/arch/X86/X86Module.c
+@@ -29,7 +29,7 @@ cs_err X86_global_init(cs_struct *ud)
+ 	ud->printer_info = mri;
+ 	ud->disasm = X86_getInstruction;
+ 	ud->reg_name = X86_reg_name;
+-	ud->insn_id = X86_get_insn_id;
++	ud->insn_id = X86_mapper_for_mode(ud->mode);
+ 	ud->insn_name = X86_insn_name;
+ 	ud->group_name = X86_group_name;
+ 	ud->post_printer = X86_postprinter;
+@@ -62,6 +62,8 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		else
+ 			handle->regsize_map = regsize_map_32;
  
-diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
-index e7704042..a15efbb4 100644
---- a/suite/synctools/x86_mapping_counts.py
-+++ b/suite/synctools/x86_mapping_counts.py
-@@ -156,6 +156,13 @@ def generate(directory, suffix):
-             )
-             counts.append(tokens.index("0") if "0" in tokens else len(tokens))
-         read, write, group = counts
-+        if name in ("X86_VZEROALL", "X86_VZEROUPPER"):
-+            # The mapper appends YMM8..15 only in 64-bit mode.
-+            low_bank = [f"X86_REG_YMM{i}" for i in range(8)]
-+            require(
-+                [v.strip() for v in row[4].split(",")] == [*low_bank, "0"],
-+                f"Unexpected common vector bank for {name}",
-+            )
-         # Fixed fields are checked against the owning array capacities above.
-         value = read | (write << 5) | (group << 10)
-         repair = row[2] in repairs
++		if (handle->insn_id == X86_mapper_for_mode(handle->mode))
++			handle->insn_id = X86_mapper_for_mode((cs_mode)value);
+ 		handle->mode = (cs_mode)(value &
+ 					 (CS_MODE_16 | CS_MODE_32 | CS_MODE_64 |
+ 					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..b15f88cc 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -35,7 +35,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
+ 	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
+ 	 (handle)->disasm != X86_getInstruction || \
+-	 (handle)->insn_id != X86_get_insn_id || \
++	 (handle)->insn_id != X86_mapper_for_mode((handle)->mode) || \
+ 	 (handle)->printer != X86_Intel_printInst || \
+ 	 (handle)->post_printer != X86_postprinter || \
+ 	 cs_vsnprintf != cs_default_vsnprintf)
 diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
-index d9dd18e2..428aed88 100644
+index d9dd18e2..e7ac71dc 100644
 --- a/tests/unit/x86_reg_access.c
 +++ b/tests/unit/x86_reg_access.c
 @@ -53,6 +53,54 @@ static bool check_implicit_copies(csh handle)
@@ -152,17 +122,19 @@ index d9dd18e2..428aed88 100644
 +	if (cs_support(CS_SUPPORT_X86_REDUCE))
 +		return true;
 +
-+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
++	const cs_mode modes[] = { CS_MODE_64, CS_MODE_32 | CS_MODE_X86_INTEL,
++				  CS_MODE_16, CS_MODE_64 | CS_MODE_X86_AMD };
 +	const uint8_t bytes[][4] = { { 0xc5, 0xf8, 0x77 },
 +				     { 0xc5, 0xfc, 0x77 },
 +				     { 0xc4, 0xe1, 0x78, 0x77 },
 +				     { 0xc4, 0xe1, 0x7c, 0x77 } };
-+	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
-+		const unsigned expected = modes[m] == CS_MODE_64 ? 16 : 8;
-+		csh h = 0;
-+		if (cs_open(CS_ARCH_X86, modes[m], &h) != CS_ERR_OK)
-+			return false;
-+		bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
++	csh h = 0;
++	if (cs_open(CS_ARCH_X86, modes[0], &h) != CS_ERR_OK)
++		return false;
++	bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
++	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]) && ok; ++m) {
++		const unsigned expected = modes[m] & CS_MODE_64 ? 16 : 8;
++		ok = cs_option(h, CS_OPT_MODE, modes[m]) == CS_ERR_OK;
 +		for (unsigned n = 0; n < sizeof(bytes) / sizeof(bytes[0]) && ok;
 +		     ++n) {
 +			cs_insn *insn = NULL;
@@ -188,11 +160,9 @@ index d9dd18e2..428aed88 100644
 +					"vector clear writes: mode=%u encoding=%u\n",
 +					(unsigned)modes[m], n);
 +		}
-+		cs_close(&h);
-+		if (!ok)
-+			return false;
 +	}
-+	return true;
++	cs_close(&h);
++	return ok;
 +}
 +
  static bool check_test_operands(void)
