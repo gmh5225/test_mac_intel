@@ -1,0 +1,72 @@
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 60ec4b72..725209f6 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -66,6 +66,33 @@ static bool writeLegacyMap38Registers(const uint8_t *code, cs_insn *insn,
+ 	return true;
+ }
+ 
++#define X86_MEMORY_IMMEDIATE writeCompareMemory64
++#define X86_IMMEDIATE_WIDE 1
++#define X86_COMPARE_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_COMPARE_IMMEDIATE
++#undef X86_IMMEDIATE_WIDE
++#undef X86_MEMORY_IMMEDIATE
++
++/* Match only memory CMP /7 after the fixed iterator has tried its generated plans. */
++static bool tryCompareMemory64(cs_struct *handle, const uint8_t *code,
++			       size_t size, cs_insn *insn, uint16_t *length)
++{
++	const unsigned lead = (code[0] & 0xf0) == 0x40;
++	if (size < lead + 2)
++		return false;
++	const unsigned opcode = code[lead], modrm = code[lead + 1];
++	if ((opcode != 0x80 && opcode != 0x81 && opcode != 0x83) ||
++	    modrm >= 0xc0 || (modrm & 0x38) != 0x38 ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	const unsigned prefix = lead ? 1 + ((code[0] >> 3) & 1) : 0;
++	const unsigned plan = x86_simple_plans[1][prefix][0x38 | (opcode & 1)];
++	return writeCompareMemory64(code, size, insn, length,
++				    &x86_simple_outputs[plan >> 2],
++				    x86_simple_registers);
++}
++
+ /* The caller checked a complete 66 [REX] 0F 70..73 /r ib register form. */
+ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+ 					 uint16_t *insn_size, unsigned offset,
+@@ -228,6 +255,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 		}
+ 	}
+ fallback:
++	if (tryCompareMemory64(handle, code, size, insn, insn_size))
++		return true;
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ 	/* The fixed AMD64 decoder has just tried the shared output plans.
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 1c7944f4..215e6a57 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -338,6 +338,20 @@ static bool check_group1(csh handles[2], cs_mode mode)
+ 					return false;
+ 			}
+ 	}
++	static const struct {
++		uint8_t bytes[12];
++		unsigned length;
++	} memory[] = {
++		{ { 0x80, 0x7d, 0, 0 }, 4 },
++		{ { 0x49, 0x83, 0x7d, 0x70, 0x80 }, 5 },
++		{ { 0x48, 0x81, 0x3d, 0xff, 0xff, 0xff, 0xff,
++		    0, 0, 0, 0x80 }, 11 },
++		{ { 0x43, 0x83, 0x7c, 0x88, 0xf0, 0xff }, 6 },
++	};
++	for (size_t i = 0; i < sizeof(memory) / sizeof(memory[0]); ++i)
++		for (unsigned n = 1; n <= memory[i].length; ++n)
++			if (!compare(handles, memory[i].bytes, n, (unsigned)i + n))
++				return false;
+ 	return true;
+ }
+ 

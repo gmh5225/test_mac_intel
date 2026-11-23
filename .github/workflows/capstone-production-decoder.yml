@@ -1,7 +1,7 @@
-name: Verify two decoder candidates in source-built NeverD against the current dependency
+name: Compare real NeverD builds for AMD64 immediate comparisons and isolated scalar detail work
 on:
   push:
-    branches: [codex/product-i386-sib-and-ordered-memory]
+    branches: [codex/product-compare-and-scalar-detail]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ordered-sib-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: compare-detail-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
