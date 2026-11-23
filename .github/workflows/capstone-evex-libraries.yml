@@ -1,7 +1,7 @@
-name: Compare the released EVEX register control writer and fork iced on four native hosts
+name: Prove x86 and NeverD library identity before and after the LoongArch-only source change
 on:
   push:
-    branches: [codex/shipped-register-immediate-iced]
+    branches: [codex/prove-x86-inputs-after-dedicated-loongarch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 94c4b304eb3e0d95dffde5db8272c073b1bfc714
+          ref: f0a3d31ab59b5a7f2dbae69e1f4fe573a693c451
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-register-imm-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: loong-x86-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
