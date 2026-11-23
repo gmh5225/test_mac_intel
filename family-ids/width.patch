@@ -25,10 +25,51 @@ index f225ca2c..680809fb 100644
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index 947fd2d2..8986ea81 100644
+index 947fd2d2..9aed0731 100644
 --- a/arch/RISCV/RISCVDisassembler.c
 +++ b/arch/RISCV/RISCVDisassembler.c
-@@ -803,3 +803,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+@@ -615,6 +615,21 @@ void addSPOperands(MCInst *MI)
+ }
+ #endif
+ 
++/* Every immediate and destination register is valid for these non-E forms. */
++static unsigned scanMajorOpcode(unsigned major)
++{
++	switch (major) {
++	case 0x17:
++		return RISCV_AUIPC;
++	case 0x37:
++		return RISCV_LUI;
++	case 0x6f:
++		return RISCV_JAL;
++	default:
++		return 0;
++	}
++}
++
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 				  const uint8_t *Bytes, size_t BytesLen,
+ 				  uint64_t Address, SStream *CS)
+@@ -758,6 +773,18 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 			4, RISCV_FeatureVendorXCVbi, DecoderTableXCVbi32,
+ 			"CORE-V Immediate Branching custom opcode table");
+ 	base32:
++#ifndef CAPSTONE_RISCV_SCAN_BY_OPTION
++		if (MI->csh->no_text && !MI->csh->detail_opt &&
++		    !MI->flat_insn->detail &&
++		    !(MI->csh->mode & CS_MODE_BIG_ENDIAN) &&
++		    !RISCV_getFeatureBits(MI->csh->mode, RISCV_FeatureRVE)) {
++			const unsigned opcode = scanMajorOpcode(Insn & 0x7f);
++			if (opcode) {
++				MCInst_setOpcode(MI, opcode);
++				return MCDisassembler_Success;
++			}
++		}
++#endif
+ 		TRY_TO_DECODE(4, true, DecoderTable32, "RISCV32 table");
+ 
+ 		return MCDisassembler_Fail;
+@@ -803,3 +830,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
  
  	return ret != MCDisassembler_Fail;
  }
@@ -237,10 +278,10 @@ index df2f2431..aa664a2c 100644
  #endif
 diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
 new file mode 100644
-index 00000000..4f02638a
+index 00000000..1bce609c
 --- /dev/null
 +++ b/arch/RISCV/RISCVScan.h
-@@ -0,0 +1,55 @@
+@@ -0,0 +1,41 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +#ifndef CS_RISCV_SCAN_H
@@ -255,29 +296,15 @@ index 00000000..4f02638a
 +			       void *info)
 +{
 +	if (length >= 4 && !inst->flat_insn->detail) {
-+		unsigned opcode;
 +		const unsigned major = code[0] & 0x7f;
-+		switch (major) {
-+		case 0x17:
-+			opcode = RISCV_AUIPC;
-+			break;
-+		case 0x37:
-+			opcode = RISCV_LUI;
-+			break;
-+		case 0x6f:
-+			opcode = RISCV_JAL;
-+			break;
-+		default:
-+			goto full;
-+		}
++		const unsigned opcode = scanMajorOpcode(major);
 +		/* Give an overlapping extension its normal decoding priority. */
-+		if (!(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << (major >> 2)))) {
++		if (opcode && !(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << (major >> 2)))) {
 +			MCInst_setOpcode(inst, opcode);
 +			*size = 4;
 +			return true;
 +		}
 +	}
-+full:
 +	return RISCV_LLVM_getInstruction(handle, code, length, inst, size,
 +					 address, info);
 +}
