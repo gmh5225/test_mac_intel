@@ -13,6 +13,7 @@ assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}
 
 try:
     images={};profiles={}
+    cmd('cpu',['lscpu'])
     cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
     for profile,architectures in [('mixed',mixed),('diet',['MIPS']),('systemz',['SYSTEMZ']),('loongarch',['LOONGARCH']),('sparc',['SPARC']),('pure',['MIPS'])]:
         b=t/profile;variants={}
@@ -58,7 +59,7 @@ try:
             assert int((out/'primary-records.log').read_text().split()[0])==10*32*32*8*4
             for name in ('storage','candidate'):
                 diff=[f for f,v in variants['base']['objects'].items() if variants[name]['objects'][f]!=v]
-                assert set(diff)==({'cs.c.o'} if name=='storage' else {'cs.c.o','arch/Mips/MipsMapping.c.o'}),(profile,name,diff)
+                assert set(diff)==({'arch/Mips/MipsMapping.c.o'} if name=='storage' else {'cs.c.o','arch/Mips/MipsMapping.c.o'}),(profile,name,diff)
         else:
             assert variants['base']==variants['storage']==variants['candidate'],profile
 

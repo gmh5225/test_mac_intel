@@ -1,7 +1,7 @@
-name: Compare standard MIPS scan records, visible text and details against unchanged public outputs
+name: Repeat MIPS scan and detail comparisons on independent hosts with separate scan and text components
 on:
   push:
-    branches: [codex/mips-standard-primary-records]
+    branches: [codex/mips-repeat-primary-components]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-primary-and-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: repeated-mips-primary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

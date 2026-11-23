@@ -1,55 +1,77 @@
-diff --git a/cs.c b/cs.c
-index 65ae1a9d..a2a654c2 100644
---- a/cs.c
-+++ b/cs.c
-@@ -93,6 +93,12 @@
- #define CS_PRIVATE_DECODER LoongArch_getInstruction
- #define CS_PRIVATE_PRINTER LoongArch_printer
- #define CS_KNOWN_PRINTER_EXTENT
-+#elif defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#include "arch/Mips/MipsMapping.h"
-+#define CS_PRIVATE_PRINTER Mips_printer
-+#define CS_MIPS_VISIBLE_OPERANDS
- #elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
- 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-@@ -1005,9 +1011,14 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 		off++;
- 	const char *operands = OS->buffer + off;
- 	if (stream_length_valid) {
--		/* The private x86 stream's index is its terminating NUL. */
--		const size_t length =
--			MIN(OS->index - off, sizeof(insn->op_str) - 1);
-+#ifdef CS_MIPS_VISIBLE_OPERANDS
-+		/* MIPS can remove the MIPS16 comment or a '$' after printing.
-+		 * Both edits shorten the visible string without moving the cursor. */
-+		const size_t extent = strlen(operands);
-+#else
-+		const size_t extent = OS->index - off;
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index a3561eb8..9f78fd0d 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -313,17 +313,56 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ {
+ 	uint64_t size64;
+ 	Mips_init_cs_detail(instr);
+-/* These standard encodings have no extra operands to validate in a scan. */
+-#ifdef MIPS_DIRECT_MAPPING
++/* Each bit below the primary opcode of these standard forms is an
++ * operand. The ordinary decoder handles all text, details and callbacks. */
++#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
++#define MIPS_STANDARD_SCAN
 +#endif
-+		const size_t length = MIN(extent, sizeof(insn->op_str) - 1);
- 		if (length > 32) {
- 			memcpy(insn->op_str, operands, length);
- 		} else if (length >= 16) {
-@@ -1169,8 +1180,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		} else
- #endif
- 		{
--#ifdef CS_KNOWN_PRINTER_EXTENT
--			/* The built-in printer only appends to this stream. A custom
-+#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
-+			/* The built-in printer owns this stream. A custom
- 			 * formatter may return a count beyond its first NUL. */
- 			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
- 						  !handle->post_printer &&
-@@ -1178,7 +1189,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- #else
- 			const bool known_length = false;
- #endif
--#ifdef CS_KNOWN_PRINTER_EXTENT
-+#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
- 			if (known_length) {
- 				ss.buffer[0] = '\0';
- 				ss.index = 0;
++#if defined(MIPS_DIRECT_MAPPING) || defined(MIPS_STANDARD_SCAN)
+ 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
+ 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
+ 	    instr->csh->disasm == Mips_getInstruction &&
++#ifdef MIPS_STANDARD_SCAN
++	    instr->csh->insn_id == Mips_get_insn_id &&
++#endif
+ 	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
+ 		/* For these standard immediate and load/store encodings all
+ 		 * register and immediate bits are operands. */
+ 		const unsigned major = readBytes32(instr, code) >> 26;
+ 		unsigned opcode = 0;
+ 		switch (major) {
++#ifdef MIPS_STANDARD_SCAN
++		case 4:
++			opcode = Mips_BEQ;
++			break;
++		case 5:
++			opcode = Mips_BNE;
++			break;
++		case 10:
++			opcode = Mips_SLTi;
++			break;
++		case 11:
++			opcode = Mips_SLTiu;
++			break;
++		case 32:
++			opcode = Mips_LB;
++			break;
++		case 33:
++			opcode = Mips_LH;
++			break;
++		case 36:
++			opcode = Mips_LBu;
++			break;
++		case 37:
++			opcode = Mips_LHu;
++			break;
++		case 40:
++			opcode = Mips_SB;
++			break;
++		case 41:
++			opcode = Mips_SH;
++			break;
++#endif
+ 		case 9:
+ 			opcode = Mips_ADDiu;
+ 			break;
+diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
+index d04a63ce..81885ed3 100644
+--- a/tests/unit/mips_scan.c
++++ b/tests/unit/mips_scan.c
+@@ -60,6 +60,9 @@ static bool check_mode(cs_mode mode)
+ 	static const uint32_t words[] = {
+ 		0x24080001, 0x3128ffff, 0x35080000,
+ 		0x3928ffff, 0x8fa80000, 0xafa8fffc,
++		0x10000000, 0x1109ffff, 0x15000004, 0x29080000,
++		0x2d28ffff, 0x81a88000, 0x85a87fff, 0x91a80001,
++		0x95a8ffff, 0xa1a80000, 0xa5a8ffff,
+ 	};
+ 	static const uint32_t others[] = {
+ 		0x6508ffff, 0xdfa80000, 0xffa8fffc, 0x10000002,
