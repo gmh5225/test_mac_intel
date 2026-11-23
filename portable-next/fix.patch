@@ -1,13 +1,15 @@
 diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
-index 7b8535ac..a4c4277c 100644
+index 7b8535ac..4e233d52 100644
 --- a/arch/X86/X86EvexScan.c
 +++ b/arch/X86/X86EvexScan.c
-@@ -4,7 +4,10 @@
+@@ -4,7 +4,12 @@
  #ifdef CAPSTONE_HAS_X86
  #include "X86FeatureExtension.h"
  #ifdef X86_EVEX_REGISTER_SCAN
-+/* The extension reader already established the EVEX mode and input bounds. */
++/* Share the native batch reader's packed-transfer rows on AArch64 Linux. */
++#if defined(__linux__) && defined(__aarch64__)
 +#define X86_EVEX_BATCH_PACKED
++#endif
  #include "X86EvexScanPlan.h"
 +#undef X86_EVEX_BATCH_PACKED
  
