@@ -1,7 +1,7 @@
-name: Measure the reach of vector operand writes in real PE and ELF text and details
+name: Replay actual vector operands and isolate lookup and separator costs in one binary
 on:
   push:
-    branches: [codex/vector-register-write-coverage]
+    branches: [codex/vector-writer-real-replay]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,7 +38,7 @@ jobs:
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: Trace every vector-register write at the verified benchmark boundaries
+      - name: Compare arithmetic, padded-name and joined-operand writes on identical address traces
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
@@ -48,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-name-coverage-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-write-replay-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
