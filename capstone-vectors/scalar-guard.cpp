@@ -92,7 +92,7 @@ int main(int argc, char **)
 #else
     munmap(area,page*2);
 #endif
-    if ((hits[0]>0)!=candidate || (hits[1]>0)!=candidate) return 7;
+    if (hits[0]!=0 || (hits[1]>0)!=candidate) return 7;
     std::printf("%llu %llu %llu\n",trials,hits[0],hits[1]);
     return 0;
 }

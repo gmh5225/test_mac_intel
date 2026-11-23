@@ -1,7 +1,7 @@
-name: Measure VEX packed register output on real PE, JPEG, OpenSSL and glibc functions
+name: Measure actual AMD64 VEX fallback hits and throughput against iced FastFormatter
 on:
   push:
-    branches: [codex/vex-packed-registers-on-real-libraries]
+    branches: [codex/measured-amd64-bare-vector-fallback]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 76395023380f346cd58f166905c5be77afede197
+          ref: 6de392819bbc0d468ad7c30531271823416f655e
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 791803a03ec4ac62f305e605917e76737d11ad42
+          ref: 2eb5cf73722a3c2a4956d26815428d79c2b47d18
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-register-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: bare-fallback-real-hits-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
