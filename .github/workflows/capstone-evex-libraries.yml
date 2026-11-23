@@ -1,7 +1,7 @@
-name: Attribute fallback, output and ordered register costs on the released NeverD configuration and fork iced
+name: Trace formatted and detailed output on identical zero and high fallback instruction blocks
 on:
   push:
-    branches: [codex/profile-shipped-banks-and-formatters]
+    branches: [codex/trace-capstone-iced-matched-blocks]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,6 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
+          - { host: ubuntu-22.04, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -24,13 +25,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 94c4b304eb3e0d95dffde5db8272c073b1bfc714
+          ref: f0a3d31ab59b5a7f2dbae69e1f4fe573a693c451
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -48,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: released-formatter-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: matched-block-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

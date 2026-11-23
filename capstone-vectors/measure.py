@@ -150,19 +150,33 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        save(name+'-input.json',dict(text_sha256=sha(f),extent_sha256=sha(intervals),spans=len(selected)))
-        from costs import profile
-        for mode,engines in ((0,['vecbatch','capstone','iced____']),(1,['x86_len_','capstone','iced____','fast____']),(2,['x86_len_','capstone','iced____','fast____']),(4,['x86_len_','capstone'])):
-            same=[];own=[]
-            for engine in engines:
-                target=evidence/engine;target.mkdir(exist_ok=True)
-                row=profile(bins['project'],engine,mode,bits,f,intervals,w,target,name);results.append(row)
-                same.append(tuple(row['raw_signature'][:3]))
-                if mode and engine in ('capstone','x86_len_'):own.append(tuple(row['raw_signature']))
-            assert len(set(same))==1 and len(set(own))<=1
-            save('profile.json',results)
-        print(name,len(selected),flush=True)
-    assert len(results)==13*len(m['samples'])
+        block_input=r/(name+'-blocks.tsv');assert sha(block_input)==m['blocks'][name]['block_sha256']
+        block_rows=[tuple(map(int,x.split()))for x in block_input.read_text().splitlines()]
+        import bisect
+        ordered=sorted(selected)
+        for start,length,ip,misses in block_rows:
+            # Original functions can overlap or share identical beginning offsets.
+            pos=bisect.bisect_right(ordered,[start,1<<60,1<<64])-1
+            assert any(a<=start and start+length<=a+b and pc+start-a==ip for a,b,pc in ordered[max(0,pos-16):pos+1]),(name,start,length,ip)
+        for bucket in (0,2):
+            series=[v for v in block_rows if (0 if v[3]==0 else 1 if v[3]<5 else 2)==bucket]
+            assert len(series)==m['blocks'][name]['bins'][str(bucket)]
+            if not series:continue
+            emit([v[:3] for v in series])
+            from costs import profile
+            label=name+'-b'+str(bucket)
+            for mode in (1,2):
+                sig=[]
+                for engine in ('x86_len_','fast____'):
+                    target=evidence/engine;target.mkdir(exist_ok=True)
+                    row=profile(bins['project'],engine,mode,bits,f,intervals,w,target,label)
+                    assert row['decoded']==64*len(series) and row['raw_signature'][1]==0
+                    row.update(sample=name,bucket=bucket,input_sha=sha(f),extent_sha=sha(intervals),blocks=len(series),expected_full=sum(v[3]for v in series))
+                    sig.append(row['raw_signature'][:3]);results.append(row)
+                assert sig[0]==sig[1]
+                save('profile.json',results)
+        print(name,flush=True)
+    assert len(results)==len(m['samples'])*8
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
