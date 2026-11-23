@@ -10,7 +10,6 @@ q=read(r/'attribution-source.json');prior=read(r/'samples.json')
 def git(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 assert git('rev-parse','HEAD')==q['checkout']
 assert git('write-tree')==q['tree']
-vfile=s/'arch/X86/X86VectorOutput.c';vfile.write_text(vfile.read_text()+'\n'+(r/'row.inc').read_text());shutil.copy2(r/'census-vex-rows.inc',vfile.parent/'census-vex-rows.inc')
 w=Path(tempfile.mkdtemp());b=w/'build'
 try:
     run(['cmake','-G','Ninja','-S',s,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON','-DCAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS=ON','-DCAPSTONE_MIPS_FINAL_OUTPUT_TRIM=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'])
@@ -35,10 +34,10 @@ try:
         sf.write_text(''.join('%d %d %d\n'%v for v in used))
         assert len(used)==p['timed_functions'] and sha(sf)==p['extent_sha256']
         with (out/(name+'-comparison.log')).open('w') as log:
-            lines=sp.check_output([w/'trace',str(bits),f,sf,out/(name+'-shapes.tsv'),out/(name+'-blocks.tsv')],text=True,stderr=log)
+            lines=sp.check_output([w/'trace',str(bits),f,sf,out/(name+'-shapes.tsv')],text=True,stderr=log)
         (out/(name+'.tsv')).write_text(lines)
         values=list(map(int,lines.split()));assert len(values)==6 and values[0]==values[-1] and values[0]>=values[2]>=values[3]
-        summary[name]=dict(source=p,values=values,shape_sha256=sha(out/(name+'-shapes.tsv')),block_sha256=sha(out/(name+'-blocks.tsv')))
+        summary[name]=dict(source=p,values=values,shape_sha256=sha(out/(name+'-shapes.tsv')))
     assert len(summary)==6
     save('checked',dict(complete=True,source=q,samples=summary))
 finally:
