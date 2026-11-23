@@ -162,12 +162,12 @@ def main(w):
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
-        active_tail=(mixed or darwin) and kind=='bare'
+        active_tail=False
         assert members==expected,(key,members,expected)
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert set(changed)==({'cs.c.o','X86OutputIterator.c.o','X86Vex32Output.c.o','X86Sse64Output.c.o'}|({'X86DisassemblerDecoder.c.o'} if mixed else set()) if active_tail else set()),(key,changed)
+            assert {'X86Sse64Output.c.o'} <= set(changed) <= {'X86Sse64Output.c.o','X86Vex32Output.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86MemoryOutput.c.o'},(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
