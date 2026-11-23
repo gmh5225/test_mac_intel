@@ -1,83 +1,56 @@
 from pathlib import Path
-import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
-d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
-def load(p):return json.loads(p.read_text())
-def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def cmd(n,a,cwd=None):
-    with (out/(n+'.log')).open('w')as f:z=sp.run(a,cwd=cwd,stdout=f,stderr=sp.STDOUT)
-    if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2200:]);z.check_returncode()
-def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
-def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
-meta=load(d/'revisions.json');ref=load(d/'reference.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['fixed']['parent']==meta['mode']['parent']
+import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
+r=Path(__file__).resolve().parent;s=r.parent/'source';out=r.parent/'evidence';out.mkdir(exist_ok=True);t=Path(tempfile.mkdtemp())
+meta=json.loads((r/'metadata.json').read_text())
+def save(name,v):(out/(name+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+def cmd(*args,**kw):return sp.check_output(args,text=True,**kw)
+def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
+def once(s,a,b):
+    assert s.count(a)==1,a
+    return s.replace(a,b)
 try:
-    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC')]])
-    imgs={};ids={}
-    for k in ('base','mode','fixed'):
-        if k!='base':
-            if k=='fixed':g('restore','--source',orig,'--staged','--worktree','--','.')
-            assert sha(d/(k+'.patch'))==meta[k]['sha256'];g('apply','--index',str(d/(k+'.patch')));assert g('write-tree')==meta[k]['tree']
-        cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
-        so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        ids[k]=sha(so)
-        mapper,=b.rglob('X86Mapping.c.o')
-        raw=t/'common.bin';cmd('text-'+k,['objcopy','--dump-section','.text='+str(raw),mapper,t/'copy.o'])
-        syms={}
-        for line in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
-            e=line.split()
-            if len(e)==4 and e[3] in ('X86_get_insn_id','X86_map_full_register_bank','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst','insns','x86_implicit_details','x86_mapping_counts'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
-        assert 'cs_disasm_iter' in syms and 'X86_get_insn_id' in syms
-        for line in sp.check_output(['nm','-S','--defined-only',mapper],text=True).splitlines():
-            e=line.split()
-            if len(e)==4 and e[3] in ('insns','x86_implicit_details','x86_mapping_counts'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
-        save('object-symbols-'+k,syms)
-        assert syms['insns'][1]==15143*(8 if k=='fixed' else 80),(k,syms['insns'])
-        if k=='fixed': assert 'x86_implicit_details' in syms and syms['x86_implicit_details'][1]<30000
-        else: assert 'x86_mapping_counts' in syms
-        cmd('class-tests-build-'+k,['cmake','--build',b,'--target','x86_mapping_counts','--parallel','4'])
-        cmd('class-tests-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_x86_mapping_counts'])
-        cmd('mapper-disassembly-'+k,['objdump','-d','--disassemble=X86_get_insn_id',so])
-        save('layout-'+k,dict(symbols=syms,text_sha=sha(raw),size=raw.stat().st_size))
-        cmd('build-tests-'+k,['cmake','--build',b,'--parallel','4','--target','x86_reg_access','x86_buffer_bounds','x86_scan_batch'])
-        cmd('test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(x86_reg_access|x86_buffer_bounds|x86_scan_batch)$'])
-        cmd('mapping-'+k,['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
-        imgs[k]=so.read_bytes()
-    imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
-    slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
-    cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
-    shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
-    import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name']in ('riscv64-sort','mips64el-ls')]
-    assert len(extra)==2
-    panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
-    panels.extend((q['name'],105 if q['name']=='riscv64-sort' else 103,Path(q['path']),0x100000,(0,1,2))for q in extra)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
-    save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output(['clang','--version'],text=True),images=ids,osrel=osrel))
-    def invoke(k,arch,mode,path,ip,n):
-        target.write_bytes(imgs[k]);return list(map(int,sp.check_output(['setarch','x86_64','-R',t/'time',str(arch),str(mode),path,str(ip),str(n)],text=True).split()))
-    for name,arch,path,ip,modes in panels:
-        for mode in modes:
-            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(85e6/one[0]));rows_=[]
-            for i in range(19):
-                order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
-                for k in order+order[::-1]:
-                    v=invoke(k,arch,mode,path,ip,n)
-                    expect=one[2]-(ref['pe32-score'] if name=='putty32'and mode==3 and k in ('mode','fixed') else 0)
-                    assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
-                rows_.append(cyc)
-            rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
-    if os.environ['FLAVOR']=='first':
-        stats={}
-        for k in ('base','mode','fixed'):
-            target.write_bytes(imgs[k]);f=t/'callgrind.out'
-            args=['valgrind','--tool=callgrind','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(f),t/'time','32','2',t/'putty-0.85-32.text',str(0x401000),'1']
-            cmd('profile-'+k,args)
-            docs=f.read_text(errors='replace').splitlines();events=next(x for x in docs if x.startswith('events:')).split()[1:];totals=next(x for x in docs if x.startswith('totals:')).split()[1:]
-            assert len(totals)==len(events) and 'Ir' in events
-            stats[k]=dict(zip(events,map(int,totals)))
-            cmd('functions-'+k,['callgrind_annotate','--show=Ir,Bc,Bcm,D1mr,D1mw','--auto=no','--threshold=99.95',f])
-            f.unlink()
-        save('profile',stats)
-    save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
+    assert cmd('git','-C',s,'rev-parse','HEAD').strip()==meta['checkout']
+    assert sha(s/'arch/X86/X86Mapping.c')==meta['owner'] and sha(r/'instrumentation.patch')==meta['patch']
+    cmd('git','-C',s,'apply','--check',r/'instrumentation.patch');cmd('git','-C',s,'apply',r/'instrumentation.patch')
+    project=t/'project';(project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(s,target_is_directory=True);(project/'cmake').mkdir()
+    for f in ('CMakeLists.txt','cmake/NeverDCapstoneCompilerOptions.inc'):
+        shutil.copy2(r/Path(f).name,project/f)
+    cmd('cmake','-S',project,'-B',t/'build','-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++')
+    cmd('cmake','--build',t/'build','--target','capstone_static','--parallel','4')
+    lib,=(t/'build').rglob('libcapstone.a');args=['clang++','-O3','-std=c++17','-I',s,'-I',s/'include']
+    cmd(*args,r/'time.cpp',lib,'-o',t/'time')
+    prof=(r/'time.cpp').read_text();prof='#include <valgrind/callgrind.h>\n'+once(prof,'if(argc!=6)','if(argc!=7)')
+    a=prof.index('    uint64_t a=now(')
+    prof=prof[:a]+'''    bench_select_prefix(std::atoi(argv[6]));
+    const auto expected=go(h,insn,bytes,addr,mode);
+    CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT;
+    const auto measured=go(h,insn,bytes,addr,mode);
+    CALLGRIND_TOGGLE_COLLECT;
+    if(measured!=expected)return 7;
+    std::printf("%llu\\n",(unsigned long long)measured);
+    cs_free(insn,1);cs_close(&h);
+}
+'''
+    (t/'profile.cpp').write_text(prof);cmd(*args,t/'profile.cpp',lib,'-o',t/'profile')
+    for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
+    for f in ('fetch.py','libmvec.py'):cmd('python3','-B',t/f)
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});images={f:sha(t/f)for f in ('time','profile')}
+    rows={};events={};counts={};stats_path=t/'callgrind.out'
+    for name,info in meta['inputs'].items():
+        bits=info['bits'];f=t/('libmvec.text'if 'libmvec' in name else 'putty-0.85-'+str(bits)+'.text')
+        assert sha(f)==info['sha256']
+        for mode in (0,1,2):
+            for private in (0,1):
+                label=f'{name}/{mode}/{private}';work=[f,str(bits),str(mode),str(private),str(info['address'])]
+                rows[label]=json.loads(cmd('setarch','x86_64','-R',t/'time',*work));save('timings',rows)
+                if name=='putty64' or mode!=1:continue
+                counts[label]={}
+                for merged in (0,1):
+                    checks=cmd('setarch','x86_64','-R','valgrind','--tool=callgrind','--collect-atstart=no','--branch-sim=yes','--callgrind-out-file='+str(stats_path),t/'profile',*work,str(merged)).strip()
+                    assert int(checks)==rows[label]['sum']
+                    lines=stats_path.read_text().splitlines();names=next(x.split()[1:]for x in lines if x.startswith('events:'));tot=next(x.split()[1:]for x in lines if x.startswith('totals:'));counts[label][merged]=dict(zip(names,map(int,tot)))
+                    assert counts[label][merged]['Ir']>1000 and counts[label][merged]['Bc']>100;stats_path.unlink()
+                save('events',counts)
+    save('complete',dict(metadata=meta,images=images,platform=platform.platform(),cpu=cmd('lscpu'),compiler=cmd('clang','--version'),panels=len(rows)))
 finally:
-    count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
+    size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))

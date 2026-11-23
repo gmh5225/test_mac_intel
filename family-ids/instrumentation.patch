@@ -1,0 +1,204 @@
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..0794b421 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11801,11 +11801,198 @@ static void X86_lockrep_full(MCInst *MI, SStream *O)
+ 	copy_normalized_prefixes(MI);
+ }
+ 
++enum x86_print_prefix {
++	X86_PRINT_REPNE = 1 << 0,
++	X86_PRINT_REP = 1 << 1,
++	X86_PRINT_REPE = 1 << 2,
++	X86_PRINT_REPZ = 1 << 3,
++	X86_PRINT_BND = 1 << 4,
++	X86_PRINT_NOTRACK = 1 << 5,
++};
++
++/* F2, F3 and DS may have an instruction-specific printed spelling.
++ * Some scalar media instructions share the public ID of a string operation. */
++static unsigned print_prefix_flags(cs_struct *handle, unsigned opcode)
++{
++	const unsigned i = find_insn_h(handle, opcode);
++	if (i == (unsigned)-1)
++		return 0;
++
++	switch (insns[i].mapid) {
++	case X86_INS_CMPSB:
++	case X86_INS_CMPSW:
++	case X86_INS_CMPSQ:
++	case X86_INS_SCASB:
++	case X86_INS_SCASW:
++	case X86_INS_SCASQ:
++		return X86_PRINT_REPNE | X86_PRINT_REPE;
++	case X86_INS_CMPSD:
++		return opcode == X86_CMPSL ? X86_PRINT_REPNE | X86_PRINT_REPE : 0;
++	case X86_INS_SCASD:
++		return opcode == X86_SCASL ? X86_PRINT_REPNE | X86_PRINT_REPE : 0;
++	case X86_INS_CMPSS:
++	case X86_INS_MOVSS:
++		return X86_PRINT_REPNE;
++	case X86_INS_MOVSB:
++	case X86_INS_MOVSW:
++	case X86_INS_MOVSQ:
++	case X86_INS_LODSB:
++	case X86_INS_LODSW:
++	case X86_INS_LODSQ:
++	case X86_INS_STOSB:
++	case X86_INS_STOSW:
++	case X86_INS_STOSQ:
++	case X86_INS_INSB:
++	case X86_INS_INSW:
++	case X86_INS_INSD:
++	case X86_INS_OUTSB:
++	case X86_INS_OUTSW:
++	case X86_INS_OUTSD:
++		return X86_PRINT_REPNE | X86_PRINT_REP;
++	case X86_INS_MOVSD:
++		if (opcode == X86_MOVSL)
++			return X86_PRINT_REPNE | X86_PRINT_REP;
++		return opcode == X86_MOVSW ? X86_PRINT_REPNE : 0;
++	case X86_INS_LODSD:
++		return X86_PRINT_REPNE | (opcode == X86_LODSL ? X86_PRINT_REP : 0);
++	case X86_INS_STOSD:
++		return X86_PRINT_REPNE | (opcode == X86_STOSL ? X86_PRINT_REP : 0);
++	case X86_INS_RET:
++		return X86_PRINT_REPZ | X86_PRINT_BND;
++	case X86_INS_JMP:
++	case X86_INS_CALL:
++		return X86_PRINT_BND | X86_PRINT_NOTRACK;
++	case X86_INS_RETF:
++	case X86_INS_RETFQ:
++	case X86_INS_JAE:
++	case X86_INS_JA:
++	case X86_INS_JBE:
++	case X86_INS_JB:
++	case X86_INS_JCXZ:
++	case X86_INS_JECXZ:
++	case X86_INS_JE:
++	case X86_INS_JGE:
++	case X86_INS_JG:
++	case X86_INS_JLE:
++	case X86_INS_JL:
++	case X86_INS_JNE:
++	case X86_INS_JNO:
++	case X86_INS_JNP:
++	case X86_INS_JNS:
++	case X86_INS_JO:
++	case X86_INS_JP:
++	case X86_INS_JRCXZ:
++	case X86_INS_JS:
++		return X86_PRINT_BND;
++	default:
++		return 0;
++	}
++}
++
++__attribute__((noinline))
++static void merged_prefix(MCInst *MI, SStream *O)
++{
++	unsigned int prefix;
++
++#ifndef CAPSTONE_DIET
++	switch (MI->xAcquireRelease) {
++	case 0xF2:
++		SStream_concat(O, "xacquire|");
++		break;
++	case 0xF3:
++		SStream_concat(O, "xrelease|");
++		break;
++	default:
++		break;
++	}
++#endif
++
++	if (MI->xAcquireRelease) {
++		if (MI->x86Lock) {
++			// Force LOCK prefix as group 0 prefix for XACQUIRE and XRELEASE if a LOCK is also present.
++			// This is an arbitrary choice, since there are effectively two group 0 prefixes present.
++			// The Intel SDM is not clear on how we should interpret group 0 in this case. It states:
++			// "it is only useful to include up to one prefix code from each of the four groups"
++			// ...and then defines instructions where both an F2/F3 and F0 are useful anyway.
++			MI->x86_prefix[0] = 0xF0;
++		}
++	} else {
++		switch (MI->x86_prefix[0]) {
++		case 0xF2:
++			prefix = print_prefix_flags(MI->csh, MCInst_getOpcode(MI));
++#ifndef CAPSTONE_DIET
++			if (prefix & X86_PRINT_REPNE) {
++				SStream_concat(O, "repne|");
++				add_cx(MI);
++			} else if (prefix & X86_PRINT_BND) {
++				SStream_concat(O, "bnd|");
++			} else {
++				// invalid prefix
++				MI->x86_prefix[0] = 0;
++			}
++#else
++			if (!(prefix & X86_PRINT_REPNE)) {
++				MI->x86_prefix[0] = 0;
++			}
++#endif
++			break;
++		case 0xF3:
++			prefix = print_prefix_flags(MI->csh, MCInst_getOpcode(MI));
++#ifndef CAPSTONE_DIET
++			if (prefix & X86_PRINT_REP) {
++				SStream_concat(O, "rep|");
++				add_cx(MI);
++			} else if (prefix & X86_PRINT_REPE) {
++				SStream_concat(O, "repe|");
++				add_cx(MI);
++			} else if (prefix & X86_PRINT_REPZ) {
++				SStream_concat(O, "repz|");
++			} else {
++				// invalid prefix
++				MI->x86_prefix[0] = 0;
++			}
++#else
++			if (!(prefix & (X86_PRINT_REP | X86_PRINT_REPE))) {
++				MI->x86_prefix[0] = 0;
++			}
++#endif
++			break;
++		default:
++			break;
++		}
++	}
++
++	// LOCK and F2/F3 may both be present (for XACQUIRE/XRELEASE).
++	// There are also XRELEASEs that can be LOCKless.
++	if (MI->x86Lock) {
++		SStream_concat(O, "lock|");
++	}
++
++	switch (MI->x86_prefix[1]) {
++	default:
++		break;
++	case 0x3e:
++		prefix = print_prefix_flags(MI->csh, MCInst_getOpcode(MI));
++		if (prefix & X86_PRINT_NOTRACK) {
++			SStream_concat(O, "notrack|");
++		}
++		break;
++	}
++
++	copy_normalized_prefixes(MI);
++}
++
++static void (*prefix_printer)(MCInst *, SStream *) = X86_lockrep_full;
++void bench_select_prefix(unsigned merged)
++{
++    prefix_printer = merged ? merged_prefix : X86_lockrep_full;
++}
++
+ void X86_printPrefixes(MCInst *MI, SStream *O)
+ {
+ 	if (MI->xAcquireRelease || MI->x86Lock || MI->x86_prefix[0] ||
+ 	    MI->x86_prefix[1]) {
+-		X86_lockrep_full(MI, O);
++		prefix_printer(MI, O);
+ 		return;
+ 	}
+ 
