@@ -21,15 +21,20 @@ try:
         assert g('rev-parse','HEAD')==q['parent']
         patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+name+'.patch']))
         assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-        cmd(v/'configure.log',[*cfg,'-DCAPSTONE_AARCH64_SUPPORT='+('ON' if name=='mixed' else 'OFF')])
-        assert ('CAPSTONE_AARCH64_SUPPORT:BOOL=ON' in (b/'CMakeCache.txt').read_text())==(name=='mixed')
+        static_only=name=='mixed_static'
+        suffixes=('static',) if static_only else ('static','shared')
+        cmd(v/'configure.log',[*cfg,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_SHARED_LIBS='+('OFF' if static_only else 'ON'),'-DCAPSTONE_AARCH64_SUPPORT='+('ON' if name.startswith('mixed') else 'OFF')])
+        assert ('CAPSTONE_AARCH64_SUPPORT:BOOL=ON' in (b/'CMakeCache.txt').read_text())==(name.startswith('mixed'))
+        commands=json.loads((b/'compile_commands.json').read_text());active=static_only and profile in ('full','noatt')
+        linked=[v for v in commands if v['file'].replace(chr(92),'/').endswith('/X86PublicOutput.c')]
+        assert bool(linked)==active and all('CAPSTONE_X86_MIXED_STATIC_OUTPUT' in v['command'] for v in linked),(name,profile)
         names={z['name']for z in json.loads(sp.check_output(['ctest','--test-dir',b,'-C','Release','--show-only=json-v1'],text=True))['tests']}
         possible=['x86_scan_batch','x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy','x86_evex_move_access','detail_option','text_option','x86_x87_environment']
         targets=[a for a in possible if 'unit_'+a in names]
         assert 'x86_scan_batch' in targets and 'x86_buffer_bounds' in targets and 'x86_mapping_counts'in targets
         full=profile in ('full','noatt')
         if full:assert 'x86_simple_output'in targets
-        cmd(v/'build.log',['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*targets, *(['probe_static','probe_shared','vector_rows']if full else [])])
+        cmd(v/'build.log',['cmake','--build',b,'--parallel','4','--target',*['capstone_'+v for v in suffixes],*targets,*(['probe_'+v for v in suffixes]+['vector_rows'] if full else [])])
         cmd(v/'tests.log',['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(targets)+')$'])
         cmd(v/'mapping.log',[sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
         if full:
@@ -40,14 +45,14 @@ try:
             assert table==(s/'arch/X86/X86GenVectorOutput.inc').read_bytes().replace(b'\r\n',b'\n')
             save(v/'table.json',dict(bytes=len(table),sha256=hashlib.sha256(table).hexdigest()))
             rows=[]
-            for suffix in ('static','shared'):
+            for suffix in suffixes:
                 exe,=[f for f in b.rglob('probe_'+suffix+('.exe' if win else '')) if f.is_file()]
                 obs=[ln.split()for ln in sp.check_output([exe],text=True,env=env).splitlines()];assert len(obs)==12
                 for bits,instr,vex,num,write,first,last in obs:
                     count=8 if name in ('repair','combined') and bits!='64' else 16
                     assert int(num)==int(write)==count and first=='ymm0' and last=='ymm'+str(count-1)
                 rows.append(obs)
-            assert rows[0]==rows[1];save(v/'vzero.json',rows[0])
+            assert rows and all(z==rows[0] for z in rows);save(v/'vzero.json',rows[0])
         save(v/'checked.json',dict(complete=True,source=q,profile=profile,tests=targets,host=platform.machine(),full=full))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file()and not f.is_symlink());shutil.rmtree(t);save(out/'cleanup.json',dict(removed=not t.exists(),bytes=n))

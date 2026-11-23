@@ -1,7 +1,7 @@
-name: Verify unsigned comparison records in four source configurations on 32 and 64 bit Windows and macOS
+name: Verify mixed static-only public readers and mixed shared libraries on Windows and macOS
 on:
   push:
-    branches: [codex/portable-dedicated-compare]
+    branches: [codex/portable-static-public-reader-options]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-compare-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mixed-static-public-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
