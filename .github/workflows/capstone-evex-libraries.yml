@@ -1,7 +1,7 @@
-name: Verify SystemZ operand storage and text leave inactive multi-architecture consumers byte-identical
+name: Check LoongArch private operands in stock, mixed and NeverD static builds
 on:
   push:
-    branches: [codex/systemz-operand-stream-release-identity]
+    branches: [codex/loongarch-release-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,13 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6de392819bbc0d468ad7c30531271823416f655e
+          ref: 8835df03f81c2011e14511446686a6b68eabdd68
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 06b00d67cbfef584518b8a48b751f88d0cd86d16
+          ref: 1d2e9acae726a33e11dcf59797c2e9385caadb86
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: systemz-operand-stream-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: loongarch-release-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
