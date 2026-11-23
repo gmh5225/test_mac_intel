@@ -50,6 +50,17 @@ def measure(t):
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
             variants[k]=dict(so=sha(so),archive=sha(b/'libcapstone.a'),objects=files)
+            if profile=='full':
+                hot={'RISCV_getInstruction','RISCV_LLVM_getInstruction','RISCV_LLVM_printInstruction','RISCV_get_insn_id','getScanInstruction','RISCV_scanBaseInstruction','scanCompressedInstruction','cs_disasm_iter'}
+                layout={};lines=sp.check_output(['nm','-n','-S',so],text=True).splitlines()
+                data=so.read_bytes();section,=[z.split()for z in sp.check_output(['objdump','-h',so],text=True).splitlines()if len(z.split())>=6 and z.split()[1]=='.text'];vma,offset=int(section[3],16),int(section[5],16)
+                for ln in lines:
+                    cols=ln.split()
+                    if len(cols)==4 and cols[3] in hot:
+                        addr,nbytes=[int(z,16)for z in cols[:2]];begin=offset+addr-vma
+                        layout[cols[3]]=dict(address=addr,size=nbytes,sha256=hashlib.sha256(data[begin:begin+nbytes]).hexdigest())
+                assert 'cs_disasm_iter'in layout and 'RISCV_LLVM_printInstruction'in layout
+                save('layout-'+k,layout)
             if profile=='full':libs[k]=t/(k+'.so');shutil.copy2(so,libs[k])
         if profile=='neverd':assert variants['base']==variants['width']
         else:
@@ -57,7 +68,7 @@ def measure(t):
                 assert set(row['objects'])==set(variants['base']['objects'])
                 changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
                 actual={Path(f).name for f in changed}
-                allowed={'RISCVDisassembler.c.o'} if k!='base' and (profile=='diet' or not mixed) else set()
+                allowed=({'RISCVDisassembler.c.o','RISCVModule.c.o'} if k=='width' else {'RISCVDisassembler.c.o'}) if k!='base' and (profile=='diet' or not mixed) else set()
                 assert actual<=allowed and (profile!='full' or actual==allowed),(profile,k,actual,allowed)
                 if profile=='full' and mixed:assert row==variants['base']
         info[profile]=variants;shutil.rmtree(b)
@@ -104,7 +115,7 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-compressed-integer-2319-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('RISCV-configured-compressed-2323-'+flavor)
     del images['lazy']
     images['candidate_copy']=images['width']
     for name,bits in cases.items():

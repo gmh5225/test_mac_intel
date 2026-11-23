@@ -1,7 +1,7 @@
-name: Measure RISC-V compressed arithmetic and stack scans on four real ELF files with independent duplicate controls
+name: Measure compressed scanning with the decoder selected at option time and check ordinary instruction layout
 on:
   push:
-    branches: [codex/riscv-compressed-integer-load-store]
+    branches: [codex/riscv-mode-owned-compressed]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-compressed-integer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-selected-compressed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

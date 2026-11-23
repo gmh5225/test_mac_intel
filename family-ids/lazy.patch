@@ -1,8 +1,8 @@
 diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
-index 4f02638a..d3cb5926 100644
+index 4f02638a..4439581c 100644
 --- a/arch/RISCV/RISCVScan.h
 +++ b/arch/RISCV/RISCVScan.h
-@@ -5,13 +5,60 @@
+@@ -5,13 +5,77 @@
  
  #include "RISCVModule.h"
  
@@ -10,7 +10,6 @@ index 4f02638a..d3cb5926 100644
 + * and encodings whose operation differs between RV32 and RV64. */
 +static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
 +{
-+	(void)mode;
 +	const unsigned encoding = ((word >> 13) << 2) | (word & 3);
 +	const unsigned rd = (word >> 7) & 31;
 +	switch (encoding) {
@@ -34,6 +33,24 @@ index 4f02638a..d3cb5926 100644
 +		return (word & 0x1000) ? RISCV_C_ADD : RISCV_C_MV;
 +	case (0 << 2) | 1:
 +		return rd && (word & 0x107c) ? RISCV_C_ADDI : 0;
++	case (2 << 2) | 2:
++		return rd ? RISCV_C_LWSP : 0;
++	case (3 << 2) | 0:
++		return RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_LD :
++			       0;
++	case (7 << 2) | 0:
++		return RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_SD :
++			       0;
++	case (3 << 2) | 2:
++		return rd && RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_LDSP :
++			       0;
++	case (7 << 2) | 2:
++		return RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_SDSP :
++			       0;
 +	default:
 +		return 0;
 +	}

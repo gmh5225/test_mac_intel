@@ -1,13 +1,17 @@
-diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
-index 4f02638a..4439581c 100644
---- a/arch/RISCV/RISCVScan.h
-+++ b/arch/RISCV/RISCVScan.h
-@@ -5,13 +5,77 @@
- 
+diff --git a/arch/RISCV/RISCVModule.c b/arch/RISCV/RISCVModule.c
+index 4105553b..afb11679 100644
+--- a/arch/RISCV/RISCVModule.c
++++ b/arch/RISCV/RISCVModule.c
+@@ -11,6 +11,97 @@
  #include "RISCVModule.h"
+ #include "RISCVLinkage.h"
  
-+/* The ordinary decoder retains reserved immediates, zero-register hints
-+ * and encodings whose operation differs between RV32 and RV64. */
++#ifdef CAPSTONE_RISCV_ONLY
++#include "RISCVDisassemblerExtension.h"
++#define GET_INSTRINFO_ENUM
++#include "RISCVGenInstrInfo.inc"
++
++/* The ordinary decoder retains reserved immediates, hints and extension-specific encodings. */
 +static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
 +{
 +	const unsigned encoding = ((word >> 13) << 2) | (word & 3);
@@ -56,31 +60,93 @@ index 4f02638a..4439581c 100644
 +	}
 +}
 +
- /* The scanner is selected for little-endian, non-E modes without output.
-  * These major opcodes admit every destination register and immediate. */
- static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
- 			       MCInst *inst, uint16_t *size, uint64_t address,
- 			       void *info)
- {
--	if (length >= 4 && !inst->flat_insn->detail) {
-+	if (length < 2 || inst->flat_insn->detail)
-+		goto full;
-+	if ((code[0] & 3) != 3) {
++static bool scanCompressedInstruction(csh handle, const uint8_t *code,
++				      size_t length, MCInst *inst,
++				      uint16_t *size, uint64_t address,
++				      void *info)
++{
++	if (length >= 2 && (code[0] & 3) != 3 && !inst->flat_insn->detail) {
 +		const uint16_t word = code[0] | ((uint16_t)code[1] << 8);
-+		const unsigned opcode = scanCompressedOpcode(word, inst->csh->mode);
-+		if (opcode &&
-+		    (RISCV_getFeatureBits(inst->csh->mode, RISCV_FeatureStdExtC) ||
-+		     RISCV_getFeatureBits(inst->csh->mode, RISCV_FeatureStdExtZca))) {
++		const unsigned opcode =
++			scanCompressedOpcode(word, inst->csh->mode);
++		if (opcode) {
 +			MCInst_setOpcode(inst, opcode);
 +			*size = 2;
 +			return true;
 +		}
-+		goto full;
 +	}
-+	if (length >= 4) {
- 		unsigned opcode;
- 		const unsigned major = code[0] & 0x7f;
- 		switch (major) {
++	return RISCV_scanBaseInstruction(handle, code, length, inst, size,
++					 address, info);
++}
++
++void RISCV_selectScanDecoder(cs_struct *handle)
++{
++	if (handle->disasm != RISCV_LLVM_getInstruction &&
++	    handle->disasm != RISCV_scanBaseInstruction &&
++	    handle->disasm != scanCompressedInstruction)
++		return;
++	if (!handle->no_text || handle->detail_opt ||
++	    (handle->mode & CS_MODE_BIG_ENDIAN) ||
++	    RISCV_getFeatureBits(handle->mode, RISCV_FeatureRVE))
++		handle->disasm = RISCV_LLVM_getInstruction;
++	else if (RISCV_getFeatureBits(handle->mode, RISCV_FeatureStdExtC) ||
++		 RISCV_getFeatureBits(handle->mode, RISCV_FeatureStdExtZca))
++		handle->disasm = scanCompressedInstruction;
++	else
++		handle->disasm = RISCV_scanBaseInstruction;
++}
++#endif
++
+ cs_err RISCV_global_init(cs_struct *ud)
+ {
+ 	MCRegisterInfo *mri;
+diff --git a/arch/RISCV/RISCVModule.h b/arch/RISCV/RISCVModule.h
+index 9d154c2d..45017622 100644
+--- a/arch/RISCV/RISCVModule.h
++++ b/arch/RISCV/RISCVModule.h
+@@ -8,6 +8,11 @@
+ 
+ cs_err RISCV_global_init(cs_struct *ud);
+ #ifdef CAPSTONE_RISCV_ONLY
++CAPSTONE_INTERNAL bool RISCV_scanBaseInstruction(csh handle,
++						 const uint8_t *code,
++						 size_t length, MCInst *inst,
++						 uint16_t *size,
++						 uint64_t address, void *info);
+ void RISCV_selectScanDecoder(cs_struct *handle);
+ #endif
+ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value);
+diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
+index 4f02638a..25b438e1 100644
+--- a/arch/RISCV/RISCVScan.h
++++ b/arch/RISCV/RISCVScan.h
+@@ -7,7 +7,7 @@
+ 
+ /* The scanner is selected for little-endian, non-E modes without output.
+  * These major opcodes admit every destination register and immediate. */
+-static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
++bool RISCV_scanBaseInstruction(csh handle, const uint8_t *code, size_t length,
+ 			       MCInst *inst, uint16_t *size, uint64_t address,
+ 			       void *info)
+ {
+@@ -39,17 +39,4 @@ full:
+ 					 address, info);
+ }
+ 
+-void RISCV_selectScanDecoder(cs_struct *handle)
+-{
+-	if (handle->disasm == RISCV_LLVM_getInstruction ||
+-	    handle->disasm == getScanInstruction) {
+-		const bool scan = handle->no_text && !handle->detail_opt &&
+-				  !(handle->mode & CS_MODE_BIG_ENDIAN) &&
+-				  !RISCV_getFeatureBits(handle->mode,
+-							RISCV_FeatureRVE);
+-		handle->disasm = scan ? getScanInstruction :
+-					RISCV_LLVM_getInstruction;
+-	}
+-}
+-
+ #endif
 diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
 index 44a891a2..056cff15 100644
 --- a/tests/unit/riscv_scan_options.c
