@@ -1,0 +1,104 @@
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 76b35f22..70d45f87 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -200,7 +200,7 @@ bool X86_writeMemoryOutput(
+ 		*out++ = '-';
+ 	writeUnsignedImmediate(out, (uint64_t)(value < 0 ? -value : value));
+ #else
+-	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
++	/* The 64-bit memory forms sign-extend their encoded imm32. */
+ #if X86_IMMEDIATE_WIDE
+ 	const uint64_t value = row->ops[0].size == 8 ?
+ 				       (uint64_t)(int64_t)(int32_t)encoded :
+@@ -209,7 +209,15 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t value = encoded;
+ #endif
+ 	memcpy(out, ", ", 2);
+-	writeUnsignedImmediate(out + 2, value);
++	out += 2;
++#if X86_IMMEDIATE_WIDE
++	/* TEST prints a sign-extended negative mask in signed notation. */
++	if (opcode == 0xf7 && (value >> 63)) {
++		*out++ = '-';
++		writeUnsignedImmediate(out, 0u - encoded);
++	} else
++#endif
++		writeUnsignedImmediate(out, value);
+ #endif
+ #else
+ 	if (!load && !push) {
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..80212449 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -159,14 +159,17 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 	}
+ 	if (primary != 0x0f) {
+ 		const uint8_t mr = code[has_rex + 1];
+-		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
++		const unsigned family = primary & 0xfe;
++		if ((family != 0xc6 && family != 0xf6) || mr >= 0xc0 ||
++		    (mr & 0x38) ||
+ 		    X86_OUTPUT_UNSUPPORTED(handle, false))
+ 			return false;
+ 		const unsigned prefix_class =
+ 			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
+-		/* The MOV store row carries its operand width and access. */
++		/* Register TEST and MOV rows carry the memory width, access and flags. */
++		const unsigned opcode = (family == 0xf6 ? 0x84 : 0x88) | (primary & 1);
+ 		const unsigned row = x86_simple_plans[1][prefix_class]
+-						     [0x88 | (primary & 1)] >>
++						     [opcode] >>
+ 				     2;
+ 		return writeMemoryImmediate64(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..d49b9bee 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -151,8 +151,9 @@ static bool writeExtend32(const uint8_t *code, size_t size, cs_insn *insn,
+ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 			       size_t size, cs_insn *insn, uint16_t *insn_size)
+ {
+-	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
+-	if ((code[0] & 0xfc) != 0xc4)
++	/* The /0 memory forms of MOV and TEST share the encoded immediate. */
++	const unsigned family = code[0] & 0xfe;
++	if ((code[0] & 0xfc) != 0xc4 && family != 0xf6)
+ 		return code[0] == 0x0f && size >= 3 &&
+ 		       (code[1] & 0xf6) == 0xb6 &&
+ 		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+@@ -162,7 +163,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	if (code[0] & 2) {
+ 		if (size < 2 || code[1] >= 0xc0 || (code[1] & 0x38))
+ 			return false;
+-		const unsigned opcode = 0x88 | (code[0] & 1);
++		const unsigned opcode = (family == 0xf6 ? 0x84 : 0x88) | (code[0] & 1);
+ 		const unsigned row = x86_simple_plans[0][0][opcode] >> 2;
+ 		return writeMemoryImmediate32(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 1c7944f4..59abcc7e 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -338,6 +338,19 @@ static bool check_group1(csh handles[2], cs_mode mode)
+ 					return false;
+ 			}
+ 	}
++	static const struct {
++		uint8_t bytes[12];
++		uint8_t length;
++	} masks[] = {
++		{ { 0xf6, 0x80, 0x9e, 0, 0, 0, 8 }, 7 },
++		{ { 0xf6, 0x44, 0x24, 0x48, 0xff }, 5 },
++		{ { 0xf7, 0x00, 0, 0, 0, 0x80 }, 6 },
++		{ { 0x49, 0xf7, 0x45, 0xf0, 0xff, 0xff, 0xff, 0xff }, 8 },
++	};
++	for (size_t i = 0; i < sizeof(masks) / sizeof(masks[0]); ++i)
++		for (unsigned n = 1; n <= masks[i].length; ++n)
++			if (!compare(handles, masks[i].bytes, n, (unsigned)i + n))
++				return false;
+ 	return true;
+ }
+ 

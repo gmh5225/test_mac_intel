@@ -75,19 +75,19 @@ int main() {
                 std::memcmp(actual.mnemonic, reference.mnemonic, sizeof(actual.mnemonic)) ||
                 std::memcmp(actual.op_str, reference.op_str, sizeof(actual.op_str)) ||
                 (detail && std::memcmp(&act, &ref, offsetof(cs_detail, x86) + sizeof(cs_x86))))
-                return false;
+                { std::fprintf(stderr,"mismatch %s | %s  /  %s | %s\n",actual.mnemonic,actual.op_str,reference.mnemonic,reference.op_str); return false; }
             actual.detail = reference.detail;
             if (std::memcmp(&actual, &reference, sizeof(actual)) ||
                 std::memcmp(&act, &ref, sizeof(act))) return false;
             return true;
         };
         for (unsigned rex=0;rex<=(wide?16:0);++rex)
-        for (unsigned op: {0x80u,0x81u,0x82u,0x83u,0xc7u}) for (unsigned mr=0;mr<256;++mr) {
+        for (unsigned op: {0xf6u,0xf7u,0xf4u,0xffu}) for (unsigned mr=0;mr<256;++mr) {
             const unsigned mod=mr>>6,rm=mr&7,field=(mr>>3)&7,lead=bool(rex);
-            const bool indexed=rm==4 && mod<3,eligible=wide && field==7 && mod!=3 && op!=0x82 && op!=0xc7;
+            const bool indexed=rm==4 && mod<3,eligible=field==0 && mod!=3 && (op==0xf6 || op==0xf7);
             for(unsigned sib=0;sib<(eligible&&indexed?256u:1u);++sib) {
                 const unsigned disp=mod==2 || (mod==0 && (rm==5 || (indexed && (sib&7)==5))) ? 4 : (mod==1);
-                const unsigned off=lead+2+indexed+disp,len=off+(op==0x81 || op==0xc7?4:1);
+                const unsigned off=lead+2+indexed+disp,len=off+(op==0xf7?4:1);
                 std::array<uint8_t,15>b{};if(rex)b[0]=0x3f+rex;b[lead]=op;b[lead+1]=mr;
                 if(indexed)b[lead+2]=sib;
                 if(disp){b[off-disp]=0x80;b[off-1]=0xff;}
@@ -98,8 +98,8 @@ int main() {
                 for(unsigned n=0;n<len;++n)if(!check(b,n,true)){std::fprintf(stderr,"short rex %u op %x mr %x sib %x n %u\\n",rex,op,mr,sib,n);return 4;}
             }
         }
-        std::array<uint8_t,15>b{0x48,0x83,0x38,0xff};
-        if(cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) || !check(b,4,true))return 6;
+        std::array<uint8_t,15>b{0xf6,0x00,0xff,0};
+        if(cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) || !check(b,3,true))return 6;
         cs_close(&ordinary);
         cs_close(&fast);
     }

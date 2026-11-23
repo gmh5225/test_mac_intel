@@ -121,11 +121,12 @@ def main(w):
         db=json.loads((build/'compile_commands.json').read_text())
         entry,=[z for z in db if z['file'].endswith('/X86Sse64Output.c')]
         defs=[v for v in shlex.split(entry['command'])if v.startswith('-D')]
-        run(['clang','-O2',*defs,'-I',base,'-I',base/'include','-c',r/'scalar-guard.c','-o',w/'scalar.o'],'scalar-probe-'+key)
-        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'scalar-guard.cpp',w/'scalar.o',lib,'-o',w/'scalar-guard'],'scalar-link-'+key)
+        for bits in (32,64):
+            run(['clang','-O2',*defs,'-I',base,'-I',base/'include','-c',r/f'mask{bits}.c','-o',w/f'mask{bits}.o'],f'mask-probe-{bits}-'+key)
+        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'scalar-guard.cpp',w/'mask32.o',w/'mask64.o',lib,'-o',w/'scalar-guard'],'scalar-link-'+key)
         run([w/'scalar-guard'],'scalar-guard-'+key)
         counts=list(map(int,(evidence/('scalar-guard-'+key+'.log')).read_text().split()))
-        assert counts==[1777646,0,506856 if key=='cmp' else 0],(key,counts)
+        assert counts[0]==1321680 and (counts[1:]==[0,0] if kind=='base' else (counts[2]==337904 and 0<counts[1]<=19264)),(key,counts)
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -141,9 +142,7 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='cmp':
-            assert set(changed)<={'X86Sse64Output.c.o','X86MemoryFallback32.c.o'},(key,changed)
-            if not mixed:assert 'X86Sse64Output.c.o' in changed,(key,changed)
+        if kind=='test':assert set(changed)=={'X86Sse64Output.c.o','X86Vex32Output.c.o'},(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
