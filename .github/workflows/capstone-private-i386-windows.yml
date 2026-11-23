@@ -1,7 +1,7 @@
-name: Build generated broadcast and base-memory readers on native Windows and macOS
+name: Verify public iterators, segmented i386 records, and shared VEX plans in sixteen native builds
 on:
   push:
-    branches: [codex/portable-specialized-vector-memory]
+    branches: [codex/portable-public-and-memory-readers]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: base-broadcast-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: output-record-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
