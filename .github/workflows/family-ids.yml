@@ -1,7 +1,7 @@
-name: Measure static x86 mapping details and the legacy VZERO fix with two Clang generations
+name: Isolate the x86 mapping algorithm within one shared image on real PE, RISC-V and MIPS
 on:
   push:
-    branches: [codex/static-x86-details-before-repairs]
+    branches: [codex/static-details-same-mapper-image]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,8 +31,6 @@ jobs:
           ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
           path: source
           persist-credentials: false
-      - if: matrix.flavor == 'first'
-        run: command -v valgrind || (sudo apt-get -qq update && sudo apt-get -qq install -y valgrind)
       - run: python3 -B family-ids/native.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
@@ -40,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: static-mapping-details-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: same-image-mapper-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
