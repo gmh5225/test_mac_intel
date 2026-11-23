@@ -14,9 +14,9 @@ try:
     shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake');(project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+flow[i:j])
     public_test=d/'identity-probe.c'
     profiles={}
-    for profile in ('project','ten','dual','pure','mixed-diet','mixed-reduced','pure-noatt'):
+    for profile in ('project','ten','dual','pure','mixed-diet','mixed-reduced','pure-noatt','pure-diet','pure-reduced','pure-custom'):
         b=t/('build-'+profile);receipts={}
-        expected='reference' if profile.startswith('pure') else 'base'
+        expected='reference' if profile in ('pure','pure-noatt') else 'base'
         variants=('base','reference','candidate') if expected=='reference' else ('base','candidate')
         pair={}
         for stage in variants:
@@ -32,8 +32,9 @@ try:
                     arches=('ARM','AARCH64','MIPS','LOONGARCH','SYSTEMZ','RISCV','PPC','SPARC','XTENSA') if profile=='ten' else (() if profile.startswith('pure') else ('MIPS',))
                     if profile=='pure-noatt':cfg+=['-DCAPSTONE_X86_ATT_DISABLE=ON']
                     cfg+=['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in arches]
-                    if profile=='mixed-diet':cfg+=['-DCAPSTONE_BUILD_DIET=ON']
-                    if profile=='mixed-reduced':cfg+=['-DCAPSTONE_X86_REDUCE=ON']
+                    if profile in ('mixed-diet','pure-diet'):cfg+=['-DCAPSTONE_BUILD_DIET=ON']
+                    if profile in ('mixed-reduced','pure-reduced'):cfg+=['-DCAPSTONE_X86_REDUCE=ON']
+                if profile=='pure-custom':cfg+=['-DCAPSTONE_USE_DEFAULT_ALLOC=OFF']
                 run('configure-'+label,cfg);run('build-'+label,['cmake','--build',b,'--parallel','4','--target','capstone_static',*(['capstone_shared']if profile!='project'else [])])
                 lib,=b.rglob('libcapstone.a');objects={str(f.relative_to(b)):sha(f)for f in b.rglob('*.c.o')};assert any('LoongArch' in name for name in objects)==(profile=='ten')
                 members=[n for n in sp.check_output(['ar','t',lib],text=True).splitlines()if not n.startswith('__.SYMDEF')]
@@ -46,7 +47,12 @@ try:
                 force=(['-Wl,-u,_X86_disasmIter32','-Wl,-u,_X86_disasmIterText','-Wl,-u,_X86_scanNativeBatch'] if platform.system()=='Darwin' else ['-Wl,--undefined=X86_disasmIter32','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_scanNativeBatch'])
                 executables={}
                 for name,flags in [('normal',[]),('private',force)]:
-                    run('link-'+label+'-'+name,['clang','-std=c99','-O2','-I',s/'include',public_test,*flags,lib,'-lm','-o',p])
+                    probe=public_test
+                    if profile=='pure-custom':
+                        original=probe.read_text();pos=original.index('{',original.index('int main('))+1
+                        prefix='#include <stdlib.h>\n#include <stdio.h>\n'
+                        probe=t/'custom.c';probe.write_text(prefix+original[:pos]+'\ncs_opt_mem mem={malloc,calloc,realloc,free,vsnprintf}; if(cs_option(0,CS_OPT_MEM,(size_t)&mem)) return 1;\n'+original[pos:])
+                    run('link-'+label+'-'+name,['clang','-std=c99','-O2','-I',s/'include',probe,*flags,lib,'-lm','-o',p])
                     assert sp.check_output([p],text=True).strip()=='verified'
                     executables[name]=sha(p)
                 pair[stage]=dict(objects=objects,members=list(zip(members,digests)),shared=shared,probes=executables)
@@ -58,7 +64,7 @@ try:
         changed=sorted(k for k in z['objects'] if z['objects'][k]!=a['objects'].get(k))
         names={Path(f).name for f in changed}
         if expected=='reference':
-            assert names=={'X86RegisterFallback32.c.o'} and a['shared']!=z['shared'],(profile,names)
+            assert names=={'X86DoubleShift32.c.o','X86RegisterFallback32.c.o'} and a['shared']!=z['shared'],(profile,names)
         else:assert not changed and a==z,profile
         receipts=dict(expected=expected,changed=changed,trees={k:m[k]['tree'] for k in variants},objects=len(a['objects']),members=len(a['members']),shared=z['shared'],probes=z['probes'],member_sha256=hashlib.sha256(json.dumps(z['members']).encode()).hexdigest())
         profiles[profile]=receipts;save('profiles',profiles)
