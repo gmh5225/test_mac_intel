@@ -1,7 +1,7 @@
-name: Check legacy VZERO implicit registers at write list construction in native x86 and foreign workloads
+name: Classify final x86 detail repairs and compare real PE, RISC-V and MIPS traces
 on:
   push:
-    branches: [codex/limit-vzero-long-write-lists]
+    branches: [codex/tagged-late-x86-details]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 372fbd2d967c5023371a12e0e406f8be2ec84ae5
+          ref: 76395023380f346cd58f166905c5be77afede197
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: long-vector-writes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: tagged-x86-details-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
