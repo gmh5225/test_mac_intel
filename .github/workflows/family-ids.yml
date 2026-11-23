@@ -1,7 +1,7 @@
-name: Compare selecting the x86 implicit-write source with branching on the register bank
+name: Check legacy vector writes with a shared implicit-repair flag on PE32 and cross-architecture workloads
 on:
   push:
-    branches: [codex/x86-upper-write-source]
+    branches: [codex/shared-implicit-register-repair-test]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8835df03f81c2011e14511446686a6b68eabdd68
+          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: selected-write-source-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: unified-implicit-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

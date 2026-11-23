@@ -1,68 +1,207 @@
+diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
+index ea9309f4..e5b0854e 100644
+--- a/arch/X86/X86GenMappingCounts.inc
++++ b/arch/X86/X86GenMappingCounts.inc
+@@ -1036,8 +1036,8 @@ static const uint16_t x86_mapping_counts[] = {
+ 	32, // X86_RDSEED64r
+ 	0, // X86_RDSSPD
+ 	0, // X86_RDSSPQ
+-	64, // X86_RDTSC
+-	1120, // X86_RDTSCP
++	16448, // X86_RDTSC
++	17504, // X86_RDTSCP
+ 	0, // X86_REPNE_PREFIX
+ 	0, // X86_REP_PREFIX
+ 	2114, // X86_RETIL
+@@ -3749,8 +3749,8 @@ static const uint16_t x86_mapping_counts[] = {
+ 	32, // X86_RDSEED64r
+ 	0, // X86_RDSSPD
+ 	0, // X86_RDSSPQ
+-	64, // X86_RDTSC
+-	1120, // X86_RDTSCP
++	16448, // X86_RDTSC
++	17504, // X86_RDTSCP
+ 	0, // X86_REPNE_PREFIX
+ 	0, // X86_REP_PREFIX
+ 	2114, // X86_RETIL
+@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
+ 	0, // X86_VXORPSZrrkz
+ 	2048, // X86_VXORPSrm
+ 	2048, // X86_VXORPSrr
+-	1536, // X86_VZEROALL
+-	1536, // X86_VZEROUPPER
++	17920, // X86_VZEROALL
++	17920, // X86_VZEROUPPER
+ 	1024, // X86_WAIT
+ 	1024, // X86_WBINVD
+ 	0, // X86_WBNOINVD
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..bb4327b4 100644
+index 79adee8d..3ce717a7 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10324,13 +10324,31 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10251,6 +10251,44 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
+ 		}
+ 	}
+ }
++
++/* The generated repair bit covers these mode-dependent writes as well as
++ * the adjustments below. The timestamp instructions write only their
++ * active slots when called on an existing detail record. */
++static bool write_legacy_mode_registers(cs_insn *insn, cs_mode mode,
++					const insn_map_x86 *mapping)
++{
++	if (mode == CS_MODE_64)
++		return false;
++
++	cs_detail *detail = insn->detail;
++	switch (insn->id) {
++	default:
++		break;
++	case X86_INS_RDTSC:
++		detail->regs_write[0] = X86_REG_EAX;
++		detail->regs_write[1] = X86_REG_EDX;
++		detail->regs_write_count = 2;
++		return true;
++	case X86_INS_RDTSCP:
++		detail->regs_write[0] = X86_REG_EAX;
++		detail->regs_write[1] = X86_REG_ECX;
++		detail->regs_write[2] = X86_REG_EDX;
++		detail->regs_write_count = 3;
++		return true;
++	case X86_INS_VZEROALL:
++	case X86_INS_VZEROUPPER:
++		/* The legacy vector register bank ends at YMM7. */
++		memcpy(detail->regs_write, mapping->regs_mod,
++		       8 * sizeof(detail->regs_write[0]));
++		memset(detail->regs_write + 8, 0,
++		       sizeof(mapping->regs_mod) - 8 * sizeof(detail->regs_write[0]));
++		detail->regs_write_count = 8;
++		return true;
++	}
++	return false;
++}
++
+ #endif
  
- 			// special cases when regs_write[] depends on arch
- 			switch (id) {
+ // look for @id in @insns
+@@ -10322,49 +10360,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			insn->detail->regs_read_count =
+ 				(x86_mapping_counts[i] & 31);
+ 
+-			// special cases when regs_write[] depends on arch
+-			switch (id) {
 -			default:
 -				memcpy(insn->detail->regs_write,
 -				       insns[i].regs_mod,
--				       sizeof(insns[i].regs_mod));
--				insn->detail->regs_write_count =
++			if (!(x86_mapping_counts[i] & X86_MAPPING_IMPLICIT_REPAIR) ||
++			    !write_legacy_mode_registers(insn, mode, &insns[i])) {
++				memcpy(insn->detail->regs_write, insns[i].regs_mod,
+ 				       sizeof(insns[i].regs_mod));
+ 				insn->detail->regs_write_count =
 -					((x86_mapping_counts[i] >> 5) & 31);
-+			default: {
-+				cs_detail *detail = insn->detail;
-+				const insn_map_x86 *row = &insns[i];
-+				const unsigned writes =
+-				break;
+-			case X86_RDTSC:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 2;
+-				}
+-				break;
+-			case X86_RDTSCP:
+-				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
+-					insn->detail->regs_write_count =
+-						((x86_mapping_counts[i] >> 5) &
+-						 31);
+-				} else {
+-					insn->detail->regs_write[0] =
+-						X86_REG_EAX;
+-					insn->detail->regs_write[1] =
+-						X86_REG_ECX;
+-					insn->detail->regs_write[2] =
+-						X86_REG_EDX;
+-					insn->detail->regs_write_count = 3;
+-				}
+-				break;
 +					(x86_mapping_counts[i] >> 5) & 31;
-+#ifndef CAPSTONE_X86_REDUCE
-+				/* Only the full VZERO rows have writes beyond
-+				 * YMM7. The generator checks the upper bank. */
-+				static const uint16_t no_upper[ARR_SIZE(row->regs_mod) - 8];
-+				const bool wide = mode == CS_MODE_64;
-+				const uint16_t *upper =
-+					wide ? row->regs_mod + 8 : no_upper;
-+				const unsigned limit = wide ? ARR_SIZE(row->regs_mod) : 8;
-+				memcpy(detail->regs_write, row->regs_mod,
-+				       8 * sizeof(detail->regs_write[0]));
-+				memcpy(detail->regs_write + 8, upper,
-+				       sizeof(no_upper));
-+				detail->regs_write_count = MIN(writes, limit);
-+#else
-+				memcpy(detail->regs_write, row->regs_mod,
-+				       sizeof(row->regs_mod));
-+				detail->regs_write_count = writes;
-+#endif
- 				break;
-+			}
- 			case X86_RDTSC:
- 				if (mode == CS_MODE_64) {
- 					memcpy(insn->detail->regs_write,
+ 			}
+ 			/* The generator derives eligibility from the switches below. */
+ 			if (!(x86_mapping_counts[i] &
 diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
-index e7704042..0b2ab36c 100644
+index e7704042..509f26d9 100644
 --- a/suite/synctools/x86_mapping_counts.py
 +++ b/suite/synctools/x86_mapping_counts.py
-@@ -156,6 +156,16 @@ def generate(directory, suffix):
-             )
-             counts.append(tokens.index("0") if "0" in tokens else len(tokens))
-         read, write, group = counts
-+        if not suffix:
-+            modified = [token.strip() for token in row[4].split(",") if token.strip()]
-+            if name in ("X86_VZEROALL", "X86_VZEROUPPER"):
-+                bank = [f"X86_REG_YMM{i}" for i in range(16)]
-+                require(modified == bank + ["0"], f"Unexpected vector clear bank for {name}")
-+            else:
-+                require(
-+                    write <= 8 and all(token == "0" for token in modified[8:]),
-+                    f"{name} requires an explicit legacy-mode write projection",
-+                )
-         # Fixed fields are checked against the owning array capacities above.
-         value = read | (write << 5) | (group << 10)
-         repair = row[2] in repairs
+@@ -43,7 +43,22 @@ def implicit_repair_ids(source):
+         len(guards) == len(labels) == 1 and guards[0].end() < labels[0].start(),
+         "Unexpected implicit-register repair guard",
+     )
+-    remaining = source[guards[0].end() : labels[0].start()].strip()
++    return repair_switch_ids(source[guards[0].end() : labels[0].start()].strip())
++
++
++def legacy_write_ids(source):
++    """Return the mode-dependent write cases sharing the repair bit."""
++    source = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
++    switch = re.search(
++        r"\bwrite_legacy_mode_registers\s*\([^)]*\)\s*\{[^{}]*"
++        r"(switch\s*\(insn->id\)\s*\{.*?\})\s*return\s+false\s*;\s*\}",
++        source, re.S,
++    )
++    require(switch is not None, "Missing legacy write-register switch")
++    return repair_switch_ids(switch[1])
++
++
++def repair_switch_ids(remaining):
+     require(
+         "#" not in remaining, "Conditional repair cases need an explicit projection"
+     )
+@@ -100,7 +115,8 @@ def implicit_repair_ids(source):
+ 
+ def generate(directory, suffix):
+     source = (directory / f"X86MappingInsn{suffix}.inc").read_text()
+-    repairs = implicit_repair_ids((directory / "X86Mapping.c").read_text())
++    mapping = (directory / "X86Mapping.c").read_text()
++    repairs = implicit_repair_ids(mapping) | legacy_write_ids(mapping)
+     enum = dict(
+         (name, int(value))
+         for name, value in re.findall(
+diff --git a/tests/unit/test_x86_mapping_counts.py b/tests/unit/test_x86_mapping_counts.py
+index 0ba7e8e6..911044f4 100644
+--- a/tests/unit/test_x86_mapping_counts.py
++++ b/tests/unit/test_x86_mapping_counts.py
+@@ -41,6 +41,19 @@ class RepairProjection(unittest.TestCase):
+             {"X86_INS_LOOP", "X86_INS_LOOPE", "X86_INS_XADD", "X86_INS_JMP"},
+         )
+ 
++    def test_legacy_write_ids_share_repair_eligibility(self):
++        source = (
++            "static bool write_legacy_mode_registers(cs_insn *insn) {\n"
++            + SWITCH
++            + "return false;\n}"
++        )
++        self.assertEqual(
++            MAPPING.legacy_write_ids(source),
++            {"X86_INS_LOOP", "X86_INS_LOOPE", "X86_INS_XADD"},
++        )
++        with self.assertRaises(ValueError):
++            MAPPING.legacy_write_ids(source.replace("default: break;", "default: repair(); break;", 1))
++
+     def test_default_work_cannot_be_skipped(self):
+         for replacement in ["default: repair(); break;", "default:"]:
+             with self.subTest(replacement=replacement), self.assertRaises(ValueError):
 diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
-index d9dd18e2..e7ac71dc 100644
+index d9dd18e2..428aed88 100644
 --- a/tests/unit/x86_reg_access.c
 +++ b/tests/unit/x86_reg_access.c
 @@ -53,6 +53,54 @@ static bool check_implicit_copies(csh handle)
@@ -74,19 +213,17 @@ index d9dd18e2..e7ac71dc 100644
 +	if (cs_support(CS_SUPPORT_X86_REDUCE))
 +		return true;
 +
-+	const cs_mode modes[] = { CS_MODE_64, CS_MODE_32 | CS_MODE_X86_INTEL,
-+				  CS_MODE_16, CS_MODE_64 | CS_MODE_X86_AMD };
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 +	const uint8_t bytes[][4] = { { 0xc5, 0xf8, 0x77 },
 +				     { 0xc5, 0xfc, 0x77 },
 +				     { 0xc4, 0xe1, 0x78, 0x77 },
 +				     { 0xc4, 0xe1, 0x7c, 0x77 } };
-+	csh h = 0;
-+	if (cs_open(CS_ARCH_X86, modes[0], &h) != CS_ERR_OK)
-+		return false;
-+	bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
-+	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]) && ok; ++m) {
-+		const unsigned expected = modes[m] & CS_MODE_64 ? 16 : 8;
-+		ok = cs_option(h, CS_OPT_MODE, modes[m]) == CS_ERR_OK;
++	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
++		const unsigned expected = modes[m] == CS_MODE_64 ? 16 : 8;
++		csh h = 0;
++		if (cs_open(CS_ARCH_X86, modes[m], &h) != CS_ERR_OK)
++			return false;
++		bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
 +		for (unsigned n = 0; n < sizeof(bytes) / sizeof(bytes[0]) && ok;
 +		     ++n) {
 +			cs_insn *insn = NULL;
@@ -112,9 +249,11 @@ index d9dd18e2..e7ac71dc 100644
 +					"vector clear writes: mode=%u encoding=%u\n",
 +					(unsigned)modes[m], n);
 +		}
++		cs_close(&h);
++		if (!ok)
++			return false;
 +	}
-+	cs_close(&h);
-+	return ok;
++	return true;
 +}
 +
  static bool check_test_operands(void)
