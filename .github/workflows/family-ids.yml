@@ -1,7 +1,7 @@
-name: Repeat MIPS scan and detail comparisons on independent hosts with separate scan and text components
+name: Repeat MIPS throughput with longer trials on four Ubuntu Clang 18 hosts
 on:
   push:
-    branches: [codex/mips-repeat-primary-components]
+    branches: [codex/mips-repeat-clang18-details]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04, cc: clang, flavor: first }
           - { host: ubuntu-24.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
+          - { host: ubuntu-24.04, cc: clang, flavor: third }
+          - { host: ubuntu-24.04, cc: clang, flavor: fourth }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: repeated-mips-primary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: focused-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

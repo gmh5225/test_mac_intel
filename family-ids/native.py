@@ -89,12 +89,12 @@ try:
                 result=list(map(int,sp.check_output([t/'raw','103',t/(name+'.text'),str(opt)]).split()))
                 assert result==observed[0]
             signatures[name+'/'+str(opt)]=observed[0]
-    save('raw',signatures);rng=random.Random(2044);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    save('raw',signatures);rng=random.Random(78419);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     def sample(k,name,mode,n):
         target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time','103',str(mode),t/(name+'.text'),'1048576',str(n)]).split()))
     for name in samples:
         for mode in range(3):
-            one=sample('base',name,mode,1);n=max(1,round(65e6/one[0]));cycles=[]
+            one=sample('base',name,mode,1);n=max(1,round(100e6/one[0]));cycles=[]
             for _ in range(17):
                 keys=list(images);rng.shuffle(keys);observed={k:[]for k in keys}
                 for k in keys+keys[::-1]:
