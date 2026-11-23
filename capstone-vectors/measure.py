@@ -167,7 +167,7 @@ def main(w):
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert {'X86Sse64Output.c.o'} <= set(changed) <= {'X86Sse64Output.c.o','X86Vex32Output.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86MemoryOutput.c.o'},(key,changed)
+            assert {'X86Sse64Output.c.o','X86Vex32Output.c.o'} == set(changed),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

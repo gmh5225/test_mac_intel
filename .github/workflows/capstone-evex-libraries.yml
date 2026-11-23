@@ -1,7 +1,7 @@
-name: Compare both active AMD64 memory record builds to the iced fork on six real binaries
+name: Compare opcode-register MOV and accumulator immediate formatting against iced on real PE32 PE64 and ELF
 on:
   push:
-    branches: [codex/amd64-memory-records-real-matrix]
+    branches: [codex/accumulator-and-byte-mov-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: memory-records-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: opcode-immediates-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
