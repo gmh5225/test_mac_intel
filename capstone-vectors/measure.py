@@ -179,6 +179,7 @@ def main(w):
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
+        if darwin and kind=='base':flags.append('-Wl,-U,_X86_disasmOneText')
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
         names={'X86_disasmOneText','X86_disasmOneText32','X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
@@ -188,6 +189,7 @@ def main(w):
             if len(cols)!=3 or cols[1] not in ('t','T'):continue
             name=cols[2][1:] if darwin and cols[2].startswith('_') else cols[2]
             if name in names:linked[name]=int(cols[0],16)
+        assert ('X86_disasmOneText' in linked)==(kind=='bare')
         assert ('X86_decodePublicRecord' in linked)==(not mixed)
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         save('linked-'+key+'.json',linked)
