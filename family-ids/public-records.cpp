@@ -133,4 +133,5 @@ int main(int argc, char **argv) {
   }
   std::printf("{\"complete_record_comparisons\":%llu,\"batch_calls\":%llu,\"batch_records\":%llu}\n",
               (unsigned long long)attempts,(unsigned long long)batches,(unsigned long long)batch_records);
+  return 0;
 }

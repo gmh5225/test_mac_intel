@@ -1,7 +1,7 @@
-name: Compare statically linked real programs on ten architectures and verify complete public records
+name: Measure mixed public and already linked fixed readers from the same architecture check
 on:
   push:
-    branches: [codex/static-public-records-and-nine-other-isas]
+    branches: [codex/shared-public-architecture-test]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 372fbd2d967c5023371a12e0e406f8be2ec84ae5
+          ref: 8835df03f81c2011e14511446686a6b68eabdd68
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: static-ten-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mixed-public-arch-check-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

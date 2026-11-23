@@ -14,6 +14,7 @@ try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={};raw_bins={};probe_bins={};libs={}
     units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','aarch64_scan','aarch64_postprocess','mips_scan','mips_single','text_option','detail_option']
+    linked_probes={}
     for k in ('base','candidate'):
         if k=='candidate':
             patch=d/'candidate.patch';assert sha(patch)==meta['sha256'];g('apply','--index',str(patch));assert g('write-tree')==meta['tree']
@@ -30,6 +31,20 @@ try:
         for case,store in [('time',probe_bins),('raw',raw_bins)]:
             exe=t/(case+'-'+k)
             cmd('compile-'+case+'-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/(case+'.cpp'),lib,'-lm','-o',exe]);store[k]=exe
+        linked=t/('linked-'+k)
+        cmd('link-already-used-'+k,['c++','-std=c++17','-O3','-no-pie','-Wl,-u,X86_disasmIterText','-I',s/'include',d/'time.cpp',lib,'-lm','-o',linked])
+        linked_probes[k]=linked.read_bytes()
+        names={'cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','X86_decodePublicRecord','cs_decode_full_insn','X86_scanNativeBatch','AArch64_getInstruction','Mips_getInstruction','RISCV_getInstruction','SystemZ_LLVM_getInstruction','Xtensa_getInstruction'}
+        for label,exe in [('public',probe_bins[k]),('linked',linked)]:
+            symbols={}
+            for line in sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines():
+                z=line.split()
+                if len(z)==4 and z[-1] in names:symbols[z[-1]]=[int(z[0],16),int(z[1],16)]
+            assert 'cs_decode_full_insn' in symbols and 'cs_disasm_iter' in symbols
+            assert ('X86_decodePublicRecord' in symbols)==(k=='candidate')
+            if label=='linked' or k=='candidate':assert 'X86_disasmIterText' in symbols
+            save('layout-'+label+'-'+k,symbols)
+            cmd('iter-'+label+'-'+k,['objdump','-d','--disassemble=cs_disasm_iter',exe])
         imgs[k]=probe_bins[k].read_bytes();ids[k]=sha(probe_bins[k])
         so=t/(k+'.so')
         cmd('loadable-'+k,[cc,'-shared','-Wl,-Bsymbolic','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',so]);libs[k]=so
@@ -84,6 +99,21 @@ try:
                     assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
                 rows_.append(cyc)
             rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
+    linked_probes['copy']=linked_probes['base'];size=max(map(len,linked_probes.values()))
+    imgs={k:raw+bytes(size-len(raw))for k,raw in linked_probes.items()}
+    probe_rows=[]
+    for name,arch,path,ip,modes in panels:
+        for mode in modes:
+            if (name,mode) not in {('putty32',0),('putty32',1),('putty32',2),('putty64',0),('putty64',1),('putty64',2),('libmvec-amd64',1),('libmvec-amd64',2),('arm64-ls',1),('riscv64-ls',1),('mips64el-ls',2),('ppc64el-ls',0)}:continue
+            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(55e6/one[0]));cycles=[]
+            for _ in range(13):
+                order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
+                for k in order+order[::-1]:
+                    v=invoke(k,arch,mode,path,ip,n);assert v[2]==one[2];cyc[k].append(v[0])
+                cycles.append(cyc)
+            probe_rows.append(dict(case=name,mode=mode,cycles=cycles,reps=n))
+    assert len(probe_rows)==12
+    save('linked-readers',probe_rows)
     save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
 finally:
     count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
