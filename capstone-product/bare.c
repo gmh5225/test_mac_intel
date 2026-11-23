@@ -1,14 +1,27 @@
-#include "arch/X86/X86SimpleOutput.h"
-#include "arch/X86/X86ScanAdapter.h"
-bool observed_bare(const uint8_t *bytes, size_t length, bool wide)
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <capstone/capstone.h>
+#if __has_include("arch/X86/X86GenBareVexRegisters64.inc")
+#define X86_decodeOutputMiss64 observed_vector_miss
+#include "arch/X86/X86VectorFallback64.c"
+#undef X86_decodeOutputMiss64
+bool observed_bare(const uint8_t *bytes, size_t length, bool wide, csh handle)
 {
-    if (!length || (bytes[0] != 0xc4 && bytes[0] != 0xc5)) return false;
-    const unsigned prefix = bytes[0] == 0xc5 ? 2 : 3;
-    if (length < prefix + 2 || (bytes[prefix - 1] & 3) ||
-        bytes[prefix + 1] < 0xc0 || (prefix == 3 && (bytes[1] & 31) != 1)) return false;
-    if (!wide && (prefix == 2 ? (bytes[1] & 0xc0) != 0xc0 :
-        (bytes[1] & 0xe0) != 0xe0 || (bytes[2] & 0xc0) != 0x40)) return false;
+    if (!wide || !length || (bytes[0] & 0xfe) != 0xc4)
+        return false;
     cs_insn out = { 0 };
     uint16_t size;
-    return X86_writeVectorOutput(bytes, length, &out, &size, NULL, true);
+#if defined(EARLY_CHECKS)
+    return writeBareVexRegisters64(bytes, length, &out, &size,
+#else
+    return writeBareVexRegisters64((cs_struct *)(uintptr_t)handle, bytes, length, &out, &size,
+#endif
+                                   bytes[0] == 0xc5 ? 2 : 3);
 }
+#else
+bool observed_bare(const uint8_t *bytes, size_t length, bool wide, csh handle)
+{
+    return false;
+}
+#endif
