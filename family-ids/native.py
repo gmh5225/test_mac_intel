@@ -44,7 +44,8 @@ def measure(t):
             if k!='base':
                 patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
             run(profile+k+'-config',config(b,arch,extra))
-            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else [])])
+            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else []),*(['riscv_scan_options'] if profile=='full' and k=='width' else [])])
+            if profile=='full' and k=='width':run('generated-aliases',['python3','-B',source/'suite/synctools/alias_pattern_rows.py','--check'])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
@@ -55,13 +56,19 @@ def measure(t):
             for k,row in variants.items():
                 assert set(row['objects'])==set(variants['base']['objects'])
                 changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
-                assert all(f.endswith('/arch/RISCV/RISCVInstPrinter.c.o')for f in changed),changed
-                if profile=='full' and k!='base':assert len(changed)==1,(k,changed)
+                actual={Path(f).name for f in changed}
+                allowed={'RISCVInstPrinter.c.o'} if k=='lazy' else {'RISCVInstPrinter.c.o','cs.c.o','RISCVDisassembler.c.o','RISCVModule.c.o'} if k=='width' else set()
+                assert actual<=allowed and (profile!='full' or actual==allowed),(profile,k,actual,allowed)
         info[profile]=variants;shutil.rmtree(b)
     save('profiles',info)
     for k in ('lazy','width'):
         proof=list(map(int,sp.check_output([t/'guard',libs['base'],libs[k]]).split()))
         assert proof[0]==checks['guards'][k][0] and all(proof);save('guard-'+k,proof)
+    run('scan-guard-build',['c++','-std=c++17','-O2','-I',source/'include',r/'scan-guard.cpp','-ldl','-o',t/'scan-guard'])
+    for k in ('width','lazy'):
+        counts=list(map(int,sp.check_output([t/'scan-guard',libs['base'],libs[k]]).split()))
+        assert counts==[1489920,338432,1151488],counts
+        save('scan-proof-'+k,counts)
     lib=t/'libcapstone.so.6';(t/'libcapstone.so').symlink_to(lib.name)
     images={k:f.read_bytes() for k,f in libs.items()};length=max(map(len,images.values()));images={k:v+bytes(length-len(v))for k,v in images.items()};images['copy']=images['base'];lib.write_bytes(images['base'])
     for f in ('time','raw'):run(f,['c++','-O3','-std=c++17','-I',source/'include',r/(f+'.cpp'),'-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/f])
@@ -73,6 +80,16 @@ def measure(t):
         if current!=k:
             with lib.open('r+b')as f:assert f.write(images[k])==length
             current=k
+    run('census',['c++','-O2','-std=c++17','-I',source/'include',r/'scan-census.cpp','-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/'census'])
+    census={}
+    for name in cases:
+        if not name.startswith('riscv64-'):continue
+        data=[]
+        for k in ('base','width'):
+            select(k);data.append(list(map(int,sp.check_output([t/'census',t/(name+'.text')]).split())))
+        assert data[0]==data[1] and sum(data[0][2:])>0
+        census[name]=data[0]
+    save('scan-census',census)
     signatures={}
     for name,bits in cases.items():
         f=t/(name+'.text')
