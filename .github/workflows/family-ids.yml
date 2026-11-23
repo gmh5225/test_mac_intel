@@ -1,7 +1,7 @@
-name: Measure RISC-V aliases and standalone scan selection, with identity controls for shared ARM and MIPS decoding
+name: Isolate RISC-V scan throughput from printer and mixed-library layout on four real programs
 on:
   push:
-    branches: [codex/riscv-standalone-option-and-alias]
+    branches: [codex/riscv-standalone-scan-only]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-option-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-standalone-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
