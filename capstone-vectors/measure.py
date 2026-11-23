@@ -82,13 +82,20 @@ def main(w):
         save('direct-guard-'+label,dict(counts=counts))
         if label=='integrated':
             run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'verify-evex-memory'],'link-generated-memory')
+            assert sp.check_output([w/'verify-evex-memory'])==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
             assert sp.check_output([w/'verify-evex-memory','--vex-base-memory'])==(base/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
         from elftools.elf.elffile import ELFFile
         vector_obj,=b.rglob('X86VectorOutput.c.o')
         with vector_obj.open('rb')as f:
             ef=ELFFile(f)
             sections={z.name:dict(bytes=z.data_size,sha256=hashlib.sha256(z.data()).hexdigest())for z in ef.iter_sections()if z['sh_flags']&4 and z.data_size and z['sh_type']=='SHT_PROGBITS'}
-        syms=[line.split()for line in sp.check_output(['nm','-S','--defined-only',vector_obj],text=True).splitlines()]
+        memory_obj,=b.rglob('X86PlainEvexOutput.c.o')
+        syms=[line.split()for line in sp.check_output(['nm','-S','--defined-only',memory_obj],text=True).splitlines()]
+        with vector_obj.open('rb')as f:
+            sy=ELFFile(f).get_section_by_name('.symtab')
+            shared={v.name:[v['st_info']['bind'],v['st_other']['visibility'],v['st_size']]for v in sy.iter_symbols() if v.name in ('X86_vexRegisterRows','X86_vexRegisterWidths','X86_vexRegisterPlans')}
+        assert (not shared if label=='baseline' else len(shared)==3 and all(v[:2]==['STB_GLOBAL','STV_HIDDEN']and v[2]>0 for v in shared.values()))
+        save('vex-plan-visibility-'+label+'.json',shared)
         flags=[int(line[1],16)for line in syms if line[-1]=='vex_base_memory_rows']
         assert flags==([34]if label=='integrated' else [])
         save('shared-reader-code-'+label+'.json',dict(sections=sections,table=flags))
@@ -191,7 +198,6 @@ def main(w):
             prefix,attempt,accepted=observed.stderr.split()
             attempt,accepted=int(attempt),int(accepted)
             assert prefix=='vexrip' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
-            if bits==32:assert attempt==0
             if bits==32:assert attempt==0
             coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
         assert coverage['1']==coverage['2']
