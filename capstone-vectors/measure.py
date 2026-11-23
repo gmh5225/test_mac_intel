@@ -98,6 +98,11 @@ def main(w):
         if label=='integrated':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'coverage.c','-o',w/'coverage.o'],'link-counter-object')
             run(['clang++',obj,w/'coverage.o','-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVexBaseMemory',*libs,'-o',w/'coverage'],'link-counter')
+        if label=='integrated':
+            for count in (0,1):
+                name='gate-'+str(count)
+                run(['clang','-O2','-DCOUNT_HITS='+str(count),'-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'gate.c','-o',w/(name+'.o')],'compile-'+name)
+                run(['clang++',obj,w/(name+'.o'),'-Wl,--undefined=X86_disasmIterText','-Wl,--undefined=X86_disasmIter32','-Wl,--wrap=X86_writeVexBaseMemory',*libs,'-o',w/name],'link-'+name)
         ordinary=w/('unselected-'+label);run(['clang++',obj,*libs,'-o',ordinary],'link-control-'+label)
         for image,selected in [(ordinary,False),(target,True)]:
             symbols={line.split()[-1] for line in sp.check_output(['nm','--defined-only',image],text=True).splitlines() if line.strip()}
@@ -197,49 +202,29 @@ def main(w):
         assert coverage['1']==coverage['2']
         save('coverage-'+name+'.json',coverage)
 
-        for mode in (0,1,2):
-            def measure(lib,n,launch):
-                engine=lib+'____' if lib in ('iced','fast') else 'x86_iter' if lib.startswith('private_') else 'capstone'
-                tail=[engine,str(mode),str(n),str(f),str(intervals),str(bits)]
-                if launch=='images':
-                    command=[str(exe[lib]),*tail];executable=None
-                elif launch=='same-argv':
-                    command=[str(image),*tail];executable=str(exe[lib])
-                else:
-                    with image.open('r+b')as out:
-                        assert out.write(padded[lib])==maximum
-                    assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                    command=[str(image),*tail];executable=None
-                    if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                return list(map(int,sp.check_output(command,executable=executable).split()))
-            probe=measure('baseline',1,'images');rep=max(1,math.ceil(30e6/max(1,probe[0])))
-            cycles={launch:[]for launch in launches};labels=['baseline','aa','integrated','iced']+(['fast','private_base','private_integrated'] if mode else [])
-            stable={}
-            for i in range(data['cycles']):
-                launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                for launch in launch_order:
-                    order=labels[i%len(labels):]+labels[:i%len(labels)]
-                    obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                    assert all(len(v)==6 for k,v in obs)
-                    assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                    for k,v in obs:
-                        root='baseline' if k=='aa' else k
-                        if root not in stable:stable[root]=v[2:]
-                        assert v[2:]==stable[root],(name,mode,k,v,stable[root])
-                    assert stable['baseline']==stable['integrated']
-                    if mode:assert stable['private_base']==stable['private_integrated']==stable['integrated'],(name,mode,stable)
-                    cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-            for launch,observations in cycles.items():
-                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('baseline',k)for k in labels},cycles=observations)
-                row['vs_iced']={k:md('iced',k) for k in ('baseline','integrated')}
-                row['vs_fast']={k:md('fast',k) for k in ('baseline','integrated')} if mode else None
-                reported.append(row)
-            save('measurements.json',reported)
-        print(name,panel,len(sel),flush=True)
-    expected={(name,panel,mode,launch) for name,panel in data['samples'].items() for mode in ('scan','format','detail') for launch in launches}
-    assert len(reported)==len(expected) and {(x['case'],x['panel'],x['mode'],x['launch']) for x in reported}==expected
-    save('complete.json',dict(cases=len(reported),success=True,launches=launches))
+        for mode in (1,2):
+            observations=[]
+            def command(n,count):
+                return ['setarch',platform.machine(),'-R',w/('gate-'+str(count)),'x86_iter',str(mode),str(n),f,intervals,str(bits)]
+            def test(k,n,count=0):
+                probe=sp.run(command(n,count),env=dict(os.environ,CS_COMPARE_VEX=str(k)),capture_output=True,text=True,check=True)
+                v=list(map(int,probe.stdout.split()));assert len(v)==6
+                if count:
+                    name_,attempts,hits=probe.stderr.strip().split()
+                    assert name_=='admitted' and int(hits)==2*data['expected'][name][k] and int(hits)<=int(attempts),(name,k,hits)
+                return v
+            for k in range(3):test(k,1,1)
+            probe=test(0,1);reps=max(1,math.ceil(75e6/max(1,probe[0])))
+            import random
+            rng=random.Random(name+str(mode))
+            for pair in range(25):
+                labels=[('none',0),('aa',0),('rip',1),('all',2)];rng.shuffle(labels)
+                obs=[(label,test(k,reps))for label,k in labels+labels[::-1]];assert len({tuple(v[2:])for label,v in obs})==1
+                observations.append(obs)
+            reported.append(dict(case=name,mode=mode,cycles=observations,reps=reps,functions=len(sel),extent=sha(intervals)))
+            save('gated-timings.json',reported)
+    assert len(reported)==2*len(data['samples'])
+    save('complete.json',dict(success=True,cases=len(reported),timed_sha256=sha(w/'gate-0'),counter_sha256=sha(w/'gate-1'),pairs=25))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
