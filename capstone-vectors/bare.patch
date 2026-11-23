@@ -1,64 +1,68 @@
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..fef039d1 100644
+index 62d4288a..f37aba42 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
-@@ -27,10 +27,15 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 			cs_insn *insn, uint16_t *insn_size, bool batch);
+@@ -11,6 +11,12 @@
+ #include "X86InstPrinterCommon.h"
+ #include "X86Mapping.h"
  
--/* Keep the mode, option and callback checks in a single short-circuit chain
-- * in both instantiations of the scalar writer. */
-+/* The fixed iterators admit exactly one bitness with text enabled. */
-+#ifdef CS_DECODE_FIXED_TEXT
-+#define X86_OUTPUT_MODE_UNSUPPORTED(handle, mismatch) false
-+#else
-+#define X86_OUTPUT_MODE_UNSUPPORTED(handle, mismatch) ((mismatch) || (handle)->no_text)
-+#endif
++/* The caller has selected an x86 handle with 32-bit mode and text enabled. */
++CAPSTONE_INTERNAL bool X86_disasmIterSelected32(csh handle,
++					       const uint8_t **code,
++					       size_t *size, uint64_t *address,
++					       cs_insn *insn);
 +
- #define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
--	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
-+	(X86_OUTPUT_MODE_UNSUPPORTED(handle, mode_mismatch) || (handle)->imm_unsigned || \
- 	 (handle)->mnem_list || (handle)->doing_mem || \
- 	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
- 	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
+ /* Called by the static i386 iterator with at least one input byte. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..d92e70dc 100644
+index 96ce9f72..7ce32142 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -13,6 +13,7 @@
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
-+#define CS_DECODE_FIXED_TEXT
- #include "X86OutputOptions.h"
- #define GET_INSTRINFO_ENUM
- #include "X86GenInstrInfo.inc"
+@@ -268,10 +268,15 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ {
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 &&
+-	    handle->mode == CS_MODE_64 && !handle->no_text)
+-		return cs_disasm_iter_core(ud, code, size, address, insn);
+-#endif
++	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
++		if (handle->mode == CS_MODE_64)
++			return cs_disasm_iter_core(ud, code, size, address, insn);
++		if (handle->mode == CS_MODE_32)
++			return X86_disasmIterSelected32(ud, code, size, address, insn);
++	}
++	return X86_disasmIter(ud, code, size, address, insn);
++#else
+ 	return X86_disasmIter32(ud, code, size, address, insn);
++#endif
+ }
+ #endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..95b51266 100644
+index 443b2f86..14e3c21c 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -12,6 +12,7 @@
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
-+#define CS_DECODE_FIXED_TEXT
- #include "X86OutputOptions.h"
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b0f4a6ce..f0660815 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -191,7 +191,12 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+@@ -199,6 +199,13 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
++
++CAPSTONE_INTERNAL bool X86_disasmIterSelected32(csh ud, const uint8_t **code,
++					       size_t *size, uint64_t *address,
++					       cs_insn *insn)
++{
++	return cs_disasm_iter_core(ud, code, size, address, insn);
++}
+ #endif
  
- 	handle->errnum = CS_ERR_OK;
- 
-+#ifdef CS_DECODE_FIXED_TEXT
-+	/* Both fixed-mode iterators check the text option before entering here. */
-+	const bool scan = false;
-+#else
- 	const bool scan = use_x86_scan(handle);
-+#endif
- 	insn->address = *address;
- #ifdef CAPSTONE_DIET
- 	// zero out mnemonic & op_str
+ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+@@ -209,7 +216,7 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+ 	if (handle && handle->arch == CS_ARCH_X86 &&
+ 	    handle->mode == CS_MODE_32 && !handle->no_text)
+-		return cs_disasm_iter_core(ud, code, size, address, insn);
++		return X86_disasmIterSelected32(ud, code, size, address, insn);
+ #endif
+ 	return X86_disasmIter(ud, code, size, address, insn);
+ }

@@ -1,7 +1,7 @@
-name: Time fixed text admission on PE and ELF with matched public and private readers
+name: Measure width selection at the Capstone text entry actually called by NeverD
 on:
   push:
-    branches: [codex/fixed-text-iterator-options]
+    branches: [codex/shared-i386-neverd-text-entry]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 2eb5cf73722a3c2a4956d26815428d79c2b47d18
+          ref: 5f94ab1b84695ee25584f81f198df6000a8ebbd1
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-text-admission-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: product-text-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

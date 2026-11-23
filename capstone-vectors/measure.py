@@ -86,6 +86,8 @@ def main(w):
     inc=once(inc,'engine!="x86_iter" &&','engine!="x86_iter" && engine!="x86_len_" &&')
     inc='#include <cstring>\n'+inc
     inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
+    inc=once(inc,'else if(engine=="x86_len_" && bits==32)', 'else if(engine=="x86_all_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\\n        else if(engine=="x86_len_" && bits==32)')
+    inc=once(inc,'engine!="x86_len_" &&','engine!="x86_all_" && engine!="x86_len_" &&')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={};objects={};base_orders={}
@@ -123,6 +125,8 @@ def main(w):
         run([w/'targets'],'targets-'+key)
         current=(evidence/('targets-'+key+'.log')).read_text().splitlines()
         assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
+        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'build-dispatch-guard-'+key)
+        run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='860160'
         if kind=='bare':
             ref=('mixed_' if mixed else '')+'base'
             assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
@@ -199,16 +203,17 @@ def main(w):
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
-            targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}
+            targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
             if mode:targets['fast']=('base','fast____')
             for k in trees:
-                targets['private_'+k]=(k,'x86_len_' if mode else 'vecbatch')
+                targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
                 targets['public_'+k]=(k,'capstone')
+                if bits==32 and mode:targets['width_'+k]=(k,'x86_len_')
             def timed(label,count):
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'released-public-reader')))
+            labels=list(targets);order=random.Random(str((name,mode,'product-text-width-selection')))
             for idx in range(13):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1
