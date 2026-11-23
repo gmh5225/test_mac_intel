@@ -3,7 +3,8 @@ def inspect(root):
     def read(f):
         z={}
         for ln in f.read_text().splitlines():
-            i,off,n,mr,sib,name,encoding=ln.split()
+            i,off,n,mr,sib,tail=ln.split(maxsplit=5)
+            name,encoding=tail.rsplit(maxsplit=1)
             assert int(i) not in z and len(encoding)==2*int(n)
             z[int(i)]=(int(off),int(n),int(mr),int(sib),name,bytes.fromhex(encoding))
         return z
