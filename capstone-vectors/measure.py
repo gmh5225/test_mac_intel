@@ -123,6 +123,13 @@ def main(w):
         run([w/'targets'],'targets-'+key)
         current=(evidence/('targets-'+key+'.log')).read_text().splitlines()
         assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
+        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'link-pairs-'+key)
+        run([w/'guard'],'pairs-'+key);assert (evidence/('pairs-'+key+'.log')).read_text().split()[0]=='860160'
+        if kind=='bare':
+            run(['clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'gen'],'compile-table-'+key)
+            table=sp.check_output([w/'gen','--register-pairs32'])
+            assert table==(base/'arch/X86/X86GenRegisterPairs32.inc').read_bytes()
+            save('regenerated-'+key+'.json',dict(rows=256,bytes=len(table),sha256=hashlib.sha256(table).hexdigest()))
         if kind=='bare':
             ref=('mixed_' if mixed else '')+'base'
             assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
@@ -142,7 +149,7 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert set(changed)<={'X86Sse64Output.c.o','X86Vex32Output.c.o'},(key,changed)
+            assert changed==['X86Vex32Output.c.o'],(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
