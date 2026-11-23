@@ -1,7 +1,7 @@
-name: Compare the linked NeverD decoder and mixed architecture libraries across the x86 public reader change
+name: Verify mixed masked formatting and unchanged dedicated public archives and consumers
 on:
   push:
-    branches: [codex/mixed-archives-public-x86-output]
+    branches: [codex/qualify-private-masked-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,29 +27,26 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
+          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f0a3d31ab59b5a7f2dbae69e1f4fe573a693c451
+          ref: 8e00638c3faf294907b6118313ce068d77de1a43
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
-        run: |
-          python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+      - name: Build all profiles and verify linked consumers
+        run: python3 capstone-vectors/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-mixed-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: private-masked-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
