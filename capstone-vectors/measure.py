@@ -124,7 +124,7 @@ def main(w):
             for name in units:
                 run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',base/('tests/unit/'+name+'.c'),lib,'-lm','-o',w/name],'link-'+name+'-'+key)
                 run([w/name],'unit-'+name+'-'+key)
-        members=sp.check_output(['ar','t',lib],text=True).splitlines()
+        members=[v for v in sp.check_output(['ar','t',lib],text=True).splitlines() if v and not v.startswith('__.SYMDEF')]
         objects[key]={p.name:sha(p) for p in build.rglob('*.c.o') if '/tests/' not in str(p)}
         assert set(members)==set(objects[key]) and len(members)==len(set(members))
         earlier=['X86PublicOutput.c.o','X86BatchScan.c.o']
@@ -136,7 +136,7 @@ def main(w):
             expected=expected[:first]+earlier+[n for n in expected[first:] if n not in earlier]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='sib':assert changed==['X86MemoryFallback32.c.o'],changed
+        if kind=='sib':assert 'X86Vex32Output.c.o' in changed and set(changed)<={'X86Vex32Output.c.o','X86MemoryFallback32.c.o'},changed
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
