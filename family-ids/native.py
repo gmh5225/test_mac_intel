@@ -21,9 +21,9 @@ try:
             opts=['-DCAPSTONE_'+v+'_SUPPORT=ON'for v in arches]
             if profile=='diet':opts.append('-DCAPSTONE_BUILD_DIET=ON')
             cmd('cfg-'+tag,['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers'if cc=='gcc'else'-Wno-error=incompatible-pointer-types-discards-qualifiers'),*opts])
-            units=['register_descriptors','mcinst']if active else []
+            units=(['register_descriptors','mcinst'] if profile=='SYSTEMZ' else ['riscv_mapping_index','riscv_reg_access','mcinst']) if active else []
             cmd('build-'+tag,['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*units])
-            if units:cmd('test-'+tag,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
+            if units:cmd('test-'+tag,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
             so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
             lib=b/'libcapstone.a'
             states[k]=dict(archive=sha(lib),shared=sha(so),objects={f.name:sha(f)for f in b.rglob('*.c.o')if '/tests/'not in str(f)})

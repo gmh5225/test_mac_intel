@@ -1,7 +1,7 @@
-name: Time scoped SystemZ and RISC-V hexadecimal output on eight pinned coreutils sections
+name: Verify dedicated SystemZ and RISC-V numeric output with native architecture tests
 on:
   push:
-    branches: [codex/dedicated-s390-riscv-hex]
+    branches: [codex/dedicated-s390-riscv-hex-units]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: scoped-host-hex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-host-hex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
