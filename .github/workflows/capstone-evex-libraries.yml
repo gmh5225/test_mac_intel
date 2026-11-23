@@ -1,7 +1,7 @@
-name: Measure the published Capstone and NeverD heads against fork iced on four native hosts
+name: Compare public and native readers in both library profiles against fork iced formatter and decoder
 on:
   push:
-    branches: [codex/released-vector-iced-ba03305d]
+    branches: [codex/private-mask-pure-mixed-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-vector-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: private-masked-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
