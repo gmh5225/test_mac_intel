@@ -1,7 +1,7 @@
-name: Check standalone detail formats on native Linux macOS and both Windows ABIs
+name: Verify standalone detail modifiers at the mapping boundary on 32 and 64 bit builds
 on:
   push:
-    branches: [codex/verify-detail-format-initialization]
+    branches: [codex/detail-modifier-mapping-options]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 567e62d3ff038035ea62ac460cc894f480065bee
+          ref: eda656187b91970987b016629023b894bf83ce2f
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -47,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: detail-format-initialization-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: detail-modifier-reads-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

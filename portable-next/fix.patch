@@ -1,22 +1,29 @@
-diff --git a/cs.c b/cs.c
-index ede7c2aa..e04247d0 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1381,12 +1381,11 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 		return CS_ERR_OK;
+diff --git a/Mapping.c b/Mapping.c
+index d3bb3e3d..b5769b50 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -439,7 +439,7 @@ DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
+ bool map_use_alias_details(const MCInst *MI)
+ {
+ 	assert(MI);
+-	return (MI->csh->detail_opt & CS_OPT_ON) &&
++	return MI->csh->detail_opt != CS_OPT_OFF &&
+ 	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
+ }
  
- 	case CS_OPT_DETAIL:
--		// CS_OPT_OFF turns detail off.  Any other value adds its flags
--		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
-+		// A requested detail format enables detail, including when set first.
- 		if (value == CS_OPT_OFF)
- 			handle->detail_opt = CS_OPT_OFF;
- 		else
--			handle->detail_opt |= (cs_opt_value)value;
-+			handle->detail_opt |= (cs_opt_value)(value | CS_OPT_ON);
- #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
- 		Mips_selectScanDecoder(handle);
- #endif
+diff --git a/Mapping.h b/Mapping.h
+index dd340ed5..3c04b8da 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -265,7 +265,7 @@ DEFINE_check_safe_inc(Sparc, SPARC);
+ static inline bool detail_is_set(const MCInst *MI)
+ {
+ 	assert(MI && MI->flat_insn);
+-	return MI->flat_insn->detail != NULL && MI->csh->detail_opt & CS_OPT_ON;
++	return MI->flat_insn->detail != NULL && MI->csh->detail_opt != CS_OPT_OFF;
+ }
+ 
+ static inline cs_detail *get_detail(const MCInst *MI)
 diff --git a/include/capstone/capstone.h b/include/capstone/capstone.h
 index 80f8ce9e..6da7468b 100644
 --- a/include/capstone/capstone.h
