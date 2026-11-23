@@ -21,12 +21,13 @@ try:
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        names={'cs_disasm_default_iter','cs_decode_public_record','matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','Sparc_getInstruction','Sparc_printInst','LoongArch_getInstruction','Xtensa_getInstruction','X86_disasmProjected32','X86_disasmProjected64','X86_decodeTextRecord32','X86_decodeTextRecord64','scanBatch32','scanBatch64','readFirst32','readFirst64'}
+        names={'cs_disasm_default_iter','X86_decodePublicRecord','matchAliasPatterns','X86_disasmIter32','X86_disasmIterText','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','Sparc_getInstruction','Sparc_printInst','LoongArch_getInstruction','Xtensa_getInstruction','X86_disasmProjected32','X86_disasmProjected64','X86_decodeTextRecord32','X86_decodeTextRecord64','scanBatch32','scanBatch64','readFirst32','readFirst64'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
             if len(fs)==4 and fs[-1] in names:syms[fs[-1]]=list(map(lambda x:int(x,16),fs[:2]))
         assert 'matchAliasPatterns' in syms and 'cs_disasm_iter' in syms
+        assert ('X86_decodePublicRecord' in syms)==(k!='base')
         printer,=b.rglob('MCInstPrinter.c.o')
         cmd('common-code-'+k,['objcopy','--dump-section','.text='+str(t/'common.text'),printer])
         regular_code=sha(t/'common.text')
@@ -37,7 +38,7 @@ try:
         for symbol in ('cs_disasm_iter','cs_disasm_default_iter','cs_decode_full_insn','X86_disasmScanFallback','X86_disasmProjected32','X86_disasmProjected64','X86_decodeTextRecord32','X86_decodeTextRecord64','scanBatch32','scanBatch64'):
             cmd('assembly-'+symbol+'-'+k,['objdump','-d','--disassemble='+symbol,so])
         decoder,=b.rglob('X86DisassemblerDecoder.c.o')
-        underlying='cs_disasm_iter' if k=='base' else 'cs_disasm_default_iter'
+        underlying='cs_disasm_iter'
         symbol,=[ln.split() for ln in sp.check_output(['objdump','-t',decoder],text=True).splitlines()if ln.split()[-1:]==[underlying]]
         symbol=[f for f in symbol if f not in ('.hidden','.protected','.internal')]
         off=int(symbol[0],16);section=symbol[-3];length=int(symbol[-2],16)
