@@ -21,7 +21,8 @@ try:
         assert g('rev-parse','HEAD')==q['parent']
         patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+name+'.patch']))
         assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-        cmd(v/'configure.log',cfg)
+        cmd(v/'configure.log',[*cfg,'-DCAPSTONE_AARCH64_SUPPORT='+('ON' if name=='mixed' else 'OFF')])
+        assert ('CAPSTONE_AARCH64_SUPPORT:BOOL=ON' in (b/'CMakeCache.txt').read_text())==(name=='mixed')
         names={z['name']for z in json.loads(sp.check_output(['ctest','--test-dir',b,'-C','Release','--show-only=json-v1'],text=True))['tests']}
         possible=['x86_scan_batch','x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy','x86_evex_move_access','detail_option','text_option','x86_x87_environment']
         targets=[a for a in possible if 'unit_'+a in names]

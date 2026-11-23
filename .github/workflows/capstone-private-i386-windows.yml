@@ -1,7 +1,7 @@
-name: Check four x86 formatter changes against the released public iterator on Windows and macOS
+name: Exercise private masked output and dedicated public readers in sixteen native configurations
 on:
   push:
-    branches: [codex/portable-after-public-records]
+    branches: [codex/portable-private-masked-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: shipped-records-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mixed-mask-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
