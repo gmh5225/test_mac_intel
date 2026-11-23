@@ -1,7 +1,7 @@
-name: Measure option-selected MIPS decoding and unchanged text callbacks on four real ELF programs
+name: Time the final MIPS option decoder and verify dedicated binary identity
 on:
   push:
-    branches: [codex/mips-standard-scan-options]
+    branches: [codex/mips-shared-scan-opcodes]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -34,6 +34,8 @@ jobs:
           ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
+      - name: Check source parent
+        run: python -B family-ids/stage_parent.py
       - run: python3 -B family-ids/native.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
@@ -41,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-option-decoder-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-shared-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

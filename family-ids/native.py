@@ -53,13 +53,14 @@ try:
                     (s/'cs.c').write_text(original)
         a,bv=variants['storage'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
         changed=[p for p in a['objects']if a['objects'][p]!=bv['objects'][p]]
+        assert a==bv,(profile,changed)
         if profile=='pure':
             cmd('primary-link',['c++','-std=c++17','-O2','-I',s/'include',d/'primary.cpp','-ldl','-o',t/'primary'])
             cmd('primary-records',[t/'primary',t/'pure-base.so',t/'pure-candidate.so'])
             assert int((out/'primary-records.log').read_text().split()[0])==10*32*32*8*4
             for name in ('storage','candidate'):
                 diff=[f for f,v in variants['base']['objects'].items() if variants[name]['objects'][f]!=v]
-                assert set(diff)==({'cs.c.o'} if name=='storage' else {'cs.c.o','arch/Mips/MipsMapping.c.o'}),(profile,name,diff)
+                assert set(diff)=={'cs.c.o','arch/Mips/MipsMapping.c.o'},(profile,name,diff)
         else:
             assert variants['base']==variants['storage']==variants['candidate'],profile
 
@@ -89,7 +90,7 @@ try:
                 result=list(map(int,sp.check_output([t/'raw','103',t/(name+'.text'),str(opt)]).split()))
                 assert result==observed[0]
             signatures[name+'/'+str(opt)]=observed[0]
-    save('raw',signatures);rng=random.Random(2044);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    save('raw',signatures);rng=random.Random(53933);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     def sample(k,name,mode,n):
         target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time','103',str(mode),t/(name+'.text'),'1048576',str(n)]).split()))
     for name in samples:
