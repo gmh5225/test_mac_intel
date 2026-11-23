@@ -95,8 +95,8 @@ def main(w):
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
-        mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
-        patches=[kind] if kind!='base' else []
+        mixed=False;kind=key.removeprefix('layout_')
+        patches=[key] if key!='base' else []
         for name in patches:
             patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
             run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
@@ -166,8 +166,13 @@ def main(w):
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
-        assert members==expected
+        if key.startswith('layout_'):
+            readers=['X86RegisterFallback32.c.o','X86PublicOutput.c.o']
+            expected=[f for f in expected if f not in readers];idx=expected.index('X86VectorFallback64.c.o')
+            expected[idx:idx]=readers
+        assert members==expected,(key,members,expected)
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
+        if kind=='base':assert not changed,(key,changed)
         if kind=='bare':
             assert changed==([] if mixed else ['X86PlainEvexOutput.c.o','X86VectorFallback64.c.o']),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
@@ -176,6 +181,7 @@ def main(w):
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
         names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
+        names.update(('X86_decodeRegisterFallback32','X86_decodeOutputMiss64','X86_writeEvexVectorMemory','X86_writeEvexRipMemory','X86_writePlainEvexRegisters'))
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
             cols=line.split()
@@ -191,7 +197,7 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    assert hashes['mixed_base']==hashes['mixed_bare'] and hashes['base']!=hashes['bare']
+    assert len(set(hashes.values()))==4
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}

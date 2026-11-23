@@ -1,0 +1,29 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d36460a3..66507bbb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1071,15 +1071,22 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+     endif()
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
++    set(capstone_x86_vector_sources arch/X86/X86VectorFallback64.c
++        arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
++    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86")
+-        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++        # Link public and i386 record readers before the AMD64 vector handlers.
++        target_sources(capstone_x86_native PRIVATE arch/X86/X86RegisterFallback32.c
++            arch/X86/X86PublicOutput.c ${capstone_x86_vector_sources})
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+             $<TARGET_OBJECTS:capstone_x86_native>)
+         target_sources(capstone INTERFACE ${capstone_x86_objects})
++    else()
++        target_sources(capstone_x86_native PRIVATE ${capstone_x86_vector_sources}
++            arch/X86/X86RegisterFallback32.c)
+     endif()
+ endif()
+ 
