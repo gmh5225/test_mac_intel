@@ -15,7 +15,7 @@ try:
     public_test=d/'identity-probe.c'
     profiles={}
     for profile in ('project','full','diet','reduced','no-att'):
-        b=t/profile;receipts={}
+        b=t/('build-'+profile);receipts={}
         for stage,info in m['stages'].items():
             pair=[]
             for loong in (False,True):
