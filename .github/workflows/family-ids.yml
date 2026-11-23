@@ -1,7 +1,7 @@
-name: Measure fixed-width register mapping with a local ELF call on PE and foreign inputs
+name: Check the verified eight-slot legacy write span on real PE32 and non-x86 traces
 on:
   push:
-    branches: [codex/x86-fixed-width-register-mapper]
+    branches: [codex/i386-write-span-verified]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6de392819bbc0d468ad7c30531271823416f655e
+          ref: 8835df03f81c2011e14511446686a6b68eabdd68
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: fixed-width-x86-mapper-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: legacy-x86-write-span-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
