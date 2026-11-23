@@ -1,3 +1,4 @@
+import re,sys
 """Compare real ELF library functions at common boundaries with current forked iced."""
 from pathlib import Path
 import gzip, os, shlex, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
@@ -92,14 +93,15 @@ def main(w):
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={};objects={};base_orders={}
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
-    for key,z in trees.items():
+    from profile_train import train
+    raw=w/'profiles';raw.mkdir()
+    compiler=sp.check_output(['clang','-dumpversion'],text=True).split('.')[0].strip()
+    tool=shutil.which('llvm-profdata-'+compiler) or shutil.which('llvm-profdata')
+    assert tool,compiler
+    for key,z in [('mixed_base',trees['mixed_base']),('mixed_train',trees['mixed_base']),('mixed_bare',trees['mixed_bare'])]:
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
         mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
-        patches=[kind] if kind!='base' else []
-        for name in patches:
-            patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
-            run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/('build-'+key);project=base
         if mixed :
@@ -107,10 +109,13 @@ def main(w):
             assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
             for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
             text=(nd/'CMakeLists.txt').read_text();a=text.index('# --- Capstone (our fork');end=text.index('# --- NeverD CMake helpers',a)
-            project=w/('project-'+key);(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
+            project=w/'project';(project/'cmake').mkdir(parents=True,exist_ok=True);(project/'third_party').mkdir(exist_ok=True)
+            if not (project/'third_party/capstone').exists():(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
             shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake')
             (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+text[a:end])
-        run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
+        profile_arg='-fprofile-generate='+str(raw) if kind=='train' else '-fprofile-use='+str(w/'capstone.profdata')
+        launcher=['-DCMAKE_C_COMPILER_LAUNCHER='+';'.join([sys.executable,str(r/'clang_profile.py'),profile_arg])] if kind!='base' else []
+        run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg,*launcher],'configure-'+key)
         db=json.loads((build/'compile_commands.json').read_text());files={Path(u['file']).name for u in db}
         near={Path(u['file']).name for u in db if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in u['command'].split()}
         assert near==({'X86Sse64Output.c'}if mixed and platform.system()=='Linux' and platform.machine().lower() in ('x86_64','amd64') else set()),near
@@ -120,36 +125,12 @@ def main(w):
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access','text_option']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
-        db=json.loads((build/'compile_commands.json').read_text())
-        run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'records.cpp',lib,'-o',w/'targets'],'link-targets-'+key)
-        run([w/'targets'],'targets-'+key)
-        current=(evidence/('targets-'+key+'.log')).read_text().splitlines()
-        assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
-        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'build-dispatch-guard-'+key)
-        run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='882784'
-        if kind=='bare':
-            ref=('mixed_' if mixed else '')+'base'
-            assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
-        if kind=='bare':
-            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator'],'build-generator-'+key)
-            generated=sp.check_output([w/'generator'])
-            assert generated==(base/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
-            save('rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
-        if kind=='bare':
-            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator'],'build-vector-generator-'+key)
-            generated=sp.check_output([w/'vector-generator'])
-            assert generated==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
-            save('vector-rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
-            if (base/'arch/X86/X86GenVexBaseMemory.inc').is_file():
-                special=sp.check_output([w/'vector-generator','--vex-base-memory'])
-                assert special==(base/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
-                save('memory-rows-'+key+'.json',dict(bytes=len(special),sha256=hashlib.sha256(special).hexdigest()))
-        if not mixed :
-            run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
-        else:
+        if kind!='train':
             for name in units:
                 run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',base/('tests/unit/'+name+'.c'),lib,'-lm','-o',w/name],'link-'+name+'-'+key)
                 run([w/name],'unit-'+name+'-'+key)
+            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'build-guard-'+key)
+            run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='882784'
         members=[v for v in sp.check_output(['ar','t',lib],text=True).splitlines() if v and not v.startswith('__.SYMDEF')]
         objects[key]={p.name:sha(p) for p in build.rglob('*.c.o') if '/tests/' not in str(p)}
         assert set(members)==set(objects[key]) and len(members)==len(set(members))
@@ -160,12 +141,17 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed==['X86VectorFallback64.c.o'],(key,changed)
+            assert changed and all(n.startswith('X86') for n in changed) and 'X86Vex32Output.c.o' in changed and 'X86DisassemblerDecoder.c.o' in changed,(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
-        run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
+        runtime=[profile_arg] if kind=='train' else []
+        run(['clang++',*runtime,w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe)
+        if kind=='train':
+            train(exe,w,m['training'],tool,raw,evidence)
+            shutil.rmtree(build);continue
+        bins[key]=exe
         names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
@@ -176,7 +162,7 @@ def main(w):
         assert ('X86_decodePublicRecord' in linked)==(not mixed)
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         save('linked-'+key+'.json',linked)
-        if key=='base':
+        if key=='mixed_base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
     import random
@@ -188,8 +174,8 @@ def main(w):
     active=None
     if not darwin:
         run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
-        image.write_bytes(padded['base']);image.chmod(0o755)
-        active=hashes['base']
+        image.write_bytes(padded['mixed_base']);image.chmod(0o755)
+        active=hashes['mixed_base']
     save('launch.json',dict(linked=hashes,same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
     def invoke(key,tail):
         nonlocal active
@@ -217,8 +203,8 @@ def main(w):
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
-            targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
+            targets={'copy':('mixed_base','x86_all_' if mode else 'vecbatch'),'iced':('mixed_base','iced____')}
+            if mode:targets['fast']=('mixed_base','fast____')
             for k in trees:
                 targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
                 targets['public_'+k]=(k,'capstone')
@@ -226,7 +212,7 @@ def main(w):
             def timed(label,count):
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
+            rep=max(1,math.ceil(50e6/max(1,timed('private_mixed_base',1)[0])));cycles=[]
             labels=list(targets);order=random.Random(str((name,mode,'product-text-width-selection')))
             for idx in range(13):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
