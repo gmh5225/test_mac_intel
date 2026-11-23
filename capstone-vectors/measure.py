@@ -119,9 +119,9 @@ def main(w):
             parent='release' if key=='project'else 'official'
             a,b=objects[parent],objects[key];assert a.keys()==b.keys()
             changed=[n for n in a if a[n]!=b[n]]
-            allowed={'X86Vex32Output.c.o','X86Sse64Output.c.o','X86DisassemblerDecoder.c.o','X86OutputIterator.c.o'}
+            allowed={'X86DisassemblerDecoder.c.o','X86OutputIterator.c.o'}
             if key=='project':assert not changed,changed
-            else:assert 'X86DisassemblerDecoder.c.o' in changed and set(changed)<=allowed,changed
+            else:assert set(changed)==allowed,changed
             save('archive-'+key+'.json',dict(baseline=parent,all_members=len(a),changed=changed,objects=[a,b]))
         if key in ('single','official') and not darwin:
             functions={}
@@ -142,7 +142,7 @@ def main(w):
                         if len(z)==3 and z[1].startswith('R_') and off<=int(z[0],16)<off+sz:rel.append([int(z[0],16)-off,z[1],z[2]])
                     functions[name]=dict(size=sz,section=section,sha256=hashlib.sha256(data).hexdigest(),relocations=rel)
             assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText'}<=functions.keys()
-            if key=='single':assert {'X86_tryOutput32','X86_tryOutput64'}<=functions.keys()
+            assert {'tryOutput32','tryOutput64'}<=functions.keys()
             save('functions-'+key+'.json',functions)
         if key in ('single','official'):
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
@@ -153,7 +153,7 @@ def main(w):
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
-        run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe],'link-'+key);bins[key]=exe
+        run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
         if key=='project':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):
@@ -163,6 +163,28 @@ def main(w):
             for flag,file in [('--evex-scan','X86GenEvexScan.inc'),('--rounded-registers64','X86GenRoundedRegister64.inc'),('--evex-shifts','X86GenEvexShiftOutput.inc')]:
                 assert sp.check_output([w/'generator',flag])==(base/'arch/X86'/file).read_bytes(),flag
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
+    import random
+    images={k:v.read_bytes() for k,v in bins.items()}
+    assert images['release']==images['project'], 'mixed linked images differ despite identical archive members'
+    bins['project']=bins['release']
+    hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
+    image=w/'timed-runner'
+    n=max(map(len,images.values()))
+    padded={k:v+bytes(n-len(v)) for k,v in images.items()}
+    active=None
+    if not darwin:
+        run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
+        image.write_bytes(padded['release']);image.chmod(0o755)
+        active=hashes['release']
+    save('launch.json',dict(linked=hashes,mixed_shared_executable=bins['project']==bins['release'],same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
+    def invoke(key,tail):
+        nonlocal active
+        if darwin:
+            return sp.check_output([image,*tail],executable=bins[key])
+        if active!=hashes[key]:
+            with image.open('r+b')as out:assert out.write(padded[key])==n
+            active=hashes[key]
+        return sp.check_output(['setarch',platform.machine(),'-R',image,*tail])
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
@@ -184,11 +206,12 @@ def main(w):
             def timed(label,count):
                 key={'official':'official','release':'release','single':'single','public_official':'official','public_release':'release','public_single':'single'}.get(label,'project')
                 engine={'iced':'iced____','fast':'fast____','public':'capstone','public_official':'capstone','public_single':'capstone','public_release':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
-                return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
+                return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
             labels=['official','release','single','project','copy','public','public_official','public_single','public_release','iced']+(['fast']if mode else [])
+            order=random.Random(str((name,mode,'public-and-private-records')))
             for idx in range(13):
-                labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
+                order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public','public_official','public_single','public_release')})==1
                 assert len({tuple(v[2:])for k,v in obs if k in ('public','public_official','public_single','public_release')})==1
                 if mode:assert len({tuple(v[2:])for k,v in obs if k in ('public','project')})==1

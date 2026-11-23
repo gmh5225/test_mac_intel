@@ -77,10 +77,10 @@ index da328571..c685d209 100644
  
  ifeq ($(PKG_EXTRA),)
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..ee5e32dd 100644
+index ae1554b0..e44cf734 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,6 +30,21 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,6 +30,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -89,14 +89,7 @@ index ae1554b0..ee5e32dd 100644
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
 +#define CAPSTONE_X86_PUBLIC_OUTPUT
-+/* Fixed-mode writers receive a nonempty instruction span. A successful
-+ * write fills one record. Cursor and skipdata handling belong to the caller. */
-+CAPSTONE_INTERNAL bool X86_tryOutput32(struct cs_struct *handle,
-+				      const uint8_t *code, size_t size,
-+				      cs_insn *insn, uint16_t *insn_size);
-+CAPSTONE_INTERNAL bool X86_tryOutput64(struct cs_struct *handle,
-+				      const uint8_t *code, size_t size,
-+				      cs_insn *insn, uint16_t *insn_size);
++
 +#endif
 +
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
@@ -123,10 +116,10 @@ index 12428fff..0d9b1a76 100644
  /* Keep the admitted terminal's public ID and zero alias adjustment visible
   * through output completion. Cold helpers can take the fallback result's
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..197311ab 100644
+index cec4bec6..e60feecf 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -32,4 +32,28 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+@@ -32,4 +32,25 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
  #endif
  	return cs_disasm_iter(ud, code, size, address, insn);
  }
@@ -136,99 +129,22 @@ index cec4bec6..197311ab 100644
 +					    cs_insn *insn, uint16_t *length,
 +					    bool batch)
 +{
-+	if (!handle->no_text) {
-+		if (handle->mode == CS_MODE_32) {
-+			if (X86_tryOutput32(handle, code, size, insn, length))
-+				return true;
-+			return X86_decodeOutputMiss32(handle, code, size, insn,
-+						      length, batch);
-+		}
-+		if (handle->mode == CS_MODE_64) {
-+			if (X86_tryOutput64(handle, code, size, insn, length))
-+				return true;
-+			return X86_decodeOutputMiss64(handle, code, size, insn,
-+						      length, batch);
-+		}
++	/* The caller owns skipdata callbacks, bulk boundaries and the public
++	 * cursors. A fixed iterator can fill this one record using local cursors. */
++	if (!batch && !handle->skipdata && !handle->no_text &&
++	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
++		uint64_t address = insn->address;
++		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
++					     &size, &address, insn);
++		if (ok)
++			*length = insn->size;
++		return ok;
 +	}
 +	return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +}
 +#endif
 +
  #endif
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..b0e4a88e 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -37,7 +37,12 @@ static void writeRelativeHex(char *out, uint64_t value)
- #include "X86GenIndirectMemory.inc"
- #endif
- #ifdef X86_FIXED_OUTPUT
--static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
-+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+CAPSTONE_INTERNAL
-+#else
-+static
-+#endif
-+bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
- 			     size_t size, cs_insn *insn, uint16_t *insn_size)
- #else
- #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..b4b9ea6f 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -249,17 +249,21 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- }
- 
- #define X86_FIXED_ROUNDED writeRoundedRegisters
-+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#define X86_FIXED_OUTPUT X86_tryOutput64
-+#else
- #define X86_FIXED_OUTPUT tryOutput64
-+#endif
- #define X86_FIXED_WIDE true
- #define X86_OUTPUT_MISS writeExtraOutput64
- #include "X86SimpleOutputImpl.h"
- #undef X86_OUTPUT_MISS
- #undef X86_FIXED_WIDE
--#undef X86_FIXED_OUTPUT
- #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
--#define CS_DECODE_TRY_OUTPUT tryOutput64
-+#define CS_DECODE_TRY_OUTPUT X86_FIXED_OUTPUT
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
-+#undef X86_FIXED_OUTPUT
- #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..679fb3e1 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -188,17 +188,21 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- 	return true;
- }
- 
-+#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#define X86_FIXED_OUTPUT X86_tryOutput32
-+#else
- #define X86_FIXED_OUTPUT tryOutput32
-+#endif
- #define X86_FIXED_WIDE false
- #define X86_OUTPUT_MISS writeExtraOutput32
- #include "X86SimpleOutputImpl.h"
- #undef X86_OUTPUT_MISS
- #undef X86_FIXED_WIDE
--#undef X86_FIXED_OUTPUT
--#define CS_DECODE_TRY_OUTPUT tryOutput32
-+#define CS_DECODE_TRY_OUTPUT X86_FIXED_OUTPUT
- #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
-+#undef X86_FIXED_OUTPUT
- #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
 index f3dfc374..b0f4a6ce 100644
 --- a/cs_disasm_internal.h

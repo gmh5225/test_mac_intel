@@ -1,7 +1,7 @@
-name: Measure public x86 output through the original fixed writer functions on pure and mixed builds
+name: Compare pure public and private iterator output with identical fixed writer objects
 on:
   push:
-    branches: [codex/share-x86-record-writer-functions]
+    branches: [codex/canonical-iterators-in-cold-public-record]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: writer-functions-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: identical-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
