@@ -1,7 +1,7 @@
-name: Prove x86 and NeverD library identity before and after the LoongArch-only source change
+name: Compare the linked NeverD decoder and mixed architecture libraries across the x86 public reader change
 on:
   push:
-    branches: [codex/prove-x86-inputs-after-dedicated-loongarch]
+    branches: [codex/mixed-archives-public-x86-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: loong-x86-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-mixed-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

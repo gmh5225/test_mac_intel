@@ -14,27 +14,31 @@ try:
     shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake');(project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+flow[i:j])
     public_test=d/'identity-probe.c'
     profiles={}
-    for profile in ('project','full','diet','reduced','no-att'):
+    for profile in ('project','nine','dual','mixed-diet','mixed-reduced'):
         b=t/('build-'+profile);receipts={}
         for stage,info in m['stages'].items():
+            if profile!='project' and stage!='base':continue
             pair=[]
-            for loong in (False,True):
-                label=profile+'-'+stage+('-after' if loong else '-before')
+            for public in (False,True):
+                label=profile+'-'+stage+('-after' if public else '-before')
                 g('restore','--source','HEAD','--staged','--worktree','--','.')
-                for nm in (['loong'] if loong else [])+([stage] if stage!='base' else []):
+                for nm in (['public'] if public else [])+([stage] if stage!='base' else []):
                     p=d/('receipt-'+nm+'.patch');assert sha(p)==m['patches'][nm];g('apply','--index',str(p))
-                tree=g('write-tree');assert tree==info['after'if loong else 'before']['tree']
+                tree=g('write-tree');assert tree==info['after'if public else 'before']['tree']
                 cfg=['cmake','-G','Ninja','-S',project if profile=='project'else s,'-B',b,'-DCMAKE_C_COMPILER=clang','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON']
                 if profile!='project':
                     cfg+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
-                    cfg+=dict(diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],full=[],**{'no-att':['-DCAPSTONE_X86_ATT_DISABLE=ON']})[profile]
+                    arches=('ARM','AARCH64','MIPS','LOONGARCH','SYSTEMZ','RISCV','POWERPC','SPARC') if profile=='nine' else ('MIPS',)
+                    cfg+=['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in arches]
+                    if profile=='mixed-diet':cfg+=['-DCAPSTONE_BUILD_DIET=ON']
+                    if profile=='mixed-reduced':cfg+=['-DCAPSTONE_X86_REDUCE=ON']
                 run('configure-'+label,cfg);run('build-'+label,['cmake','--build',b,'--parallel','4','--target','capstone_static',*(['capstone_shared']if profile!='project'else [])])
-                lib,=b.rglob('libcapstone.a');objects={str(f.relative_to(b)):sha(f)for f in b.rglob('*.c.o')};assert not any('LoongArch' in name for name in objects)
+                lib,=b.rglob('libcapstone.a');objects={str(f.relative_to(b)):sha(f)for f in b.rglob('*.c.o')};assert any('LoongArch' in name for name in objects)==(profile=='nine')
                 members=[n for n in sp.check_output(['ar','t',lib],text=True).splitlines()if not n.startswith('__.SYMDEF')]
                 assert len(members)==len(set(members))>10
                 digests=[hashlib.sha256(sp.check_output(['ar','p',lib,n])).hexdigest()for n in members]
                 shared=[sha(f)for f in b.rglob('libcapstone.*')if f.name!='libcapstone.a' and not f.is_symlink() and ('.so' in f.name or f.suffix=='.dylib')]
-                p=t/'public-probe';run('link-'+label,['clang','-std=c99','-O2','-I',s/'include',public_test,lib,'-lm','-o',p]);res=sp.check_output([p],text=True).strip();assert res=='verified'
+                p=t/'public-probe';link_flags=(['-Wl,-u,_X86_disasmIter32','-Wl,-u,_X86_disasmIterText'] if platform.system()=='Darwin' else ['-Wl,--undefined=X86_disasmIter32','-Wl,--undefined=X86_disasmIterText']) if profile=='project' else [];run('link-'+label,['clang','-std=c99','-O2','-I',s/'include',public_test,*link_flags,lib,'-lm','-o',p]);res=sp.check_output([p],text=True).strip();assert res=='verified'
                 y=dict(tree=tree,objects=objects,members=list(zip(members,digests)),shared=shared,probe=sha(p))
                 pair.append(y)
             aa,bb=pair;assert all(aa[k]==bb[k] for k in ('objects','members','shared','probe')),(stage,profile)
