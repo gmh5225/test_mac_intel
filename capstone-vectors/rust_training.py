@@ -13,7 +13,7 @@ def fork_profdata(w,out):
     head=sp.check_output(['git','-C',src,'rev-parse','HEAD'],text=True).strip()
     (out/'llvm-source-at-configure.json').write_text(json.dumps(dict(repository=uri,branch='main',commit=head))+'\n')
     try:
-        sp.run(['cmake','-S',src/'llvm','-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DLLVM_TARGETS_TO_BUILD=Native','-DLLVM_INCLUDE_TESTS=OFF','-DLLVM_INCLUDE_EXAMPLES=OFF','-DLLVM_INCLUDE_BENCHMARKS=OFF','-DLLVM_BUILD_TOOLS=ON','-DLLVM_ENABLE_PROJECTS=','-DLLVM_ENABLE_TERMINFO=OFF'],check=True)
+        sp.run(['cmake','-S',src/'llvm','-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DLLVM_TARGETS_TO_BUILD=Native','-DLLVM_ENABLE_RTTI=ON','-DLLVM_INCLUDE_TESTS=OFF','-DLLVM_INCLUDE_EXAMPLES=OFF','-DLLVM_INCLUDE_BENCHMARKS=OFF','-DLLVM_BUILD_TOOLS=ON','-DLLVM_ENABLE_PROJECTS=','-DLLVM_ENABLE_TERMINFO=OFF'],check=True)
     except sp.CalledProcessError:
         for name in ('CMakeConfigureLog.yaml','CMakeError.log'):
             log=build/'CMakeFiles'/name
@@ -46,8 +46,11 @@ def instrument(ad,w,out,flags,capstone,syslibs):
     return exe
 def optimize(ad,w,out,counts):
     raw=w/'rust-raw';frozen=sorted(raw.glob('training-*.profraw'));assert len(frozen)==36 and all(f.stat().st_size>128 for f in frozen),(len(frozen),[f.stat().st_size for f in frozen])
+    (out/'input-counter-files.json').write_text(json.dumps({f.name:{'bytes':f.stat().st_size,'sha256':hashlib.sha256(f.read_bytes()).hexdigest()} for f in frozen},indent=2)+'\n')
     tool=fork_profdata(w,out);merged=w/'iced.profdata';sp.run([tool,'merge','-o',merged,*frozen],check=True)
     shown=sp.check_output([tool,'show','--all-functions','--counts',merged],text=True)
+    import gzip
+    (out/'iced-counter-functions.txt.gz').write_bytes(gzip.compress(shown.encode(),mtime=0))
     groups=dict(decoder={},formatter={},info={},adapter={})
     symbols=re.findall(r'^  (\S[^\n]*):\n((?:    [^\n]+\n)+)',shown,re.M)
     for name,data in symbols:
