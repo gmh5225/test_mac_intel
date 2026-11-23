@@ -39,7 +39,7 @@ def measure(t):
     info={};libs={};units=checks['tests']
     for profile,arch,extra in [('full',arches,[]),('diet',['RISCV'],['-DCAPSTONE_BUILD_DIET=ON']),('neverd',['ARM','AARCH64','MIPS','X86'],[])]:
         b=t/profile;variants={}
-        for k in (('base','lazy','width') if profile=='full' else ('base','width')):
+        for k in (('base','original','lazy','width') if profile=='full' else ('base','width')):
             git('restore','--source','HEAD','--worktree','--staged','--','.')
             if k!='base':
                 patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
@@ -88,7 +88,12 @@ def measure(t):
                 assert set(row['objects'])==set(variants['base']['objects'])
                 changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
                 assert all(f.endswith('/arch/RISCV/RISCVInstPrinter.c.o')for f in changed),changed
-                if profile=='full' and k!='base':assert len(changed)==1,(k,changed)
+                if profile=='full':assert len(changed)==int(k in ('original','width')),(k,changed)
+            if profile=='full':
+                assert variants['base']['objects']==variants['lazy']['objects'] and variants['width']['objects']==variants['original']['objects']
+                fast=('RISCV_LLVM_getInstruction','RISCV_getInstruction','RISCV_get_insn_id','cs_disasm_iter')
+                layout={k:rd(out/('layout-'+k+'.json'))['built']for k in variants}
+                save('decoder-addresses',{n:{k:layout[k][n] for k in layout} for n in fast})
         info[profile]=variants;shutil.rmtree(b)
     save('profiles',info)
     for k in ('lazy','width'):

@@ -1,7 +1,7 @@
-name: Validate one alias lookup for successfully expanded RISC-V opcodes against canonical decoder records
+name: Separate RISC-V alias execution and ELF scanner placement on seven real build configurations
 on:
   push:
-    branches: [codex/riscv-expanded-alias-owners]
+    branches: [codex/riscv-map-before-printer]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-expanded-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-printer-after-mapping-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
