@@ -1,7 +1,7 @@
-name: Compare XCore generated detail records and throughput on official XS2 and XS3 firmware
+name: Repeat XS2 and XS3 firmware timings with matched executables and two Linux runners per compiler
 on:
   push:
-    branches: [codex/xcore-native-real-firmware-times]
+    branches: [codex/xcore-firmware-linux-repeat]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,8 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, arch: arm64, profile: full }
-          - { host: macos-15-intel, arch: x86_64, profile: full }
+          - { host: ubuntu-22.04, arch: repeat2, profile: full }
+          - { host: ubuntu-24.04, arch: repeat2, profile: full }
           - { host: ubuntu-22.04, arch: x86_64, profile: full }
           - { host: ubuntu-24.04, arch: x86_64, profile: full }
     runs-on: ${{ matrix.host }}
@@ -34,11 +34,12 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Compare original and candidate bytes and native tests
         env:
+          REPEAT: ${{ matrix.arch }}
           SCAN_PROFILE: ${{ matrix.profile }}
         run: python -B portable-next/native.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-firmware-time-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-firmware-repeat-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

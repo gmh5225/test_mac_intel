@@ -28,6 +28,10 @@ try:
             run('clang','-D_POSIX_C_SOURCE=200809L','-std=c11','-O3','-I',s/'include',r/(name+'.c'),b/'libcapstone.a','-o',t/(k+name))
         source[k]=dict(tree=call('git','-C',s,'write-tree'),lib=sha(b/'libcapstone.a'),bin=sha(t/(k+'time')))
     assert source['base']['lib']!=source['candidate']['lib']
+    programs={k:(t/(k+'time')).read_bytes() for k in ('base','candidate')}; width=max(map(len,programs.values()))
+    programs={k:v+bytes(width-len(v)) for k,v in programs.items()};programs['copy']=programs['base']
+    selected=t/'selected';selected.write_bytes(programs['base']);selected.chmod(0o755)
+    invoke=['setarch',platform.machine(),'-R',selected]
     samples_checked={}
     for image in samples['images']:
         for sect in image['sections']:
@@ -40,9 +44,9 @@ try:
                 for mode in range(3):
                     key=f.stem+'/'+api+'/'+str(mode)
                     def take(k,num):
-                        return list(map(int,call(t/(('base' if k=='copy' else k)+'time'),f,str(sect['address']),str(mode),api,str(num)).split()))
-                    n=max(1,ceil(16e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random(key);cycles=[]
-                    for cycle in range(17):
+                        selected.write_bytes(programs[k]);return list(map(int,call(*invoke,f,str(sect['address']),str(mode),api,str(num)).split()))
+                    n=max(1,ceil(30e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random(key+os.environ.get("REPEAT",""));cycles=[]
+                    for cycle in range(31):
                         order=keys.copy();rng.shuffle(order);obs={k:[]for k in keys}
                         for k in order+order[::-1]:
                             v=take(k,n);assert v[2:]==expected;obs[k].append(v[:2])
