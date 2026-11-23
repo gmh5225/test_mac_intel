@@ -1,0 +1,258 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4c125e67..48ae85a8 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1060,8 +1060,13 @@ target_include_directories(capstone_build_settings INTERFACE
+ )
+ set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+ 
+-# The x86-only public iterator uses the fixed-mode readers in both library forms.
+-if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_enabled_architectures STREQUAL "X86"))
++# Formatted public records reuse the fixed-mode readers in both library forms.
++set(capstone_public_fixed_readers OFF)
++if(capstone_enabled_architectures STREQUAL "X86" OR
++   (CAPSTONE_USE_DEFAULT_ALLOC AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
++    set(capstone_public_fixed_readers ON)
++endif()
++if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_public_fixed_readers))
+     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
+     target_link_libraries(capstone_x86_iter32 PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+@@ -1076,6 +1081,8 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86")
+         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++    endif()
++    if(capstone_public_fixed_readers)
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+             $<TARGET_OBJECTS:capstone_x86_native>)
+diff --git a/Makefile b/Makefile
+index 0fe49035..c22f2fe3 100644
+--- a/Makefile
++++ b/Makefile
+@@ -453,6 +453,8 @@ LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
+ LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ LIBOBJ_SHARED := $(LIBOBJ)
++else ifeq ($(CAPSTONE_USE_SYS_DYN_MEM):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no)
++LIBOBJ_SHARED := $(LIBOBJ)
+ endif
+ 
+ 
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index f15ce655..ab1b7576 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -925,6 +925,10 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+ 
+ void Mips_selectScanDecoder(cs_struct *handle)
+ {
++#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
++	if (handle->arch != CS_ARCH_MIPS)
++		return;
++#endif
+ 	/* An installed callback owns its MC operands and its dispatch. */
+ 	if (handle->disasm == Mips_getInstruction ||
+ 	    handle->disasm == getScanInstruction)
+diff --git a/arch/Mips/MipsMapping.h b/arch/Mips/MipsMapping.h
+index e2ebd0a0..b446e6ff 100644
+--- a/arch/Mips/MipsMapping.h
++++ b/arch/Mips/MipsMapping.h
+@@ -15,7 +15,8 @@ typedef enum {
+ bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
+ 			 cs_insn *insn);
+ 
+-#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
++#if (defined(CAPSTONE_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++	!defined(CAPSTONE_DIET)
+ #define CAPSTONE_MIPS_SCAN_BY_OPTION
+ void Mips_selectScanDecoder(cs_struct *handle);
+ #endif
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..513ed307 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,11 +30,22 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
+ 
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
++#if !defined(CAPSTONE_DIET) && \
+ 	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
++#else
++#define CAPSTONE_X86_MIXED_OUTPUT
++#include "../../cs_priv.h"
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeRecord32(cs_struct *handle, const uint8_t *code, size_t size,
++		  cs_insn *insn, uint16_t *insn_size, bool batch);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeRecord64(cs_struct *handle, const uint8_t *code, size_t size,
++		  cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..9cfdd29a 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3757,7 +3757,9 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
++#define CS_DECODE_PUBLIC_X86
+ #include "../../cs_disasm_internal.h"
++#undef CS_DECODE_PUBLIC_X86
+ #undef CS_DECODE_SCAN_IMPL
+ #ifdef CS_DECODE_OUTPUT_MISS
+ #undef CS_DECODE_OUTPUT_MISS
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..2e9417eb 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -257,6 +257,19 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
++#ifdef CAPSTONE_X86_MIXED_OUTPUT
++CS_PRESERVE_MOST bool X86_decodeRecord64(cs_struct *handle,
++				       const uint8_t *code, size_t size,
++				       cs_insn *insn, uint16_t *insn_size,
++				       bool batch)
++{
++	if (tryOutput64(handle, code, size, insn, insn_size))
++		return true;
++	return X86_decodeOutputMiss64(handle, code, size, insn, insn_size,
++				      batch);
++}
++#endif
++
+ #define CS_DECODE_TRY_OUTPUT tryOutput64
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..a9c290c4 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -195,6 +195,19 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#ifdef CAPSTONE_X86_MIXED_OUTPUT
++CS_PRESERVE_MOST bool X86_decodeRecord32(cs_struct *handle,
++				       const uint8_t *code, size_t size,
++				       cs_insn *insn, uint16_t *insn_size,
++				       bool batch)
++{
++	if (tryOutput32(handle, code, size, insn, insn_size))
++		return true;
++	return X86_decodeOutputMiss32(handle, code, size, insn, insn_size,
++				      batch);
++}
++#endif
++
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
+diff --git a/cs.c b/cs.c
+index ede7c2aa..617c3989 100644
+--- a/cs.c
++++ b/cs.c
+@@ -969,7 +969,9 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ }
+ #endif
+ 
++#define CS_DECODE_PUBLIC_X86
+ #include "cs_disasm_internal.h"
++#undef CS_DECODE_PUBLIC_X86
+ 
+ /* Keep the generic copy specialized without the private x86 length checks. */
+ #if defined(__GNUC__)
+@@ -980,7 +982,19 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 			     PostPrinter_t postprinter, const uint8_t *code,
+ 			     bool stream_length_valid)
+ {
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && !defined(CAPSTONE_DIET)
++	const char *text = OS->buffer;
++	if (!postprinter && !stream_length_valid) {
++		while (*text == ' ' || *text == '\t')
++			++text;
++	} else
++		SStream_trimls(OS);
++#else
+ 	SStream_trimls(OS);
++#ifndef CAPSTONE_DIET
++	const char *text = OS->buffer;
++#endif
++#endif
+ 	// Copy only decoded instruction bytes before the postprinter observes them.
+ 	uint16_t copy_size = copy_insn_bytes(insn, code, false);
+ 	insn->op_str[0] = '\0';
+@@ -998,18 +1012,18 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
+ 	memset(insn->op_str, '\0', sizeof(insn->op_str));
+ 	size_t off = 0;
+-	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
+-	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
+-		char c = OS->buffer[off];
++	while (off < sizeof(insn->mnemonic) - 1 && text[off] &&
++	       text[off] != ' ' && text[off] != '\t') {
++		char c = text[off];
+ 		insn->mnemonic[off] = c == '|' ? ' ' : c;
+ 		off++;
+ 	}
+-	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
+-	       OS->buffer[off] != '\t')
++	while (text[off] && text[off] != ' ' &&
++	       text[off] != '\t')
+ 		off++;
+-	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
++	while (text[off] == ' ' || text[off] == '\t')
+ 		off++;
+-	const char *operands = OS->buffer + off;
++	const char *operands = text + off;
+ 	if (stream_length_valid) {
+ #ifdef CS_MIPS_VISIBLE_OPERANDS
+ 		/* MIPS can remove the MIPS16 comment or a '$' after printing.
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..cee65f44 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -170,6 +170,19 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ #endif
+ 	}
+ #endif
++#if defined(CS_DECODE_PUBLIC_X86) && defined(CAPSTONE_X86_MIXED_OUTPUT)
++	/* The array allocator may change detail mode after creating the record.
++	 * Pass the original batch policy through every fallback. */
++	if (handle->arch == CS_ARCH_X86 && size && !handle->no_text &&
++	    (!insn->detail || handle->detail_opt)) {
++		if (handle->mode == CS_MODE_64)
++			return X86_decodeRecord64(handle, code, size, insn,
++						  insn_size, batch);
++		if (handle->mode == CS_MODE_32)
++			return X86_decodeRecord32(handle, code, size, insn,
++						  insn_size, batch);
++	}
++#endif
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 8b413445..9a1f6d0d 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -212,7 +212,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
+     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
+ endforeach()
+ 
+-if(TARGET x86_simple_output AND NOT capstone_enabled_architectures STREQUAL "X86")
++if(TARGET x86_simple_output AND NOT capstone_x86_objects)
+     target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
+ endif()
+ 

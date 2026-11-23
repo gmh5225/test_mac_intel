@@ -230,11 +230,65 @@ static int single(char **argv) {
   return 0;
 }
 
+static void foreignRecords(Api &left, Api &right) {
+  const cs_mode mips_modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64, CS_MODE_MIPS16,
+    CS_MODE_MICRO32R3, CS_MODE_MIPS32R2, CS_MODE_MIPS32R6, CS_MODE_MIPS64R6 };
+  uint64_t count=0, accepted=0;
+  for (cs_arch arch : {CS_ARCH_MIPS,CS_ARCH_AARCH64}) {
+    for (unsigned big=0;big<2;++big) {
+      Session a(left,arch,arch==CS_ARCH_MIPS?CS_MODE_MIPS32:CS_MODE_LITTLE_ENDIAN);
+      Session b(right,arch,arch==CS_ARCH_MIPS?CS_MODE_MIPS32:CS_MODE_LITTLE_ENDIAN);
+      unsigned widths=arch==CS_ARCH_MIPS?sizeof(mips_modes)/sizeof(*mips_modes):1;
+      for(unsigned w=0;w<widths;++w) {
+        auto mode=static_cast<cs_mode>((arch==CS_ARCH_MIPS?unsigned(mips_modes[w]):0u)|(big?unsigned(CS_MODE_BIG_ENDIAN):0u));
+        for(Session *s:{&a,&b})s->set(CS_OPT_MODE,mode);
+        for(unsigned config=0;config<8;++config) {
+          bool detail=(config&2)!=0;
+          for(Session *s:{&a,&b}) {
+            s->set(CS_OPT_DETAIL,CS_OPT_OFF);
+            if(detail)s->set(CS_OPT_DETAIL,config&4?CS_OPT_DETAIL_REAL:CS_OPT_ON);
+            s->set(CS_OPT_TEXT,config&1?CS_OPT_ON:CS_OPT_OFF);
+            s->set(CS_OPT_SKIPDATA,config>=6?CS_OPT_ON:CS_OPT_OFF);
+            if(arch==CS_ARCH_MIPS && config==4)s->set(CS_OPT_SYNTAX,CS_OPT_SYNTAX_NO_DOLLAR);
+          }
+          std::mt19937 rng(1301+w);
+          for(unsigned major=0;major<64;++major)for(unsigned t=0;t<80;++t) {
+            uint32_t word=(major<<26)|(rng()&0x3ffffff);
+            uint8_t raw[4];for(unsigned j=0;j<4;++j)raw[big?3-j:j]=uint8_t(word>>(8*j));
+            for(unsigned n=t<8?0:4;n<=4;++n) {
+              cs_insn v[2];cs_detail d[2];
+              const uint8_t *p[2]={raw,raw};size_t left_sz[2]={n,n};
+              uint64_t ip[2]={0x401000+uint64_t(t*4),0x401000+uint64_t(t*4)};bool valid[2];
+              for(unsigned i=0;i<2;++i) {
+                auto &s=i?b:a;
+                std::memset(v+i,0xa5,sizeof(cs_insn));std::memset(d+i,0xa5,sizeof(cs_detail));
+                v[i].is_alias=v[i].usesAliasDetails=v[i].illegal=false;v[i].detail=detail?d+i:nullptr;
+                valid[i]=s.api.next(s.h,p+i,left_sz+i,ip+i,v+i);
+                bool same_presence=!!v[i].detail==!!(i?v[0].detail:(detail?d:nullptr));
+                if(i)check(same_presence,"foreign detail presence");
+              }
+              v[0].detail=v[1].detail=nullptr;
+              if(valid[0]!=valid[1]||ip[0]!=ip[1]||p[0]!=p[1]||left_sz[0]!=left_sz[1]||
+                 left.error(a.h)!=right.error(b.h)||std::memcmp(v,v+1,sizeof(cs_insn))||
+                 std::memcmp(d,d+1,sizeof(cs_detail))) {
+                std::fprintf(stderr,"foreign raw mismatch arch %u mode %x config %u word %x length %u\n",unsigned(arch),unsigned(mode),config,word,n);
+                std::exit(1);
+              }
+              ++count;accepted+=valid[0];
+            }
+          }
+        }
+      }
+    }
+  }
+  std::printf("{\"records\":%" PRIu64 ",\"accepted\":%" PRIu64 "}\n",count,accepted);
+}
+
 int main(int argc,char **argv) {
   if(argc==9 && std::string(argv[2])=="single")return single(argv);
   if(argc<4)return 2;
   Api a(argv[1]),b(argv[2]);check(a.disasm!=b.disasm,"distinct array decoders");
-  std::string op=argv[3];if(op=="options"){options(a,b);return 0;}
+  std::string op=argv[3];if(op=="foreign"){foreignRecords(a,b);return 0;}if(op=="options"){options(a,b);return 0;}
   if(argc<7)return 2;
   std::ifstream f(argv[4],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};check(!bytes.empty(),"input");
   std::string target=argv[5];uint64_t ip=std::strtoull(argv[6],nullptr,10);

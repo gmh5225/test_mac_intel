@@ -1,7 +1,7 @@
-name: Measure x86 mode-selected public record decoders and foreign callers against direct selection
+name: Measure MIPS mode selection and private output splitting alongside x86 record writers
 on:
   push:
-    branches: [codex/mode-selected-public-records]
+    branches: [codex/mixed-mips-scan-and-public-split]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-mode-selected-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mixed-record-split-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

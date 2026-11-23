@@ -20,7 +20,7 @@ try:
     for k in ('base',*q):
         apply(k);b=t/'build'
         run('cmake-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
-        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option']
+        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option','mips_scan','mips_register_names','mips16_memory_calls','mips_single']
         run('build-'+k,'cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
         run('unit-'+k,'ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$')
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
@@ -46,6 +46,7 @@ try:
     for k in q:
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
         snapshot['options']=json.loads(get(*args,'options'))
+        snapshot['foreign']=json.loads(get(*args,'foreign'));assert snapshot['foreign']['records']>900000 and snapshot['foreign']['accepted']>0
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
     if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
