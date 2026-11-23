@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 71cb781f7f22f614d894f284b6f7c24e5be96fe5
+          ref: 1a40f3cc12189c3dc82dd556dcb638a1f19ca6e0
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -67,7 +67,7 @@ jobs:
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='71cb781f7f22f614d894f284b6f7c24e5be96fe5'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='1a40f3cc12189c3dc82dd556dcb638a1f19ca6e0'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
