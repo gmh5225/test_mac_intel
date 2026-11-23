@@ -15,7 +15,7 @@ def apply(k):
 try:
     assert get('git','-C',s,'rev-parse','HEAD')==m['checkout'] and all(v['parent']==m['checkout']for v in q.values())
     arch=['X86','ARM','AARCH64','MIPS']
-    flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
+    flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
     libs={};images={}
     for k in ('base',*q):
         apply(k);b=t/'build'
@@ -32,6 +32,7 @@ try:
     changed=[n for n in images['base']['object']if images['moves']['object'][n]!=images['base']['object'][n]]
     assert changed==['X86EvexScan.c.o'],changed
     run('guard-moves','clang++','-O2','-std=c++17','-I',s/'include',r/'guard-packed.cpp','-ldl','-o',t/'moves')
+    run('compile-oracle','g++','-O2','-std=c++17','-I',s/'include',r/'oracle.cpp','-ldl','-o',t/'oracle')
     run('guard-driver','clang++','-O2','-std=c++17','-I',s/'include',r/'guard.cpp','-ldl','-o',t/'guard')
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
@@ -56,6 +57,10 @@ try:
         snapshot['guard']={'trials':trials,'valid':valid}
         count,hits=map(int,get(t/'moves',libs['base'],libs[k]).split());assert count==5308416 and 0<hits<count
         snapshot['packed_moves']=dict(trials=count,accepted=hits)
+        res=sp.run([t/'oracle',libs['base'],libs[k]],capture_output=True,text=True);(out/'oracle.log').write_text(res.stderr+res.stdout);res.check_returncode()
+        cases_oracle,valid,before,after,new,fixed=map(int,res.stdout.split())
+        assert cases_oracle==4*4*(4*256*256+256*256+7*256*16)
+        snapshot['full_oracle']=dict(cases=cases_oracle,accepted=valid,baseline_mismatches=before,candidate_mismatches=after,new_mismatches=new,resolved=fixed)
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
     if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -107,6 +112,6 @@ try:
                     cycles.append({k:[sum(o[i]for l,o in obs if k==l)for i in (0,1)]for k in keys})
                 timings[key]=dict(cycles=cycles,reps=reps,records=t0[2],value=t0[3]);put('timings',timings)
         put('mappings',dict(sets={k:sorted(v)for k,v in addresses.items()},offsets=offsets,fixed=not darwin,inode=image.stat().st_ino if not darwin else None))
-    put('complete',dict(source=q,panels=len(timings),compiler=get('clang','--version'),cpu=get('sysctl','-n','machdep.cpu.brand_string')if darwin else get('lscpu')))
+    put('complete',dict(source=q,panels=len(timings),compiler=get('gcc','--version'),cpu=get('sysctl','-n','machdep.cpu.brand_string')if darwin else get('lscpu')))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);put('cleanup',dict(removed=not t.exists(),bytes=size))
