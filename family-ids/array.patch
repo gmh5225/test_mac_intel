@@ -41,23 +41,14 @@ index 0fe49035..c22f2fe3 100644
  
  
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..513ed307 100644
+index 8d827a97..22f02935 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,11 +30,22 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
- 					 uint16_t *insn_size);
+@@ -37,6 +37,15 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
  #endif
  
--#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
-+#if !defined(CAPSTONE_DIET) && \
- 	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
-+#ifdef CAPSTONE_X86_ONLY
- #define CAPSTONE_X86_PUBLIC_OUTPUT
-+#else
-+#define CAPSTONE_X86_MIXED_OUTPUT
-+#include "../../cs_priv.h"
++#ifdef CAPSTONE_X86_MIXED_OUTPUT
 +CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 +X86_decodeRecord32(cs_struct *handle, const uint8_t *code, size_t size,
 +		  cs_insn *insn, uint16_t *insn_size, bool batch);
@@ -65,14 +56,73 @@ index 8d827a97..513ed307 100644
 +X86_decodeRecord64(cs_struct *handle, const uint8_t *code, size_t size,
 +		  cs_insn *insn, uint16_t *insn_size, bool batch);
 +#endif
++
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *info);
+diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
+index 6fcbe3f4..9e2f7fc3 100644
+--- a/arch/X86/X86Module.c
++++ b/arch/X86/X86Module.c
+@@ -10,6 +10,25 @@
+ #include "X86Mapping.h"
+ #include "X86Module.h"
+ 
++static void setBitMode(cs_struct *handle)
++{
++	handle->regsize_map = x86_has_feature(handle->mode, CS_MODE_64) ?
++				      regsize_map_64 : regsize_map_32;
++#ifdef CAPSTONE_X86_MIXED_OUTPUT
++	switch (handle->mode) {
++	case CS_MODE_32:
++		handle->decode_record = X86_decodeRecord32;
++		break;
++	case CS_MODE_64:
++		handle->decode_record = X86_decodeRecord64;
++		break;
++	default:
++		handle->decode_record = cs_decode_full_insn;
++		break;
++	}
++#endif
++}
++
+ cs_err X86_global_init(cs_struct *ud)
+ {
+ 	MCRegisterInfo *mri;
+@@ -37,10 +56,7 @@ cs_err X86_global_init(cs_struct *ud)
+ 	ud->reg_access = X86_reg_access;
  #endif
  
- bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+-	if (x86_has_feature(ud->mode, CS_MODE_64))
+-		ud->regsize_map = regsize_map_64;
+-	else
+-		ud->regsize_map = regsize_map_32;
++	setBitMode(ud);
+ 
+ 	X86_build_lookup_tables(ud);
+ 
+@@ -57,14 +73,10 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		     x86_has_feature(value, CS_MODE_X86_AMD)))
+ 			return CS_ERR_OPTION;
+ 
+-		if (x86_has_feature(value, CS_MODE_64))
+-			handle->regsize_map = regsize_map_64;
+-		else
+-			handle->regsize_map = regsize_map_32;
+-
+ 		handle->mode = (cs_mode)(value &
+ 					 (CS_MODE_16 | CS_MODE_32 | CS_MODE_64 |
+ 					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
++		setBitMode(handle);
+ 		break;
+ 	case CS_OPT_SYNTAX:
+ 		switch (value) {
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..2e9417eb 100644
+index 96ce9f72..33aea0f9 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -257,6 +257,19 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+@@ -257,6 +257,22 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
  #undef X86_FIXED_WIDE
  #undef X86_FIXED_OUTPUT
  #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
@@ -82,6 +132,9 @@ index 96ce9f72..2e9417eb 100644
 +				       cs_insn *insn, uint16_t *insn_size,
 +				       bool batch)
 +{
++	/* The array allocator may change detail mode after allocating this record. */
++	if (!size || handle->no_text || (insn->detail && !handle->detail_opt))
++		return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 +	if (tryOutput64(handle, code, size, insn, insn_size))
 +		return true;
 +	return X86_decodeOutputMiss64(handle, code, size, insn, insn_size,
@@ -93,10 +146,10 @@ index 96ce9f72..2e9417eb 100644
  #include "../../cs_disasm_internal.h"
  #undef CS_DECODE_OUTPUT_MISS
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..a9c290c4 100644
+index 443b2f86..f5632860 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -195,6 +195,19 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+@@ -195,6 +195,22 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
  #undef X86_OUTPUT_MISS
  #undef X86_FIXED_WIDE
  #undef X86_FIXED_OUTPUT
@@ -106,6 +159,9 @@ index 443b2f86..a9c290c4 100644
 +				       cs_insn *insn, uint16_t *insn_size,
 +				       bool batch)
 +{
++	/* The array allocator may change detail mode after allocating this record. */
++	if (!size || handle->no_text || (insn->detail && !handle->detail_opt))
++		return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 +	if (tryOutput32(handle, code, size, insn, insn_size))
 +		return true;
 +	return X86_decodeOutputMiss32(handle, code, size, insn, insn_size,
@@ -117,10 +173,20 @@ index 443b2f86..a9c290c4 100644
  #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
  #include "../../cs_disasm_internal.h"
 diff --git a/cs.c b/cs.c
-index ede7c2aa..128f573f 100644
+index ede7c2aa..e1473a6b 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -969,7 +969,9 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+@@ -882,6 +882,9 @@ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
+ 
+ 	ud->errnum = CS_ERR_OK;
+ 	ud->arch = arch;
++#ifdef CAPSTONE_X86_MIXED_OUTPUT
++	ud->decode_record = cs_decode_full_insn;
++#endif
+ 	ud->mode = mode;
+ 	// by default, do not break instruction into details
+ 	ud->detail_opt = CS_OPT_OFF;
+@@ -969,7 +972,9 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
  }
  #endif
  
@@ -131,29 +197,64 @@ index ede7c2aa..128f573f 100644
  /* Keep the generic copy specialized without the private x86 length checks. */
  #if defined(__GNUC__)
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b0f4a6ce..cee65f44 100644
+index b0f4a6ce..7ac4443d 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -170,6 +170,19 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+@@ -23,9 +23,6 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ #endif
+-CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+-cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -170,6 +167,9 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
  #endif
  	}
  #endif
 +#if defined(CS_DECODE_PUBLIC_X86) && defined(CAPSTONE_X86_MIXED_OUTPUT)
-+	/* The array allocator may change detail mode after creating the record.
-+	 * Pass the original batch policy through every fallback. */
-+	if (handle->arch == CS_ARCH_X86 && size && !handle->no_text &&
-+	    (!insn->detail || handle->detail_opt)) {
-+		if (handle->mode == CS_MODE_64)
-+			return X86_decodeRecord64(handle, code, size, insn,
-+						  insn_size, batch);
-+		if (handle->mode == CS_MODE_32)
-+			return X86_decodeRecord32(handle, code, size, insn,
-+						  insn_size, batch);
-+	}
++	return handle->decode_record(handle, code, size, insn, insn_size, batch);
 +#endif
  #ifdef CS_DECODE_TRY_OUTPUT
  	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
  		return true;
+diff --git a/cs_priv.h b/cs_priv.h
+index 84e1c748..a26a71b9 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -45,6 +45,20 @@ typedef bool (*Disasm_t)(csh handle, const uint8_t *code, size_t code_len,
+ 			 MCInst *instr, uint16_t *size, uint64_t address,
+ 			 void *info);
+ 
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch);
++
++#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_X86_ONLY) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_MIXED_OUTPUT
++typedef CS_PRESERVE_MOST bool (*DecodeRecord_t)(cs_struct *, const uint8_t *,
++						size_t, cs_insn *, uint16_t *,
++						bool);
++#endif
++
+ typedef const char *(*GetName_t)(csh handle, unsigned int id);
+ 
+ typedef void (*GetID_t)(cs_struct *h, cs_insn *insn, unsigned int id);
+@@ -151,6 +165,9 @@ struct cs_struct {
+ 	void *x86_scan_adapter_data;
+ 	cs_mode x86_scan_adapter_mode;
+ #endif
++#ifdef CAPSTONE_X86_MIXED_OUTPUT
++	DecodeRecord_t decode_record;
++#endif
+ };
+ 
+ #define MAX_ARCH CS_ARCH_MAX
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 8b413445..9a1f6d0d 100644
 --- a/tests/unit/CMakeLists.txt

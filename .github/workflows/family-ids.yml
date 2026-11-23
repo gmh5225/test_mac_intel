@@ -1,7 +1,7 @@
-name: Compare complete fixed-width and primary-only public output with a single mapped library
+name: Measure x86 mode-selected public record decoders and foreign callers against direct selection
 on:
   push:
-    branches: [codex/public-complete-fallback-chain]
+    branches: [codex/mode-selected-public-records]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-output-fallback-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-mode-selected-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

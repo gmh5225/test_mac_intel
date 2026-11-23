@@ -97,6 +97,20 @@ static void *changing_calloc(size_t n,size_t z) {
   return std::calloc(n,z);
 }
 static void options(Api &a,Api &b) {
+  {
+    Session l(a,CS_ARCH_X86,CS_MODE_16),r(b,CS_ARCH_X86,CS_MODE_16);
+    const uint8_t bytes[]={0x48,0x8b,0xc1,0xc5,0xf8,0xc2,0xc1,7,0x50,0x64,0x8d,0x01};
+    const size_t modes[]={CS_MODE_64,CS_MODE_32,CS_MODE_16,CS_MODE_32|CS_MODE_X86_INTEL,CS_MODE_64|CS_MODE_X86_AMD,CS_MODE_32,CS_MODE_64};
+    for(auto mode:modes) {
+      l.set(CS_OPT_MODE,mode);r.set(CS_OPT_MODE,mode);
+      const auto invalid=CS_MODE_X86_INTEL|CS_MODE_X86_AMD|mode;
+      check(a.option(l.h,CS_OPT_MODE,invalid)==CS_ERR_OPTION&&b.option(r.h,CS_OPT_MODE,invalid)==CS_ERR_OPTION,"invalid mode");
+      for(auto text:{CS_OPT_OFF,CS_OPT_ON})for(auto det:{CS_OPT_OFF,CS_OPT_ON}){
+        l.set(CS_OPT_TEXT,text);r.set(CS_OPT_TEXT,text);l.set(CS_OPT_DETAIL,det);r.set(CS_OPT_DETAIL,det);
+        for(size_t n=1;n<=sizeof(bytes);++n)compare(l,r,bytes,n,0xfffffffcu,0);
+      }
+    }
+  }
   long ps=sysconf(_SC_PAGESIZE);check(ps>256,"page");
   auto *page=static_cast<uint8_t *>(mmap(nullptr,size_t(ps)*2,PROT_READ|PROT_WRITE,MAP_ANON|MAP_PRIVATE,-1,0));
   check(page!=MAP_FAILED&&!mprotect(page+ps,ps,PROT_NONE),"guard");
