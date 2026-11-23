@@ -45,7 +45,7 @@ def measure(t):
                 patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
             run(profile+k+'-config',config(b,arch,extra))
             run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else []),*(['riscv_scan_options'] if profile=='full' and k=='width' else [])])
-            if profile=='full' and k=='width':run('generated-aliases',['python3','-B',source/'suite/synctools/alias_pattern_rows.py','--check'])
+            if profile=='full' and k=='width':run('generated-aliases',[source/'suite/synctools/alias_pattern_rows.py','--check'])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
@@ -101,7 +101,9 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-2260-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('RISCV-four-final-images-2297-'+flavor)
+    del images['lazy']
+    images['candidate_copy']=images['width']
     for name,bits in cases.items():
         def sample(k,mode,reps):
             select(k);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(bits),str(mode),t/(name+'.text'),'1048576',str(reps)]).split()))

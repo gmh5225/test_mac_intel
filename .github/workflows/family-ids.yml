@@ -1,7 +1,7 @@
-name: Check dedicated RISC-V expansion and original-alias eligibility on real programs with mixed-library identity
+name: Validate the release tree with executable generator and four shuffled images on RISC-V and foreign ELF workloads
 on:
   push:
-    branches: [codex/riscv-original-alias-dedicated]
+    branches: [codex/riscv-final-dedicated-four-copies]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-dedicated-original-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-final-dedicated-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
