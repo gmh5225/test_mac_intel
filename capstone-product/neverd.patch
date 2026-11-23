@@ -1,13 +1,13 @@
---- a/lib/decode/X86/X86Decoder.cpp
-+++ b/lib/decode/X86/X86Decoder.cpp
-@@ -108,8 +108,8 @@
- size_t
- Decoder::classifyX86Prefix(llvm::ArrayRef<uint8_t> Bytes, va_t Addr,
-                            llvm::MutableArrayRef<uint32_t> Output) const {
--  return X86_scanBatch(Handle, Bytes.data(), Bytes.size(), Addr, Output.data(),
--                       Output.size())
-+  return X86_scanNativeBatch(Handle, Bytes.data(), Bytes.size(), Addr,
-+                             Output.data(), Output.size())
-       .count;
- }
- 
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index 54af15350b..01fb0e34bc 100644
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -345,7 +345,7 @@ Decoder::decodeOtherPhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+   const bool Decoded =
+-      X86 && Text ? X86_disasmIterText(Handle, &Code, &Remaining, &PC, InsnBuf)
++      X86 && Text ? X86_disasmOneText(Handle, Bytes, Len, Addr, InsnBuf) != 0
+                   : cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf);
+   return Decoded || (X86 && (decodePrefixedX86Fence(Bytes, Len, Addr) ||
+                              decodeX86MpxFallback(Bytes, Len, Addr)));

@@ -41,6 +41,11 @@ try:
     for variant in ('base','tail','memory'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
+        caller='lib/decode/Decoder.cpp'
+        command(['git','restore','--source','HEAD','--worktree','--',caller],'restore-caller-'+variant,nd)
+        assert sha(r/'neverd.patch')==m['neverd_patch_sha256']
+        if variant=='tail':command(['git','apply',r/'neverd.patch'],'apply-caller-'+variant,nd)
+        assert ('X86_disasmOneText(Handle' in (nd/caller).read_text())==(variant=='tail')
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
@@ -81,7 +86,7 @@ try:
         command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'vector-generator'],'compile-vector-rows-'+variant)
         generated=sp.check_output([t/'vector-generator']);assert generated==(cs/'arch/X86/X86GenVectorOutput.inc').read_bytes()
         save('vector-table-'+variant,dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
-        if variant in ('memory','tail'):
+        if (cs/'arch/X86/X86GenVexBaseMemory.inc').is_file():
             memory=sp.check_output([t/'vector-generator','--vex-base-memory']);assert memory==(cs/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
             save('generated-vex-memory',dict(bytes=len(memory),sha256=hashlib.sha256(memory).hexdigest()))
         obj,=build.rglob('X86Decoder.cpp.o')
@@ -95,7 +100,7 @@ try:
             fields=ln.split(maxsplit=3)
             if len(fields)!=4 or fields[2].lower()!='t':continue
             name=fields[3]
-            if name.startswith(('cs_decode_full_insn','cs_decode_public_insn','cs_disasm_iter','X86_disasmIter','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','matchAArch64AliasPatterns','matchAliasPatterns','AArch64_LLVM_printInstruction','X86_decodeVexMemoryOrFull','neverd::Decoder::classifyX86Prefix')):
+            if name.startswith(('cs_decode_full_insn','cs_decode_public_insn','cs_disasm_iter','X86_disasmIter','X86_disasmOneText','X86_scanNativeBatch','X86_get_insn_id','set_implicit_writes','Mips_getInstruction','Mips_disasm','AArch64_getInstruction','AArch64_disasm','matchAArch64AliasPatterns','matchAliasPatterns','AArch64_LLVM_printInstruction','X86_decodeVexMemoryOrFull','neverd::Decoder::classifyX86Prefix')):
                 symbols[name]=[int(fields[0],16),int(fields[1],16)]
         assert 'cs_disasm_iter' in symbols and any('classifyX86Prefix' in n for n in symbols)
         with binary.open('rb') as file:
@@ -109,13 +114,11 @@ try:
             command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         else:raise AssertionError(('missing shipped alias member',variant))
         assert 'X86PublicOutput.c.o' not in members and 'X86PostPrinter.c.o' not in members
-        if variant=='memory':
-            assert members.index('X86VexBaseMemory.c.o')>members.index('AliasPatternLookup.c.o')
-        else:assert 'X86VexBaseMemory.c.o' not in members
-        if variant=='tail':
-            mask=sp.check_output([t/'vector-generator','--vex-memory-register-mask'])
-            assert mask==(cs/'arch/X86/X86GenVexMemoryRegisterMask.inc').read_bytes()
-            save('row-mask',dict(sha256=hashlib.sha256(mask).hexdigest(),bitmap_bytes=34))
+        owner,=build.rglob('NeverDDecode.dir/Decoder.cpp.o')
+        refs=sp.check_output(['nm','-u',owner],text=True)
+        assert ('X86_disasmOneText' in refs)==(variant=='tail')
+        assert ('X86_disasmIterText' in refs)==(variant!='tail')
+        save('caller-'+variant,dict(source=sha(nd/caller),object=sha(owner),one=variant=='tail',undefined=refs))
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
@@ -142,7 +145,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert len({v['archive'] for v in identities.values()})==3
+    assert identities['memory']['archive']==identities['tail']['archive']!=identities['base']['archive']
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))

@@ -1,91 +1,145 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d36460a3..913578d9 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1094,6 +1094,15 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
-             # Keep the opcode rows after the native scanner when both are linked.
-             set(capstone_alias_patterns_tail
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-+            if(NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE AND CAPSTONE_USE_DEFAULT_ALLOC)
-+                # Keep optional AMD64 memory records after the common alias matcher.
-+                add_library(capstone_x86_vex_memory OBJECT arch/X86/X86VexBaseMemory.c)
-+                target_link_libraries(capstone_x86_vex_memory PRIVATE capstone_build_settings)
-+                target_compile_definitions(capstone_x86_native PRIVATE CAPSTONE_X86_MIXED_VEX_MEMORY)
-+                target_compile_definitions(capstone_x86_vex_memory PRIVATE CAPSTONE_X86_MIXED_VEX_MEMORY)
-+                set_target_properties(capstone_x86_vex_memory PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-+                list(APPEND capstone_alias_patterns_tail $<TARGET_OBJECTS:capstone_x86_vex_memory>)
-+            endif()
-             set(capstone_static_objects
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..946c1e10 100644
+index 62d4288a..e4b180be 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
-@@ -22,6 +22,13 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 			     size_t size, cs_insn *insn, uint16_t *insn_size,
- 			     bool batch);
+@@ -11,6 +11,13 @@
+ #include "X86InstPrinterCommon.h"
+ #include "X86Mapping.h"
  
-+#ifdef CAPSTONE_X86_MIXED_VEX_MEMORY
-+/* The mixed AMD64 iterator supplies a VEX2 or VEX3 prefix. */
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeVexMemoryOrFull(cs_struct *handle, const uint8_t *code, size_t size,
-+			  cs_insn *insn, uint16_t *insn_size, bool batch);
-+#endif
-+
- /* Called by the static AMD64 iterator with at least one input byte. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..b19e0edd 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -200,6 +200,11 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
- 					  x86_simple_registers, true))
- 		return true;
-+#ifdef CAPSTONE_X86_MIXED_VEX_MEMORY
-+	if ((code[0] & 0xfe) == 0xc4)
-+		return X86_decodeVexMemoryOrFull(handle, code, size, insn,
-+						 insn_size, batch);
-+#endif
- 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
- 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
- 		const unsigned offset = 4 + (rex != 0);
-diff --git a/arch/X86/X86VexBaseMemory.c b/arch/X86/X86VexBaseMemory.c
-new file mode 100644
-index 00000000..ffde157e
---- /dev/null
-+++ b/arch/X86/X86VexBaseMemory.c
-@@ -0,0 +1,31 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include "../../cs_priv.h"
-+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_vex_memory_text" rodata = \
-+	".cs_x86_vex_memory_rodata"
-+#endif
-+#include "../../cs_disasm_internal.h"
-+#include "X86OutputOptions.h"
-+#include "X86SimpleOutput.h"
-+#include "X86GenSimpleOutput.inc"
-+#include "X86VexBaseMemory.h"
-+
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeVexMemoryOrFull(cs_struct *handle, const uint8_t *code, size_t size,
-+			  cs_insn *insn, uint16_t *insn_size, bool batch)
++static inline bool X86_matchesTextMode(csh ud, cs_mode mode)
 +{
-+	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-+	if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
-+	    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+	    writeVexBaseMemory(code, size, prefix, insn, insn_size,
-+			       x86_simple_registers[3]))
-+		return true;
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	return handle && handle->arch == CS_ARCH_X86 && handle->mode == mode &&
++	       !handle->no_text;
++}
++
+ /* Called by the static i386 iterator with at least one input byte. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index 246ee26c..bfa24db7 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -56,6 +56,14 @@ bool X86_disasmIter32(csh handle, const uint8_t **code, size_t *size,
+ bool X86_disasmIterText(csh handle, const uint8_t **code, size_t *size,
+ 		      uint64_t *address, cs_insn *insn);
+ 
++/* Decode one text record at an address. Return the number of input bytes
++ * consumed, or zero on failure. Output, errors and callbacks follow the
++ * corresponding iterator, including when a skip exceeds sizeof(insn->bytes). */
++size_t X86_disasmOneText(csh handle, const uint8_t *code, size_t size,
++			 uint64_t address, cs_insn *insn);
++size_t X86_disasmOneText32(csh handle, const uint8_t *code, size_t size,
++			   uint64_t address, cs_insn *insn);
++
+ /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
+  * an installed cs_* API. The callback
+  * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..0644663c 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -267,11 +267,19 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ 					  cs_insn *insn)
+ {
+ #ifdef CS_DECODE_TRY_OUTPUT
+-	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 &&
+-	    handle->mode == CS_MODE_64 && !handle->no_text)
++	if (X86_matchesTextMode(ud, CS_MODE_64))
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
++
++CAPSTONE_INTERNAL size_t X86_disasmOneText(csh ud, const uint8_t *code,
++				    size_t size, uint64_t address, cs_insn *insn)
++{
++#ifdef CS_DECODE_TRY_OUTPUT
++	if (X86_matchesTextMode(ud, CS_MODE_64))
++		return cs_disasm_one_core(ud, code, size, address, insn);
++#endif
++	return X86_disasmOneText32(ud, code, size, address, insn);
++}
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..73e602d3 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -206,11 +206,22 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ 					cs_insn *insn)
+ {
+ #ifdef CS_DECODE_TRY_OUTPUT
+-	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 &&
+-	    handle->mode == CS_MODE_32 && !handle->no_text)
++	if (X86_matchesTextMode(ud, CS_MODE_32))
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
+ #endif
+ 	return X86_disasmIter(ud, code, size, address, insn);
+ }
++
++CAPSTONE_INTERNAL size_t X86_disasmOneText32(csh ud, const uint8_t *code,
++				    size_t size, uint64_t address, cs_insn *insn)
++{
++#ifdef CS_DECODE_TRY_OUTPUT
++	if (X86_matchesTextMode(ud, CS_MODE_32))
++		return cs_disasm_one_core(ud, code, size, address, insn);
++#endif
++	size_t remaining = size;
++	return X86_disasmIter(ud, &code, &remaining, &address, insn) ?
++		       size - remaining :
++		       0;
++}
+ #endif
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..ecd1a8db 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -235,4 +235,18 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+ 	return r;
+ }
+ 
++#ifdef CS_DECODE_TRY_OUTPUT
++/* A single-record caller needs the consumed length, including the exact
++ * skip-data callback result, but does not expose iterator cursors. */
++CS_DECODE_INLINE size_t cs_disasm_one_core(csh ud, const uint8_t *code,
++					   size_t size, uint64_t address,
++					   cs_insn *insn)
++{
++	size_t remaining = size;
++	return cs_disasm_iter_core(ud, &code, &remaining, &address, insn) ?
++		       size - remaining :
++		       0;
 +}
 +#endif
++
+ #endif
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 19e16b16..23f5eb20 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1702,8 +1702,23 @@ done:
+ 	return ok;
+ }
+ 
++static bool one_text_iter(csh h, const uint8_t **code, size_t *size,
++			  uint64_t *address, cs_insn *insn)
++{
++	const size_t consumed = X86_disasmOneText(h, *code, *size, *address, insn);
++	if (!consumed)
++		return false;
++	*code += consumed;
++	*size -= consumed;
++	*address += consumed;
++	return true;
++}
++
+ int main(void)
+ {
++	private_iter = one_text_iter;
++	if (!check_mode(CS_MODE_32) || !check_mode(CS_MODE_64))
++		return 1;
+ 	private_iter = X86_disasmIter32;
+ 	if (!check_mode(CS_MODE_32))
+ 		return 1;
