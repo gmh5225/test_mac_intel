@@ -31,7 +31,7 @@ def main(w):
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=(sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip() if platform.system()=='Darwin' else Path('/proc/cpuinfo').read_text()),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
-    save('entrypoints.json',dict(scan='X86_scanNativeBatch with canonical iterator fallback',format='X86_disasmIterText (both widths; fixed 32-bit reported separately)',detail='X86_disasmIterText (both widths; fixed 32-bit reported separately)',consumer='Public iterator benchmark plus the private static-link text entry called by NeverD; both consume the same output fields'))
+    save('entrypoints.json',dict(scan='X86_scanNativeBatch with canonical iterator fallback',format='X86_disasmIterText (both widths)',detail='X86_disasmIterText (both widths)',consumer='Public iterator benchmark plus the private static-link text entry called by NeverD; both consume the same output fields'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -135,6 +135,11 @@ def main(w):
             generated=sp.check_output([w/'generator'])
             assert generated==(base/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
             save('rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
+        if kind=='bare':
+            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator'],'build-vector-generator-'+key)
+            generated=sp.check_output([w/'vector-generator'])
+            assert generated==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
+            save('vector-rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:

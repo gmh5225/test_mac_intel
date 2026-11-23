@@ -1,7 +1,7 @@
-name: Compare Intel operand-access mapping against both fork iced formatters
+name: Compare single-write vector operands with the released readers and fork iced
 on:
   push:
-    branches: [codex/intel-padded-access-row]
+    branches: [codex/vector-register-and-separator]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8835df03f81c2011e14511446686a6b68eabdd68
+          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 6a8c36481bf169dea633c5fc72069a69e8b67efb
+          ref: 611e77b790a261443a2ba9c805cbfe125a4e72e1
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: intel-operand-access-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-operand-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
