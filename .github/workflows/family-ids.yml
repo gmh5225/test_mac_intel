@@ -1,7 +1,7 @@
-name: Check the verified eight-slot legacy write span on real PE32 and non-x86 traces
+name: Compare selecting the x86 implicit-write source with branching on the register bank
 on:
   push:
-    branches: [codex/i386-write-span-verified]
+    branches: [codex/x86-upper-write-source]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: legacy-x86-write-span-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: selected-write-source-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

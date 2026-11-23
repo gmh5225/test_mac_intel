@@ -1,34 +1,40 @@
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..6235e725 100644
+index 79adee8d..bb4327b4 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10324,13 +10324,26 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10324,13 +10324,31 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  
  			// special cases when regs_write[] depends on arch
  			switch (id) {
 -			default:
 -				memcpy(insn->detail->regs_write,
 -				       insns[i].regs_mod,
-+			default: {
-+				cs_detail *detail = insn->detail;
-+				const unsigned writes = (x86_mapping_counts[i] >> 5) & 31;
-+#ifndef CAPSTONE_X86_REDUCE
-+				if (mode != CS_MODE_64) {
-+					/* Only the full VZERO rows have writes above
-+					 * eight. The generator checks that contract. */
-+					const size_t low = 8 * sizeof(detail->regs_write[0]);
-+					memcpy(detail->regs_write, insns[i].regs_mod, low);
-+					memset(detail->regs_write + 8, 0,
-+					       sizeof(insns[i].regs_mod) - low);
-+					detail->regs_write_count = MIN(writes, 8);
-+					break;
-+				}
-+#endif
-+				memcpy(detail->regs_write, insns[i].regs_mod,
- 				       sizeof(insns[i].regs_mod));
+-				       sizeof(insns[i].regs_mod));
 -				insn->detail->regs_write_count =
 -					((x86_mapping_counts[i] >> 5) & 31);
++			default: {
++				cs_detail *detail = insn->detail;
++				const insn_map_x86 *row = &insns[i];
++				const unsigned writes =
++					(x86_mapping_counts[i] >> 5) & 31;
++#ifndef CAPSTONE_X86_REDUCE
++				/* Only the full VZERO rows have writes beyond
++				 * YMM7. The generator checks the upper bank. */
++				static const uint16_t no_upper[ARR_SIZE(row->regs_mod) - 8];
++				const bool wide = mode == CS_MODE_64;
++				const uint16_t *upper =
++					wide ? row->regs_mod + 8 : no_upper;
++				const unsigned limit = wide ? ARR_SIZE(row->regs_mod) : 8;
++				memcpy(detail->regs_write, row->regs_mod,
++				       8 * sizeof(detail->regs_write[0]));
++				memcpy(detail->regs_write + 8, upper,
++				       sizeof(no_upper));
++				detail->regs_write_count = MIN(writes, limit);
++#else
++				memcpy(detail->regs_write, row->regs_mod,
++				       sizeof(row->regs_mod));
 +				detail->regs_write_count = writes;
++#endif
  				break;
 +			}
  			case X86_RDTSC:
