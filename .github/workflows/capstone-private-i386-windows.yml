@@ -1,7 +1,7 @@
-name: Check RISC-V option transitions and alias records on MSVC Win32 and Win64 and native Macs
+name: Verify dedicated RISC-V full-width printing and scan options in full and DIET Win32 Win64 and native Mac libraries
 on:
   push:
-    branches: [codex/riscv-option-native-ports]
+    branches: [codex/riscv-dedicated-width-ports]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-option-native-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: riscv-dedicated-width-ports-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
