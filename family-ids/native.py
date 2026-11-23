@@ -25,16 +25,25 @@ try:
         assert len(order)==len(obj)>55 and 'XtensaDisassembler.c.o' in order
         if k=='base':base_obj=obj;base_order=order
         else:
-            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86PublicOutput.c.o','X86DisassemblerDecoder.c.o'}
+            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'cs.c.o','X86PublicOutput.c.o','X86DisassemblerDecoder.c.o'}
             assert [n for n in obj if n in base_obj]==base_order
         save('objects-'+k,dict(members=obj,order=order))
+        member=t/('decoder-'+k+'.o')
+        member.write_bytes(sp.check_output(['ar','p',lib,'X86DisassemblerDecoder.c.o']))
+        machine=t/('decoder-'+k+'.bin')
+        cmd('decode-machine-code-'+k,['objcopy','-O','binary','--only-section=.text',member,machine])
+        size=machine.stat().st_size;assert size>5000
+        rel=sp.check_output(['readelf','-Wr',member],text=True)
+        assert ('cs_decode_public_insn' in rel)==(k=='candidate')
+        save('decoder-code-'+k,dict(text_bytes=size,sha256=sha(machine)))
+
         for case,store in [('time',probe_bins),('raw',raw_bins)]:
             exe=t/(case+'-'+k)
             cmd('compile-'+case+'-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/(case+'.cpp'),lib,'-lm','-o',exe]);store[k]=exe
         linked=t/('linked-'+k)
         cmd('link-already-used-'+k,['c++','-std=c++17','-O3','-no-pie','-Wl,-u,X86_disasmIterText','-I',s/'include',d/'time.cpp',lib,'-lm','-o',linked])
         linked_probes[k]=linked.read_bytes()
-        names={'cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','X86_decodePublicRecord','cs_decode_full_insn','X86_scanNativeBatch','AArch64_getInstruction','Mips_getInstruction','RISCV_getInstruction','SystemZ_LLVM_getInstruction','Xtensa_getInstruction'}
+        names={'cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','X86_decodePublicRecord','cs_decode_full_insn','cs_decode_public_insn','X86_scanNativeBatch','AArch64_getInstruction','Mips_getInstruction','RISCV_getInstruction','SystemZ_LLVM_getInstruction','Xtensa_getInstruction'}
         for label,exe in [('public',probe_bins[k]),('linked',linked)]:
             symbols={}
             for line in sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines():
@@ -46,6 +55,36 @@ try:
             save('layout-'+label+'-'+k,symbols)
             cmd('iter-'+label+'-'+k,['objdump','-d','--disassemble=cs_disasm_iter',exe])
         imgs[k]=probe_bins[k].read_bytes();ids[k]=sha(probe_bins[k])
+        if k=='candidate':
+            canonical=t/'canonical-call'
+            cmd('link-call-target',['c++','-std=c++17','-O3','-no-pie','-Wl,--wrap=cs_decode_public_insn,--defsym=__wrap_cs_decode_public_insn=cs_decode_full_insn','-I',s/'include',d/'time.cpp',lib,'-lm','-o',canonical])
+            def alloc_sections(exe):
+                sections={}
+                for line in sp.check_output(['readelf','-SW',exe],text=True).splitlines():
+                    z=re.match(r'^\s*\[\s*\d+\]\s+(\S+)\s+(\S+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)\s+[0-9a-f]+\s+(\S+)\s+',line,re.I)
+                    if z and 'A' in z[6]:
+                        name,kind=z[1],z[2];sections[name]=(kind,int(z[3],16),int(z[4],16),int(z[5],16))
+                assert '.text' in sections and '.rodata' in sections
+                return sections
+            simgs=[x.read_bytes() for x in (canonical,probe_bins[k])]
+            same_call={'base':simgs[0],'candidate':simgs[1]}
+            sx,sy=map(alloc_sections,(canonical,probe_bins[k]))
+            left=load(out/'layout-public-candidate.json')
+            caller,extent=left['cs_disasm_iter'];sections={}
+            for name in sorted(sx.keys()|sy.keys()):
+                if name not in sx or name not in sy:sections[name]=dict(layout_equal=False);continue
+                x,y=sx[name],sy[name];layout=x[:2]+x[3:]==y[:2]+y[3:];area=dict(layout_equal=layout);sections[name]=area
+                if not layout or x[0]=='NOBITS':continue
+                a=simgs[0][x[2]:x[2]+x[3]];bdata=simgs[1][y[2]:y[2]+y[3]]
+                area['bytes']=x[3];area['different_bytes']=0
+                if a!=bdata:
+                    indices=[i for i,(a1,b1)in enumerate(zip(a,bdata))if a1!=b1]
+                    area.update(different_bytes=len(indices),first_addresses=[x[1]+i for i in indices[:16]],all_within_iterator=all(caller<=x[1]+i<caller+extent for i in indices))
+            exact=all(a['layout_equal'] for a in sections.values()) and all(not a.get('different_bytes')for name,a in sections.items() if name not in ('.text','.note.gnu.build-id')) and sections['.text'].get('all_within_iterator',False)
+            symbols=sp.check_output(['nm','-n',canonical],text=True).splitlines()
+            selected={v[-1]:int(v[0],16) for line in symbols if len(v:=line.split())==3 and v[-1] in ('__wrap_cs_decode_public_insn','cs_decode_full_insn')}
+            assert len(selected)==2 and len(set(selected.values()))==1
+            save('call-target-image',dict(same_layout_and_only_iterator_changed=exact,sections=sections,caller=[caller,extent],canonical=selected,public_entry=left['cs_decode_public_insn'],sha256=[hashlib.sha256(img).hexdigest()for img in simgs]))
         so=t/(k+'.so')
         cmd('loadable-'+k,[cc,'-shared','-Wl,-Bsymbolic','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',so]);libs[k]=so
     assert ids['base']!=ids['candidate']
@@ -99,21 +138,22 @@ try:
                     assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
                 rows_.append(cyc)
             rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
-    linked_probes['copy']=linked_probes['base'];size=max(map(len,linked_probes.values()))
-    imgs={k:raw+bytes(size-len(raw))for k,raw in linked_probes.items()}
-    probe_rows=[]
-    for name,arch,path,ip,modes in panels:
-        for mode in modes:
-            if (name,mode) not in {('putty32',0),('putty32',1),('putty32',2),('putty64',0),('putty64',1),('putty64',2),('libmvec-amd64',1),('libmvec-amd64',2),('arm64-ls',1),('riscv64-ls',1),('mips64el-ls',2),('ppc64el-ls',0)}:continue
-            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(55e6/one[0]));cycles=[]
-            for _ in range(13):
-                order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
-                for k in order+order[::-1]:
-                    v=invoke(k,arch,mode,path,ip,n);assert v[2]==one[2];cyc[k].append(v[0])
-                cycles.append(cyc)
-            probe_rows.append(dict(case=name,mode=mode,cycles=cycles,reps=n))
-    assert len(probe_rows)==12
-    save('linked-readers',probe_rows)
+    for label,probes in [('linked-readers',linked_probes),('call-target',same_call)]:
+        probes['copy']=probes['base'];size=max(map(len,probes.values()))
+        imgs={k:raw+bytes(size-len(raw))for k,raw in probes.items()}
+        probe_rows=[]
+        for name,arch,path,ip,modes in panels:
+            for mode in modes:
+                if (name,mode) not in {('putty32',0),('putty32',1),('putty32',2),('putty64',0),('putty64',1),('putty64',2),('libmvec-amd64',1),('libmvec-amd64',2),('arm64-ls',1),('riscv64-ls',1),('mips64el-ls',2),('ppc64el-ls',0)}:continue
+                one=invoke('base',arch,mode,path,ip,1);n=max(1,round(55e6/one[0]));cycles=[]
+                for _ in range(13):
+                    order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
+                    for k in order+order[::-1]:
+                        v=invoke(k,arch,mode,path,ip,n);assert v[2]==one[2];cyc[k].append(v[0])
+                    cycles.append(cyc)
+                probe_rows.append(dict(case=name,mode=mode,cycles=cycles,reps=n))
+        assert len(probe_rows)==12
+        save(label,probe_rows)
     save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
 finally:
     count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))

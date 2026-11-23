@@ -1,7 +1,7 @@
-name: Measure mixed public and already linked fixed readers from the same architecture check
+name: Compare x86 public output with an unchanged scan call site across ten real architectures
 on:
   push:
-    branches: [codex/shared-public-architecture-test]
+    branches: [codex/public-full-record-scan-code]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mixed-public-arch-check-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-full-record-call-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

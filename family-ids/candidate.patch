@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6f3ff5f..0bf125e8 100644
+index d6f3ff5f..6d381c10 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1070,7 +1070,13 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
@@ -11,14 +11,14 @@ index d6f3ff5f..0bf125e8 100644
 +       (CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
 +        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE AND CAPSTONE_USE_DEFAULT_ALLOC))
 +        if(NOT capstone_enabled_architectures STREQUAL "X86")
-+            set_property(SOURCE arch/X86/X86DisassemblerDecoder.c arch/X86/X86PublicOutput.c
++            set_property(SOURCE cs.c arch/X86/X86DisassemblerDecoder.c arch/X86/X86PublicOutput.c
 +                APPEND PROPERTY COMPILE_DEFINITIONS CAPSTONE_X86_LINKED_PUBLIC_RECORD)
 +        endif()
          target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
          set(capstone_x86_objects
              $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
 diff --git a/Makefile b/Makefile
-index 8118f71d..b607ca9b 100644
+index 8118f71d..22f992fb 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -289,6 +289,9 @@ endif
@@ -27,7 +27,7 @@ index 8118f71d..b607ca9b 100644
  	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
 +else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_USE_SYS_DYN_MEM):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:yes:no:no)
 +	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
-+$(OBJDIR)/arch/X86/X86DisassemblerDecoder.o $(OBJDIR)/arch/X86/X86PublicOutput.o: CFLAGS += -DCAPSTONE_X86_LINKED_PUBLIC_RECORD
++$(OBJDIR)/cs.o $(OBJDIR)/arch/X86/X86DisassemblerDecoder.o $(OBJDIR)/arch/X86/X86PublicOutput.o: CFLAGS += -DCAPSTONE_X86_LINKED_PUBLIC_RECORD
  endif
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
@@ -45,21 +45,110 @@ index 8d827a97..06459c42 100644
  	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
  	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
  	!defined(_WIN32_WCE)
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..ae18aa12 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,7 +3753,9 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && defined(CAPSTONE_X86_LINKED_PUBLIC_RECORD)
++#define CS_DECODE_OUTPUT_MISS cs_decode_public_insn
++#elif defined(CAPSTONE_X86_PUBLIC_OUTPUT)
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+diff --git a/cs.c b/cs.c
+index 0a820fbe..be1b66ce 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1046,7 +1046,13 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+-#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && defined(CAPSTONE_X86_LINKED_PUBLIC_RECORD)
++CS_DECODE_INLINE bool decode_full_record(cs_struct *handle, const uint8_t *code,
++					size_t size, cs_insn *insn,
++					uint16_t *insn_size, bool batch,
++					bool public_reader)
++{
++#elif defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+@@ -1077,9 +1083,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && defined(CAPSTONE_X86_LINKED_PUBLIC_RECORD)
++		/* The fixed reader already tried its own public record. Its
++		 * misses enter the canonical decoder through the other entry. */
++		if (public_reader)
++			return X86_decodePublicRecord(handle, code, size, insn,
++						      insn_size, batch);
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+@@ -1180,6 +1193,37 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	return true;
+ }
+ 
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && defined(CAPSTONE_X86_LINKED_PUBLIC_RECORD)
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_full_record(handle, code, size, insn, insn_size, batch, false);
++}
++
++/* Mixed static builds keep the scan loop intact. Only its ordinary
++ * full-record call selects the public x86 formatter. */
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_public_full_text")))
++#endif
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++CS_PRESERVE_MOST bool
++cs_decode_public_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_full_record(handle, code, size, insn, insn_size, batch, true);
++}
++#endif
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b0f4a6ce..adb6ae03 100644
+index b0f4a6ce..43a7bbc1 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -155,6 +155,13 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 				  uint16_t *insn_size, bool scan, bool batch)
- {
- #ifdef CAPSTONE_HAS_X86
-+#if defined(CS_DECODE_SCAN_IMPL) && defined(CAPSTONE_X86_LINKED_PUBLIC_RECORD) && \
-+	defined(CAPSTONE_X86_PUBLIC_OUTPUT)
-+	/* Both x86 scan and text use the architecture test. Foreign records
-+	 * can enter their ordinary decoder directly from this call site. */
-+	if (handle->arch != CS_ARCH_X86)
-+		return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+@@ -23,6 +23,11 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ #endif
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && defined(CAPSTONE_X86_LINKED_PUBLIC_RECORD)
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++cs_decode_public_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch);
 +#endif
- 	if (CS_DECODE_LIKELY(scan)) {
- #ifdef CS_DECODE_SCAN_IMPL
- 		return CS_DECODE_SCAN_IMPL(handle, code, size, insn, insn_size,
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
