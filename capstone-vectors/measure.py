@@ -148,20 +148,35 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (0,1,2):
-            def timed(label,count):
-                key='official'if label=='official'else 'project'
-                engine={'iced':'iced____','fast':'fast____','public':'capstone'}.get(label,'x86_len_' if mode else 'vecbatch')
-                return list(map(int,sp.check_output([bins[key],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('project',1)[0])));cycles=[]
-            labels=['official','project','copy','public','iced']+(['fast']if mode else [])
-            for idx in range(13):
-                labels=labels[1:]+labels[:1];obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','public')})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k in ('public','project')})==1
-                cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
+        block_input=r/(name+'-blocks.tsv');assert sha(block_input)==m['blocks'][name]['block_sha256']
+        block_rows=[tuple(map(int,x.split()))for x in block_input.read_text().splitlines()]
+        import bisect
+        ordered=sorted(selected)
+        for start,length,ip,misses in block_rows:
+            # Original functions can overlap or share identical beginning offsets.
+            pos=bisect.bisect_right(ordered,[start,1<<60,1<<64])-1
+            assert any(a<=start and start+length<=a+b and pc+start-a==ip for a,b,pc in ordered[max(0,pos-16):pos+1]),(name,start,length,ip)
+        for bucket in range(3):
+            series=[v for v in block_rows if (0 if v[3]==0 else 1 if v[3]<5 else 2)==bucket]
+            assert len(series)==m['blocks'][name]['bins'][str(bucket)]
+            if not series:continue
+            emit([v[:3] for v in series])
+            for mode in (1,2):
+                def timed(label,count):
+                    engine={'iced':'iced____','fast':'fast____','public':'capstone'}.get(label,'x86_len_')
+                    return list(map(int,sp.check_output([bins['project'],engine,str(mode),str(count),f,intervals,str(bits)]).split()))
+                initial=timed('project',1);assert initial[2]==64*len(series) and initial[3]==0
+                rep=max(1,math.ceil(50e6/max(1,initial[0])));cycles=[]
+                import random
+                rng=random.Random(str((name,bucket,mode)))
+                for idx in range(13):
+                    labels=['project','copy','public','iced','fast'];rng.shuffle(labels)
+                    obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
+                    assert len({tuple(v[2:5])for k,v in obs})==1 and len({tuple(v[2:])for k,v in obs if k in ('project','copy','public')})==1
+                    cycles.append(dict(raw=obs))
+                results.append(dict(case=name,bucket=bucket,mode=mode,bits=bits,original_extent=expected['extent_sha256'],extent_sha256=sha(intervals),blocks=len(series),generic=sum(v[3]for v in series),decoded=initial[2],rep=rep,cycles=cycles))
+                save('timings.json',results)
+    assert len(results)==2*sum(sum(v!=0 for v in z['bins'].values())for z in m['blocks'].values())
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
