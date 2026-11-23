@@ -27,6 +27,9 @@ def main(w):
     ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
     src=src.replace('InstructionInfoFactory, IntelFormatter,','InstructionInfoFactory, IntelFormatter, FastFormatter,').replace('    formatter: IntelFormatter,','    formatter: IntelFormatter,\n    fast: FastFormatter,\n    fast_enabled: bool,').replace('        mode,','        mode: mode & 3,\n        fast_enabled: mode & 8 != 0,\n        fast: FastFormatter::new(),')
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
+    src='extern "C" { fn profile_instruction(ptr: *const u8); }\n'+src
+    marker='let offset = decoder.position();';assert src.count(marker)==1
+    src=src.replace(marker,marker+'\n            profile_instruction(input.add(offset));')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=(sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip() if platform.system()=='Darwin' else Path('/proc/cpuinfo').read_text()),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
@@ -88,6 +91,9 @@ def main(w):
     inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
     inc=once(inc,'else if(engine=="x86_len_" && bits==32)', 'else if(engine=="x86_all_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode); else if(engine=="x86_len_" && bits==32)')
     inc=once(inc,'engine!="x86_len_" &&','engine!="x86_all_" && engine!="x86_len_" &&')
+    inc=(r/'collect-region.h').read_text()+'\n'+inc
+    inc=once(inc,'size_t offset = cursor - bytes;', 'size_t offset = cursor - bytes; profile_instruction(cursor);')
+    inc=once(inc,'Result timed=run(reps);','profile_begin(bytes.data()); Result timed=run(reps); profile_end();')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={};objects={};base_orders={}
@@ -120,44 +126,11 @@ def main(w):
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access','text_option']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
-        db=json.loads((build/'compile_commands.json').read_text())
-        run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'records.cpp',lib,'-o',w/'targets'],'link-targets-'+key)
-        run([w/'targets'],'targets-'+key)
-        current=(evidence/('targets-'+key+'.log')).read_text().splitlines()
-        assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
-        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'build-dispatch-guard-'+key)
-        run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='882784'
-        if kind=='bare':
-            ref=('mixed_' if mixed else '')+'base'
-            assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
-        if kind=='bare':
-            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator'],'build-generator-'+key)
-            generated=sp.check_output([w/'generator'])
-            assert generated==(base/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
-            save('rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
-        if kind=='bare':
-            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator'],'build-vector-generator-'+key)
-            generated=sp.check_output([w/'vector-generator'])
-            assert generated==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
-            save('vector-rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
-        if not mixed :
-            run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
-        else:
-            for name in units:
-                run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',base/('tests/unit/'+name+'.c'),lib,'-lm','-o',w/name],'link-'+name+'-'+key)
-                run([w/name],'unit-'+name+'-'+key)
-        members=[v for v in sp.check_output(['ar','t',lib],text=True).splitlines() if v and not v.startswith('__.SYMDEF')]
-        objects[key]={p.name:sha(p) for p in build.rglob('*.c.o') if '/tests/' not in str(p)}
-        assert set(members)==set(objects[key]) and len(members)==len(set(members))
-        earlier=['X86PublicOutput.c.o','X86BatchScan.c.o']
-        orig='mixed_base' if mixed else 'base'
-        if key==orig:base_orders[orig]=members
-        expected=base_orders[orig]
-        assert members==expected
-        changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='bare':
-            assert changed==['X86VectorOutput.c.o'],(key,changed)
-        save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
+        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'cohorts.cpp',lib,'-o',w/'cohorts'],'build-cohorts')
+        run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'build-verify-vectors')
+        members=sp.check_output(['ar','t',lib],text=True).splitlines()
+        assert len(members)>=49 and 'X86VectorOutput.c.o' in members
+        save('archive.json',dict(members=members,sha256=sha(lib)))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
@@ -175,32 +148,12 @@ def main(w):
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
-    import random
-    images={k:v.read_bytes() for k,v in bins.items()}
-    hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    image=w/'timed-runner'
-    n=max(map(len,images.values()))
-    padded={k:v+bytes(n-len(v)) for k,v in images.items()}
-    active=None
-    if not darwin:
-        run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
-        image.write_bytes(padded['base']);image.chmod(0o755)
-        active=hashes['base']
-    save('launch.json',dict(linked=hashes,same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
-    def invoke(key,tail):
-        nonlocal active
-        if darwin:
-            return sp.check_output([image,*tail],executable=bins[key])
-        if active!=hashes[key]:
-            with image.open('r+b')as out:assert out.write(padded[key])==n
-            active=hashes[key]
-        return sp.check_output(['setarch',platform.machine(),'-R',image,*tail])
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
     glibc=json.loads((w/'libmvec.json').read_text());extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
     results=[]
-    for name,bits,f,spans,source in itertools.chain(extra,pe_panels.prepare(w),frozen_deb.prepare(w)):
+    for name,bits,f,spans,source in itertools.chain(extra,pe_panels.prepare(w)):
         if name not in m['samples']:continue
         expected=m['provenance'][name];assert sha(f)==expected['text_sha256']
         intervals=w/(name+'.tsv');emit=lambda rows:intervals.write_text(''.join('%d %d %d\n'%tuple(a)for a in rows))
@@ -212,28 +165,18 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (0,1,2):
-            targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
-            for k in trees:
-                targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
-                targets['public_'+k]=(k,'capstone')
-                if bits==32 and mode:targets['width_'+k]=(k,'x86_len_')
-            def timed(label,count):
-                key,engine=targets[label]
-                return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'product-text-width-selection')))
-            for idx in range(13):
-                order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1
-                for kind in ('public_','private_'):
-                    assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
-                cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
-    save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
+        from profiles import measure
+        tags=w/(name+'.tags')
+        counts=list(map(int,sp.check_output([w/'cohorts',str(bits),f,intervals,tags]).split()))
+        assert len(counts)==8 and tags.stat().st_size==9*sum(counts)
+        modes={}
+        for mode in (1,2):
+            modes[mode]=measure(bins['mixed_base'],mode,bits,f,intervals,tags,counts,w,evidence,name)
+        results.append((name,dict(input=sha(f),extent=sha(intervals),counts=counts,mask=sha(tags),modes=modes)))
+        save('regions.json',dict(results))
+        tags.unlink()
+    assert len(results)==2
+    save('complete.json',dict(done=True,source=m,iced=iced,cases=len(results)))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
     if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

@@ -1,7 +1,7 @@
-name: Compare local vector register names across PE and ELF readers and fork iced
+name: Attribute Capstone and iced FastFormatter work to identical real PE32 and SIMD operands
 on:
   push:
-    branches: [codex/vector-register-names-one-writer]
+    branches: [codex/x86-real-formatter-work-by-operands]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -42,6 +40,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          command -v valgrind >/dev/null || (sudo apt-get -qq update && sudo apt-get -y -qq install valgrind)
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -50,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-register-table-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: opcode-cost-cohorts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
