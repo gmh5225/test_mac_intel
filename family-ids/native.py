@@ -9,8 +9,7 @@ def cmd(n,a,cwd=None):
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';base_meta=load(d/'base-tree.json');assert g('rev-parse','HEAD')==base_meta['parent'] and base_meta['commit']==meta['parent']
-base_patch=d/'base.patch';assert sha(base_patch)==base_meta['sha256'];g('apply','--index',str(base_patch));baseline=g('write-tree');assert baseline==base_meta['tree']
+t=Path(tempfile.mkdtemp());b=t/'build';assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}')
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
