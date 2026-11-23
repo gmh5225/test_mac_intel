@@ -1,7 +1,7 @@
-name: Verify mixed masked formatting and unchanged dedicated public archives and consumers
+name: Verify dedicated i386 address writers and byte-identical mixed archives and readers
 on:
   push:
-    branches: [codex/qualify-private-masked-records]
+    branches: [codex/dedicated-i386-sib-object-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
+          ref: aa095ef5688bfc49b8ba0c5e5a7648faa7ed6877
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 8e00638c3faf294907b6118313ce068d77de1a43
+          ref: e93da2b1d89e79cb9b884b4844d7b7695e597af9
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: private-masked-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: dedicated-i386-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

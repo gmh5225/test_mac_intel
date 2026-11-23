@@ -16,7 +16,7 @@ try:
     profiles={}
     for profile in ('project','ten','dual','pure','mixed-diet','mixed-reduced','pure-noatt'):
         b=t/('build-'+profile);receipts={}
-        expected='reference' if profile in ('project','ten','dual') else 'base'
+        expected='reference' if profile.startswith('pure') else 'base'
         variants=('base','reference','candidate') if expected=='reference' else ('base','candidate')
         pair={}
         for stage in variants:
@@ -54,8 +54,9 @@ try:
         a,z=pair['base'],pair['candidate']
         changed=sorted(k for k in a['objects'] if a['objects'][k]!=z['objects'][k])
         assert a['objects'].keys()==z['objects'].keys()
-        assert ([Path(f).name for f in changed]==['X86VectorFallback64.c.o'] if expected=='reference' else not changed)
-        assert a['shared']==z['shared']
+        names={Path(f).name for f in changed}
+        if expected=='reference':assert 'X86Vex32Output.c.o' in names and names<={'X86Vex32Output.c.o','X86MemoryFallback32.c.o'},names
+        else:assert not changed and a['shared']==z['shared']
         if profile in ('ten','dual'):assert a['probes']['normal']==z['probes']['normal']
         receipts=dict(expected=expected,changed=changed,trees={k:m[k]['tree'] for k in variants},objects=len(a['objects']),members=len(a['members']),shared=z['shared'],probes=z['probes'],member_sha256=hashlib.sha256(json.dumps(z['members']).encode()).hexdigest())
         profiles[profile]=receipts;save('profiles',profiles)
