@@ -1,7 +1,7 @@
-name: Time all three x86 entrypoints in one image at verified instruction addresses on four CPU profiles
+name: Compare shared x86 scalar output in public array and iterator APIs on real x86 MIPS and ARM64 files
 on:
   push:
-    branches: [codex/x86-addressed-single-record-consumers]
+    branches: [codex/x86-public-array-scalar-readers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -16,7 +16,7 @@ jobs:
           - { host: macos-15, cc: clang, flavor: first }
           - { host: macos-15-intel, cc: clang, flavor: first }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 55
+    timeout-minutes: 95
     env:
       CC: ${{ matrix.cc }}
       FLAVOR: ${{ matrix.flavor }}
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: decode-record-at-address-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-array-scalar-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

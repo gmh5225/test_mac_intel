@@ -1,0 +1,75 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..5f7682dd 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,12 +30,21 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
+ 
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
+-	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
+ #endif
++#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
++#include "../../cs_priv.h"
++/* Dedicated Linux builds already try this writer in the common decoder. */
++#define CAPSTONE_X86_BULK_OUTPUT
++CAPSTONE_INTERNAL bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code,
++					size_t size, cs_insn *insn,
++					uint16_t *insn_size);
++#endif
++#endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..07fa8e88 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -15,6 +15,16 @@
+ 
+ #include "X86SimpleOutputImpl.h"
+ 
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size)
++{
++	/* A custom detail allocator may change the option mid-record. */
++	return (!insn->detail || handle->detail_opt) &&
++	       X86_trySimpleOutput(handle, code, size, insn, insn_size);
++}
++#endif
++
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+ #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
+ #endif
+diff --git a/cs.c b/cs.c
+index ede7c2aa..8e01681f 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1625,8 +1625,17 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+ 		insn_cache->op_str[0] = '\0';
+ #endif
+ 
+-		r = decode_insn(handle, buffer, size, insn_cache, &insn_size,
+-				scan, true);
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++		/* Fast writers commit only complete instructions. The array
++		 * decoder retains its skip-data callback and VCMP policy. */
++		if (!scan && handle->arch == CS_ARCH_X86 &&
++		    X86_tryBulkOutput(handle, buffer, size, insn_cache,
++				      &insn_size))
++			r = true;
++		else
++#endif
++			r = decode_insn(handle, buffer, size, insn_cache,
++					&insn_size, scan, true);
+ 		if (CS_DECODE_LIKELY(r)) {
+ 			next_offset = insn_size;
+ 		} else {
