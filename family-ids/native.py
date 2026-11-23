@@ -35,6 +35,8 @@ try:
                 assert modes in (1,2) and trials==57344*modes and accepted>0
             if profile=='pure':
                 images[k]=so.read_bytes()
+                for symbol in ('SystemZ_getInstruction','SystemZ_set_instr_map_data','SystemZ_init_cs_detail'):
+                    cmd('code-'+k+'-'+symbol,['objdump','-dr','--disassemble='+symbol,so])
                 flags=['-DNDEBUG','-O2','-DCAPSTONE_HAS_SYSTEMZ','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include']
                 cmd('spans-build-'+k,[cc,*flags,d/'spans.c',b/'libcapstone.a','-o',t/'spans'])
                 assert int(sp.check_output([t/'spans']))==30880

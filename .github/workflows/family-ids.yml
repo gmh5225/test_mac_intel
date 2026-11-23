@@ -1,7 +1,7 @@
-name: Measure SystemZ empty and single-register effects on four real s390x programs
+name: Measure SystemZ detail initialization after LLVM decoding across four s390x programs
 on:
   push:
-    branches: [codex/systemz-sparse-register-effects]
+    branches: [codex/systemz-detail-after-decoding]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-effect-shapes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-postdecode-details-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
