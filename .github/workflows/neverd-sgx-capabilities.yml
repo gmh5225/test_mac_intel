@@ -113,6 +113,13 @@ jobs:
           python neverd-sgx-capabilities/prepare_neverc.py --source NeverC --compiler NeverC/build-portable/bin/neverc --output compiler-check
           mkdir -p software-evidence
           cp compiler-check/compiler.json software-evidence/
+      - name: Retain the verified portable x64 compiler
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neverc-portable-linux-x64
+          path: NeverC/build-portable/bin/neverc
+          if-no-files-found: error
+          retention-days: 2
       - name: Configure with the LLVM release pinned by NeverD
         working-directory: NeverD
         run: |
