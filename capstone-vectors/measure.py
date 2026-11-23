@@ -149,7 +149,7 @@ def main(w):
             run(['clang++','-std=c++17','-O2','-I',base/'include',r/'pp-oracle.cpp',w/'pp-oracle.o',lib,'-o',w/'pp-oracle'],'oracle-link-'+key)
             run([w/'pp-oracle'],'oracle-'+key)
             checks=list(map(int,(evidence/('oracle-'+key+'.log')).read_text().split()))
-            assert checks==[33030160,0,290330,29952,252890,0,7488] if kind=='bare' else checks==[33030160,0,249722,0,249722,0,0]
+            assert checks==checks==[33030160,0,249722,0,249722,0,0]
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -166,7 +166,13 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed==([] if mixed else ['X86VectorFallback64.c.o']),(key,changed)
+            assert changed==['X86Mapping.c.o'],(key,changed)
+        mapper,=build.rglob('X86Mapping.c.o')
+        disasm=(sp.check_output(['otool','-tvV',mapper],text=True) if darwin else sp.check_output(['objdump','-d','--disassemble=find_insn',mapper],text=True))
+        if darwin:
+            start=disasm.index('_find_insn:\n');disasm=disasm[start:].split('\n_',1)[0]
+        else:assert '<find_insn>:' in disasm
+        (evidence/('find-'+key+'.s')).write_text(disasm+'\n')
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
@@ -188,7 +194,7 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    assert hashes['mixed_base']==hashes['mixed_bare'] and hashes['base']!=hashes['bare']
+    assert hashes['mixed_base']!=hashes['mixed_bare'] and hashes['base']!=hashes['bare']
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}

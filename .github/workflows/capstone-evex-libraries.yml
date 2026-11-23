@@ -1,7 +1,7 @@
-name: Verify mandatory-prefix memory records against fork iced and the released PE32 reader
+name: Compare ordinal x86 mapping in complete and NeverD profiles on PE32 PE64 and ELF
 on:
   push:
-    branches: [codex/fused-vex-prefix-memory]
+    branches: [codex/ordinal-x86-instruction-lookup]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mandatory-prefix-vex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ordinal-x86-lookup-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
