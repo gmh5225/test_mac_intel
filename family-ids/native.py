@@ -46,7 +46,15 @@ try:
     for k in q:
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
         snapshot['options']=json.loads(get(*args,'options'))
-        snapshot['foreign']=json.loads(get(*args,'foreign'));assert snapshot['foreign']['records']>900000 and snapshot['foreign']['accepted']>0
+        dest=t/(k+'-foreign.json')
+        with (t/'foreign-output').open('wb')as log:sp.run([*args,'foreign',dest],check=True,stdout=log)
+        messages=(t/'foreign-output').read_bytes().splitlines()
+        from collections import Counter
+        observed=Counter(a.decode()for a in messages)
+        snapshot['foreign']=rd(dest)
+        snapshot['foreign']['diagnostics']=dict(observed)
+        assert snapshot['foreign']['records']==917504 and snapshot['foreign']['accepted']>0
+        if k!=next(iter(q)):assert snapshot['foreign']==verify[next(iter(q))]['foreign']
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
     if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

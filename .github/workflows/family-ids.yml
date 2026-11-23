@@ -1,7 +1,7 @@
-name: Measure MIPS mode selection and private output splitting alongside x86 record writers
+name: Verify mixed record splitting and option-selected MIPS scans with separate raw records and diagnostics
 on:
   push:
-    branches: [codex/mixed-mips-scan-and-public-split]
+    branches: [codex/mixed-record-split-raw-matrix]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mixed-record-split-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mixed-split-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

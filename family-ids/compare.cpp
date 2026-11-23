@@ -230,7 +230,7 @@ static int single(char **argv) {
   return 0;
 }
 
-static void foreignRecords(Api &left, Api &right) {
+static void foreignRecords(Api &left, Api &right, const char *record) {
   const cs_mode mips_modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64, CS_MODE_MIPS16,
     CS_MODE_MICRO32R3, CS_MODE_MIPS32R2, CS_MODE_MIPS32R6, CS_MODE_MIPS64R6 };
   uint64_t count=0, accepted=0;
@@ -264,8 +264,7 @@ static void foreignRecords(Api &left, Api &right) {
                 std::memset(v+i,0xa5,sizeof(cs_insn));std::memset(d+i,0xa5,sizeof(cs_detail));
                 v[i].is_alias=v[i].usesAliasDetails=v[i].illegal=false;v[i].detail=detail?d+i:nullptr;
                 valid[i]=s.api.next(s.h,p+i,left_sz+i,ip+i,v+i);
-                bool same_presence=!!v[i].detail==!!(i?v[0].detail:(detail?d:nullptr));
-                if(i)check(same_presence,"foreign detail presence");
+                if(i)check(!!v[i].detail==!!v[0].detail,"foreign detail presence");
               }
               v[0].detail=v[1].detail=nullptr;
               if(valid[0]!=valid[1]||ip[0]!=ip[1]||p[0]!=p[1]||left_sz[0]!=left_sz[1]||
@@ -281,14 +280,16 @@ static void foreignRecords(Api &left, Api &right) {
       }
     }
   }
-  std::printf("{\"records\":%" PRIu64 ",\"accepted\":%" PRIu64 "}\n",count,accepted);
+  std::ofstream out(record);
+  out << "{\"records\":" << count << ",\"accepted\":" << accepted << "}\n";
+  check(bool(out),"foreign results file");
 }
 
 int main(int argc,char **argv) {
   if(argc==9 && std::string(argv[2])=="single")return single(argv);
   if(argc<4)return 2;
   Api a(argv[1]),b(argv[2]);check(a.disasm!=b.disasm,"distinct array decoders");
-  std::string op=argv[3];if(op=="foreign"){foreignRecords(a,b);return 0;}if(op=="options"){options(a,b);return 0;}
+  std::string op=argv[3];if(op=="foreign"){check(argc==5,"foreign results argument");foreignRecords(a,b,argv[4]);return 0;}if(op=="options"){options(a,b);return 0;}
   if(argc<7)return 2;
   std::ifstream f(argv[4],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};check(!bytes.empty(),"input");
   std::string target=argv[5];uint64_t ip=std::strtoull(argv[6],nullptr,10);
