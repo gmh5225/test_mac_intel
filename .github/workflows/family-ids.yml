@@ -1,7 +1,7 @@
-name: Validate short x86 implicit write lists and the legacy vector bank in real programs
+name: Measure compact x86 mapping rows with eight legacy and sixteen long-mode vector writes
 on:
   push:
-    branches: [codex/short-x86-implicit-writes]
+    branches: [codex/compact-x86-mode-writes]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: bounded-x86-writes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: compact-x86-mode-writes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

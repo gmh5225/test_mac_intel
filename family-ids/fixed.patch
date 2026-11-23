@@ -1,63 +1,144 @@
+diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
+index ea9309f4..de20a05a 100644
+--- a/arch/X86/X86GenMappingCounts.inc
++++ b/arch/X86/X86GenMappingCounts.inc
+@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
+ 	0, // X86_VXORPSZrrkz
+ 	2048, // X86_VXORPSrm
+ 	2048, // X86_VXORPSrr
+-	1536, // X86_VZEROALL
+-	1536, // X86_VZEROUPPER
++	17664, // X86_VZEROALL
++	17664, // X86_VZEROUPPER
+ 	1024, // X86_WAIT
+ 	1024, // X86_WBINVD
+ 	0, // X86_WBNOINVD
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..9b2a7cdf 100644
+index 79adee8d..96990a8f 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10324,13 +10324,31 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10298,6 +10298,17 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ #include "X86GenMappingCounts.inc"
+ #endif
  
++#ifndef CAPSTONE_DIET
++static inline void copy_implicit_writes(cs_detail *detail, const insn_map_x86 *row)
++{
++	/* The public mapper replaces the first twenty slots even if the caller
++	 * reuses nonzero detail storage. The compact row supplies the first twelve. */
++	memcpy(detail->regs_write, row->regs_mod, sizeof(row->regs_mod));
++	memset(detail->regs_write + ARR_SIZE(row->regs_mod), 0,
++	       (20 - ARR_SIZE(row->regs_mod)) * sizeof(detail->regs_write[0]));
++}
++#endif
++
+ // given internal insn id, return public instruction info
+ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ {
+@@ -10325,17 +10336,13 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			// special cases when regs_write[] depends on arch
  			switch (id) {
--			default:
+ 			default:
 -				memcpy(insn->detail->regs_write,
 -				       insns[i].regs_mod,
 -				       sizeof(insns[i].regs_mod));
--				insn->detail->regs_write_count =
--					((x86_mapping_counts[i] >> 5) & 31);
-+			default: {
-+				uint16_t *writes = insn->detail->regs_write;
-+				const size_t bytes = sizeof(insns[i].regs_mod);
-+				const unsigned count =
-+					(x86_mapping_counts[i] >> 5) & 31;
-+				insn->detail->regs_write_count = count;
-+				if (count <= 1) {
-+					/* Short lists have zero padding in the mapping. */
-+					writes[0] = insns[i].regs_mod[0];
-+					memset(writes + 1, 0, bytes - sizeof(*writes));
-+					break;
-+				}
-+#ifndef CAPSTONE_X86_REDUCE
-+				if (mode != CS_MODE_64 &&
-+				    (id == X86_VZEROALL || id == X86_VZEROUPPER)) {
-+					/* Only YMM0 through YMM7 are available. */
-+					memcpy(writes, insns[i].regs_mod, 8 * sizeof(*writes));
-+					memset(writes + 8, 0, bytes - 8 * sizeof(*writes));
-+					insn->detail->regs_write_count = 8;
-+					break;
-+				}
-+#endif
-+				memcpy(writes, insns[i].regs_mod, bytes);
++				copy_implicit_writes(insn->detail, &insns[i]);
+ 				insn->detail->regs_write_count =
+ 					((x86_mapping_counts[i] >> 5) & 31);
  				break;
-+			}
  			case X86_RDTSC:
  				if (mode == CS_MODE_64) {
- 					memcpy(insn->detail->regs_write,
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
++					copy_implicit_writes(insn->detail, &insns[i]);
+ 					insn->detail->regs_write_count =
+ 						((x86_mapping_counts[i] >> 5) &
+ 						 31);
+@@ -10349,9 +10356,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 				break;
+ 			case X86_RDTSCP:
+ 				if (mode == CS_MODE_64) {
+-					memcpy(insn->detail->regs_write,
+-					       insns[i].regs_mod,
+-					       sizeof(insns[i].regs_mod));
++					copy_implicit_writes(insn->detail, &insns[i]);
+ 					insn->detail->regs_write_count =
+ 						((x86_mapping_counts[i] >> 5) &
+ 						 31);
+@@ -10374,6 +10379,20 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			switch (insn->id) {
+ 			default:
+ 				break;
++			case X86_INS_VZEROALL:
++			case X86_INS_VZEROUPPER:
++				if (mode == CS_MODE_64) {
++					static const uint16_t upper[] = {
++						X86_REG_YMM8, X86_REG_YMM9,
++						X86_REG_YMM10, X86_REG_YMM11,
++						X86_REG_YMM12, X86_REG_YMM13,
++						X86_REG_YMM14, X86_REG_YMM15,
++					};
++					memcpy(insn->detail->regs_write + 8, upper,
++					       sizeof(upper));
++					insn->detail->regs_write_count = 16;
++				}
++				break;
+ 			case X86_INS_XADD:
+ 				insn->detail->regs_write[0] = X86_REG_EFLAGS;
+ 				insn->detail->regs_write_count = 1;
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index 380faa79..196d53ef 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -15,7 +15,7 @@ typedef struct insn_map_x86 {
+ #ifndef CAPSTONE_DIET
+ 	uint16_t regs_use[12]; // list of implicit registers used by this instruction
+ 	uint16_t regs_mod
+-		[20]; // list of implicit registers modified by this instruction
++		[12]; // includes the low vector bank for VZERO
+ 	unsigned char groups[8]; // list of group this instruction belong to
+ 	bool branch; // branch instruction?
+ 	bool indirect_branch; // indirect branch instruction?
+diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
+index 7e5e7f51..97359b70 100644
+--- a/arch/X86/X86MappingInsn.inc
++++ b/arch/X86/X86MappingInsn.inc
+@@ -105244,14 +105244,14 @@
+ {
+ 	X86_VZEROALL, X86_INS_VZEROALL, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, X86_REG_YMM8, X86_REG_YMM9, X86_REG_YMM10, X86_REG_YMM11, X86_REG_YMM12, X86_REG_YMM13, X86_REG_YMM14, X86_REG_YMM15, 0 }, { X86_GRP_AVX, 0 }, 0, 0
++	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+ },
+ 
+ {
+ 	X86_VZEROUPPER, X86_INS_VZEROUPPER, 0,
+ #ifndef CAPSTONE_DIET
+-	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, X86_REG_YMM8, X86_REG_YMM9, X86_REG_YMM10, X86_REG_YMM11, X86_REG_YMM12, X86_REG_YMM13, X86_REG_YMM14, X86_REG_YMM15, 0 }, { X86_GRP_AVX, 0 }, 0, 0
++	{ 0 }, { X86_REG_YMM0, X86_REG_YMM1, X86_REG_YMM2, X86_REG_YMM3, X86_REG_YMM4, X86_REG_YMM5, X86_REG_YMM6, X86_REG_YMM7, 0 }, { X86_GRP_AVX, 0 }, 0, 0
+ #endif
+ },
+ 
 diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
-index e7704042..a5fc88f2 100644
+index e7704042..a15efbb4 100644
 --- a/suite/synctools/x86_mapping_counts.py
 +++ b/suite/synctools/x86_mapping_counts.py
-@@ -154,7 +154,12 @@ def generate(directory, suffix):
-             require(
-                 "0" in tokens or len(tokens) < capacity, "Unterminated mapping list"
+@@ -156,6 +156,13 @@ def generate(directory, suffix):
              )
--            counts.append(tokens.index("0") if "0" in tokens else len(tokens))
-+            count = tokens.index("0") if "0" in tokens else len(tokens)
-+            require(
-+                all(value == "0" for value in tokens[count:]),
-+                f"Nonzero padding in {name} mapping list",
-+            )
-+            counts.append(count)
+             counts.append(tokens.index("0") if "0" in tokens else len(tokens))
          read, write, group = counts
++        if name in ("X86_VZEROALL", "X86_VZEROUPPER"):
++            # The mapper appends YMM8..15 only in 64-bit mode.
++            low_bank = [f"X86_REG_YMM{i}" for i in range(8)]
++            require(
++                [v.strip() for v in row[4].split(",")] == [*low_bank, "0"],
++                f"Unexpected common vector bank for {name}",
++            )
          # Fixed fields are checked against the owning array capacities above.
          value = read | (write << 5) | (group << 10)
+         repair = row[2] in repairs
 diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
 index d9dd18e2..428aed88 100644
 --- a/tests/unit/x86_reg_access.c
@@ -125,3 +206,17 @@ index d9dd18e2..428aed88 100644
  		       check_scalar_move_flags() &&
  		       check_scalar_segment_reads() &&
  		       check_vector_compare_flags();
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 1c7944f4..ad7e7773 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1639,7 +1639,8 @@ static bool check_mode(cs_mode mode)
+ 		    !check_evex_memory_moves(handles) ||
+ 		    !check_padding(handles) ||
+ 		    (mode == CS_MODE_32 &&
+-		     (!check_segment_lea32(handles) ||
++		     (!check_vex_clear(handles) ||
++		      !check_segment_lea32(handles) ||
+ 		      !check_vex32_register_moves(handles) ||
+ 		      !check_memory_flag_immediates(handles, mode))) ||
+ 		    !check_alu_memory(handles, mode) ||
