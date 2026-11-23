@@ -1,7 +1,7 @@
-name: Check LoongArch private operands in stock, mixed and NeverD static builds
+name: Check SPARC private operands in stock, mixed and NeverD static builds
 on:
   push:
-    branches: [codex/loongarch-release-consumers]
+    branches: [codex/sparc-release-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,13 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8835df03f81c2011e14511446686a6b68eabdd68
+          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1d2e9acae726a33e11dcf59797c2e9385caadb86
+          ref: b8c025b2c666124865954de188b11a4ad00c7a4e
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: loongarch-release-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: sparc-release-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
