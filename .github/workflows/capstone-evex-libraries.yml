@@ -1,7 +1,7 @@
-name: Measure AMD64 comparisons at group-1 dispatch on top of dedicated i386 addressing
+name: Construct memory operand details once and compare real PE and ELF readers
 on:
   push:
-    branches: [codex/scalar-group-amd64-compare-readers]
+    branches: [codex/measure-direct-memory-details]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-group-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: direct-memory-details-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
