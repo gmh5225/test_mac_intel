@@ -1,7 +1,7 @@
-name: Compare both placements of the x86 public formatter in a ten-architecture shared build
+name: Measure architecture dispatch ahead of the x86 scan frame across ten real architectures
 on:
   push:
-    branches: [codex/mixed-x86-public-reader-boundaries]
+    branches: [codex/separate-x86-public-iterator-frame]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
+          ref: aa095ef5688bfc49b8ba0c5e5a7648faa7ed6877
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py

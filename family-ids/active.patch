@@ -86,3 +86,25 @@ index 732c4004..57ede1e7 100644
  	/* The caller owns skipdata callbacks, bulk boundaries and the public
  	 * cursors. A fixed iterator can fill this one record using local cursors. */
  	if (!batch && !handle->skipdata && !handle->no_text &&
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 60ec4b72..216a4c29 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -88,7 +88,7 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+ 
+ /* This writer belongs to the private mixed-library reader. In dedicated
+  * builds the public iterator shares the same fallback object. */
+-#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
++#if !defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_OUTPUT)
+ /* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
+  * Insert the writemask after its destination. Only a register destination
+  * can request zeroing or read through the mask. */
+@@ -184,7 +184,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
+ 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
+ 		return true;
+-#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
++#if !defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_OUTPUT)
+ 	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
+ 	    (code[4] | 0x10) == 0x7f &&
+ 	    writeMaskedByteMove(handle, code, size, insn, insn_size))

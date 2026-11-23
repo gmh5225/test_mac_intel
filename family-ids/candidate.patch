@@ -71,43 +71,126 @@ index 8d827a97..7ddb0c11 100644
  	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
  	!defined(_WIN32_WCE)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..672f9d9a 100644
+index 0d9b1a76..6fed41c3 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3754,8 +3754,16 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  bool batch);
+@@ -3793,12 +3793,33 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
  
- #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#ifdef CAPSTONE_X86_MIXED_OUTPUT
-+X86_DECODE_INLINE bool decodeIteratorOutput(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch);
-+#define CS_DECODE_OUTPUT_MISS decodeIteratorOutput
-+#else
- #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
- #endif
++#if defined(CAPSTONE_X86_MIXED_OUTPUT) && defined(CAPSTONE_X86_PUBLIC_OUTPUT)
++/* Keep the x86 scan frame out of the ordinary multi-architecture iterator. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
 +#endif
- #define CS_DECODE_SCAN_IMPL decodeIteratorScan
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_SCAN_IMPL
-@@ -3763,6 +3771,19 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- #undef CS_DECODE_OUTPUT_MISS
- #endif
- 
-+#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) && defined(CAPSTONE_X86_MIXED_OUTPUT)
-+X86_DECODE_INLINE bool decodeIteratorOutput(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch)
++static bool disasmMixedX86(csh ud, const uint8_t **code, size_t *size,
++			   uint64_t *address, cs_insn *insn)
 +{
-+	if (handle->arch == CS_ARCH_X86)
-+		return X86_decodePublicRecord(handle, code, size, insn, length,
-+					      batch);
-+	return cs_decode_full_insn(handle, code, size, insn, length, batch);
++	return cs_disasm_iter_core(ud, code, size, address, insn);
 +}
 +#endif
 +
- /* Keep the admitted terminal's public ID and zero alias adjustment visible
-  * through output completion. Cold helpers can take the fallback result's
-  * address without forcing terminal output through that escaped object. */
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+ {
++#if defined(CAPSTONE_X86_MIXED_OUTPUT) && defined(CAPSTONE_X86_PUBLIC_OUTPUT)
++	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
++	if (*size && handle && handle->arch == CS_ARCH_X86)
++		return disasmMixedX86(ud, code, size, address, insn);
++	return cs_disasm_iter_core_arch(ud, code, size, address, insn, false);
++#else
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
++#endif
+ }
+ 
+ X86_DECODE_ALIGN
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 60ec4b72..216a4c29 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -88,7 +88,7 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+ 
+ /* This writer belongs to the private mixed-library reader. In dedicated
+  * builds the public iterator shares the same fallback object. */
+-#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
++#if !defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_OUTPUT)
+ /* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
+  * Insert the writemask after its destination. Only a register destination
+  * can request zeroing or read through the mask. */
+@@ -184,7 +184,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
+ 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
+ 		return true;
+-#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
++#if !defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_OUTPUT)
+ 	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
+ 	    (code[4] | 0x10) == 0x7f &&
+ 	    writeMaskedByteMove(handle, code, size, insn, insn_size))
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..ef1bf3ff 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -184,14 +184,15 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+-					  uint64_t *address, cs_insn *insn)
++					  uint64_t *address, cs_insn *insn,
++					  bool try_x86)
+ {
+ 	uint16_t insn_size;
+ 	bool r;
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
+-	const bool scan = use_x86_scan(handle);
++	const bool scan = try_x86 && use_x86_scan(handle);
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+@@ -199,7 +200,10 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 	insn->op_str[0] = '\0';
+ #endif
+ 
+-	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
++	if (try_x86)
++		r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
++	else
++		r = cs_decode_full_insn(handle, *code, *size, insn, &insn_size, false);
+ 	if (CS_DECODE_LIKELY(r)) {
+ 		*code += insn_size;
+ 		*size -= insn_size;
+@@ -212,9 +216,9 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 	return true;
+ }
+ 
+-CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
++CS_DECODE_INLINE bool cs_disasm_iter_core_arch(csh ud, const uint8_t **code,
+ 					  size_t *size, uint64_t *address,
+-					  cs_insn *insn)
++					  cs_insn *insn, bool try_x86)
+ {
+ 	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
+ 	cs_detail *detail;
+@@ -230,9 +234,16 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+ 	detail = insn->detail;
+ 	if (CS_DECODE_LIKELY(!handle->detail_opt))
+ 		insn->detail = NULL;
+-	r = cs_disasm_iter_body(handle, code, size, address, insn);
++	r = cs_disasm_iter_body(handle, code, size, address, insn, try_x86);
+ 	insn->detail = detail;
+ 	return r;
+ }
+ 
++CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
++{
++	return cs_disasm_iter_core_arch(ud, code, size, address, insn, true);
++}
++
+ #endif
