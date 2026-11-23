@@ -16,7 +16,7 @@ try:
     profiles={}
     for profile in ('project','ten','dual','pure','mixed-diet','mixed-reduced','pure-noatt'):
         b=t/('build-'+profile);receipts={}
-        expected='reference' if profile in ('ten','dual') and platform.system()=='Linux' else 'base'
+        expected='base'
         variants=('base','reference','candidate') if expected=='reference' else ('base','candidate')
         pair={}
         for stage in variants:
@@ -66,7 +66,7 @@ try:
     for form in ('static','shared'):
         active=platform.system()=='Linux' and form=='shared'
         chunks={}
-        for variant in ('reference' if active else 'base','candidate'):
+        for variant in ('base','candidate'):
             label='make-'+form+'-'+variant
             g('restore','--source','HEAD','--staged','--worktree','--','.')
             if variant!='base':g('apply','--index',str(d/(variant+'.patch')))

@@ -1,123 +1,62 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 1aae4f9a..d6f3ff5f 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -478,6 +478,14 @@ if(CAPSTONE_X86_SUPPORT)
-     set(CSTOOL_SRC
-         ${CSTOOL_SRC}
-         cstool/cstool_x86.c)
-+    # Only mixed ELF shared-library builds use the scalar post-printer.
-+    if(CAPSTONE_BUILD_SHARED_LIBS AND NOT CAPSTONE_BUILD_DIET
-+       AND NOT CAPSTONE_X86_REDUCE AND NOT capstone_enabled_architectures STREQUAL "X86"
-+       AND CMAKE_EXECUTABLE_FORMAT STREQUAL "ELF" AND CMAKE_C_COMPILER_ID MATCHES "^(Clang|GNU)$")
-+        set(capstone_x86_postprinter arch/X86/X86PostPrinter.c)
-+        set_property(SOURCE arch/X86/X86Mapping.c ${capstone_x86_postprinter} APPEND
-+                     PROPERTY COMPILE_DEFINITIONS CAPSTONE_X86_SHARED_POSTPRINTER)
-+    endif()
-     set(SOURCES_X86
-         arch/X86/X86Disassembler.c
-         arch/X86/X86DisassemblerDecoder.c
-@@ -485,6 +493,7 @@ if(CAPSTONE_X86_SUPPORT)
-         arch/X86/X86IntelInstPrinterPrechecked.c
-         arch/X86/X86InstPrinterCommon.c
-         arch/X86/X86Mapping.c
-+        ${capstone_x86_postprinter}
-         arch/X86/X86Module.c
-         arch/X86/X86ImmediateOutput.c
-         arch/X86/X86MemoryOutput.c
-diff --git a/Makefile b/Makefile
-index b3a012fa..8118f71d 100644
---- a/Makefile
-+++ b/Makefile
-@@ -271,6 +271,14 @@ ifeq (,$(findstring yes,$(CAPSTONE_X86_ATT_DISABLE)))
- endif
- endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
-+ifneq ($(sort $(CAPSTONE_ARCHS)),x86)
-+ifeq ($(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no)
-+ifneq (,$(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c /dev/null 2>/dev/null | grep -w __ELF__))
-+	CFLAGS += -DCAPSTONE_X86_SHARED_POSTPRINTER
-+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86PostPrinter.o
-+endif
-+endif
-+endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..79adee8d 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -12788,7 +12788,11 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 711691be..f611cfbb 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -39,8 +39,12 @@ const insn_map systemz_insns[] = {
+ #include "SystemZGenCSMappingInsn.inc"
+ };
  
- /// The post-printer function. Used to fixup flaws in the disassembly information
- /// of certain instructions.
-+#ifdef X86_SEPARATE_POSTPRINTER
-+void X86_postprinter_full(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
++static inline void mapSystemZInstruction(MCInst *MI, bool initialize_detail)
 +#else
- void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 				size_t BytesLen)
 +#endif
  {
- 	cs_x86_op *memory = NULL;
- 	bool has_mask = false;
-@@ -12805,7 +12809,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
- 	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
- 	 * Other encodings can only need the first memory operand's broadcast
- 	 * repair, including decorators introduced by a custom formatter. */
--	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
-+	if (X86_ONLY_REPAIRS_BROADCAST(x86->opcode[0])) {
- 		for (i = 0; i < x86->op_count; ++i) {
- 			cs_x86_op *operand = &x86->operands[i];
- 			if (operand->type == X86_OP_MEM) {
-diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..380faa79 100644
---- a/arch/X86/X86Mapping.h
-+++ b/arch/X86/X86Mapping.h
-@@ -122,6 +122,17 @@ void X86_build_lookup_tables(cs_struct *h);
- 
- void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci);
- 
-+#if defined(CAPSTONE_X86_SHARED_POSTPRINTER) && defined(__ELF__) && defined(__GNUC__)
-+#define X86_SEPARATE_POSTPRINTER
-+CAPSTONE_INTERNAL void X86_postprinter_full(csh handle, cs_insn *insn,
-+					    SStream *mnem, MCInst *mci);
+ #ifdef CAPSTONE_SYSTEMZ_DEDICATED_MAPPING
+ 	/* The generated opcode row also owns the implicit effects and format. */
+@@ -48,6 +52,10 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 	MI->flat_insn->id = row->mapid;
+ 	if (!MI->flat_insn->detail)
+ 		return;
++#ifndef CAPSTONE_DIET
++	if (initialize_detail)
++		SystemZ_init_cs_detail(MI);
 +#endif
-+
-+/* These opcodes can only need the printed broadcast decorator repaired.
-+ * VEX/EVEX, x87 environment and rotate forms take the full repair path. */
-+#define X86_ONLY_REPAIRS_BROADCAST(opcode) \
-+	(((opcode) & 0xe0) != 0xc0 && (opcode) != 0x62)
-+
- static inline bool x86_has_feature(cs_mode mode, int flag)
- {
- 	return (mode & flag) == flag;
-diff --git a/arch/X86/X86PostPrinter.c b/arch/X86/X86PostPrinter.c
-new file mode 100644
-index 00000000..1202e088
---- /dev/null
-+++ b/arch/X86/X86PostPrinter.c
-@@ -0,0 +1,24 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifdef CAPSTONE_HAS_X86
-+#include "X86Mapping.h"
-+
-+#ifdef X86_SEPARATE_POSTPRINTER
-+#include <string.h>
-+
-+/* Preserve custom broadcast spellings, which may appear on a scalar operand. */
-+__attribute__((section(".cs_x86_postprinter_text")))
-+void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ #else
+ 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
+ #endif
+@@ -65,6 +73,14 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ #endif
+ }
+ 
++#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
++void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
++				size_t BytesLen)
 +{
-+	if (insn && insn->id != X86_INS_VPCMP) {
-+		if (!insn->detail)
-+			return;
-+		if (X86_ONLY_REPAIRS_BROADCAST(insn->detail->x86.opcode[0]) &&
-+		    !strchr(mnem->buffer, '{'))
-+			return;
-+	}
-+	X86_postprinter_full(handle, insn, mnem, mci);
++	mapSystemZInstruction(MI, false);
 +}
 +#endif
++
+ void SystemZ_init_mri(MCRegisterInfo *MRI)
+ {
+ 	MCRegisterInfo_InitMCRegisterInfo(
+@@ -105,11 +121,18 @@ bool SystemZ_getInstruction(csh handle, const uint8_t *bytes, size_t bytes_len,
+ 			    MCInst *MI, uint16_t *size, uint64_t address,
+ 			    void *info)
+ {
++#if !defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) || defined(CAPSTONE_DIET)
+ 	SystemZ_init_cs_detail(MI);
 +#endif
+ 	MI->MRI = (MCRegisterInfo *)info;
+ 	DecodeStatus Result = SystemZ_LLVM_getInstruction(
+ 		handle, bytes, bytes_len, MI, size, address, info);
++#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
++	/* The decoder writes MCInst. Initialize public details with the mapping. */
++	mapSystemZInstruction(MI, true);
++#else
+ 	SystemZ_set_instr_map_data(MI, bytes, bytes_len);
++#endif
+ 	if (Result == MCDisassembler_SoftFail) {
+ 		MCInst_setSoftFail(MI);
+ 	}

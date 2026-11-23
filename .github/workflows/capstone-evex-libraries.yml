@@ -1,7 +1,7 @@
-name: Verify GCC and Clang use the existing pure scalar predicate with isolated mixed shared repair
+name: Verify SystemZ postdecode mapping leaves real NeverD and mixed consumers byte-identical
 on:
   push:
-    branches: [codex/shared-detail-inlined-condition]
+    branches: [codex/systemz-project-binary-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,13 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 372fbd2d967c5023371a12e0e406f8be2ec84ae5
+          ref: 76395023380f346cd58f166905c5be77afede197
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 30c94d8e3eda73dbcf459130262ba347a33712eb
+          ref: 37de56f103420371dabbb797fc8cec39fae2bf5c
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-predicate-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: systemz-consumer-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
