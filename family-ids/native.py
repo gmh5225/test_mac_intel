@@ -100,7 +100,10 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-2260-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('RISCV-four-copies-2289-'+flavor)
+    del images['lazy']
+    images['candidate_copy']=images['width']
+    assert images['candidate_copy']==images['width'] and images['base']==images['copy']
     for name,bits in cases.items():
         def sample(k,mode,reps):
             select(k);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(bits),str(mode),t/(name+'.text'),'1048576',str(reps)]).split()))

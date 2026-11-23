@@ -1,7 +1,7 @@
-name: Measure RISC-V mixed-library scans inside their owning decoder with real ELF and cross-architecture controls
+name: Repeat RISC-V and cross-architecture ELF timing using independent shuffled copies of both actual libraries
 on:
   push:
-    branches: [codex/riscv-base-decoder-scan-record]
+    branches: [codex/riscv-four-image-holdout]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-base-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-four-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
