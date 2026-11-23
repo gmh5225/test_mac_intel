@@ -192,7 +192,7 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    assert (hashes['bare']==hashes['base'])==(not darwin)
+    assert hashes['bare']!=hashes['base']
     assert hashes['mixed_bare']!=hashes['mixed_base']
     image=w/'timed-runner'
     n=max(map(len,images.values()))
