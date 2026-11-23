@@ -1,7 +1,7 @@
-name: Compare isolated legacy write lists and inline mode dispatch on PuTTY and foreign architectures
+name: Check legacy VZERO implicit registers at write list construction in native x86 and foreign workloads
 on:
   push:
-    branches: [codex/cold-legacy-write-lists]
+    branches: [codex/limit-vzero-long-write-lists]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
+          ref: 372fbd2d967c5023371a12e0e406f8be2ec84ae5
           path: source
           persist-credentials: false
       - if: matrix.flavor == 'first'
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: outlined-legacy-writes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: long-vector-writes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
