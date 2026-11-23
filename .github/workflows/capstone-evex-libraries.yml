@@ -1,7 +1,7 @@
-name: Compare the released EVEX register control writer and fork iced on four native hosts
+name: Measure by-value single record decoding and the released iterator ABI in one native image
 on:
   push:
-    branches: [codex/shipped-register-immediate-iced]
+    branches: [codex/by-value-single-x86-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-register-imm-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: one-x86-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -1,0 +1,127 @@
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index 246ee26c..fbbcefc2 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -56,6 +56,13 @@ bool X86_disasmIter32(csh handle, const uint8_t **code, size_t *size,
+ bool X86_disasmIterText(csh handle, const uint8_t **code, size_t *size,
+ 		      uint64_t *address, cs_insn *insn);
+ 
++/* Private fixed-mode entry for callers that consume one output record.
++ * The record, error and callback behavior follow X86_disasmIterText. */
++bool X86_disasmOneText32(csh handle, const uint8_t *code, size_t size,
++			 uint64_t address, cs_insn *insn);
++bool X86_disasmOneText(csh handle, const uint8_t *code, size_t size,
++		       uint64_t address, cs_insn *insn);
++
+ /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
+  * an installed cs_* API. The callback
+  * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..a2d6b581 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -262,16 +262,34 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #undef CS_DECODE_OUTPUT_MISS
+ #endif
+ 
++#ifdef CS_DECODE_TRY_OUTPUT
++static inline bool usesText64(const cs_struct *handle)
++{
++	return handle && handle->arch == CS_ARCH_X86 &&
++	       handle->mode == CS_MODE_64 && !handle->no_text;
++}
++#endif
++
+ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ 					  size_t *size, uint64_t *address,
+ 					  cs_insn *insn)
+ {
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 &&
+-	    handle->mode == CS_MODE_64 && !handle->no_text)
++	if (usesText64(handle))
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
++
++CAPSTONE_INTERNAL bool X86_disasmOneText(csh ud, const uint8_t *code,
++				     size_t size, uint64_t address, cs_insn *insn)
++{
++#ifdef CS_DECODE_TRY_OUTPUT
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (usesText64(handle))
++		return cs_disasm_iter_core(ud, &code, &size, &address, insn);
++#endif
++	return X86_disasmOneText32(ud, code, size, address, insn);
++}
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..d3131310 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -201,16 +201,34 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef CS_DECODE_OUTPUT_MISS
+ #endif
+ 
++#ifdef CS_DECODE_TRY_OUTPUT
++static inline bool usesText32(const cs_struct *handle)
++{
++	return handle && handle->arch == CS_ARCH_X86 &&
++	       handle->mode == CS_MODE_32 && !handle->no_text;
++}
++#endif
++
+ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ 					size_t *size, uint64_t *address,
+ 					cs_insn *insn)
+ {
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 &&
+-	    handle->mode == CS_MODE_32 && !handle->no_text)
++	if (usesText32(handle))
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
+ #endif
+ 	return X86_disasmIter(ud, code, size, address, insn);
+ }
++
++CAPSTONE_INTERNAL bool X86_disasmOneText32(csh ud, const uint8_t *code,
++				     size_t size, uint64_t address, cs_insn *insn)
++{
++#ifdef CS_DECODE_TRY_OUTPUT
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (usesText32(handle))
++		return cs_disasm_iter_core(ud, &code, &size, &address, insn);
++#endif
++	return X86_disasmIter(ud, &code, &size, &address, insn);
++}
+ #endif
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 586b3c09..e2529234 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1676,8 +1676,22 @@ done:
+ 	return ok;
+ }
+ 
++static bool one_as_iter(csh h, const uint8_t **p, size_t *n, uint64_t *ip,
++			cs_insn *insn)
++{
++	if (!X86_disasmOneText(h, *p, *n, *ip, insn))
++		return false;
++	*p += insn->size;
++	*n -= insn->size;
++	*ip += insn->size;
++	return true;
++}
++
+ int main(void)
+ {
++	private_iter = one_as_iter;
++	if (!check_mode(CS_MODE_32) || !check_mode(CS_MODE_64))
++		return 1;
+ 	private_iter = X86_disasmIter32;
+ 	if (!check_mode(CS_MODE_32))
+ 		return 1;
