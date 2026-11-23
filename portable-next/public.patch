@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 46b3184d..2fea6feb 100644
+index 46b3184d..1aae4f9a 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1038,27 +1038,35 @@ set(ALL_HEADERS
+@@ -1038,27 +1038,36 @@ set(ALL_HEADERS
  set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
  
  ## targets
@@ -36,6 +36,7 @@ index 46b3184d..2fea6feb 100644
 +    target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
      set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
 +    if(capstone_enabled_architectures STREQUAL "X86")
++        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
 +        set(capstone_x86_objects
 +            $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
 +            $<TARGET_OBJECTS:capstone_x86_native>)
@@ -44,7 +45,7 @@ index 46b3184d..2fea6feb 100644
  endif()
  
  if(CAPSTONE_BUILD_STATIC_LIBS)
-@@ -1094,7 +1102,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+@@ -1094,7 +1103,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
  endif()
  
  if(CAPSTONE_BUILD_SHARED_LIBS)
@@ -53,7 +54,7 @@ index 46b3184d..2fea6feb 100644
      # Use normal capstone name. Otherwise we get libcapstone_shared.so
      set_target_properties(capstone_shared PROPERTIES OUTPUT_NAME "capstone")
      set_target_properties(capstone_shared PROPERTIES
-@@ -1104,7 +1112,7 @@ if(CAPSTONE_BUILD_SHARED_LIBS)
+@@ -1104,7 +1113,7 @@ if(CAPSTONE_BUILD_SHARED_LIBS)
      target_include_directories(capstone_shared PUBLIC
          $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
      )
@@ -63,10 +64,20 @@ index 46b3184d..2fea6feb 100644
      if(MSVC)
          message("Enabling PDB for Windows")
 diff --git a/Makefile b/Makefile
-index da328571..c685d209 100644
+index da328571..b3a012fa 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -436,6 +436,9 @@ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $
+@@ -279,6 +279,9 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+ 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
++ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
++endif
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+@@ -436,6 +439,9 @@ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $
  LIBOBJ += $(LIBOBJ_X86_NUMBERS)
  LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
  LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
@@ -77,10 +88,10 @@ index da328571..c685d209 100644
  
  ifeq ($(PKG_EXTRA),)
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..e44cf734 100644
+index ae1554b0..8d827a97 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,6 +30,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,6 +30,13 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -89,7 +100,6 @@ index ae1554b0..e44cf734 100644
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
 +#define CAPSTONE_X86_PUBLIC_OUTPUT
-+
 +#endif
 +
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
@@ -115,15 +125,22 @@ index 12428fff..0d9b1a76 100644
  
  /* Keep the admitted terminal's public ID and zero alias adjustment visible
   * through output completion. Cold helpers can take the fallback result's
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..e60feecf 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -32,4 +32,25 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- #endif
- 	return cs_disasm_iter(ud, code, size, address, insn);
- }
+diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
+new file mode 100644
+index 00000000..732c4004
+--- /dev/null
++++ b/arch/X86/X86PublicOutput.c
+@@ -0,0 +1,29 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "../../cs_disasm_internal.h"
++#include "X86ScanAdapter.h"
++
 +#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_public_output_text"
++#endif
 +CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
 +					    const uint8_t *code, size_t size,
 +					    cs_insn *insn, uint16_t *length,
@@ -143,8 +160,6 @@ index cec4bec6..e60feecf 100644
 +	return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +}
 +#endif
-+
- #endif
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
 index f3dfc374..b0f4a6ce 100644
 --- a/cs_disasm_internal.h
