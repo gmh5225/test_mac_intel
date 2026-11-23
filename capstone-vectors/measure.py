@@ -174,27 +174,24 @@ def main(w):
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
+        header=base/'arch/X86/X86VectorRegisterWriter.h'
+        saved=header.read_bytes()
+        try:
+            if kind=='bare':
+                text=saved.decode()
+                at='extern CAPSTONE_INTERNAL const char X86_vectorRegisterOperands'
+                assert text.count(at)==1
+                text=text.replace(at, 'extern unsigned long long vector_writes[2][3][2], vector_calls;'+chr(10)+at)
+                for idx,func in enumerate(('writeVectorRegister','appendVectorRegister')):
+                    anchor=func+'(char *out, unsigned bank, unsigned n)'+chr(10)+'{'
+                    assert text.count(anchor)==1
+                    text=text.replace(anchor,anchor+chr(10)+f'    ++vector_calls; ++vector_writes[{idx}][bank][n >= 10];')
+                header.write_text(text)
+                run(['cmake','--build',build,'--parallel','4','--target','capstone_static'],'build-coverage-'+key)
+            run(['clang++','-std=c++17','-O2','-I',base/'include',r/'trace.cpp',lib,'-o',w/('trace-'+key)],'link-coverage-'+key)
+        finally:
+            if kind=='bare':header.write_bytes(saved)
         shutil.rmtree(build)
-    import random
-    images={k:v.read_bytes() for k,v in bins.items()}
-    hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    image=w/'timed-runner'
-    n=max(map(len,images.values()))
-    padded={k:v+bytes(n-len(v)) for k,v in images.items()}
-    active=None
-    if not darwin:
-        run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
-        image.write_bytes(padded['base']);image.chmod(0o755)
-        active=hashes['base']
-    save('launch.json',dict(linked=hashes,same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
-    def invoke(key,tail):
-        nonlocal active
-        if darwin:
-            return sp.check_output([image,*tail],executable=bins[key])
-        if active!=hashes[key]:
-            with image.open('r+b')as out:assert out.write(padded[key])==n
-            active=hashes[key]
-        return sp.check_output(['setarch',platform.machine(),'-R',image,*tail])
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
@@ -212,27 +209,19 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (0,1,2):
-            targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
-            for k in trees:
-                targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
-                targets['public_'+k]=(k,'capstone')
-                if bits==32 and mode:targets['width_'+k]=(k,'x86_len_')
-            def timed(label,count):
-                key,engine=targets[label]
-                return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'product-text-width-selection')))
-            for idx in range(13):
-                order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
-                assert len({tuple(v[2:5])for k,v in obs})==1
-                for kind in ('public_','private_'):
-                    assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
-                cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
+        outputs={}
+        wanted=json.loads((r/'expected.json').read_text())[name]
+        for key in trees:
+            lines=sp.check_output([w/('trace-'+key),str(bits),f,intervals],text=True).splitlines()
+            rows=[list(map(int,line.split()))for line in lines]
+            assert len(rows)==4 and all(len(row)==21 and row[2:4]==wanted for row in rows)
+            outputs[key]=rows
+            if key.endswith('base'):assert all(not any(row[7:]) for row in rows)
+            if key.endswith('bare'):
+                control=key.replace('bare','base')
+                assert [v[:7] for v in rows]==[v[:7] for v in outputs[control]]
+        save('coverage-'+name+'.json',outputs);results.append(name)
+    assert len(results)==6
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
