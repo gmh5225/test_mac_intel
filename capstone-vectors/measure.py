@@ -139,19 +139,31 @@ def main(w):
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
-        if kind in ('order','bare'):
-            fallback='X86RegisterFallback32.c.o';expected=list(expected);expected.remove(fallback);expected.insert(expected.index('X86PublicOutput.c.o')+1,fallback)
-        assert members==expected,(key,members,expected)
-        changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind in ('order','base'):assert not changed,(key,changed)
-        else:assert changed==['X86RegisterFallback32.c.o'],(key,changed)
-        if kind=='bare':assert objects[key]==objects[('mixed_' if mixed else '')+'plain']
+        extra=['X86DoubleShift32.c.o'] if key=='bare' else []
+        assert [n for n in members if n not in extra]==expected
+        if extra:assert members.index(extra[0])>members.index('X86PublicOutput.c.o')
+        changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
+        assert changed==sorted((['X86RegisterFallback32.c.o']if key!='base' else [])+extra),(key,changed)
+        # Link an independently instrumented copy of the exact terminal source
+        # to count admission while the ordinary binary retains its original code.
+        path=base/'arch/X86'/('X86DoubleShift32.c' if key=='bare' else 'X86RegisterFallback32.c')
+        sample=path.read_text();entry='writeDoubleShift32(code, insn, insn_size);'
+        if key!='base':
+            assert sample.count(entry)==1
+            sample=sample.replace(entry,'++bare_opcode_hits[code[1]]; '+entry)
+        probe=w/'counts.c';probe.write_text('unsigned long long bare_opcode_hits[256];'+chr(10)+sample)
+        tu,=[row for row in db if Path(row['file'])==path]
+        defs=[v for v in shlex.split(tu['command']) if v.startswith('-D')]
+        run(['clang','-O2',*defs,'-iquote',path.parent,'-I',base,'-I',base/'include','-c',probe,'-o',w/'probe.o'],'build-guard-'+key)
+        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'guard.cpp',w/'probe.o',lib,'-o',w/'guard'],'link-guard-'+key)
+        run([w/'guard',*(['candidate']if key!='base'else[])],'guard-'+key)
+        assert list(map(int,(evidence/('guard-'+key+'.log')).read_text().split()))==[817152,100644 if key!='base'else 0,0]
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
-        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
+        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','X86_decodeRegisterFallback32','X86_decodeDoubleShift32','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
             cols=line.split()
