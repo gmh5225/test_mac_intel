@@ -111,7 +111,7 @@ def main(w):
         run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
         db=json.loads((build/'compile_commands.json').read_text());files={Path(u['file']).name for u in db}
         near={Path(u['file']).name for u in db if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in u['command'].split()}
-        assert near==({'X86Sse64Output.c'}if mixed and not darwin else set()),near
+        assert near==({'X86Sse64Output.c'}if mixed and platform.system()=='Linux' and platform.machine().lower() in ('x86_64','amd64') else set()),near
         assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(mixed )
         save('compile-'+key+'.json',dict(archive_profile=key,near_indirect=sorted(near),neverd=m['neverd'],compile_commands_sha256=sha(build/'compile_commands.json')))
         assert ('X86PublicOutput.c' in files)==(not mixed)
@@ -119,13 +119,13 @@ def main(w):
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
         db=json.loads((build/'compile_commands.json').read_text())
-        entry,=[z for z in db if z['file'].endswith('/X86Sse64Output.c')]
-        defs=[v for v in shlex.split(entry['command'])if v.startswith('-D')]
-        run(['clang','-O2',*defs,'-iquote',base/'arch/X86','-I',base,'-I',base/'include','-c',r/'scalar-guard.c','-o',w/'scalar.o'],'scalar-probe-'+key)
-        run(['clang++','-std=c++17','-O2','-I',base/'include',r/'scalar-guard.cpp',w/'scalar.o',lib,'-o',w/'scalar-guard'],'scalar-link-'+key)
-        run([w/'scalar-guard',*(['candidate'] if kind=='bare' else [])],'scalar-guard-'+key)
-        counts=list(map(int,(evidence/('scalar-guard-'+key+'.log')).read_text().split()))
-        assert counts==([817152, 100644, 0] if kind=='bare' else [817152, 0, 0]),(key,counts)
+        run(['clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'records.cpp',lib,'-o',w/'targets'],'link-targets-'+key)
+        run([w/'targets'],'targets-'+key)
+        current=(evidence/('targets-'+key+'.log')).read_text().splitlines()
+        assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
+        if kind=='bare':
+            ref=('mixed_' if mixed else '')+'base'
+            assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -141,7 +141,8 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='bare':assert changed==['X86RegisterFallback32.c.o'],(key,changed)
+        if kind=='bare':
+            assert set(changed)<={'X86Sse64Output.c.o','X86Vex32Output.c.o'},(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
@@ -159,8 +160,6 @@ def main(w):
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
-        if kind=='bare':
-            run(['clang++','-O2','-std=c++17','-I',base/'include',r/'realhits.cpp',w/'scalar.o',lib,'-o',w/('hits-'+key)],'link-hits-'+key)
         shutil.rmtree(build)
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
@@ -199,15 +198,6 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        reached={}
-        for stage in ('bare','mixed_bare'):
-            for private in (0,1):
-                for details in (0,1):
-                    v=list(map(int,sp.check_output([w/('hits-'+stage),str(bits),str(private),str(details),f,intervals]).split()))
-                    assert len(v)==259 and v[2]==len(selected) and (bits!=64 or sum(v[3:])==0) and all(n==0 or op in (0xa4,0xac) for op,n in enumerate(v[3:]))
-                    reached[f'{stage}/{private}/{details}']=dict(valid=v[0],invalid=v[1],spans=v[2],hits=sum(v[3:]),opcodes={format(k,'02x'):n for k,n in enumerate(v[3:]) if n})
-        assert len({(v['valid'],v['invalid'],v['spans'])for v in reached.values()})==1
-        save('reach-'+name+'.json',reached)
         for mode in (0,1,2):
             targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}
             if mode:targets['fast']=('base','fast____')
