@@ -1,7 +1,7 @@
-name: Check legacy vector writes with a shared implicit-repair flag on PE32 and cross-architecture workloads
+name: Measure static x86 mapping details and the legacy VZERO fix with two Clang generations
 on:
   push:
-    branches: [codex/shared-implicit-register-repair-test]
+    branches: [codex/static-x86-details-before-repairs]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: unified-implicit-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: static-mapping-details-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
