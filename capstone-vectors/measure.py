@@ -215,6 +215,7 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
             targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}
+            targets['public_copy']=('base','capstone')
             if mode:targets['fast']=('base','fast____')
             for k in trees:
                 targets['private_'+k]=(k,'x86_len_' if mode else 'vecbatch')
@@ -223,7 +224,7 @@ def main(w):
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'released-public-reader')))
+            labels=list(targets);order=random.Random(str((name,mode,'late-double-shift-independent-confirmation')))
             for idx in range(13):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1

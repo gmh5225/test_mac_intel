@@ -1,27 +1,28 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6f3ff5f..264a4e20 100644
+index d6f3ff5f..ad59595c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1071,7 +1071,8 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+@@ -1072,6 +1072,9 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
      set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
      if(capstone_enabled_architectures STREQUAL "X86")
--        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
-+        target_sources(capstone_x86_native PRIVATE
-+            arch/X86/X86PublicOutput.c arch/X86/X86DoubleShift32.c)
+         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++        if(NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE AND CAPSTONE_USE_DEFAULT_ALLOC)
++            target_sources(capstone_x86_native PRIVATE arch/X86/X86DoubleShift32.c)
++        endif()
          set(capstone_x86_objects
              $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
              $<TARGET_OBJECTS:capstone_x86_native>)
 diff --git a/Makefile b/Makefile
-index 8118f71d..cfde936e 100644
+index 8118f71d..3db49f79 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -288,7 +288,7 @@ endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+@@ -289,6 +289,9 @@ endif
  	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
  ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
--	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
-+	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o $(OBJDIR)/arch/X86/X86DoubleShift32.o
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
++ifeq ($(findstring yes,$(CAPSTONE_DIET)$(CAPSTONE_X86_REDUCE)):$(CAPSTONE_USE_SYS_DYN_MEM),:yes)
++	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86DoubleShift32.o
++endif
  endif
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
