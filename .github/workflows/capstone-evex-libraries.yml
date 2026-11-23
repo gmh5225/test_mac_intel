@@ -1,7 +1,7 @@
-name: Compare canonical VEX row sharing with iced on PuTTY, OpenSSL, libjpeg and glibc
+name: Measure the VEX memory predicate using existing register rows while preserving the pure x86 address expression
 on:
   push:
-    branches: [codex/shared-vex-memory-iced]
+    branches: [codex/vex-shared-row-operands]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-vex-register-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: same-operands-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

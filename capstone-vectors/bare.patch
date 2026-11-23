@@ -131,22 +131,24 @@ index dceebc42..7bd8da5f 100644
  #endif
  #endif
 diff --git a/arch/X86/X86VexBaseMemory.h b/arch/X86/X86VexBaseMemory.h
-index a8ea43f2..e6b84d8f 100644
+index a8ea43f2..aee528db 100644
 --- a/arch/X86/X86VexBaseMemory.h
 +++ b/arch/X86/X86VexBaseMemory.h
-@@ -4,7 +4,11 @@
+@@ -4,7 +4,13 @@
  #define CS_X86_VEX_BASE_MEMORY_H
  #include "X86SimpleOutput.h"
  #include "X86VectorRegisterWriter.h"
 +#ifdef CAPSTONE_X86_MIXED_VEX_MEMORY
 +#include "X86GenVexMemoryRegisterMask.inc"
++#define X86_VEX_MEMORY_ROWS vex_register_rows
 +#else
  #include "X86GenVexBaseMemory.inc"
++#define X86_VEX_MEMORY_ROWS vex_base_rows
 +#endif
  
  static const struct X86SimpleRegister vector_rip = { X86_REG_RIP, 3, "rip" };
  
-@@ -83,10 +87,19 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
+@@ -83,10 +89,17 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
  	const unsigned w = short_prefix ? 0 : flags >> 7;
  	const unsigned ll = (flags >> 2) & 1, wl = w * 2 + ll,
  		       opcode = code[prefix];
@@ -155,26 +157,26 @@ index a8ea43f2..e6b84d8f 100644
 +	const unsigned index = vex_register_widths[plan][wl];
 +	if (!(vex_memory_register_mask[index / 8] & (1u << (index % 8))))
 +		return false;
-+	const struct VectorOutputRow *row = &vex_register_rows[index];
 +#else
  	const unsigned plan = vex_base_plans[map - 1][opcode];
  	const unsigned index = vex_base_widths[plan][wl];
  	if (!index)
  		return false;
-+	const struct VectorOutputRow *row = &vex_base_rows[index];
 +#endif
  	const unsigned rxb = (~(unsigned)code[1] >> 5) & (short_prefix ? 4 : 7);
  	const unsigned dst = ((code[prefix + 1] >> 3) & 7) | ((rxb & 4) << 1);
  	const unsigned mod = code[prefix + 1] >> 6;
-@@ -102,7 +115,7 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
+@@ -102,8 +115,9 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
  			     disp_size == 1 ? (int8_t)code[offset] : 0;
  	const struct X86SimpleRegister *base =
  		rip ? &vector_rip : &regs[rm | ((rxb & 1) << 3)];
 -	return writeVectorMemory(code, insn, insn_size, &vex_base_rows[index],
-+	return writeVectorMemory(code, insn, insn_size, row,
++	return writeVectorMemory(code, insn, insn_size, &X86_VEX_MEMORY_ROWS[index],
  				 prefix, ll, 0x40 | (w << 3) | rxb, dst,
  				 (~flags >> 3) & 15, base, disp_size, disp);
  }
++#undef X86_VEX_MEMORY_ROWS
+ #endif
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
 index f0312e90..d37f786c 100644
 --- a/suite/synctools/x86_vector_output.cpp
