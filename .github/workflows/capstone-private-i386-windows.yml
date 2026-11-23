@@ -1,7 +1,7 @@
-name: Validate complete x86 public records for shared scalar writers on four native platforms and four build profiles
+name: Check hashed x86 inputs and complete public outputs with distinct record summaries on all configurations
 on:
   push:
-    branches: [codex/public-x86-array-output-ports]
+    branches: [codex/public-x86-array-ports-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-public-arrays-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: public-mode-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

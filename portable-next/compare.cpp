@@ -211,6 +211,6 @@ int main(int argc,char **argv) {
       off+=used?used:1;
     }
   }
-  std::printf("{\"batches\":%" PRIu64 ",\"records\":%" PRIu64 ",\"width\":%d}\\n",total_batches,total_records,bits);
+  std::printf("{\"batches\":%" PRIu64 ",\"records\":%" PRIu64 ",\"width\":%d}",total_batches,total_records,bits); std::putchar(10);
   options(a,b);
 }
