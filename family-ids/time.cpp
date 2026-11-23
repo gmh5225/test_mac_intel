@@ -8,6 +8,10 @@
 #include <ctime>
 #include <vector>
 uint64_t ns(clockid_t id){timespec t{};clock_gettime(id,&t);return uint64_t(t.tv_sec)*1000000000+t.tv_nsec;}
+#ifdef TIMED_PRIVATE_READERS
+extern "C" bool X86_disasmIter32(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
+extern "C" bool X86_disasmIterText(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
+#endif
 int main(int argc,char **argv){
  if(argc!=6)return 2;
  auto bits=std::atoi(argv[1]),mode=std::atoi(argv[2]),reps=std::atoi(argv[5]);
@@ -30,11 +34,16 @@ int main(int argc,char **argv){
  cs_option(handle,CS_OPT_TEXT,mode==0?CS_OPT_OFF:CS_OPT_ON)||
  cs_option(handle,CS_OPT_DETAIL,mode>=2?CS_OPT_ON:CS_OPT_OFF))return 3;
  cs_insn *i=cs_malloc(handle);if(!i)return 4;
+#ifdef TIMED_PRIVATE_READERS
+ auto next=arch==CS_ARCH_X86 && mode ? (bits==32?X86_disasmIter32:X86_disasmIterText) : cs_disasm_iter;
+#else
+ auto next=cs_disasm_iter;
+#endif
  auto go=[&]{
    uint64_t count=0,values=0;
    const uint8_t *ptr=bytes.data();size_t left=bytes.size();uint64_t va=ip;
    while(left){
-     if(cs_disasm_iter(handle,&ptr,&left,&va,i)){
+     if(next(handle,&ptr,&left,&va,i)){
        ++count;values+=i->size;
        if(mode==3){
            cs_regs rr,ww;uint8_t nr=0,nw=0;

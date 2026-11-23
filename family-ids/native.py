@@ -24,12 +24,17 @@ try:
         assert len(order)==len(obj)>55 and 'XtensaDisassembler.c.o' in order
         if k=='base':base_obj=obj;base_order=order
         else:
-            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'cs.c.o','X86DisassemblerDecoder.c.o'}
+            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86RegisterFallback32.c.o'}
             assert [n for n in obj if n in base_obj]==base_order
         save('objects-'+k,dict(members=obj,order=order))
-        stages=[k,'forced'] if k=='base' else [k]
+        normal=t/'public-only'
+        cmd('normal-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'time.cpp',lib,'-lm','-o',normal])
+        normal_hash=sha(normal);save('public-'+k,dict(sha256=normal_hash))
+        if k=='base':normal_base=normal_hash
+        else:assert normal_hash==normal_base
+        stages=[k]
         for stage in stages:
-            forced=['-Wl,-u,X86_disasmIterText'] if stage=='forced' else []
+            forced=['-DTIMED_PRIVATE_READERS']
             exe=t/('time-'+stage)
             cmd('compile-time-'+stage,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'time.cpp',*forced,lib,'-lm','-o',exe])
             symbols={}
@@ -38,7 +43,7 @@ try:
                 fs=line.split()
                 if len(fs)==4 and fs[-1] in targets:symbols[fs[-1]]=[int(v,16)for v in fs[:2]]
             assert {'cs_disasm_iter','cs_decode_full_insn'}<=symbols.keys()
-            assert ('X86_disasmIterText' in symbols)==(stage!='base') and ('X86_disasmIter32' in symbols)==(stage!='base')
+            assert {'X86_disasmIterText','X86_disasmIter32'}<=symbols.keys()
             assert 'X86_decodePublicRecord' not in symbols
             save('layout-'+stage,symbols)
             cmd('public-code-'+stage,['objdump','-d','--disassemble=cs_disasm_iter',exe])
@@ -46,7 +51,7 @@ try:
         raw=t/('raw-'+k);cmd('compile-raw-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'raw.cpp',lib,'-lm','-o',raw]);raw_bins[k]=raw
         so=t/(k+'.so')
         cmd('loadable-'+k,[cc,'-shared','-Wl,-Bsymbolic','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',so]);libs[k]=so
-    assert len(set(ids.values()))==3,ids
+    assert len(set(ids.values()))==2,ids
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v))for k,v in imgs.items()}
     target=t/'time';target.write_bytes(imgs['base']);target.chmod(0o755)
     shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
