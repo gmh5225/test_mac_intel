@@ -26,8 +26,10 @@ def train(exe,w,recipes,tool,raw,out,rust_runner,stock):
                 for reader in ('iced____','fast____'):
                     args=[reader,str(mode),'1',text,span,bits]
                     old=sp.check_output([stock,*args],text=True).split()[2:]
-                    env=dict(os.environ,LLVM_PROFILE_FILE=str(w/'rust-raw'/'iced-%m-%p.profraw'))
+                    profile=w/'rust-raw'/f'training-{arch}-{name}-{reader}-{mode}.profraw'
+                    env=dict(os.environ,ICED_TRAINING_PROFILE=str(profile),LLVM_PROFILE_FILE=str(w/'automatic-%p.profraw'))
                     new=sp.check_output([rust_runner,*args],env=env,text=True).split()[2:]
+                    assert profile.is_file() and profile.stat().st_size>128,(profile,arch,name,mode)
                     assert old==new and int(new[0])>1000,(arch,name,reader,mode)
                     paired[reader+'/'+str(mode)]=list(map(int,new))
             iced_programs[arch+'/'+name]=dict(sha256=h,records=paired)

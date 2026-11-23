@@ -1,7 +1,7 @@
-name: Measure trained Capstone and trained Rust iced on the same withheld PE and ELF code
+name: Train both decoders and explicitly export the instrumented Rust profile for each input
 on:
   push:
-    branches: [codex/symmetric-iced-formatter-training]
+    branches: [codex/explicit-rust-profile-counters]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: both-trained-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: exported-profile-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

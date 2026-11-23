@@ -30,11 +30,13 @@ def instrument(ad,w,out,flags,capstone,syslibs):
     libdir=Path(sp.check_output(['rustc','--print','target-libdir'],text=True).strip())
     rt,=libdir.glob('libprofiler_builtins-*.rlib')
     exe=w/'rust-training-runner'
+    wrapper=w/'profile_driver.o'
+    sp.run(['clang','-O2','-c',Path(__file__).with_name('profile_driver.c'),'-o',wrapper],check=True)
     with (out/'rust-instrumented-link.log').open('w')as log:
-        sp.run(['clang++',w/'driver.o',*flags,capstone,lib,rt,*syslibs,'-o',exe],stdout=log,stderr=sp.STDOUT,check=True)
+        sp.run(['clang++','-Wl,--wrap=main',w/'driver.o',wrapper,*flags,capstone,lib,rt,*syslibs,'-o',exe],stdout=log,stderr=sp.STDOUT,check=True)
     return exe
 def optimize(ad,w,out,counts):
-    raw=w/'rust-raw';frozen=list(raw.glob('*.profraw'));assert frozen and all(f.stat().st_size for f in frozen)
+    raw=w/'rust-raw';frozen=sorted(raw.glob('training-*.profraw'));assert len(frozen)==36 and all(f.stat().st_size>128 for f in frozen),(len(frozen),[f.stat().st_size for f in frozen])
     tool=fork_profdata(w,out);merged=w/'iced.profdata';sp.run([tool,'merge','-o',merged,*frozen],check=True)
     shown=sp.check_output([tool,'show','--all-functions','--counts',merged],text=True)
     groups=dict(decoder={},formatter={},info={},adapter={})
