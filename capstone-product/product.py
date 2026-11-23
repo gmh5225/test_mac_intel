@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','public','access'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','public','vector'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -38,7 +38,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','public','access'):
+    for variant in ('base','public','vector'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -75,6 +75,9 @@ try:
         command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'build-generator-'+variant)
         generated=sp.check_output([t/'simple-generator'])
         assert generated==(cs/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
+        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'vector-generator'],'compile-vector-rows-'+variant)
+        generated=sp.check_output([t/'vector-generator']);assert generated==(cs/'arch/X86/X86GenVectorOutput.inc').read_bytes()
+        save('vector-table-'+variant,dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
         obj,=build.rglob('X86Decoder.cpp.o')
         with obj.open('rb') as f:
             ef=ELFFile(f);sections={se.name:hashlib.sha256(se.data()).hexdigest() for se in ef.iter_sections() if se['sh_flags']&4 and se.data_size}
@@ -108,7 +111,7 @@ try:
         immediate_code={se.name:hashlib.sha256(se.data()).hexdigest() for se in contents.iter_sections() if se.data_size and se['sh_flags'] & 4}
         assert '.text' in immediate_code
         if variant=='base':original_immediate=immediate_code
-        elif variant=='public':assert original_immediate==immediate_code
+        else:assert original_immediate==immediate_code
         save('layout-'+variant,dict(all_members=all_members,immediate_code=immediate_code,member_digests=member_digests,symbols=symbols,decoder_executable_sections=sections,linked_sections=linked_sections,archive_members=members))
 
         if variant=='base':

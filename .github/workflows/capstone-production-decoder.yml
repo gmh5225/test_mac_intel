@@ -1,7 +1,7 @@
-name: Measure public full-record dispatch and Intel operand-access projection in the actual NeverD decoder
+name: Measure production NeverD with public record selection and local vector register names
 on:
   push:
-    branches: [codex/neverd-routed-records-and-access]
+    branches: [codex/neverd-public-selection-local-vector-names]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 611e77b790a261443a2ba9c805cbfe125a4e72e1
+          ref: 83dc20e512ed43a9fcf5994ba585f85c7d9b2f20
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "611e77b790a261443a2ba9c805cbfe125a4e72e1"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "a19fb997d94b4f285afe905aa0d9ccaa98139651"
+          test "$(git rev-parse HEAD)" = "83dc20e512ed43a9fcf5994ba585f85c7d9b2f20"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin a19fb997d94b4f285afe905aa0d9ccaa98139651
-          git -C third_party/capstone checkout --detach a19fb997d94b4f285afe905aa0d9ccaa98139651
+          git -C third_party/capstone fetch --depth=1 origin 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
+          git -C third_party/capstone checkout --detach 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: full-record-access-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: public-vector-name-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
