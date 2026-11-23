@@ -1,7 +1,7 @@
-name: Compare single-write vector operands with the released readers and fork iced
+name: Measure byte immediate MOV on real PE/ELF readers and count every use
 on:
   push:
-    branches: [codex/vector-register-and-separator]
+    branches: [codex/x86-byte-mov-immediate-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-operand-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: byte-immediate-mov-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

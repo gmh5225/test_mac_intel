@@ -174,6 +174,21 @@ def main(w):
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
+        # Link a separate, untimed counter into the verified library only
+        # after the benchmark and all normal tests have been linked.
+        source=base/'arch/X86/X86ImmediateOutput.c'
+        saved=source.read_bytes()
+        try:
+            if kind=='bare':
+                text=saved.decode()
+                mark='const uint8_t opcode = code[rex != 0];'
+                assert text.count(mark)==1
+                text=text.replace(mark,mark+chr(10)+'    extern unsigned long long byte_mov_calls;'+chr(10)+'    if ((opcode & 0xf8) == 0xb0) ++byte_mov_calls;')
+                source.write_text(text)
+                run(['cmake','--build',build,'--parallel','4','--target','capstone_static'],'byte-counter-'+key)
+            run(['clang++','-O2','-std=c++17','-I',base/'include',r/'trace.cpp',lib,'-o',w/('byte-coverage-'+key)],'link-byte-counter-'+key)
+        finally:
+            if kind=='bare':source.write_bytes(saved)
         shutil.rmtree(build)
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
@@ -212,6 +227,16 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
+        coverage={}
+        for key in trees:
+            raw=sp.check_output([w/('byte-coverage-'+key),str(bits),f,intervals],text=True)
+            rows=[list(map(int,row.split()))for row in raw.splitlines()]
+            assert len(rows)==4 and all(0<=z[6]<=z[5]<=z[2] for z in rows)
+            assert all(z[2:4]==json.loads((r/'expected.json').read_text())[name]for z in rows)
+            if key.endswith('base'):assert all(z[6]==0 for z in rows)
+            if key.endswith('bare'):assert [z[:6]for z in rows]==[z[:6]for z in coverage[key.replace('bare','base')]]
+            coverage[key]=rows
+        save('byte-move-'+name+'.json',coverage)
         for mode in (0,1,2):
             targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
             if mode:targets['fast']=('base','fast____')
