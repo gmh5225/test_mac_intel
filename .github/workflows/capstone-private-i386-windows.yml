@@ -1,7 +1,7 @@
-name: Exercise private masked output and dedicated public readers in sixteen native configurations
+name: Validate dedicated i386 address writers in pure and mixed Windows and macOS libraries
 on:
   push:
-    branches: [codex/portable-private-masked-records]
+    branches: [codex/portable-dedicated-base-only-sib]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
+          ref: aa095ef5688bfc49b8ba0c5e5a7648faa7ed6877
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mixed-mask-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: dedicated-sib-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
