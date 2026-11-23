@@ -14,7 +14,7 @@ assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}
 try:
     images={};profiles={}
     cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
-    for profile,architectures in [('mixed',mixed),('diet',['SYSTEMZ']),('pure',['SYSTEMZ'])]:
+    for profile,architectures in [('mixed',mixed),('diet',['LOONGARCH']),('systemz',['SYSTEMZ']),('pure',['LOONGARCH'])]:
         b=t/profile;variants={}
         for k in ('base','storage','candidate'):
             g('restore','--source',baseline,'--staged','--worktree','--','.')
@@ -29,19 +29,19 @@ try:
             so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
             variants[k]=dict(shared=sha(so),objects={str(f.relative_to(b/'CMakeFiles/capstone.dir')):sha(f)for f in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')},archive=sha(b/'libcapstone.a'))
             target=t/(profile+'-'+k+'.so');shutil.copy2(so,target)
-            if k!='base':
+            if k!='base' and profile!='systemz':
                 cmd('boundary-'+profile+'-'+k,[t/'guard',t/(profile+'-base.so'),target])
                 modes,trials,accepted=map(int,(out/('boundary-'+profile+'-'+k+'.log')).read_text().split())
                 assert modes in (1,2) and trials==57344*modes and accepted>0
             if profile=='pure':
                 images[k]=so.read_bytes()
                 cmd('symbols-'+k,['nm','-S','-n','--defined-only',so])
-                for sym in ('cs_decode_full_insn','cs_disasm_iter','systemz_print_record'):
+                for sym in ('cs_decode_full_insn','cs_disasm_iter','LoongArch_printer'):
                     cmd('code-'+k+'-'+sym,['objdump','-d','--disassemble='+sym,so])
                 cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
                 if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
                 if k=='candidate':
-                    original=(s/'cs.c').read_text();line='MCInst_InitStorage(&mci, CS_ARCH_SYSTEMZ, false);';assert original.count(line)==1
+                    original=(s/'cs.c').read_text();line='MCInst_InitStorage(&mci, CS_PRIVATE_ARCH, false);';assert original.count(line)==1
                     for pattern in (0xa5,0x5a):
                         # Change only the private operand slots the decoder is allowed to leave unused.
                         start='offsetof(MCInst, Operands) + sizeof(mci.Operands[0])'
@@ -65,12 +65,12 @@ try:
         profiles[profile]=dict(changed=changed,variants=variants)
     save('profiles',profiles)
     # The package digest binds every extracted member. Check the established ls digest as well.
-    manifest=json.loads((d/'manifest.json').read_text());ls,=[x for x in manifest['inputs']if x['name']=='s390x-ls']
+    manifest=json.loads((d/'manifest.json').read_text());ls,=[x for x in manifest['inputs']if x['name']=='loong64-ls']
     pkg=t/'coreutils.deb';cmd('download',['curl','--retry','2','-fsSL',ls['url'],'-o',pkg]);assert sha(pkg)==ls['package_sha256']
     samples={}
     for name in ('ls','cat','sort','cp'):
         binary=corpus.deb_binary(pkg,name);data=corpus.elf_text(binary);f=t/(name+'.text');f.write_bytes(data)
-        samples[name]=dict(package_sha256=sha(pkg),elf_sha256=hashlib.sha256(binary).hexdigest(),section_sha256=sha(f),bytes=len(data));assert len(data)>1024 and len(data)%2==0
+        samples[name]=dict(package_sha256=sha(pkg),elf_sha256=hashlib.sha256(binary).hexdigest(),section_sha256=sha(f),bytes=len(data));assert len(data)>1024 and len(data)%4==0
     assert samples['ls']['section_sha256']==ls['text_sha256'];save('samples',samples)
     sz=max(map(len,images.values()));images={k:v+bytes(sz-len(v))for k,v in images.items()};images['aa']=images['base']
     slot=t/'fixed';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(images['base']);(slot/'libcapstone.so').symlink_to(target.name)
@@ -80,17 +80,17 @@ try:
         for opt in range(5):
             observed=[]
             for k in ('base','storage','candidate'):
-                target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','107',t/(name+'.text'),str(opt)]).split())))
+                target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','108',t/(name+'.text'),str(opt)]).split())))
             assert observed[0]==observed[1]==observed[2] and observed[0][0]>0
             for pattern in (0xa5,0x5a):
                 img=(t/('poison-'+str(pattern)+'.so')).read_bytes()
                 target.write_bytes(img)
-                result=list(map(int,sp.check_output([t/'raw','107',t/(name+'.text'),str(opt)]).split()))
+                result=list(map(int,sp.check_output([t/'raw','108',t/(name+'.text'),str(opt)]).split()))
                 assert result==observed[0]
             signatures[name+'/'+str(opt)]=observed[0]
     save('raw',signatures);rng=random.Random(2044);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     def sample(k,name,mode,n):
-        target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time','107',str(mode),t/(name+'.text'),'1048576',str(n)]).split()))
+        target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time','108',str(mode),t/(name+'.text'),'1048576',str(n)]).split()))
     for name in samples:
         for mode in range(3):
             one=sample('base',name,mode,1);n=max(1,round(65e6/one[0]));cycles=[]

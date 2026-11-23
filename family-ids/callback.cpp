@@ -44,13 +44,15 @@ int main(int argc,char **argv) {
     if(argc!=3) return 1;
     Api a(argv[1]),b(argv[2]);
     if(!a.lib||!b.lib) return 2;
-    const std::array<std::array<uint8_t,6>,4> inputs{{{0x18,0x12},{0xa7,0x1a,0xf1,0x23},{0xc0,0xf4,0,0,0x12,0x34},{0x58,0x13,0x41,0x20}}};
+    const std::array<std::array<uint8_t,4>,4> inputs{{
+        {0x47,0xb1,0x00,0x58}, {0x21,0x8b,0x00,0x5c},
+        {0x43,0xf5,0x8a,0x76}, {0x74,0x16,0x0a,0x74}}};
     unsigned total=0,seen[6]={};
     for(int kind=0;kind<6;++kind)for(bool detail:{false,true})for(bool un:{false,true})for(bool skip:{false,true})for(auto &bytes:inputs) {
         auto observe=[&](Api &api,Observation &v) {
             active=&api;behavior=kind;calls=0;memory.vsnprintf=kind?custom:vsnprintf;
             if(api.option(0,CS_OPT_MEM,(size_t)&memory))std::abort();
-            csh h=0;if(api.open(CS_ARCH_SYSTEMZ,CS_MODE_BIG_ENDIAN,&h)||
+            csh h=0;if(api.open(CS_ARCH_LOONGARCH,CS_MODE_LOONGARCH64,&h)||
                api.option(h,CS_OPT_DETAIL,detail?CS_OPT_ON:CS_OPT_OFF)||
                api.option(h,CS_OPT_UNSIGNED,un?CS_OPT_ON:CS_OPT_OFF)||
                api.option(h,CS_OPT_SKIPDATA,skip?CS_OPT_ON:CS_OPT_OFF))std::abort();

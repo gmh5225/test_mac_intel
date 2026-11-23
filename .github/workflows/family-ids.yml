@@ -1,7 +1,7 @@
-name: Verify SystemZ decoded operand initialization with two stack patterns and real workloads
+name: Measure LoongArch private operand storage and printer lengths on four coreutils binaries
 on:
   push:
-    branches: [codex/systemz-construct-operands-on-demand]
+    branches: [codex/loongarch-private-operands]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6de392819bbc0d468ad7c30531271823416f655e
+          ref: 8835df03f81c2011e14511446686a6b68eabdd68
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-constructed-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: loongarch-private-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
