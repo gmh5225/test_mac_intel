@@ -1,7 +1,7 @@
-name: Compare directly linked x86 iterators and nine foreign architectures on the published base
+name: Separate x86 public dispatch from pulling fixed readers into normal ten-architecture executables
 on:
   push:
-    branches: [codex/linked-direct-static-iterator]
+    branches: [codex/isolate-static-reader-admission-and-linkage]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: linked-direct-iterator-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: static-reader-link-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

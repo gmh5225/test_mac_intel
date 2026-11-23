@@ -27,22 +27,26 @@ try:
             assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86DisassemblerDecoder.c.o'}
             assert [n for n in obj if n in base_obj]==base_order
         save('objects-'+k,dict(members=obj,order=order))
-        for case,store in [('time',probe_bins),('raw',raw_bins)]:
-            exe=t/(case+'-'+k)
-            cmd('compile-'+case+'-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/(case+'.cpp'),lib,'-lm','-o',exe]);store[k]=exe
-        symbols={}
-        targets={'cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','RISCV_getInstruction','PPC_getInstruction','SystemZ_LLVM_getInstruction','Xtensa_getInstruction','LoongArch_getInstruction','X86_decodePublicRecord'}
-        for line in sp.check_output(['nm','-n','-S','--defined-only',probe_bins[k]],text=True).splitlines():
-            fs=line.split()
-            if len(fs)==4 and fs[-1] in targets:symbols[fs[-1]]=list(map(lambda v:int(v,16),fs[:2]))
-        assert 'X86_decodePublicRecord' not in symbols and 'cs_disasm_iter' in symbols and 'cs_decode_full_insn' in symbols
-        if k=='candidate':assert 'X86_disasmIterText' in symbols
-        save('layout-'+k,symbols)
-        cmd('public-code-'+k,['objdump','-d','--disassemble=cs_disasm_iter',probe_bins[k]])
-        imgs[k]=probe_bins[k].read_bytes();ids[k]=sha(probe_bins[k])
+        stages=[k,'forced'] if k=='base' else [k]
+        for stage in stages:
+            forced=['-Wl,-u,X86_disasmIterText'] if stage=='forced' else []
+            exe=t/('time-'+stage)
+            cmd('compile-time-'+stage,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'time.cpp',*forced,lib,'-lm','-o',exe])
+            symbols={}
+            targets={'cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','RISCV_getInstruction','PPC_getInstruction','SystemZ_LLVM_getInstruction','Xtensa_getInstruction','LoongArch_getInstruction','X86_decodePublicRecord'}
+            for line in sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines():
+                fs=line.split()
+                if len(fs)==4 and fs[-1] in targets:symbols[fs[-1]]=[int(v,16)for v in fs[:2]]
+            assert {'cs_disasm_iter','cs_decode_full_insn'}<=symbols.keys()
+            assert ('X86_disasmIterText' in symbols)==(stage!='base') and ('X86_disasmIter32' in symbols)==(stage!='base')
+            assert 'X86_decodePublicRecord' not in symbols
+            save('layout-'+stage,symbols)
+            cmd('public-code-'+stage,['objdump','-d','--disassemble=cs_disasm_iter',exe])
+            imgs[stage]=exe.read_bytes();ids[stage]=sha(exe)
+        raw=t/('raw-'+k);cmd('compile-raw-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'raw.cpp',lib,'-lm','-o',raw]);raw_bins[k]=raw
         so=t/(k+'.so')
         cmd('loadable-'+k,[cc,'-shared','-Wl,-Bsymbolic','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',so]);libs[k]=so
-    assert ids['base']!=ids['candidate']
+    assert len(set(ids.values()))==3,ids
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v))for k,v in imgs.items()}
     target=t/'time';target.write_bytes(imgs['base']);target.chmod(0o755)
     shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
