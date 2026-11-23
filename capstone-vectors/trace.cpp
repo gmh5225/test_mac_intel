@@ -59,7 +59,10 @@ int main(int argc, char **argv)
 				if (full) {
                     const cs_x86 &x=ref.detail->x86;
                     bool sib=x.encoding.modrm_offset && x.addr_size!=2 && (x.modrm & 7)==4 && x.modrm<0xc0;
-                    rows<<records<<' '<<(p-bytes.data())<<' '<<ref.size<<' '<<unsigned(x.modrm)<<' '<<(sib?int(x.sib):-1)<<' '<<ref.mnemonic<<'\n';
+                    rows<<records<<' '<<(p-bytes.data())<<' '<<ref.size<<' '<<unsigned(x.modrm)<<' '<<(sib?int(x.sib):-1)<<' '<<ref.mnemonic<<' ';
+                    const char *digits="0123456789abcdef";
+                    for (unsigned i=0;i<ref.size;++i) rows<<digits[p[i]>>4]<<digits[p[i]&15];
+                    rows<<'\n';
                     ++eligible;
                 }
 				p=after; n=left; ip=address;
