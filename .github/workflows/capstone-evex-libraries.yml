@@ -1,7 +1,7 @@
-name: Verify mandatory-prefix memory records against fork iced and the released PE32 reader
+name: Compare compact mandatory-prefix pages on scalar and vector PE ELF inputs and verify every admitted row
 on:
   push:
-    branches: [codex/fused-vex-prefix-memory]
+    branches: [codex/vex-memory-form-pages]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mandatory-prefix-vex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: prefix-memory-pages-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

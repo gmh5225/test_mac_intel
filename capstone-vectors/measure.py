@@ -143,6 +143,7 @@ def main(w):
             if (base/'arch/X86/X86GenVexBaseMemory.inc').is_file():
                 special=sp.check_output([w/'vector-generator','--vex-base-memory'])
                 assert special==(base/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
+                assert hashlib.sha256(special).hexdigest()=='4b66c239c979ca707c402741e613812e5a3775d353a6de6fb35e916359d9dcb7'
                 save('memory-rows-'+key+'.json',dict(bytes=len(special),sha256=hashlib.sha256(special).hexdigest()))
         if not mixed:
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'pp-oracle.c','-o',w/'pp-oracle.o'],'oracle-build-'+key)
