@@ -27,7 +27,7 @@ try:
             cmd(profile+'-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*(['register_descriptors','mcinst']if profile!='diet'else [])])
             if profile!='diet':cmd(profile+'-test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
             so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
-            variants[k]=dict(shared=sha(so),objects={str(f.relative_to(b)):sha(f)for f in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')},archive=sha(b/'libcapstone.a'))
+            variants[k]=dict(shared=sha(so),objects={str(f.relative_to(b/'CMakeFiles/capstone.dir')):sha(f)for f in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')},archive=sha(b/'libcapstone.a'))
             target=t/(profile+'-'+k+'.so');shutil.copy2(so,target)
             if k!='base':
                 cmd('boundary-'+profile+'-'+k,[t/'guard',t/(profile+'-base.so'),target])
