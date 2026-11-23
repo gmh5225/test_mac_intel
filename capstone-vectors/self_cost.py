@@ -1,6 +1,10 @@
 """Read exclusive event rows from the Callgrind file format, separate from call edges."""
 from collections import Counter
 import gzip,hashlib,re,shutil
+def checksum(stream):
+    digest=hashlib.sha256()
+    for block in iter(lambda: stream.read(1<<20),b''):digest.update(block)
+    return digest.digest()
 def read(path,out,prefix):
     seen={};by_symbol={};symbols={};function=None;object_name=None;edge=False
     events=positions=None;totals=None
@@ -32,6 +36,6 @@ def read(path,out,prefix):
     names=[v[0][1]for v in order if v[1]['Ir']]
     compressed=out/(prefix+'-events.gz')
     with path.open('rb')as src,gzip.open(compressed,'wb',compresslevel=5)as dst:shutil.copyfileobj(src,dst)
-    with path.open('rb')as orig,gzip.open(compressed,'rb')as restored:assert hashlib.file_digest(orig,'sha256').digest()==hashlib.file_digest(restored,'sha256').digest()
+    with path.open('rb')as orig,gzip.open(compressed,'rb')as restored:assert checksum(orig)==checksum(restored)
     annotated=[dict(binary=k[0].rsplit('/',1)[-1],function=k[1],events=dict(v))for k,v in order[:32]]
     return dict(events=whole,accounted=accounted,symbols=len(names),top=annotated,compressed_bytes=compressed.stat().st_size)

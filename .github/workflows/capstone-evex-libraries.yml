@@ -1,7 +1,7 @@
-name: Locate instruction-address costs in PE32 formatter records and vector-memory operands
+name: Verify exclusive formatter costs and restore compressed evidence on both Linux Python runtimes
 on:
   push:
-    branches: [codex/x86-vector-and-implicit-self-events]
+    branches: [codex/x86-verified-formatter-self-costs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-instruction-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-checked-self-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
