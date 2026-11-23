@@ -1,7 +1,7 @@
-name: Measure repeated-prefix AMD64 alignment records on the real PE and SIMD corpora
+name: Measure VEX packed register output on real PE, JPEG, OpenSSL and glibc functions
 on:
   push:
-    branches: [codex/long-alignment-record-costs]
+    branches: [codex/vex-packed-registers-on-real-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: aa095ef5688bfc49b8ba0c5e5a7648faa7ed6877
+          ref: 76395023380f346cd58f166905c5be77afede197
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: e93da2b1d89e79cb9b884b4844d7b7695e597af9
+          ref: 791803a03ec4ac62f305e605917e76737d11ad42
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: long-alignment-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: packed-register-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

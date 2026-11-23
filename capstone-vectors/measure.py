@@ -94,7 +94,7 @@ def main(w):
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
         mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
-        patches=['base']+([kind] if kind!='base' else [])
+        patches=[kind] if kind!='base' else []
         for name in patches:
             patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
             run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
@@ -123,9 +123,9 @@ def main(w):
         defs=[v for v in shlex.split(entry['command'])if v.startswith('-D')]
         run(['clang','-O2',*defs,'-I',base,'-I',base/'include','-c',r/'scalar-guard.c','-o',w/'scalar.o'],'scalar-probe-'+key)
         run(['clang++','-std=c++17','-O2','-I',base/'include',r/'scalar-guard.cpp',w/'scalar.o',lib,'-o',w/'scalar-guard'],'scalar-link-'+key)
-        run([w/'scalar-guard',*(['candidate'] if kind=='padding' else [])],'scalar-guard-'+key)
+        run([w/'scalar-guard',*(['candidate'] if kind=='bare' else [])],'scalar-guard-'+key)
         counts=list(map(int,(evidence/('scalar-guard-'+key+'.log')).read_text().split()))
-        assert counts==[3073220,0,480 if kind=='padding' else 0],(key,counts)
+        assert counts==([2162688, 1388, 468798] if kind=='bare' else [1703936, 0, 0]),(key,counts)
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -141,7 +141,7 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='padding':assert changed==['X86VectorOutput.c.o'],(key,changed)
+        if kind=='bare':assert changed==['X86VectorOutput.c.o'],(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
