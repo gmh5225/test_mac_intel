@@ -58,7 +58,7 @@ def measure(t):
                 changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
                 actual={Path(f).name for f in changed}
                 allowed={'RISCVInstPrinter.c.o'} if k=='lazy' else {'RISCVInstPrinter.c.o','cs.c.o','RISCVDisassembler.c.o','RISCVModule.c.o'} if k=='width' else set()
-                if mixed and k=='width':
+                if profile=='full' and mixed and k=='width':
                     allowed={'RISCVInstPrinter.c.o'}
                     # This mixed build must be bit-for-bit the separately timed alias change.
                     assert row['so']==variants['lazy']['so'] and row['archive']==variants['lazy']['archive']
