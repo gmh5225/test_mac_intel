@@ -1,7 +1,7 @@
-name: Retest public and private x86 readers for memory, mask and i386 records on six real binaries
+name: Separate formatter work from linked entry placement using identical archive members
 on:
   push:
-    branches: [codex/released-public-private-records]
+    branches: [codex/hold-hot-reader-positions]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: released-reader-matrix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-reader-positions-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

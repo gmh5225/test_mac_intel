@@ -90,7 +90,8 @@ def main(w):
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
     darwin=platform.system()=='Darwin';bins={};objects={}
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
-    for key,z in trees.items():
+    for source_key in ('base','masked','both'):
+        key=source_key;z=trees[key]
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
         if key!='base':
@@ -110,19 +111,40 @@ def main(w):
         if key in ('masked','opcode'):
             assert changed==[('X86VectorFallback64.c.o' if key=='masked' else 'X86MemoryFallback32.c.o')],changed
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,commands_sha256=sha(build/'compile_commands.json')))
-        exe=w/('runner-'+key)
-        flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
-        syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
-        run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
-        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
-        linked={}
-        for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
-            cols=line.split()
-            if len(cols)!=3 or cols[1] not in ('t','T'):continue
-            name=cols[2][1:] if darwin and cols[2].startswith('_') else cols[2]
-            if name in names:linked[name]=int(cols[0],16)
-        assert {'X86_decodePublicRecord','cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
-        save('linked-'+key+'.json',linked)
+        original_lib=lib
+        def members(archive):
+            return [v for v in sp.check_output(['ar','t',archive],text=True).splitlines() if v and not v.startswith('__.SYMDEF')]
+        sequence=members(lib)
+        earlier=['X86PublicOutput.c.o','X86BatchScan.c.o']
+        first=sequence.index('X86MemoryFallback32.c.o')
+        assert all(sequence.index(n)>first for n in earlier) and len(set(sequence))==len(sequence)
+        moved=sequence[:first]+earlier+[n for n in sequence[first:] if n not in earlier]
+        dest=w/('members-'+key);dest.mkdir()
+        run(['ar','x',lib],'extract-'+key,dest)
+        checks={n:sha(dest/n) for n in sequence}
+        assert checks==objects[key]
+        alt=dest/'libcapstone-first.a'
+        run(['ar','cr',alt,*moved],'order-'+key,dest);run(['ranlib',alt],'index-'+key)
+        assert members(alt)==moved
+        for member in moved:
+            assert hashlib.sha256(sp.check_output(['ar','p',alt,member])).hexdigest()==checks[member]
+        save('order-'+key+'.json',dict(original=sequence,first=moved,members=checks))
+        for key,lib in [(source_key,original_lib),(source_key+'_first',alt)]:
+            exe=w/('runner-'+key)
+            flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
+            syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
+            run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
+            names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
+            linked={}
+            for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
+                cols=line.split()
+                if len(cols)!=3 or cols[1] not in ('t','T'):continue
+                name=cols[2][1:] if darwin and cols[2].startswith('_') else cols[2]
+                if name in names:linked[name]=int(cols[0],16)
+            assert {'X86_decodePublicRecord','cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
+            save('linked-'+key+'.json',linked)
+        key=source_key;lib=original_lib
+        shutil.rmtree(dest)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
@@ -173,7 +195,7 @@ def main(w):
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
             rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'released-public-reader')))
+            labels=list(targets);order=random.Random(str((name,mode,'ordered-public-reader')))
             for idx in range(13):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1
