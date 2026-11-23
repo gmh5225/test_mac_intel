@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..e2601582 100644
+index bc463d2b..22c0da94 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -12788,7 +12788,30 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
@@ -48,11 +48,14 @@ index bc463d2b..e2601582 100644
  		return;
  	}
  #endif
-@@ -12868,4 +12885,21 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+@@ -12868,4 +12885,24 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
  	}
  }
  
 +#if !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET)
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_postprinter_text")))
++#endif
 +void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 +{
 +	if (insn && insn->id != X86_INS_VPCMP) {

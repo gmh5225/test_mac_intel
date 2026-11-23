@@ -1,7 +1,7 @@
-name: Isolate scalar detail repair placement with identical postprocessing across ten architectures
+name: Isolate formatter placement by restoring every original executable section with identical candidate objects
 on:
   push:
-    branches: [codex/isolated-x86-scalar-detail-repair]
+    branches: [codex/move-postprinter-after-evex-with-identical-objects]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: scalar-repair-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: scalar-repair-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

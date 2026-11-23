@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
+import hashlib,json,re,os,platform,random,shutil,subprocess as sp,tempfile
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
 def load(p):return json.loads(p.read_text())
 def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
@@ -14,13 +14,45 @@ try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
     for k in ('base','active','indexed'):
-        if k!='base':
+        if k=='active':
             g('restore','--source',baseline,'--staged','--worktree','--','.')
             selected=load(d/'active-tree.json') if k=='active' else meta
             patch=d/('active.patch' if k=='active' else 'candidate.patch')
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
+        def executable_sections(path):
+            text=sp.check_output(['readelf','-SW',path],text=True)
+            result={}
+            for line in text.splitlines():
+                m=re.match(r'\s*\[\s*\d+\]\s+(\S+)\s+\S+\s+([a-f0-9]+)\s+\S+\s+([a-f0-9]+)\s+\S+\s+(\w+)',line)
+                if m and 'X' in m[4]:result[m[1]]=[int(m[2],16),int(m[3],16)]
+            return result
+        if k=='base':
+            original_sections=executable_sections(so)
+            old_sections=[n for n in original_sections if n.startswith('.cs_')]
+            assert '.cs_x86_evex_scan_text' in old_sections
+        elif k=='indexed':
+            assert g('write-tree')==meta['tree'] and sha(so)==ids['active']
+            # Re-execute exactly the shared link with the same objects. Preserve
+            # every old executable input section in its original link order.
+            layout=b/'postprinter-order.ld'
+            sections=old_sections+['.cs_x86_postprinter_text']
+            assert all(re.fullmatch(r'\.cs_[a-z_0-9]+',n) for n in sections)
+            layout.write_text('SECTIONS {\n'+''.join('  '+n+' : { *('+n+') }\n' for n in sections)+'}\nINSERT AFTER .text;\n')
+            commands=sp.check_output(['ninja','-C',b,'-t','commands','capstone_shared'],text=True).splitlines()
+            link,=[v for v in commands if ' -shared ' in v and ' -o '+so.name+' ' in v]
+            cmd('relink-tail',['sh','-c',link.replace(' -shared ',' -Wl,-T,postprinter-order.ld -shared ',1)],cwd=b)
+        positions=executable_sections(so)
+        objects={str(f.relative_to(b)):sha(f) for f in b.glob('CMakeFiles/capstone*.dir/**/*.c.o')}
+        assert len(objects)>60
+        if k=='active':early_objects=objects
+        if k=='indexed':assert objects==early_objects
+        assert (positions['.cs_x86_evex_scan_text'][0]!=original_sections['.cs_x86_evex_scan_text'][0])==(k=='active'),(k,positions,original_sections)
+        if k=='indexed':
+            assert all(original_sections[n]==positions[n] for n in ['.text',*old_sections]),(positions,original_sections)
+            tail=positions['.cs_x86_postprinter_text'][0];assert all(tail>=sum(positions[n]) for n in old_sections)
+        save('causal-order-'+k,dict(positions=positions,objects=objects,custom=old_sections))
         names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','X86_postprinter','postprocess_full','repair_avx_broadcast'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
@@ -58,7 +90,7 @@ try:
         entries=sp.check_output(['objdump','-t',mapping],text=True).splitlines()
         table={row.split()[-1]:row.split() for row in entries if row.split() and row.split()[-1].split('.')[0] in ('postprocess_full','X86_postprinter')}
         assert any(name.startswith('postprocess_full') for name in table)==(k!='base'),table
-        assert ('.cs_x86_postprinter_text' in table['X86_postprinter'])==(k=='indexed'),table
+        assert ('.cs_x86_postprinter_text' in table['X86_postprinter'])==(k!='base'),table
         save('postprinter-sections-'+k,table)
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
