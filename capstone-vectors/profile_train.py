@@ -24,12 +24,25 @@ def train(exe,w,recipes,tool,raw,out):
     profiles=sorted(raw.glob('*.profraw'));assert profiles
     merged=w/'capstone.profdata';sp.run([tool,'merge','-o',merged,*profiles],check=True)
     shown=sp.check_output([tool,'show','--all-functions','--counts',merged],text=True)
+    import gzip
+    with gzip.open(out/'function-counters.txt.gz','wt')as f:f.write(shown)
+    # Clang can inline or coalesce the forwarding wrapper. Verify the counter
+    # of a function doing the work in each decoder or formatter family.
     functions={}
-    for sym in ('tryOutput32','tryOutput64','X86_reg_access','X86_getInstruction'):
-        blocks=re.findall(r'^\s{2}([^\n]*'+sym+r'):\s*\n((?:    [^\n]+\n)+)',shown,re.M)
-        assert blocks,(sym,shown[:500])
-        hits=max(int(n) for _,t in blocks for line in t.splitlines() if 'Block counts:' in line or 'Function count:' in line for n in re.findall(r'[0-9]+',line.split(':',1)[1]))
-        assert hits>100, (sym,hits)
-        functions[sym]=blocks
+    for family,names in {
+        'i386 formatting':('tryOutput32',),
+        'AMD64 formatting':('tryOutput64',),
+        'register access':('X86_reg_access',),
+        'ordinary decoder':('X86_getInstruction','_getInstruction','decodeInstructionFull','getIDWithAttrMask','readModRM')
+    }.items():
+        entries={}
+        for heading,data in re.findall(r'^  (\S[^\n]*):\n((?:    [^\n]+\n)+)',shown,re.M):
+            # Clang versions emit either an object path plus semicolon or a bare symbol.
+            symbol=heading.rsplit(';',1)[-1].split('.')[0]
+            if symbol not in names:continue
+            counters=[int(n) for line in data.splitlines() if 'Block counts:' in line or 'Function count:' in line for n in re.findall(r'[0-9]+',line.split(':',1)[1])]
+            if counters:entries[heading]=max(counters)
+        assert entries and max(entries.values())>100,(family,entries)
+        functions[family]=entries
     (out/'profile.json').write_text(json.dumps(dict(training=programs,functions=functions,bytes=merged.stat().st_size,sha256=hashlib.sha256(merged.read_bytes()).hexdigest(),tool=str(tool),raw=len(profiles)),indent=2)+'\n')
     return merged

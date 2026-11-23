@@ -1,7 +1,7 @@
-name: Measure profile-guided x86 compiler layout on six disjoint ELF and PE workloads
+name: Measure trained x86 code on withheld real programs with verified decoder counters
 on:
   push:
-    branches: [codex/x86-held-out-profile-feedback]
+    branches: [codex/x86-held-out-decoder-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -48,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: trained-x86-writers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: verified-trained-x86-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

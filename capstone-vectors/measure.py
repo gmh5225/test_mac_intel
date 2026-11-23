@@ -124,6 +124,10 @@ def main(w):
         assert ('X86PublicOutput.c' in files)==(not mixed)
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access','text_option']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
+        if kind=='bare':
+            warnings=[line for line in (evidence/('build-'+key+'.log')).read_text().splitlines() if 'warning:' in line and 'profile' in line.lower()]
+            save('feedback-diagnostics.json',dict(messages=warnings))
+            assert not any('out of date' in line or 'mismatch' in line for line in warnings),warnings
         lib,=build.rglob('libcapstone.a')
         if kind!='train':
             for name in units:
