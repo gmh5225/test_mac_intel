@@ -144,6 +144,12 @@ def main(w):
                 special=sp.check_output([w/'vector-generator','--vex-base-memory'])
                 assert special==(base/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
                 save('memory-rows-'+key+'.json',dict(bytes=len(special),sha256=hashlib.sha256(special).hexdigest()))
+        if not mixed:
+            run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'pp-oracle.c','-o',w/'pp-oracle.o'],'oracle-build-'+key)
+            run(['clang++','-std=c++17','-O2','-I',base/'include',r/'pp-oracle.cpp',w/'pp-oracle.o',lib,'-o',w/'pp-oracle'],'oracle-link-'+key)
+            run([w/'pp-oracle'],'oracle-'+key)
+            checks=list(map(int,(evidence/('oracle-'+key+'.log')).read_text().split()))
+            assert checks==[33030160,0,290330,29952,252890,0,7488] if kind=='bare' else checks==[33030160,0,249722,0,249722,0,0]
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -182,6 +188,7 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
+    assert hashes['mixed_base']==hashes['mixed_bare'] and hashes['base']!=hashes['bare']
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}
