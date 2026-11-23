@@ -1,7 +1,7 @@
-name: Compare SystemZ static and shared records on Windows and macOS against four real programs
+name: Compare SystemZ static and shared records using the canonical Git patch on Windows and macOS
 on:
   push:
-    branches: [codex/systemz-allocated-details-portable]
+    branches: [codex/verify-systemz-canonical-patch-bytes]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: systemz-cross-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: systemz-verified-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

@@ -35,7 +35,7 @@ try:
     variants={}
     for stage in ('base','candidate'):
         if stage=='candidate':
-            patch=d/'candidate.patch';assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
+            patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
         units=[]if profile=='diet'else ['register_descriptors','mcinst']
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*units])
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
