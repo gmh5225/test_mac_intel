@@ -31,6 +31,8 @@ try:
     cases.append(data)
     shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp')
     with (nd/'CMakeLists.txt').open('a') as f:f.write('\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
+    shutil.copyfile(r/'oracle.cpp',nd/'capstone-count-clear.cpp')
+    with (nd/'CMakeLists.txt').open('a')as f:f.write('\nadd_executable(capstone-count-clear capstone-count-clear.cpp)\ntarget_link_libraries(capstone-count-clear PRIVATE NeverDDecode)\n')
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
@@ -45,6 +47,9 @@ try:
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
+        if variant=='base':
+            command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-count-clear','--parallel','4'],'build-reference-counter',nd)
+            binary,=build.rglob('capstone-count-clear');counter=t/'count';shutil.copy2(binary,counter)
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
@@ -67,7 +72,7 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
-        assert len(regs)==12 and all(int(v[3])==int(v[4])==16 for v in regs)
+        assert len(regs)==12 and all(int(v[3])==int(v[4])==(8 if variant=='tail' and v[0]!='64' else 16) for v in regs)
         if variant!='base':
             for unit in ('x86_simple_output','x86_reg_access'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
@@ -109,8 +114,7 @@ try:
             command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         else:raise AssertionError(('missing shipped alias member',variant))
         assert 'X86PublicOutput.c.o' not in members and 'X86PostPrinter.c.o' not in members
-        if variant!='base':
-            assert members.index('X86VexBaseMemory.c.o')>members.index('AliasPatternLookup.c.o')
+        assert 'X86VexBaseMemory.c.o' not in members
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
@@ -155,15 +159,23 @@ try:
             n=max(1,round(50000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
+            delta,occurrences=0,0
+            if c['selector']==32 and mode==2:
+                counted=list(map(int,sp.check_output([counter,c['path'],'32','2','1',*([c['intervals']]if 'intervals'in c else [])],text=True).split()))
+                occurrences,delta=counted[:2]
+                assert counted[3:]==single[1:]
+                assert (occurrences==0)==(delta==0)
+                if c['name']=='putty-32-0.85':assert occurrences==3
             for rep in range(21):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
                     wanted=expected.copy()
+                    if k=='tail':wanted[-1]-=delta*n
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
-            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],reps=n,cycles=cycles))
+            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],legacy_clears=occurrences,register_delta=delta,reps=n,cycles=cycles))
             save('timings',rows)
     save('complete',dict(done=True,pairs=21,panels=len(rows),source=llvm))
 finally:

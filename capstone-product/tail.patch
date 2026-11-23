@@ -1,91 +1,184 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d36460a3..913578d9 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1094,6 +1094,15 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
-             # Keep the opcode rows after the native scanner when both are linked.
-             set(capstone_alias_patterns_tail
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-+            if(NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE AND CAPSTONE_USE_DEFAULT_ALLOC)
-+                # Keep optional AMD64 memory records after the common alias matcher.
-+                add_library(capstone_x86_vex_memory OBJECT arch/X86/X86VexBaseMemory.c)
-+                target_link_libraries(capstone_x86_vex_memory PRIVATE capstone_build_settings)
-+                target_compile_definitions(capstone_x86_native PRIVATE CAPSTONE_X86_MIXED_VEX_MEMORY)
-+                target_compile_definitions(capstone_x86_vex_memory PRIVATE CAPSTONE_X86_MIXED_VEX_MEMORY)
-+                set_target_properties(capstone_x86_vex_memory PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-+                list(APPEND capstone_alias_patterns_tail $<TARGET_OBJECTS:capstone_x86_vex_memory>)
-+            endif()
-             set(capstone_static_objects
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..946c1e10 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -22,6 +22,13 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 			     size_t size, cs_insn *insn, uint16_t *insn_size,
- 			     bool batch);
+diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
+index ea9309f4..5444947a 100644
+--- a/arch/X86/X86GenMappingCounts.inc
++++ b/arch/X86/X86GenMappingCounts.inc
+@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
+ 	0, // X86_VXORPSZrrkz
+ 	2048, // X86_VXORPSrm
+ 	2048, // X86_VXORPSrr
+-	1536, // X86_VZEROALL
+-	1536, // X86_VZEROUPPER
++	17920, // X86_VZEROALL
++	17920, // X86_VZEROUPPER
+ 	1024, // X86_WAIT
+ 	1024, // X86_WBINVD
+ 	0, // X86_WBNOINVD
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..263db425 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10253,45 +10253,34 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
+ }
+ #endif
  
-+#ifdef CAPSTONE_X86_MIXED_VEX_MEMORY
-+/* The mixed AMD64 iterator supplies a VEX2 or VEX3 prefix. */
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeVexMemoryOrFull(cs_struct *handle, const uint8_t *code, size_t size,
-+			  cs_insn *insn, uint16_t *insn_size, bool batch);
-+#endif
-+
- /* Called by the static AMD64 iterator with at least one input byte. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..b19e0edd 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -200,6 +200,11 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
- 					  x86_simple_registers, true))
- 		return true;
-+#ifdef CAPSTONE_X86_MIXED_VEX_MEMORY
-+	if ((code[0] & 0xfe) == 0xc4)
-+		return X86_decodeVexMemoryOrFull(handle, code, size, insn,
-+						 insn_size, batch);
-+#endif
- 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
- 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
- 		const unsigned offset = 4 + (rex != 0);
-diff --git a/arch/X86/X86VexBaseMemory.c b/arch/X86/X86VexBaseMemory.c
-new file mode 100644
-index 00000000..ffde157e
---- /dev/null
-+++ b/arch/X86/X86VexBaseMemory.c
-@@ -0,0 +1,31 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include "../../cs_priv.h"
-+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_vex_memory_text" rodata = \
-+	".cs_x86_vex_memory_rodata"
-+#endif
-+#include "../../cs_disasm_internal.h"
-+#include "X86OutputOptions.h"
-+#include "X86SimpleOutput.h"
-+#include "X86GenSimpleOutput.inc"
-+#include "X86VexBaseMemory.h"
-+
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeVexMemoryOrFull(cs_struct *handle, const uint8_t *code, size_t size,
-+			  cs_insn *insn, uint16_t *insn_size, bool batch)
+-// look for @id in @insns
+-// return -1 if not found
+-unsigned int find_insn(unsigned int id)
++static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ {
+-	// binary searching since the IDs are sorted in order
+-	unsigned int left, right, m;
+-	unsigned int max = ARR_SIZE(insns);
+-
+-	right = max - 1;
+-
+-	if (id < insns[0].id || id > insns[right].id)
+-		// not found
+-		return -1;
+-
+-	left = 0;
++	const unsigned int count = ARR_SIZE(insns);
++	const unsigned int first = insns[0].id;
++	/* The generator orders distinct IDs. If the endpoints span exactly
++	 * count entries, subtraction indexes every opcode in the table. */
++	if (insns[count - 1].id - first == count - 1) {
++		const unsigned int row = id - first;
++		return row < count ? row : (unsigned int)-1;
++	}
+ 
+-	while (left <= right) {
+-		m = (left + right) / 2;
+-		if (id == insns[m].id) {
+-			return m;
+-		}
++	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
++		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
+ 
+-		if (id < insns[m].id)
+-			right = m - 1;
++	unsigned int lo = 0, hi = count;
++	while (lo < hi) {
++		const unsigned int mid = lo + (hi - lo) / 2;
++		if (insns[mid].id < id)
++			lo = mid + 1;
+ 		else
+-			left = m + 1;
++			hi = mid;
+ 	}
+-
+-	// not found
+-	// printf("NOT FOUNDDDDDDDDDDDDDDD id = %u\n", id);
+-	return -1;
++	return lo < count && insns[lo].id == id ? lo : (unsigned int)-1;
+ }
+ 
+-static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
++unsigned int find_insn(unsigned int id)
+ {
+-	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
+-		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
+-
+-	return find_insn(id);
++	return find_insn_h(NULL, id);
+ }
+ 
+ #ifndef CAPSTONE_DIET
+@@ -10374,6 +10363,17 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			switch (insn->id) {
+ 			default:
+ 				break;
++			case X86_INS_VZEROALL:
++			case X86_INS_VZEROUPPER:
++				if (mode != CS_MODE_64) {
++					/* Outside long mode only YMM0 through YMM7 exist. */
++					cs_detail *d = insn->detail;
++					memset(d->regs_write + 8, 0,
++					       sizeof(insns[i].regs_mod) -
++						       8 * sizeof(d->regs_write[0]));
++					d->regs_write_count = 8;
++				}
++				break;
+ 			case X86_INS_XADD:
+ 				insn->detail->regs_write[0] = X86_REG_EFLAGS;
+ 				insn->detail->regs_write_count = 1;
+diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
+index d9dd18e2..428aed88 100644
+--- a/tests/unit/x86_reg_access.c
++++ b/tests/unit/x86_reg_access.c
+@@ -53,6 +53,54 @@ static bool check_implicit_copies(csh handle)
+ 	return true;
+ }
+ 
++static bool check_vector_clear_writes(void)
 +{
-+	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-+	if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
-+	    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+	    writeVexBaseMemory(code, size, prefix, insn, insn_size,
-+			       x86_simple_registers[3]))
++	if (cs_support(CS_SUPPORT_X86_REDUCE))
 +		return true;
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
++	const uint8_t bytes[][4] = { { 0xc5, 0xf8, 0x77 },
++				     { 0xc5, 0xfc, 0x77 },
++				     { 0xc4, 0xe1, 0x78, 0x77 },
++				     { 0xc4, 0xe1, 0x7c, 0x77 } };
++	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
++		const unsigned expected = modes[m] == CS_MODE_64 ? 16 : 8;
++		csh h = 0;
++		if (cs_open(CS_ARCH_X86, modes[m], &h) != CS_ERR_OK)
++			return false;
++		bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
++		for (unsigned n = 0; n < sizeof(bytes) / sizeof(bytes[0]) && ok;
++		     ++n) {
++			cs_insn *insn = NULL;
++			size_t size = n < 2 ? 3 : 4;
++			size_t count =
++				cs_disasm(h, bytes[n], size, 0, 1, &insn);
++			cs_regs reads, writes;
++			uint8_t nr, nw;
++			ok = count == 1 && insn->size == size &&
++			     insn->id == (n % 2 ? X86_INS_VZEROALL :
++						  X86_INS_VZEROUPPER) &&
++			     insn->detail->regs_write_count == expected &&
++			     cs_regs_access(h, insn, reads, &nr, writes, &nw) ==
++				     CS_ERR_OK &&
++			     nw == expected;
++			for (unsigned i = 0; ok && i < expected; ++i)
++				ok = insn->detail->regs_write[i] ==
++					     X86_REG_YMM0 + i &&
++				     writes[i] == X86_REG_YMM0 + i;
++			cs_free(insn, count);
++			if (!ok)
++				fprintf(stderr,
++					"vector clear writes: mode=%u encoding=%u\n",
++					(unsigned)modes[m], n);
++		}
++		cs_close(&h);
++		if (!ok)
++			return false;
++	}
++	return true;
 +}
-+#endif
++
+ static bool check_test_operands(void)
+ {
+ 	static const unsigned widths[] = { 1, 2, 4, 8 };
+@@ -784,6 +832,7 @@ int main(void)
+ 		return 1;
+ 	}
+ 	bool success = check_implicit_copies(handle) && check_test_operands() &&
++		       check_vector_clear_writes() &&
+ 		       check_scalar_move_flags() &&
+ 		       check_scalar_segment_reads() &&
+ 		       check_vector_compare_flags();
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 19e16b16..d4d2072a 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1649,7 +1649,8 @@ static bool check_mode(cs_mode mode)
+ 		    !check_evex_memory_moves(handles) ||
+ 		    !check_padding(handles) ||
+ 		    (mode == CS_MODE_32 &&
+-		     (!check_segment_lea32(handles) ||
++		     (!check_vex_clear(handles) ||
++		      !check_segment_lea32(handles) ||
+ 		      !check_vex32_register_moves(handles) ||
+ 		      !check_memory_flag_immediates(handles, mode))) ||
+ 		    !check_alu_memory(handles, mode) ||

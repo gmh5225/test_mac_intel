@@ -1,93 +1,70 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d36460a3..913578d9 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1094,6 +1094,15 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
-             # Keep the opcode rows after the native scanner when both are linked.
-             set(capstone_alias_patterns_tail
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-+            if(NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE AND CAPSTONE_USE_DEFAULT_ALLOC)
-+                # Keep optional AMD64 memory records after the common alias matcher.
-+                add_library(capstone_x86_vex_memory OBJECT arch/X86/X86VexBaseMemory.c)
-+                target_link_libraries(capstone_x86_vex_memory PRIVATE capstone_build_settings)
-+                target_compile_definitions(capstone_x86_native PRIVATE CAPSTONE_X86_MIXED_VEX_MEMORY)
-+                target_compile_definitions(capstone_x86_vex_memory PRIVATE CAPSTONE_X86_MIXED_VEX_MEMORY)
-+                set_target_properties(capstone_x86_vex_memory PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-+                list(APPEND capstone_alias_patterns_tail $<TARGET_OBJECTS:capstone_x86_vex_memory>)
-+            endif()
-             set(capstone_static_objects
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..0a32cc1f 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -22,6 +22,13 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 			     size_t size, cs_insn *insn, uint16_t *insn_size,
- 			     bool batch);
- 
-+#ifdef CAPSTONE_X86_MIXED_VEX_MEMORY
-+/* The mixed AMD64 iterator has exhausted its ordinary output records. */
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeVexMemoryOrFull(cs_struct *handle, const uint8_t *code, size_t size,
-+			  cs_insn *insn, uint16_t *insn_size, bool batch);
-+#endif
-+
- /* Called by the static AMD64 iterator with at least one input byte. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..97877615 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -251,7 +251,11 @@ fallback:
- 		return cs_decode_full_insn_body(handle, code, size, insn,
- 						insn_size, batch);
- #endif
-+#ifdef CAPSTONE_X86_MIXED_VEX_MEMORY
-+	return X86_decodeVexMemoryOrFull(handle, code, size, insn, insn_size, batch);
-+#else
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+#endif
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..2511bdb0 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10253,45 +10253,34 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
  }
  #endif
- #endif
-diff --git a/arch/X86/X86VexBaseMemory.c b/arch/X86/X86VexBaseMemory.c
-new file mode 100644
-index 00000000..9cba5874
---- /dev/null
-+++ b/arch/X86/X86VexBaseMemory.c
-@@ -0,0 +1,33 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include "../../cs_priv.h"
-+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_vex_memory_text" rodata = \
-+	".cs_x86_vex_memory_rodata"
-+#endif
-+#include "../../cs_disasm_internal.h"
-+#include "X86OutputOptions.h"
-+#include "X86SimpleOutput.h"
-+#include "X86GenSimpleOutput.inc"
-+#include "X86VexBaseMemory.h"
-+
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeVexMemoryOrFull(cs_struct *handle, const uint8_t *code, size_t size,
-+			  cs_insn *insn, uint16_t *insn_size, bool batch)
-+{
-+	if ((code[0] & 0xfe) == 0xc4) {
-+		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-+		if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		    writeVexBaseMemory(code, size, prefix, insn, insn_size,
-+				       x86_simple_registers[3]))
-+			return true;
+ 
+-// look for @id in @insns
+-// return -1 if not found
+-unsigned int find_insn(unsigned int id)
++static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ {
+-	// binary searching since the IDs are sorted in order
+-	unsigned int left, right, m;
+-	unsigned int max = ARR_SIZE(insns);
+-
+-	right = max - 1;
+-
+-	if (id < insns[0].id || id > insns[right].id)
+-		// not found
+-		return -1;
+-
+-	left = 0;
++	const unsigned int count = ARR_SIZE(insns);
++	const unsigned int first = insns[0].id;
++	/* The generator orders distinct IDs. If the endpoints span exactly
++	 * count entries, subtraction indexes every opcode in the table. */
++	if (insns[count - 1].id - first == count - 1) {
++		const unsigned int row = id - first;
++		return row < count ? row : (unsigned int)-1;
 +	}
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+}
-+#endif
+ 
+-	while (left <= right) {
+-		m = (left + right) / 2;
+-		if (id == insns[m].id) {
+-			return m;
+-		}
++	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
++		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
+ 
+-		if (id < insns[m].id)
+-			right = m - 1;
++	unsigned int lo = 0, hi = count;
++	while (lo < hi) {
++		const unsigned int mid = lo + (hi - lo) / 2;
++		if (insns[mid].id < id)
++			lo = mid + 1;
+ 		else
+-			left = m + 1;
++			hi = mid;
+ 	}
+-
+-	// not found
+-	// printf("NOT FOUNDDDDDDDDDDDDDDD id = %u\n", id);
+-	return -1;
++	return lo < count && insns[lo].id == id ? lo : (unsigned int)-1;
+ }
+ 
+-static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
++unsigned int find_insn(unsigned int id)
+ {
+-	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
+-		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
+-
+-	return find_insn(id);
++	return find_insn_h(NULL, id);
+ }
+ 
+ #ifndef CAPSTONE_DIET
