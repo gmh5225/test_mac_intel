@@ -1,1232 +1,484 @@
-diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
-index ea9309f4..5444947a 100644
---- a/arch/X86/X86GenMappingCounts.inc
-+++ b/arch/X86/X86GenMappingCounts.inc
-@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
- 	0, // X86_VXORPSZrrkz
- 	2048, // X86_VXORPSrm
- 	2048, // X86_VXORPSrr
--	1536, // X86_VZEROALL
--	1536, // X86_VZEROUPPER
-+	17920, // X86_VZEROALL
-+	17920, // X86_VZEROUPPER
- 	1024, // X86_WAIT
- 	1024, // X86_WBINVD
- 	0, // X86_WBNOINVD
-diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 7d3a6e84..d78a771c 100644
---- a/arch/X86/X86GenVectorOutput.inc
-+++ b/arch/X86/X86GenVectorOutput.inc
-@@ -626,17 +626,11 @@ static const uint8_t vex_shift_plans[3][8][4] = {
- 		{ 19, 20, 19, 20 },
- 	},
- };
--static const struct VectorOutputRow broadcast_rows[2][3] = {
--	{
--		{ 0 },
--		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
--		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
--	},
--	{
--		{ 0 },
--		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
--		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
--	},
-+static const struct BroadcastOutput broadcast_rows[] = {
-+	{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", { 255, 0, 0 } },
-+	{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", { 255, 0, 0 } },
-+	{ X86_INS_VBROADCASTI32X4, "vbroadcasti32x4", { 255, 0, 134 } },
-+	{ X86_INS_VBROADCASTI64X2, "vbroadcasti64x2", { 255, 0, 0 } },
- };
- struct VexRipLoad {
- 	unsigned id; char mnemonic[12], address[20];
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..961a1115 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -10296,6 +10296,450 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d36460a3..d806354c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -187,7 +187,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
+ endif()
  
- #ifndef CAPSTONE_DIET
- #include "X86GenMappingCounts.inc"
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+-    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_SCAN_BY_OPTION)
+     # Fixed-width implicit counts improve detailed decoding in this configuration.
+     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+diff --git a/Makefile b/Makefile
+index f225ca2c..680809fb 100644
+--- a/Makefile
++++ b/Makefile
+@@ -148,7 +148,7 @@ CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPAT
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+-CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_SCAN_BY_OPTION
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 947fd2d2..9aed0731 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -615,6 +615,21 @@ void addSPOperands(MCInst *MI)
+ }
+ #endif
+ 
++/* Every immediate and destination register is valid for these non-E forms. */
++static unsigned scanMajorOpcode(unsigned major)
++{
++	switch (major) {
++	case 0x17:
++		return RISCV_AUIPC;
++	case 0x37:
++		return RISCV_LUI;
++	case 0x6f:
++		return RISCV_JAL;
++	default:
++		return 0;
++	}
++}
 +
-+/* The mapping counts select instructions whose implicit registers need repair. */
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 				  const uint8_t *Bytes, size_t BytesLen,
+ 				  uint64_t Address, SStream *CS)
+@@ -758,6 +773,18 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 			4, RISCV_FeatureVendorXCVbi, DecoderTableXCVbi32,
+ 			"CORE-V Immediate Branching custom opcode table");
+ 	base32:
++#ifndef CAPSTONE_RISCV_SCAN_BY_OPTION
++		if (MI->csh->no_text && !MI->csh->detail_opt &&
++		    !MI->flat_insn->detail &&
++		    !(MI->csh->mode & CS_MODE_BIG_ENDIAN) &&
++		    !RISCV_getFeatureBits(MI->csh->mode, RISCV_FeatureRVE)) {
++			const unsigned opcode = scanMajorOpcode(Insn & 0x7f);
++			if (opcode) {
++				MCInst_setOpcode(MI, opcode);
++				return MCDisassembler_Success;
++			}
++		}
++#endif
+ 		TRY_TO_DECODE(4, true, DecoderTable32, "RISCV32 table");
+ 
+ 		return MCDisassembler_Fail;
+@@ -803,3 +830,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+ 
+ 	return ret != MCDisassembler_Fail;
+ }
++
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#include "RISCVScan.h"
++#endif
+diff --git a/arch/RISCV/RISCVGenExpandedAlias.inc b/arch/RISCV/RISCVGenExpandedAlias.inc
+new file mode 100644
+index 00000000..4b76922f
+--- /dev/null
++++ b/arch/RISCV/RISCVGenExpandedAlias.inc
+@@ -0,0 +1,6 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++static inline bool expandedOpcodeHasOwnAlias(unsigned opcode)
++{
++	(void)opcode;
++	return false;
++}
+diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
+index f7778c5d..0d0f74ed 100644
+--- a/arch/RISCV/RISCVInstPrinter.c
++++ b/arch/RISCV/RISCVInstPrinter.c
+@@ -407,66 +407,27 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
+ 	SStream_concat0(O, ".t");
+ }
+ 
+-void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+-				 void * /* MCRegisterInfo* */ info)
+-{
+-	MI->MRI = (MCRegisterInfo *)info;
+-
+-	MCInst_setIsAlias(MI, false);
+-	bool usesAliasDetails = detail_is_set(MI) && isAliasDetail(MI) &&
+-				!isRealDetail(MI);
+-	MI->flat_insn->usesAliasDetails = usesAliasDetails;
++#include "RISCVGenExpandedAlias.inc"
+ 
+-	MCInst Uncompressed;
+-	MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
+-	MCInst *MIUncompressed = MI;
+-	bool is_uncompressed = false;
+-
+-	bool textReal = isRealSyntax(MI);
+-	bool detailReal = isRealDetail(MI);
+-
+-	if (!textReal || (detail_is_set(MI) && !detailReal)) {
+-		// Side-effectful check for compressed instructions that also creates the equivalent
+-		// uncompressed instruction in case of returning true
+-		// False means no side effect happened
+-		// (LLVM doesn't have an API for doing a pure check)
+-		if (uncompressInst(&Uncompressed, MI)) {
+-			MIUncompressed = &Uncompressed;
+-			Uncompressed.address = MI->address;
+-			Uncompressed.MRI = MI->MRI;
+-			Uncompressed.csh = MI->csh;
+-			Uncompressed.flat_insn = MI->flat_insn;
+-			is_uncompressed = true;
+-		}
+-	}
++/* Preserve the original opcode's alias when both opcodes have patterns. */
++static bool printOperandAlias(MCInst *MI, MCInst *expanded, SStream *O)
++{
++	if (MI != expanded && expandedOpcodeHasOwnAlias(MCInst_getOpcode(MI)) &&
++	    printAliasInstr(MI, MI->address, O))
++		return true;
++	return printAliasInstr(expanded, expanded->address, O);
++}
+ 
+-	if (isRealSyntax(MI)) {
++static void printOperandForms(MCInst *MI, MCInst *expanded, SStream *O)
++{
++	if (isRealSyntax(MI))
+ 		printInstruction(MI, MI->address, O);
+-	} else {
+-		if (isUncompressedRealSyntax(MI)) {
+-			printInstruction(MIUncompressed,
+-					 MIUncompressed->address, O);
+-		} else {
+-			// Side-effectful check for alias instructions that prints to the SStream if it returns true
+-			// False means no printing to stream happened
+-			if (printAliasInstr(MI, MI->address, O)) {
+-				MCInst_setIsAlias(MI, true);
+-			} else { // the instruction is not an alias
+-				if (!is_uncompressed) {
+-					printInstruction(MI, MI->address, O);
+-				} else if (printAliasInstr(
+-						   MIUncompressed,
+-						   MIUncompressed->address,
+-						   O)) {
+-					MCInst_setIsAlias(MI, true);
+-				} else {
+-					printInstruction(
+-						MIUncompressed,
+-						MIUncompressed->address, O);
+-				}
+-			}
+-		}
+-	}
++	else if (isUncompressedRealSyntax(MI))
++		printInstruction(expanded, expanded->address, O);
++	else if (printOperandAlias(MI, expanded, O))
++		MCInst_setIsAlias(MI, true);
++	else
++		printInstruction(expanded, expanded->address, O);
+ 
+ 	bool textAndDetailModesMatch = (isRealSyntax(MI) && isRealDetail(MI)) ||
+ 				       (isUncompressedRealSyntax(MI) &&
+@@ -485,19 +446,10 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 		if (isRealDetail(MI)) {
+ 			printInstruction(MI, MI->address, O);
+ 		} else if (isUncompressedRealDetail(MI)) {
+-			printInstruction(MIUncompressed,
+-					 MIUncompressed->address, O);
+-		} else if (!printAliasInstr(MI, MI->address, O)) {
+-			if (!is_uncompressed) {
+-				printInstruction(MI, MI->address, O);
+-			} else if (!printAliasInstr(MIUncompressed,
+-						    MIUncompressed->address,
+-						    O)) {
+-				printInstruction(MIUncompressed,
+-						 MIUncompressed->address, O);
+-			} else {
+-				/* Nothing, printAliasInstr returned true and did its side effect */
+-			}
++			printInstruction(expanded,
++					 expanded->address, O);
++		} else if (!printOperandAlias(MI, expanded, O)) {
++			printInstruction(expanded, expanded->address, O);
+ 		}
+ 
+ 		// re-open the stream to restore the usual state
+@@ -509,6 +461,45 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 	RISCV_set_alias_id(MI, O);
+ }
+ 
++/* Keep the expanded MCInst out of the full-width printer's stack frame. */
 +#if defined(_MSC_VER)
 +__declspec(noinline)
 +#elif defined(__GNUC__)
 +__attribute__((noinline))
 +#endif
-+static void repair_implicit_registers(cs_insn *insn, cs_mode mode)
++static void printCompressedOperandForms(MCInst *MI, SStream *O)
 +{
-+	switch (insn->id) {
-+	default:
-+		break;
-+	case X86_INS_VZEROALL:
-+	case X86_INS_VZEROUPPER:
-+		if (mode != CS_MODE_64) {
-+			/* Outside long mode only YMM0 through YMM7 exist. */
-+			cs_detail *d = insn->detail;
-+			memset(d->regs_write + 8, 0,
-+			       sizeof(insns[0].regs_mod) -
-+				       8 * sizeof(d->regs_write[0]));
-+			d->regs_write_count = 8;
-+		}
-+		break;
-+	case X86_INS_XADD:
-+		insn->detail->regs_write[0] = X86_REG_EFLAGS;
-+		insn->detail->regs_write_count = 1;
-+		break;
-+	case X86_INS_CMPXCHG8B:
-+	case X86_INS_CMPXCHG16B: {
-+		const bool wide = insn->id ==
-+				  X86_INS_CMPXCHG16B;
-+		cs_detail *d = insn->detail;
-+		d->regs_read[0] = d->regs_write[0] =
-+			wide ? X86_REG_RAX : X86_REG_EAX;
-+		d->regs_read[1] = d->regs_write[1] =
-+			wide ? X86_REG_RDX : X86_REG_EDX;
-+		d->regs_read[2] = wide ? X86_REG_RBX :
-+					 X86_REG_EBX;
-+		d->regs_read[3] = wide ? X86_REG_RCX :
-+					 X86_REG_ECX;
-+		d->regs_write[2] = X86_REG_EFLAGS;
-+		d->regs_read_count = 4;
-+		d->regs_write_count = 3;
-+		break;
++	MCInst expanded;
++	MCInst_InitStorage(&expanded, MI->csh->arch, false);
++	if (!uncompressInst(&expanded, MI)) {
++		printOperandForms(MI, MI, O);
++		return;
 +	}
-+
-+	case X86_INS_LOOP:
-+	case X86_INS_LOOPE:
-+	case X86_INS_LOOPNE:
-+		// The instruction pointer register follows the mode.
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EIP, X86_REG_IP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_IP);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EIP, X86_REG_RIP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_RIP);
-+			break;
-+		}
-+		// The loop counter register follows the effective address
-+		// size, which a 0x67 address-size prefix can override.
-+		if (insn->detail->x86.addr_size == 2) {
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ECX, X86_REG_CX);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ECX, X86_REG_CX);
-+		} else if (insn->detail->x86.addr_size == 8) {
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ECX, X86_REG_RCX);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ECX, X86_REG_RCX);
-+		}
-+	}
-+
-+	switch (insn->id) {
-+	default:
-+		break;
-+	case X86_INS_LODSB:
-+	case X86_INS_LODSD:
-+	case X86_INS_LODSQ:
-+	case X86_INS_LODSW:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESI, X86_REG_SI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESI, X86_REG_SI);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESI, X86_REG_RSI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESI, X86_REG_RSI);
-+			break;
-+		}
-+		break;
-+
-+	case X86_INS_SCASB:
-+	case X86_INS_SCASD:
-+	case X86_INS_SCASW:
-+	case X86_INS_SCASQ:
-+	case X86_INS_STOSB:
-+	case X86_INS_STOSD:
-+	case X86_INS_STOSQ:
-+	case X86_INS_STOSW:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDI, X86_REG_DI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EDI, X86_REG_DI);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDI, X86_REG_RDI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EDI, X86_REG_RDI);
-+			break;
-+		}
-+		break;
-+
-+	case X86_INS_CMPSB:
-+	case X86_INS_CMPSD:
-+	case X86_INS_CMPSQ:
-+	case X86_INS_CMPSW:
-+	case X86_INS_MOVSB:
-+	case X86_INS_MOVSW:
-+	case X86_INS_MOVSD:
-+	case X86_INS_MOVSQ:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDI, X86_REG_DI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EDI, X86_REG_DI);
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESI, X86_REG_SI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESI, X86_REG_SI);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDI, X86_REG_RDI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EDI, X86_REG_RDI);
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESI, X86_REG_RSI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESI, X86_REG_RSI);
-+			break;
-+		}
-+		break;
-+
-+	case X86_INS_ENTER:
-+	case X86_INS_LEAVE:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EBP, X86_REG_BP);
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESP, X86_REG_SP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EBP, X86_REG_BP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESP, X86_REG_SP);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EBP, X86_REG_RBP);
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESP, X86_REG_RSP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EBP, X86_REG_RBP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESP, X86_REG_RSP);
-+		}
-+		break;
-+
-+	case X86_INS_INSB:
-+	case X86_INS_INSW:
-+	case X86_INS_INSD:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDI, X86_REG_DI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EDI, X86_REG_DI);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDI, X86_REG_RDI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EDI, X86_REG_RDI);
-+			break;
-+		}
-+		break;
-+
-+	case X86_INS_OUTSB:
-+	case X86_INS_OUTSW:
-+	case X86_INS_OUTSD:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESI, X86_REG_RSI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESI, X86_REG_RSI);
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ESI, X86_REG_SI);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESI, X86_REG_SI);
-+			break;
-+		}
-+		break;
-+	}
-+
-+	switch (insn->id) {
-+	default:
-+		break;
-+	case X86_INS_LODSB:
-+	case X86_INS_LODSD:
-+	case X86_INS_LODSW:
-+	case X86_INS_CMPSB:
-+	case X86_INS_CMPSD:
-+	case X86_INS_CMPSW:
-+	case X86_INS_MOVSB:
-+	case X86_INS_MOVSW:
-+	case X86_INS_MOVSD:
-+	case X86_INS_OUTSB:
-+	case X86_INS_OUTSW:
-+	case X86_INS_OUTSD:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+		case CS_MODE_32: {
-+			int pos = insn->detail->regs_read_count;
-+			insn->detail->regs_read[pos] =
-+				X86_REG_DS;
-+			insn->detail->regs_read_count += 1;
-+		} break;
-+		}
-+		break;
-+
-+	case X86_INS_JMP:
-+	case X86_INS_LJMP:
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EIP, X86_REG_IP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_IP);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EIP, X86_REG_RIP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_RIP);
-+			break;
-+		}
-+		break;
-+
-+	case X86_INS_SYSENTER: {
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_IP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESP, X86_REG_SP);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_RIP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESP, X86_REG_RSP);
-+			break;
-+		}
-+		break;
-+	} break;
-+	case X86_INS_SYSEXIT: {
-+		switch (mode) {
-+		default:
-+			break;
-+		case CS_MODE_16:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ECX, X86_REG_CX);
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDX, X86_REG_DX);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_IP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESP, X86_REG_SP);
-+			break;
-+		case CS_MODE_64:
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_ECX, X86_REG_RCX);
-+			arr_replace(
-+				insn->detail->regs_read,
-+				insn->detail->regs_read_count,
-+				X86_REG_EDX, X86_REG_RDX);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_EIP, X86_REG_RIP);
-+			arr_replace(
-+				insn->detail->regs_write,
-+				insn->detail->regs_write_count,
-+				X86_REG_ESP, X86_REG_RSP);
-+			break;
-+		}
-+		break;
-+	} break;
-+	}
-+}
- #endif
- 
- // given internal insn id, return public instruction info
-@@ -10366,436 +10810,8 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 				}
- 				break;
- 			}
--			/* The generator derives eligibility from the switches below. */
--			if (!(x86_mapping_counts[i] &
--			      X86_MAPPING_IMPLICIT_REPAIR))
--				goto implicit_registers_done;
--
--			switch (insn->id) {
--			default:
--				break;
--			case X86_INS_XADD:
--				insn->detail->regs_write[0] = X86_REG_EFLAGS;
--				insn->detail->regs_write_count = 1;
--				break;
--			case X86_INS_CMPXCHG8B:
--			case X86_INS_CMPXCHG16B: {
--				const bool wide = insn->id ==
--						  X86_INS_CMPXCHG16B;
--				cs_detail *d = insn->detail;
--				d->regs_read[0] = d->regs_write[0] =
--					wide ? X86_REG_RAX : X86_REG_EAX;
--				d->regs_read[1] = d->regs_write[1] =
--					wide ? X86_REG_RDX : X86_REG_EDX;
--				d->regs_read[2] = wide ? X86_REG_RBX :
--							 X86_REG_EBX;
--				d->regs_read[3] = wide ? X86_REG_RCX :
--							 X86_REG_ECX;
--				d->regs_write[2] = X86_REG_EFLAGS;
--				d->regs_read_count = 4;
--				d->regs_write_count = 3;
--				break;
--			}
--
--			case X86_INS_LOOP:
--			case X86_INS_LOOPE:
--			case X86_INS_LOOPNE:
--				// The instruction pointer register follows the mode.
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EIP, X86_REG_IP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_IP);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EIP, X86_REG_RIP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_RIP);
--					break;
--				}
--				// The loop counter register follows the effective address
--				// size, which a 0x67 address-size prefix can override.
--				if (insn->detail->x86.addr_size == 2) {
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ECX, X86_REG_CX);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ECX, X86_REG_CX);
--				} else if (insn->detail->x86.addr_size == 8) {
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ECX, X86_REG_RCX);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ECX, X86_REG_RCX);
--				}
--			}
--
--			switch (insn->id) {
--			default:
--				break;
--			case X86_INS_LODSB:
--			case X86_INS_LODSD:
--			case X86_INS_LODSQ:
--			case X86_INS_LODSW:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESI, X86_REG_SI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESI, X86_REG_SI);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESI, X86_REG_RSI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESI, X86_REG_RSI);
--					break;
--				}
--				break;
--
--			case X86_INS_SCASB:
--			case X86_INS_SCASD:
--			case X86_INS_SCASW:
--			case X86_INS_SCASQ:
--			case X86_INS_STOSB:
--			case X86_INS_STOSD:
--			case X86_INS_STOSQ:
--			case X86_INS_STOSW:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDI, X86_REG_DI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EDI, X86_REG_DI);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDI, X86_REG_RDI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EDI, X86_REG_RDI);
--					break;
--				}
--				break;
--
--			case X86_INS_CMPSB:
--			case X86_INS_CMPSD:
--			case X86_INS_CMPSQ:
--			case X86_INS_CMPSW:
--			case X86_INS_MOVSB:
--			case X86_INS_MOVSW:
--			case X86_INS_MOVSD:
--			case X86_INS_MOVSQ:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDI, X86_REG_DI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EDI, X86_REG_DI);
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESI, X86_REG_SI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESI, X86_REG_SI);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDI, X86_REG_RDI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EDI, X86_REG_RDI);
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESI, X86_REG_RSI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESI, X86_REG_RSI);
--					break;
--				}
--				break;
--
--			case X86_INS_ENTER:
--			case X86_INS_LEAVE:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EBP, X86_REG_BP);
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESP, X86_REG_SP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EBP, X86_REG_BP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESP, X86_REG_SP);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EBP, X86_REG_RBP);
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESP, X86_REG_RSP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EBP, X86_REG_RBP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESP, X86_REG_RSP);
--				}
--				break;
--
--			case X86_INS_INSB:
--			case X86_INS_INSW:
--			case X86_INS_INSD:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDI, X86_REG_DI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EDI, X86_REG_DI);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDI, X86_REG_RDI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EDI, X86_REG_RDI);
--					break;
--				}
--				break;
--
--			case X86_INS_OUTSB:
--			case X86_INS_OUTSW:
--			case X86_INS_OUTSD:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESI, X86_REG_RSI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESI, X86_REG_RSI);
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ESI, X86_REG_SI);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESI, X86_REG_SI);
--					break;
--				}
--				break;
--			}
--
--			switch (insn->id) {
--			default:
--				break;
--			case X86_INS_LODSB:
--			case X86_INS_LODSD:
--			case X86_INS_LODSW:
--			case X86_INS_CMPSB:
--			case X86_INS_CMPSD:
--			case X86_INS_CMPSW:
--			case X86_INS_MOVSB:
--			case X86_INS_MOVSW:
--			case X86_INS_MOVSD:
--			case X86_INS_OUTSB:
--			case X86_INS_OUTSW:
--			case X86_INS_OUTSD:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--				case CS_MODE_32: {
--					int pos = insn->detail->regs_read_count;
--					insn->detail->regs_read[pos] =
--						X86_REG_DS;
--					insn->detail->regs_read_count += 1;
--				} break;
--				}
--				break;
--
--			case X86_INS_JMP:
--			case X86_INS_LJMP:
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EIP, X86_REG_IP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_IP);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EIP, X86_REG_RIP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_RIP);
--					break;
--				}
--				break;
--
--			case X86_INS_SYSENTER: {
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_IP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESP, X86_REG_SP);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_RIP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESP, X86_REG_RSP);
--					break;
--				}
--				break;
--			} break;
--			case X86_INS_SYSEXIT: {
--				switch (mode) {
--				default:
--					break;
--				case CS_MODE_16:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ECX, X86_REG_CX);
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDX, X86_REG_DX);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_IP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESP, X86_REG_SP);
--					break;
--				case CS_MODE_64:
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_ECX, X86_REG_RCX);
--					arr_replace(
--						insn->detail->regs_read,
--						insn->detail->regs_read_count,
--						X86_REG_EDX, X86_REG_RDX);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_EIP, X86_REG_RIP);
--					arr_replace(
--						insn->detail->regs_write,
--						insn->detail->regs_write_count,
--						X86_REG_ESP, X86_REG_RSP);
--					break;
--				}
--				break;
--			} break;
--			}
--
--implicit_registers_done:
-+			if (x86_mapping_counts[i] & X86_MAPPING_IMPLICIT_REPAIR)
-+				repair_implicit_registers(insn, mode);
- 			memcpy(insn->detail->groups, insns[i].groups,
- 			       sizeof(insns[i].groups));
- 			insn->detail->groups_count =
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..28a8aec1 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -20,6 +20,14 @@ struct PaddingOutput {
- 		index, scale;
- };
- 
-+/* The generator records UINT8_MAX for an unsupported vector length.
-+ * An admitted length has either no group or one nonzero public group. */
-+struct BroadcastOutput {
-+	uint16_t id;
-+	char mnemonic[16];
-+	uint8_t group[3];
-+};
-+
- #include "X86GenVectorOutput.inc"
- #include "X86VectorRegisterOutput.h"
- 
-@@ -473,18 +481,21 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 		size < 6 ||
- #endif
- 		(code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
--		(code[3] & 0x9f) != 8 || code[4] != 0x1a)
-+		(code[3] & 0x9f) != 8 || (code[4] & 0xbf) != 0x1a)
- 		return false;
- 	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
- 	const uint8_t modrm = code[5];
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
- 	if (ll >= 3 || mod > 1 || (!mod && rm == 5))
- 		return false;
--	const struct VectorOutputRow *row = &broadcast_rows[w][ll];
-+	/* Opcodes 1A and 5A broadcast a 16-byte floating or integer block. */
-+	const unsigned form = ((code[4] >> 5) & 2) | w;
-+	const struct BroadcastOutput *row = &broadcast_rows[form];
-+	const uint8_t group = row->group[ll];
- 	const bool sib = rm == 4;
- 	const unsigned offset = 6 + sib, length = offset + mod;
- 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
--	if (!row->id || size < length ||
-+	if (group == UINT8_MAX || size < length ||
- 	    (sib && ((rxb & 2) || code[6] != 0x24)))
- 		return false;
- 	const unsigned dst = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
-@@ -518,8 +529,8 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
- 		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
--		d->groups_count = row->group_count;
--		memcpy(d->groups, row->groups, sizeof(row->groups));
-+		d->groups_count = group != 0;
-+		d->groups[0] = group;
- 		cs_x86 *x = &d->x86;
- 		memcpy(x->opcode, code, sizeof(x->opcode));
- 		x->rex = (uint8_t)(0x40 | w << 3 | rxb);
-@@ -543,14 +554,14 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 							X86_REG_YMM0,
- 							X86_REG_ZMM0 };
- 		op->reg = (x86_reg)(vector_bases[ll] + dst);
--		op->access = (cs_ac_type)row->access[0];
-+		op->access = CS_AC_WRITE;
- 		op = &x->operands[1];
- 		op->type = X86_OP_MEM;
- 		op->size = 16;
- 		op->mem.base = (x86_reg)base->reg;
- 		op->mem.scale = 1;
- 		op->mem.disp = x->disp = displacement;
--		op->access = (cs_ac_type)row->access[1];
-+		op->access = CS_AC_READ;
- 	}
- 	return true;
- }
-diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
-index e7704042..4f46bf48 100644
---- a/suite/synctools/x86_mapping_counts.py
-+++ b/suite/synctools/x86_mapping_counts.py
-@@ -30,20 +30,13 @@ def entries(text):
- def implicit_repair_ids(source):
-     """Derive candidate IDs from the guarded public-ID switches themselves."""
-     source = re.sub(r"/\*.*?\*/|//[^\n]*", "", source, flags=re.S)
--    guards = list(
--        re.finditer(
--            r"if\s*\(\s*!\(\s*x86_mapping_counts\[i\]\s*&\s*"
--            r"X86_MAPPING_IMPLICIT_REPAIR\s*\)\s*\)\s*"
--            r"goto\s+implicit_registers_done\s*;",
--            source,
--        )
--    )
--    labels = list(re.finditer(r"\bimplicit_registers_done\s*:", source))
--    require(
--        len(guards) == len(labels) == 1 and guards[0].end() < labels[0].start(),
--        "Unexpected implicit-register repair guard",
-+    definition = re.search(
-+        r"^static void repair_implicit_registers\([^{}]+\)\s*\{\n(.*?)^\}",
-+        source,
-+        flags=re.M | re.S,
-     )
--    remaining = source[guards[0].end() : labels[0].start()].strip()
-+    require(definition is not None, "Missing implicit-register repair function")
-+    remaining = definition[1].strip()
-     require(
-         "#" not in remaining, "Conditional repair cases need an explicit projection"
-     )
-diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 91426243..e7431705 100644
---- a/suite/synctools/x86_vector_output.cpp
-+++ b/suite/synctools/x86_vector_output.cpp
-@@ -500,28 +500,28 @@ void emit_legacy_registers(Decoder &wide, bool map38 = false)
-  * decoder, including the disp8 tuple multiplier and both operand sizes. */
- void emit_broadcast_rows(Decoder &decoder)
- {
--	std::puts(
--		"static const struct VectorOutputRow broadcast_rows[2][3] = {");
--	for (unsigned w = 0; w != 2; ++w) {
--		std::puts("\t{");
-+	std::puts("static const struct BroadcastOutput broadcast_rows[] = {");
-+	const char *const mnemonics[] = { "vbroadcastf32x4", "vbroadcastf64x2",
-+					   "vbroadcasti32x4", "vbroadcasti64x2" };
-+	for (unsigned form = 0; form < 4; ++form) {
-+		const unsigned w = form & 1;
-+		std::array<unsigned, 3> groups{ UINT8_MAX, UINT8_MAX, UINT8_MAX };
-+		std::string symbol;
- 		for (unsigned ll = 0; ll != 3; ++ll) {
- 			uint8_t bytes[] = { 0x62,
- 					    0xf2,
- 					    uint8_t(0x7d | w << 7),
- 					    uint8_t(8 | ll << 5),
--					    0x1a,
-+					    uint8_t(form < 2 ? 0x1a : 0x5a),
- 					    0x58,
- 					    1 };
- 			unsigned id = decoder.decode(bytes, sizeof(bytes));
--			if (!id) {
--				std::puts("\t\t{ 0 },");
-+			if (!id)
- 				continue;
--			}
- 			const cs_insn &insn = *decoder.insn;
- 			const cs_detail &detail = *insn.detail;
- 			const cs_x86 &x = detail.x86;
--			const char *mnemonic = w ? "vbroadcastf64x2" :
--						   "vbroadcastf32x4";
-+			const char *mnemonic = mnemonics[form];
- 			const std::string dest = std::string(ll == 2 ? "zmm" :
- 							     ll == 1 ? "ymm" :
- 								       "xmm") +
-@@ -556,23 +556,20 @@ void emit_broadcast_rows(Decoder &decoder)
- 			    insn.op_str !=
- 				    dest + ", xmmword ptr [rax + 0x10]" ||
- 			    detail.regs_read_count || detail.regs_write_count ||
--			    detail.groups_count > 4 ||
--			    std::memcmp(&x, &expect, sizeof(x))) {
--				std::puts("\t\t{ 0 },");
-+			    detail.groups_count > 1 ||
-+			    (detail.groups_count && (detail.groups[0] == 0 ||
-+						     detail.groups[0] == UINT8_MAX)) ||
-+			    std::memcmp(&x, &expect, sizeof(x)))
- 				continue;
--			}
--			Bytes4 groups{}, access{ unsigned(reg.access),
--						 unsigned(mem.access), 0, 0 };
--			std::copy_n(detail.groups, detail.groups_count,
--				    groups.begin());
--			const std::string symbol = decoder.symbol(id);
--			std::printf("\t\t{ %s, \"%s\", %u, %s, %s, 0 },\n",
--				    symbol.c_str(), mnemonic,
--				    unsigned(detail.groups_count),
--				    fields(groups).c_str(),
--				    fields(access).c_str());
-+			const std::string current = decoder.symbol(id);
-+			if (!symbol.empty() && current != symbol)
-+				throw std::runtime_error("nonuniform EVEX broadcast ID");
-+			symbol = current;
-+			groups[ll] = detail.groups_count ? detail.groups[0] : 0;
- 		}
--		std::puts("\t},");
-+		std::printf("\t{ %s, \"%s\", { %u, %u, %u } },\n",
-+			    symbol.empty() ? "0" : symbol.c_str(), mnemonics[form],
-+			    groups[0], groups[1], groups[2]);
- 	}
- 	std::puts("};");
- }
-diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
-index d9dd18e2..428aed88 100644
---- a/tests/unit/x86_reg_access.c
-+++ b/tests/unit/x86_reg_access.c
-@@ -53,6 +53,54 @@ static bool check_implicit_copies(csh handle)
- 	return true;
- }
- 
-+static bool check_vector_clear_writes(void)
-+{
-+	if (cs_support(CS_SUPPORT_X86_REDUCE))
-+		return true;
-+
-+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
-+	const uint8_t bytes[][4] = { { 0xc5, 0xf8, 0x77 },
-+				     { 0xc5, 0xfc, 0x77 },
-+				     { 0xc4, 0xe1, 0x78, 0x77 },
-+				     { 0xc4, 0xe1, 0x7c, 0x77 } };
-+	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
-+		const unsigned expected = modes[m] == CS_MODE_64 ? 16 : 8;
-+		csh h = 0;
-+		if (cs_open(CS_ARCH_X86, modes[m], &h) != CS_ERR_OK)
-+			return false;
-+		bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
-+		for (unsigned n = 0; n < sizeof(bytes) / sizeof(bytes[0]) && ok;
-+		     ++n) {
-+			cs_insn *insn = NULL;
-+			size_t size = n < 2 ? 3 : 4;
-+			size_t count =
-+				cs_disasm(h, bytes[n], size, 0, 1, &insn);
-+			cs_regs reads, writes;
-+			uint8_t nr, nw;
-+			ok = count == 1 && insn->size == size &&
-+			     insn->id == (n % 2 ? X86_INS_VZEROALL :
-+						  X86_INS_VZEROUPPER) &&
-+			     insn->detail->regs_write_count == expected &&
-+			     cs_regs_access(h, insn, reads, &nr, writes, &nw) ==
-+				     CS_ERR_OK &&
-+			     nw == expected;
-+			for (unsigned i = 0; ok && i < expected; ++i)
-+				ok = insn->detail->regs_write[i] ==
-+					     X86_REG_YMM0 + i &&
-+				     writes[i] == X86_REG_YMM0 + i;
-+			cs_free(insn, count);
-+			if (!ok)
-+				fprintf(stderr,
-+					"vector clear writes: mode=%u encoding=%u\n",
-+					(unsigned)modes[m], n);
-+		}
-+		cs_close(&h);
-+		if (!ok)
-+			return false;
-+	}
-+	return true;
++	expanded.address = MI->address;
++	expanded.MRI = MI->MRI;
++	expanded.csh = MI->csh;
++	expanded.flat_insn = MI->flat_insn;
++	printOperandForms(MI, &expanded, O);
 +}
 +
- static bool check_test_operands(void)
++void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
++				 void * /* MCRegisterInfo* */ info)
++{
++	MI->MRI = (MCRegisterInfo *)info;
++
++	MCInst_setIsAlias(MI, false);
++	bool usesAliasDetails = detail_is_set(MI) && isAliasDetail(MI) &&
++				!isRealDetail(MI);
++	MI->flat_insn->usesAliasDetails = usesAliasDetails;
++
++	/* Only the two-byte decoder produces opcodes in the uncompression table. */
++	if (MI->flat_insn->size == 2 &&
++	    (!isRealSyntax(MI) || (detail_is_set(MI) && !isRealDetail(MI))))
++		printCompressedOperandForms(MI, O);
++	else
++		printOperandForms(MI, MI, O);
++}
++
+ const char *getSysRegName(unsigned reg)
  {
- 	static const unsigned widths[] = { 1, 2, 4, 8 };
-@@ -784,6 +832,7 @@ int main(void)
- 		return 1;
+ 	const RISCV_SysReg *SysReg = RISCV_lookupSysRegByEncoding(reg);
+diff --git a/arch/RISCV/RISCVModule.c b/arch/RISCV/RISCVModule.c
+index 426d755a..08a84d26 100644
+--- a/arch/RISCV/RISCVModule.c
++++ b/arch/RISCV/RISCVModule.c
+@@ -42,6 +42,9 @@ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		handle->syntax |= (int)value;
+ 	} else if (type == CS_OPT_MODE) {
+ 		handle->mode = (cs_mode)value;
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
++#endif
  	}
- 	bool success = check_implicit_copies(handle) && check_test_operands() &&
-+		       check_vector_clear_writes() &&
- 		       check_scalar_move_flags() &&
- 		       check_scalar_segment_reads() &&
- 		       check_vector_compare_flags();
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 586b3c09..119a748b 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -821,7 +821,7 @@ static bool check_evex_memory_moves(csh handles[2])
- 	}
- 	return true;
- }
--static bool check_broadcast(csh handles[2])
-+static bool check_broadcast(csh handles[2], uint8_t opcode)
- {
- 	static const uint8_t disp[] = { 0, 1, 0x7f, 0x80, 0xff };
- 	for (unsigned rx = 0; rx < 16; ++rx)
-@@ -840,7 +840,7 @@ static bool check_broadcast(csh handles[2])
- 							(uint8_t)(0x7d |
- 								  w << 7),
- 							(uint8_t)(8 | ll << 5),
--							0x1a,
-+							opcode,
- 							(uint8_t)mr,
- 							0x24,
- 							0,
-@@ -860,7 +860,7 @@ static bool check_broadcast(csh handles[2])
- 							return false;
- 					}
- 	/* Reserved and masked EVEX payloads must fall back to the canonical decoder. */
--	uint8_t bytes[] = { 0x62, 0xf2, 0xfd, 0x48, 0x1a, 0x58, 0x80 };
-+	uint8_t bytes[] = { 0x62, 0xf2, 0xfd, 0x48, opcode, 0x58, 0x80 };
- 	for (unsigned field = 1; field <= 3; ++field) {
- 		uint8_t save = bytes[field];
- 		for (unsigned v = 0; v < 256; ++v) {
-@@ -1619,11 +1619,13 @@ static bool check_mode(cs_mode mode)
- 			!check_legacy_memory(handles, 0xf3) ||
- 			!check_vex_packed_memory(handles))))) ||
- 		    !check_rex_stack(handles) ||
--		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
-+		    (mode == CS_MODE_64 && (!check_broadcast(handles, 0x1a) ||
-+					     !check_broadcast(handles, 0x5a))) ||
- 		    !check_evex_memory_moves(handles) ||
- 		    !check_padding(handles) ||
- 		    (mode == CS_MODE_32 &&
--		     (!check_segment_lea32(handles) ||
-+		     (!check_vex_clear(handles) ||
-+		      !check_segment_lea32(handles) ||
- 		      !check_vex32_register_moves(handles) ||
- 		      !check_memory_flag_immediates(handles, mode))) ||
- 		    !check_alu_memory(handles, mode) ||
+ 
+ 	return CS_ERR_OK;
+diff --git a/arch/RISCV/RISCVModule.h b/arch/RISCV/RISCVModule.h
+index df2f2431..aa664a2c 100644
+--- a/arch/RISCV/RISCVModule.h
++++ b/arch/RISCV/RISCVModule.h
+@@ -7,6 +7,9 @@
+ #include "../../utils.h"
+ 
+ cs_err RISCV_global_init(cs_struct *ud);
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++void RISCV_selectScanDecoder(cs_struct *handle);
++#endif
+ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value);
+ 
+ #endif
+diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
+new file mode 100644
+index 00000000..1bce609c
+--- /dev/null
++++ b/arch/RISCV/RISCVScan.h
+@@ -0,0 +1,41 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#ifndef CS_RISCV_SCAN_H
++#define CS_RISCV_SCAN_H
++
++#include "RISCVModule.h"
++
++/* The scanner is selected for little-endian, non-E modes without output.
++ * These major opcodes admit every destination register and immediate. */
++static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
++			       MCInst *inst, uint16_t *size, uint64_t address,
++			       void *info)
++{
++	if (length >= 4 && !inst->flat_insn->detail) {
++		const unsigned major = code[0] & 0x7f;
++		const unsigned opcode = scanMajorOpcode(major);
++		/* Give an overlapping extension its normal decoding priority. */
++		if (opcode && !(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << (major >> 2)))) {
++			MCInst_setOpcode(inst, opcode);
++			*size = 4;
++			return true;
++		}
++	}
++	return RISCV_LLVM_getInstruction(handle, code, length, inst, size,
++					 address, info);
++}
++
++void RISCV_selectScanDecoder(cs_struct *handle)
++{
++	if (handle->disasm == RISCV_LLVM_getInstruction ||
++	    handle->disasm == getScanInstruction) {
++		const bool scan = handle->no_text && !handle->detail_opt &&
++				  !(handle->mode & CS_MODE_BIG_ENDIAN) &&
++				  !RISCV_getFeatureBits(handle->mode,
++							RISCV_FeatureRVE);
++		handle->disasm = scan ? getScanInstruction :
++					RISCV_LLVM_getInstruction;
++	}
++}
++
++#endif
+diff --git a/cs.c b/cs.c
+index 1375ad41..b806ecbc 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1374,6 +1374,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		handle->no_text = value == CS_OPT_OFF;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
++#endif
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+@@ -1386,6 +1389,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 			handle->detail_opt |= (cs_opt_value)value;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
++#endif
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+diff --git a/suite/synctools/alias_pattern_rows.py b/suite/synctools/alias_pattern_rows.py
+index bfed2b30..118fa9d3 100755
+--- a/suite/synctools/alias_pattern_rows.py
++++ b/suite/synctools/alias_pattern_rows.py
+@@ -50,15 +50,49 @@ def generate(directory):
+     return "\n".join(lines)
+ 
+ 
++def expanded_riscv_aliases(directory):
++    """Identify input opcodes that can both expand and print their own alias."""
++    generated = (directory / "RISCVGenCompressedInstructionsInfo.inc").read_text()
++    generated = re.sub(r"/\*.*?\*/|//[^\n]*", "", generated, flags=re.S)
++    match = re.search(
++        r"static bool uncompressInst\([^)]*\)\s*\{\s*"
++        r"switch\s*\(\s*MCInst_getOpcode\(MI\)\s*\)\s*\{\s*"
++        r"default:\s*return false;\s*(.*?)\}\s*return false;\s*\}\s*#endif",
++        generated, flags=re.S,
++    )
++    if match is None or match[1].count("switch") or match[1].count("default"):
++        raise ValueError("Unrecognized RISC-V expansion switch")
++    source = match[1]
++    labels = re.findall(r"\bcase\s+(RISCV_\w+)\s*:", source)
++    if not labels or len(labels) != len(re.findall(r"\bcase\b", source)):
++        raise ValueError("Unrecognized RISC-V expansion case")
++    enum = (directory / "RISCVGenInstrInfo.inc").read_text()
++    values = dict(re.findall(r"\b(RISCV_\w+)\s*=\s*(\d+)\s*,", enum))
++    aliases = set(entries(directory))
++    shared = sorted(name for name in labels if int(values[name]) in aliases)
++    lines = ["/* Generated by suite/synctools/alias_pattern_rows.py. */",
++             "static inline bool expandedOpcodeHasOwnAlias(unsigned opcode)", "{"]
++    if shared:
++        lines += ["\tswitch (opcode) {", *[f"\tcase {name}:" for name in shared],
++                  "\t\treturn true;", "\tdefault:", "\t\treturn false;", "\t}"]
++    else:
++        lines += ["\t(void)opcode;", "\treturn false;"]
++    return "\n".join(lines + ["}", ""])
++
++
+ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument("--check", action="store_true")
+     args = parser.parse_args()
+     root = Path(__file__).resolve().parents[2] / "arch"
++    outputs = {}
+     for arch in ("AArch64", "Mips", "ARM", "PowerPC", "RISCV", "Sparc", "LoongArch"):
+         name = "PPC" if arch == "PowerPC" else arch
+         path = root / arch / f"{name}GenAliasPatternRows.inc"
+-        data = generate(path.parent)
++        outputs[path] = generate(path.parent)
++    riscv = root / "RISCV"
++    outputs[riscv / "RISCVGenExpandedAlias.inc"] = expanded_riscv_aliases(riscv)
++    for path, data in outputs.items():
+         if args.check:
+             if not path.is_file() or data != path.read_text():
+                 raise SystemExit(f"Stale {path}; rerun {Path(__file__).name}")
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 34635d83..8b413445 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -188,8 +188,12 @@ if(CAPSTONE_X86_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES text_option.c x86_printer_prechecked.c)
+     list(APPEND UNIT_TEST_SOURCES detail_option.c)
+ endif()
++if(CAPSTONE_RISCV_SUPPORT AND Python3_Interpreter_FOUND)
++    add_test(NAME unit_alias_pattern_rows_generator
++        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_pattern_rows.py" --check)
++endif()
+ if(CAPSTONE_RISCV_SUPPORT)
+-    list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c)
++    list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c riscv_scan_options.c)
+     list(APPEND UNIT_TEST_SOURCES riscv_instruction_groups.c)
+     list(APPEND UNIT_TEST_SOURCES riscv_op_count_iter.c riscv_sysreg.c riscv_reg_access.c riscv_insn_name_segv.c)
+ endif()
+diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
+new file mode 100644
+index 00000000..44a891a2
+--- /dev/null
++++ b/tests/unit/riscv_scan_options.c
+@@ -0,0 +1,56 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#include <capstone/capstone.h>
++#include <string.h>
++
++int main(void)
++{
++	static const unsigned ids[] = {
++		RISCV_INS_AUIPC, RISCV_INS_LUI, RISCV_INS_JAL,
++	};
++	static const uint8_t majors[] = { 0x17, 0x37, 0x6f };
++	csh h;
++	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, &h) != CS_ERR_OK)
++		return 1;
++	cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
++	cs_insn *insn = cs_malloc(h);
++	if (!insn)
++		return 1;
++	unsigned ok = 1;
++	for (unsigned phase = 0; phase < 4 && ok; ++phase) {
++		const bool scan = phase == 0 || phase == 2;
++		cs_option(h, CS_OPT_TEXT, scan ? CS_OPT_OFF : CS_OPT_ON);
++		cs_option(h, CS_OPT_DETAIL, scan ? CS_OPT_OFF : CS_OPT_ON);
++		for (unsigned e = 0; e < 2; ++e) {
++			cs_option(h, CS_OPT_MODE, CS_MODE_RISCV64 |
++							(e ? CS_MODE_RISCV_E : 0));
++			for (unsigned m = 0; m < 3; ++m) {
++				for (unsigned reg = 0; reg < 32; ++reg) {
++					const uint8_t raw[] = {
++						(uint8_t)(majors[m] | (reg << 7)),
++						(uint8_t)(0xc0 | (reg >> 1)),
++						0x81, 0xfe,
++					};
++					const uint8_t *p = raw;
++					size_t n = sizeof(raw);
++					uint64_t ip = 0x1000;
++					const bool valid = !e || reg < 16;
++					const bool got =
++						cs_disasm_iter(h, &p, &n, &ip, insn);
++					if (got != valid ||
++					    (got && (insn->id != ids[m] || n ||
++						     p != raw + 4 || ip != 0x1004 ||
++						     memcmp(insn->bytes, raw, 4))))
++						ok = 0;
++#ifndef CAPSTONE_DIET
++					if (got && !scan && !insn->mnemonic[0])
++						ok = 0;
++#endif
++				}
++			}
++		}
++	}
++	cs_free(insn, 1);
++	cs_close(&h);
++	return ok ? 0 : 1;
++}

@@ -1,84 +1,484 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 1aae4f9a..ccba0b9b 100644
+index d36460a3..d806354c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1061,7 +1061,13 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
-     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
-     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
--    if(capstone_enabled_architectures STREQUAL "X86")
-+    # Static-only libraries already contain both fixed x86 text readers.
-+    if(capstone_enabled_architectures STREQUAL "X86" OR
-+       (CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
-+        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
-+        if(NOT capstone_enabled_architectures STREQUAL "X86")
-+            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_MIXED_STATIC_OUTPUT)
-+        endif()
-         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
-         set(capstone_x86_objects
-             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+@@ -187,7 +187,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+-    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_SCAN_BY_OPTION)
+     # Fixed-width implicit counts improve detailed decoding in this configuration.
+     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
 diff --git a/Makefile b/Makefile
-index b3a012fa..7c714ef8 100644
+index f225ca2c..680809fb 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -281,6 +281,9 @@ endif
- 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
-+else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
-+	CFLAGS += -DCAPSTONE_X86_MIXED_STATIC_OUTPUT
-+	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+@@ -148,7 +148,7 @@ CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPAT
  endif
- 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+-CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_SCAN_BY_OPTION
  endif
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..304b19dc 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -30,7 +30,8 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
- 					 uint16_t *insn_size);
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 947fd2d2..9aed0731 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -615,6 +615,21 @@ void addSPOperands(MCInst *MI)
+ }
  #endif
  
--#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
-+#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_X86_MIXED_STATIC_OUTPUT)) && \
-+	!defined(CAPSTONE_DIET) && \
- 	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
-diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
-index 732c4004..7f2ac90f 100644
---- a/arch/X86/X86PublicOutput.c
-+++ b/arch/X86/X86PublicOutput.c
-@@ -13,6 +13,10 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
- 					    cs_insn *insn, uint16_t *length,
- 					    bool batch)
- {
-+#ifdef CAPSTONE_X86_MIXED_STATIC_OUTPUT
-+	if (handle->arch != CS_ARCH_X86)
-+		return cs_decode_full_insn(handle, code, size, insn, length, batch);
++/* Every immediate and destination register is valid for these non-E forms. */
++static unsigned scanMajorOpcode(unsigned major)
++{
++	switch (major) {
++	case 0x17:
++		return RISCV_AUIPC;
++	case 0x37:
++		return RISCV_LUI;
++	case 0x6f:
++		return RISCV_JAL;
++	default:
++		return 0;
++	}
++}
++
+ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 				  const uint8_t *Bytes, size_t BytesLen,
+ 				  uint64_t Address, SStream *CS)
+@@ -758,6 +773,18 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 			4, RISCV_FeatureVendorXCVbi, DecoderTableXCVbi32,
+ 			"CORE-V Immediate Branching custom opcode table");
+ 	base32:
++#ifndef CAPSTONE_RISCV_SCAN_BY_OPTION
++		if (MI->csh->no_text && !MI->csh->detail_opt &&
++		    !MI->flat_insn->detail &&
++		    !(MI->csh->mode & CS_MODE_BIG_ENDIAN) &&
++		    !RISCV_getFeatureBits(MI->csh->mode, RISCV_FeatureRVE)) {
++			const unsigned opcode = scanMajorOpcode(Insn & 0x7f);
++			if (opcode) {
++				MCInst_setOpcode(MI, opcode);
++				return MCDisassembler_Success;
++			}
++		}
 +#endif
- 	/* The caller owns skipdata callbacks, bulk boundaries and the public
- 	 * cursors. A fixed iterator can fill this one record using local cursors. */
- 	if (!batch && !handle->skipdata && !handle->no_text &&
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 60ec4b72..b93ffe8d 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -88,7 +88,7 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+ 		TRY_TO_DECODE(4, true, DecoderTable32, "RISCV32 table");
  
- /* This writer belongs to the private mixed-library reader. In dedicated
-  * builds the public iterator shares the same fallback object. */
--#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
-+#ifndef CAPSTONE_X86_ONLY
- /* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
-  * Insert the writemask after its destination. Only a register destination
-  * can request zeroing or read through the mask. */
-@@ -184,7 +184,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
- 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
- 		return true;
--#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
-+#ifndef CAPSTONE_X86_ONLY
- 	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
- 	    (code[4] | 0x10) == 0x7f &&
- 	    writeMaskedByteMove(handle, code, size, insn, insn_size))
+ 		return MCDisassembler_Fail;
+@@ -803,3 +830,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+ 
+ 	return ret != MCDisassembler_Fail;
+ }
++
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#include "RISCVScan.h"
++#endif
+diff --git a/arch/RISCV/RISCVGenExpandedAlias.inc b/arch/RISCV/RISCVGenExpandedAlias.inc
+new file mode 100644
+index 00000000..4b76922f
+--- /dev/null
++++ b/arch/RISCV/RISCVGenExpandedAlias.inc
+@@ -0,0 +1,6 @@
++/* Generated by suite/synctools/alias_pattern_rows.py. */
++static inline bool expandedOpcodeHasOwnAlias(unsigned opcode)
++{
++	(void)opcode;
++	return false;
++}
+diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
+index f7778c5d..0d0f74ed 100644
+--- a/arch/RISCV/RISCVInstPrinter.c
++++ b/arch/RISCV/RISCVInstPrinter.c
+@@ -407,66 +407,27 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
+ 	SStream_concat0(O, ".t");
+ }
+ 
+-void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+-				 void * /* MCRegisterInfo* */ info)
+-{
+-	MI->MRI = (MCRegisterInfo *)info;
+-
+-	MCInst_setIsAlias(MI, false);
+-	bool usesAliasDetails = detail_is_set(MI) && isAliasDetail(MI) &&
+-				!isRealDetail(MI);
+-	MI->flat_insn->usesAliasDetails = usesAliasDetails;
++#include "RISCVGenExpandedAlias.inc"
+ 
+-	MCInst Uncompressed;
+-	MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
+-	MCInst *MIUncompressed = MI;
+-	bool is_uncompressed = false;
+-
+-	bool textReal = isRealSyntax(MI);
+-	bool detailReal = isRealDetail(MI);
+-
+-	if (!textReal || (detail_is_set(MI) && !detailReal)) {
+-		// Side-effectful check for compressed instructions that also creates the equivalent
+-		// uncompressed instruction in case of returning true
+-		// False means no side effect happened
+-		// (LLVM doesn't have an API for doing a pure check)
+-		if (uncompressInst(&Uncompressed, MI)) {
+-			MIUncompressed = &Uncompressed;
+-			Uncompressed.address = MI->address;
+-			Uncompressed.MRI = MI->MRI;
+-			Uncompressed.csh = MI->csh;
+-			Uncompressed.flat_insn = MI->flat_insn;
+-			is_uncompressed = true;
+-		}
+-	}
++/* Preserve the original opcode's alias when both opcodes have patterns. */
++static bool printOperandAlias(MCInst *MI, MCInst *expanded, SStream *O)
++{
++	if (MI != expanded && expandedOpcodeHasOwnAlias(MCInst_getOpcode(MI)) &&
++	    printAliasInstr(MI, MI->address, O))
++		return true;
++	return printAliasInstr(expanded, expanded->address, O);
++}
+ 
+-	if (isRealSyntax(MI)) {
++static void printOperandForms(MCInst *MI, MCInst *expanded, SStream *O)
++{
++	if (isRealSyntax(MI))
+ 		printInstruction(MI, MI->address, O);
+-	} else {
+-		if (isUncompressedRealSyntax(MI)) {
+-			printInstruction(MIUncompressed,
+-					 MIUncompressed->address, O);
+-		} else {
+-			// Side-effectful check for alias instructions that prints to the SStream if it returns true
+-			// False means no printing to stream happened
+-			if (printAliasInstr(MI, MI->address, O)) {
+-				MCInst_setIsAlias(MI, true);
+-			} else { // the instruction is not an alias
+-				if (!is_uncompressed) {
+-					printInstruction(MI, MI->address, O);
+-				} else if (printAliasInstr(
+-						   MIUncompressed,
+-						   MIUncompressed->address,
+-						   O)) {
+-					MCInst_setIsAlias(MI, true);
+-				} else {
+-					printInstruction(
+-						MIUncompressed,
+-						MIUncompressed->address, O);
+-				}
+-			}
+-		}
+-	}
++	else if (isUncompressedRealSyntax(MI))
++		printInstruction(expanded, expanded->address, O);
++	else if (printOperandAlias(MI, expanded, O))
++		MCInst_setIsAlias(MI, true);
++	else
++		printInstruction(expanded, expanded->address, O);
+ 
+ 	bool textAndDetailModesMatch = (isRealSyntax(MI) && isRealDetail(MI)) ||
+ 				       (isUncompressedRealSyntax(MI) &&
+@@ -485,19 +446,10 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 		if (isRealDetail(MI)) {
+ 			printInstruction(MI, MI->address, O);
+ 		} else if (isUncompressedRealDetail(MI)) {
+-			printInstruction(MIUncompressed,
+-					 MIUncompressed->address, O);
+-		} else if (!printAliasInstr(MI, MI->address, O)) {
+-			if (!is_uncompressed) {
+-				printInstruction(MI, MI->address, O);
+-			} else if (!printAliasInstr(MIUncompressed,
+-						    MIUncompressed->address,
+-						    O)) {
+-				printInstruction(MIUncompressed,
+-						 MIUncompressed->address, O);
+-			} else {
+-				/* Nothing, printAliasInstr returned true and did its side effect */
+-			}
++			printInstruction(expanded,
++					 expanded->address, O);
++		} else if (!printOperandAlias(MI, expanded, O)) {
++			printInstruction(expanded, expanded->address, O);
+ 		}
+ 
+ 		// re-open the stream to restore the usual state
+@@ -509,6 +461,45 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 	RISCV_set_alias_id(MI, O);
+ }
+ 
++/* Keep the expanded MCInst out of the full-width printer's stack frame. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static void printCompressedOperandForms(MCInst *MI, SStream *O)
++{
++	MCInst expanded;
++	MCInst_InitStorage(&expanded, MI->csh->arch, false);
++	if (!uncompressInst(&expanded, MI)) {
++		printOperandForms(MI, MI, O);
++		return;
++	}
++	expanded.address = MI->address;
++	expanded.MRI = MI->MRI;
++	expanded.csh = MI->csh;
++	expanded.flat_insn = MI->flat_insn;
++	printOperandForms(MI, &expanded, O);
++}
++
++void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
++				 void * /* MCRegisterInfo* */ info)
++{
++	MI->MRI = (MCRegisterInfo *)info;
++
++	MCInst_setIsAlias(MI, false);
++	bool usesAliasDetails = detail_is_set(MI) && isAliasDetail(MI) &&
++				!isRealDetail(MI);
++	MI->flat_insn->usesAliasDetails = usesAliasDetails;
++
++	/* Only the two-byte decoder produces opcodes in the uncompression table. */
++	if (MI->flat_insn->size == 2 &&
++	    (!isRealSyntax(MI) || (detail_is_set(MI) && !isRealDetail(MI))))
++		printCompressedOperandForms(MI, O);
++	else
++		printOperandForms(MI, MI, O);
++}
++
+ const char *getSysRegName(unsigned reg)
+ {
+ 	const RISCV_SysReg *SysReg = RISCV_lookupSysRegByEncoding(reg);
+diff --git a/arch/RISCV/RISCVModule.c b/arch/RISCV/RISCVModule.c
+index 426d755a..08a84d26 100644
+--- a/arch/RISCV/RISCVModule.c
++++ b/arch/RISCV/RISCVModule.c
+@@ -42,6 +42,9 @@ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		handle->syntax |= (int)value;
+ 	} else if (type == CS_OPT_MODE) {
+ 		handle->mode = (cs_mode)value;
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
++#endif
+ 	}
+ 
+ 	return CS_ERR_OK;
+diff --git a/arch/RISCV/RISCVModule.h b/arch/RISCV/RISCVModule.h
+index df2f2431..aa664a2c 100644
+--- a/arch/RISCV/RISCVModule.h
++++ b/arch/RISCV/RISCVModule.h
+@@ -7,6 +7,9 @@
+ #include "../../utils.h"
+ 
+ cs_err RISCV_global_init(cs_struct *ud);
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++void RISCV_selectScanDecoder(cs_struct *handle);
++#endif
+ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value);
+ 
+ #endif
+diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
+new file mode 100644
+index 00000000..1bce609c
+--- /dev/null
++++ b/arch/RISCV/RISCVScan.h
+@@ -0,0 +1,41 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#ifndef CS_RISCV_SCAN_H
++#define CS_RISCV_SCAN_H
++
++#include "RISCVModule.h"
++
++/* The scanner is selected for little-endian, non-E modes without output.
++ * These major opcodes admit every destination register and immediate. */
++static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
++			       MCInst *inst, uint16_t *size, uint64_t address,
++			       void *info)
++{
++	if (length >= 4 && !inst->flat_insn->detail) {
++		const unsigned major = code[0] & 0x7f;
++		const unsigned opcode = scanMajorOpcode(major);
++		/* Give an overlapping extension its normal decoding priority. */
++		if (opcode && !(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << (major >> 2)))) {
++			MCInst_setOpcode(inst, opcode);
++			*size = 4;
++			return true;
++		}
++	}
++	return RISCV_LLVM_getInstruction(handle, code, length, inst, size,
++					 address, info);
++}
++
++void RISCV_selectScanDecoder(cs_struct *handle)
++{
++	if (handle->disasm == RISCV_LLVM_getInstruction ||
++	    handle->disasm == getScanInstruction) {
++		const bool scan = handle->no_text && !handle->detail_opt &&
++				  !(handle->mode & CS_MODE_BIG_ENDIAN) &&
++				  !RISCV_getFeatureBits(handle->mode,
++							RISCV_FeatureRVE);
++		handle->disasm = scan ? getScanInstruction :
++					RISCV_LLVM_getInstruction;
++	}
++}
++
++#endif
+diff --git a/cs.c b/cs.c
+index 1375ad41..b806ecbc 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1374,6 +1374,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		handle->no_text = value == CS_OPT_OFF;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
++#endif
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+@@ -1386,6 +1389,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 			handle->detail_opt |= (cs_opt_value)value;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
++#endif
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+diff --git a/suite/synctools/alias_pattern_rows.py b/suite/synctools/alias_pattern_rows.py
+index bfed2b30..118fa9d3 100755
+--- a/suite/synctools/alias_pattern_rows.py
++++ b/suite/synctools/alias_pattern_rows.py
+@@ -50,15 +50,49 @@ def generate(directory):
+     return "\n".join(lines)
+ 
+ 
++def expanded_riscv_aliases(directory):
++    """Identify input opcodes that can both expand and print their own alias."""
++    generated = (directory / "RISCVGenCompressedInstructionsInfo.inc").read_text()
++    generated = re.sub(r"/\*.*?\*/|//[^\n]*", "", generated, flags=re.S)
++    match = re.search(
++        r"static bool uncompressInst\([^)]*\)\s*\{\s*"
++        r"switch\s*\(\s*MCInst_getOpcode\(MI\)\s*\)\s*\{\s*"
++        r"default:\s*return false;\s*(.*?)\}\s*return false;\s*\}\s*#endif",
++        generated, flags=re.S,
++    )
++    if match is None or match[1].count("switch") or match[1].count("default"):
++        raise ValueError("Unrecognized RISC-V expansion switch")
++    source = match[1]
++    labels = re.findall(r"\bcase\s+(RISCV_\w+)\s*:", source)
++    if not labels or len(labels) != len(re.findall(r"\bcase\b", source)):
++        raise ValueError("Unrecognized RISC-V expansion case")
++    enum = (directory / "RISCVGenInstrInfo.inc").read_text()
++    values = dict(re.findall(r"\b(RISCV_\w+)\s*=\s*(\d+)\s*,", enum))
++    aliases = set(entries(directory))
++    shared = sorted(name for name in labels if int(values[name]) in aliases)
++    lines = ["/* Generated by suite/synctools/alias_pattern_rows.py. */",
++             "static inline bool expandedOpcodeHasOwnAlias(unsigned opcode)", "{"]
++    if shared:
++        lines += ["\tswitch (opcode) {", *[f"\tcase {name}:" for name in shared],
++                  "\t\treturn true;", "\tdefault:", "\t\treturn false;", "\t}"]
++    else:
++        lines += ["\t(void)opcode;", "\treturn false;"]
++    return "\n".join(lines + ["}", ""])
++
++
+ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument("--check", action="store_true")
+     args = parser.parse_args()
+     root = Path(__file__).resolve().parents[2] / "arch"
++    outputs = {}
+     for arch in ("AArch64", "Mips", "ARM", "PowerPC", "RISCV", "Sparc", "LoongArch"):
+         name = "PPC" if arch == "PowerPC" else arch
+         path = root / arch / f"{name}GenAliasPatternRows.inc"
+-        data = generate(path.parent)
++        outputs[path] = generate(path.parent)
++    riscv = root / "RISCV"
++    outputs[riscv / "RISCVGenExpandedAlias.inc"] = expanded_riscv_aliases(riscv)
++    for path, data in outputs.items():
+         if args.check:
+             if not path.is_file() or data != path.read_text():
+                 raise SystemExit(f"Stale {path}; rerun {Path(__file__).name}")
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 34635d83..8b413445 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -188,8 +188,12 @@ if(CAPSTONE_X86_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES text_option.c x86_printer_prechecked.c)
+     list(APPEND UNIT_TEST_SOURCES detail_option.c)
+ endif()
++if(CAPSTONE_RISCV_SUPPORT AND Python3_Interpreter_FOUND)
++    add_test(NAME unit_alias_pattern_rows_generator
++        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_pattern_rows.py" --check)
++endif()
+ if(CAPSTONE_RISCV_SUPPORT)
+-    list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c)
++    list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c riscv_scan_options.c)
+     list(APPEND UNIT_TEST_SOURCES riscv_instruction_groups.c)
+     list(APPEND UNIT_TEST_SOURCES riscv_op_count_iter.c riscv_sysreg.c riscv_reg_access.c riscv_insn_name_segv.c)
+ endif()
+diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
+new file mode 100644
+index 00000000..44a891a2
+--- /dev/null
++++ b/tests/unit/riscv_scan_options.c
+@@ -0,0 +1,56 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#include <capstone/capstone.h>
++#include <string.h>
++
++int main(void)
++{
++	static const unsigned ids[] = {
++		RISCV_INS_AUIPC, RISCV_INS_LUI, RISCV_INS_JAL,
++	};
++	static const uint8_t majors[] = { 0x17, 0x37, 0x6f };
++	csh h;
++	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, &h) != CS_ERR_OK)
++		return 1;
++	cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
++	cs_insn *insn = cs_malloc(h);
++	if (!insn)
++		return 1;
++	unsigned ok = 1;
++	for (unsigned phase = 0; phase < 4 && ok; ++phase) {
++		const bool scan = phase == 0 || phase == 2;
++		cs_option(h, CS_OPT_TEXT, scan ? CS_OPT_OFF : CS_OPT_ON);
++		cs_option(h, CS_OPT_DETAIL, scan ? CS_OPT_OFF : CS_OPT_ON);
++		for (unsigned e = 0; e < 2; ++e) {
++			cs_option(h, CS_OPT_MODE, CS_MODE_RISCV64 |
++							(e ? CS_MODE_RISCV_E : 0));
++			for (unsigned m = 0; m < 3; ++m) {
++				for (unsigned reg = 0; reg < 32; ++reg) {
++					const uint8_t raw[] = {
++						(uint8_t)(majors[m] | (reg << 7)),
++						(uint8_t)(0xc0 | (reg >> 1)),
++						0x81, 0xfe,
++					};
++					const uint8_t *p = raw;
++					size_t n = sizeof(raw);
++					uint64_t ip = 0x1000;
++					const bool valid = !e || reg < 16;
++					const bool got =
++						cs_disasm_iter(h, &p, &n, &ip, insn);
++					if (got != valid ||
++					    (got && (insn->id != ids[m] || n ||
++						     p != raw + 4 || ip != 0x1004 ||
++						     memcmp(insn->bytes, raw, 4))))
++						ok = 0;
++#ifndef CAPSTONE_DIET
++					if (got && !scan && !insn->mnemonic[0])
++						ok = 0;
++#endif
++				}
++			}
++		}
++	}
++	cs_free(insn, 1);
++	cs_close(&h);
++	return ok ? 0 : 1;
++}

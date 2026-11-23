@@ -1,0 +1,226 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d36460a3..d806354c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -187,7 +187,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+-    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_RISCV_SCAN_BY_OPTION)
+     # Fixed-width implicit counts improve detailed decoding in this configuration.
+     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+diff --git a/Makefile b/Makefile
+index f225ca2c..680809fb 100644
+--- a/Makefile
++++ b/Makefile
+@@ -148,7 +148,7 @@ CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPAT
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+-CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_SCAN_BY_OPTION
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 947fd2d2..8986ea81 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -803,3 +803,7 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+ 
+ 	return ret != MCDisassembler_Fail;
+ }
++
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++#include "RISCVScan.h"
++#endif
+diff --git a/arch/RISCV/RISCVModule.c b/arch/RISCV/RISCVModule.c
+index 426d755a..08a84d26 100644
+--- a/arch/RISCV/RISCVModule.c
++++ b/arch/RISCV/RISCVModule.c
+@@ -42,6 +42,9 @@ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		handle->syntax |= (int)value;
+ 	} else if (type == CS_OPT_MODE) {
+ 		handle->mode = (cs_mode)value;
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
++#endif
+ 	}
+ 
+ 	return CS_ERR_OK;
+diff --git a/arch/RISCV/RISCVModule.h b/arch/RISCV/RISCVModule.h
+index df2f2431..aa664a2c 100644
+--- a/arch/RISCV/RISCVModule.h
++++ b/arch/RISCV/RISCVModule.h
+@@ -7,6 +7,9 @@
+ #include "../../utils.h"
+ 
+ cs_err RISCV_global_init(cs_struct *ud);
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++void RISCV_selectScanDecoder(cs_struct *handle);
++#endif
+ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value);
+ 
+ #endif
+diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
+new file mode 100644
+index 00000000..4f02638a
+--- /dev/null
++++ b/arch/RISCV/RISCVScan.h
+@@ -0,0 +1,55 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#ifndef CS_RISCV_SCAN_H
++#define CS_RISCV_SCAN_H
++
++#include "RISCVModule.h"
++
++/* The scanner is selected for little-endian, non-E modes without output.
++ * These major opcodes admit every destination register and immediate. */
++static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
++			       MCInst *inst, uint16_t *size, uint64_t address,
++			       void *info)
++{
++	if (length >= 4 && !inst->flat_insn->detail) {
++		unsigned opcode;
++		const unsigned major = code[0] & 0x7f;
++		switch (major) {
++		case 0x17:
++			opcode = RISCV_AUIPC;
++			break;
++		case 0x37:
++			opcode = RISCV_LUI;
++			break;
++		case 0x6f:
++			opcode = RISCV_JAL;
++			break;
++		default:
++			goto full;
++		}
++		/* Give an overlapping extension its normal decoding priority. */
++		if (!(RISCV_EXTENSION_MAJORS & (UINT32_C(1) << (major >> 2)))) {
++			MCInst_setOpcode(inst, opcode);
++			*size = 4;
++			return true;
++		}
++	}
++full:
++	return RISCV_LLVM_getInstruction(handle, code, length, inst, size,
++					 address, info);
++}
++
++void RISCV_selectScanDecoder(cs_struct *handle)
++{
++	if (handle->disasm == RISCV_LLVM_getInstruction ||
++	    handle->disasm == getScanInstruction) {
++		const bool scan = handle->no_text && !handle->detail_opt &&
++				  !(handle->mode & CS_MODE_BIG_ENDIAN) &&
++				  !RISCV_getFeatureBits(handle->mode,
++							RISCV_FeatureRVE);
++		handle->disasm = scan ? getScanInstruction :
++					RISCV_LLVM_getInstruction;
++	}
++}
++
++#endif
+diff --git a/cs.c b/cs.c
+index 1375ad41..b806ecbc 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1374,6 +1374,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		handle->no_text = value == CS_OPT_OFF;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
++#endif
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+@@ -1386,6 +1389,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 			handle->detail_opt |= (cs_opt_value)value;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
++#endif
++#ifdef CAPSTONE_RISCV_SCAN_BY_OPTION
++		RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 34635d83..dffc987d 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -189,7 +189,7 @@ if(CAPSTONE_X86_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES detail_option.c)
+ endif()
+ if(CAPSTONE_RISCV_SUPPORT)
+-    list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c)
++    list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c riscv_scan_options.c)
+     list(APPEND UNIT_TEST_SOURCES riscv_instruction_groups.c)
+     list(APPEND UNIT_TEST_SOURCES riscv_op_count_iter.c riscv_sysreg.c riscv_reg_access.c riscv_insn_name_segv.c)
+ endif()
+diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
+new file mode 100644
+index 00000000..44a891a2
+--- /dev/null
++++ b/tests/unit/riscv_scan_options.c
+@@ -0,0 +1,56 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#include <capstone/capstone.h>
++#include <string.h>
++
++int main(void)
++{
++	static const unsigned ids[] = {
++		RISCV_INS_AUIPC, RISCV_INS_LUI, RISCV_INS_JAL,
++	};
++	static const uint8_t majors[] = { 0x17, 0x37, 0x6f };
++	csh h;
++	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, &h) != CS_ERR_OK)
++		return 1;
++	cs_option(h, CS_OPT_DETAIL, CS_OPT_ON);
++	cs_insn *insn = cs_malloc(h);
++	if (!insn)
++		return 1;
++	unsigned ok = 1;
++	for (unsigned phase = 0; phase < 4 && ok; ++phase) {
++		const bool scan = phase == 0 || phase == 2;
++		cs_option(h, CS_OPT_TEXT, scan ? CS_OPT_OFF : CS_OPT_ON);
++		cs_option(h, CS_OPT_DETAIL, scan ? CS_OPT_OFF : CS_OPT_ON);
++		for (unsigned e = 0; e < 2; ++e) {
++			cs_option(h, CS_OPT_MODE, CS_MODE_RISCV64 |
++							(e ? CS_MODE_RISCV_E : 0));
++			for (unsigned m = 0; m < 3; ++m) {
++				for (unsigned reg = 0; reg < 32; ++reg) {
++					const uint8_t raw[] = {
++						(uint8_t)(majors[m] | (reg << 7)),
++						(uint8_t)(0xc0 | (reg >> 1)),
++						0x81, 0xfe,
++					};
++					const uint8_t *p = raw;
++					size_t n = sizeof(raw);
++					uint64_t ip = 0x1000;
++					const bool valid = !e || reg < 16;
++					const bool got =
++						cs_disasm_iter(h, &p, &n, &ip, insn);
++					if (got != valid ||
++					    (got && (insn->id != ids[m] || n ||
++						     p != raw + 4 || ip != 0x1004 ||
++						     memcmp(insn->bytes, raw, 4))))
++						ok = 0;
++#ifndef CAPSTONE_DIET
++					if (got && !scan && !insn->mnemonic[0])
++						ok = 0;
++#endif
++				}
++			}
++		}
++	}
++	cs_free(insn, 1);
++	cs_close(&h);
++	return ok ? 0 : 1;
++}

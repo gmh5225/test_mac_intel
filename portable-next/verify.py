@@ -18,7 +18,7 @@ def extract(pkg):
         pos+=60+size+(size%2)
     raise ValueError('missing package member')
 try:
-    assert g('rev-parse','HEAD')==q['parent']
+    assert g('rev-parse','HEAD')==q['scanner']['parent']==q['combined']['parent']
     pkg=t/'sample.deb';cmd('download',['curl','--retry','3','--retry-all-errors','-fsSL',source['url'],'-o',pkg]);data=pkg.read_bytes();assert sha(data)==source['package_sha256']
     texts={}
     for name,elf in extract(data).items():
@@ -33,12 +33,13 @@ try:
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
     if profile=='diet':cfg.append('-DCAPSTONE_BUILD_DIET=ON')
     variants={}
-    for stage in ('base','candidate'):
-        if stage=='candidate':
-            patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
+    for stage in ('base','scanner','combined','mixed'):
+        g('restore','--source','HEAD','--staged','--worktree','--','.')
+        if stage!='base':
+            patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+stage+'.patch']));assert sha(patch.read_bytes())==q[stage]['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q[stage]['tree']
         units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_instruction_groups', 'riscv_op_count_iter'] if profile=='full' else []
-        if profile=='full' and stage=='candidate':units.append('riscv_scan_options')
-        cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*units])
+        if profile=='full' and stage!='base':units.append('riscv_scan_options')
+        cmd('configure-'+stage,cfg+['-DCAPSTONE_MIPS_SUPPORT='+('ON' if stage=='mixed' else 'OFF')]);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*units])
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
@@ -54,6 +55,6 @@ try:
             outputs[suffix]=rows
         assert outputs['static']==outputs['shared']
         variants[stage]=outputs
-    assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
+    assert variants['base']==variants['combined']==variants['scanner']==variants['mixed'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['combined']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))
