@@ -1,7 +1,7 @@
-name: Measure formatter-only compiler feedback with original scan objects on six withheld programs
+name: Measure trained Capstone and trained Rust iced on the same withheld PE and ELF code
 on:
   push:
-    branches: [codex/x86-formatter-only-profile]
+    branches: [codex/symmetric-iced-formatter-training]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,7 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -48,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: formatter-profile-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: both-trained-formatters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

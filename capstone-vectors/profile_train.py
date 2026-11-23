@@ -1,7 +1,8 @@
 from pathlib import Path
 import hashlib,json,os,re,shutil,subprocess as sp
 import training_corpus
-def train(exe,w,recipes,tool,raw,out):
+def train(exe,w,recipes,tool,raw,out,rust_runner,stock):
+    iced_programs={}
     programs={};unseen=recipes['forbidden_hashes']
     for arch,group in recipes['packages'].items():
         pkg=w/(arch+'.deb')
@@ -20,7 +21,18 @@ def train(exe,w,recipes,tool,raw,out):
                     values=list(map(int,numbers.split()));assert len(values)>=5 and values[2]>1000
                     results[reader+'/'+str(mode)]=values[2:]
             programs[arch+'/'+name]=dict(sha256=h,records=results)
+            paired={}
+            for mode in (0,1,2):
+                for reader in ('iced____','fast____'):
+                    args=[reader,str(mode),'1',text,span,bits]
+                    old=sp.check_output([stock,*args],text=True).split()[2:]
+                    env=dict(os.environ,LLVM_PROFILE_FILE=str(w/'rust-raw'/'iced-%m-%p.profraw'))
+                    new=sp.check_output([rust_runner,*args],env=env,text=True).split()[2:]
+                    assert old==new and int(new[0])>1000,(arch,name,reader,mode)
+                    paired[reader+'/'+str(mode)]=list(map(int,new))
+            iced_programs[arch+'/'+name]=dict(sha256=h,records=paired)
         pkg.unlink()
+    (out/'rust-training.json').write_text(json.dumps(iced_programs,indent=2)+chr(10))
     profiles=sorted(raw.glob('*.profraw'));assert profiles
     merged=w/'capstone.profdata';sp.run([tool,'merge','-o',merged,*profiles],check=True)
     shown=sp.check_output([tool,'show','--all-functions','--counts',merged],text=True)

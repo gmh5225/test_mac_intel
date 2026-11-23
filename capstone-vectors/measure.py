@@ -18,6 +18,8 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
+    from rust_training import instrument,optimize,rust_triple
+    triple=rust_triple()
     reference=json.loads((r/'experiment.json').read_text())['checkout_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     meta=json.loads((r/'experiment.json').read_text())
@@ -29,7 +31,7 @@ def main(w):
     src=src.replace('InstructionInfoFactory, IntelFormatter,','InstructionInfoFactory, IntelFormatter, FastFormatter,').replace('    formatter: IntelFormatter,','    formatter: IntelFormatter,\n    fast: FastFormatter,\n    fast_enabled: bool,').replace('        mode,','        mode: mode & 3,\n        fast_enabled: mode & 8 != 0,\n        fast: FastFormatter::new(),')
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
-    (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
+    (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release','--target',triple],'iced-build',ad)
     save('cpu.json',dict(cpu=(sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip() if platform.system()=='Darwin' else Path('/proc/cpuinfo').read_text()),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
     save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='X86_scanNativeBatch with canonical iterator fallback',format='X86_disasmIterText (both widths)',detail='X86_disasmIterText (both widths)',consumer='Public iterator benchmark plus the private static-link text entry called by NeverD; both consume the same output fields'))
@@ -154,9 +156,12 @@ def main(w):
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         runtime=[profile_arg] if kind=='train' else []
-        run(['clang++',*runtime,w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe)
+        stock_rust=ad/'target'/triple/'release/libiced_compare.a'
+        rust_lib=trained_rust if kind=='bare' else stock_rust
+        run(['clang++',*runtime,w/'driver.o',*flags,lib,rust_lib,*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe)
         if kind=='train':
-            train(exe,w,m['training'],tool,raw,evidence)
+            train(exe,w,m['training'],tool,raw,evidence,rust_runner,bins['mixed_base'])
+            trained_rust=optimize(ad,w,evidence,json.loads((evidence/'rust-training.json').read_text()))
             shutil.rmtree(build);continue
         bins[key]=exe
         names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
@@ -170,6 +175,7 @@ def main(w):
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         save('linked-'+key+'.json',linked)
         if key=='mixed_base':
+            rust_runner=instrument(ad,w,evidence,flags,lib,syslibs)
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
     import random
@@ -212,6 +218,8 @@ def main(w):
         for mode in (0,1,2):
             targets={'copy':('mixed_base','x86_all_' if mode else 'vecbatch'),'iced':('mixed_base','iced____')}
             if mode:targets['fast']=('mixed_base','fast____')
+            targets['trained_iced']=('mixed_bare','iced____')
+            if mode:targets['trained_fast']=('mixed_bare','fast____')
             for k in trees:
                 targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
                 targets['public_'+k]=(k,'capstone')
@@ -226,7 +234,9 @@ def main(w):
                 assert len({tuple(v[2:5])for k,v in obs})==1
                 for kind in ('public_','private_'):
                     assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
+                if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast','trained_iced','trained_fast')})==1
+                for tag in ('iced','fast') if mode else ('iced',):
+                    assert len({tuple(v[2:]) for k,v in obs if k in (tag,'trained_'+tag)})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
     assert len(results)==3*len(m['samples'])
