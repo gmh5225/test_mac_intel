@@ -94,7 +94,7 @@ def main(w):
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
         mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
-        patches=['base']+([kind] if kind!='base' else [])
+        patches=[kind] if kind!='base' else []
         for name in patches:
             patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
             run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
@@ -131,12 +131,9 @@ def main(w):
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
-        if kind=='ordered' and not mixed:
-            first=expected.index('X86MemoryFallback32.c.o')
-            expected=expected[:first]+earlier+[n for n in expected[first:] if n not in earlier]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='sib':assert 'X86Vex32Output.c.o' in changed and set(changed)<={'X86Vex32Output.c.o','X86MemoryFallback32.c.o'},changed
+        if kind=='cmp':assert changed==['X86VectorFallback64.c.o'],changed
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
