@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','mips','memory'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','tail','memory'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -38,7 +38,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','mips','memory'):
+    for variant in ('base','tail','memory'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -61,6 +61,9 @@ try:
         if variant=='base':base_records=records
         else:assert base_records==records
         save('alias-records-'+variant,records)
+        command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'entry-guard.cpp',archive,'-o',t/'entry-guard'],'build-entry-guard-'+variant)
+        command([t/'entry-guard'],'entry-guard-'+variant)
+        assert (out/('entry-guard-'+variant+'.log')).read_text().split()[0]=='5734400'
         command(['clang','-O2','-I',cs/'include',r/'registers.c',archive,'-lm','-o',t/'verify'],'compile-records-'+variant)
         command([t/'verify'],'registers-'+variant)
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
@@ -78,7 +81,7 @@ try:
         command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'vector-generator'],'compile-vector-rows-'+variant)
         generated=sp.check_output([t/'vector-generator']);assert generated==(cs/'arch/X86/X86GenVectorOutput.inc').read_bytes()
         save('vector-table-'+variant,dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
-        if variant=='memory':
+        if variant in ('memory','tail'):
             memory=sp.check_output([t/'vector-generator','--vex-base-memory']);assert memory==(cs/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
             save('generated-vex-memory',dict(bytes=len(memory),sha256=hashlib.sha256(memory).hexdigest()))
         obj,=build.rglob('X86Decoder.cpp.o')
@@ -106,6 +109,8 @@ try:
             command(['python3','-B',cs/'suite/synctools/alias_pattern_rows.py','--check'],'check-rows-'+variant,cs)
         else:raise AssertionError(('missing shipped alias member',variant))
         assert 'X86PublicOutput.c.o' not in members and 'X86PostPrinter.c.o' not in members
+        if variant=='tail':
+            assert members.index('X86VexBaseMemory.c.o')>members.index('AliasPatternLookup.c.o')
         all_members={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in members}
         member_digests={n:hashlib.sha256(sp.check_output(['ar','p',archive,n])).hexdigest() for n in ('X86EvexScan.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','AliasMapping.c.o','X86BatchScan.c.o')}
         import io
@@ -132,7 +137,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert identities['mips']['archive']==identities['base']['archive']
+    assert len({v['archive'] for v in identities.values()})==3
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))

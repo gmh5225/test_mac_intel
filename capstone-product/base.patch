@@ -1,0 +1,298 @@
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index a3561eb8..f15ce655 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -307,6 +307,57 @@ static bool finishInstruction(MCInst *instr, DecodeStatus result)
+ 	return true;
+ }
+ 
++/* Shared primary opcodes, including the instructions restricted to MIPS64. */
++#define MIPS_COMMON_SCAN_OPS(OP, OP64) \
++	OP(9, Mips_ADDiu) \
++	OP(12, Mips_ANDi) \
++	OP(13, Mips_ORi) \
++	OP(14, Mips_XORi) \
++	OP64(25, Mips_DADDiu) \
++	OP(35, Mips_LW) \
++	OP(43, Mips_SW) \
++	OP64(55, Mips_LD) \
++	OP64(63, Mips_SD)
++
++#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
++/* These standard forms use every bit below the primary opcode for operands. */
++static inline unsigned standardScanOpcode(unsigned major, cs_mode mode)
++{
++	switch (major) {
++	case 4:
++		return Mips_BEQ;
++	case 5:
++		return Mips_BNE;
++	case 10:
++		return Mips_SLTi;
++	case 11:
++		return Mips_SLTiu;
++	case 32:
++		return Mips_LB;
++	case 33:
++		return Mips_LH;
++	case 36:
++		return Mips_LBu;
++	case 37:
++		return Mips_LHu;
++	case 40:
++		return Mips_SB;
++	case 41:
++		return Mips_SH;
++#define MIPS_SCAN_OP(n, id) \
++	case n: \
++		return id;
++#define MIPS_SCAN_OP64(n, id) \
++	case n: \
++		return mode == CS_MODE_MIPS64 ? id : 0;
++		MIPS_COMMON_SCAN_OPS(MIPS_SCAN_OP, MIPS_SCAN_OP64)
++#undef MIPS_SCAN_OP64
++#undef MIPS_SCAN_OP
++	}
++	return 0;
++}
++#endif
++
+ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			 MCInst *instr, uint16_t *size, uint64_t address,
+ 			 void *info)
+@@ -314,46 +365,26 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 	uint64_t size64;
+ 	Mips_init_cs_detail(instr);
+ /* These standard encodings have no extra operands to validate in a scan. */
+-#ifdef MIPS_DIRECT_MAPPING
++#if defined(MIPS_DIRECT_MAPPING) && !defined(CAPSTONE_MIPS_SCAN_BY_OPTION)
+ 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
+ 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
+ 	    instr->csh->disasm == Mips_getInstruction &&
+ 	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
+-		/* For these standard immediate and load/store encodings all
+-		 * register and immediate bits are operands. */
+ 		const unsigned major = readBytes32(instr, code) >> 26;
+ 		unsigned opcode = 0;
+ 		switch (major) {
+-		case 9:
+-			opcode = Mips_ADDiu;
+-			break;
+-		case 12:
+-			opcode = Mips_ANDi;
+-			break;
+-		case 13:
+-			opcode = Mips_ORi;
+-			break;
+-		case 14:
+-			opcode = Mips_XORi;
+-			break;
+-		case 25:
+-			if (mode == CS_MODE_MIPS64)
+-				opcode = Mips_DADDiu;
+-			break;
+-		case 35:
+-			opcode = Mips_LW;
+-			break;
+-		case 43:
+-			opcode = Mips_SW;
+-			break;
+-		case 55:
+-			if (mode == CS_MODE_MIPS64)
+-				opcode = Mips_LD;
+-			break;
+-		case 63:
+-			if (mode == CS_MODE_MIPS64)
+-				opcode = Mips_SD;
+-			break;
++#define MIPS_SCAN_OP(n, id) \
++	case n: \
++		opcode = id; \
++		break;
++#define MIPS_SCAN_OP64(n, id) \
++	case n: \
++		if (mode == CS_MODE_MIPS64) \
++			opcode = id; \
++		break;
++			MIPS_COMMON_SCAN_OPS(MIPS_SCAN_OP, MIPS_SCAN_OP64)
++#undef MIPS_SCAN_OP64
++#undef MIPS_SCAN_OP
+ 		}
+ 		if (opcode) {
+ 			MCInst_setOpcode(instr, opcode);
+@@ -869,4 +900,37 @@ void Mips_set_mem_access(MCInst *MI, bool status)
+ 	}
+ }
+ 
++#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
++static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
++			       MCInst *instr, uint16_t *size, uint64_t address,
++			       void *info)
++{
++	const cs_struct *h = instr->csh;
++	const cs_mode mode = h->mode & ~CS_MODE_BIG_ENDIAN;
++	if (length >= 4 && (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64) &&
++	    h->disasm == getScanInstruction && h->insn_id == Mips_get_insn_id &&
++	    h->no_text && !instr->flat_insn->detail) {
++		const unsigned opcode =
++			standardScanOpcode(readBytes32(instr, code) >> 26, mode);
++		if (opcode) {
++			Mips_init_cs_detail(instr);
++			MCInst_setOpcode(instr, opcode);
++			instr->flat_insn->id = mips_insns[opcode].mapid;
++			*size = 4;
++			return true;
++		}
++	}
++	return Mips_getInstruction(handle, code, length, instr, size, address, info);
++}
++
++void Mips_selectScanDecoder(cs_struct *handle)
++{
++	/* An installed callback owns its MC operands and its dispatch. */
++	if (handle->disasm == Mips_getInstruction ||
++	    handle->disasm == getScanInstruction)
++		handle->disasm = handle->no_text && !handle->detail_opt ?
++					 getScanInstruction : Mips_getInstruction;
++}
++#endif
++
+ #endif
+diff --git a/arch/Mips/MipsMapping.h b/arch/Mips/MipsMapping.h
+index 771601c0..e2ebd0a0 100644
+--- a/arch/Mips/MipsMapping.h
++++ b/arch/Mips/MipsMapping.h
+@@ -15,6 +15,11 @@ typedef enum {
+ bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
+ 			 cs_insn *insn);
+ 
++#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
++#define CAPSTONE_MIPS_SCAN_BY_OPTION
++void Mips_selectScanDecoder(cs_struct *handle);
++#endif
++
+ void Mips_init_mri(MCRegisterInfo *MRI);
+ 
+ // return name of register in friendly string
+diff --git a/cs.c b/cs.c
+index 65ae1a9d..1375ad41 100644
+--- a/cs.c
++++ b/cs.c
+@@ -93,6 +93,12 @@
+ #define CS_PRIVATE_DECODER LoongArch_getInstruction
+ #define CS_PRIVATE_PRINTER LoongArch_printer
+ #define CS_KNOWN_PRINTER_EXTENT
++#elif defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#include "arch/Mips/MipsMapping.h"
++#define CS_PRIVATE_PRINTER Mips_printer
++#define CS_MIPS_VISIBLE_OPERANDS
+ #elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+ 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+@@ -1005,9 +1011,14 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 		off++;
+ 	const char *operands = OS->buffer + off;
+ 	if (stream_length_valid) {
+-		/* The private x86 stream's index is its terminating NUL. */
+-		const size_t length =
+-			MIN(OS->index - off, sizeof(insn->op_str) - 1);
++#ifdef CS_MIPS_VISIBLE_OPERANDS
++		/* MIPS can remove the MIPS16 comment or a '$' after printing.
++		 * Both edits shorten the visible string without moving the cursor. */
++		const size_t extent = strlen(operands);
++#else
++		const size_t extent = OS->index - off;
++#endif
++		const size_t length = MIN(extent, sizeof(insn->op_str) - 1);
+ 		if (length > 32) {
+ 			memcpy(insn->op_str, operands, length);
+ 		} else if (length >= 16) {
+@@ -1169,8 +1180,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else
+ #endif
+ 		{
+-#ifdef CS_KNOWN_PRINTER_EXTENT
+-			/* The built-in printer only appends to this stream. A custom
++#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
++			/* The built-in printer owns this stream. A custom
+ 			 * formatter may return a count beyond its first NUL. */
+ 			const bool known_length = handle->printer == CS_PRIVATE_PRINTER &&
+ 						  !handle->post_printer &&
+@@ -1178,7 +1189,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #else
+ 			const bool known_length = false;
+ #endif
+-#ifdef CS_KNOWN_PRINTER_EXTENT
++#if defined(CS_KNOWN_PRINTER_EXTENT) || defined(CS_MIPS_VISIBLE_OPERANDS)
+ 			if (known_length) {
+ 				ss.buffer[0] = '\0';
+ 				ss.index = 0;
+@@ -1361,6 +1372,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 
+ 	case CS_OPT_TEXT:
+ 		handle->no_text = value == CS_OPT_OFF;
++#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
++		Mips_selectScanDecoder(handle);
++#endif
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_DETAIL:
+@@ -1370,6 +1384,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 			handle->detail_opt = CS_OPT_OFF;
+ 		else
+ 			handle->detail_opt |= (cs_opt_value)value;
++#ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
++		Mips_selectScanDecoder(handle);
++#endif
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_SKIPDATA:
+diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
+index d04a63ce..acf6e7ac 100644
+--- a/tests/unit/mips_scan.c
++++ b/tests/unit/mips_scan.c
+@@ -55,11 +55,33 @@ static bool compare(csh handles[2], uint32_t word, bool big_endian,
+ 	return false;
+ }
+ 
++/* Switch a single live handle between each output form. An installed
++ * inspection callback must keep receiving the ordinary operands. */
++static bool check_option_changes(csh handles[2], bool big_endian)
++{
++	const cs_opt_type option[] = { CS_OPT_TEXT, CS_OPT_DETAIL, CS_OPT_TEXT,
++				       CS_OPT_DETAIL, CS_OPT_TEXT };
++	const cs_opt_value value[] = { CS_OPT_ON, CS_OPT_ON, CS_OPT_OFF,
++				       CS_OPT_OFF, CS_OPT_ON };
++	for (unsigned i = 0; i < sizeof(option) / sizeof(*option); ++i) {
++		for (unsigned h = 0; h < 2; ++h)
++			if (cs_option(handles[h], option[i], value[i]) != CS_ERR_OK)
++				return false;
++		if (((cs_struct *)(uintptr_t)handles[1])->disasm != inspect_operands ||
++		    !compare(handles, 0x24080001, big_endian, 4, true))
++			return false;
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	static const uint32_t words[] = {
+ 		0x24080001, 0x3128ffff, 0x35080000,
+ 		0x3928ffff, 0x8fa80000, 0xafa8fffc,
++		0x10000000, 0x1109ffff, 0x15000004, 0x29080000,
++		0x2d28ffff, 0x81a88000, 0x85a87fff, 0x91a80001,
++		0x95a8ffff, 0xa1a80000, 0xa5a8ffff,
+ 	};
+ 	static const uint32_t others[] = {
+ 		0x6508ffff, 0xdfa80000, 0xffa8fffc, 0x10000002,
+@@ -90,7 +112,7 @@ static bool check_mode(cs_mode mode)
+ 			if (!compare(handles, others[i], big_endian, 4, false))
+ 				goto done;
+ 	}
+-	success = true;
++	success = check_option_changes(handles, big_endian);
+ done:
+ 	for (unsigned i = 0; i < 2; ++i)
+ 		if (handles[i])
