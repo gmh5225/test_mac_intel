@@ -43,7 +43,10 @@ try:
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         caller='lib/decode/Decoder.cpp'
         command(['git','restore','--source','HEAD','--worktree','--',caller],'restore-caller-'+variant,nd)
-        entry={'base':'X86_disasmIterText','memory':'X86_disasmOneText','tail':'X86_decodeOneText'}[variant]
+        entry='X86_disasmIterText' if variant=='base'else 'X86_decodeOneText'
+        first='foreach(capstone_object IN ITEMS capstone capstone_x86_iter32 capstone_x86_iter64)'
+        assert normal_cmake.count(first)==1
+        cmake_file.write_text(normal_cmake if variant=='base'else normal_cmake.replace(first,first[:-1]+' capstone_x86_single)'))
         if variant!='base':
             patch=r/(variant+'-caller.patch')
             assert sha(patch)==m['caller_patches'][variant]
@@ -58,6 +61,26 @@ try:
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
+        if variant!='base':
+            command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'status.cpp',archive,'-o',t/'single'],'link-single-'+variant)
+            results={}
+            for case in cases:
+                if case['name'] not in ('putty-32-0.85','putty-64-0.85'):continue
+                for bits in ((16,32)if case['selector']==32 else(64,)):
+                    results[str(bits)]=json.loads(sp.check_output([t/'single',str(bits),case['path']]))
+            assert set(results)=={'16','32','64'} and all(v['callback_bytes']==70000 for v in results.values())
+            save('single-'+variant,results)
+        consumers={}
+        for num,fn in [(0,'cs_disasm_iter'),(1,'X86_disasmIterText')]:
+            app=t/'previous-consumer';src=t/'previous-consumer.c'
+            src.write_text('#include "arch/X86/X86ScanAdapter.h"\nint main(void){csh h=0;const uint8_t data[]={0x90};const uint8_t *p=data;size_t n=1;uint64_t a=0;if(cs_open(CS_ARCH_X86,CS_MODE_32,&h))return 1;cs_insn *i=cs_malloc(h);int ok='+fn+'(h,&p,&n,&a,i);cs_free(i,1);cs_close(&h);return !ok;}\n')
+            command(['clang','-O2','-fno-pie','-no-pie','-Wl,--build-id=sha1','-I',cs,'-I',cs/'include',src,archive,'-lm','-o',app],'link-old-'+str(num)+'-'+variant)
+            command([app],'run-old-'+str(num)+'-'+variant);names=sp.check_output(['nm','--defined-only',app],text=True)
+            assert 'X86_decodeOneText'not in names
+            with app.open('rb')as inp:
+                elf=ELFFile(inp);loaded={z.name:hashlib.sha256(z.data()).hexdigest()for z in elf.iter_sections()if z['sh_flags'] & 2 and z['sh_type']=='SHT_PROGBITS'}
+            consumers[str(num)]=dict(executable=sha(app),sections=loaded)
+        save('old-consumers-'+variant,consumers)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
         for z in foreign:

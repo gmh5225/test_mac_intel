@@ -1,49 +1,81 @@
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..46b7d403 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -32,4 +32,18 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- #endif
- 	return cs_disasm_iter(ud, code, size, address, insn);
- }
-+
-+CAPSTONE_INTERNAL bool X86_decodeOneFallback(csh ud, const uint8_t *code,
-+					     size_t size, uint64_t address,
-+					     cs_insn *insn)
-+{
-+	return X86_disasmIter(ud, &code, &size, &address, insn);
-+}
-+
-+CAPSTONE_INTERNAL bool X86_skipOneRecord(cs_struct *handle,
-+					      const uint8_t *code, size_t size,
-+					      uint64_t address, cs_insn *insn)
-+{
-+	return cs_disasm_iter_skipdata(handle, &code, &size, &address, insn);
-+}
- #endif
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4c125e67..3f050296 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1074,6 +1074,11 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++    if(CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST)
++        add_library(capstone_x86_single OBJECT arch/X86/X86SingleRecord.c)
++        target_link_libraries(capstone_x86_single PRIVATE capstone_build_settings)
++        set_target_properties(capstone_x86_single PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++    endif()
+     if(capstone_enabled_architectures STREQUAL "X86")
+         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+         set(capstone_x86_objects
+@@ -1101,7 +1106,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+         else()
+             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+         endif()
+-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
++        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail} $<TARGET_OBJECTS:capstone_x86_single>)
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+diff --git a/Makefile b/Makefile
+index 0fe49035..88c51c02 100644
+--- a/Makefile
++++ b/Makefile
+@@ -294,6 +294,7 @@ endif
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+ endif
++	LIBOBJ_X86_SINGLE = $(OBJDIR)/arch/X86/X86SingleRecord.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+@@ -454,6 +455,7 @@ LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ LIBOBJ_SHARED := $(LIBOBJ)
+ endif
++LIBOBJ += $(LIBOBJ_X86_SINGLE)
+ 
+ 
+ ifeq ($(PKG_EXTRA),)
+@@ -573,7 +575,7 @@ $(LIBOBJ_PPC): $(DEP_PPC)
+ $(LIBOBJ_SH): $(DEP_SH)
+ $(LIBOBJ_SPARC): $(DEP_SPARC)
+ $(LIBOBJ_SYSZ): $(DEP_SYSZ)
+-$(LIBOBJ_X86) $(LIBOBJ_X86_STATIC_OUTPUT): $(DEP_X86)
++$(LIBOBJ_X86) $(LIBOBJ_X86_STATIC_OUTPUT) $(LIBOBJ_X86_SINGLE): $(DEP_X86)
+ $(LIBOBJ_XCORE): $(DEP_XCORE)
+ $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
+ $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..e4b180be 100644
+index 62d4288a..e918b511 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
-@@ -11,6 +11,13 @@
+@@ -11,6 +11,14 @@
  #include "X86InstPrinterCommon.h"
  #include "X86Mapping.h"
  
-+static inline bool X86_matchesTextMode(csh ud, cs_mode mode)
-+{
-+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	return handle && handle->arch == CS_ARCH_X86 && handle->mode == mode &&
-+	       !handle->no_text;
-+}
++/* Shared fixed-width writers used by the cursor and single-record readers. */
++CAPSTONE_INTERNAL bool X86_tryOutput32(cs_struct *handle, const uint8_t *code,
++				       size_t size, cs_insn *insn,
++				       uint16_t *insn_size);
++CAPSTONE_INTERNAL bool X86_tryOutput64(cs_struct *handle, const uint8_t *code,
++				       size_t size, cs_insn *insn,
++				       uint16_t *insn_size);
 +
  /* Called by the static i386 iterator with at least one input byte. */
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
 diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
-index 246ee26c..d13e94d3 100644
+index 246ee26c..9deea82d 100644
 --- a/arch/X86/X86ScanAdapter.h
 +++ b/arch/X86/X86ScanAdapter.h
-@@ -56,6 +56,15 @@ bool X86_disasmIter32(csh handle, const uint8_t **code, size_t *size,
+@@ -56,6 +56,11 @@ bool X86_disasmIter32(csh handle, const uint8_t **code, size_t *size,
  bool X86_disasmIterText(csh handle, const uint8_t **code, size_t *size,
  		      uint64_t *address, cs_insn *insn);
  
@@ -51,149 +83,163 @@ index 246ee26c..d13e94d3 100644
 + * A caller that needs the next cursor uses X86_disasmIterText instead. */
 +bool X86_decodeOneText(csh handle, const uint8_t *code, size_t size,
 +		       uint64_t address, cs_insn *insn);
-+bool X86_decodeOneText32(csh handle, const uint8_t *code, size_t size,
-+			 uint64_t address, cs_insn *insn);
-+bool X86_decodeOneFallback(csh handle, const uint8_t *code, size_t size,
-+			   uint64_t address, cs_insn *insn);
 +
  /* Requires CAPSTONE_X86_SCAN_ADAPTER. Private static-link integration, not
   * an installed cs_* API. The callback
   * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..7be03b7f 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -267,11 +267,19 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
- 					  cs_insn *insn)
- {
- #ifdef CS_DECODE_TRY_OUTPUT
--	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
--	if (handle && handle->arch == CS_ARCH_X86 &&
--	    handle->mode == CS_MODE_64 && !handle->no_text)
-+	if (X86_matchesTextMode(ud, CS_MODE_64))
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..dd7ef6e9 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -37,7 +37,7 @@ static void writeRelativeHex(char *out, uint64_t value)
+ #include "X86GenIndirectMemory.inc"
  #endif
- 	return X86_disasmIter32(ud, code, size, address, insn);
- }
+ #ifdef X86_FIXED_OUTPUT
+-static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
++CAPSTONE_INTERNAL bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size)
+ #else
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+diff --git a/arch/X86/X86SingleRecord.c b/arch/X86/X86SingleRecord.c
+new file mode 100644
+index 00000000..16263c5a
+--- /dev/null
++++ b/arch/X86/X86SingleRecord.c
+@@ -0,0 +1,58 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "../../cs_priv.h"
++#include "X86ScanAdapter.h"
++
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86OutputOptions.h"
++
++static bool decodeTextRecord(cs_struct *handle, const uint8_t *code,
++			     size_t size, cs_insn *insn, uint16_t *insn_size,
++			     bool batch)
++{
++	if (handle->mode == CS_MODE_64)
++		return X86_tryOutput64(handle, code, size, insn, insn_size) ||
++		       X86_decodeOutputMiss64(handle, code, size, insn, insn_size,
++					      batch);
++	return X86_tryOutput32(handle, code, size, insn, insn_size) ||
++	       X86_decodeOutputMiss32(handle, code, size, insn, insn_size,
++				      batch);
++}
++
++static bool skipRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       uint64_t address, cs_insn *insn);
++#define CS_DECODE_SKIP_RECORD skipRecord
++#define CS_DECODE_OUTPUT_MISS decodeTextRecord
++#include "../../cs_disasm_internal.h"
++
++/* Materialize cursors only when skip-data needs them. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool skipRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       uint64_t address, cs_insn *insn)
++{
++	return cs_disasm_iter_skipdata(handle, &code, &size, &address, insn);
++}
++#endif
 +
 +CAPSTONE_INTERNAL bool X86_decodeOneText(csh ud, const uint8_t *code,
-+				    size_t size, uint64_t address, cs_insn *insn)
++					  size_t size, uint64_t address,
++					  cs_insn *insn)
 +{
-+#ifdef CS_DECODE_TRY_OUTPUT
-+	if (X86_matchesTextMode(ud, CS_MODE_64))
-+		return cs_decode_one_core(ud, code, size, address, insn);
++#ifdef CS_DECODE_OUTPUT_MISS
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text &&
++	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64))
++		return cs_disasm_iter_core(ud, &code, &size, &address, insn);
 +#endif
-+	return X86_decodeOneText32(ud, code, size, address, insn);
++	return X86_disasmIter(ud, &code, &size, &address, insn);
 +}
++#endif
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..3cbd751b 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -249,7 +249,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ }
+ 
+ #define X86_FIXED_ROUNDED writeRoundedRegisters
+-#define X86_FIXED_OUTPUT tryOutput64
++#define X86_FIXED_OUTPUT X86_tryOutput64
+ #define X86_FIXED_WIDE true
+ #define X86_OUTPUT_MISS writeExtraOutput64
+ #include "X86SimpleOutputImpl.h"
+@@ -257,7 +257,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
+-#define CS_DECODE_TRY_OUTPUT tryOutput64
++#define CS_DECODE_TRY_OUTPUT X86_tryOutput64
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
  #endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..8c6b52de 100644
+index 443b2f86..9496ce8b 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -206,11 +206,19 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
- 					cs_insn *insn)
- {
- #ifdef CS_DECODE_TRY_OUTPUT
--	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
--	if (handle && handle->arch == CS_ARCH_X86 &&
--	    handle->mode == CS_MODE_32 && !handle->no_text)
-+	if (X86_matchesTextMode(ud, CS_MODE_32))
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
- #endif
- 	return X86_disasmIter(ud, code, size, address, insn);
- }
-+
-+CAPSTONE_INTERNAL bool X86_decodeOneText32(csh ud, const uint8_t *code,
-+				    size_t size, uint64_t address, cs_insn *insn)
-+{
-+#ifdef CS_DECODE_TRY_OUTPUT
-+	if (X86_matchesTextMode(ud, CS_MODE_32))
-+		return cs_decode_one_core(ud, code, size, address, insn);
-+#endif
-+	return X86_decodeOneFallback(ud, code, size, address, insn);
-+}
- #endif
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b0f4a6ce..7cf0c5f1 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -35,6 +35,12 @@ cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
- 			size_t *size, uint64_t *address, cs_insn *insn);
-+#ifdef CS_DECODE_TRY_OUTPUT
-+/* The record-only path passes values across the cold skip-data call. */
-+CAPSTONE_INTERNAL bool X86_skipOneRecord(struct cs_struct *handle,
-+					      const uint8_t *code, size_t size,
-+					      uint64_t address, cs_insn *insn);
-+#endif
- #ifndef CAPSTONE_DIET
- CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
- 					 size_t size);
-@@ -182,9 +188,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- }
- #undef CS_DECODE_SCAN
- 
--CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
-+CS_DECODE_INLINE bool cs_disasm_record_body(struct cs_struct *handle,
- 					  const uint8_t **code, size_t *size,
--					  uint64_t *address, cs_insn *insn)
-+					  uint64_t *address, cs_insn *insn,
-+					  bool single)
- {
- 	uint16_t insn_size;
- 	bool r;
-@@ -205,6 +212,11 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 		*size -= insn_size;
- 		*address += insn_size;
- 	} else {
-+#ifdef CS_DECODE_TRY_OUTPUT
-+		if (single)
-+			return X86_skipOneRecord(handle, *code, *size,
-+						      *address, insn);
-+#endif
- 		return cs_disasm_iter_skipdata(handle, code, size, address,
- 					       insn);
- 	}
-@@ -212,9 +224,9 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+@@ -188,14 +188,14 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
  	return true;
  }
  
--CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
-+CS_DECODE_INLINE bool cs_disasm_record_core(csh ud, const uint8_t **code,
- 					  size_t *size, uint64_t *address,
--					  cs_insn *insn)
-+					  cs_insn *insn, bool single)
- {
- 	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
- 	cs_detail *detail;
-@@ -230,9 +242,25 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
- 	detail = insn->detail;
- 	if (CS_DECODE_LIKELY(!handle->detail_opt))
- 		insn->detail = NULL;
--	r = cs_disasm_iter_body(handle, code, size, address, insn);
-+	r = cs_disasm_record_body(handle, code, size, address, insn, single);
- 	insn->detail = detail;
- 	return r;
- }
- 
-+CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
-+					  size_t *size, uint64_t *address,
-+					  cs_insn *insn)
-+{
-+	return cs_disasm_record_core(ud, code, size, address, insn, false);
-+}
-+
-+#ifdef CS_DECODE_TRY_OUTPUT
-+CS_DECODE_INLINE bool cs_decode_one_core(csh ud, const uint8_t *code,
-+					 size_t size, uint64_t address,
-+					 cs_insn *insn)
-+{
-+	return cs_disasm_record_core(ud, &code, &size, &address, insn, true);
-+}
+-#define X86_FIXED_OUTPUT tryOutput32
++#define X86_FIXED_OUTPUT X86_tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32
+ #include "X86SimpleOutputImpl.h"
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
+-#define CS_DECODE_TRY_OUTPUT tryOutput32
++#define CS_DECODE_TRY_OUTPUT X86_tryOutput32
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..a733f96f 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -205,8 +205,13 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 		*size -= insn_size;
+ 		*address += insn_size;
+ 	} else {
++#ifdef CS_DECODE_SKIP_RECORD
++		return CS_DECODE_SKIP_RECORD(handle, *code, *size, *address,
++					     insn);
++#else
+ 		return cs_disasm_iter_skipdata(handle, code, size, address,
+ 					       insn);
 +#endif
+ 	}
+ 
+ 	return true;
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 8b413445..b4661a48 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -212,6 +212,10 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
+     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
+ endforeach()
+ 
++if(TARGET x86_simple_output)
++    target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_single>)
++endif()
 +
- #endif
+ if(TARGET x86_simple_output AND NOT capstone_enabled_architectures STREQUAL "X86")
+     target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
+ endif()
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index 19e16b16..e5c725d2 100644
 --- a/tests/unit/x86_simple_output.c
