@@ -1,7 +1,7 @@
-name: Verify both VEX candidates in Win32, Win64 and native Mac full, DIET, reduced and no-ATT builds
+name: Verify compact prefix pages and gated mixed reader on MSVC Win32 Win64 and both Mac ABIs
 on:
   push:
-    branches: [codex/portable-vex-prefix-and-mixed-call]
+    branches: [codex/native-prefix-pages-and-branch-ports]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-prefix-and-call-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: portable-prefix-pages-gate-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
