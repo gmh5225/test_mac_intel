@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','vex'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','segment'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -40,7 +40,7 @@ try:
     normal_cmake=cmake_file.read_text()
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','vex'):
+    for variant in ('base','segment'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
@@ -126,7 +126,7 @@ try:
         if variant !='base':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-o',t/'simple-generator'],'simple-generator-'+variant)
             assert sp.check_output([t/'simple-generator','--legacy-packed-memory'])==(cs/'arch/X86/X86GenLegacyPackedMemory.inc').read_bytes()
-        if variant=='vex':
+        if variant=='segment':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-producer')
             generated=sp.check_output([t/'table-producer','--evex-scan']);assert generated==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             command(['python3','-B',cs/'suite/synctools/x86_operand_specializations.py','--check'],'generated-tables',cs)
@@ -145,11 +145,11 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        if variant=='vex':
+        if variant=='segment':
             command(['clang++','-O2','-std=c++17','-I',cs/'include',cs/'suite/synctools/x86_vector_output.cpp',archive,'-o',t/'table-producer'],'evex-table-'+variant)
             assert sp.check_output([t/'table-producer','--evex-scan'])==(cs/'arch/X86/X86GenEvexScan.inc').read_bytes()
             assert sp.check_output([t/'table-producer','--evex-memory'])==(cs/'arch/X86/X86GenEvexMemoryOutput.inc').read_bytes()
-        if variant=='vex':
+        if variant=='segment':
             command(['python3','-B',cs/'suite/synctools/x86_mapping_counts.py','--check'],'check-mode-repair-'+variant,cs)
         if variant != 'base':
             assert sp.check_output([t/'table-producer','--plain-evex-registers'])==(cs/'arch/X86/X86GenPlainEvexRegisterOutput.inc').read_bytes()
@@ -166,7 +166,7 @@ try:
             command([t/'legacy'],'legacy-guard-'+variant)
         if variant!='base':
             assert sp.check_output([t/'simple-generator','--test32-registers'])==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
-        if variant in ('base','vex'):
+        if variant in ('base','segment'):
             from observe import install
             observed=t/'probe-source';arch=observed/'arch/X86';arch.mkdir(parents=True,exist_ok=True)
             sources=('X86MemoryFallback32','X86Vex32Output')
@@ -186,14 +186,16 @@ try:
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'map38.c','-o',t/'map38.o'],'map38-wrapper-'+variant)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'map38.cpp',t/'map38.o',archive,'-o',t/'map38'],'map38-link-'+variant)
         command([t/'map38'],'map38-guard-'+variant)
-        if variant=='vex':
+        if variant=='segment':
             command(['python3','-B',cs/'suite/synctools/x86_mapping_counts.py','--check'],'mapping-writes-'+variant)
-        if variant=='vex':
-            assert sp.check_output([t/'table-producer','--vex-rip-memory'])==(cs/'arch/X86/X86GenVexRipMemory.inc').read_bytes()
+        if variant=='segment':
             assert sp.check_output([t/'table-producer'])==(cs/'arch/X86/X86GenVectorOutput.inc').read_bytes()
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'vexrip.c','-o',t/'vexrip.o'],'vexrip-wrap-'+variant)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'vexrip.cpp',t/'vexrip.o',archive,'-o',t/'vexrip'],'vexrip-link-'+variant)
         command([t/'vexrip'],'vexrip-guard-'+variant)
+        command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'segment.c','-o',t/'segment.o'],'segment-wrap-'+variant)
+        command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'segment.cpp',t/'segment.o',archive,'-o',t/'segment'],'segment-link-'+variant)
+        command([t/'segment'],'segment-guard-'+variant)
         command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include','-c',r/'broadcast.c','-o',t/'bc.o'],'broadcast-wrapper-'+variant)
         command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'broadcast.cpp',t/'bc.o',archive,'-o',t/'bc'],'broadcast-link-'+variant)
         command([t/'bc'],'broadcast-guard-'+variant)
