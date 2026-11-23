@@ -88,28 +88,56 @@ def main(w):
     inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
-    darwin=platform.system()=='Darwin';bins={};objects={}
+    darwin=platform.system()=='Darwin';bins={};objects={};base_orders={}
     cfg=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
-        if key!='base':
-            patch=r/(key+'.patch');assert sha(patch)==z['sha256'];run(['git','apply','--index',patch],'apply-'+key,base)
+        mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
+        patches=['base']+([kind] if kind!='base' else [])
+        for name in patches:
+            patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
+            run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
-        build=w/('build-'+key)
-        run(['cmake','-S',base,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
+        build=w/('build-'+key);project=base
+        if mixed :
+            nd=r.parent/'neverd-config';record=m['neverd']
+            assert sp.check_output(['git','-C',nd,'rev-parse','HEAD'],text=True).strip()==record['commit']
+            for name,blob in record['blobs'].items():assert sp.check_output(['git','-C',nd,'hash-object',name],text=True).strip()==blob
+            text=(nd/'CMakeLists.txt').read_text();a=text.index('# --- Capstone (our fork');end=text.index('# --- NeverD CMake helpers',a)
+            project=w/('project-'+key);(project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(base,target_is_directory=True)
+            shutil.copy2(nd/'cmake/NeverDCapstoneCompilerOptions.inc',project/'cmake')
+            (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Profile LANGUAGES C CXX)\n'+text[a:end])
+        run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
         db=json.loads((build/'compile_commands.json').read_text());files={Path(u['file']).name for u in db}
-        assert 'X86PublicOutput.c' in files and not any(f in files for f in ('ARMMapping.c','AArch64InstPrinter.c','MipsMapping.c'))
+        near={Path(u['file']).name for u in db if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in u['command'].split()}
+        assert near==({'X86Sse64Output.c'}if mixed and not darwin else set()),near
+        assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(mixed )
+        save('compile-'+key+'.json',dict(archive_profile=key,near_indirect=sorted(near),neverd=m['neverd'],compile_commands_sha256=sha(build/'compile_commands.json')))
+        assert ('X86PublicOutput.c' in files)==(not mixed)
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access','text_option']
-        run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*units],'build-'+key)
-        run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
+        run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
-        objects[key]={p.name:sha(p)for p in build.rglob('*.c.o')if '/tests/' not in str(p)}
-        assert objects[key].keys()==objects['base'].keys() and 'X86PublicOutput.c.o' in objects[key]
-        changed=sorted(n for n,v in objects[key].items() if v!=objects['base'][n])
-        if key in ('masked','opcode'):
-            assert changed==[('X86VectorFallback64.c.o' if key=='masked' else 'X86MemoryFallback32.c.o')],changed
-        save('objects-'+key+'.json',dict(all=objects[key],changed=changed,commands_sha256=sha(build/'compile_commands.json')))
+        if not mixed :
+            run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
+        else:
+            for name in units:
+                run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',base/('tests/unit/'+name+'.c'),lib,'-lm','-o',w/name],'link-'+name+'-'+key)
+                run([w/name],'unit-'+name+'-'+key)
+        members=sp.check_output(['ar','t',lib],text=True).splitlines()
+        objects[key]={p.name:sha(p) for p in build.rglob('*.c.o') if '/tests/' not in str(p)}
+        assert set(members)==set(objects[key]) and len(members)==len(set(members))
+        earlier=['X86PublicOutput.c.o','X86BatchScan.c.o']
+        orig='mixed_base' if mixed else 'base'
+        if key==orig:base_orders[orig]=members
+        expected=base_orders[orig]
+        if kind=='ordered' and not mixed:
+            first=expected.index('X86MemoryFallback32.c.o')
+            expected=expected[:first]+earlier+[n for n in expected[first:] if n not in earlier]
+        assert members==expected
+        changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
+        if kind=='sib':assert changed==['X86MemoryFallback32.c.o'],changed
+        save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
@@ -121,7 +149,8 @@ def main(w):
             if len(cols)!=3 or cols[1] not in ('t','T'):continue
             name=cols[2][1:] if darwin and cols[2].startswith('_') else cols[2]
             if name in names:linked[name]=int(cols[0],16)
-        assert {'X86_decodePublicRecord','cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
+        assert ('X86_decodePublicRecord' in linked)==(not mixed)
+        assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
