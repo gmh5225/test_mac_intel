@@ -86,7 +86,7 @@ def main(w):
     inc=once(inc,'engine!="x86_iter" &&','engine!="x86_iter" && engine!="x86_len_" &&')
     inc='#include <cstring>\n'+inc
     inc=once(inc,'row=cs_span<cs_disasm_iter>(', 'row=cs_span<cs_disasm_iter,true>(')
-    inc=once(inc,'else if(engine=="x86_len_" && bits==32)', 'else if(engine=="x86_all_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);\\n        else if(engine=="x86_len_" && bits==32)')
+    inc=once(inc,'else if(engine=="x86_len_" && bits==32)', 'else if(engine=="x86_all_") row=cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode); else if(engine=="x86_len_" && bits==32)')
     inc=once(inc,'engine!="x86_len_" &&','engine!="x86_all_" && engine!="x86_len_" &&')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     m=json.loads((r/'experiment.json').read_text());trees=m['stages']
