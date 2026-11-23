@@ -1,185 +1,54 @@
-diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 7d3a6e84..7a48c8a3 100644
---- a/arch/X86/X86GenVectorOutput.inc
-+++ b/arch/X86/X86GenVectorOutput.inc
-@@ -803,3 +803,107 @@ static const uint8_t legacy_register_plans[256] = {
- 	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
- 	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
- };
-+static const char vector_register_names[3][32][6] = {
-+	{
-+		"xmm0",
-+		"xmm1",
-+		"xmm2",
-+		"xmm3",
-+		"xmm4",
-+		"xmm5",
-+		"xmm6",
-+		"xmm7",
-+		"xmm8",
-+		"xmm9",
-+		"xmm10",
-+		"xmm11",
-+		"xmm12",
-+		"xmm13",
-+		"xmm14",
-+		"xmm15",
-+		"xmm16",
-+		"xmm17",
-+		"xmm18",
-+		"xmm19",
-+		"xmm20",
-+		"xmm21",
-+		"xmm22",
-+		"xmm23",
-+		"xmm24",
-+		"xmm25",
-+		"xmm26",
-+		"xmm27",
-+		"xmm28",
-+		"xmm29",
-+		"xmm30",
-+		"xmm31",
-+	},
-+	{
-+		"ymm0",
-+		"ymm1",
-+		"ymm2",
-+		"ymm3",
-+		"ymm4",
-+		"ymm5",
-+		"ymm6",
-+		"ymm7",
-+		"ymm8",
-+		"ymm9",
-+		"ymm10",
-+		"ymm11",
-+		"ymm12",
-+		"ymm13",
-+		"ymm14",
-+		"ymm15",
-+		"ymm16",
-+		"ymm17",
-+		"ymm18",
-+		"ymm19",
-+		"ymm20",
-+		"ymm21",
-+		"ymm22",
-+		"ymm23",
-+		"ymm24",
-+		"ymm25",
-+		"ymm26",
-+		"ymm27",
-+		"ymm28",
-+		"ymm29",
-+		"ymm30",
-+		"ymm31",
-+	},
-+	{
-+		"zmm0",
-+		"zmm1",
-+		"zmm2",
-+		"zmm3",
-+		"zmm4",
-+		"zmm5",
-+		"zmm6",
-+		"zmm7",
-+		"zmm8",
-+		"zmm9",
-+		"zmm10",
-+		"zmm11",
-+		"zmm12",
-+		"zmm13",
-+		"zmm14",
-+		"zmm15",
-+		"zmm16",
-+		"zmm17",
-+		"zmm18",
-+		"zmm19",
-+		"zmm20",
-+		"zmm21",
-+		"zmm22",
-+		"zmm23",
-+		"zmm24",
-+		"zmm25",
-+		"zmm26",
-+		"zmm27",
-+		"zmm28",
-+		"zmm29",
-+		"zmm30",
-+		"zmm31",
-+	},
-+};
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..9f4f0dcf 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -21,6 +21,7 @@ struct PaddingOutput {
- };
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..9be7e415 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -111,7 +111,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		}
+ 	}
+-	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
++	if (CS_DECODE_UNLIKELY(X86_OUTPUT_UNSUPPORTED(
++		    handle, !wide && handle->mode != CS_MODE_32)))
+ 		return false;
  
- #include "X86GenVectorOutput.inc"
-+#define X86_USE_VECTOR_REGISTER_NAMES
- #include "X86VectorRegisterOutput.h"
- 
- #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
-diff --git a/arch/X86/X86VectorRegisterWriter.h b/arch/X86/X86VectorRegisterWriter.h
-index 9c434eac..28aa0ec3 100644
---- a/arch/X86/X86VectorRegisterWriter.h
-+++ b/arch/X86/X86VectorRegisterWriter.h
-@@ -7,6 +7,12 @@
- static char *writeVectorRegister(char *out, unsigned length_code,
- 				 unsigned number)
- {
-+#ifdef X86_USE_VECTOR_REGISTER_NAMES
-+	/* This writer appends to the initialized operand string. */
-+	memcpy(out, vector_register_names[length_code][number],
-+	       sizeof(vector_register_names[0][0]));
-+	return out + 4 + (number >= 10);
-+#else
- 	*out++ = "xyz"[length_code];
- 	*out++ = 'm';
- 	*out++ = 'm';
-@@ -14,6 +20,7 @@ static char *writeVectorRegister(char *out, unsigned length_code,
- 		*out++ = (char)('0' + number / 10);
- 	*out++ = (char)('0' + number % 10);
- 	return out;
-+#endif
- }
- 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..6c79dd80 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -40,16 +40,6 @@ CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
+ 					 size_t size);
  #endif
-diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 91426243..48836058 100644
---- a/suite/synctools/x86_vector_output.cpp
-+++ b/suite/synctools/x86_vector_output.cpp
-@@ -2297,6 +2297,23 @@ void emit_evex_shifts(Decoder &decoder)
- 	std::puts("};");
- }
  
-+void emit_register_names(Decoder &decoder)
-+{
-+	const x86_reg banks[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
-+	std::puts("static const char vector_register_names[3][32][6] = {");
-+	for (auto bank : banks) {
-+		std::puts("\t{");
-+		for (unsigned n = 0; n < 32; ++n) {
-+			const char *name = cs_reg_name(decoder.handle, bank + n);
-+			if (!name || std::strlen(name) != 4 + (n >= 10))
-+				throw std::runtime_error("unexpected vector register name");
-+			std::printf("\t\t\"%s\",\n", name);
-+		}
-+		std::puts("\t},");
-+	}
-+	std::puts("};");
-+}
-+
- void emit_output(Decoder &decoder, bool scan_only)
+-/* Keep successful compact decoding contiguous with cached mapping and
+- * short copies; cold fallback blocks otherwise split the inline path. */
+-#if defined(__GNUC__)
+-#define CS_DECODE_LIKELY(x) __builtin_expect(!!(x), 1)
+-#define CS_DECODE_UNLIKELY(x) __builtin_expect(!!(x), 0)
+-#else
+-#define CS_DECODE_LIKELY(x) (x)
+-#define CS_DECODE_UNLIKELY(x) (x)
+-#endif
+-
+ static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
+ 						cs_insn *insn, unsigned int id)
  {
- 	std::vector<std::string> records;
-@@ -2355,6 +2372,7 @@ void emit_output(Decoder &decoder, bool scan_only)
- 	Decoder padding32(CS_MODE_32);
- 	emit_padding_rows(padding32, decoder);
- 	emit_legacy_registers(decoder);
-+	emit_register_names(decoder);
- }
- }
+diff --git a/cs_priv.h b/cs_priv.h
+index 84e1c748..36532ff6 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -11,6 +11,14 @@
+ #define CAPSTONE_INTERNAL
+ #endif
  
++#if defined(__GNUC__)
++#define CS_DECODE_LIKELY(x) __builtin_expect(!!(x), 1)
++#define CS_DECODE_UNLIKELY(x) __builtin_expect(!!(x), 0)
++#else
++#define CS_DECODE_LIKELY(x) (x)
++#define CS_DECODE_UNLIKELY(x) (x)
++#endif
++
+ /* Keep iterator state in registers across private decoder calls. Every
+  * declaration and definition uses the same internal calling convention. */
+ /* Before LLVM 17, x86-64 preserve_most restores RAX over return values.
