@@ -1,7 +1,7 @@
-name: Compare opcode-register MOV and accumulator immediate formatting against iced on real PE32 PE64 and ELF
+name: Compare AMD64 conditional move formatting and details with iced on real PE and ELF programs
 on:
   push:
-    branches: [codex/accumulator-and-byte-mov-records]
+    branches: [codex/amd64-conditional-move-format-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: opcode-immediates-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-cmov-format-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

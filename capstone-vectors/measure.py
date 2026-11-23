@@ -137,6 +137,7 @@ def main(w):
             assert entry==(evidence/('entry-guard-'+ref+'.log')).read_text()
         if kind=='bare':
             run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator'],'build-generator-'+key)
+            assert sp.check_output([w/'generator','--cmov64'])==(base/'arch/X86/X86GenCmov64Output.inc').read_bytes()
             generated=sp.check_output([w/'generator'])
             assert generated==(base/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
             save('rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
@@ -167,7 +168,7 @@ def main(w):
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert {'X86Sse64Output.c.o','X86Vex32Output.c.o'} == set(changed),(key,changed)
+            assert {'X86Sse64Output.c.o'} == set(changed),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
