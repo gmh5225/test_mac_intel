@@ -1,12 +1,57 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d6f3ff5f..222cbbeb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -171,7 +171,7 @@ if(capstone_enabled_architectures STREQUAL "MIPS")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "SYSTEMZ")
+-    add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING)
++    add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING CAPSTONE_SSTREAM_VECTOR_HEX)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "LOONGARCH")
+@@ -183,7 +183,7 @@ if(capstone_enabled_architectures STREQUAL "PPC")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+-    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS CAPSTONE_SSTREAM_VECTOR_HEX)
+     # Fixed-width implicit counts improve detailed decoding in this configuration.
+     if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+diff --git a/Makefile b/Makefile
+index 8118f71d..4d613ef2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -132,7 +132,7 @@ CFLAGS += -DCAPSTONE_MIPS_ONLY
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),systemz)
+-CFLAGS += -DCAPSTONE_SYSTEMZ_DEDICATED_MAPPING
++CFLAGS += -DCAPSTONE_SYSTEMZ_DEDICATED_MAPPING -DCAPSTONE_SSTREAM_VECTOR_HEX
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),loongarch)
+@@ -144,7 +144,7 @@ CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPAT
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+-CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_SSTREAM_VECTOR_HEX
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/SStream.c b/SStream.c
-index 5d387fb0..822409ef 100644
+index 5d387fb0..88dbce3c 100644
 --- a/SStream.c
 +++ b/SStream.c
-@@ -18,6 +18,15 @@
+@@ -18,6 +18,16 @@
  #include "cs_priv.h"
  #include "utils.h"
  
-+#if defined(__aarch64__) && defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
++#if defined(CAPSTONE_SSTREAM_VECTOR_HEX) && defined(__aarch64__) && \
++	defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
 +	!defined(__KERNEL__) && !defined(CAPSTONE_DIET) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
@@ -18,7 +63,7 @@ index 5d387fb0..822409ef 100644
  #ifndef CAPSTONE_DIET
  static size_t SStream_remaining(SStream *ss)
  {
-@@ -355,11 +364,24 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
+@@ -355,11 +365,24 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
  		SSTREAM_RETURN_IF_CLOSED(ss);
  		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
  		char *end = buffer + sizeof(buffer);

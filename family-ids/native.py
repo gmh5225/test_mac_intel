@@ -1,121 +1,69 @@
 from pathlib import Path
-import hashlib,json,re,shlex,os,platform,random,shutil,subprocess as sp,tempfile
+import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
+import corpus
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
-def load(p):return json.loads(p.read_text())
-def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def cmd(n,a,cwd=None):
-    with (out/(n+'.log')).open('w')as f:z=sp.run(a,cwd=cwd,stdout=f,stderr=sp.STDOUT)
-    if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2200:]);z.check_returncode()
-def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
-def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
-cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';assert g('rev-parse','HEAD')==meta['parent']
+rd=lambda f:json.loads(f.read_text());q=rd(d/'tree.json');cc=os.environ['CC'];t=Path(tempfile.mkdtemp())
+def g(*args):return sp.check_output(['git','-C',s,*args],text=True).strip()
+def save(name,obj):(out/(name+'.json')).write_text(json.dumps(obj,indent=2)+'\n')
+def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
+def cmd(name,args):
+    with (out/(name+'.log')).open('w')as f:z=sp.run(args,stdout=f,stderr=sp.STDOUT)
+    if z.returncode:print((out/(name+'.log')).read_text()[-2100:]);z.check_returncode()
+assert platform.machine()=='aarch64' and g('rev-parse','HEAD')==q['parent']
 try:
-    cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
-    imgs={};ids={};raw_bins={};probe_bins={};libs={}
-    units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','aarch64_scan','aarch64_postprocess','mips_scan','mips_single','text_option','detail_option']
-    for k in ('base','candidate'):
-        if k=='candidate':
-            patch=d/'candidate.patch';assert sha(patch)==meta['sha256'];g('apply','--index',str(patch));assert g('write-tree')==meta['tree']
-        cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*units])
-        cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','--parallel','3','-R','^unit_('+'|'.join(units)+')$'])
-        lib=b/'libcapstone.a';order=sp.check_output(['ar','t',lib],text=True).splitlines()
-        obj={n:hashlib.sha256(sp.check_output(['ar','p',lib,n])).hexdigest()for n in order}
-        assert len(order)==len(obj)>55 and 'XtensaDisassembler.c.o' in order
-        if k=='base':base_obj=obj;base_order=order
-        else:
-            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'SStream.c.o'}
-            assert [n for n in obj if n in base_obj]==base_order
-        save('objects-'+k,dict(members=obj,order=order))
-        normal=t/'public-only'
-        cmd('normal-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'time.cpp',lib,'-lm','-o',normal])
-        normal_hash=sha(normal);save('public-'+k,dict(sha256=normal_hash))
-        if k=='base':normal_base=normal_hash
-        else:assert normal_hash!=normal_base
-        # Count at the actual stream writer, including calls from its own translation unit.
-        tu=next(z for z in load(b/'compile_commands.json')if z['file'].endswith('/SStream.c'))
-        cmdline=shlex.split(tu['command']);cmdline[cmdline.index('-o')+1]=str(t/'count.o')
-        body=Path(tu['file']).read_text();loc=body.index('{',body.index('void SStream_concat_hex64('))+1
-        body='unsigned long long observed_hex_lengths[16];'+chr(10)+body[:loc]+chr(10)+'++observed_hex_lengths[(63u-__builtin_clzll(value | 1ULL))/4];'+chr(10)+body[loc:]
-        candidate=t/'count.c';candidate.write_text(body);cmdline[cmdline.index(tu['file'])]=str(candidate)
-        cmd('compile-counter-'+k,cmdline+['-I',s],cwd=tu['directory'])
-        cmd('link-counter-'+k,['c++','-O2','-DTIMED_PRIVATE_READERS','-DHEX_COUNTS','-I',s/'include',d/'time.cpp',t/'count.o',lib,'-lm','-o',t/('count-'+k)])
-        stages=[k]
-        for stage in stages:
-            forced=['-DTIMED_PRIVATE_READERS']
-            exe=t/('time-'+stage)
-            cmd('compile-time-'+stage,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'time.cpp',*forced,lib,'-lm','-o',exe])
-            symbols={}
-            targets={'cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','RISCV_getInstruction','PPC_getInstruction','SystemZ_LLVM_getInstruction','Xtensa_getInstruction','LoongArch_getInstruction','X86_decodePublicRecord'}
-            for line in sp.check_output(['nm','-n','-S','--defined-only',exe],text=True).splitlines():
-                fs=line.split()
-                if len(fs)==4 and fs[-1] in targets:symbols[fs[-1]]=[int(v,16)for v in fs[:2]]
-            assert {'cs_disasm_iter','cs_decode_full_insn'}<=symbols.keys()
-            assert {'X86_disasmIterText','X86_disasmIter32'}<=symbols.keys()
-            assert 'X86_decodePublicRecord' not in symbols
-            save('layout-'+stage,symbols)
-            cmd('public-code-'+stage,['objdump','-d','--disassemble=cs_disasm_iter',exe])
-            imgs[stage]=exe.read_bytes();ids[stage]=sha(exe)
-        raw=t/('raw-'+k);cmd('compile-raw-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'raw.cpp',lib,'-lm','-o',raw]);raw_bins[k]=raw
-        so=t/(k+'.so')
-        cmd('loadable-'+k,[cc,'-shared','-Wl,-Bsymbolic','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',so]);libs[k]=so
-    assert len(set(ids.values()))==2,ids
-    imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v))for k,v in imgs.items()}
-    target=t/'time';target.write_bytes(imgs['base']);target.chmod(0o755)
-    shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
-    for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
-    cmd('libmvec',['python3','-B',t/'libmvec.py'])
-    cmd('build-public-states',['c++','-std=c++17','-O2','-I',s/'include',d/'public-records.cpp','-ldl','-o',t/'public-states'])
-    states={}
-    for label,bits,f in [('real-pe32',32,t/'putty-0.85-32.text'),('real-pe64',64,t/'putty-0.85-64.text'),('code16',16,t/'putty-0.85-32.text'),('simd64',64,t/'libmvec.text')]:
-        result=json.loads(sp.check_output([t/'public-states',libs['base'],libs['candidate'],f,str(bits)],text=True))
-        assert result['complete_record_comparisons']>0 and result['batch_records']>0
-        states[label]=result
-    save('public-differential',states)
-    cmd('build-transitions',['c++','-O2','-std=c++17','-I',s/'include',d/'transitions.cpp','-ldl','-o',t/'transitions'])
-    cmd('transitions',[t/'transitions',libs['base'],libs['candidate']])
-    cmd('build-guard',['c++','-std=c++17','-O2','-I',s/'include',d/'primary-guard.cpp','-ldl','-o',t/'guard'])
-    cmd('guard',[t/'guard',libs['base'],libs['candidate']]);assert (out/'guard.log').read_text().split()==['14255104','10945975']
-    import corpus
-    foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name'] in ('arm-ls', 'arm64-ls', 'mips64el-ls', 'ppc64el-ls', 'riscv64-ls', 'sparc64-ls', 's390x-ls', 'loong64-ls')]
-    from xtensa import get
-    xfile,xsource=get(t,load(d/'xtensa-source.json'));save('xtensa-source',xsource);extra.append(dict(name='xtensa-picolibc',path=xfile))
-    assert len(extra)==9
-    selectors={'arm': 101, 'arm64': 102, 'mips64el': 103, 'ppc64el': 104, 'riscv64': 105, 'sparc64': 106, 's390x': 107, 'loong64': 108, 'xtensa': 109}
-    panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(0,1,2))]
-    panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(0,1,2)))
-    panels.extend((q['name'],selectors[q['name'].split('-')[0]],Path(q['path']),0x100000,(0,1,2))for q in extra)
-    samples=[q for q in foreign if q['name'].split('-')[0] in selectors]+[extra[-1]]
-    bystage={}
-    for k in ('base','candidate'):
-        rows={}
-        for q in samples:
+    manifest=rd(d/'manifest.json')['inputs'];profiles={};samples={};rows=[];raw={}
+    for profile,arches in [('mixed',['ARM','AARCH64','MIPS','X86']),('paired',['SYSTEMZ','RISCV']),('diet',['SYSTEMZ']),('SYSTEMZ',['SYSTEMZ']),('RISCV',['RISCV'])]:
+        b=t/profile;states={};images={};active=profile in ('SYSTEMZ','RISCV')
+        for k in ('base','candidate'):
+            g('restore','--source','HEAD','--staged','--worktree','.');tag=profile+'-'+k
+            if k=='candidate':
+                delta=d/'candidate.patch';assert sha(delta)==q['sha256'];g('apply','--index',str(delta));assert g('write-tree')==q['tree']
+            opts=['-DCAPSTONE_'+v+'_SUPPORT=ON'for v in arches]
+            if profile=='diet':opts.append('-DCAPSTONE_BUILD_DIET=ON')
+            cmd('cfg-'+tag,['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers'if cc=='gcc'else'-Wno-error=incompatible-pointer-types-discards-qualifiers'),*opts])
+            units=['register_descriptors','mcinst']if active else []
+            cmd('build-'+tag,['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*units])
+            if units:cmd('test-'+tag,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
+            so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
+            lib=b/'libcapstone.a'
+            states[k]=dict(archive=sha(lib),shared=sha(so),objects={f.name:sha(f)for f in b.rglob('*.c.o')if '/tests/'not in str(f)})
+            if active:
+                cmd('shim-'+tag,[cc,'-shared','-Wl,-Bsymbolic','-fPIC','-O2','-DCAPSTONE_HAS_'+profile,'-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'shim.c',lib,'-lm','-o',t/(tag+'.so')])
+                images[k]=so.read_bytes()
+        a,z=states['base'],states['candidate'];assert a['objects'].keys()==z['objects'].keys()
+        changes=[n for n,v in a['objects'].items()if z['objects'][n]!=v]
+        assert changes==(['SStream.c.o']if active else []) and (a['shared']==z['shared'])!=active and (a['archive']==z['archive'])!=active
+        profiles[profile]=dict(states=states,changed=changes);save('profiles',profiles)
+        if not active:shutil.rmtree(b);continue
+        cmd('compile-state-'+profile,[cc,'-O2','-I',s,'-I',s/'include',d/'hex-state.c','-ldl','-o',t/'guard'])
+        cmd('hex-states-'+profile,[t/'guard',t/(profile+'-base.so'),t/(profile+'-candidate.so')])
+        assert (out/('hex-states-'+profile+'.log')).read_text().split()[0]=='24824832'
+        selector,prefix=('107','s390x')if profile=='SYSTEMZ'else('105','riscv64')
+        ref,=[v for v in manifest if v['name']==prefix+'-ls']
+        pkg=t/(prefix+'.deb');cmd('fetch-'+prefix,['curl','--retry','3','-fsSL',ref['url'],'-o',pkg]);assert sha(pkg)==ref['package_sha256']
+        sz=max(map(len,images.values()));images={k:v+bytes(sz-len(v))for k,v in images.items()};images['copy']=images['base']
+        slot=t/(prefix+'-fixed');slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(images['base']);(slot/'libcapstone.so').symlink_to(target.name)
+        for name in ('time','raw'):cmd('link-'+prefix+name,['c++','-O3','-std=c++17','-I',s/'include',d/(name+'.cpp'),'-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/name])
+        rng=random.Random(2162);os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+        for member in ('ls','cat','sort','cp'):
+            data=corpus.deb_binary(pkg,member);path=t/(prefix+'-'+member+'.text');path.write_bytes(corpus.elf_text(data));case=prefix+'-'+member
+            digest=sha(path);assert member!='ls'or digest==ref['text_sha256'];samples[case]=dict(text=digest,elf=hashlib.sha256(data).hexdigest(),package=sha(pkg))
             for opt in range(5):
-                raw=list(map(int,sp.check_output([raw_bins[k],str(selectors[q['name'].split('-')[0]]),q['path'],str(opt)]).split()))
-                assert len(raw)==4 and raw[0]>0
-                rows[q['name']+'/'+str(opt)]=raw
-        bystage[k]=rows
-    assert bystage['base']==bystage['candidate'] and len(bystage['base'])>=10
-    save('raw-records',bystage)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rng=random.Random(1756);rows=[]
-    save('host',dict(cpu=sp.check_output(['lscpu'],text=True),compiler=sp.check_output([cc,'--version'],text=True),images=ids,osrel=osrel,machine=platform.machine(),cc=cc))
-    def invoke(k,arch,mode,path,ip,n):
-        target.write_bytes(imgs[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(arch),str(mode),path,str(ip),str(n)],text=True).split()))
-    for name,arch,path,ip,modes in panels:
-        for mode in modes:
-            counts={stage:list(map(int,sp.check_output([t/('count-'+stage),str(arch),str(mode),path,str(ip),'1']).split()))for stage in ('base','candidate')}
-            assert len(counts['base'])==17 and counts['candidate']==counts['base'],(name,mode,counts)
-            one=invoke('base',arch,mode,path,ip,1);assert one[2]==counts['base'][0]
-            save('hex-'+name+'-'+str(mode),dict(signature=one[2],digit_counts=counts['base'][1:]))
-            n=max(1,round(65e6/one[0]));rows_=[]
-            for i in range(21):
-                order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
-                for k in order+order[::-1]:
-                    v=invoke(k,arch,mode,path,ip,n)
-                    expect=one[2]
-                    assert v[2]==expect,(name,mode,k,v[2],expect);cyc[k].append(v[0])
-                rows_.append(cyc)
-            rows.append(dict(name=name,arch=arch,mode=mode,cycles=rows_,sha=sha(path),reps=n));save('timings',rows)
-    save('complete',dict(done=True,panels=len(rows),revisions=meta,images=ids))
+                obs=[]
+                for k in ('base','candidate'):
+                    target.write_bytes(images[k]);obs.append(list(map(int,sp.check_output([t/'raw',selector,path,str(opt)]).split())))
+                assert obs[0]==obs[1] and obs[0][0]>0;raw[case+'/'+str(opt)]=obs[0]
+            def timed(k,mode,rep):
+                target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',selector,str(mode),path,'1048576',str(rep)]).split()))
+            for mode in (0,1,2):
+                one=timed('base',mode,1);reps=max(1,round(65e6/one[0]));cycles=[]
+                for _ in range(21):
+                    keys=list(images);rng.shuffle(keys);v={k:[]for k in keys}
+                    for k in keys+keys[::-1]:
+                        z=timed(k,mode,reps);assert z[2]==one[2];v[k].append(z[0])
+                    cycles.append(v)
+                rows.append(dict(name=case,mode=mode,cycles=cycles,sha=digest,reps=reps));save('timings',rows)
+        shutil.rmtree(b)
+    save('samples',samples);save('raw',raw);save('complete',dict(done=True,source=q,host=platform.machine(),cc=cc,records=len(raw),panels=len(rows)))
 finally:
-    count=sum(p.stat().st_size for p in t.rglob('*') if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=count))
+    n=sum(p.stat().st_size for p in t.rglob('*')if p.is_file()and not p.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
