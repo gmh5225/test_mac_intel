@@ -1,121 +1,123 @@
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index f417cdc9..60ec4b72 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -86,6 +86,69 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
- 	return true;
- }
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1aae4f9a..d6f3ff5f 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -478,6 +478,14 @@ if(CAPSTONE_X86_SUPPORT)
+     set(CSTOOL_SRC
+         ${CSTOOL_SRC}
+         cstool/cstool_x86.c)
++    # Only mixed ELF shared-library builds use the scalar post-printer.
++    if(CAPSTONE_BUILD_SHARED_LIBS AND NOT CAPSTONE_BUILD_DIET
++       AND NOT CAPSTONE_X86_REDUCE AND NOT capstone_enabled_architectures STREQUAL "X86"
++       AND CMAKE_EXECUTABLE_FORMAT STREQUAL "ELF" AND CMAKE_C_COMPILER_ID MATCHES "^(Clang|GNU)$")
++        set(capstone_x86_postprinter arch/X86/X86PostPrinter.c)
++        set_property(SOURCE arch/X86/X86Mapping.c ${capstone_x86_postprinter} APPEND
++                     PROPERTY COMPILE_DEFINITIONS CAPSTONE_X86_SHARED_POSTPRINTER)
++    endif()
+     set(SOURCES_X86
+         arch/X86/X86Disassembler.c
+         arch/X86/X86DisassemblerDecoder.c
+@@ -485,6 +493,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86IntelInstPrinterPrechecked.c
+         arch/X86/X86InstPrinterCommon.c
+         arch/X86/X86Mapping.c
++        ${capstone_x86_postprinter}
+         arch/X86/X86Module.c
+         arch/X86/X86ImmediateOutput.c
+         arch/X86/X86MemoryOutput.c
+diff --git a/Makefile b/Makefile
+index b3a012fa..8118f71d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -271,6 +271,14 @@ ifeq (,$(findstring yes,$(CAPSTONE_X86_ATT_DISABLE)))
+ endif
+ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
++ifneq ($(sort $(CAPSTONE_ARCHS)),x86)
++ifeq ($(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no)
++ifneq (,$(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c /dev/null 2>/dev/null | grep -w __ELF__))
++	CFLAGS += -DCAPSTONE_X86_SHARED_POSTPRINTER
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86PostPrinter.o
++endif
++endif
++endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index bc463d2b..79adee8d 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12788,7 +12788,11 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
  
-+/* This writer belongs to the private mixed-library reader. In dedicated
-+ * builds the public iterator shares the same fallback object. */
-+#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
-+/* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
-+ * Insert the writemask after its destination. Only a register destination
-+ * can request zeroing or read through the mask. */
-+static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
-+				size_t size, cs_insn *insn, uint16_t *insn_size)
-+{
-+	const unsigned mask = code[3] & 7, ll = (code[3] >> 5) & 3;
-+	const bool zero = (code[3] & 0x80) != 0;
-+	const bool memory = code[5] < 0xc0, store = code[4] == 0x7f;
-+	if (!mask || ll == 3 || (code[1] & 15) != 1 || code[2] != 0x7f ||
-+	    (code[3] & 0x18) != 8 || (store && (!memory || zero)) ||
-+	    X86_OUTPUT_UNSUPPORTED(handle, false))
-+		return false;
-+	/* The longest transfer uses a SIB and a four-byte displacement. */
-+	uint8_t plain[11];
-+	const size_t available = memory ? MIN(size, sizeof(plain)) : 6;
-+	memcpy(plain, code, available);
-+	plain[3] &= 0x78;
-+	if (memory) {
-+#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
-+		if (!X86_writeEvexMemoryOutput(plain, available, insn, insn_size,
-+					       x86_simple_registers[3]) &&
-+		    !writeIndexedEvexMemory(plain, available, insn, insn_size,
-+					    x86_simple_registers[3]))
-+			return false;
+ /// The post-printer function. Used to fixup flaws in the disassembly information
+ /// of certain instructions.
++#ifdef X86_SEPARATE_POSTPRINTER
++void X86_postprinter_full(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 +#else
-+		return false;
+ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
 +#endif
-+	} else if (!X86_writePlainEvexRegisters(handle, plain, available, insn,
-+						insn_size)) {
-+		return false;
-+	}
-+	insn->bytes[3] = code[3];
-+	/* The underlying writer emitted exactly two operands. Their longest
-+	 * address and vector name leave room for both decorators. */
-+	char *comma = strchr(insn->op_str, ',');
-+	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
-+	memcpy(comma, " {k0}", 5);
-+	comma[3] = (char)('0' + mask);
-+	if (zero)
-+		memcpy(comma + 5, " {z}", 4);
-+	if (insn->detail) {
-+		cs_x86 *x = &insn->detail->x86;
-+		x->opcode[3] = code[3];
-+		x->operands[2] = x->operands[1];
-+		cs_x86_op *k = &x->operands[1];
-+		memset(k, 0, sizeof(*k));
-+		k->type = X86_OP_REG;
-+		k->reg = (x86_reg)(X86_REG_K0 + mask);
-+		k->size = (uint8_t)(2u << ll);
-+		k->access = CS_AC_READ;
-+		k->avx_zero_opmask = zero;
-+		x->op_count = 3;
-+		if (!store && !zero)
-+			x->operands[0].access = (cs_ac_type)(CS_AC_READ | CS_AC_WRITE);
-+	}
-+	return true;
-+}
-+#endif
-+
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -121,6 +184,12 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
- 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
- 		return true;
-+#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
-+	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
-+	    (code[4] | 0x10) == 0x7f &&
-+	    writeMaskedByteMove(handle, code, size, insn, insn_size))
-+		return true;
-+#endif
- 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
- 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
- 		return true;
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 586b3c09..1c7944f4 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -705,6 +705,21 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
- 	return true;
- }
- 
-+static bool check_masked_byte_moves(csh handles[2])
-+{
-+	static const uint8_t forms[][11] = {
-+		{ 0x62, 0xf1, 0x7f, 0xc9, 0x6f, 0xc0 },
-+		{ 0x62, 0xd1, 0x7f, 0x49, 0x6f, 0x57, 1 },
-+		{ 0x62, 0xa1, 0x7f, 0xa9, 0x6f, 0x5c, 0x19, 2 },
-+		{ 0x62, 0x91, 0x7f, 0x0f, 0x7f, 0x5c, 0x1a, 4 },
-+	};
-+	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
-+		for (size_t n = 0; n <= sizeof(forms[i]); ++n)
-+			if (!compare(handles, forms[i], n, i))
-+				return false;
-+	return true;
-+}
-+
- static bool check_vex_clear(csh handles[2])
  {
- 	for (unsigned flags = 0; flags < 256; ++flags) {
-@@ -1610,6 +1625,7 @@ static bool check_mode(cs_mode mode)
- 		      (private_iter == X86_disasmIterText &&
- 		       (!check_plain_evex_registers(handles) ||
- 			!check_evex_immediate_shifts(handles) ||
-+			!check_masked_byte_moves(handles) ||
- 			!check_vex_clear(handles) ||
- 			!check_sse_base_memory(handles) ||
- 			!check_legacy_register_immediates(handles) ||
+ 	cs_x86_op *memory = NULL;
+ 	bool has_mask = false;
+@@ -12805,7 +12809,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
+ 	 * Other encodings can only need the first memory operand's broadcast
+ 	 * repair, including decorators introduced by a custom formatter. */
+-	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
++	if (X86_ONLY_REPAIRS_BROADCAST(x86->opcode[0])) {
+ 		for (i = 0; i < x86->op_count; ++i) {
+ 			cs_x86_op *operand = &x86->operands[i];
+ 			if (operand->type == X86_OP_MEM) {
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index a2677cb8..380faa79 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -122,6 +122,17 @@ void X86_build_lookup_tables(cs_struct *h);
+ 
+ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci);
+ 
++#if defined(CAPSTONE_X86_SHARED_POSTPRINTER) && defined(__ELF__) && defined(__GNUC__)
++#define X86_SEPARATE_POSTPRINTER
++CAPSTONE_INTERNAL void X86_postprinter_full(csh handle, cs_insn *insn,
++					    SStream *mnem, MCInst *mci);
++#endif
++
++/* These opcodes can only need the printed broadcast decorator repaired.
++ * VEX/EVEX, x87 environment and rotate forms take the full repair path. */
++#define X86_ONLY_REPAIRS_BROADCAST(opcode) \
++	(((opcode) & 0xe0) != 0xc0 && (opcode) != 0x62)
++
+ static inline bool x86_has_feature(cs_mode mode, int flag)
+ {
+ 	return (mode & flag) == flag;
+diff --git a/arch/X86/X86PostPrinter.c b/arch/X86/X86PostPrinter.c
+new file mode 100644
+index 00000000..1202e088
+--- /dev/null
++++ b/arch/X86/X86PostPrinter.c
+@@ -0,0 +1,24 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "X86Mapping.h"
++
++#ifdef X86_SEPARATE_POSTPRINTER
++#include <string.h>
++
++/* Preserve custom broadcast spellings, which may appear on a scalar operand. */
++__attribute__((section(".cs_x86_postprinter_text")))
++void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++{
++	if (insn && insn->id != X86_INS_VPCMP) {
++		if (!insn->detail)
++			return;
++		if (X86_ONLY_REPAIRS_BROADCAST(insn->detail->x86.opcode[0]) &&
++		    !strchr(mnem->buffer, '{'))
++			return;
++	}
++	X86_postprinter_full(handle, insn, mnem, mci);
++}
++#endif
++#endif

@@ -9,8 +9,9 @@ def cmd(n,a,cwd=None):
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}')
+t=Path(tempfile.mkdtemp());b=t/'build';base=load(d/'base.json');assert g('rev-parse','HEAD')==base['parent'] and base['commit']==meta['parent']
 try:
+    prior=d/'base.patch';assert sha(prior)==base['sha256'];g('apply','--index',str(prior));assert g('write-tree')==base['tree']
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={};raw_bins={};probe_bins={};libs={}
     units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','aarch64_scan','aarch64_postprocess','mips_scan','mips_single','text_option','detail_option']
@@ -24,12 +25,21 @@ try:
         assert len(order)==len(obj)>55 and 'XtensaDisassembler.c.o' in order
         if k=='base':base_obj=obj;base_order=order
         else:
-            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86PublicOutput.c.o','X86DisassemblerDecoder.c.o'}
+            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86DisassemblerDecoder.c.o'}
             assert [n for n in obj if n in base_obj]==base_order
         save('objects-'+k,dict(members=obj,order=order))
         for case,store in [('time',probe_bins),('raw',raw_bins)]:
             exe=t/(case+'-'+k)
             cmd('compile-'+case+'-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/(case+'.cpp'),lib,'-lm','-o',exe]);store[k]=exe
+        symbols={}
+        targets={'cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','RISCV_getInstruction','PPC_getInstruction','SystemZ_LLVM_getInstruction','Xtensa_getInstruction','LoongArch_getInstruction','X86_decodePublicRecord'}
+        for line in sp.check_output(['nm','-n','-S','--defined-only',probe_bins[k]],text=True).splitlines():
+            fs=line.split()
+            if len(fs)==4 and fs[-1] in targets:symbols[fs[-1]]=list(map(lambda v:int(v,16),fs[:2]))
+        assert 'X86_decodePublicRecord' not in symbols and 'cs_disasm_iter' in symbols and 'cs_decode_full_insn' in symbols
+        if k=='candidate':assert 'X86_disasmIterText' in symbols
+        save('layout-'+k,symbols)
+        cmd('public-code-'+k,['objdump','-d','--disassemble=cs_disasm_iter',probe_bins[k]])
         imgs[k]=probe_bins[k].read_bytes();ids[k]=sha(probe_bins[k])
         so=t/(k+'.so')
         cmd('loadable-'+k,[cc,'-shared','-Wl,-Bsymbolic','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',so]);libs[k]=so
