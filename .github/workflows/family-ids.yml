@@ -1,7 +1,7 @@
-name: Compare complete fixed-width and primary-only public output with a single mapped library
+name: Compare 64-bit and dual-width scan readers with an unchanged native batch loop
 on:
   push:
-    branches: [codex/public-complete-fallback-chain]
+    branches: [codex/independent-public-scan-readers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-output-fallback-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: independent-scan-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
