@@ -14,12 +14,12 @@ extern "C" int census_calls();
 extern "C" unsigned census_vector_memory(const uint8_t *, size_t, const cs_insn *);
 int main(int argc, char **argv)
 {
-	if (argc != 5) return 1;
+	if (argc != 6) return 1;
 	const unsigned bits = std::atoi(argv[1]);
 	const cs_mode mode = bits == 64 ? CS_MODE_64 : CS_MODE_32;
 	std::ifstream in(argv[2], std::ios::binary), spans(argv[3]);
-	std::ofstream rows(argv[4]);
-	if (!in || !spans || !rows) return 2;
+	std::ofstream rows(argv[4]), blocks(argv[5]);
+	if (!in || !spans || !rows || !blocks) return 2;
 	const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in), {}};
 	csh normal{}, fast{};
 	cs_opt_mnem custom{X86_INS_UD2, "ud2"};
@@ -34,6 +34,8 @@ int main(int argc, char **argv)
 	while (spans >> start >> n >> ip) {
 		if (start > bytes.size() || n > bytes.size() - start) return 4;
 		const uint8_t *p = bytes.data() + start;
+		size_t block_start = start, count = 0, block_misses = 0;
+		uint64_t block_ip = ip;
 		while (n) {
 			cs_insn fast_record{}, ref{};
 			cs_detail fast_detail{}, ref_detail{};
@@ -56,6 +58,13 @@ int main(int argc, char **argv)
 					return 6;
 				}
 				valid++; misses += full; records++;
+				if (count == 0) { block_start = size_t(p - bytes.data()); block_ip = ip; }
+				block_misses += full;
+				if (++count == 64) {
+					blocks << block_start << ' ' << size_t(after-bytes.data())-block_start << ' '
+					       << block_ip << ' ' << block_misses << '\n';
+					count = block_misses = 0;
+				}
 				const auto row = bits == 64 ? census_vector_memory(p, ref.size, &ref) : 0;
 				std::string addr = "other";
 				const auto &x = ref_detail.x86;
@@ -73,7 +82,7 @@ int main(int argc, char **argv)
 				eligible += full && row == 1;
 				conflicting += full && row == 2;
 				p=after; n=left; ip=address;
-			} else { ++invalid; ++p; --n; ++ip; }
+			} else { count = block_misses = 0; ++invalid; ++p; --n; ++ip; }
 		}
 	}
 	for (const auto &item : histogram) {

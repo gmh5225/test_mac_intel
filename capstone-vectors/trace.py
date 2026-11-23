@@ -35,10 +35,10 @@ try:
         sf.write_text(''.join('%d %d %d\n'%v for v in used))
         assert len(used)==p['timed_functions'] and sha(sf)==p['extent_sha256']
         with (out/(name+'-comparison.log')).open('w') as log:
-            lines=sp.check_output([w/'trace',str(bits),f,sf,out/(name+'-shapes.tsv')],text=True,stderr=log)
+            lines=sp.check_output([w/'trace',str(bits),f,sf,out/(name+'-shapes.tsv'),out/(name+'-blocks.tsv')],text=True,stderr=log)
         (out/(name+'.tsv')).write_text(lines)
         values=list(map(int,lines.split()));assert len(values)==6 and values[0]==values[-1] and values[0]>=values[2]>=values[3]
-        summary[name]=dict(source=p,values=values,shape_sha256=sha(out/(name+'-shapes.tsv')))
+        summary[name]=dict(source=p,values=values,shape_sha256=sha(out/(name+'-shapes.tsv')),block_sha256=sha(out/(name+'-blocks.tsv')))
     assert len(summary)==6
     save('checked',dict(complete=True,source=q,samples=summary))
 finally:

@@ -1,7 +1,7 @@
-name: Trace actual released decoder calls and measure missing vector memory shapes on six real inputs
+name: Classify contiguous 64-instruction real blocks by observed generic fallback calls
 on:
   push:
-    branches: [codex/census-vector-memory-addresses]
+    branches: [codex/real-fallback-density-blocks]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: released-address-census-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fallback-density-blocks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
