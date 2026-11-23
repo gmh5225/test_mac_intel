@@ -1,7 +1,7 @@
-name: Verify dedicated VEX memory records in x86 and mixed static and shared libraries on Windows and macOS
+name: Verify shipped VEX and scalar tables across Windows and macOS Capstone configurations
 on:
   push:
-    branches: [codex/dedicated-vex-memory-across-platforms]
+    branches: [codex/verify-vex-and-scalar-generators]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-vex-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: shipped-vex-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

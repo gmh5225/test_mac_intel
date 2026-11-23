@@ -11,7 +11,7 @@ try:
     for suffix in ('static','shared'):
         lines += [f'add_executable(probe_{suffix} "{(d/"registers.c").as_posix()}")',f'target_link_libraries(probe_{suffix} PRIVATE capstone_{suffix})',f'target_include_directories(probe_{suffix} PRIVATE "{(s/"include").as_posix()}")']
     lines += [f'add_executable(vector_rows "{(s/"suite/synctools/x86_vector_output.cpp").as_posix()}")','target_compile_features(vector_rows PRIVATE cxx_std_17)','target_link_libraries(vector_rows PRIVATE capstone_static)',f'target_include_directories(vector_rows PRIVATE "{(s/"include").as_posix()}")']
-    lines += [f'add_executable(shift_rows "{(s/"suite/synctools/x86_simple_output.cpp").as_posix()}")','target_compile_features(shift_rows PRIVATE cxx_std_17)','target_link_libraries(shift_rows PRIVATE capstone_static)',f'target_include_directories(shift_rows PRIVATE "{s.as_posix()}" "{(s/"include").as_posix()}")']
+    lines += [f'add_executable(scalar_rows "{(s/"suite/synctools/x86_simple_output.cpp").as_posix()}")','target_compile_features(scalar_rows PRIVATE cxx_std_17)','target_link_libraries(scalar_rows PRIVATE capstone_static)',f'target_include_directories(scalar_rows PRIVATE "{s.as_posix()}" "{(s/"include").as_posix()}")']
     (proj/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
     cfg=['cmake','-S',proj,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     cfg+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'])[profile]
@@ -30,7 +30,7 @@ try:
         assert 'x86_scan_batch' in targets and 'x86_buffer_bounds' in targets and 'x86_mapping_counts'in targets
         full=profile in ('full','noatt')
         if full:assert 'x86_simple_output'in targets
-        cmd(v/'build.log',['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*targets, *(['probe_static','probe_shared','vector_rows','shift_rows']if full else [])])
+        cmd(v/'build.log',['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*targets, *(['probe_static','probe_shared','vector_rows','scalar_rows']if full else [])])
         cmd(v/'tests.log',['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(targets)+')$'])
         cmd(v/'mapping.log',[sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
         if full:
@@ -40,10 +40,10 @@ try:
             table=sp.check_output([exe],env=env).replace(b'\r\n',b'\n')
             assert table==(s/'arch/X86/X86GenVectorOutput.inc').read_bytes().replace(b'\r\n',b'\n')
             save(v/'table.json',dict(bytes=len(table),sha256=hashlib.sha256(table).hexdigest()))
-            shift,=[f for f in b.rglob('shift_rows'+('.exe' if win else '')) if f.is_file()]
-            emitted=sp.check_output([shift,'--double-shift32'],env=env).replace(bytes([13,10]),bytes([10]))
-            assert emitted==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenDoubleShift32.inc'])
-            save(v/'shift-table.json',dict(rows=2,canonical_encodings=32768,sha256=hashlib.sha256(emitted).hexdigest()))
+            scalar,=[f for f in b.rglob('scalar_rows'+('.exe' if win else '')) if f.is_file()]
+            emitted=sp.check_output([scalar,'--test32-registers'],env=env).replace(bytes([13,10]),bytes([10]))
+            assert emitted==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenTest32Registers.inc'])
+            save(v/'scalar-table.json',dict(rows=2,sha256=hashlib.sha256(emitted).hexdigest()))
             memory=sp.check_output([exe,'--vex-base-memory'],env=env).replace(bytes([13,10]),bytes([10]))
             assert memory==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenVexBaseMemory.inc'])
             save(v/'memory-table.json',dict(bytes=len(memory),sha256=hashlib.sha256(memory).hexdigest()))
