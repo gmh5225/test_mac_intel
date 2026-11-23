@@ -104,7 +104,7 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-compressed-scan-2316-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('RISCV-compressed-integer-2319-'+flavor)
     del images['lazy']
     images['candidate_copy']=images['width']
     for name,bits in cases.items():

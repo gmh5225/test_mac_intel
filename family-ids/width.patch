@@ -1,8 +1,64 @@
 diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
-index 4f02638a..ccac56d3 100644
+index 4f02638a..4439581c 100644
 --- a/arch/RISCV/RISCVScan.h
 +++ b/arch/RISCV/RISCVScan.h
-@@ -11,7 +11,31 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+@@ -5,13 +5,77 @@
+ 
+ #include "RISCVModule.h"
+ 
++/* The ordinary decoder retains reserved immediates, zero-register hints
++ * and encodings whose operation differs between RV32 and RV64. */
++static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
++{
++	const unsigned encoding = ((word >> 13) << 2) | (word & 3);
++	const unsigned rd = (word >> 7) & 31;
++	switch (encoding) {
++	case (5 << 2) | 1:
++		return RISCV_C_J;
++	case (6 << 2) | 1:
++		return RISCV_C_BEQZ;
++	case (7 << 2) | 1:
++		return RISCV_C_BNEZ;
++	case (2 << 2) | 0:
++		return RISCV_C_LW;
++	case (6 << 2) | 0:
++		return RISCV_C_SW;
++	case (6 << 2) | 2:
++		return RISCV_C_SWSP;
++	case (2 << 2) | 1:
++		return rd ? RISCV_C_LI : 0;
++	case (4 << 2) | 2:
++		if (!rd || !(word & 0x7c))
++			return 0;
++		return (word & 0x1000) ? RISCV_C_ADD : RISCV_C_MV;
++	case (0 << 2) | 1:
++		return rd && (word & 0x107c) ? RISCV_C_ADDI : 0;
++	case (2 << 2) | 2:
++		return rd ? RISCV_C_LWSP : 0;
++	case (3 << 2) | 0:
++		return RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_LD :
++			       0;
++	case (7 << 2) | 0:
++		return RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_SD :
++			       0;
++	case (3 << 2) | 2:
++		return rd && RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_LDSP :
++			       0;
++	case (7 << 2) | 2:
++		return RISCV_getFeatureBits(mode, RISCV_Feature64Bit) ?
++			       RISCV_C_SDSP :
++			       0;
++	default:
++		return 0;
++	}
++}
++
+ /* The scanner is selected for little-endian, non-E modes without output.
+  * These major opcodes admit every destination register and immediate. */
+ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
  			       MCInst *inst, uint16_t *size, uint64_t address,
  			       void *info)
  {
@@ -10,18 +66,8 @@ index 4f02638a..ccac56d3 100644
 +	if (length < 2 || inst->flat_insn->detail)
 +		goto full;
 +	if ((code[0] & 3) != 3) {
-+		/* These base compressed forms accept every operand bit pattern.
-+		 * Other quadrants and extension encodings retain table priority. */
-+		static const uint16_t opcodes[32] = {
-+			[(5 << 2) | 1] = RISCV_C_J,
-+			[(6 << 2) | 1] = RISCV_C_BEQZ,
-+			[(7 << 2) | 1] = RISCV_C_BNEZ,
-+			[(2 << 2) | 0] = RISCV_C_LW,
-+			[(6 << 2) | 0] = RISCV_C_SW,
-+			[(6 << 2) | 2] = RISCV_C_SWSP,
-+		};
-+		const unsigned index = ((code[1] >> 5) << 2) | (code[0] & 3);
-+		const unsigned opcode = opcodes[index];
++		const uint16_t word = code[0] | ((uint16_t)code[1] << 8);
++		const unsigned opcode = scanCompressedOpcode(word, inst->csh->mode);
 +		if (opcode &&
 +		    (RISCV_getFeatureBits(inst->csh->mode, RISCV_FeatureStdExtC) ||
 +		     RISCV_getFeatureBits(inst->csh->mode, RISCV_FeatureStdExtZca))) {
@@ -36,56 +82,62 @@ index 4f02638a..ccac56d3 100644
  		const unsigned major = code[0] & 0x7f;
  		switch (major) {
 diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
-index 44a891a2..18ebe600 100644
+index 44a891a2..056cff15 100644
 --- a/tests/unit/riscv_scan_options.c
 +++ b/tests/unit/riscv_scan_options.c
-@@ -3,6 +3,36 @@
+@@ -3,6 +3,44 @@
  #include <capstone/capstone.h>
  #include <string.h>
  
-+/* Every operand and displacement in these compressed classes is valid. */
-+static bool checkCompressed(csh handle, cs_insn *insn)
++/* Disable the scan specialization on the reference handle by requesting
++ * detail. Compare instruction identity and boundaries for every halfword. */
++static bool checkCompressed(cs_mode mode)
 +{
-+	static const struct {
-+		uint8_t quadrant, funct3;
-+		unsigned int id;
-+	} forms[] = {
-+		{ 1, 5, RISCV_INS_C_J }, { 1, 6, RISCV_INS_C_BEQZ },
-+		{ 1, 7, RISCV_INS_C_BNEZ },
-+		{ 0, 2, RISCV_INS_C_LW }, { 0, 6, RISCV_INS_C_SW },
-+		{ 2, 6, RISCV_INS_C_SWSP },
-+	};
-+	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i) {
-+		for (unsigned payload = 0; payload < 2048; ++payload) {
-+			uint16_t bits = (forms[i].funct3 << 13) |
-+					(payload << 2) | forms[i].quadrant;
-+			uint8_t bytes[] = { (uint8_t)bits, (uint8_t)(bits >> 8) };
-+			const uint8_t *code = bytes;
-+			size_t remaining = sizeof(bytes);
-+			uint64_t pc = 0xfffe;
-+			if (!cs_disasm_iter(handle, &code, &remaining, &pc, insn) ||
-+			    insn->id != forms[i].id || insn->size != 2 ||
-+			    code != bytes + 2 || remaining || pc != 0x10000 ||
-+			    memcmp(insn->bytes, bytes, 2))
-+				return false;
-+		}
++	csh scan, reference;
++	if (cs_open(CS_ARCH_RISCV, mode, &scan) != CS_ERR_OK)
++		return false;
++	if (cs_open(CS_ARCH_RISCV, mode, &reference) != CS_ERR_OK) {
++		cs_close(&scan);
++		return false;
 +	}
-+	return true;
++	cs_option(scan, CS_OPT_TEXT, CS_OPT_OFF);
++	cs_option(reference, CS_OPT_TEXT, CS_OPT_OFF);
++	cs_option(reference, CS_OPT_DETAIL, CS_OPT_ON);
++	cs_insn *a = cs_malloc(scan), *b = cs_malloc(reference);
++	bool ok = a && b;
++	for (unsigned bits = 0; ok && bits <= UINT16_MAX; ++bits) {
++		if ((bits & 3) == 3)
++			continue;
++		const uint8_t raw[] = { (uint8_t)bits, (uint8_t)(bits >> 8) };
++		const uint8_t *p = raw, *q = raw;
++		size_t n = 2, m = 2;
++		uint64_t pc = 0xfffe, ip = pc;
++		const bool x = cs_disasm_iter(scan, &p, &n, &pc, a);
++		const bool y = cs_disasm_iter(reference, &q, &m, &ip, b);
++		ok = x == y && n == m && p == q && pc == ip &&
++		     (!x || (a->id == b->id && a->size == b->size &&
++			     memcmp(a->bytes, b->bytes, 2) == 0));
++	}
++	if (a)
++		cs_free(a, 1);
++	if (b)
++		cs_free(b, 1);
++	cs_close(&scan);
++	cs_close(&reference);
++	return ok;
 +}
 +
  int main(void)
  {
  	static const unsigned ids[] = {
-@@ -50,6 +80,12 @@ int main(void)
+@@ -50,6 +88,10 @@ int main(void)
  			}
  		}
  	}
-+	cs_option(h, CS_OPT_DETAIL, CS_OPT_OFF);
-+	cs_option(h, CS_OPT_TEXT, CS_OPT_OFF);
-+	cs_option(h, CS_OPT_MODE, CS_MODE_RISCV32 | CS_MODE_RISCV_C);
-+	ok &= checkCompressed(h, insn);
-+	cs_option(h, CS_OPT_MODE, CS_MODE_RISCV64 | CS_MODE_RISCV_C);
-+	ok &= checkCompressed(h, insn);
++	const unsigned extensions = CS_MODE_RISCV_C | CS_MODE_RISCV_FD |
++				    CS_MODE_RISCV_ZICFISS | CS_MODE_RISCV_ZCMP_ZCMT_ZCE;
++	ok &= checkCompressed((cs_mode)(CS_MODE_RISCV32 | extensions));
++	ok &= checkCompressed((cs_mode)(CS_MODE_RISCV64 | extensions));
  	cs_free(insn, 1);
  	cs_close(&h);
  	return ok ? 0 : 1;

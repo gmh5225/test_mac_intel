@@ -1,7 +1,7 @@
-name: Verify compressed RISC-V scan records and time real ELF with cross-architecture controls
+name: Measure RISC-V compressed arithmetic and stack scans on four real ELF files with independent duplicate controls
 on:
   push:
-    branches: [codex/riscv-compressed-base-scan]
+    branches: [codex/riscv-compressed-integer-load-store]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-compressed-base-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-compressed-integer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
