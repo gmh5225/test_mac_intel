@@ -1,7 +1,7 @@
-name: Check standalone detail formats on native Linux macOS and both Windows ABIs
+name: Test packed EVEX scans on GCC, macOS and Windows with full and small builds
 on:
   push:
-    branches: [codex/verify-detail-format-initialization]
+    branches: [codex/evex-move-scan-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -23,6 +23,8 @@ jobs:
           - { host: ubuntu-24.04, arch: x86_64, profile: full }
           - { host: ubuntu-24.04, arch: x86_64, profile: reduced }
           - { host: ubuntu-24.04, arch: x86_64, profile: noatt }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: full }
+          - { host: ubuntu-24.04, arch: x86_64, profile: diet }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 85
     steps:
@@ -47,6 +49,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: detail-format-initialization-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: packed-evex-profiles-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
