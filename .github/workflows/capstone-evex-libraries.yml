@@ -1,7 +1,7 @@
-name: Classify contiguous 64-instruction real blocks by observed generic fallback calls
+name: Count actual full decoding, mapping, numeric output and splitting in both published readers
 on:
   push:
-    branches: [codex/real-fallback-density-blocks]
+    branches: [codex/real-published-formatter-census]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,8 +25,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: 6de392819bbc0d468ad7c30531271823416f655e
           path: source
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: f33e57e48b3ed221f14bc66acdf54af74f6cb34a
+          path: neverd-config
+          sparse-checkout: |
+            CMakeLists.txt
+            cmake/NeverDCapstoneCompilerOptions.inc
+          sparse-checkout-cone-mode: false
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
@@ -38,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fallback-density-blocks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: published-formatter-census-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

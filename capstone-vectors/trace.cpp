@@ -1,6 +1,8 @@
 #include "arch/X86/X86ScanAdapter.h"
+#include <algorithm>
+#include <array>
+#include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -9,86 +11,76 @@
 #include <tuple>
 #include <vector>
 
-extern "C" void census_reset();
-extern "C" int census_calls();
-extern "C" unsigned census_vector_memory(const uint8_t *, size_t, const cs_insn *);
-int main(int argc, char **argv)
-{
-	if (argc != 6) return 1;
-	const unsigned bits = std::atoi(argv[1]);
-	const cs_mode mode = bits == 64 ? CS_MODE_64 : CS_MODE_32;
-	std::ifstream in(argv[2], std::ios::binary), spans(argv[3]);
-	std::ofstream rows(argv[4]), blocks(argv[5]);
-	if (!in || !spans || !rows || !blocks) return 2;
-	const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in), {}};
-	csh normal{}, fast{};
-	cs_opt_mnem custom{X86_INS_UD2, "ud2"};
-	if (cs_open(CS_ARCH_X86, mode, &normal) || cs_open(CS_ARCH_X86, mode, &fast) ||
-	    cs_option(normal, CS_OPT_MNEMONIC, reinterpret_cast<size_t>(&custom)) ||
-	    cs_option(normal, CS_OPT_DETAIL, CS_OPT_ON) || cs_option(fast, CS_OPT_DETAIL, CS_OPT_ON)) return 3;
-	auto next = bits == 64 ? X86_disasmIterText : X86_disasmIter32;
-	uint64_t ip;
-	size_t start, n;
-	std::map<std::tuple<unsigned, unsigned, std::string, std::string>, size_t> histogram;
-	size_t valid{}, invalid{}, misses{}, eligible{}, conflicting{}, records{};
-	while (spans >> start >> n >> ip) {
-		if (start > bytes.size() || n > bytes.size() - start) return 4;
-		const uint8_t *p = bytes.data() + start;
-		size_t block_start = start, count = 0, block_misses = 0;
-		uint64_t block_ip = ip;
-		while (n) {
-			cs_insn fast_record{}, ref{};
-			cs_detail fast_detail{}, ref_detail{};
-			fast_record.detail = &fast_detail;
-			ref.detail = &ref_detail;
-			const uint8_t *after = p, *observed = p;
-			auto address = ip, current = ip;
-			auto left = n, available = n;
-			const bool accepted = cs_disasm_iter(normal, &after, &left, &address, &ref);
-			census_reset();
-			const bool match = next(fast, &observed, &available, &current, &fast_record);
-			const int full = census_calls();
-			if (match != accepted || observed != after || available != left || current != address ||
-			    full > 1) return 5;
-			if (accepted) {
-				fast_record.detail = ref.detail;
-				if (std::memcmp(&fast_record, &ref, sizeof(ref)) ||
-				    std::memcmp(&fast_detail, &ref_detail, sizeof(cs_detail))) {
-					std::fprintf(stderr, "record difference bitness %u IP %llx %s %s\n", bits, (unsigned long long)ip, ref.mnemonic, ref.op_str);
-					return 6;
-				}
-				valid++; misses += full; records++;
-				if (count == 0) { block_start = size_t(p - bytes.data()); block_ip = ip; }
-				block_misses += full;
-				if (++count == 64) {
-					blocks << block_start << ' ' << size_t(after-bytes.data())-block_start << ' '
-					       << block_ip << ' ' << block_misses << '\n';
-					count = block_misses = 0;
-				}
-				const auto row = bits == 64 ? census_vector_memory(p, ref.size, &ref) : 0;
-				std::string addr = "other";
-				const auto &x = ref_detail.x86;
-				for (unsigned i = 0; i != x.op_count; ++i) {
-					if (x.operands[i].type != X86_OP_MEM) continue;
-					const auto &mem = x.operands[i].mem;
-					if (mem.base == X86_REG_RIP) addr = "rip";
-					else if (mem.base == X86_REG_INVALID) addr = "no-base";
-					else if (mem.index != X86_REG_INVALID) addr = "base-index";
-					else if ((x.modrm & 7) == 4) addr = "sib-base";
-					else addr = "base";
-					break;
-				}
-				histogram[{full,row,addr,ref.mnemonic}]++;
-				eligible += full && row == 1;
-				conflicting += full && row == 2;
-				p=after; n=left; ip=address;
-			} else { count = block_misses = 0; ++invalid; ++p; --n; ++ip; }
-		}
-	}
-	for (const auto &item : histogram) {
-		const auto &[full,row,address,mnemonic] = item.first;
-		rows << full << '\t' << row << '\t' << address << '\t' << mnemonic << '\t' << item.second << '\n';
-	}
-	std::printf("%zu %zu %zu %zu %zu %zu\n",valid,invalid,misses,eligible,conflicting,records);
-	cs_close(&fast);cs_close(&normal);
+extern "C" unsigned path_events[7];
+using Counts=std::array<uint64_t,8>;
+struct Buckets {
+    Counts counts{};
+    std::string example;
+};
+static std::string shape(const cs_x86 &x) {
+    std::string s;
+    for(unsigned i=0;i<x.op_count;++i) {
+        const cs_x86_op &op=x.operands[i];
+        if(i) s+=",";
+        if(op.type==X86_OP_REG) s+="r";
+        else if(op.type==X86_OP_IMM) s+="i";
+        else if(op.type==X86_OP_MEM) {
+            s+="m";
+            s+=op.mem.base==X86_REG_RIP?"rip":op.mem.base==X86_REG_INVALID?"abs":"base";
+            if(op.mem.index!=X86_REG_INVALID) s+="+idx";
+            if(op.mem.segment!=X86_REG_INVALID) s+="+seg";
+            if(x.encoding.disp_size) s+="d"+std::to_string(x.encoding.disp_size);
+        } else s+="?";
+        s+=std::to_string(op.size);
+    }
+    return s.empty()?"none":s;
+}
+int main(int argc,char **argv) {
+    if(argc!=5) return 1;
+    const unsigned bits=std::stoul(argv[1]);const auto mode=bits==32?CS_MODE_32:CS_MODE_64;
+    std::ifstream input(argv[2],std::ios::binary);std::ofstream output(argv[4]);
+    if(!input||!output) return 2;
+    std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(input),{}};
+    csh canonical{},actual{};
+    if(cs_open(CS_ARCH_X86,mode,&actual)||cs_open(CS_ARCH_X86,mode,&canonical)) return 3;
+    cs_opt_mnem m{X86_INS_UD2,"ud2"};if(cs_option(canonical,CS_OPT_MNEMONIC,(size_t)&m)) return 4;
+    for(unsigned detail:{0,1}) for(unsigned fixed:{0,1}) {
+        for(auto h:{actual,canonical}) if(cs_option(h,CS_OPT_DETAIL,detail?CS_OPT_ON:CS_OPT_OFF)) return 5;
+        const auto next=fixed?(bits==64?X86_disasmIterText:X86_disasmIter32):cs_disasm_iter;
+        std::map<std::tuple<bool,std::string,std::string>,Buckets> histogram;
+        std::ifstream intervals(argv[3]);size_t start,len,valid=0,invalid=0;uint64_t ip;
+        if(!intervals)return 6;
+        while(intervals>>start>>len>>ip) {
+            if(start>bytes.size()||len>bytes.size()-start)return 7;
+            const uint8_t *p=bytes.data()+start;
+            while(len) {
+                cs_detail da{},db{};cs_insn a{},b{};a.detail=detail?&da:nullptr;b.detail=detail?&db:nullptr;
+                auto pa=p,pb=p;auto na=len,nb=len;auto ia=ip,ib=ip;
+                const bool ref=cs_disasm_iter(canonical,&pa,&na,&ia,&a);
+                std::fill(path_events,path_events+7,0u);
+                const bool ok=next(actual,&pb,&nb,&ib,&b);
+                if(a.detail!=(detail?&da:nullptr)||b.detail!=(detail?&db:nullptr))return 8;
+                b.detail=a.detail;
+                if(ok!=ref||pa!=pb||na!=nb||ia!=ib||std::memcmp(&a,&b,sizeof(a))||std::memcmp(&da,&db,sizeof(da))||path_events[0]>1) {
+                    std::fprintf(stderr,"%u-bit fixed=%u detail=%u ip=%llx %s %s\n",bits,fixed,detail,(unsigned long long)ip,a.mnemonic,a.op_str);
+                    return 9;
+                }
+                auto &bucket=histogram[{path_events[0]!=0,ok?a.mnemonic:"(invalid)",detail&&ok?shape(da.x86):"-"}];
+                ++bucket.counts[0];
+                for(unsigned i=0;i<7;++i)bucket.counts[i+1]+=path_events[i];
+                if(bucket.example.empty()) for(size_t i=0;i<(ok?a.size:1);++i) {
+                    char hex[3];std::snprintf(hex,sizeof(hex),"%02x",p[i]);bucket.example+=hex;
+                }
+                if(ok){++valid;p=pa;len=na;ip=ia;} else {++invalid;++p;--len;++ip;}
+            }
+        }
+        std::printf("%u %u %zu %zu\n",fixed,detail,valid,invalid);
+        for(const auto &[k,b]:histogram) {
+            const auto &[full,name,kind]=k;
+            output<<fixed<<'\t'<<detail<<'\t'<<full<<'\t'<<name<<'\t'<<kind<<'\t'<<b.example;
+            for(auto n:b.counts)output<<'\t'<<n;
+            output<<'\n';
+        }
+    }
+    cs_close(&canonical);cs_close(&actual);
 }
