@@ -1,7 +1,7 @@
-name: Measure scalar detail repairs and custom broadcast spelling on ten real architectures
+name: Isolate scalar detail repair placement with identical postprocessing across ten architectures
 on:
   push:
-    branches: [codex/mixed-scalar-postprinter-detail]
+    branches: [codex/isolated-x86-scalar-detail-repair]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mixed-scalar-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: scalar-repair-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

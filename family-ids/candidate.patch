@@ -1,16 +1,75 @@
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..f983ee13 100644
+index bc463d2b..22c0da94 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -12815,6 +12815,11 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
- 		}
+@@ -12788,7 +12788,30 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
+ 
+ /// The post-printer function. Used to fixup flaws in the disassembly information
+ /// of certain instructions.
++#if (defined(CAPSTONE_X86_ONLY) && defined(__linux__)) || \
++	(!defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET))
++static inline void repair_scalar_broadcast(cs_x86 *x86, const SStream *mnem)
++{
++	for (uint8_t i = 0; i < x86->op_count; ++i) {
++		cs_x86_op *operand = &x86->operands[i];
++		if (operand->type == X86_OP_MEM) {
++			repair_avx_broadcast(operand, mnem);
++			break;
++		}
++	}
++}
++#endif
++
++#if !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET)
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static void postprocess_full(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++#else
+ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++#endif
+ {
+ 	cs_x86_op *memory = NULL;
+ 	bool has_mask = false;
+@@ -12806,13 +12829,7 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 	 * Other encodings can only need the first memory operand's broadcast
+ 	 * repair, including decorators introduced by a custom formatter. */
+ 	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
+-		for (i = 0; i < x86->op_count; ++i) {
+-			cs_x86_op *operand = &x86->operands[i];
+-			if (operand->type == X86_OP_MEM) {
+-				repair_avx_broadcast(operand, mnem);
+-				break;
+-			}
+-		}
++		repair_scalar_broadcast(x86, mnem);
  		return;
  	}
-+#elif !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET)
-+	/* For an ordinary opcode only a printed broadcast can change detail. */
-+	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62 &&
-+	    !strchr(mnem->buffer, '{'))
-+		return;
  #endif
- 	// Find the operands that these repairs can change once, in output order.
- 	for (i = 0; i < x86->op_count; ++i) {
+@@ -12868,4 +12885,24 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 	}
+ }
+ 
++#if !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET)
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_postprinter_text")))
++#endif
++void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
++{
++	if (insn && insn->id != X86_INS_VPCMP) {
++		if (!insn->detail)
++			return;
++		cs_x86 *x86 = &insn->detail->x86;
++		/* Legacy operands only need the printed broadcast spelling. */
++		if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
++			repair_scalar_broadcast(x86, mnem);
++			return;
++		}
++	}
++	postprocess_full(handle, insn, mnem, mci);
++}
++#endif
++
+ #endif

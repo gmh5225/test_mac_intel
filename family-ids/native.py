@@ -21,7 +21,7 @@ try:
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','X86_postprinter','repair_avx_broadcast'}
+        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name','RISCV_getInstruction','RISCV_printInst','PPC_getInstruction','Sparc_getInstruction','LoongArch_getInstruction','Xtensa_getInstruction','X86_postprinter','postprocess_full','repair_avx_broadcast'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
@@ -54,6 +54,12 @@ try:
             if len(z)==3 and z[1].startswith('R_') and off<=int(z[0],16)<off+length:
                 calls.append([int(z[0],16)-off,z[1],z[2]])
         save('scan-bytes-'+k,dict(section=section,offset=off,size=length,sha256=hashlib.sha256(body).hexdigest(),relocations=calls))
+        mapping,=b.rglob('X86Mapping.c.o')
+        entries=sp.check_output(['objdump','-t',mapping],text=True).splitlines()
+        table={row.split()[-1]:row.split() for row in entries if row.split() and row.split()[-1].split('.')[0] in ('postprocess_full','X86_postprinter')}
+        assert any(name.startswith('postprocess_full') for name in table)==(k!='base'),table
+        assert ('.cs_x86_postprinter_text' in table['X86_postprinter'])==(k=='indexed'),table
+        save('postprinter-sections-'+k,table)
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
         if cc=='clang':
