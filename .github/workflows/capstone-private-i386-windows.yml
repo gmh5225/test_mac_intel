@@ -1,7 +1,7 @@
-name: Check the exact composed memory and standalone public trees across sixteen native configurations
+name: Check masked transfers and mode-dependent implicit writes across four native platforms and configurations
 on:
   push:
-    branches: [codex/portable-public-owner-combined-memory]
+    branches: [codex/portable-mask-and-implicit-writes]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: public-composed-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: masked-implicit-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
