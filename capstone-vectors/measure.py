@@ -98,7 +98,7 @@ def main(w):
         mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
         patches=[kind] if kind!='base' else []
         for name in patches:
-            patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
+            patch=r/(name+'.patch');assert sha(patch)==z['sha256']
             run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/('build-'+key);project=base
@@ -183,22 +183,24 @@ def main(w):
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         assert ('X86_decodeVexMemoryOrFull' in linked)==active_tail
         save('linked-'+key+'.json',linked)
-        if key=='base':
+        if active_tail:
+            import switch
+            bins['switch']=switch.link(w,r,base,db,lib,ad,flags,syslibs,run,save)
+        if key=='mixed_base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    assert hashes['bare']==hashes['base']
-    assert (hashes['mixed_bare']==hashes['mixed_base'])==darwin
+    assert not darwin and len(set(hashes.values()))==3 and len(hashes)==3
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}
     active=None
     if not darwin:
         run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
-        image.write_bytes(padded['base']);image.chmod(0o755)
-        active=hashes['base']
+        image.write_bytes(padded['mixed_base']);image.chmod(0o755)
+        active=hashes['mixed_base']
     save('launch.json',dict(linked=hashes,same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
     def invoke(key,tail):
         nonlocal active
@@ -212,7 +214,9 @@ def main(w):
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
     glibc=json.loads((w/'libmvec.json').read_text());extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
-    results=[]
+    results=[];census={}
+    os.environ['CAPSTONE_ROUTE_RECEIPT']=str(w/'route-numbers')
+    os.environ['CAPSTONE_BENCH_ROUTE']='g'
     for name,bits,f,spans,source in itertools.chain(extra,pe_panels.prepare(w),frozen_deb.prepare(w)):
         if name not in m['samples']:continue
         expected=m['provenance'][name];assert sha(f)==expected['text_sha256']
@@ -225,27 +229,31 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (0,1,2):
-            targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
-            for k in trees:
-                targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
-                targets['public_'+k]=(k,'capstone')
-                if bits==32 and mode:targets['width_'+k]=(k,'x86_len_')
+        for mode in (1,2):
+            name_mode=name+'/'+str(mode)
+            args=['x86_all_',str(mode),'1',f,intervals,str(bits)]
+            os.environ['CAPSTONE_BENCH_ROUTE']='c'
+            counted=list(map(int,invoke('switch',args).split()))
+            counter=w/'route-numbers';counts=list(map(int,counter.read_text().split()));counter.unlink()
+            assert len(counts)==4 and counts[0]>=counts[1]>=counts[2]>=counts[3]>=0
+            assert (counts[0]>0)==(bits==64) and (name!='libmvec-amd64' or counts[3]>0)
+            census[name_mode]=dict(attempted=counted[2],entry=counts[0],full_boundary=counts[1],vex=counts[2],written=counts[3],extent_sha256=sha(intervals));save('census.json',census)
+            labels=['direct','copy','old','gated','baseline','production','fast']
             def timed(label,count):
-                key,engine=targets[label]
+                env={'direct':'a','copy':'b','old':'t','gated':'g'}
+                os.environ['CAPSTONE_BENCH_ROUTE']=env.get(label,'g')
+                key='switch' if label in env else ('mixed_bare' if label=='production' else 'mixed_base')
+                engine='fast____' if label=='fast' else 'x86_all_'
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
-            labels=list(targets);order=random.Random(str((name,mode,'product-text-width-selection')))
-            for idx in range(13):
-                order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
+            rep=max(1,math.ceil(45e6/max(1,timed('baseline',1)[0])));cycles=[]
+            rng=random.Random(name_mode+'/prefix-route')
+            for _ in range(21):
+                rng.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1
-                for kind in ('public_','private_'):
-                    assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
-                if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
+                assert len({tuple(v[2:])for k,v in obs if k!='fast'})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
+    assert len(results)==2*len(m['samples'])
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:

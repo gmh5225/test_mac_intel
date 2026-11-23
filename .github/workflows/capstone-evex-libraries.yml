@@ -1,7 +1,7 @@
-name: Compare the mixed AMD64 boundary with fork iced on six applications and four hosts
+name: Separate scalar AMD64 fallback routing and VEX formatting in a fixed executable
 on:
   push:
-    branches: [codex/mixed-vex-reader-iced]
+    branches: [codex/mixed-vex-prefix-branch-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -50,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-vex-entry-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: prefix-fallback-route-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
