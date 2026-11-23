@@ -24,10 +24,10 @@ int main(int argc,char **argv) {
     uint8_t *memory=(uint8_t*)mmap(nullptr,page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
     if(memory==MAP_FAILED || mprotect(memory+page,page,PROT_NONE))return 3;
     unsigned checks=0,okays=0,open_modes=0;
-    for(cs_mode mode:{CS_MODE_LOONGARCH64,CS_MODE_LOONGARCH32}) {
-        csh a=0,b=0;auto err=old.open(CS_ARCH_LOONGARCH,mode,&a);
-        if(err!=updated.open(CS_ARCH_LOONGARCH,mode,&b))return 4;
-        if(err!=CS_ERR_OK){if(mode==CS_MODE_LOONGARCH64)return 5;continue;}
+    for(cs_mode mode:{CS_MODE_32, CS_MODE_64, CS_MODE_V9, cs_mode(CS_MODE_32|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_64|CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_V9|CS_MODE_BIG_ENDIAN)}) {
+        csh a=0,b=0;auto err=old.open(CS_ARCH_SPARC,mode,&a);
+        if(err!=updated.open(CS_ARCH_SPARC,mode,&b))return 4;
+        if(err!=CS_ERR_OK)return 5;
         ++open_modes;
         for(bool detail:{false,true})for(bool text:{false,true}) {
             for (auto [opt,value]:{std::pair{CS_OPT_DETAIL,detail},std::pair{CS_OPT_TEXT,text}}) {
@@ -35,7 +35,7 @@ int main(int argc,char **argv) {
             }
             for(unsigned first=0;first!=256;++first) for(unsigned sample=0;sample!=8;++sample) for(unsigned n=0;n<=6;++n) {
                 uint8_t *p=memory+page-n;
-                for(unsigned i=0;i<n;++i)p[i]=i==3?first:(sample*61+first*7+i*29)&255;
+                for(unsigned i=0;i<n;++i)p[i]=i==((mode&CS_MODE_BIG_ENDIAN)?0u:3u)?first:(sample*61+first*7+i*29)&255;
                 const uint8_t *aa=p,*bb=p;size_t na=n,nb=n;uint64_t ia=UINT64_MAX-3,ib=ia;
                 cs_insn x,y;cs_detail dx,dy;memset(&x,0xa5,sizeof(x));memset(&dx,0x5a,sizeof(dx));
                 x.illegal=x.is_alias=x.usesAliasDetails=false;memcpy(&y,&x,sizeof(x));memcpy(&dy,&dx,sizeof(dx));

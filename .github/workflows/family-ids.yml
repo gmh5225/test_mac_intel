@@ -1,7 +1,7 @@
-name: Measure LoongArch private operand storage and printer lengths on four coreutils binaries
+name: Check SPARC operand construction and printer extents with real V9 coreutils
 on:
   push:
-    branches: [codex/loongarch-private-operands]
+    branches: [codex/sparc-private-operands]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8835df03f81c2011e14511446686a6b68eabdd68
+          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: loongarch-private-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: sparc-private-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
