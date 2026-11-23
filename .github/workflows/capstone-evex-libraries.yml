@@ -1,7 +1,7 @@
-name: Compare the released EVEX register control writer and fork iced on four native hosts
+name: Measure the published Capstone and NeverD heads against fork iced on four native hosts
 on:
   push:
-    branches: [codex/shipped-register-immediate-iced]
+    branches: [codex/released-vector-iced-ba03305d]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 94c4b304eb3e0d95dffde5db8272c073b1bfc714
+          ref: 8e00638c3faf294907b6118313ce068d77de1a43
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shipped-register-imm-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: release-vector-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
