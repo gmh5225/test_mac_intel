@@ -1,7 +1,7 @@
-name: Confirm compact VEX pages against two equivalent PE32 public controls and both Linux SIMD samples
+name: Check the active mixed VEX row reader against two copies per image on PE32 and real SIMD samples
 on:
   push:
-    branches: [codex/compact-vex-public-pe32-confirm]
+    branches: [codex/vex-rows-mixed-pe32-four-image]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,8 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 2 }
+          - { host: ubuntu-22.04, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
+          ref: 6fbeffec215f3c7c79169c655b0928c616b46152
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: deb20b49abc68cea5368ce6f7724fdfea01f05be
+          ref: 138a38bdb4f0866040e14196e88a4ac32b3f9553
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: paged-vex-pe32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-vex-pe32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

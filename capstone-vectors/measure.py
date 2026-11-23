@@ -95,7 +95,7 @@ def main(w):
     for key,z in trees.items():
         run(['git','restore','--source','HEAD','--staged','--worktree','.'],'restore-'+key,base)
         assert sp.check_output(['git','-C',base,'rev-parse','HEAD'],text=True).strip()==m['checkout_commit']
-        mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
+        mixed=True;kind=key
         patches=[kind] if kind!='base' else []
         for name in patches:
             patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
@@ -128,7 +128,7 @@ def main(w):
         run(['clang++','-std=c++17','-O2','-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'build-dispatch-guard-'+key)
         run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='882784'
         if kind=='bare':
-            ref=('mixed_' if mixed else '')+'base'
+            ref='base'
             assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
         if kind=='bare':
             run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator'],'build-generator-'+key)
@@ -144,6 +144,9 @@ def main(w):
                 special=sp.check_output([w/'vector-generator','--vex-base-memory'])
                 assert special==(base/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
                 save('memory-rows-'+key+'.json',dict(bytes=len(special),sha256=hashlib.sha256(special).hexdigest()))
+            mask=sp.check_output([w/'vector-generator','--vex-memory-register-mask'])
+            assert mask==(base/'arch/X86/X86GenVexMemoryRegisterMask.inc').read_bytes()
+            save('mask.json',dict(sha256=hashlib.sha256(mask).hexdigest()))
         if not mixed :
             run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'unit-'+key)
         else:
@@ -154,13 +157,13 @@ def main(w):
         objects[key]={p.name:sha(p) for p in build.rglob('*.c.o') if '/tests/' not in str(p)}
         assert set(members)==set(objects[key]) and len(members)==len(set(members))
         earlier=['X86PublicOutput.c.o','X86BatchScan.c.o']
-        orig='mixed_base' if mixed else 'base'
+        orig='base'
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed==([] if mixed else ['X86VectorFallback64.c.o']),(key,changed)
+            assert changed==['X86VectorFallback64.c.o','X86VectorOutput.c.o'],(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
@@ -198,11 +201,13 @@ def main(w):
                 hashes[number]=sha(slot);available[link][k+str(number)]=slot
             assert hashes[1]==hashes[2]
     save('launch.json',dict(canonical_argv=True,canonical_image=True,images={link:{k:sha(f)for k,f in z.items()}for link,z in available.items()}))
+    files={p:p.read_bytes() for copies in available.values() for p in copies.values()}
+    length=max(map(len,files.values()));files={p:v+bytes(length-len(v))for p,v in files.items()}
+    image.write_bytes(next(iter(files.values())));image.chmod(0o755);inode=image.stat().st_ino
     def invoke(path,tail):
-        if not image.exists() or not image.samefile(path):
-            fresh=w/'fresh-runner';os.link(path,fresh);os.replace(fresh,image)
-        args=[image,*tail] if darwin else ['setarch',platform.machine(),'-R',image,*tail]
-        return sp.check_output(args)
+        with image.open('r+b')as f:assert f.write(files[path])==length
+        assert image.stat().st_ino==inode
+        return sp.check_output(['setarch',platform.machine(),'-R',image,*tail])
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
@@ -225,7 +230,7 @@ def main(w):
                 engine='capstone' if name in m['public_controls'] else ('x86_all_' if mode else 'vecbatch')
                 def timed(k,count):return list(map(int,invoke(images[k],[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
                 rep=max(1,math.ceil(70e6/max(1,timed('base1',1)[0])));cycles=[]
-                order=random.Random(str((name,mode,link,'repeated scan')))
+                order=random.Random(str((name,mode,link,'shared VEX rows mixed library, repeated scan')))
                 for _ in range(21):
                     labels=list(images);order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                     assert len({tuple(z[2:])for _,z in obs})==1
