@@ -1,248 +1,195 @@
-diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
-index 7b8535ac..a4c4277c 100644
---- a/arch/X86/X86EvexScan.c
-+++ b/arch/X86/X86EvexScan.c
-@@ -4,7 +4,10 @@
- #ifdef CAPSTONE_HAS_X86
- #include "X86FeatureExtension.h"
- #ifdef X86_EVEX_REGISTER_SCAN
-+/* The extension reader already established the EVEX mode and input bounds. */
-+#define X86_EVEX_BATCH_PACKED
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..30fc9eaf 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -25,7 +25,6 @@
+ #define X86_BATCH_EVEX_PLANS
+ #define X86_EVEX_SCAN_RODATA ".cs_x86_native_batch_rodata"
+ #define X86_EVEX_TRANSFER_RODATA X86_EVEX_SCAN_RODATA
+-#define X86_EVEX_BATCH_PACKED
  #include "X86EvexScanPlan.h"
-+#undef X86_EVEX_BATCH_PACKED
- 
- /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
-  * The ordinary output generator owns the admitted IDs and widths. */
-diff --git a/arch/XCore/XCoreInstPrinter.c b/arch/XCore/XCoreInstPrinter.c
-index cdeb5b9f..32e67aa9 100644
---- a/arch/XCore/XCoreInstPrinter.c
-+++ b/arch/XCore/XCoreInstPrinter.c
-@@ -240,9 +240,10 @@ void XCore_insn_extract(MCInst *MI, const char *code)
- 
- static void set_mem_access(MCInst *MI, bool status, int reg)
- {
--	if (MI->csh->detail_opt != CS_OPT_ON)
-+	if (!MI->csh->detail_opt)
- 		return;
- 
-+	const bool was_memory = MI->csh->doing_mem;
- 	MI->csh->doing_mem = status;
- 	if (status) {
- 		if (reg != 0xffff && reg != -0xffff) {
-@@ -303,14 +304,13 @@ static void set_mem_access(MCInst *MI, bool status, int reg)
- 							  .op_count]
- 					.mem.direct = -1;
- 		}
--	} else {
-+	} else if (was_memory) {
- 		if (reg) {
- 			MI->flat_insn->detail->xcore
- 				.operands[MI->flat_insn->detail->xcore.op_count]
- 				.mem.index = (uint8_t)reg;
--			// done, create the next operand slot
--			MI->flat_insn->detail->xcore.op_count++;
- 		}
-+		++MI->flat_insn->detail->xcore.op_count;
- 	}
- }
- 
-@@ -399,7 +399,8 @@ static void printInlineJT32(MCInst *MI, int OpNum, SStream *O)
- void XCore_printInst(MCInst *MI, SStream *O, void *Info)
- {
- 	printInstruction(MI, O, Info);
--	set_mem_access(MI, false, 0);
-+	/* Literal instructions already supplied their complete operand list. */
-+	MI->csh->doing_mem = false;
- }
- 
- #endif
-diff --git a/cs.c b/cs.c
-index ede7c2aa..e04247d0 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1381,12 +1381,11 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 		return CS_ERR_OK;
- 
- 	case CS_OPT_DETAIL:
--		// CS_OPT_OFF turns detail off.  Any other value adds its flags
--		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
-+		// A requested detail format enables detail, including when set first.
- 		if (value == CS_OPT_OFF)
- 			handle->detail_opt = CS_OPT_OFF;
- 		else
--			handle->detail_opt |= (cs_opt_value)value;
-+			handle->detail_opt |= (cs_opt_value)(value | CS_OPT_ON);
- #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
- 		Mips_selectScanDecoder(handle);
- #endif
-diff --git a/include/capstone/capstone.h b/include/capstone/capstone.h
-index 80f8ce9e..6da7468b 100644
---- a/include/capstone/capstone.h
-+++ b/include/capstone/capstone.h
-@@ -384,7 +384,7 @@ typedef struct cs_opt_mnem {
- typedef enum cs_opt_type {
- 	CS_OPT_INVALID = 0, ///< No option specified
- 	CS_OPT_SYNTAX, ///< Assembly output syntax
--	CS_OPT_DETAIL, ///< Break down instruction structure into details
-+	CS_OPT_DETAIL, ///< A nonzero detail flag enables instruction details. CS_OPT_OFF clears all detail flags.
- 	CS_OPT_MODE, ///< Change engine's mode at run-time
- 	CS_OPT_MEM, ///< User-defined dynamic memory related functions
- 	CS_OPT_SKIPDATA, ///< Skip data when disassembling. Then engine is in SKIPDATA mode.
-diff --git a/tests/details/xcore.yaml b/tests/details/xcore.yaml
-index bf5a348f..e7753e3d 100644
---- a/tests/details/xcore.yaml
-+++ b/tests/details/xcore.yaml
-@@ -35,6 +35,9 @@ test_cases:
-         details:
-           xcore:
-             operands:
-+              -
-+                type: XCORE_OP_MEM
-+                mem_base: r3
-               -
-                 type: XCORE_OP_REG
-                 reg: r4
-@@ -72,6 +75,11 @@ test_cases:
-               -
-                 type: XCORE_OP_REG
-                 reg: r9
-+              -
-+                type: XCORE_OP_MEM
-+                mem_base: r3
-+                mem_index: r11
-+                mem_direct: -1
-       -
-         asm_text: "ldw dp, dp[0x81c5]"
-         details:
-@@ -80,6 +88,10 @@ test_cases:
-               -
-                 type: XCORE_OP_REG
-                 reg: dp
-+              -
-+                type: XCORE_OP_MEM
-+                mem_base: dp
-+                mem_disp: 0x81c5
-       -
-         asm_text: "lmul r11, r0, r2, r5, r8, r10"
-         details:
-@@ -125,4 +137,28 @@ test_cases:
-               -
-                 type: XCORE_OP_REG
-                 reg: r8
+ #define X86_ROUNDED_SCAN_IDS
+ #include "X86RoundedRegisterPlan.h"
+diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
+index a60fc089..3603085f 100644
+--- a/arch/X86/X86EvexScanPlan.h
++++ b/arch/X86/X86EvexScanPlan.h
+@@ -34,26 +34,15 @@ static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
+ 	const unsigned map = code[1] & 15;
+ 	const unsigned index = evex_scan_index[code[4]];
+ 	unsigned id, length;
+-	if (index & 128) {
++	if (index >= EVEX_SCAN_FIRST_TRANSFER) {
+ 		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+ 			return false;
+-		unsigned kind;
+-		if (index == EVEX_SCAN_MOVE) {
+-			if (map != 1 || !pp)
+-				return false;
+-			kind = pp;
 -
-+              -
-+                type: XCORE_OP_MEM
-+                mem_base: r2
-+                mem_disp: 9
-+                mem_direct: -1
-+  -
-+    input:
-+      bytes: [ 0x00, 0x00 ]
-+      arch: "xcore"
-+      options: [ CS_OPT_DETAIL_REAL ]
-+      address: 0x0
-+    expected:
-+      insns:
-+      -
-+        asm_text: "stw r0, r0[0]"
-+        details:
-+          xcore:
-+            operands:
-+              -
-+                type: XCORE_OP_REG
-+                reg: r0
-+              -
-+                type: XCORE_OP_MEM
-+                mem_base: r0
-+                mem_direct: 1
-diff --git a/tests/unit/api.c b/tests/unit/api.c
-index 0a86e462..d0fb371d 100644
---- a/tests/unit/api.c
-+++ b/tests/unit/api.c
-@@ -3,6 +3,7 @@
- 
- #include "../../include/capstone/capstone.h"
- #include "unit_test.h"
-+#include <stddef.h>
- #include <stdio.h>
- #include <string.h>
- 
-@@ -197,12 +198,78 @@ static bool test_iterator_results(void)
- 	return true;
+-#ifdef X86_EVEX_BATCH_PACKED
+-		} else if (index >= EVEX_SCAN_PACKED) {
+-			if (map != 1 || pp > 1)
+-				return false;
+-			kind = 4 + (index - EVEX_SCAN_PACKED) * 2 + pp;
+-#endif
+-		} else {
+-			if (map != 2 || pp != 1 || code[5] >= 0xc0)
+-				return false;
+-			kind = 0;
+-		}
++		const unsigned form =
++			evex_transfer_prefixes[index - EVEX_SCAN_FIRST_TRANSFER]
++					      [code[5] >= 0xc0][pp];
++		if ((form & 31) != map)
++			return false;
++		const unsigned kind = form >> 5;
+ 		id = evex_transfer_scan_ids[kind][code[2] >> 7][code[3] >> 5];
+ 		length = evex_transfer_lengths[((code[5] >> 3) & 24) |
+ 					       (code[5] & 7)];
+diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
+index 31cef345..9171e32f 100644
+--- a/arch/X86/X86GenEvexScan.inc
++++ b/arch/X86/X86GenEvexScan.inc
+@@ -1,11 +1,5 @@
+ /* Generated by suite/synctools/x86_vector_output.cpp. */
+-enum { EVEX_SCAN_RESERVED_SOURCE = 128 };
+-enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };
+-#ifdef X86_EVEX_BATCH_PACKED
+-enum { EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };
+-#else
+-enum { EVEX_SCAN_PACKED = 0, EVEX_SCAN_ALIGNED = 0 };
+-#endif
++enum { EVEX_SCAN_RESERVED_SOURCE = 128, EVEX_SCAN_FIRST_TRANSFER = 128 };
+ struct EvexScanPlan {
+ 	uint8_t map, length_flags;
+ 	uint16_t ids[2][3];
+@@ -30,8 +24,8 @@ static const struct EvexScanPlan evex_scan_plans[]
+ static const uint8_t evex_scan_index[256]
+ 	X86_EVEX_SECTION(X86_EVEX_SCAN_RODATA) = {
+ 	3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	EVEX_SCAN_PACKED, EVEX_SCAN_PACKED, 0, 0, 0, 0, 0, 0, 0, 8, 129, 9, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 10, 0, 0, EVEX_SCAN_ALIGNED, EVEX_SCAN_ALIGNED, 0, 0, 0, 0, 0, 0,
++	130, 130, 0, 0, 0, 0, 0, 0, 0, 8, 129, 9, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 10, 0, 0, 131, 131, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 12, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -46,6 +40,13 @@ static const uint8_t evex_scan_index[256]
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0,
+ };
++static const uint8_t evex_transfer_prefixes[4][2][4]
++	X86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {
++	{ { 31, 33, 65, 97 }, { 31, 33, 65, 97 } },
++	{ { 31, 2, 31, 31 }, { 31, 31, 31, 31 } },
++	{ { 129, 161, 31, 31 }, { 129, 161, 31, 31 } },
++	{ { 193, 225, 31, 31 }, { 193, 225, 31, 31 } },
++};
+ static const uint16_t evex_transfer_scan_ids[][2][3]
+ 	X86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {
+ 	{
+@@ -64,7 +65,6 @@ static const uint16_t evex_transfer_scan_ids[][2][3]
+ 		{ X86_INS_VMOVDQU8, X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 },
+ 		{ X86_INS_VMOVDQU16, X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 },
+ 	},
+-#ifdef X86_EVEX_BATCH_PACKED
+ 	{
+ 		{ X86_INS_VMOVUPS, X86_INS_VMOVUPS, X86_INS_VMOVUPS },
+ 		{ 0, 0, 0 },
+@@ -81,7 +81,6 @@ static const uint16_t evex_transfer_scan_ids[][2][3]
+ 		{ 0, 0, 0 },
+ 		{ X86_INS_VMOVAPD, X86_INS_VMOVAPD, X86_INS_VMOVAPD },
+ 	},
+-#endif
+ };
+ static const uint8_t evex_transfer_lengths[32]
+ 	X86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index f0312e90..641c724e 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -1238,7 +1238,7 @@ void emit_vex_registers(Decoder &decoder)
+ 	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
+ 		     rows.size(), widths.size() - 1);
+ }
+-void emit_evex_transfer_scan(Decoder &decoder)
++void emit_evex_transfer_scan(Decoder &decoder, const std::array<unsigned, 256> &index)
+ {
+ 	// The pair of directions must have the same public ID for every
+ 	// admitted register, ModR/M and SIB combination.
+@@ -1252,10 +1252,36 @@ void emit_evex_transfer_scan(Decoder &decoder)
+ 		{ 1, 0, 0x10, 0x11 }, { 1, 1, 0x10, 0x11 },
+ 		{ 1, 0, 0x28, 0x29 }, { 1, 1, 0x28, 0x29 },
+ 	};
++	// The low five bits select the required EVEX map. Map 31 can never
++	// match a four-bit encoding. The upper bits select the public ID row.
++	std::array<std::array<std::array<unsigned, 4>, 2>, 4> prefixes;
++	for (auto &group : prefixes)
++		for (auto &form : group)
++			form.fill(31);
++	for (unsigned row = 0; row < std::size(transfers); ++row) {
++		const auto &form = transfers[row];
++		const unsigned group = index[form.load] - 128;
++		if (group >= prefixes.size() || row >= 8 || form.map >= 16 ||
++		    (form.store && index[form.store] != index[form.load]) ||
++		    prefixes[group][0][form.pp] != 31)
++			throw std::runtime_error("invalid EVEX transfer prefix class");
++		const unsigned key = (row << 5) | form.map;
++		prefixes[group][0][form.pp] = key;
++		if (form.store)
++			prefixes[group][1][form.pp] = key;
++	}
++	std::puts("static const uint8_t evex_transfer_prefixes[4][2][4]\n\tX86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {");
++	for (const auto &group : prefixes) {
++		std::printf("\t{ ");
++		for (unsigned reg = 0; reg < 2; ++reg) {
++			const auto &p = group[reg];
++			std::printf("%s{ %u, %u, %u, %u }", reg ? ", " : "", p[0], p[1], p[2], p[3]);
++		}
++		std::puts(" },");
++	}
++	std::puts("};");
+ 	std::puts("static const uint16_t evex_transfer_scan_ids[][2][3]\n\tX86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {");
+ 	for (const auto &form : transfers) {
+-		if (form.load == 0x10 && !form.pp)
+-			std::puts("#ifdef X86_EVEX_BATCH_PACKED");
+ 		std::puts("\t{");
+ 		for (unsigned w = 0; w < 2; ++w) {
+ 			std::printf("\t\t{ ");
+@@ -1305,7 +1331,7 @@ void emit_evex_transfer_scan(Decoder &decoder)
+ 		}
+ 		std::puts("\t},");
+ 	}
+-	std::puts("#endif\n};");
++	std::puts("};");
+ 	std::fprintf(stderr, "%llu canonical EVEX transfer probes\n", static_cast<unsigned long long>(decoder.probes));
  }
  
-+static bool test_detail_modifiers(cs_arch arch, cs_mode mode,
-+				  const uint8_t *code, size_t size,
-+				  size_t detail_size)
-+{
-+	if (!cs_support(arch))
-+		return true;
-+	csh handle;
-+	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
-+		return false;
-+	bool ok = true;
-+	for (unsigned flags = 2; ok && flags < 16; flags += 2) {
-+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
-+		cs_option(handle, CS_OPT_DETAIL, flags | CS_OPT_ON);
-+		cs_insn *expected = NULL;
-+		if (cs_disasm(handle, code, size, 0x1000, 1, &expected) != 1) {
-+			ok = false;
-+			break;
-+		}
-+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
-+		cs_option(handle, CS_OPT_DETAIL, flags);
-+		cs_insn *actual = cs_malloc(handle);
-+		ok = actual && actual->detail && expected->detail;
-+		if (ok) {
-+			// Reusing a record must clear counts from its last instruction.
-+			memset(actual->detail, 0, sizeof(*actual->detail));
-+			actual->detail->groups_count = 1;
-+			const uint8_t *cursor = code;
-+			size_t left = size;
-+			uint64_t address = 0x1000;
-+			ok = cs_disasm_iter(handle, &cursor, &left, &address,
-+					    actual) &&
-+			     left == 0 && actual->id == expected->id &&
-+			     actual->alias_id == expected->alias_id &&
-+			     actual->usesAliasDetails ==
-+				     expected->usesAliasDetails &&
-+			     !memcmp(actual->detail, expected->detail,
-+				     detail_size);
-+		}
-+		if (!ok)
-+			fprintf(stderr,
-+				"Detail modifiers: arch=%u flags=0x%x\n",
-+				(unsigned)arch, flags);
-+		if (actual)
-+			cs_free(actual, 1);
-+		cs_free(expected, 1);
-+	}
-+	cs_close(&handle);
-+	return ok;
-+}
-+
- int main()
- {
- 	bool result = true;
- 	result &= test_cs_mem_setup_fail();
- 	result &= test_iterator_allocation();
- 	result &= test_iterator_results();
-+	static const uint8_t bl[] = { 0x00, 0x00, 0x00, 0x94 };
-+	static const uint8_t mov[] = { 0x01, 0x00, 0xa0, 0xe1 };
-+	static const uint8_t addiu[] = { 0x01, 0x00, 0x82, 0x24 };
-+	static const uint8_t c_nop[] = { 0x01, 0x00 };
-+	result &= test_detail_modifiers(
-+		CS_ARCH_AARCH64, CS_MODE_ARM, bl, sizeof(bl),
-+		offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
-+	result &= test_detail_modifiers(
-+		CS_ARCH_ARM, CS_MODE_ARM, mov, sizeof(mov),
-+		offsetof(cs_detail, arm) + sizeof(cs_arm));
-+	result &= test_detail_modifiers(
-+		CS_ARCH_MIPS, CS_MODE_MIPS32, addiu, sizeof(addiu),
-+		offsetof(cs_detail, mips) + sizeof(cs_mips));
-+	result &= test_detail_modifiers(
-+		CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C, c_nop,
-+		sizeof(c_nop), offsetof(cs_detail, riscv) + sizeof(cs_riscv));
+@@ -1334,7 +1360,7 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 	index[0x1a] = 129;
+ 	index[0x10] = index[0x11] = 130;
+ 	index[0x28] = index[0x29] = 131;
+-	std::puts("enum { EVEX_SCAN_RESERVED_SOURCE = 128 };\nenum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };\n#ifdef X86_EVEX_BATCH_PACKED\nenum { EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };\n#else\nenum { EVEX_SCAN_PACKED = 0, EVEX_SCAN_ALIGNED = 0 };\n#endif");
++	std::puts("enum { EVEX_SCAN_RESERVED_SOURCE = 128, EVEX_SCAN_FIRST_TRANSFER = 128 };");
+ 	std::puts("struct EvexScanPlan {\n\tuint8_t map, length_flags;\n\tuint16_t ids[2][3];\n};");
+ 	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\tX86_EVEX_SECTION(X86_EVEX_SCAN_RODATA) = {\n\t{ 0 },");
+ 	for (const auto &[key, widths] : ids) {
+@@ -1356,14 +1382,11 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 	for (unsigned i = 0; i < index.size(); i += 16) {
+ 		std::printf("\t");
+ 		for (unsigned j = 0; j < 16; ++j)
+-			if (index[i+j] == 130 || index[i+j] == 131)
+-				std::printf("%s%s,", j ? " " : "", index[i+j] == 130 ? "EVEX_SCAN_PACKED" : "EVEX_SCAN_ALIGNED");
+-			else
+-				std::printf("%s%u,", j ? " " : "", index[i + j]);
++			std::printf("%s%u,", j ? " " : "", index[i + j]);
+ 		std::putchar('\n');
+ 	}
+ 	std::puts("};");
+-	emit_evex_transfer_scan(decoder);
++	emit_evex_transfer_scan(decoder, index);
+ 	std::puts("static const uint8_t evex_transfer_lengths[32]\n\tX86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {\n\t6, 6, 6, 6, 0, 10, 6, 6,\n\t7, 7, 7, 7, 8, 7, 7, 7,\n\t10, 10, 10, 10, 11, 10, 10, 10,\n\t6, 6, 6, 6, 6, 6, 6, 6,\n};");
+ }
  
- 	if (result) {
- 		printf("All tests passed.\n");

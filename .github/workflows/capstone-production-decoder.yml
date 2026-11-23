@@ -1,7 +1,7 @@
-name: Verify 64-bit EVEX packed move scans in NeverD built with the latest forked LLVM
+name: Measure CMOV output and generated EVEX prefix classes with the production NeverD decoder
 on:
   push:
-    branches: [codex/neverd-evex-packed-scan]
+    branches: [codex/neverd-cmov-and-evex-prefix-classes]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 0f37c6fce07b12454b8d91cc5de87843ff4c41b2
+          ref: bed28203c2dd222c5209e151fbd4a4c9ffe71c35
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "0f37c6fce07b12454b8d91cc5de87843ff4c41b2"
+          test "$(git rev-parse HEAD)" = "bed28203c2dd222c5209e151fbd4a4c9ffe71c35"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "567e62d3ff038035ea62ac460cc894f480065bee"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 567e62d3ff038035ea62ac460cc894f480065bee
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-moves-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: cmov-evex-classes-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
