@@ -1,7 +1,7 @@
-name: Measure shared x86 implicit records with corrected legacy writes and compare PE and cross-architecture output
+name: Measure complete x86 operand-access classes and legacy vector writes on real PE and ELF details
 on:
   push:
-    branches: [codex/x86-implicit-details-owned-table]
+    branches: [codex/x86-explicit-operand-classes]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: shared-implicit-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: explicit-operand-classes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
