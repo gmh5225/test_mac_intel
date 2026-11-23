@@ -1,7 +1,7 @@
-name: Isolate compressed RISC-V printer stack costs with static same-image and shared-library controls
+name: Validate one alias lookup for successfully expanded RISC-V opcodes against canonical decoder records
 on:
   push:
-    branches: [codex/riscv-print-frame-same-image]
+    branches: [codex/riscv-expanded-alias-owners]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-frame-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-expanded-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

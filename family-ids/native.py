@@ -44,6 +44,7 @@ def measure(t):
             if k!='base':
                 patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
             run(profile+k+'-config',config(b,arch,extra))
+            if profile=='full' and k=='width':run('alias-projection',['python3','-B',source/'suite/synctools/alias_pattern_rows.py','--check'])
             run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else [])])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
