@@ -1,8 +1,8 @@
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..5f7682dd 100644
+index 8d827a97..da1dceeb 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,12 +30,21 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,12 +30,36 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -20,19 +20,54 @@ index 8d827a97..5f7682dd 100644
 +#include "../../cs_priv.h"
 +/* Dedicated Linux builds already try this writer in the common decoder. */
 +#define CAPSTONE_X86_BULK_OUTPUT
++CAPSTONE_INTERNAL bool X86_tryRecord32(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size);
++CAPSTONE_INTERNAL bool X86_tryRecord64(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size);
 +CAPSTONE_INTERNAL bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code,
 +					size_t size, cs_insn *insn,
 +					uint16_t *insn_size);
++/* The scan path has already been considered. Public array ownership and
++ * skip-data semantics stay in the caller when a fixed writer declines. */
++static inline bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code,
++				      size_t size, cs_insn *insn,
++				      uint16_t *insn_size)
++{
++	return handle->arch == CS_ARCH_X86 && size && !handle->no_text &&
++	       X86_tryBulkOutput(handle, code, size, insn, insn_size);
++}
 +#endif
 +#endif
  
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..216b51d4 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3755,10 +3755,15 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 
+ #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
++#elif defined(CAPSTONE_X86_BULK_OUTPUT)
++#define CS_DECODE_TRY_OUTPUT X86_tryPublicOutput
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
++#ifdef CS_DECODE_TRY_OUTPUT
++#undef CS_DECODE_TRY_OUTPUT
++#endif
+ #ifdef CS_DECODE_OUTPUT_MISS
+ #undef CS_DECODE_OUTPUT_MISS
+ #endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..07fa8e88 100644
+index cec4bec6..4b601820 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -15,6 +15,16 @@
+@@ -15,6 +15,20 @@
  
  #include "X86SimpleOutputImpl.h"
  
@@ -41,19 +76,73 @@ index cec4bec6..07fa8e88 100644
 +		       cs_insn *insn, uint16_t *insn_size)
 +{
 +	/* A custom detail allocator may change the option mid-record. */
-+	return (!insn->detail || handle->detail_opt) &&
-+	       X86_trySimpleOutput(handle, code, size, insn, insn_size);
++	if (insn->detail && !handle->detail_opt)
++		return false;
++	if (handle->mode == CS_MODE_64)
++		return X86_tryRecord64(handle, code, size, insn, insn_size);
++	return handle->mode == CS_MODE_32 &&
++	       X86_tryRecord32(handle, code, size, insn, insn_size);
 +}
 +#endif
 +
  #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
  #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
  #endif
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..f374d2ad 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -256,6 +256,13 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++bool X86_tryRecord64(cs_struct *handle, const uint8_t *code, size_t size,
++		     cs_insn *insn, uint16_t *insn_size)
++{
++	return tryOutput64(handle, code, size, insn, insn_size);
++}
++#endif
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
+ #define CS_DECODE_TRY_OUTPUT tryOutput64
+ #include "../../cs_disasm_internal.h"
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..d759b6fd 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -195,6 +195,13 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++bool X86_tryRecord32(cs_struct *handle, const uint8_t *code, size_t size,
++		     cs_insn *insn, uint16_t *insn_size)
++{
++	return tryOutput32(handle, code, size, insn, insn_size);
++}
++#endif
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
 diff --git a/cs.c b/cs.c
-index ede7c2aa..04f5d701 100644
+index ede7c2aa..e7d27a2d 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -996,7 +996,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -969,7 +969,13 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ }
+ #endif
+ 
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++#define CS_DECODE_TRY_OUTPUT X86_tryPublicOutput
++#endif
+ #include "cs_disasm_internal.h"
++#ifdef CS_DECODE_TRY_OUTPUT
++#undef CS_DECODE_TRY_OUTPUT
++#endif
+ 
+ /* Keep the generic copy specialized without the private x86 length checks. */
+ #if defined(__GNUC__)
+@@ -996,7 +1002,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  
  #ifndef CAPSTONE_DIET
  	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
@@ -62,7 +151,7 @@ index ede7c2aa..04f5d701 100644
  	size_t off = 0;
  	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
  	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
-@@ -1011,6 +1011,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -1011,6 +1017,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  		off++;
  	const char *operands = OS->buffer + off;
  	if (stream_length_valid) {
@@ -70,7 +159,7 @@ index ede7c2aa..04f5d701 100644
  #ifdef CS_MIPS_VISIBLE_OPERANDS
  		/* MIPS can remove the MIPS16 comment or a '$' after printing.
  		 * Both edits shorten the visible string without moving the cursor. */
-@@ -1041,9 +1042,9 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -1041,9 +1048,9 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  			insn->op_str[0] = operands[0];
  		}
  	} else {
@@ -83,20 +172,3 @@ index ede7c2aa..04f5d701 100644
  	}
  
  	// we might have customized mnemonic
-@@ -1107,9 +1108,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- #endif
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
--	if (handle->arch == CS_ARCH_X86)
-+	if (handle->arch == CS_ARCH_X86) {
-+#ifdef CAPSTONE_X86_BULK_OUTPUT
-+		if (size && !handle->no_text &&
-+		    X86_tryBulkOutput(handle, code, size, insn, insn_size))
-+			return true;
-+#endif
- 		MCInst_InitX86(&mci);
--	else
-+	} else
- #endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)

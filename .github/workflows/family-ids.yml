@@ -1,7 +1,7 @@
-name: Measure public operand copies and ARM constructed-operand initialization with x86 scalar writers
+name: Compare width-specific writers at the public call site and shared decoder with real array and iterator records
 on:
   push:
-    branches: [codex/public-operand-copy-and-padding]
+    branches: [codex/x86-public-records-width-selection]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: public-operand-copy-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-width-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

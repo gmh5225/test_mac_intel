@@ -1,0 +1,118 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..7d940a22 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,12 +30,27 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
+ 
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
+-	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
+ #endif
++#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
++#include "../../cs_priv.h"
++/* Dedicated Linux builds already try this writer in the common decoder. */
++#define CAPSTONE_X86_BULK_OUTPUT
++CAPSTONE_INTERNAL bool X86_tryRecord32(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size);
++CAPSTONE_INTERNAL bool X86_tryRecord64(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size);
++CAPSTONE_INTERNAL bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code,
++					size_t size, cs_insn *insn,
++					uint16_t *insn_size);
++#endif
++#endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..4b601820 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -15,6 +15,20 @@
+ 
+ #include "X86SimpleOutputImpl.h"
+ 
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size)
++{
++	/* A custom detail allocator may change the option mid-record. */
++	if (insn->detail && !handle->detail_opt)
++		return false;
++	if (handle->mode == CS_MODE_64)
++		return X86_tryRecord64(handle, code, size, insn, insn_size);
++	return handle->mode == CS_MODE_32 &&
++	       X86_tryRecord32(handle, code, size, insn, insn_size);
++}
++#endif
++
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+ #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
+ #endif
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..f374d2ad 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -256,6 +256,13 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++bool X86_tryRecord64(cs_struct *handle, const uint8_t *code, size_t size,
++		     cs_insn *insn, uint16_t *insn_size)
++{
++	return tryOutput64(handle, code, size, insn, insn_size);
++}
++#endif
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
+ #define CS_DECODE_TRY_OUTPUT tryOutput64
+ #include "../../cs_disasm_internal.h"
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..d759b6fd 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -195,6 +195,13 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++bool X86_tryRecord32(cs_struct *handle, const uint8_t *code, size_t size,
++		     cs_insn *insn, uint16_t *insn_size)
++{
++	return tryOutput32(handle, code, size, insn, insn_size);
++}
++#endif
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
+diff --git a/cs.c b/cs.c
+index ede7c2aa..d31bf34d 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1107,9 +1107,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#ifdef CAPSTONE_X86_BULK_OUTPUT
++		if (size && !handle->no_text &&
++		    X86_tryBulkOutput(handle, code, size, insn, insn_size))
++			return true;
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
