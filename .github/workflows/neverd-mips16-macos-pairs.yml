@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: b25a1eee3cc2be05e02530f439d730e4d5df032c
+          ref: f1b8458fdccaa29f03788a7e40e5d3809f7f766f
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
@@ -22,9 +22,9 @@ jobs:
       - run: brew install cmake ninja lld
       - name: Build the same Release decoder
         run: |
-          test "$(git rev-parse HEAD)" = b25a1eee3cc2be05e02530f439d730e4d5df032c
+          test "$(git rev-parse HEAD)" = f1b8458fdccaa29f03788a7e40e5d3809f7f766f
           git submodule update --init --depth 1 third_party/capstone third_party/unicorn signatures
-          test "$(git -C third_party/capstone rev-parse HEAD)" = 79f474ac7714f11d216a4d85208fed8121055369
+          test "$(git -C third_party/capstone rev-parse HEAD)" = ba03305d2a6423b1689bfa9f3206c889898c59c2
           cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON
           python scripts/build.py build-check --config Release --parallel 4 --target neverd-mips-bench
       - name: Time twelve ABBA and BAAB blocks for both byte orders and corpora
@@ -91,6 +91,6 @@ jobs:
           python "$RUNNER_TEMP/mips16-timing.py" build-check/bin/neverd-mips-bench evidence/pairs.json 12
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: paired-mips16-macos-b25a1eee3cc2be05e02530f439d730e4d5df032c
+          name: paired-mips16-macos-f1b8458fdccaa29f03788a7e40e5d3809f7f766f
           path: evidence/
           retention-days: 7
