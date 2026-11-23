@@ -10,16 +10,16 @@ index 00000000..564f83ae
 +	{ 687, "shrd", "", UINT64_C(18691697672222), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 2, 3, 1, { { 0, 4, 3 }, { 0, 4, 1 } } },
 +};
 diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index ee9b645b..d8169ca1 100644
+index ee9b645b..ead0d8c7 100644
 --- a/arch/X86/X86RegisterFallback32.c
 +++ b/arch/X86/X86RegisterFallback32.c
-@@ -14,8 +14,44 @@
- #include "X86OutputOptions.h"
- #include "X86RegisterImmediateOutput.h"
+@@ -16,6 +16,46 @@
  #include "X86GenTest32Registers.inc"
-+#include "X86GenDoubleShift32.inc"
  #include "../../cs_disasm_internal.h"
  
++#ifdef CAPSTONE_X86_ONLY
++#include "X86GenDoubleShift32.inc"
++
 +/* The caller checked the complete 0F A4/AC register encoding. */
 +static void writeDoubleShift32(const uint8_t *code, cs_insn *insn,
 +			       uint16_t *insn_size)
@@ -55,18 +55,22 @@ index ee9b645b..d8169ca1 100644
 +	}
 +}
 +
++#endif
++
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
  			     size_t size, cs_insn *insn, uint16_t *insn_size,
-@@ -34,6 +70,11 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+@@ -34,6 +74,13 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
  			return true;
  		}
  	}
++#ifdef CAPSTONE_X86_ONLY
 +	if (opcode == 0x0f && size >= 4 && (code[1] & 0xf7) == 0xa4 &&
 +	    code[2] >= 0xc0 && !X86_OUTPUT_UNSUPPORTED(handle, false)) {
 +		writeDoubleShift32(code, insn, insn_size);
 +		return true;
 +	}
++#endif
  	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
  #endif
