@@ -1,7 +1,7 @@
-name: Compare EVEX scan handling and ordinary x86 output with both iced formatters
+name: Compare the AArch64 EVEX scan reader with iced and verify unchanged x86-64 executables
 on:
   push:
-    branches: [codex/evex-scan-packed-moves-iced]
+    branches: [codex/aarch64-linux-evex-move-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,8 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 567e62d3ff038035ea62ac460cc894f480065bee
+          ref: eda656187b91970987b016629023b894bf83ce2f
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 0f37c6fce07b12454b8d91cc5de87843ff4c41b2
+          ref: 67dc5459e38411aecbb1c10e6372cc005ffc2f96
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-scan-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm-evex-move-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
