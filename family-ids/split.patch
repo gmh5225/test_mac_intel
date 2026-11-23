@@ -1,0 +1,50 @@
+diff --git a/cs.c b/cs.c
+index ede7c2aa..895b6158 100644
+--- a/cs.c
++++ b/cs.c
+@@ -980,7 +980,19 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 			     PostPrinter_t postprinter, const uint8_t *code,
+ 			     bool stream_length_valid)
+ {
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && !defined(CAPSTONE_DIET)
++	const char *text = OS->buffer;
++	if (!postprinter && !stream_length_valid) {
++		while (*text == ' ' || *text == '\t')
++			++text;
++	} else
++		SStream_trimls(OS);
++#else
+ 	SStream_trimls(OS);
++#ifndef CAPSTONE_DIET
++	const char *text = OS->buffer;
++#endif
++#endif
+ 	// Copy only decoded instruction bytes before the postprinter observes them.
+ 	uint16_t copy_size = copy_insn_bytes(insn, code, false);
+ 	insn->op_str[0] = '\0';
+@@ -998,18 +1010,18 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
+ 	memset(insn->op_str, '\0', sizeof(insn->op_str));
+ 	size_t off = 0;
+-	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
+-	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
+-		char c = OS->buffer[off];
++	while (off < sizeof(insn->mnemonic) - 1 && text[off] &&
++	       text[off] != ' ' && text[off] != '\t') {
++		char c = text[off];
+ 		insn->mnemonic[off] = c == '|' ? ' ' : c;
+ 		off++;
+ 	}
+-	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
+-	       OS->buffer[off] != '\t')
++	while (text[off] && text[off] != ' ' &&
++	       text[off] != '\t')
+ 		off++;
+-	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
++	while (text[off] == ' ' || text[off] == '\t')
+ 		off++;
+-	const char *operands = OS->buffer + off;
++	const char *operands = text + off;
+ 	if (stream_length_valid) {
+ #ifdef CS_MIPS_VISIBLE_OPERANDS
+ 		/* MIPS can remove the MIPS16 comment or a '$' after printing.

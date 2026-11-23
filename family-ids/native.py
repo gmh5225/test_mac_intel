@@ -36,7 +36,7 @@ try:
         f=t/('libmvec.text'if n.startswith('libmvec')else'putty-0.85-'+str(v['bits'])+'.text');assert sha(f)==v['sha256']
         cases[n]=(f,str(v['bits']),v['address'])
     manifest=rd(r/'corpus-manifest.json')
-    for n,arch in [('mips64el-ls','mips64el'),('arm64-ls','arm64')]:
+    for n,arch in [(arch+'-'+cmd,arch)for arch in ('mips64el','arm64')for cmd in ('ls','cp','sort')]:
         v,=[e for e in manifest['inputs']if e['name']==n];deb=t/(n+'.deb');run('download-'+n,'curl','-fsSL','--retry','3','--max-time','100',v['url'],'-o',deb);assert sha(deb)==v['package_sha256']
         raw=corpus.deb_binary(deb,v['command'],v.get('member'));body=corpus.elf_text(raw);f=t/(n+'.text');f.write_bytes(body);assert sha(f)==v['text_sha256'];deb.unlink()
         hdr=struct.unpack_from('<16sHHIQQQIHHHHHH',raw);secs=[struct.unpack_from('<IIQQQQIIQQ',raw,hdr[6]+i*hdr[11])for i in range(hdr[12])];sect,=[v for v in secs if v[5]==len(body)and raw[v[4]:v[4]+v[5]]==body]
