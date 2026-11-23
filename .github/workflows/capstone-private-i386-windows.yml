@@ -1,7 +1,7 @@
-name: Check masked transfers and mode-dependent implicit writes across four native platforms and configurations
+name: Check four x86 formatter changes against the released public iterator on Windows and macOS
 on:
   push:
-    branches: [codex/portable-mask-and-implicit-writes]
+    branches: [codex/portable-after-public-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
+          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: masked-implicit-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: shipped-records-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
