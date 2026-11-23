@@ -1,7 +1,7 @@
-name: Measure direct formatting from the original SystemZ register-name strings across nine real architectures
+name: Check register dialect correction and dedicated specialization against nine other architectures
 on:
   push:
-    branches: [codex/systemz-native-name-append]
+    branches: [codex/systemz-dialects-mixed-readers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: systemz-name-append-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: systemz-mixed-spelling-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

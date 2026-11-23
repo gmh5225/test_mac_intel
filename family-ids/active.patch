@@ -29,28 +29,33 @@ index e0409109..0323e70d 100644
  	}
  }
 diff --git a/arch/SystemZ/SystemZInstPrinter.c b/arch/SystemZ/SystemZInstPrinter.c
-index ee9eb18e..487c0f1d 100644
+index ee9eb18e..b242ccd6 100644
 --- a/arch/SystemZ/SystemZInstPrinter.c
 +++ b/arch/SystemZ/SystemZInstPrinter.c
-@@ -149,12 +149,13 @@ static void printMCOperand(const MCInst *MI, const MCOperand *MO, SStream *O)
+@@ -149,12 +149,16 @@ static void printMCOperand(const MCInst *MI, const MCOperand *MO, SStream *O)
  void printFormattedRegName(const MCAsmInfo *MAI, MCRegister Reg, SStream *O)
  {
  	const char *RegName = getRegisterName(Reg);
 -	if (MAI->assemblerDialect == SYSTEMZASMDIALECT_AD_ATT) {
-+	if (MAI->assemblerDialect == SYSTEMZASMDIALECT_AD_HLASM) {
- 		// Skip register prefix so that only register number is left
- 		CS_ASSERT((isalpha(RegName[0]) && isdigit(RegName[1])));
- 		SStream_concat0(markup_OS(O, Markup_Register), (RegName + 1));
+-		// Skip register prefix so that only register number is left
+-		CS_ASSERT((isalpha(RegName[0]) && isdigit(RegName[1])));
+-		SStream_concat0(markup_OS(O, Markup_Register), (RegName + 1));
 -	} else
--		SStream_concat1(markup_OS(O, Markup_Register), '%');
-+		return;
++	if (MAI->assemblerDialect == SYSTEMZASMDIALECT_AD_HLASM) {
++#ifndef CAPSTONE_DIET
++		/* HLASM prints the number without its register class. */
++		CS_ASSERT(isalpha((unsigned char)RegName[0]) &&
++			  isdigit((unsigned char)RegName[1]));
++		++RegName;
++#endif
++	} else {
+ 		SStream_concat1(markup_OS(O, Markup_Register), '%');
 +	}
-+	SStream_concat1(markup_OS(O, Markup_Register), '%');
  	SStream_concat0(markup_OS(O, Markup_Register), RegName);
  }
  
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 92e01e07..2d0e4028 100644
+index 34635d83..9c9d3650 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
 @@ -13,6 +13,9 @@ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT

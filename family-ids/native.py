@@ -9,13 +9,14 @@ def cmd(n,a,cwd=None):
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['parent']
+t=Path(tempfile.mkdtemp());b=t/'build';base_meta=load(d/'base-tree.json');assert g('rev-parse','HEAD')==base_meta['parent'] and base_meta['commit']==meta['parent']
+base_patch=d/'base.patch';assert sha(base_patch)==base_meta['sha256'];g('apply','--index',str(base_patch));baseline=g('write-tree');assert baseline==base_meta['tree']
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
     for k in ('base','active','indexed'):
         if k!='base':
-            g('restore','--source','HEAD','--staged','--worktree','--','.')
+            g('restore','--source',baseline,'--staged','--worktree','--','.')
             selected=load(d/'active-tree.json') if k=='active' else meta
             patch=d/('active.patch' if k=='active' else 'candidate.patch')
             assert sha(patch)==selected['sha256'];g('apply','--index',str(patch));assert g('write-tree')==selected['tree']
@@ -73,7 +74,7 @@ try:
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
             cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
-    assert ids['base']!=ids['indexed']
+    assert ids['active']==ids['indexed'] and ids['base']!=ids['indexed']
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
