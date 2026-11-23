@@ -1,7 +1,7 @@
-name: Verify SPARC operand construction on Windows and macOS with four real programs
+name: Verify MIPS standard scan records and visible operands on Windows and macOS with four real programs
 on:
   push:
-    branches: [codex/portable-sparc-operand-storage]
+    branches: [codex/portable-mips-primary-output]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: sparc-operand-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mips-primary-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
