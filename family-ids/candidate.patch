@@ -1,20 +1,25 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6f3ff5f..749714fe 100644
+index d6f3ff5f..adfa7583 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1070,6 +1070,12 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+@@ -1070,8 +1070,15 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
      add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
      target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
      set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-+    if(CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
-+       AND NOT capstone_enabled_architectures STREQUAL "X86"
-+       AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE)
-+        set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS CAPSTONE_X86_LINKED_TEXT_ITERATORS)
-+    endif()
-     if(capstone_enabled_architectures STREQUAL "X86")
-         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+-    if(capstone_enabled_architectures STREQUAL "X86")
+-        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++    if(capstone_enabled_architectures STREQUAL "X86" OR
++       (CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
++        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
++        if(capstone_enabled_architectures STREQUAL "X86")
++            target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++        else()
++            set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY
++                COMPILE_DEFINITIONS CAPSTONE_X86_LINKED_TEXT_ITERATORS)
++        endif()
          set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+             $<TARGET_OBJECTS:capstone_x86_native>)
 diff --git a/Makefile b/Makefile
 index 8118f71d..7576144f 100644
 --- a/Makefile
