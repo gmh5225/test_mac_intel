@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,re,os,platform,random,shutil,subprocess as sp,tempfile
+import hashlib,json,re,shlex,os,platform,random,shutil,subprocess as sp,tempfile
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
 def load(p):return json.loads(p.read_text())
 def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
@@ -24,14 +24,22 @@ try:
         assert len(order)==len(obj)>55 and 'XtensaDisassembler.c.o' in order
         if k=='base':base_obj=obj;base_order=order
         else:
-            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'X86RegisterFallback32.c.o'}
+            assert {n for n in obj if base_obj.get(n)!=obj[n]}=={'SStream.c.o'}
             assert [n for n in obj if n in base_obj]==base_order
         save('objects-'+k,dict(members=obj,order=order))
         normal=t/'public-only'
         cmd('normal-'+k,['c++','-std=c++17','-O3','-no-pie','-I',s/'include',d/'time.cpp',lib,'-lm','-o',normal])
         normal_hash=sha(normal);save('public-'+k,dict(sha256=normal_hash))
         if k=='base':normal_base=normal_hash
-        else:assert normal_hash==normal_base
+        else:assert normal_hash!=normal_base
+        # Count at the actual stream writer, including calls from its own translation unit.
+        tu=next(z for z in load(b/'compile_commands.json')if z['file'].endswith('/SStream.c'))
+        cmdline=shlex.split(tu['command']);cmdline[cmdline.index('-o')+1]=str(t/'count.o')
+        body=Path(tu['file']).read_text();loc=body.index('{',body.index('void SStream_concat_hex64('))+1
+        body='unsigned long long observed_hex_lengths[16];'+chr(10)+body[:loc]+chr(10)+'++observed_hex_lengths[(63u-__builtin_clzll(value | 1ULL))/4];'+chr(10)+body[loc:]
+        candidate=t/'count.c';candidate.write_text(body);cmdline[cmdline.index(tu['file'])]=str(candidate)
+        cmd('compile-counter-'+k,cmdline+['-I',s],cwd=tu['directory'])
+        cmd('link-counter-'+k,['c++','-O2','-DTIMED_PRIVATE_READERS','-DHEX_COUNTS','-I',s/'include',d/'time.cpp',t/'count.o',lib,'-lm','-o',t/('count-'+k)])
         stages=[k]
         for stage in stages:
             forced=['-DTIMED_PRIVATE_READERS']
@@ -95,7 +103,11 @@ try:
         target.write_bytes(imgs[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(arch),str(mode),path,str(ip),str(n)],text=True).split()))
     for name,arch,path,ip,modes in panels:
         for mode in modes:
-            one=invoke('base',arch,mode,path,ip,1);n=max(1,round(65e6/one[0]));rows_=[]
+            counts={stage:list(map(int,sp.check_output([t/('count-'+stage),str(arch),str(mode),path,str(ip),'1']).split()))for stage in ('base','candidate')}
+            assert len(counts['base'])==17 and counts['candidate']==counts['base'],(name,mode,counts)
+            one=invoke('base',arch,mode,path,ip,1);assert one[2]==counts['base'][0]
+            save('hex-'+name+'-'+str(mode),dict(signature=one[2],digit_counts=counts['base'][1:]))
+            n=max(1,round(65e6/one[0]));rows_=[]
             for i in range(21):
                 order=list(imgs);rng.shuffle(order);cyc={k:[]for k in order}
                 for k in order+order[::-1]:
