@@ -117,9 +117,9 @@ def main(w):
         objects[key]={p.name:sha(p)for p in build.rglob('*.c.o')if '/tests/' not in str(p)}
         if key in ('single','project'):
             parent='release' if key=='project'else 'official'
-            a,b=objects[parent],objects[key];assert a.keys()==b.keys()
+            a,b=objects[parent],objects[key];assert a.keys()<=b.keys() and (b.keys()-a.keys())==({'X86PublicOutput.c.o'} if key=='single' else set())
             changed=[n for n in a if a[n]!=b[n]]
-            allowed={'X86DisassemblerDecoder.c.o','X86OutputIterator.c.o'}
+            allowed={'X86DisassemblerDecoder.c.o'}
             if key=='project':assert not changed,changed
             else:assert set(changed)==allowed,changed
             save('archive-'+key+'.json',dict(baseline=parent,all_members=len(a),changed=changed,objects=[a,b]))
@@ -154,6 +154,17 @@ def main(w):
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
+        if key in ('official','single'):
+            names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_decodePublicRecord','X86_scanNativeBatch'}
+            linked={}
+            for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
+                cols=line.split()
+                if len(cols)!=3 or cols[1] not in ('t','T'):continue
+                n=cols[2][1:]if darwin and cols[2].startswith('_')else cols[2]
+                if n in names:linked[n]=int(cols[0],16)
+            assert {'X86_disasmIter32','X86_disasmIterText','cs_disasm_iter','X86_scanNativeBatch'}<=linked.keys()
+            assert ('X86_decodePublicRecord' in linked)==(key=='single')
+            save('linked-'+key+'.json',linked)
         if key=='project':
             run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-c',r/'second.c','-o',w/'plan.o'],'link-plans')
             for name in ('rounded','shift','mandatory','vex3'):

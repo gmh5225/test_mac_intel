@@ -1,7 +1,7 @@
-name: Compare pure public and private iterator output with identical fixed writer objects
+name: Measure late public x86 dispatch and capture the linked public and private entry addresses
 on:
   push:
-    branches: [codex/canonical-iterators-in-cold-public-record]
+    branches: [codex/public-x86-record-separate-object]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d403a0db2350943babe53b15cdd5b9619d34ea
+          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 94c4b304eb3e0d95dffde5db8272c073b1bfc714
+          ref: f0a3d31ab59b5a7f2dbae69e1f4fe573a693c451
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: identical-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-record-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
