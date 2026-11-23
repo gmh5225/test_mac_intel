@@ -1,7 +1,7 @@
-name: Compare single-write vector operands with the released readers and fork iced
+name: Compare local vector register names across PE and ELF readers and fork iced
 on:
   push:
-    branches: [codex/vector-register-and-separator]
+    branches: [codex/vector-register-names-one-writer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 611e77b790a261443a2ba9c805cbfe125a4e72e1
+          ref: 83dc20e512ed43a9fcf5994ba585f85c7d9b2f20
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-operand-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-register-table-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
