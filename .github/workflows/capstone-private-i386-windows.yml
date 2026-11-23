@@ -1,7 +1,7 @@
-name: Check generated XCore fixed operands against full and DIET detail records
+name: Verify XCore live operands with poisoned unused slots and alternate callbacks
 on:
   push:
-    branches: [codex/xcore-generated-operand-details]
+    branches: [codex/xcore-constructed-operands]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-generated-operands-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-constructed-operands-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

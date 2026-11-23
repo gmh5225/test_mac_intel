@@ -44,6 +44,23 @@ try:
                     literal=t/'literal.bin';literal.write_bytes(bytes((0x00,0xf0,0x49,0x7f)))
                     assert run('literal-'+str(flags),exe,str(flags),literal)=='ldaw r11, cp[9]\tR,r11;M,cp,,9,1;' 
         if k=='base':assert rows['1'][2]==2920
+    if sys.platform.startswith('linux'):
+        # Fill unconstructed slots after the partial initializer. A changed public field
+        # or a changed callback's input would expose any read of one of those slots.
+        file=s/'MCInst.h';original=file.read_text();needle='const size_t operands_end =';assert original.count(needle)==1
+        for fill in (0x5a,0xa5):
+            file.write_text(original.replace(needle,
+                'memset(inst->Operands + 1, '+str(fill)+', sizeof(inst->Operands) - sizeof(inst->Operands[0]));\\n\\t\\t'+needle))
+            run('poison-build-'+str(fill),'cmake','--build',b,'--target','capstone_static','--parallel','4')
+            run('poison-link','cc','-std=c11','-O2','-I',s/'include',r/'records.c',b/'libcapstone.a','-o',exe)
+            for flag in (1,2,14):
+                record=list(map(int,run('poison-'+str(fill)+'-'+str(flag),exe,str(flag)).split()))
+                assert record==results['candidate'][str(flag)]
+            if profile=='full':
+                hook=t/'callbacks'
+                run('callback-link','cc','-std=c11','-O2','-DCAPSTONE_HAS_XCORE','-I',s,'-I',s/'include',r/'callbacks.c',b/'libcapstone.a','-o',hook)
+                assert run('callback-'+str(fill),hook)=='6 0'
+        file.write_text(original)
     put('complete',dict(source=q,units=units,profile=profile,static=True,shared=True,official_fixture=fixture_target,rows=results))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);put('cleanup',dict(removed=not t.exists(),bytes=n))
