@@ -1,7 +1,7 @@
-name: Compare prefix-gated Linux AMD64 fallback with fork iced on PE32 PE64 and ELF across four hosts
+name: Compare canonical VEX row sharing with iced on PuTTY, OpenSSL, libjpeg and glibc
 on:
   push:
-    branches: [codex/complete-prefix-route-iced]
+    branches: [codex/shared-vex-memory-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-vex-prefix-gate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-vex-register-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

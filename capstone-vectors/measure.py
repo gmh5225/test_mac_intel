@@ -163,10 +163,10 @@ def main(w):
         if key==orig:base_orders[orig]=members
         expected=base_orders[orig]
         active_tail=mixed and not darwin and kind=='bare'
-        assert members==expected+(['X86VexBaseMemory.c.o'] if active_tail else []),(key,members,expected)
+        assert members==expected,(key,members,expected)
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         if kind=='bare':
-            assert changed==(['X86VectorFallback64.c.o','X86VexBaseMemory.c.o'] if active_tail else []),(key,changed)
+            assert changed==(['X86VectorFallback64.c.o','X86VectorOutput.c.o'] if active_tail else []),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
