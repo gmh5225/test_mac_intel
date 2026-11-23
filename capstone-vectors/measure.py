@@ -166,7 +166,7 @@ def main(w):
             source_file=Path(unit['file']).resolve();body=source_file.read_text()
             marker='return writeVectorRegisters(code, insn, insn_size, row, prefix, ll,'
             assert body.count(marker)==1
-            body='unsigned long long bare_opcode_hits[256];\\n'+body.replace(marker,'++bare_opcode_hits[code[prefix]];\\n\\t'+marker)
+            body='unsigned long long bare_opcode_hits[256];'+chr(10)+body.replace(marker,'++bare_opcode_hits[code[prefix]];'+chr(10)+chr(9)+marker)
             counted=w/'actual-fallback.c';counted.write_text(body)
             command=shlex.split(unit['command']);command[command.index('-o')+1]=str(w/'instrumented.o')
             command[command.index('-c')+1]=str(counted)
