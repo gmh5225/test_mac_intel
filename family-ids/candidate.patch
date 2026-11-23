@@ -1,33 +1,31 @@
-diff --git a/MCAsmInfo.h b/MCAsmInfo.h
-index a059aaf5..e3b6d2d9 100644
---- a/MCAsmInfo.h
-+++ b/MCAsmInfo.h
-@@ -8,8 +8,10 @@
- #define CS_MCASMINFO_H
- 
- typedef enum {
--	SYSTEMZASMDIALECT_AD_ATT = 0,
--	SYSTEMZASMDIALECT_AD_HLASM = 1,
-+	/* An all-zero MCAsmInfo uses the target's default syntax. */
-+	MCASMDIALECT_DEFAULT = 0,
-+	SYSTEMZASMDIALECT_AD_ATT,
-+	SYSTEMZASMDIALECT_AD_HLASM,
- } MCAsmInfoAssemblerDialect;
- 
- typedef struct {
 diff --git a/MCInst.h b/MCInst.h
-index e0409109..0323e70d 100644
+index e0409109..7e239309 100644
 --- a/MCInst.h
 +++ b/MCInst.h
-@@ -238,7 +238,7 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
- 	default:
- 		break;
- 	case CS_ARCH_SYSTEMZ:
+@@ -220,6 +220,8 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
+ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+ 				      bool clear_operands)
+ {
++	/* The zero-initialized SystemZ dialect is GNU. */
++	(void)arch;
+ 	if (clear_operands) {
+ 		memset(inst, 0, sizeof(*inst));
+ 	} else {
+@@ -233,14 +235,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+ 	/* All zero-valued defaults are established by the clear above. */
+ 	memset(inst->tied_op_idx, -1, sizeof(inst->tied_op_idx));
+ 
+-	// Set default assembly dialect.
+-	switch (arch) {
+-	default:
+-		break;
+-	case CS_ARCH_SYSTEMZ:
 -		inst->MAI.assemblerDialect = SYSTEMZASMDIALECT_AD_HLASM;
-+		inst->MAI.assemblerDialect = SYSTEMZASMDIALECT_AD_ATT;
- 		break;
- 	}
+-		break;
+-	}
  }
+ 
+ /* Private x86 decode state constructs operands before reading them. It does
 diff --git a/arch/SystemZ/SystemZInstPrinter.c b/arch/SystemZ/SystemZInstPrinter.c
 index ee9eb18e..33ef9e6c 100644
 --- a/arch/SystemZ/SystemZInstPrinter.c

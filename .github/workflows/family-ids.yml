@@ -1,7 +1,7 @@
-name: Verify dedicated SystemZ register spelling with four real programs and full stream comparisons
+name: Measure the zero-initialized GNU dialect and HLASM number spelling in real SystemZ binaries
 on:
   push:
-    branches: [codex/dedicated-s390x-coreutils]
+    branches: [codex/systemz-zero-default-registers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
+          ref: aa095ef5688bfc49b8ba0c5e5a7648faa7ed6877
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-systemz-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: zero-init-systemz-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

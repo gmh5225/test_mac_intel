@@ -9,9 +9,7 @@ def cmd(n,args):
     if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2000:]);z.check_returncode()
 def g(*args):return sp.check_output(['git','-C',s,*args],text=True).strip()
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-base_meta=json.loads((d/'base-tree.json').read_text())
-assert g('rev-parse','HEAD')==base_meta['parent'] and meta['parent']==base_meta['commit']
-patch=d/'base.patch';assert sha(patch)==base_meta['sha256'];g('apply','--index',str(patch));baseline=g('write-tree');assert baseline==base_meta['tree']
+assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}')
 
 try:
     images={};profiles={}
@@ -25,8 +23,8 @@ try:
             config=['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in architectures]]
             if profile=='diet':config.append('-DCAPSTONE_BUILD_DIET=ON')
             cmd(profile+'-config-'+k,config)
-            cmd(profile+'-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*(['register_descriptors']if profile!='diet'else [])])
-            if profile!='diet':cmd(profile+'-test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_register_descriptors$'])
+            cmd(profile+'-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*(['register_descriptors','mcinst']if profile!='diet'else [])])
+            if profile!='diet':cmd(profile+'-test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
             so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
             variants[k]=dict(shared=sha(so),objects={str(f.relative_to(b)):sha(f)for f in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')},archive=sha(b/'libcapstone.a'))
             if profile=='pure':
