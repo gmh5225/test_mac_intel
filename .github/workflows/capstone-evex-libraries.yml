@@ -1,7 +1,7 @@
-name: Measure late public x86 dispatch and capture the linked public and private entry addresses
+name: Retest public and private x86 readers for memory, mask and i386 records on six real binaries
 on:
   push:
-    branches: [codex/public-x86-record-separate-object]
+    branches: [codex/released-public-private-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 4abe412bdd16a5cbf2721ccfb6714219d7273126
+          ref: ba03305d2a6423b1689bfa9f3206c889898c59c2
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f0a3d31ab59b5a7f2dbae69e1f4fe573a693c451
+          ref: 8e00638c3faf294907b6118313ce068d77de1a43
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-record-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: released-reader-matrix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
