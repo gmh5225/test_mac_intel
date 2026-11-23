@@ -12,39 +12,6 @@
 extern "C" void census_reset();
 extern "C" int census_calls();
 #include <sstream>
-struct Bucket { size_t count{}; std::string first; };
-
-static void observe_miss(const cs_insn &insn, std::map<std::string, Bucket> &counts)
-{
-    const cs_x86 &x = insn.detail->x86;
-    std::ostringstream shape;
-    shape << insn.mnemonic << '\t';
-    const bool scalar = x.opcode[0] != 0x62 && x.opcode[0] != 0xc4 && x.opcode[0] != 0xc5;
-    const unsigned first = x.opcode[0], second = first == 0x0f ? x.opcode[1] : 0;
-    shape << first << '/' << second << '\t';
-    for (auto p : x.prefix) shape << unsigned(p) << '.';
-    shape << '\t' << unsigned(x.addr_size) << '/' << (x.rex ? (x.rex & 8 ? 2 : 1) : 0) << '\t';
-    if (x.encoding.modrm_offset) {
-        const unsigned mr=x.modrm, mod=mr>>6, rm=mr&7;
-        const char *kind=mod==3 ? "reg" : (rm==4 && x.addr_size!=2 ? "sib" : (mod==0 && rm==5 && x.addr_size!=2 ? "disp32" : "base"));
-        shape << kind << '/' << unsigned(x.encoding.disp_size);
-        if (scalar && (first==0x80 || first==0x81 || first==0x83 || first==0xf6 || first==0xf7 || first==0xff || first==0xc0 || first==0xc1))
-            shape << '/' << ((mr>>3)&7);
-    } else shape << "none";
-    shape << '\t' << unsigned(x.encoding.imm_size) << '\t';
-    for (unsigned i=0;i<x.op_count;i++) {
-        const auto &op=x.operands[i];
-        shape << unsigned(op.type) << '.' << unsigned(op.size) << '.' << unsigned(op.access) << '/';
-    }
-    auto &b=counts[shape.str()];
-    if (!b.count) {
-        static const char digits[]="0123456789abcdef";
-        for (unsigned i=0;i<insn.size;i++) {const unsigned v=insn.bytes[i];b.first+=digits[v>>4];b.first+=digits[v&15];}
-        b.first+='\t';b.first+=insn.op_str;
-    }
-    ++b.count;
-}
-
 int main(int argc, char **argv)
 {
 	if (argc != 5) return 1;
@@ -62,7 +29,7 @@ int main(int argc, char **argv)
 	auto next = bits == 64 ? X86_disasmIterText : X86_disasmIter32;
 	uint64_t ip;
 	size_t start, n;
-	std::map<std::string,Bucket> masks;
+	
 	size_t valid{}, invalid{}, misses{}, eligible{}, conflicting{}, records{};
 	while (spans >> start >> n >> ip) {
 		if (start > bytes.size() || n > bytes.size() - start) return 4;
@@ -89,12 +56,16 @@ int main(int argc, char **argv)
 					return 6;
 				}
 				valid++; misses += full; records++;
-				if(full) observe_miss(ref,masks);
+				if (full) {
+                    const cs_x86 &x=ref.detail->x86;
+                    bool sib=x.encoding.modrm_offset && x.addr_size!=2 && (x.modrm & 7)==4 && x.modrm<0xc0;
+                    rows<<records<<' '<<(p-bytes.data())<<' '<<ref.size<<' '<<unsigned(x.modrm)<<' '<<(sib?int(x.sib):-1)<<' '<<ref.mnemonic<<'\n';
+                    ++eligible;
+                }
 				p=after; n=left; ip=address;
 			} else { ++invalid; ++p; --n; ++ip; }
 		}
 	}
-	for(const auto &[key,b] : masks){rows<<key<<'\t'<<b.count<<'\t'<<b.first<<'\n';eligible+=b.count;}
 	std::printf("%zu %zu %zu %zu %zu %zu\n",valid,invalid,misses,eligible,conflicting,records);
 	cs_close(&fast);cs_close(&normal);
 }

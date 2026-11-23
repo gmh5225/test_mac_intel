@@ -1,7 +1,7 @@
-name: Measure actual fallback opcode and operand forms on six released PE and ELF text sections
+name: Verify exactly which real instructions leave the full decoder when scale-one SIBs reuse their base
 on:
   push:
-    branches: [codex/remaining-format-fallback-forms]
+    branches: [codex/measure-scale-one-sib-ownership]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: remaining-scalar-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scale-one-sib-coverage-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
