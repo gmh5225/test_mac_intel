@@ -1,7 +1,7 @@
-name: Benchmark public and specialized iterators against both iced formatters using six real x86 inputs
+name: Compare fixed-width public and private Capstone readers with the iced fork on six real x86 programs
 on:
   push:
-    branches: [codex/public-scalar-format-vs-iced]
+    branches: [codex/public-width-entries-vs-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6fbeffec215f3c7c79169c655b0928c616b46152
+          ref: 567e62d3ff038035ea62ac460cc894f480065bee
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: beaa8ca552ff8e8e4c9376d27d9305a3c51a17cb
+          ref: 0f37c6fce07b12454b8d91cc5de87843ff4c41b2
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-public-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-public-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

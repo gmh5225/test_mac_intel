@@ -167,13 +167,13 @@ def main(w):
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert set(changed)==({'cs.c.o','X86OutputIterator.c.o'} if active_tail else set()),(key,changed)
+            assert set(changed)==({'cs.c.o','X86OutputIterator.c.o','X86Vex32Output.c.o','X86Sse64Output.c.o'}|({'X86DisassemblerDecoder.c.o'} if mixed else set()) if active_tail else set()),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
-        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','cs_disasm_iter','cs_decode_full_insn','X86_tryBulkOutput','X86_decodePublicRecord','X86_scanNativeBatch'}
+        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','X86_tryRecord32','X86_tryRecord64','cs_disasm_iter','cs_decode_full_insn','X86_tryBulkOutput','X86_decodePublicRecord','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
             cols=line.split()
@@ -183,6 +183,8 @@ def main(w):
         assert ('X86_decodePublicRecord' in linked)==(not mixed)
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         assert ('X86_tryBulkOutput' in linked)==active_tail,(key,linked)
+        assert ('X86_tryRecord32' in linked)==active_tail,(key,linked)
+        assert ('X86_tryRecord64' in linked)==active_tail,(key,linked)
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
