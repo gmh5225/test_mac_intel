@@ -107,8 +107,8 @@ def main(w):
         objects[key]={p.name:sha(p)for p in build.rglob('*.c.o')if '/tests/' not in str(p)}
         assert objects[key].keys()==objects['base'].keys() and 'X86PublicOutput.c.o' in objects[key]
         changed=sorted(n for n,v in objects[key].items() if v!=objects['base'][n])
-        if key in ('masked','opcode'):
-            assert changed==[('X86VectorFallback64.c.o' if key=='masked' else 'X86MemoryFallback32.c.o')],changed
+        if key=='fixed':
+            assert set(changed)=={'X86PublicOutput.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'},changed
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,commands_sha256=sha(build/'compile_commands.json')))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

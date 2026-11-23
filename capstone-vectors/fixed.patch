@@ -1,0 +1,97 @@
+diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
+index 732c4004..cdc16e26 100644
+--- a/arch/X86/X86PublicOutput.c
++++ b/arch/X86/X86PublicOutput.c
+@@ -2,7 +2,6 @@
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+ #include "../../cs_disasm_internal.h"
+-#include "X86ScanAdapter.h"
+ 
+ #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+ #if defined(__ELF__) && defined(__clang__)
+@@ -13,16 +12,15 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+ 					    cs_insn *insn, uint16_t *length,
+ 					    bool batch)
+ {
+-	/* The caller owns skipdata callbacks, bulk boundaries and the public
+-	 * cursors. A fixed iterator can fill this one record using local cursors. */
+-	if (!batch && !handle->skipdata && !handle->no_text &&
+-	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
+-		uint64_t address = insn->address;
+-		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
+-					     &size, &address, insn);
+-		if (ok)
+-			*length = insn->size;
+-		return ok;
++	/* cs_disasm_iter has already established the record address and hidden
++	 * detail when needed. Only its caller advances the public cursors. */
++	if (!batch && !handle->skipdata && !handle->no_text) {
++		if (handle->mode == CS_MODE_64)
++			return X86_decodeTextRecord64(handle, code, size, insn,
++						      length);
++		if (handle->mode == CS_MODE_32)
++			return X86_decodeTextRecord32(handle, code, size, insn,
++						      length);
+ 	}
+ 	return cs_decode_full_insn(handle, code, size, insn, length, batch);
+ }
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..a5b9a5c5 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -274,4 +274,16 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_public_output_text"
++#endif
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeTextRecord64(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *length)
++{
++	return decode_insn(handle, code, size, insn, length, false, false);
++}
++#endif
+ #endif
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..169fde4e 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -213,4 +213,16 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_public_output_text"
++#endif
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeTextRecord32(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *length)
++{
++	return decode_insn(handle, code, size, insn, length, false, false);
++}
++#endif
+ #endif
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..a1480df6 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -22,6 +22,12 @@
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeTextRecord32(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *length);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeTextRecord64(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *length);
+ #endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,

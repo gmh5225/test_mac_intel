@@ -1,7 +1,7 @@
-name: Retest public and private x86 readers for memory, mask and i386 records on six real binaries
+name: Measure public x86 formatting with record construction owned by the outer iterator
 on:
   push:
-    branches: [codex/released-public-private-records]
+    branches: [codex/fill-public-x86-record-once]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: released-reader-matrix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-record-fill-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
