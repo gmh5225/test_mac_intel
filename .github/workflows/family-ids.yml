@@ -1,7 +1,7 @@
-name: Separate MIPS decoder selection from record splitting on nine real code sections
+name: Measure the scalar writer at the public iterator fallback on nine native code sections
 on:
   push:
-    branches: [codex/mixed-mips-scan-controls]
+    branches: [codex/mixed-public-scalar-miss]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 567e62d3ff038035ea62ac460cc894f480065bee
+          ref: eda656187b91970987b016629023b894bf83ce2f
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: standalone-mips-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mixed-scalar-public-miss-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

@@ -27,6 +27,8 @@ try:
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=sha(b/'libcapstone.a'),bytes=path.stat().st_size,
                        object={a:sha(next(b.rglob(a)))for a in('cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','AArch64Disassembler.c.o')})
+    changes={n for n,v in images['base']['object'].items()if images['scalar']['object'][n]!=v}
+    assert changes=={'X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'},changes
     assert len({v['shared']for v in images.values()})==len(q)+1;put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
