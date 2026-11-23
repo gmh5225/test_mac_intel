@@ -1,22 +1,27 @@
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 76b35f22..f784561b 100644
+index 76b35f22..f73834b9 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -196,9 +196,15 @@ bool X86_writeMemoryOutput(
+@@ -196,9 +196,22 @@ bool X86_writeMemoryOutput(
  		value = (int32_t)encoded;
  	memcpy(out, ", ", 2);
  	out += 2;
--	if (value < 0)
++#if X86_IMMEDIATE_WIDE && UINTPTR_MAX == UINT32_MAX
++	/* A 32-bit host can format the sign-extended AMD64 immediate
++	 * entirely in the width of its encoding. */
 +	uint32_t magnitude = encoded;
 +	if (value < 0) {
- 		*out++ = '-';
--	writeUnsignedImmediate(out, (uint64_t)(value < 0 ? -value : value));
-+		/* Negate in the encoded unsigned width, including its sign bit. */
++		*out++ = '-';
 +		magnitude = 0u - encoded;
 +		if (imm_size == 1)
 +			magnitude &= UINT8_MAX;
 +	}
 +	writeUnsignedImmediate(out, magnitude);
++#else
+ 	if (value < 0)
+ 		*out++ = '-';
+ 	writeUnsignedImmediate(out, (uint64_t)(value < 0 ? -value : value));
++#endif
  #else
  	/* MOV to a 64-bit memory operand sign-extends its encoded imm32. */
  #if X86_IMMEDIATE_WIDE
@@ -42,7 +47,7 @@ index 21414e7a..e7a294e6 100644
  		} else if (opcode == 0x8d || opcode == 0xff) {
  			return false;
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..76afb7b8 100644
+index 96ce9f72..ec71dde7 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
 @@ -26,6 +26,29 @@
@@ -75,16 +80,27 @@ index 96ce9f72..76afb7b8 100644
  #include "X86PackedMemoryOutput.h"
  #include "X86GenSse64RegisterOutput.inc"
  #include "X86GenVex64PackedMemory.inc"
-@@ -159,11 +182,17 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+@@ -137,6 +160,11 @@ static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
+ 				     x86_simple_registers[3], true);
+ }
+ 
++static inline unsigned legacyPrefixClass64(bool has_rex, uint8_t first)
++{
++	return has_rex ? ((first & 8) ? 2 : 1) : 0;
++}
++
+ /* The scalar plans have already declined this instruction. A single opcode
+  * lookup supplies the mnemonic, operand order and all implicit effects. */
+ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+@@ -159,11 +187,17 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
  	}
  	if (primary != 0x0f) {
  		const uint8_t mr = code[has_rex + 1];
-+		const unsigned prefix_class =
-+			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
 +#ifdef CAPSTONE_X86_ONLY
 +		if (primary == 0x80)
 +			return writeGroup1Compare64(handle, code, size, insn,
-+						    insn_size, prefix_class,
++						    insn_size,
++						    legacyPrefixClass64(has_rex, code[0]),
 +						    primary, mr);
 +#endif
  		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
@@ -92,10 +108,11 @@ index 96ce9f72..76afb7b8 100644
  			return false;
 -		const unsigned prefix_class =
 -			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
++		const unsigned prefix_class = legacyPrefixClass64(has_rex, code[0]);
  		/* The MOV store row carries its operand width and access. */
  		const unsigned row = x86_simple_plans[1][prefix_class]
  						     [0x88 | (primary & 1)] >>
-@@ -249,6 +278,9 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+@@ -249,6 +283,9 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
  }
  
  #define X86_FIXED_ROUNDED writeRoundedRegisters

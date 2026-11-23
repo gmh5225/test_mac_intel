@@ -142,8 +142,7 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='cmp':
-            assert set(changed)<={'X86Sse64Output.c.o','X86MemoryFallback32.c.o'},(key,changed)
-            if not mixed:assert 'X86Sse64Output.c.o' in changed,(key,changed)
+            assert changed==([] if mixed else ['X86Sse64Output.c.o']),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

@@ -1,7 +1,7 @@
-name: Measure dedicated scalar comparisons with width-safe unsigned magnitudes in ordinary readers
+name: Check identical mixed archives and measure dedicated AMD64 memory comparisons on real binaries
 on:
   push:
-    branches: [codex/pure-unsigned-amd64-compare]
+    branches: [codex/isolated-amd64-comparison-reader]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-unsigned-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: isolated-memory-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
