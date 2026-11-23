@@ -16,7 +16,7 @@ try:
     profiles={}
     for profile in ('project','ten','dual','pure','mixed-diet','mixed-reduced','pure-noatt'):
         b=t/('build-'+profile);receipts={}
-        expected='base'
+        expected='reference' if profile.startswith('pure') else 'base'
         variants=('base','reference','candidate') if expected=='reference' else ('base','candidate')
         pair={}
         for stage in variants:
@@ -58,7 +58,7 @@ try:
         changed=sorted(k for k in z['objects'] if z['objects'][k]!=a['objects'].get(k))
         names={Path(f).name for f in changed}
         if expected=='reference':
-            assert names=={'X86Mapping.c.o','X86PostPrinter.c.o'} and a['shared']!=z['shared'],(profile,names)
+            assert names=={'X86VectorFallback64.c.o'} and a['shared']!=z['shared'],(profile,names)
         else:assert not changed and a==z,profile
         receipts=dict(expected=expected,changed=changed,trees={k:m[k]['tree'] for k in variants},objects=len(a['objects']),members=len(a['members']),shared=z['shared'],probes=z['probes'],member_sha256=hashlib.sha256(json.dumps(z['members']).encode()).hexdigest())
         profiles[profile]=receipts;save('profiles',profiles)

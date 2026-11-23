@@ -1,7 +1,7 @@
-name: Verify MIPS primary scan and visible text leave the real NeverD Capstone archives and linked consumers identical
+name: Verify mixed NeverD and dedicated VEX binaries and consumers against exact controls
 on:
   push:
-    branches: [codex/mips-standard-release-consumers]
+    branches: [codex/dedicated-vex-memory-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-standard-release-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: dedicated-vex-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
