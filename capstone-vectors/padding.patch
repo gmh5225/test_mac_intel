@@ -1,0 +1,163 @@
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index dceebc42..bd0c212d 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -297,6 +297,48 @@ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
+ 
++static bool writePaddingRow(const uint8_t *code, cs_insn *insn,
++			    uint16_t *insn_size, const struct PaddingOutput *p,
++			    uint16_t length)
++{
++	insn->id = p->id;
++	*insn_size = insn->size = length;
++	memcpy(insn->bytes, code, length);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, p->mnemonic, sizeof(p->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, p->operands, sizeof(p->operands));
++	if (insn->detail) {
++		cs_detail *d = insn->detail;
++		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		d->groups_count = (uint8_t)p->group_count;
++		memcpy(d->groups, p->groups, sizeof(p->groups));
++		cs_x86 *x = &d->x86;
++		memcpy(x->prefix, p->prefix, 4);
++		memcpy(x->opcode, p->opcode, 4);
++		x->addr_size = (uint8_t)p->addr_size;
++		x->modrm = (uint8_t)p->modrm;
++		x->sib = (uint8_t)p->sib;
++		x->sib_base = (x86_reg)p->sib_base;
++		x->sib_index = (x86_reg)p->sib_index;
++		x->sib_scale = (int8_t)p->sib_scale;
++		x->encoding.modrm_offset = (uint8_t)p->modrm_offset;
++		x->encoding.disp_offset = (uint8_t)p->disp_offset;
++		x->encoding.disp_size = (uint8_t)p->disp_size;
++		if (p->mem_size) {
++			x->op_count = 1;
++			cs_x86_op *m = &x->operands[0];
++			m->type = X86_OP_MEM;
++			m->size = (uint8_t)p->mem_size;
++			m->access = (cs_ac_type)p->access;
++			m->mem.base = (x86_reg)p->base;
++			m->mem.index = (x86_reg)p->index;
++			m->mem.scale = (int)p->scale;
++		}
++	}
++	return true;
++}
++
+ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			       uint16_t *insn_size, bool wide)
+ {
+@@ -351,40 +393,33 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			return false;
+ 	}
+ 	const struct PaddingOutput *p = &padding_rows[wide][row];
+-	insn->id = p->id;
+-	*insn_size = insn->size = p->length;
+-	memcpy(insn->bytes, code, p->length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, p->mnemonic, sizeof(p->mnemonic));
+-	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	memcpy(insn->op_str, p->operands, sizeof(p->operands));
++	return writePaddingRow(code, insn, insn_size, p, p->length);
++}
++
++/* Long-mode alignment NOPs can repeat 66 and end their prefixes with CS.
++ * CS is recorded in the prefix group but does not name a memory segment. */
++static bool writeLongPadding64(const uint8_t *code, size_t size, cs_insn *insn,
++			       uint16_t *insn_size)
++{
++	static const uint8_t body[] = { 0x0f, 0x1f, 0x84, 0, 0, 0, 0, 0 };
++	unsigned lead = 1;
++	while (lead < 15 - sizeof(body) && code[lead] == 0x66)
++		++lead;
++	const bool cs = code[lead] == 0x2e;
++	lead += cs;
++	const unsigned length = lead + sizeof(body);
++	if (length > 15 || size < length ||
++	    memcmp(code + lead, body, sizeof(body)))
++		return false;
++	/* Row 7 already describes the one-prefix SIB NOP. */
++	const struct PaddingOutput *p = &padding_rows[1][7];
++	writePaddingRow(code, insn, insn_size, p, (uint16_t)length);
+ 	if (insn->detail) {
+-		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
+-		d->groups_count = (uint8_t)p->group_count;
+-		memcpy(d->groups, p->groups, sizeof(p->groups));
+-		cs_x86 *x = &d->x86;
+-		memcpy(x->prefix, p->prefix, 4);
+-		memcpy(x->opcode, p->opcode, 4);
+-		x->addr_size = (uint8_t)p->addr_size;
+-		x->modrm = (uint8_t)p->modrm;
+-		x->sib = (uint8_t)p->sib;
+-		x->sib_base = (x86_reg)p->sib_base;
+-		x->sib_index = (x86_reg)p->sib_index;
+-		x->sib_scale = (int8_t)p->sib_scale;
+-		x->encoding.modrm_offset = (uint8_t)p->modrm_offset;
+-		x->encoding.disp_offset = (uint8_t)p->disp_offset;
+-		x->encoding.disp_size = (uint8_t)p->disp_size;
+-		if (p->mem_size) {
+-			x->op_count = 1;
+-			cs_x86_op *m = &x->operands[0];
+-			m->type = X86_OP_MEM;
+-			m->size = (uint8_t)p->mem_size;
+-			m->access = (cs_ac_type)p->access;
+-			m->mem.base = (x86_reg)p->base;
+-			m->mem.index = (x86_reg)p->index;
+-			m->mem.scale = (int)p->scale;
+-		}
++		cs_x86 *x86 = &insn->detail->x86;
++		if (cs)
++			x86->prefix[1] = 0x2e;
++		x86->encoding.modrm_offset += (uint8_t)(lead - 1);
++		x86->encoding.disp_offset += (uint8_t)(lead - 1);
+ 	}
+ 	return true;
+ }
+@@ -438,9 +473,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	     (code[1] == 0x90 ||
+ 	      (size >= 3 && code[1] == 0x0f && code[2] == 0x1f))))
+ 		return writePaddingOutput(code, size, insn, insn_size, wide);
+-	if (code[0] == 0x66)
++	if (code[0] == 0x66) {
++		if (wide && size >= 10 && (code[1] == 0x66 || code[1] == 0x2e))
++			return writeLongPadding64(code, size, insn, insn_size);
+ 		return writeLegacyRegisterOutput(code, size, insn, insn_size,
+ 						 wide);
++	}
+ 	if (code[0] == 0x62)
+ 		return writeEvexOutput(code, size, insn, insn_size, regs);
+ 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 1c7944f4..11a7ac38 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -915,6 +915,24 @@ static bool check_padding(csh handles[2])
+ 			}
+ 		}
+ 	}
++	/* The extra CS prefix only names a segment in 32-bit mode. Check the
++	 * encoded offsets, the 15-byte limit, and every truncated suffix. */
++	for (unsigned prefixes = 1; prefixes <= 8; ++prefixes) {
++		for (unsigned cs = 0; cs <= 1; ++cs) {
++			uint8_t bytes[17] = { 0 };
++			memset(bytes, 0x66, prefixes);
++			if (cs)
++				bytes[prefixes] = 0x2e;
++			uint8_t *body = bytes + prefixes + cs;
++			body[0] = 0x0f;
++			body[1] = 0x1f;
++			body[2] = 0x84;
++			const unsigned length = prefixes + cs + 8;
++			for (unsigned n = 0; n <= length; ++n)
++				if (!compare(handles, bytes, n, n + prefixes))
++					return false;
++		}
++	}
+ 	return true;
+ }
+ 

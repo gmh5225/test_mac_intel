@@ -15,7 +15,8 @@
 extern "C" bool observed_plain(csh, bool, const uint8_t *, size_t,
                                cs_insn *, uint16_t *);
 
-int main() {
+int main(int argc, char **) {
+    bool candidate = argc == 2;
     uint64_t trials = 0, hits32 = 0, hits64 = 0;
 #ifdef _WIN32
     SYSTEM_INFO system;
@@ -41,7 +42,7 @@ int main() {
             return 1;
         if (detail && (cs_option(fast, CS_OPT_DETAIL, CS_OPT_ON) ||
                        cs_option(ordinary, CS_OPT_DETAIL, CS_OPT_ON))) return 1;
-        auto check = [&](const std::array<uint8_t, 15>& bytes, unsigned n,
+        auto check = [&](const std::array<uint8_t, 18>& bytes, unsigned n,
                          bool must_reject) {
             auto *p = area + page - n;
             std::memcpy(p, bytes.data(), n);
@@ -75,31 +76,37 @@ int main() {
                 std::memcmp(actual.mnemonic, reference.mnemonic, sizeof(actual.mnemonic)) ||
                 std::memcmp(actual.op_str, reference.op_str, sizeof(actual.op_str)) ||
                 (detail && std::memcmp(&act, &ref, offsetof(cs_detail, x86) + sizeof(cs_x86))))
-                return false;
+                { std::fprintf(stderr,"mismatch %s | %s  /  %s | %s\n",actual.mnemonic,actual.op_str,reference.mnemonic,reference.op_str); return false; }
             actual.detail = reference.detail;
             if (std::memcmp(&actual, &reference, sizeof(actual)) ||
                 std::memcmp(&act, &ref, sizeof(act))) return false;
             return true;
         };
-        for (unsigned rex=0;rex<=(wide?16:0);++rex)
-        for (unsigned op: {0x80u,0x81u,0x82u,0x83u,0xc7u}) for (unsigned mr=0;mr<256;++mr) {
-            const unsigned mod=mr>>6,rm=mr&7,field=(mr>>3)&7,lead=bool(rex);
-            const bool indexed=rm==4 && mod<3,eligible=wide && field==7 && mod!=3 && op!=0x82 && op!=0xc7;
-            for(unsigned sib=0;sib<(eligible&&indexed?256u:1u);++sib) {
-                const unsigned disp=mod==2 || (mod==0 && (rm==5 || (indexed && (sib&7)==5))) ? 4 : (mod==1);
-                const unsigned off=lead+2+indexed+disp,len=off+(op==0x81 || op==0xc7?4:1);
-                std::array<uint8_t,15>b{};if(rex)b[0]=0x3f+rex;b[lead]=op;b[lead+1]=mr;
-                if(indexed)b[lead+2]=sib;
-                if(disp){b[off-disp]=0x80;b[off-1]=0xff;}
-                for (uint32_t imm:{0u,127u,128u,255u,0x7fffffffu,0x80000000u,0xffffffffu}) {
-                    for(unsigned k=0;k<4;++k)b[off+k]=imm>>(8*k);
-                    if(!check(b,len,!eligible)){std::fprintf(stderr,"cmp rex %u op %x mr %x sib %x imm %x\\n",rex,op,mr,sib,imm);return 3;}
+        for (unsigned pfx=1;pfx<=8;++pfx) for (unsigned seg=0;seg<=1;++seg) {
+            std::array<uint8_t,18> body{};
+            std::memset(body.data(),0x66,pfx);
+            if (seg) body[pfx]=0x2e;
+            const unsigned lead=pfx+seg, length=lead+8;
+            body[lead]=0x0f; body[lead+1]=0x1f; body[lead+2]=0x84;
+            for (unsigned n=0;n<=body.size();++n) {
+                const bool eligible=wide && lead>=2 && n>=length && length<=15;
+                uint64_t prior=hits64;
+                if (!check(body,n,!eligible) || ((hits64!=prior)!=(eligible && candidate))) {
+                    std::fprintf(stderr,"prefix %u cs %u n %u candidate %u expected %u\\n",pfx,seg,n,candidate,eligible);
+                    return 3;
                 }
-                for(unsigned n=0;n<len;++n)if(!check(b,n,true)){std::fprintf(stderr,"short rex %u op %x mr %x sib %x n %u\\n",rex,op,mr,sib,n);return 4;}
+            }
+            for (unsigned byte=0;byte<length;++byte) for(unsigned v=0;v<256;++v) {
+                auto changed=body;changed[byte]=uint8_t(v);
+                for(unsigned n=0;n<=length;++n)
+                    if(!check(changed,n,false)) {
+                        std::fprintf(stderr,"mutation pfx %u cs %u byte %u value %u n %u\\n",pfx,seg,byte,v,n);
+                        return 4;
+                    }
             }
         }
-        std::array<uint8_t,15>b{0x48,0x83,0x38,0xff};
-        if(cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) || !check(b,4,true))return 6;
+        std::array<uint8_t,18> prefixed{0x66,0x2e,0x0f,0x1f,0x84};
+        if(cs_option(fast,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&names)) || !check(prefixed,10,true))return 6;
         cs_close(&ordinary);
         cs_close(&fast);
     }
