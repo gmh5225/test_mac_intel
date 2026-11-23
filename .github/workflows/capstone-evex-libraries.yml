@@ -1,7 +1,7 @@
-name: Time fixed text admission on PE and ELF with matched public and private readers
+name: Control the public x86 reader address while measuring 32-bit double-shift output on six samples
 on:
   push:
-    branches: [codex/fixed-text-iterator-options]
+    branches: [codex/public-before-i386-double-shifts]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-text-admission-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-first-shift-retest-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
