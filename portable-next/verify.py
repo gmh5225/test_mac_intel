@@ -17,7 +17,8 @@ try:
     q=rd(r/'tree.json');assert git('rev-parse','HEAD')==q['parent']
     results={};units=['api','mcinst','sstream','instruction_bytes'];b=t/'build';sample=t/'op.bin';sample.write_bytes(bytes((0,0)))
     for k in ('base','candidate'):
-        if k=='candidate':stage(k,q)
+        if k=='candidate':
+            stage(k,q);run('generated',sys.executable,s/'suite/synctools/xcore_literal_operands.py','--check')
         flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_XCORE_SUPPORT=ON','-DCAPSTONE_BUILD_DIET='+('ON'if profile=='diet' else 'OFF')]
         if sys.platform.startswith('linux'):flags.append('-DCMAKE_C_COMPILER=clang')
         run('configure-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
@@ -37,7 +38,7 @@ try:
             metrics=list(map(int,run(k+'-'+str(flags),exe,str(flags)).split()));assert metrics[:2]==[161450,297302]and len(metrics)==5
             rows[str(flags)]=metrics
             if k=='candidate':
-                assert metrics[2]==121907 and results['base'][str(flags)][3]==metrics[3]and metrics==rows['1']
+                assert metrics=={'full': [161450, 297302, 121907, 10219016543264875195, 12164662004825336988], 'diet': [161450, 297302, 121907, 2646856490324891446, 12164662004825336988]}[profile] and results['base'][str(flags)][3]==metrics[3]and metrics==rows['1']
                 if profile=='full':assert run('single-'+str(flags),exe,str(flags),sample)=='stw r0, r0[0]\tR,r0;M,r0,,0,1;'
                 if profile=='full':
                     literal=t/'literal.bin';literal.write_bytes(bytes((0x00,0xf0,0x49,0x7f)))
