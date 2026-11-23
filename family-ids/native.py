@@ -25,9 +25,13 @@ try:
         syms={}
         for line in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             e=line.split()
-            if len(e)==4 and e[3] in ('X86_get_insn_id','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
+            if len(e)==4 and e[3] in ('X86_get_insn_id','X86_map_full_register_bank','cs_disasm_iter','X86_getInstruction','RISCV_getInstruction','RISCV_LLVM_printInstruction','X86_Intel_printInst'):syms[e[3]]=[int(e[0],16),int(e[1],16)]
         assert 'cs_disasm_iter' in syms and 'X86_get_insn_id' in syms
         cmd('mapper-disassembly-'+k,['objdump','-d','--disassemble=X86_get_insn_id',so])
+        if k=='fixed':
+            assert 'X86_map_full_register_bank' in syms and 'X86_map_full_register_bank@plt' not in (out/('mapper-disassembly-'+k+'.log')).read_text()
+            exports=sp.check_output(['nm','-D','--defined-only',so],text=True)
+            assert 'X86_map_full_register_bank' not in exports
         save('layout-'+k,dict(symbols=syms,text_sha=sha(raw),size=raw.stat().st_size))
         cmd('build-tests-'+k,['cmake','--build',b,'--parallel','4','--target','x86_reg_access','x86_buffer_bounds','x86_scan_batch'])
         cmd('test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(x86_reg_access|x86_buffer_bounds|x86_scan_batch)$'])

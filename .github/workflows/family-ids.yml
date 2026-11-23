@@ -1,7 +1,7 @@
-name: Measure mode-selected vector register mapping against stable 64-bit dispatch and foreign decoders
+name: Measure fixed-width register mapping with a local ELF call on PE and foreign inputs
 on:
   push:
-    branches: [codex/x86-mode-selected-mapper]
+    branches: [codex/x86-fixed-width-register-mapper]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mode-selected-x86-mapper-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: fixed-width-x86-mapper-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

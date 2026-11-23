@@ -1,19 +1,27 @@
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..3b325045 100644
+index b56826b0..b1d6e74d 100644
 --- a/arch/X86/X86BatchScan.c
 +++ b/arch/X86/X86BatchScan.c
-@@ -338,7 +338,8 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
+@@ -338,12 +338,14 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
  #if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
  	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
  	if (handle && use_x86_scan(handle) && !handle->skipdata && code &&
 -	    output && capacity && size && handle->insn_id == X86_get_insn_id &&
 +	    output && capacity && size &&
-+	    handle->insn_id == X86_mapper_for_mode(handle->mode) &&
  	    handle->disasm == X86_getInstruction) {
- 		if (handle->mode == CS_MODE_32)
+-		if (handle->mode == CS_MODE_32)
++		if (handle->mode == CS_MODE_32 &&
++		    handle->insn_id == X86_mapper_for_mode(CS_MODE_32))
  			return scanBatch32(ud, code, size, address, output,
+ 					   capacity);
+-		if (handle->mode == CS_MODE_64)
++		if (handle->mode == CS_MODE_64 &&
++		    handle->insn_id == X86_mapper_for_mode(CS_MODE_64))
+ 			return scanBatch64(ud, code, size, address, output,
+ 					   capacity);
+ 	}
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..6b7efadb 100644
+index 79adee8d..2de38989 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10299,7 +10299,11 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
@@ -21,7 +29,7 @@ index 79adee8d..6b7efadb 100644
  
  // given internal insn id, return public instruction info
 +#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+void X86_map_full_register_bank(cs_struct *h, cs_insn *insn, unsigned int id)
++CAPSTONE_INTERNAL void X86_map_full_register_bank(cs_struct *h, cs_insn *insn, unsigned int id)
 +#else
  void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 +#endif
@@ -51,7 +59,7 @@ index 79adee8d..6b7efadb 100644
 +
  #endif
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..6251d75a 100644
+index 380faa79..28ae5427 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
 @@ -143,6 +143,19 @@ static inline int x86_get_bit_mode(cs_mode mode)
@@ -59,7 +67,7 @@ index 380faa79..6251d75a 100644
  }
  
 +#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+void X86_map_full_register_bank(cs_struct *h, cs_insn *insn, unsigned int id);
++CAPSTONE_INTERNAL void X86_map_full_register_bank(cs_struct *h, cs_insn *insn, unsigned int id);
 +#endif
 +
 +static inline GetID_t X86_mapper_for_mode(cs_mode mode)
@@ -74,6 +82,37 @@ index 380faa79..6251d75a 100644
  static inline uint8_t x86_x87_environment_size(cs_mode mode,
  					       bool operand_override,
  					       bool rex_w, bool registers)
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..1904a385 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -49,7 +49,7 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 		if (size >= 4 && (code[1] & 0xf8) == 0xf8 && code[3] >= 0xc0 &&
+ 		    (code[2] == 0x6f || code[2] == 0x7f) &&
+ 		    ((code[1] & 3) == 1 || (code[1] & 3) == 2) &&
+-		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++		    !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_32)) {
+ 			const unsigned ll = (code[1] >> 2) & 1;
+ 			const unsigned reg = (code[3] >> 3) & 7,
+ 				       rm = code[3] & 7;
+@@ -69,7 +69,7 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x81:
+ 	case 0x83:
+ 		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
+-		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++		    !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_32)) {
+ 			const unsigned row =
+ 				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+ 				2;
+@@ -86,7 +86,7 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x64:
+ 	case 0x65:
+ 		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
+-		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++		    !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_32)) {
+ 			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
+ 			if (writeSegmentLea32(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
 diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
 index 6fcbe3f4..b4e066ae 100644
 --- a/arch/X86/X86Module.c
@@ -97,18 +136,209 @@ index 6fcbe3f4..b4e066ae 100644
  					 (CS_MODE_16 | CS_MODE_32 | CS_MODE_64 |
  					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..b15f88cc 100644
+index 62d4288a..bf2bd492 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
-@@ -35,7 +35,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -29,13 +29,13 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ /* Keep the mode, option and callback checks in a single short-circuit chain
+  * in both instantiations of the scalar writer. */
+-#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch, mode) \
+ 	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
+ 	 (handle)->mnem_list || (handle)->doing_mem || \
  	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
  	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
  	 (handle)->disasm != X86_getInstruction || \
 -	 (handle)->insn_id != X86_get_insn_id || \
-+	 (handle)->insn_id != X86_mapper_for_mode((handle)->mode) || \
++	 (handle)->insn_id != X86_mapper_for_mode(mode) || \
  	 (handle)->printer != X86_Intel_printInst || \
  	 (handle)->post_printer != X86_postprinter || \
  	 cs_vsnprintf != cs_default_vsnprintf)
+diff --git a/arch/X86/X86PlainEvexOutput.c b/arch/X86/X86PlainEvexOutput.c
+index ea2ae0e8..779236f9 100644
+--- a/arch/X86/X86PlainEvexOutput.c
++++ b/arch/X86/X86PlainEvexOutput.c
+@@ -45,7 +45,7 @@ bool X86_writePlainEvexRegisters(cs_struct *handle, const uint8_t *code,
+ 	const bool pair = record->order != EVEX_REGISTERS_THREE;
+ 	const unsigned src = ((~flags >> 3) & 15) | ((~p2 & 8) << 1);
+ 	if ((record->instruction.immediate && size < 7) || (pair && src != 0) ||
+-	    X86_OUTPUT_UNSUPPORTED(handle, false))
++	    X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64))
+ 		return false;
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
+ 	const unsigned reg = ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
+@@ -77,7 +77,7 @@ bool X86_writeEvexRipMemory(cs_struct *handle, const uint8_t *code,
+ 	const unsigned index = plain_evex_prefixes[prefix][key];
+ 	if (!index ||
+ 	    plain_evex_rows[index - 1].order != EVEX_REGISTERS_THREE ||
+-	    X86_OUTPUT_UNSUPPORTED(handle, false))
++	    X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64))
+ 		return false;
+ 	const struct VectorOutputRow *row =
+ 		&plain_evex_rows[index - 1].instruction;
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index ee9b645b..c3f29237 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -26,7 +26,7 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 		const unsigned form = opcode & 1;
+ 		const unsigned width = form ? 4 : 1;
+ 		if (size >= 2 + width && (code[1] & 0xf8) == 0xc0 &&
+-		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++		    !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_32)) {
+ 			writeUnsignedRegisterImmediate(
+ 				insn, &test32_rows[form],
+ 				&test32_regs[form][code[1] & 7], code, 0,
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..ff48d8bc 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -82,7 +82,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ #ifdef X86_FIXED_INDIRECT
+ 		if (opcode == 0xff &&
+ 		    ((modrm & 0x38) == 0x10 || (modrm & 0x38) == 0x20)) {
+-			if (X86_OUTPUT_UNSUPPORTED(handle, false))
++			if (X86_OUTPUT_UNSUPPORTED(handle, false, wide ? CS_MODE_64 : CS_MODE_32))
+ 				return false;
+ 			return X86_FIXED_INDIRECT(code, size, insn, insn_size,
+ 						  rex, modrm);
+@@ -111,7 +111,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		}
+ 	}
+-	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
++	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32,
++				   wide ? CS_MODE_64 : CS_MODE_32))
+ 		return false;
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..f84b273a 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -117,7 +117,7 @@ static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
+ 			detail->x86.addr_size = 8;
+ 			detail->x86.rex = 0x40;
+ 			memcpy(detail->x86.opcode, code, 2);
+-			X86_get_insn_id(handle, insn,
++			X86_map_full_register_bank(handle, insn,
+ 					all ? X86_VZEROALL : X86_VZEROUPPER);
+ 		} else {
+ 			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
+@@ -152,7 +152,7 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 	const uint8_t rex_byte = has_rex ? code[0] : 0;
+ 	if ((primary == 0x63 && (rex_byte & 8)) ||
+ 	    (primary == 0x0f && (code[length - 2] & 0xf6) == 0xb6)) {
+-		if (X86_OUTPUT_UNSUPPORTED(handle, false))
++		if (X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64))
+ 			return false;
+ 		return writeExtend64(code, size, insn, insn_size, length,
+ 				     rex_byte, code[length - 2]);
+@@ -160,7 +160,7 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 	if (primary != 0x0f) {
+ 		const uint8_t mr = code[has_rex + 1];
+ 		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+-		    X86_OUTPUT_UNSUPPORTED(handle, false))
++		    X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64))
+ 			return false;
+ 		const unsigned prefix_class =
+ 			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
+@@ -180,7 +180,7 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+ 	const struct X86SseRegisterOutput *entry =
+ 		&x86_sse_register_outputs[index];
+ 	const struct X86SimpleOutput *row = &entry->output;
+-	if (!row->id || X86_OUTPUT_UNSUPPORTED(handle, false))
++	if (!row->id || X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64))
+ 		return false;
+ 
+ 	const uint8_t rex = has_rex ? code[0] : 0, mr = code[length - 1];
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 60ec4b72..9cb345bd 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -100,7 +100,7 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+ 	const bool memory = code[5] < 0xc0, store = code[4] == 0x7f;
+ 	if (!mask || ll == 3 || (code[1] & 15) != 1 || code[2] != 0x7f ||
+ 	    (code[3] & 0x18) != 8 || (store && (!memory || zero)) ||
+-	    X86_OUTPUT_UNSUPPORTED(handle, false))
++	    X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64))
+ 		return false;
+ 	/* The longest transfer uses a SIB and a four-byte displacement. */
+ 	uint8_t plain[11];
+@@ -157,7 +157,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 7 && code[0] == 0x62 && code[5] >= 0xc0 &&
+ 	    (code[1] & 0x9f) == 0x91 && code[4] >= 0x71 && code[4] <= 0x73 &&
+ 	    !X86_EVEX_REGISTER_PREFIX_REJECTS(code, size) &&
+-	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++	    !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64)) {
+ 		const unsigned opcode = code[4];
+ 		const unsigned ll = code[3] >> 5, w = code[2] >> 7;
+ 		const unsigned plan =
+@@ -176,7 +176,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	}
+ #ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+ 	if (size >= 7 && code[0] == 0x62 && code[5] < 0xc0 &&
+-	    (code[5] & 7) == 4 && !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++	    (code[5] & 7) == 4 && !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64) &&
+ 	    writeIndexedEvexMemory(code, size, insn, insn_size,
+ 				   x86_simple_registers[3]))
+ 		return true;
+@@ -204,7 +204,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const unsigned opcode = code[offset - 2];
+ 			if (opcode == 0x38 && code[0] == 0x66) {
+ 				if (size > offset && code[offset] >= 0xc0 &&
+-				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++				    !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64) &&
+ 				    writeLegacyMap38Registers(
+ 					    code, insn, insn_size, offset, rex))
+ 					return true;
+@@ -214,14 +214,14 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 				const unsigned row =
+ 					legacy_packed_plans[bank][opcode];
+ 				if (row &&
+-				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++				    !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64) &&
+ 				    writePackedMemory(code, insn, insn_size,
+ 						      &legacy_packed_rows[row],
+ 						      rex, offset, size, false))
+ 					return true;
+ 			} else if (code[0] == 0x66 && opcode >= 0x70 &&
+ 				   opcode <= 0x73 && size > offset &&
+-				   !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++				   !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_64) &&
+ 				   writeLegacyRegisterImmediate(
+ 					   code, insn, insn_size, offset, rex))
+ 				return true;
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..ffceca79 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -155,9 +155,9 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	if ((code[0] & 0xfc) != 0xc4)
+ 		return code[0] == 0x0f && size >= 3 &&
+ 		       (code[1] & 0xf6) == 0xb6 &&
+-		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++		       !X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_32) &&
+ 		       writeExtend32(code, size, insn, insn_size);
+-	if (X86_OUTPUT_UNSUPPORTED(handle, false))
++	if (X86_OUTPUT_UNSUPPORTED(handle, false, CS_MODE_32))
+ 		return false;
+ 	if (code[0] & 2) {
+ 		if (size < 2 || code[1] >= 0xc0 || (code[1] & 0x38))
+diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
+index 3fe8460f..b1f5df61 100644
+--- a/arch/X86/X86VexRegisterImmediate.c
++++ b/arch/X86/X86VexRegisterImmediate.c
+@@ -44,7 +44,7 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 		return false;
+ 	const struct VexRegisterImmediateRow *row =
+ 		&vex_immediate_rows[index - 1];
+-	if ((!row->uses_vvvv && src) || X86_OUTPUT_UNSUPPORTED(handle, false))
++	if ((!row->uses_vvvv && src) || X86_OUTPUT_UNSUPPORTED(handle, false, wide ? CS_MODE_64 : CS_MODE_32))
+ 		return false;
+ 	const struct VectorOutputRow *record = &row->instruction;
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
 diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
 index d9dd18e2..e7ac71dc 100644
 --- a/tests/unit/x86_reg_access.c
