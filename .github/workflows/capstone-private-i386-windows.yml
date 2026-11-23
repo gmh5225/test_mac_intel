@@ -36,10 +36,10 @@ jobs:
         if: runner.os == 'Windows'
         with:
           arch: ${{ matrix.arch }}
-      - name: Compare original and candidate bytes and native tests
-        env:
       - name: Check source parent
         run: python -B portable-next/stage_parent.py
+      - name: Compare original and candidate bytes and native tests
+        env:
           SCAN_PROFILE: ${{ matrix.profile }}
         run: python -B portable-next/verify.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
