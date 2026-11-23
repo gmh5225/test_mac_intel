@@ -179,8 +179,8 @@ def main(w):
             prefix,attempt,accepted=observed.stderr.split()
             attempt,accepted=int(attempt),int(accepted)
             assert prefix=='segment' and attempt%2==accepted%2==0 and 0<=accepted<=attempt<=2*(result[2]+result[3]) and accepted<=2*result[2]
-            if bits==32:assert attempt==0
-            if bits==32:assert attempt==0
+            if bits==64:assert attempt==accepted==0
+            if name in ('libssl3t64-i386','putty-32-0.85'):assert accepted>0
             coverage[str(mode)]=dict(decoded=result[2],rejected=result[3],attempted=attempt//2,accepted=accepted//2)
         assert coverage['1']==coverage['2']
         save('coverage-'+name+'.json',coverage)
