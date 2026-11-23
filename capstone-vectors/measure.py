@@ -160,7 +160,7 @@ def main(w):
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
         if kind=='bare':
-            assert changed==['X86VectorFallback64.c.o'],(key,changed)
+            assert changed==([] if mixed else ['X86VectorFallback64.c.o']),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

@@ -1,7 +1,7 @@
-name: Measure isolated AMD64 VEX memory records on six ELF and PE executables against fork iced
+name: Repeat dedicated x86 VEX memory throughput and verify unchanged mixed readers on real programs
 on:
   push:
-    branches: [codex/x86-private-vex-base-memory]
+    branches: [codex/x86-only-vex-memory-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: private-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: dedicated-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
