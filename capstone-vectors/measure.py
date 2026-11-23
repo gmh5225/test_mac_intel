@@ -98,7 +98,7 @@ def main(w):
         mixed=key.startswith('mixed_');kind=key.removeprefix('mixed_')
         patches=[kind] if kind!='base' else []
         for name in patches:
-            patch=r/(name+'.patch');assert sha(patch)==trees[name]['sha256']
+            patch=r/(name+'.patch');assert sha(patch)==z['sha256']
             run(['git','apply','--index',patch],'apply-'+key+'-'+name,base)
         assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==z['tree']
         build=w/('build-'+key);project=base
@@ -127,15 +127,15 @@ def main(w):
         assert len(current)==3 and all(int(z.split()[0])==46656 for z in current)
         run(['clang++','-std=c++17','-O2','-I',base/'include',r/'guard.cpp',lib,'-o',w/'guard'],'build-dispatch-guard-'+key)
         run([w/'guard'],'dispatch-guard-'+key);assert (evidence/('dispatch-guard-'+key+'.log')).read_text().split()[0]=='882784'
-        if kind=='bare':
+        if kind!='base':
             ref=('mixed_' if mixed else '')+'base'
             assert current==(evidence/('targets-'+ref+'.log')).read_text().splitlines()
-        if kind=='bare':
+        if kind!='base':
             run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator'],'build-generator-'+key)
             generated=sp.check_output([w/'generator'])
             assert generated==(base/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
             save('rows-'+key+'.json',dict(bytes=len(generated),sha256=hashlib.sha256(generated).hexdigest()))
-        if kind=='bare':
+        if kind!='base':
             run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator'],'build-vector-generator-'+key)
             generated=sp.check_output([w/'vector-generator'])
             assert generated==(base/'arch/X86/X86GenVectorOutput.inc').read_bytes()
@@ -150,6 +150,14 @@ def main(w):
             for name in units:
                 run(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',base/('tests/unit/'+name+'.c'),lib,'-lm','-o',w/name],'link-'+name+'-'+key)
                 run([w/name],'unit-'+name+'-'+key)
+        if kind=='switch':
+            probe=w/'admission.c';probe.write_text('extern int X86_benchVexMemoryEnabled(void);\nint main(void) { return X86_benchVexMemoryEnabled(); }\n')
+            run(['clang',probe,lib,'-lm','-o',w/'admission'],'verify-switch-link')
+            receipts=[]
+            for value in ('0','1'):
+                state=sp.run([w/'admission'],env=dict(os.environ,CAPSTONE_BENCH_VEX_MEMORY=value)).returncode
+                assert state==int(value);receipts.append(state)
+            save('switch-states.json',receipts)
         members=[v for v in sp.check_output(['ar','t',lib],text=True).splitlines() if v and not v.startswith('__.SYMDEF')]
         objects[key]={p.name:sha(p) for p in build.rglob('*.c.o') if '/tests/' not in str(p)}
         assert set(members)==set(objects[key]) and len(members)==len(set(members))
@@ -159,7 +167,7 @@ def main(w):
         expected=base_orders[orig]
         assert members==expected
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig][n])
-        if kind=='bare':
+        if kind!='base':
             assert changed==['X86VectorFallback64.c.o'],(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
@@ -176,10 +184,11 @@ def main(w):
         assert ('X86_decodePublicRecord' in linked)==(not mixed)
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         save('linked-'+key+'.json',linked)
-        if key=='base':
+        if key=='mixed_base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
     import random
+    save('platform.json',dict(model=sp.check_output(['sysctl','-n','machdep.cpu.brand_string'] if darwin else ['lscpu'],text=True),compiler=sp.check_output(['clang','--version'],text=True)))
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
     image=w/'timed-runner'
@@ -188,8 +197,8 @@ def main(w):
     active=None
     if not darwin:
         run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
-        image.write_bytes(padded['base']);image.chmod(0o755)
-        active=hashes['base']
+        image.write_bytes(padded['mixed_base']);image.chmod(0o755)
+        active=hashes['mixed_base']
     save('launch.json',dict(linked=hashes,same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
     def invoke(key,tail):
         nonlocal active
@@ -217,18 +226,20 @@ def main(w):
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
-            targets={'copy':('base','x86_all_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
-            for k in trees:
+            targets={'copy':('mixed_base','x86_all_' if mode else 'vecbatch'),'iced':('mixed_base','iced____')}
+            if mode:targets['fast']=('mixed_base','fast____')
+            for k in ('mixed_base','mixed_bare'):
                 targets['private_'+k]=(k,'x86_all_' if mode else 'vecbatch')
                 targets['public_'+k]=(k,'capstone')
-                if bits==32 and mode:targets['width_'+k]=(k,'x86_len_')
+            for label in ('off','on'):
+                targets['switch_'+label]=('mixed_switch','x86_all_' if mode else 'vecbatch')
             def timed(label,count):
+                os.environ['CAPSTONE_BENCH_VEX_MEMORY']='0' if label=='switch_off' else '1'
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
+            rep=max(1,math.ceil(50e6/max(1,timed('private_mixed_base',1)[0])));cycles=[]
             labels=list(targets);order=random.Random(str((name,mode,'product-text-width-selection')))
-            for idx in range(13):
+            for idx in range(17):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1
                 for kind in ('public_','private_'):
