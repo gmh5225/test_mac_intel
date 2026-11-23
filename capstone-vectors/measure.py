@@ -199,7 +199,8 @@ def main(w):
             assert hashes[1]==hashes[2]
     save('launch.json',dict(canonical_argv=True,canonical_image=True,images={link:{k:sha(f)for k,f in z.items()}for link,z in available.items()}))
     def invoke(path,tail):
-        fresh=w/'fresh-runner';os.link(path,fresh);os.replace(fresh,image)
+        if not image.exists() or not image.samefile(path):
+            fresh=w/'fresh-runner';os.link(path,fresh);os.replace(fresh,image)
         args=[image,*tail] if darwin else ['setarch',platform.machine(),'-R',image,*tail]
         return sp.check_output(args)
     import pe_panels,frozen_deb,itertools
