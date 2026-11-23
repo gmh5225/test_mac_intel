@@ -1,7 +1,7 @@
-name: Measure packed EVEX scans on GCC and compare every prefix control byte against full decode
+name: Check generated EVEX map and ModRM prefix classes against canonical decode and real applications
 on:
   push:
-    branches: [codex/verify-evex-moves-gcc-and-full-decoder]
+    branches: [codex/generated-evex-transfer-classes]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: gcc, flavor: first }
+          - { host: ubuntu-22.04, cc: clang, flavor: first }
           - { host: ubuntu-24.04, cc: gcc, flavor: first }
           - { host: ubuntu-24.04-arm, cc: gcc, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: gcc, flavor: second }
+          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 95
     env:
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: gcc-packed-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: generated-transfer-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
