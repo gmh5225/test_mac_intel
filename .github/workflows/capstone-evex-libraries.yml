@@ -1,7 +1,7 @@
-name: Attribute Capstone and iced FastFormatter work to identical real PE32 and SIMD operands
+name: Trace complete one-byte records and vector moves in Capstone and fork iced on identical input offsets
 on:
   push:
-    branches: [codex/x86-real-formatter-work-by-operands]
+    branches: [codex/x86-padding-and-vector-real-work]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: opcode-cost-cohorts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-format-move-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

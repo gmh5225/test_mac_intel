@@ -1,15 +1,18 @@
 #include <capstone/capstone.h>
 #include <cstdint>
+#include <cstring>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <vector>
 static unsigned cohort(const cs_insn &rec) {
+    if (rec.size==1 && rec.bytes[0]==0x90 && rec.id==X86_INS_NOP) return 1;
+    if (rec.size==1 && rec.bytes[0]==0xcc && rec.id==X86_INS_INT3) return 2;
     const cs_detail &detail=*rec.detail;
     for(unsigned i=0;i<detail.groups_count;++i) {
         auto g=detail.groups[i];
         if(g==CS_GRP_JUMP || g==CS_GRP_CALL || g==CS_GRP_RET || g==CS_GRP_IRET)
-            return 1;
+            return 9;
     }
     bool vec=false,mem=false,imm=false,all_reg=detail.x86.op_count!=0;
     for(unsigned i=0;i<detail.x86.op_count;++i) {
@@ -24,11 +27,13 @@ static unsigned cohort(const cs_insn &rec) {
         mem|=op.type==X86_OP_MEM;
         imm|=op.type==X86_OP_IMM;
     }
-    if(vec)return mem?2:3;
-    if(mem)return 4;
-    if(all_reg)return 5;
-    if(imm)return 6;
-    return 7;
+    if (!detail.x86.op_count) return 3;
+    if (vec) {
+        const bool move=std::strstr(rec.mnemonic,"mov")!=nullptr;
+        return mem ? (move?4:5) : (move?6:7);
+    }
+    if (imm && !mem) return 8;
+    return 9;
 }
 int main(int argc,char **argv) {
     if(argc!=5)return 1;
@@ -37,7 +42,7 @@ int main(int argc,char **argv) {
     std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
     csh h;if(cs_open(CS_ARCH_X86,argv[1][0]=='3'?CS_MODE_32:CS_MODE_64,&h) || cs_option(h,CS_OPT_DETAIL,CS_OPT_ON))return 3;
     auto rec=cs_malloc(h);if(!rec)return 4;
-    size_t offset,left;uint64_t ip,counts[8]{};
+    size_t offset,left;uint64_t ip,counts[10]{};
     while(spans>>offset>>left>>ip) {
         if(offset>bytes.size()||left>bytes.size()-offset)return 5;
         auto pc=static_cast<const uint8_t *>(bytes.data()+offset);
