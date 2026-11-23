@@ -1,7 +1,7 @@
-name: Repeat dedicated x86 VEX memory throughput and verify unchanged mixed readers on real programs
+name: Compare the mixed AMD64 boundary with fork iced on six applications and four hosts
 on:
   push:
-    branches: [codex/x86-only-vex-memory-records]
+    branches: [codex/mixed-vex-reader-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
+          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 83dc20e512ed43a9fcf5994ba585f85c7d9b2f20
+          ref: deb20b49abc68cea5368ce6f7724fdfea01f05be
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mixed-vex-entry-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
