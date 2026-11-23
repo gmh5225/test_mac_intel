@@ -1,7 +1,7 @@
-name: Measure built-in MIPS operand strings after comment and register-name edits
+name: Compare standard MIPS scan records, visible text and details against unchanged public outputs
 on:
   push:
-    branches: [codex/mips-private-visible-operands]
+    branches: [codex/mips-standard-primary-records]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-visible-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-primary-and-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
