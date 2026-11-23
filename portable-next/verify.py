@@ -50,7 +50,7 @@ try:
         file=s/'MCInst.h';original=file.read_text();needle='const size_t operands_end =';assert original.count(needle)==1
         for fill in (0x5a,0xa5):
             file.write_text(original.replace(needle,
-                'memset(inst->Operands + 1, '+str(fill)+', sizeof(inst->Operands) - sizeof(inst->Operands[0]));\\n\\t\\t'+needle))
+                'memset(inst->Operands + 1, '+str(fill)+', sizeof(inst->Operands) - sizeof(inst->Operands[0])); '+needle))
             run('poison-build-'+str(fill),'cmake','--build',b,'--target','capstone_static','--parallel','4')
             run('poison-link','cc','-std=c11','-O2','-I',s/'include',r/'records.c',b/'libcapstone.a','-o',exe)
             for flag in (1,2,14):
