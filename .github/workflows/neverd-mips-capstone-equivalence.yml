@@ -1,0 +1,38 @@
+name: MIPS equivalence across the dev Capstone update
+on:
+  push:
+    branches: [codex/neverd-mips-capstone-2514]
+permissions:
+  contents: read
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025-vs2026]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          path: driver
+          sparse-checkout: neverd-mips-qualification
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 6fbeffec215f3c7c79169c655b0928c616b46152
+          fetch-depth: 2
+          persist-credentials: false
+          path: capstone
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+        with:
+          arch: x64
+      - name: Verify native MIPS and dispatch translation units
+        shell: bash
+        run: python3 driver/neverd-mips-qualification/capstone-equivalence.py capstone equivalence.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mips-equivalence-${{ matrix.os }}
+          path: equivalence.json
