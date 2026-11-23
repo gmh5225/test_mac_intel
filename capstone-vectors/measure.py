@@ -151,7 +151,7 @@ def main(w):
         if key!='base':
             assert sample.count(entry)==1
             sample=sample.replace(entry,'++bare_opcode_hits[code[1]]; '+entry)
-        entry_start={'base':'const unsigned opcode = code[0];','plain':'if (code[0] == 0x0f && size >= 4','bare':'if (size < 4 || code[2] < 0xc0'}[key]
+        entry_start={'base':'return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);','plain':'if (code[0] == 0x0f && size >= 4','bare':'if (size < 4 || code[2] < 0xc0'}[key]
         assert sample.count(entry_start)==1
         sample=sample.replace(entry_start,'++helper_calls; '+entry_start)
         probe=w/'counts.c';probe.write_text('unsigned long long bare_opcode_hits[256], helper_calls;'+chr(10)+sample)
@@ -218,10 +218,10 @@ def main(w):
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         freq={k:list(map(int,sp.check_output([w/('counts-'+k),str(bits),f,intervals]).split()))for k in trees}
-        assert len({v[0]for v in freq.values()})==1 and freq['bare'][2:]==freq['plain'][2:] and freq['base'][2:]==[0,0]
-        assert freq['bare'][1]<=freq['plain'][1]==freq['base'][1]
-        if bits==64:assert all(v[1:]==[0,0,0]for v in freq.values())
         save('real-counts-'+name+'.json',freq)
+        assert len({v[0]for v in freq.values()})==1 and freq['bare'][2:]==freq['plain'][2:] and freq['base'][2:]==[0,0]
+        assert freq['bare'][1]<=freq['plain'][1]==freq['base'][1], (name,freq)
+        if bits==64:assert all(v[1:]==[0,0,0]for v in freq.values())
         for mode in (0,1,2):
             targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}
             if mode:targets['fast']=('base','fast____')
