@@ -1,7 +1,7 @@
-name: Verify mixed NeverD and dedicated VEX binaries and consumers against exact controls
+name: Isolate alias matcher and table addresses in the mixed NeverD Capstone archive
 on:
   push:
-    branches: [codex/dedicated-vex-memory-consumers]
+    branches: [codex/arm-alias-table-address-controls]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,11 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -42,13 +38,13 @@ jobs:
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: Build all profiles and verify linked consumers
+      - name: Link four controlled layouts and measure real ARM64 and MIPS programs
         run: python3 capstone-vectors/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-vex-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: alias-address-controls-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
