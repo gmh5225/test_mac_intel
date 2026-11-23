@@ -1,7 +1,7 @@
-name: Verify exact shared scalar detail results and unchanged other builds with Make and CMake
+name: Verify GCC and Clang use the existing pure scalar predicate with isolated mixed shared repair
 on:
   push:
-    branches: [codex/verify-shared-scalar-repair-products]
+    branches: [codex/shared-detail-inlined-condition]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-repair-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-predicate-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

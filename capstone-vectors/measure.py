@@ -50,7 +50,10 @@ try:
                     assert sp.check_output([p],text=True).strip()=='verified'
                     executables[name]=sha(p)
                 pair[stage]=dict(objects=objects,members=list(zip(members,digests)),shared=shared,probes=executables)
-        assert pair[expected]==pair['candidate'],(profile,expected)
+        prior=pair[expected];current=pair['candidate']
+        diffs={f:[prior['objects'].get(f),current['objects'].get(f)]for f in prior['objects'].keys()|current['objects'].keys() if prior['objects'].get(f)!=current['objects'].get(f)}
+        save('changes-'+profile,dict(expected=expected,objects=diffs,shared=[prior['shared'],current['shared']],probes=[prior['probes'],current['probes']]))
+        assert prior==current,(profile,expected,list(diffs))
         a,z=pair['base'],pair['candidate']
         changed=sorted(k for k in z['objects'] if z['objects'][k]!=a['objects'].get(k))
         names={Path(f).name for f in changed}

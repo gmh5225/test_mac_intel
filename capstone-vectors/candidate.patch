@@ -45,7 +45,7 @@ index b3a012fa..8118f71d 100644
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index bc463d2b..9a225757 100644
+index bc463d2b..79adee8d 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -12788,7 +12788,11 @@ static void repair_x87_environment_detail(csh handle, cs_insn *insn)
@@ -65,15 +65,15 @@ index bc463d2b..9a225757 100644
  	 * Other encodings can only need the first memory operand's broadcast
  	 * repair, including decorators introduced by a custom formatter. */
 -	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
-+	if (X86_onlyRepairsBroadcast(x86->opcode[0])) {
++	if (X86_ONLY_REPAIRS_BROADCAST(x86->opcode[0])) {
  		for (i = 0; i < x86->op_count; ++i) {
  			cs_x86_op *operand = &x86->operands[i];
  			if (operand->type == X86_OP_MEM) {
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..1d271200 100644
+index a2677cb8..380faa79 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -122,6 +122,19 @@ void X86_build_lookup_tables(cs_struct *h);
+@@ -122,6 +122,17 @@ void X86_build_lookup_tables(cs_struct *h);
  
  void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci);
  
@@ -85,17 +85,15 @@ index a2677cb8..1d271200 100644
 +
 +/* These opcodes can only need the printed broadcast decorator repaired.
 + * VEX/EVEX, x87 environment and rotate forms take the full repair path. */
-+static inline bool X86_onlyRepairsBroadcast(uint8_t opcode)
-+{
-+	return (opcode & 0xe0) != 0xc0 && opcode != 0x62;
-+}
++#define X86_ONLY_REPAIRS_BROADCAST(opcode) \
++	(((opcode) & 0xe0) != 0xc0 && (opcode) != 0x62)
 +
  static inline bool x86_has_feature(cs_mode mode, int flag)
  {
  	return (mode & flag) == flag;
 diff --git a/arch/X86/X86PostPrinter.c b/arch/X86/X86PostPrinter.c
 new file mode 100644
-index 00000000..bca09178
+index 00000000..1202e088
 --- /dev/null
 +++ b/arch/X86/X86PostPrinter.c
 @@ -0,0 +1,24 @@
@@ -115,7 +113,7 @@ index 00000000..bca09178
 +	if (insn && insn->id != X86_INS_VPCMP) {
 +		if (!insn->detail)
 +			return;
-+		if (X86_onlyRepairsBroadcast(insn->detail->x86.opcode[0]) &&
++		if (X86_ONLY_REPAIRS_BROADCAST(insn->detail->x86.opcode[0]) &&
 +		    !strchr(mnem->buffer, '{'))
 +			return;
 +	}
