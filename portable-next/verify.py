@@ -44,6 +44,9 @@ try:
             emitted=sp.check_output([shift,'--double-shift32'],env=env).replace(bytes([13,10]),bytes([10]))
             assert emitted==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenDoubleShift32.inc'])
             save(v/'shift-table.json',dict(rows=2,canonical_encodings=32768,sha256=hashlib.sha256(emitted).hexdigest()))
+            memory=sp.check_output([exe,'--vex-base-memory'],env=env).replace(bytes([13,10]),bytes([10]))
+            assert memory==sp.check_output(['git','-C',s,'show',':arch/X86/X86GenVexBaseMemory.inc'])
+            save(v/'memory-table.json',dict(bytes=len(memory),sha256=hashlib.sha256(memory).hexdigest()))
             rows=[]
             for suffix in ('static','shared'):
                 exe,=[f for f in b.rglob('probe_'+suffix+('.exe' if win else '')) if f.is_file()]

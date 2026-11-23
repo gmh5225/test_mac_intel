@@ -1,7 +1,7 @@
-name: Verify the late double-shift member on Windows and macOS in all four profiles
+name: Verify dedicated VEX memory records in x86 and mixed static and shared libraries on Windows and macOS
 on:
   push:
-    branches: [codex/portable-late-i386-double-shift]
+    branches: [codex/dedicated-vex-memory-across-platforms]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6de392819bbc0d468ad7c30531271823416f655e
+          ref: 0d5ab7d58a929ac48c7a1a5bdaafe2b57effa8e7
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: late-shift-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: dedicated-vex-portable-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
