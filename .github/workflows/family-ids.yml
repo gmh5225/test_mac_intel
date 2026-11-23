@@ -1,7 +1,7 @@
-name: Place the mixed ELF scalar postprinter after the vector readers with ordinary source ordering
+name: Compare statically linked real programs on ten architectures and verify complete public records
 on:
   push:
-    branches: [codex/natural-order-scalar-postprinter]
+    branches: [codex/static-public-records-and-nine-other-isas]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: natural-scalar-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: static-ten-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
