@@ -1,7 +1,7 @@
-name: Compare EVEX scan handling and ordinary x86 output with both iced formatters
+name: Compare generated EVEX transfer dispatch with both forked iced formatters on PE and ELF
 on:
   push:
-    branches: [codex/evex-scan-packed-moves-iced]
+    branches: [codex/iced-generated-transfer-classes]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-scan-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-prefix-classes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
