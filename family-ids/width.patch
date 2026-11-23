@@ -1,3 +1,44 @@
+diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
+index 10c7f1f7..8d012afa 100644
+--- a/arch/RISCV/RISCVGenDirectDecoder.inc
++++ b/arch/RISCV/RISCVGenDirectDecoder.inc
+@@ -22,6 +22,36 @@ static DecodeStatus direct_DecoderTable16(MCInst *MI, uint16_t insn, uint64_t Ad
+ 	unsigned Opc, DecodeIdx;
+ 	bool DecodeComplete;
+ 	(void)CurFieldValue;
++#ifdef CAPSTONE_RISCV_ONLY
++	CurFieldValue = fieldFromInstruction_2(insn, 0, 2);
++	switch ((fieldFromInstruction_2(insn, 13, 3) << 2) | CurFieldValue) {
++	case 0: goto L16;
++	case 1: goto L46;
++	case 2: goto L115;
++	case 4: goto L176;
++	case 5: goto L190;
++	case 6: goto L204;
++	case 8: goto L226;
++	case 9: goto L240;
++	case 10: goto L270;
++	case 12: goto L292;
++	case 13: goto L306;
++	case 14: goto L472;
++	case 16: goto L494;
++	case 17: goto L587;
++	case 18: goto L913;
++	case 20: goto L1037;
++	case 21: goto L1051;
++	case 22: goto L1065;
++	case 24: goto L1087;
++	case 25: goto L1101;
++	case 26: goto L1115;
++	case 28: goto L1137;
++	case 29: goto L1151;
++	case 30: goto L1165;
++	default: goto L1174;
++	}
++#endif
+ 	goto L0;
+ L0:;
+ 	CurFieldValue = fieldFromInstruction_2(insn, 13, 3);
 diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
 index 4f02638a..4439581c 100644
 --- a/arch/RISCV/RISCVScan.h
@@ -81,6 +122,73 @@ index 4f02638a..4439581c 100644
  		unsigned opcode;
  		const unsigned major = code[0] & 0x7f;
  		switch (major) {
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index ab09030b..00bd2e7d 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -211,7 +211,44 @@ def primary_opcode_mask(nodes):
+     return mask
+ 
+ 
+-def emit(name, nodes, width, w):
++def riscv_compressed_entry(nodes, groups):
++    """Combine the funct3 and quadrant filters when every miss reaches Fail."""
++    root = nodes[0]
++    if root.op != "ExtractField" or root.args != (13, 3):
++        return []
++    majors = groups.get(root.end, [])
++    if {nodes[p].args[0] for p in majors} != set(range(8)):
++        return []
++    fail = nodes[majors[-1]].target
++    if nodes[fail].op != "Fail":
++        return []
++    cases = []
++    for major in majors:
++        quadrant = nodes[nodes[major].end]
++        if quadrant.op != "ExtractField" or quadrant.args != (0, 2):
++            return []
++        filters = groups.get(quadrant.end, [])
++        if not filters or nodes[filters[-1]].target != fail:
++            return []
++        for position in filters:
++            value = nodes[position].args[0]
++            if value >= 4:
++                return []
++            key = (nodes[major].args[0] << 2) | value
++            cases.append(f"\tcase {key}: goto L{nodes[position].end};")
++    # Targets see the same last extracted value as in the two original filters.
++    return [
++        "#ifdef CAPSTONE_RISCV_ONLY",
++        "\tCurFieldValue = fieldFromInstruction_2(insn, 0, 2);",
++        "\tswitch ((fieldFromInstruction_2(insn, 13, 3) << 2) | CurFieldValue) {",
++        *cases,
++        f"\tdefault: goto L{fail};",
++        "\t}",
++        "#endif",
++    ]
++
++
++def emit(name, nodes, width, w, compressed=False):
+     incoming = {p: set() for p in nodes}
+     for p, n in nodes.items():
+         for dst in successors(n):
+@@ -246,6 +283,7 @@ def emit(name, nodes, width, w):
+         "\tunsigned Opc, DecodeIdx;",
+         "\tbool DecodeComplete;",
+         "\t(void)CurFieldValue;",
++        *(riscv_compressed_entry(nodes, groups) if compressed else []),
+         "\tgoto L0;",
+     ]
+ 
+@@ -360,7 +398,7 @@ def main():
+             ):
+                 mask = primary_opcode_mask(nodes)
+                 output.append(f"#define {name}_MAJOR_MASK UINT64_C(0x{mask:016x})")
+-            output.append(emit(name, nodes, width, w))
++            output.append(emit(name, nodes, width, w, arch == "RISCV" and name == "DecoderTable16"))
+             counts.append((name, len(nodes)))
+         if arch == "RISCV":
+             output.append(
 diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
 index 44a891a2..056cff15 100644
 --- a/tests/unit/riscv_scan_options.c

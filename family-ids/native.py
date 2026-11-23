@@ -45,7 +45,7 @@ def measure(t):
                 patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
             run(profile+k+'-config',config(b,arch,extra))
             run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else []),*(['riscv_scan_options'] if profile=='full' else [])])
-            if profile=='full' and k=='width':run('generated-aliases',[source/'suite/synctools/alias_pattern_rows.py','--check'])
+            if profile=='full' and k=='width':run('fixed-len-generator',[source/'suite/synctools/fixed_len_decoder.py','--check']);run('generated-aliases',[source/'suite/synctools/alias_pattern_rows.py','--check'])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
@@ -70,6 +70,9 @@ def measure(t):
         counts=list(map(int,sp.check_output([t/'scan-guard',libs['base'],libs[k]]).split()))
         assert counts==[1489920,338432,1151488],counts
         save('scan-proof-'+k,counts)
+    run('detail-guard-build',['c++','-std=c++17','-O2','-I',source/'include',r/'detail-guard.cpp','-ldl','-o',t/'detail-guard'])
+    for k in ('lazy','width'):
+        counts=list(map(int,sp.check_output([t/'detail-guard',libs['base'],libs[k]]).split()));assert counts[0]==2*7*65536*3 and counts[1]+counts[2]==counts[0];save('detail-compressed-'+k,counts)
     run('compressed-guard-build',['c++','-std=c++17','-O2','-I',source/'include',r/'compressed-guard.cpp','-ldl','-o',t/'compressed-guard'])
     for k in ('lazy','width'):
         counts=list(map(int,sp.check_output([t/'compressed-guard',libs['base'],libs[k]]).split()))
@@ -104,7 +107,7 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-compressed-integer-2319-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('riscv-combined-field-2325-'+flavor)
     del images['lazy']
     images['candidate_copy']=images['width']
     for name,bits in cases.items():
