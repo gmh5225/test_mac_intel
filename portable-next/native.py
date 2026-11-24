@@ -55,8 +55,8 @@ try:
                             selected.write_bytes(programs[k]);args=invoke
                         else:args=[t/(('base' if k=='copy' else k)+'time')]
                         return list(map(int,call(*args,f,str(sect['address']),str(mode),api,str(num)).split()))
-                    n=max(1,ceil(50e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random("isolated-scan-repeat/"+key+os.environ.get("REPEAT",""));cycles=[]
-                    for cycle in range(47):
+                    n=max(1,ceil(50e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random("mapped-scan-control/"+key+os.environ.get("REPEAT",""));cycles=[]
+                    for cycle in range(53):
                         order=keys.copy();rng.shuffle(order);obs={k:[]for k in keys}
                         for k in order+order[::-1]:
                             v=take(k,n);assert v[2:]==expected;obs[k].append(v[:2])
