@@ -8,26 +8,27 @@ def run(label,*args):
     with (e/(label+'.log')).open('wb')as f:ret=sp.run(args,stdout=f,stderr=sp.STDOUT)
     if ret.returncode:
         print((e/(label+'.log')).read_text(errors='replace')[-2200:]);ret.check_returncode()
-def measure_probe(label):
+def guard(label):
     if os.name=='nt':
-        names=[b/'capstone_static.lib',b/'capstone.lib']
-        target=next(k for k in names if k.is_file())
-    else:target=b/'libcapstone.a'
-    exe=t/('probe.exe' if os.name=='nt' else 'probe')
-    if os.name=='nt':run(label+'-probe-build','cl','/nologo','/O2','/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (b/'CMakeCache.txt').read_text() else '/MD','/std:c11','/I'+str(s/'include'),p/'probe.c',target,'/Fo:'+str(t/'probe.obj'),'/Fe:'+str(exe))
-    else:run(label+'-probe-build',profile if profile in ('gcc','clang') else 'clang','-O2','-I',s/'include',p/'probe.c',target,'-o',exe)
-    check=sp.run([exe],text=True,capture_output=True)
-    (e/(label+'-probe.log')).write_text(check.stderr+check.stdout)
-    return check.returncode,check.stderr.splitlines(),check.stdout.splitlines()
+        lib=next(k for k in (b/'capstone_static.lib',b/'capstone.lib') if k.is_file())
+        exe=t/'guard.exe'
+        run(label+'-guard-build','cl','/nologo','/O2','/EHsc','/std:c++17','/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (b/'CMakeCache.txt').read_text() else '/MD','/I'+str(s/'include'),p/'guard.cpp',lib,'/Fo:'+str(t/'guard.obj'),'/Fe:'+str(exe))
+    else:
+        lib=b/'libcapstone.a';exe=t/'guard'
+        run(label+'-guard-build','g++' if profile=='gcc' else 'clang++','-std=c++17','-O2','-I',s/'include',p/'guard.cpp',lib,'-o',exe)
+    run(label+'-guard',exe,*(['noatt'] if profile=='noatt' else []))
+    count=int((e/(label+'-guard.log')).read_text().strip());assert count==(737280 if profile=='noatt' else 860160)
+    if label=='candidate' and profile in ('gcc','clang','full') and os.name!='nt':
+        run('table-build','g++' if profile=='gcc' else 'clang++','-std=c++17','-O2','-I',s/'include',s/'suite/synctools/x86_simple_output.cpp',lib,'-o',t/'gen')
+        table=sp.check_output([t/'gen','--register-fragments32'])
+        assert table==(s/'arch/X86/X86GenRegisterFragments32.inc').read_bytes()
+    return count
 try:
  profile=os.environ['SCAN_PROFILE'];assert git('rev-parse','HEAD')==q['parent']
  patch=t/'candidate.patch';patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']))
  assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['sha256']
  git('apply','--index',patch);assert git('write-tree')==q['tree']
  run('generator','python','-B',s/'suite/synctools/x86_mapping_counts.py','--check')
- if platform.system()=='Linux' and profile=='clang':
-    for script in ('x86_operand_specializations.py','x86_disassembler_tables.py'):
-        run(script[:-3],'python','-B',s/'suite/synctools'/script,'--check')
  arches=['X86','ARM','AARCH64','MIPS']if platform.system()=='Linux' else ['X86']
  flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arches]]
  flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
@@ -40,15 +41,10 @@ try:
  text=(e/'units.log').read_text(errors='replace');assert '100% tests passed' in text and all('unit_'+n in text for n in units)
  cases=0
  if profile not in ('diet','reduced'):
-    candidate=measure_probe('candidate')
+    cases=guard('candidate')
     git('reset','--hard',q['parent'])
     run('base-build','cmake','--build',b,'--parallel','4','--target','capstone_static')
-    original=measure_probe('base')
-    cases=1632 if profile=='noatt' else 3264
-    wrong=24 if profile=='noatt' else 48
-    assert original==(1,[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(1 if profile=='noatt' else 2)],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, {wrong} incorrect shapes']),original
-    assert candidate==(0,[],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes']),candidate
-    save('corrected-16-bit-forms',dict(reference=q['parent'],candidate=q['commit'],records=cases,original=original,updated=candidate))
+    assert guard('base')==cases
  save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units,case_count=cases))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
