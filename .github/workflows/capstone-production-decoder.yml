@@ -1,4 +1,4 @@
-name: Compare an option-selected public decoder and outlined EVEX scanning in source-built NeverD
+name: Compare the selected public decoder and outlined EVEX with the current Capstone gitlink
 on:
   push:
     branches: [codex/selected-public-and-outlined-evex-product]
@@ -49,10 +49,10 @@ jobs:
         working-directory: neverd
         run: |
           test "$(git rev-parse HEAD)" = "4e9134e054c9d5300a56b4f2adbe61f8e8ed4ee2"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "567e62d3ff038035ea62ac460cc894f480065bee"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "eda656187b91970987b016629023b894bf83ce2f"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 567e62d3ff038035ea62ac460cc894f480065bee
-          git -C third_party/capstone checkout --detach 567e62d3ff038035ea62ac460cc894f480065bee
+          git -C third_party/capstone fetch --depth=1 origin eda656187b91970987b016629023b894bf83ce2f
+          git -C third_party/capstone checkout --detach eda656187b91970987b016629023b894bf83ce2f
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
