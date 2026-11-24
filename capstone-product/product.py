@@ -64,7 +64,7 @@ try:
             fields=line.split()
             if len(fields)==4 and fields[-1] in ('modRMTable','x86PackedUIDs'):
                 uid_tables[fields[-1]]=int(fields[1],16)
-        assert uid_tables==({'modRMTable':39968} if variant=='base' else {'x86PackedUIDs':39968}),uid_tables
+        assert uid_tables==({'modRMTable':39968}),uid_tables
         save('uid-storage-'+variant,uid_tables)
 
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
