@@ -1,7 +1,7 @@
-name: Qualify both final source trees on six-architecture NeverD and real programs
+name: Qualify native six-backend operand construction in complete NeverD binaries
 on:
   push:
-    branches: [codex/final-canonical-and-i386-product]
+    branches: [codex/real-six-backend-construction]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 0394098bb9f994504f850dbed2720df1ed0370dd
+          ref: 9f35a102e0ae78ff20e0f0e0b443d275f975abf7
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,11 +51,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "0394098bb9f994504f850dbed2720df1ed0370dd"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "396483e58bf0bb8f4dd6e36daff8b0458bad2315"
+          test "$(git rev-parse HEAD)" = "9f35a102e0ae78ff20e0f0e0b443d275f975abf7"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "fa11ca3d930b9e66a919ed4de20affdbc75bd125"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 396483e58bf0bb8f4dd6e36daff8b0458bad2315
-          git -C third_party/capstone checkout --detach 396483e58bf0bb8f4dd6e36daff8b0458bad2315
+          git -C third_party/capstone fetch --depth=1 origin fa11ca3d930b9e66a919ed4de20affdbc75bd125
+          git -C third_party/capstone checkout --detach fa11ca3d930b9e66a919ed4de20affdbc75bd125
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-and-alu-six-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: constructed-storage-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

@@ -89,7 +89,7 @@ try:
         save('forms-'+variant,dict(records=3264,wrong=48 if failure else 0,stdout=v.stdout,stderr=v.stderr))
         command(['clang','-O2','-I',cs/'include',r/'selector.c',archive,'-o',t/'selector-guard'],'link-selector-'+variant)
         command([t/'selector-guard'],'selector-'+variant)
-        assert (out/('selector-'+variant+'.log')).read_text().strip()==('9088 144 1008' if variant=='base' else '9088 144 0')
+        assert (out/('selector-'+variant+'.log')).read_text().strip()=='9088 144 0'
         check=t/'verify-move-scans'
         command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
         p=sp.run([check],capture_output=True,text=True,check=True)
@@ -155,7 +155,7 @@ try:
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if (c['name'],mode) in (('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
+            pairs=35 if (c['name'],mode) in (('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
