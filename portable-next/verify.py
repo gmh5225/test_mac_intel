@@ -1,3 +1,17 @@
+from pathlib import Path as _Path
+import hashlib as _hashlib, subprocess as _sp
+_base_dir = _Path(__file__).resolve().parent
+_source_dir = _base_dir.parent / 'source'
+def _git(*args, data=None):
+    return _sp.check_output(['git','-C',_source_dir,*args],input=data).decode().strip()
+assert _git('rev-parse','HEAD') == '8347e89a4e9a9e1618009fb8a496e335e857d00f'
+_patch = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:portable-next/corrected-parent.patch'])
+assert _hashlib.sha256(_patch).hexdigest() == 'c462aa5959d9fe71006d84e6f3f2206d72ea347c945c85b6683de69621430369'
+_git('apply','--index','-',data=_patch)
+assert _git('write-tree') == 'ca4d4512e65bdf432ea1eb3f76d69d66a07cc211'
+_commit = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:portable-next/parent.commit'])
+assert _git('hash-object','-w','-t','commit','--stdin',data=_commit) == '7db5af38d02d193688bccd2b45e58627979979bb'
+_git('checkout','-q','--detach','7db5af38d02d193688bccd2b45e58627979979bb')
 from pathlib import Path
 import hashlib,json,os,platform,subprocess as sp,tempfile,shutil
 p=Path(__file__).resolve().parent;s=p.parent/'source';e=p.parent/'evidence';e.mkdir(exist_ok=True)
@@ -33,7 +47,7 @@ try:
     exe=t/('probe.exe' if os.name=='nt' else 'probe')
     if os.name=='nt':run('probe-build','cl','/nologo','/O2','/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (b/'CMakeCache.txt').read_text() else '/MD','/std:c11','/I'+str(s/'include'),p/'probe.c',target,'/Fo:'+str(t/'probe.obj'),'/Fe:'+str(exe))
     else:run('probe-build',profile if profile in ('gcc','clang') else 'clang','-O2','-I',s/'include',p/'probe.c',target,'-o',exe)
-    run('probe',exe);cases=1560 if profile=='noatt' else 3120
+    run('probe',exe);cases=1632 if profile=='noatt' else 3264
     assert (e/'probe.log').read_text().strip()==str(cases)+' encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
  save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units,case_count=cases))
 finally:

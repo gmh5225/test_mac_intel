@@ -56,7 +56,6 @@ int main(void)
             for(unsigned i=0;i<sizeof(forms)/sizeof(forms[0]);++i) {
                 const struct move_form *f=&forms[i];
                 if(m!=2 && f->wide_only)continue;
-                if(m==0 && f->head[0]==0x66)continue;
                 unsigned errors=0, shape=0, rejected=0;
                 for(unsigned mod=0;mod<3;++mod) {
                     for(unsigned reg=0;reg<8;++reg) {
