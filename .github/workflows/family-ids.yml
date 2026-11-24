@@ -1,7 +1,7 @@
-name: Retest MIPS output and scan across independent macOS image orders
+name: Balance runtime image order for classic MIPS register jump scans
 on:
   push:
-    branches: [codex/mips-alternating-mac-image-orders]
+    branches: [codex/mips-jump-mac-host-orders]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 75dded738b11353eb9aa5fa07b249f4acabfc33f
+          ref: 8347e89a4e9a9e1618009fb8a496e335e857d00f
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -36,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-mac-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-jump-mac-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
