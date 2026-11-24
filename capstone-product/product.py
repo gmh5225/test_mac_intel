@@ -1,185 +1,72 @@
 from pathlib import Path
-import hashlib,json,os,random,shutil,statistics,subprocess as sp,sys,tempfile
-import corpus,avx_corpus,load_ssl
+import hashlib, json, os, platform, random, shutil, subprocess as sp, sys, tempfile
+import xml.etree.ElementTree as ET
+import corpus
 r=Path(__file__).resolve().parent;nd=r.parent/'neverd';out=r.parent/'product-evidence';out.mkdir(exist_ok=True)
-cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
+cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project';rd=lambda f:json.loads(f.read_text())
+def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
+def get(*a):return sp.check_output(a,text=True).strip()
+def git(repo,*a):return get('git','-C',repo,*a)
 def save(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def command(args,label,cwd=None):
     print(label,flush=True)
-    with (out/(label+'.log')).open('w')as f:z=sp.run(list(map(str,args)),stdout=f,stderr=sp.STDOUT,cwd=cwd)
-    if z.returncode:print((out/(label+'.log')).read_text(errors='replace')[-3500:],flush=True);z.check_returncode()
-def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).strip()
-def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
-m=json.loads((r/'source.json').read_text());dev=m['dev']
-assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','layout','selector'):assert sha(r/(k+'.patch'))==m[k]['sha256']
-assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
-llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
-save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
-t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
+    with (out/(label+'.log')).open('w') as f:z=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT)
+    if z.returncode:print((out/(label+'.log')).read_text(errors='replace')[-4000:],flush=True);z.check_returncode()
+m=rd(r/'source.json');q=m['candidate'];llvm=git(ll,'rev-parse','HEAD')
+assert git(nd,'rev-parse','HEAD')==m['dev'] and git(cs,'rev-parse','HEAD')==q['parent'] and sha(r/'candidate.patch')==q['sha256']
+assert llvm==git(ll,'ls-remote','origin','refs/heads/main').split()[0]
+save('source',dict(m,llvm=llvm,main_at_start=llvm,prebuilt=False))
+w=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
 try:
-    build=t/'build';cases=corpus.prepare(r,t,out,command)
-    foreign=[z for z in cases if z['name'].startswith(('arm64-','mips64el-'))]
-    selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','arm-ls','ppc64el-ls','riscv64-ls'}
-    cases=[c for c in cases if c['name'] in selected]
-    assert {c['name']for c in cases}==selected
-    rv=next(c for c in cases if c['name']=='riscv64-ls')
-    elf=corpus.deb_binary(t/'corpus'/rv['package_sha256'],'ls')
-    assert corpus.digest(elf)==rv['binary_sha256'] and corpus.digest(corpus.elf_text(elf))==rv['text_sha256']
-    assert elf[:6]==b'\x7fELF\x02\x01' and int.from_bytes(elf[48:52],'little')&1
-    assert b'rv64i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_' in elf
-    save('new-architectures',dict(riscv=rv['binary_sha256'],ppc=next(c['binary_sha256'] for c in cases if c['name']=='ppc64el-ls')))
-    for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
-    command([sys.executable,t/'libmvec.py'],'libmvec')
-    glibc=json.loads((t/'libmvec.json').read_text());cases.append(dict(name='libmvec-amd64',selector=64,path=str(t/'libmvec.text'),text_sha256=glibc['text_sha256']))
-    cases.append(avx_corpus.prepare(r,t,out,command))
-    data=load_ssl.prepare(r,t,out,command)
-    cases.append(data)
+    cases=corpus.prepare(r,w,out,command)
+    selected={'putty-32-0.85','putty-64-0.85','arm64-ls','arm-ls','riscv64-ls','ppc64el-ls','mips64el-ls'}
+    cases=[c for c in cases if c['name'] in selected];assert {c['name'] for c in cases}==selected
+    for f in ('libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
+    command([sys.executable,w/'libmvec.py'],'libmvec')
+    z=rd(w/'libmvec.json');assert sha(w/'libmvec.text')==z['text_sha256']
+    cases.append(dict(name='libmvec-amd64',selector=64,path=str(w/'libmvec.text'),text_sha256=z['text_sha256']))
     shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp')
     with (nd/'CMakeLists.txt').open('a') as f:f.write('\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
-    command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
-    assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
-    targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
-    from elftools.elf.elffile import ELFFile
-    decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','layout','selector'):
-        command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
-        assert git(cs,'rev-parse','HEAD')==m['base']['commit']
-        if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
-        caller='lib/decode/Decoder.cpp'
-        entry='X86_disasmIterText'
-        assert entry+'(Handle' in (nd/caller).read_text()
-        actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
-        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
-        assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
-        assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
-        command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
-        binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
-        names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
-        assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
+    build=w/'build'
+    command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
+    cache=(build/'CMakeCache.txt').read_text();assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in cache and 'CAPSTONE_BUILD_MACOS_THIN:BOOL=OFF' in cache
+    targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
+    images={};tests={};labels=['base','copy','candidate']
+    for label in ('base','candidate'):
+        if label=='candidate':command(['git','apply','--index',r/'candidate.patch'],'apply',cs)
+        tree=git(cs,'write-tree')
+        assert tree==(q['tree'] if label=='candidate' else git(cs,'rev-parse','HEAD^{tree}'))
+        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+label,nd)
+        assert git(cs,'write-tree')==tree and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm
         archive,=build.rglob('libcapstone.a')
-        assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
-        if variant in ('base','selector'):
-            command(['clang','-fPIC','-shared','-O2','-I',cs/'include',r/'export.c','-Wl,--whole-archive',archive,'-Wl,--no-whole-archive','-lm','-o',t/(variant+'.so')],'grid-lib-'+variant)
-        if variant=='selector':
-            command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'grid.cpp','-ldl','-o',t/'grid'],'grid-link')
-            command([t/'grid',t/'base.so',t/'selector.so'],'grid-result')
-            grid=json.loads((out/'grid-result.log').read_text())
-            save('grid',grid)
-            command(['clang++','-std=c++17','-O2','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-lm','-o',t/'emit-alu'],'generate-link')
-            generated=sp.check_output([t/'emit-alu','--test32-registers'])
-            assert generated==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
-            save('regenerated',dict(sha256=hashlib.sha256(generated).hexdigest(),bytes=len(generated)))
-        uid_tables={}
-        for line in sp.check_output(['nm','-S','--defined-only',archive],text=True).splitlines():
-            fields=line.split()
-            if len(fields)==4 and fields[-1] in ('modRMTable','x86PackedUIDs'):
-                uid_tables[fields[-1]]=int(fields[1],16)
-        assert uid_tables==({'modRMTable':39968}),uid_tables
-        save('uid-storage-'+variant,uid_tables)
-
-        command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
-        records={}
-        for z in foreign:
-            for option in range(5):
-                result=list(map(int,sp.check_output([t/'alias-raw','arm'if z['name'].startswith('arm64-')else 'mips',z['path'],str(option)]).split()))
-                assert len(result)==4 and result[0]>0
-                records[z['name']+'/'+str(option)]=result
-        assert len(records)>=10
-        if variant=='base':base_records=records
-        else:assert base_records==records
-        save('alias-records-'+variant,records)
-        command(['clang','-O2','-I',cs/'include',r/'probe.c',archive,'-o',t/'mask-access'],'verify-build-'+variant)
-        command([t/'mask-access'],'verify-memory-'+variant)
-        assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
-        command(['clang','-O2','-I',cs/'include',r/'forms.c',archive,'-o',t/'forms'],'compile-forms-'+variant)
-        v=sp.run([t/'forms'],text=True,capture_output=True);failure=variant!='layout'
-        expected_errors=[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(2)] if failure else []
-        expected_stdout=f'3264 encodings and syntax cases, 0 incorrect memory accesses, {48 if failure else 0} incorrect shapes'
-        assert (v.returncode,v.stderr.splitlines(),v.stdout.splitlines())==(int(failure),expected_errors,[expected_stdout]),(v.returncode,v.stdout,v.stderr)
-        save('forms-'+variant,dict(records=3264,wrong=48 if failure else 0,stdout=v.stdout,stderr=v.stderr))
-        command(['clang','-O2','-I',cs/'include',r/'selector.c',archive,'-o',t/'selector-guard'],'link-selector-'+variant)
-        command([t/'selector-guard'],'selector-'+variant)
-        assert (out/('selector-'+variant+'.log')).read_text().strip()=='9088 144 0'
-        check=t/'verify-move-scans'
-        command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
-        p=sp.run([check],capture_output=True,text=True,check=True)
-        counts=[row.split() for row in p.stdout.splitlines()]
-        assert len(counts)==15
-        wrong=[sum(int(row[col]) for row in counts) for col in (4,5,6)]
-        assert not any(wrong),wrong
-        save('scan-'+variant,dict(counts=counts,total=sum(int(row[2]) for row in counts),mismatches=wrong))
-        test=out/('tests-'+variant+'.log')
-        assert '100% tests passed' in test.read_text()
-        if variant=='base':
-            import frozen_ssl64
-            name,bits,path,spans,metadata=next(iter(frozen_ssl64.prepare(t)));q=json.loads((r/'ssl64-extents.json').read_text())
-            assert name=='libssl3t64-amd64' and bits==64 and len(spans)==q['input_functions'] and sha(path)==q['text_sha256']
-            intervals=t/'openssl-amd64.tsv';intervals.write_text(''.join('%d %d %d\n'%s for s in spans))
-            command(['clang++','-O2','-I',cs/'include',r/'vectors.cpp',archive,'-o',t/'vectors'],'vectors')
-            views=[list(map(int,x.split()))for x in sp.check_output([t/'vectors','64',path,intervals],text=True).splitlines()]
-            assert len(views)==len(spans)
-            skip={tuple(s[:3]) for s in q['excluded_incompatible_extents']}
-            chosen=[z for z,(total,vectors) in zip(spans,views)if tuple(z)not in skip and vectors>=8 and vectors>=.15*total]
-            intervals.write_text(''.join('%d %d %d\n'%s for s in chosen));assert len(chosen)==320 and sha(intervals)==q['extent_sha256']
-            cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
-            save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
-
-        code_sections={}
-        for name in ('X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Vex32Output.c.o'):
-            obj,=build.rglob(name)
-            with obj.open('rb') as file:
-                elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
-        save('executable-sections-'+variant,code_sections)
-        with binary.open('rb') as file:
-            elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-            save('linked-sections-'+variant,layout)
-        identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert len({z['archive']for z in identities.values()})==3 and len({z['binary']for z in identities.values()})==3
-    save('products',identities)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
-    shutil.copy2(products['base'],t/'selected')
-    imgs={k:v.read_bytes()for k,v in products.items()};imgs['copy']=imgs['base']
-    length=max(map(len,imgs.values()));imgs={k:v+bytes(length-len(v))for k,v in imgs.items()}
-    image=t/'selected';image.write_bytes(imgs['base'])
-    inode=image.stat().st_ino;block=4096
-    offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
-    checked={};assert offsets
-    def execute(k,case,mode,reps):
-        # Touch exactly the same file pages, in the same order, before every exec.
-        with image.open('r+b',buffering=0) as dest:
-            for at in offsets:
-                dest.seek(at)
-                part=imgs[k][at:at+block]
-                assert dest.write(part)==len(part)
-        assert image.stat().st_ino==inode and image.stat().st_size==length
-        if k not in checked:
-            checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
-
-        sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
-        return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
-    rows=[];rng=random.Random(1739)
+        archs=sorted(get('lipo','-archs',archive).split());assert archs==['arm64','x86_64'],archs
+        compiler=rd(build/'compile_commands.json');flags=next(i['command']for i in compiler if Path(i['file']).name=='cs.c' and 'capstone' in i['file'])
+        assert ('-DCAPSTONE_STATIC_X86_READERS' in flags)==(label=='candidate') and '-arch x86_64' in flags and '-arch arm64' in flags
+        binary,=build.rglob('capstone-product');shutil.copy2(binary,w/label)
+        names=get('nm','-n',binary).splitlines()
+        assert any(l.endswith(' _X86_scanNativeBatch') for l in names) and any(l.endswith(' _cs_disasm_iter') for l in names)
+        images[label]=dict(exe=sha(binary),archive=sha(archive),cpu=platform.machine(),archs=archs,flags=flags.replace(str(nd),'$SOURCE').replace(str(w),'$BUILD'),tree=tree)
+        command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(label+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+label)
+        nodes=ET.parse(out/(label+'.xml')).findall('.//testcase');assert len(nodes)>=43 and all(n.find('error') is None and n.find('failure') is None for n in nodes)
+        tests[label]={n.get('name'):'skipped' if n.find('skipped') is not None else 'pass' for n in nodes}
+    assert tests['base']==tests['candidate'] and images['base']['archive']!=images['candidate']['archive']
+    shutil.copy2(w/'base',w/'copy');assert sha(w/'copy')==images['base']['exe']
+    save('products',images);save('tests',tests)
+    rows={}
     for c in cases:
-        for mode in (range(4) if c['selector'] in (32,64) else range(3)):
-            single=execute('base',c,mode,1)
-            n=max(1,round(25000/single[0]))
-            expected=execute('base',c,mode,n)[1:];cycles=[]
-            if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
-            for rep in range(pairs):
-                keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
-                for k in keys+keys[::-1]:
-                    sample=execute(k,c,mode,n)
-                    wanted=expected.copy()
-                    assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
-                    ticks[k].append(sample[0])
-                cycles.append(ticks)
-            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],reps=n,cycles=cycles))
-            save('timings',rows)
-    assert set(checked)==set(imgs) and checked['copy']==checked['base']
-    save('fixed-image',dict(inode=inode,verified=checked,bytes=length,block=block,blocks=len(offsets)))
-    save('complete',dict(done=True,pairs=13,ssl_pairs=35,panels=len(rows),source=llvm))
+        sel=str(c['selector']) if c['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[c['selector']]
+        for mode in range(4 if c['name'] in ('putty-32-0.85','putty-64-0.85','libmvec-amd64') else 3):
+            def take(label,n):return list(map(int,get(w/label,c['path'],sel,str(mode),str(n)).split()))
+            once=take('base',1);assert once[0]>0 and once[1]>0
+            n=max(1,round(35000/once[0]));expect=take('base',n)[1:];rng=random.Random(c['name']+'/'+str(mode));cycles=[]
+            for _ in range(21):
+                rng.shuffle(labels);pair={k:0 for k in labels}
+                for k in labels+labels[::-1]:
+                    row=take(k,n);assert row[1:]==expect;pair[k]+=row[0]
+                cycles.append(pair)
+            rows[c['name']+'/'+str(mode)]=dict(repeats=n,sha256=c['text_sha256'],checks=expect,cycles=cycles);save('timings',rows)
+    assert len(rows)==27
+    save('complete',dict(complete=True,source=m,llvm=llvm,panels=len(rows),pairs=21,cpu=platform.machine()))
 finally:
-    size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())
-    shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))
+    amount=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink())
+    shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=amount))
