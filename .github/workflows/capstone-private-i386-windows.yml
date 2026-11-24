@@ -1,7 +1,7 @@
-name: Check generated x86 move-prefix scan rows and access directions on native ABIs
+name: Validate MMX scan table regeneration across native ABIs
 on:
   push:
-    branches: [codex/combined-move-prefix-scans-abis]
+    branches: [codex/compact-mmx-scan-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 7db5af38d02d193688bccd2b45e58627979979bb
+          ref: 1a1075b8bff460c3bd4da0b93f8e0a091c09039a
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: projected-mode-move-scans-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: regenerated-mmx-scans-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

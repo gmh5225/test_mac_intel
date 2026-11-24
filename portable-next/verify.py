@@ -1,17 +1,3 @@
-from pathlib import Path as _Path
-import hashlib as _hashlib, subprocess as _sp
-_base_dir = _Path(__file__).resolve().parent
-_source_dir = _base_dir.parent / 'source'
-def _git(*args, data=None):
-    return _sp.check_output(['git','-C',_source_dir,*args],input=data).decode().strip()
-assert _git('rev-parse','HEAD') == '7db5af38d02d193688bccd2b45e58627979979bb'
-_patch = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:portable-next/corrected-parent.patch'])
-assert _hashlib.sha256(_patch).hexdigest() == 'af0133cea9a18ea06fb295ef2b7870e052bf7cf814df777d7abffbff6ed8820c'
-_git('apply','--index','-',data=_patch)
-assert _git('write-tree') == 'f85eb6a819ae2fc7580ae1f680b23e673073db24'
-_commit = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:portable-next/parent.commit'])
-assert _git('hash-object','-w','-t','commit','--stdin',data=_commit) == '1a1075b8bff460c3bd4da0b93f8e0a091c09039a'
-_git('checkout','-q','--detach','1a1075b8bff460c3bd4da0b93f8e0a091c09039a')
 from pathlib import Path
 import hashlib,json,os,platform,subprocess as sp,tempfile,shutil
 p=Path(__file__).resolve().parent;s=p.parent/'source';e=p.parent/'evidence';e.mkdir(exist_ok=True)
