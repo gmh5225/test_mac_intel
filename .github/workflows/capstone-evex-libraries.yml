@@ -1,7 +1,7 @@
-name: Time the corrected full and compact x86 move decoders against iced
+name: Repeat x86 move projection timings on the published parent
 on:
   push:
-    branches: [codex/x86-move-prefix-projections-speed]
+    branches: [codex/released-parent-move-projection-replica]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 7db5af38d02d193688bccd2b45e58627979979bb
+          ref: 1a1075b8bff460c3bd4da0b93f8e0a091c09039a
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 886f481145d46b6daae6b3b064e313b5ab65d0fe
+          ref: d435a992844193f968dcb21e96bb9a0d3ecd487d
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-projected-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: released-parent-prefix-replica-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
