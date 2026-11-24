@@ -1,7 +1,7 @@
-name: Measure EVEX-only operand mask checks on calls that need the full decoder
+name: Compare short register membership in complete native decoders against iced
 on:
   push:
-    branches: [codex/evex-only-writemask-readers]
+    branches: [codex/short-register-sets-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-mask-operand-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: short-register-sets-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

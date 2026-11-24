@@ -1,24 +1,52 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..9fd58afb 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Only the EVEX operand reader can accept a writemask. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..3f6846ce 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11979,6 +11979,16 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 	return NULL;
+ }
+ 
++/* Most explicit operands follow zero or one previously reported register. */
++static inline bool x86HasRegister(uint16_t *regs, uint8_t count, unsigned int reg)
++{
++	if (count <= 1)
++		return count != 0 && regs[0] == reg;
++	if (count == 2)
++		return (regs[0] == reg) | (regs[1] == reg);
++	return arr_exist_inline(regs, count, reg);
++}
++
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+@@ -12008,12 +12018,12 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		switch ((int)op->type) {
+ 		case X86_OP_REG:
+ 			if ((op->access & CS_AC_READ) &&
+-			    !arr_exist_inline(regs_read, read_count, op->reg)) {
++			    !x86HasRegister(regs_read, read_count, op->reg)) {
+ 				regs_read[read_count] = op->reg;
+ 				read_count++;
  			}
- #endif
+ 			if ((op->access & CS_AC_WRITE) &&
+-			    !arr_exist_inline(regs_write, write_count,
++			    !x86HasRegister(regs_write, write_count,
+ 					      op->reg)) {
+ 				regs_write[write_count] = op->reg;
+ 				write_count++;
+@@ -12026,13 +12036,13 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 				read_count++;
+ 			}
+ 			if ((op->mem.base != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !x86HasRegister(regs_read, read_count,
+ 					      op->mem.base)) {
+ 				regs_read[read_count] = op->mem.base;
+ 				read_count++;
+ 			}
+ 			if ((op->mem.index != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !x86HasRegister(regs_read, read_count,
+ 					      op->mem.index)) {
+ 				regs_read[read_count] = op->mem.index;
+ 				read_count++;
