@@ -1,7 +1,7 @@
-name: Retest the macOS Arm64 branch writer with verified fork source checkout
+name: Measure byte-pair immediate output against Capstone and iced on real x86 code
 on:
   push:
-    branches: [codex/arm64-targets-verified-iced-source]
+    branches: [codex/unsigned-immediates-real-isa]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,7 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { host: ubuntu-24.04, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
           - { host: macos-15, cc: clang, replica: 1 }
+          - { host: macos-15-intel, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -24,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
+          ref: d3dcfa80afcb4d0786308a2938659998c54a1453
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 6dc251461e86243703d0a74ed5c581b428cd1596
+          ref: 799a7b08252f4e0c6d10a918011981c1460d8bf3
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -54,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-fork-targets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: immediate-numbers-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

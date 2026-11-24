@@ -7,6 +7,8 @@
 /// Compare x86 decoder API workloads. Benchmark-only; not linked into NeverD.
 
 #include <algorithm>
+#include <cstring>
+#include "arch/X86/X86ScanAdapter.h"
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -71,11 +73,11 @@ static void record(Result &r, size_t offset, size_t length, bool ok) {
 }
 static void text_value(Result &r, const char *s) {
   size_t n = 0;
-  while (s[n])
-    ++n;
+  n=std::strlen(s);
   r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
 }
 
+template<auto Next>
 static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn,uint64_t start_ip,unsigned mode) {
   Result result;
   {
@@ -84,7 +86,7 @@ static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn
     uint64_t ip = start_ip;
     while (left) {
       size_t offset = cursor - bytes;
-      bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);
+      bool ok = Next(handle, &cursor, &left, &ip, insn);
       record(result, offset, ok ? insn->size : 1, ok);
       if (!ok) {
         ++cursor;
@@ -99,7 +101,8 @@ static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn
         text_value(result, insn->mnemonic);
         text_value(result, insn->op_str);
       }
-      if (mode == 2) {
+      if (mode == 2 || mode == 4) {
+        if (mode==2) {
         cs_regs read, written;
         uint8_t nr = 0, nw = 0;
         if (cs_regs_access(handle, insn, read, &nr, written, &nw) != CS_ERR_OK)
@@ -108,6 +111,7 @@ static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn
           result.values += read[i];
         for (unsigned i = 0; i < nw; ++i)
           result.values += written[i];
+        }
         const auto &x = insn->detail->x86;
         result.values += x.eflags + insn->detail->groups_count;
         for (unsigned i = 0; i < x.op_count; ++i) {
@@ -126,7 +130,42 @@ static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn
   }
   return result;
 }
-extern "C" size_t iced_trace(const uint8_t *, size_t, uint64_t, uint8_t *);
+extern "C" X86ScanBatchResult X86_scanBatch64(csh, const uint8_t *, size_t, uint64_t, uint32_t *, size_t) __attribute__((weak));
+extern "C" X86ScanBatchResult X86_scanBatch32(csh, const uint8_t *, size_t, uint64_t, uint32_t *, size_t) __attribute__((weak));
+template <bool Audit, auto Next = X86_scanBatch>
+static Result batch_span(const uint8_t *bytes, size_t size, csh handle, cs_insn *insn, uint64_t start_ip) {
+  Result out;
+  size_t pos=0;
+  while(pos<size) {
+    uint32_t packed[64];
+    const auto got=Next(handle,bytes+pos,size-pos,start_ip+pos,packed,64);
+    if(got.count) {
+      size_t initial=pos;
+      if constexpr(Audit) if(got.count>64)throw std::runtime_error("batch capacity");
+      for(size_t i=0;i<got.count;++i) {
+        const unsigned n=packed[i]&255, id=packed[i]>>8;
+        if constexpr(Audit) {
+          const uint8_t *p=bytes+pos;size_t left=size-pos;uint64_t ip=start_ip+pos;
+          if(!n || n>left || !cs_disasm_iter(handle,&p,&left,&ip,insn) || n!=insn->size ||
+             id!=insn->id || p!=bytes+pos+n || left!=size-pos-n || ip!=start_ip+pos+n)
+            throw std::runtime_error("batch/public record mismatch");
+        }
+        record(out,pos,n,true);out.values+=id;pos+=n;
+      }
+      if constexpr(Audit) if(pos-initial!=got.bytes)throw std::runtime_error("byte count");
+      continue;
+    }
+    const uint8_t *p=bytes+pos;size_t left=size-pos;uint64_t ip=start_ip+pos;
+    bool ok=cs_disasm_iter(handle,&p,&left,&ip,insn);
+    unsigned n=ok?insn->size:1;
+    record(out,pos,n,ok);
+    if(ok)out.values+=insn->id;
+    pos+=n;
+  }
+  return out;
+}
+
+extern "C" size_t iced_trace(unsigned, const uint8_t *, size_t, uint64_t, uint8_t *);
 
 struct Span { size_t offset, size; uint64_t ip; };
 static void add_result(Result &total,const Result &span,const Span &range) {
@@ -136,10 +175,10 @@ static void add_result(Result &total,const Result &span,const Span &range) {
 }
 
 int main(int argc,char **argv) {
-  if(argc!=6) return 2;
+  if(argc!=7) return 2;
   std::string engine=argv[1];
   unsigned mode=std::stoul(argv[2]), reps=std::stoul(argv[3]);
-  if (mode>2 || !reps) return 2;
+  if (mode>4 || !reps) return 2;
   std::ifstream file(argv[4],std::ios::binary), table(argv[5]);
   std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(file), {}};
   std::vector<Span> spans;
@@ -149,18 +188,20 @@ int main(int argc,char **argv) {
     spans.push_back(span);
   }
   if(!table.eof() || spans.empty()) return 3;
+  unsigned bits=std::stoul(argv[6]);
   csh handle=0;
-  if(cs_open(CS_ARCH_X86,CS_MODE_64,&handle)!=CS_ERR_OK ||
-     cs_option(handle,CS_OPT_DETAIL,mode==2 ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK ||
+  if(cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,&handle)!=CS_ERR_OK ||
+     cs_option(handle,CS_OPT_DETAIL,mode>=2 ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK ||
      cs_option(handle,CS_OPT_TEXT,mode ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK) return 4;
   cs_insn *insn=cs_malloc(handle);
-  void *iced=iced_create(64,mode);
+  void *iced=iced_create(bits,mode | (engine=="fast" ? 8 : 0));
   if(!insn || !iced) return 5;
   if(engine=="audit") {
     for(auto f : spans) {
       auto ptr=bytes.data()+f.offset;
+      (void)batch_span<true,X86_scanNativeBatch>(ptr,f.size,handle,insn,f.ip);
       std::vector<uint8_t> expected(f.size), actual;
-      expected.resize(iced_trace(ptr,f.size,f.ip,expected.data()));
+      expected.resize(iced_trace(bits,ptr,f.size,f.ip,expected.data()));
       const uint8_t *cursor=ptr;
       size_t left=f.size; uint64_t ip=f.ip;
       while(left) {
@@ -177,12 +218,14 @@ int main(int argc,char **argv) {
                   (unsigned long long)f.ip,actual.size(),expected.size(),offset);
     }
   } else {
-    if(engine!="capstone" && engine!="iced") return 6;
+    if(engine!="capstone" && engine!="private" && engine!="iced" && engine!="fast") return 6;
     auto run=[&](unsigned n) {
       Result all;
       for(unsigned i=0;i<n;++i) for(auto f:spans) {
         Result row;
-        if(engine=="capstone") row=cs_span(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
+        if(engine=="capstone") row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
+        else if(engine=="private" && !mode) row=batch_span<false,X86_scanNativeBatch>(bytes.data()+f.offset,f.size,handle,insn,f.ip);
+        else if(engine=="private") row=cs_span<X86_disasmIterText>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
         else iced_run(iced,bytes.data()+f.offset,f.size,1,f.ip,&row);
         add_result(all,row,f);
       }

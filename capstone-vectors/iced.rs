@@ -1,6 +1,6 @@
 // NeverD Decompiler: benchmark-only iced public API adapter.
 use iced_x86::{
-    Decoder, DecoderOptions, Formatter, Instruction, InstructionInfoFactory, IntelFormatter,
+    Decoder, DecoderOptions, Formatter, Instruction, InstructionInfoFactory, IntelFormatter, FastFormatter,
 };
 
 #[repr(C)]
@@ -15,6 +15,7 @@ struct State {
     bits: u32,
     mode: u32,
     formatter: IntelFormatter,
+    fast: FastFormatter,
     factory: InstructionInfoFactory,
     text: String,
 }
@@ -25,6 +26,7 @@ pub extern "C" fn iced_create(bits: u32, mode: u32) -> *mut std::ffi::c_void {
         bits,
         mode,
         formatter: IntelFormatter::new(),
+        fast: FastFormatter::new(),
         factory: InstructionInfoFactory::new(),
         text: String::with_capacity(512),
     }))
@@ -42,6 +44,7 @@ pub unsafe extern "C" fn iced_run(
     input: *const u8,
     length: usize,
     repeats: u32,
+    ip: u64,
     output: *mut Result,
 ) {
     let state = &mut *state.cast::<State>();
@@ -53,7 +56,7 @@ pub unsafe extern "C" fn iced_run(
         values: 0,
     };
     for _ in 0..repeats {
-        let mut decoder = Decoder::with_ip(state.bits, bytes, 0x100000, DecoderOptions::NONE);
+        let mut decoder = Decoder::with_ip(state.bits, bytes, ip, DecoderOptions::NONE);
         let mut instruction = Instruction::default();
         while decoder.can_decode() {
             let offset = decoder.position();
@@ -66,25 +69,31 @@ pub unsafe extern "C" fn iced_run(
             if !ok {
                 result.rejected += 1;
                 decoder.set_position(offset + 1).unwrap();
-                decoder.set_ip(0x100000 + offset as u64 + 1);
+                decoder.set_ip(ip + offset as u64 + 1);
                 continue;
             }
             result.instructions += 1;
             result.values = result.values.wrapping_add(instruction.code() as u64);
             if state.mode != 0 {
                 state.text.clear();
-                state.formatter.format(&instruction, &mut state.text);
+                if state.mode & 8 != 0 { state.fast.format(&instruction, &mut state.text); } else { state.formatter.format(&instruction, &mut state.text); }
                 result.values = result.values.wrapping_add(
                     state.text.len() as u64
                         + state.text.as_bytes().last().copied().unwrap_or(0) as u64,
                 );
             }
-            if state.mode == 2 {
+            if (state.mode & 7) >= 2 {
                 let info = state.factory.info(&instruction);
+                if state.mode & 7 == 3 {
+                    std::hint::black_box(&*info);
+                    continue;
+                }
+                if state.mode & 7 == 2 {
                 for r in info.used_registers() {
                     result.values = result
                         .values
                         .wrapping_add(r.register() as u64 + r.access() as u64);
+                }
                 }
                 for m in info.used_memory() {
                     result.values = result.values.wrapping_add(
@@ -116,4 +125,23 @@ pub unsafe extern "C" fn iced_run(
         }
     }
     *output = result;
+}
+#[no_mangle]
+pub unsafe extern "C" fn iced_trace(bits:u32,input:*const u8, length:usize, ip:u64, output:*mut u8)->usize {
+    let bytes = std::slice::from_raw_parts(input,length);
+    let out = std::slice::from_raw_parts_mut(output,length);
+    let mut decoder=Decoder::with_ip(bits,bytes,ip,DecoderOptions::NONE);
+    let mut instruction=Instruction::default();
+    let mut count=0;
+    while decoder.can_decode() {
+        let offset=decoder.position();
+        decoder.decode_out(&mut instruction);
+        if instruction.is_invalid() {
+            out[count]=0;
+            decoder.set_position(offset+1).unwrap();
+            decoder.set_ip(ip+offset as u64+1);
+        } else { out[count]=instruction.len() as u8; }
+        count+=1;
+    }
+    count
 }
