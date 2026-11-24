@@ -1,7 +1,7 @@
-name: Separate legacy 16-bit resolver cost in firmware, PE and SIMD decoding
+name: Measure validated EVEX mask registers on real scalar and SIMD x86 workloads
 on:
   push:
-    branches: [codex/separate-legacy16-mode-body]
+    branches: [codex/resolved-mask-register-ownership]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-mode16-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: resolved-mask-register-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
