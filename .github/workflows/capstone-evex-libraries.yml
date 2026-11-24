@@ -1,7 +1,7 @@
-name: Measure packed FMA memory rows against iced on original functions
+name: Measure packed FMA output without changing the 32-bit or immediate reader
 on:
   push:
-    branches: [codex/packed-fma-vex3-reader]
+    branches: [codex/late-packed-fma-on-x64]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-fma-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: late-packed-fma64-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
