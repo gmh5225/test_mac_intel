@@ -1,7 +1,7 @@
-name: Measure constant-width relative branch output against Capstone and iced on four hosts
+name: Compare opcode-selected branch widths and fixed displacement writes with iced on four hosts
 on:
   push:
-    branches: [codex/branch-displacement-byte-copy]
+    branches: [codex/relative-opcode-width-product-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: relative-branch-encoding-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: relative-width-encoding-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

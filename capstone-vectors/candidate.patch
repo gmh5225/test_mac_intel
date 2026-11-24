@@ -1,11 +1,45 @@
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..c39e1cb3 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -50,6 +50,13 @@ enum X86SimpleForm {
+ 	X86_SIMPLE_RELATIVE,
+ };
+ 
++/* The generated relative plans cover unprefixed Jcc, JMP and CALL
++ * with an 8- or 32-bit displacement. The generator verifies both extents. */
++static inline unsigned X86_simpleBranchWidth(unsigned opcode)
++{
++	return (opcode & 0xf0) == 0x70 || opcode == 0xeb ? 1 : 4;
++}
++
+ /* This plan gets its ALU row from ModR/M.reg. Its low bits select the
+  * same register-only operand check as a register pair. */
+ #define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..3858a677 100644
+index 21414e7a..09b7cbb7 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -196,13 +196,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		const uint8_t *bytes = code + row->imm_offset;
+@@ -174,7 +174,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	}
+ 	const bool relative = form == X86_SIMPLE_RELATIVE;
+-	if (relative && size < (size_t)row->imm_offset + row->imm_size)
++	const unsigned branch_offset = 1 + escaped;
++	const unsigned branch_width = X86_simpleBranchWidth(opcode);
++	if (relative && size < branch_offset + branch_width)
+ 		return false;
+ 	uint64_t target = 0;
+ 	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
+@@ -193,20 +195,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
+ 		*insn_size = insn->size = (uint16_t)(1 + has_rex);
+ 	} else if (relative) {
+-		const uint8_t *bytes = code + row->imm_offset;
++		const uint8_t *bytes = code + branch_offset;
  		int64_t delta;
- 		if (row->imm_size == 1) {
+-		if (row->imm_size == 1) {
++		if (branch_width == 1) {
 +			insn->bytes[1] = bytes[0];
  			delta = (int8_t)bytes[0];
  		} else {
@@ -17,12 +51,19 @@ index 21414e7a..3858a677 100644
 +			/* The two-byte opcode and the one-byte opcode share
 +			 * this copy. For the latter, byte 1 is the displacement. */
 +			insn->bytes[1] = code[1];
-+			memcpy(insn->bytes + row->imm_offset, bytes, 4);
++			memcpy(insn->bytes + branch_offset, bytes, 4);
 +			delta = X86_readDisp32(bytes);
  		}
- 		const uint16_t length = row->imm_offset + row->imm_size;
- 		target = X86_relativeBranchTarget(handle->mode, insn->address,
-@@ -226,7 +227,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+-		const uint16_t length = row->imm_offset + row->imm_size;
+-		target = X86_relativeBranchTarget(handle->mode, insn->address,
+-						  length, delta, row->imm_size);
++		const uint16_t length = branch_offset + branch_width;
++		target = X86_relativeBranchTarget(wide ? CS_MODE_64 : CS_MODE_32,
++						  insn->address, length, delta, branch_width);
+ 		if (target <= HEX_THRESHOLD) {
+ 			insn->op_str[0] = (char)('0' + target);
+ 		} else {
+@@ -226,7 +229,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			memcpy(insn->op_str + 2, p, (size_t)(end - p));
  #endif
  		}
@@ -30,3 +71,17 @@ index 21414e7a..3858a677 100644
  		*insn_size = insn->size = length;
  	} else {
  		const unsigned width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index cce3e23d..a513bb1d 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -454,8 +454,7 @@ CheckedRow check_relative(Decoder &d, bool wide, unsigned cls, unsigned op)
+ {
+ 	CheckedRow row;
+ 	const unsigned offset = cls == 3 ? 2 : 1;
+-	const unsigned width =
+-		offset == 1 && (op == 0xeb || (op & 0xf0) == 0x70) ? 1 : 4;
++	const unsigned width = X86_simpleBranchWidth(op);
+ 	uint8_t bytes[6]{};
+ 	bytes[0] = cls == 3 ? 0x0f : op;
+ 	bytes[offset - 1] = op;
