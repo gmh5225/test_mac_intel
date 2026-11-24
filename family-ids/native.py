@@ -1,3 +1,17 @@
+from pathlib import Path as _Path
+import hashlib as _hashlib, subprocess as _sp
+_base_dir = _Path(__file__).resolve().parent
+_source_dir = _base_dir.parent / 'source'
+def _git(*args, data=None):
+    return _sp.check_output(['git','-C',_source_dir,*args],input=data).decode().strip()
+assert _git('rev-parse','HEAD') == '8347e89a4e9a9e1618009fb8a496e335e857d00f'
+_patch = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:family-ids/corrected-parent.patch'])
+assert _hashlib.sha256(_patch).hexdigest() == 'c462aa5959d9fe71006d84e6f3f2206d72ea347c945c85b6683de69621430369'
+_git('apply','--index','-',data=_patch)
+assert _git('write-tree') == 'ca4d4512e65bdf432ea1eb3f76d69d66a07cc211'
+_commit = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:family-ids/parent.commit'])
+assert _git('hash-object','-w','-t','commit','--stdin',data=_commit) == '7db5af38d02d193688bccd2b45e58627979979bb'
+_git('checkout','-q','--detach','7db5af38d02d193688bccd2b45e58627979979bb')
 from pathlib import Path
 import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
@@ -18,17 +32,15 @@ try:
             assert sha(d/'candidate.patch')==meta['sha256'];g('apply','--index',str(d/'candidate.patch'));assert g('write-tree')==meta['tree']
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
         so,=[x for x in b.glob('libcapstone.so.*') if not x.is_symlink()]
-        names={'matchAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name'}
+        names={'matchAliasPatterns','matchAliasPatternRange','matchMipsAliasPatterns','X86_disasmIter32','X86_disasmIter64','cs_disasm_iter','cs_decode_full_insn','AArch64_getInstruction','Mips_getInstruction','Mips_printInst','AArch64_printInst','Mips_reg_name'}
         syms={}
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
             if len(fs)==4 and fs[-1] in names:syms[fs[-1]]=list(map(lambda x:int(x,16),fs[:2]))
-        assert 'matchAliasPatterns' in syms and 'cs_disasm_iter' in syms
+        assert 'matchAliasPatterns' in syms and 'cs_disasm_iter' in syms and ('matchAliasPatternRange' in syms)==(k=='indexed')
         printer,=b.rglob('MCInstPrinter.c.o')
         cmd('common-code-'+k,['objcopy','--dump-section','.text='+str(t/'common.text'),printer])
         regular_code=sha(t/'common.text')
-        if k=='base':original=regular_code
-        else:assert regular_code==original
         sections=sp.check_output(['readelf','-SW',so],text=True)
         save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
         ids[k]=sha(so)
