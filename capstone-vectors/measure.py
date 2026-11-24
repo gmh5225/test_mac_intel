@@ -15,7 +15,9 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    frozen=rd(r/'base.json');assert get('git','-C',base,'rev-parse','HEAD').strip()==frozen['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert sha(r/'base.patch')==frozen['sha256'] and frozen['commit']==q['parent']
+    run('git','-C',base,'apply','--index',r/'base.patch');assert get('git','-C',base,'write-tree').strip()==frozen['tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -44,6 +46,12 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        symbols=get('nm','-S' if sys.platform!='darwin' else '-m',lib)
+        has_original=any(x.rstrip().endswith((' modRMTable',' _modRMTable')) for x in symbols.splitlines())
+        has_indexed=any(x.rstrip().endswith((' x86IndexedUIDs',' _x86IndexedUIDs')) for x in symbols.splitlines())
+        assert has_original==(label=='base') and has_indexed==(label=='candidate'),(label,has_original,has_indexed)
+        save('linked-table-'+label,dict(original=has_original,indexed=has_indexed))
+
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
