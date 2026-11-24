@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','prefix','stable'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','prefix','fragments'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -36,7 +36,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','prefix','stable'):
+    for variant in ('base','prefix','fragments'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -66,14 +66,19 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'probe.c',archive,'-o',t/'mask-access'],'verify-build-'+variant)
         command([t/'mask-access'],'verify-memory-'+variant)
         assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
+        command(['clang','-O2','-I',cs/'include',r/'forms.c',archive,'-o',t/'forms'],'compile-forms-'+variant)
+        v=sp.run([t/'forms'],text=True,capture_output=True);failure=variant!='prefix'
+        expected_errors=[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(2)] if failure else []
+        expected_stdout=f'3264 encodings and syntax cases, 0 incorrect memory accesses, {48 if failure else 0} incorrect shapes'
+        assert (v.returncode,v.stderr.splitlines(),v.stdout.splitlines())==(int(failure),expected_errors,[expected_stdout]),(v.returncode,v.stdout,v.stderr)
+        save('forms-'+variant,dict(records=3264,wrong=48 if failure else 0,stdout=v.stdout,stderr=v.stderr))
         check=t/'verify-move-scans'
         command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
         p=sp.run([check],capture_output=True,text=True,check=True)
         counts=[row.split() for row in p.stdout.splitlines()]
         assert len(counts)==15
         wrong=[sum(int(row[col]) for row in counts) for col in (4,5,6)]
-        if variant!='base':assert not any(wrong),wrong
-        else:assert wrong[2]>0,wrong
+        assert not any(wrong),wrong
         save('scan-'+variant,dict(counts=counts,total=sum(int(row[2]) for row in counts),mismatches=wrong))
         test=out/('tests-'+variant+'.log')
         assert '100% tests passed' in test.read_text()
@@ -92,7 +97,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('X86BatchScan.c.o','X86DisassemblerDecoder.c.o'):
+        for name in ('X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Vex32Output.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}

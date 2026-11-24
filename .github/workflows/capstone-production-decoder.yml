@@ -1,7 +1,7 @@
-name: Compare two MMX scan projections through one verified NeverD executable inode
+name: Check prefix semantics and PE32 fragment costs in source-built NeverD
 on:
   push:
-    branches: [codex/same-image-mmx-scan-product]
+    branches: [codex/verify-prefix-fragment-products]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -17,6 +17,9 @@ jobs:
           - os: ubuntu-24.04-arm
             cc: clang
             replica: 2
+          - os: ubuntu-24.04
+            cc: clang
+            replica: 3
     runs-on: ${{ matrix.os }}
     timeout-minutes: 235
     steps:
@@ -28,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: c9e9df34dbe4527bc2dcc6da328844f1df5af42a
+          ref: 36c24ed9842919dfdeb0672cafd95fefb04c312f
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +51,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "c9e9df34dbe4527bc2dcc6da328844f1df5af42a"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "1a1075b8bff460c3bd4da0b93f8e0a091c09039a"
+          test "$(git rev-parse HEAD)" = "36c24ed9842919dfdeb0672cafd95fefb04c312f"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 1a1075b8bff460c3bd4da0b93f8e0a091c09039a
-          git -C third_party/capstone checkout --detach 1a1075b8bff460c3bd4da0b93f8e0a091c09039a
+          git -C third_party/capstone fetch --depth=1 origin d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
+          git -C third_party/capstone checkout --detach d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: same-image-scan-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: prefix-fragments-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
