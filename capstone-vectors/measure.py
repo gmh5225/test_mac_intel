@@ -15,7 +15,9 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    frozen=rd(r/'base.json');assert get('git','-C',base,'rev-parse','HEAD').strip()==frozen['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert sha(r/'base.patch')==frozen['sha256'] and frozen['commit']==q['parent']
+    run('git','-C',base,'apply','--index',r/'base.patch');assert get('git','-C',base,'write-tree').strip()==frozen['tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
