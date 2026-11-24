@@ -1,0 +1,33 @@
+diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
+index 7537d3f9..5026e15e 100644
+--- a/arch/AArch64/AArch64InstPrinter.c
++++ b/arch/AArch64/AArch64InstPrinter.c
+@@ -629,7 +629,14 @@ add_real_detail:
+ 		map_set_fill_detail_ops(MI, !(isAlias && useAliasDetails));
+ 		if (isAlias)
+ 			SStream_Close(O);
+-		printInstruction(MI, Address, O);
++		/* Some operand printers format a temporary suffix even when the
++		 * output stream is closed. Preserve custom formatter calls. */
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++		if (!isAlias || detail_is_set(MI) ||
++		    cs_vsnprintf != cs_default_vsnprintf)
++#endif
++			printInstruction(MI, Address, O);
+ 		if (isAlias)
+ 			SStream_Open(O);
+ 	}
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
+index c94daecb..9ca5c079 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
++++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
+@@ -394,7 +394,7 @@
+     },
+     "printInst": {
+       "apply_type": "OLD",
+-      "old_hash": "4bbe09edf0ffb2abf534ac3c5572eccbc3baa941cc8047d76dab0fdd1dd72781",
++      "old_hash": "b87e02b036e5862ad83ebb29865c392fa2f3391f6c55d13ab1590c300d9cb99f",
+       "new_hash": "",
+       "edit": ""
+     },

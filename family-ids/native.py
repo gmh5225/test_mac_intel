@@ -22,17 +22,17 @@ try:
         run('cmake-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
         units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option','mips_scan','mips_register_names','mips16_memory_calls']
         units+=['mips16_frames','mips16_word_order','mips16_shifts_hilo','mips16_immediates','mips_msa_control','mips_reglist_offset']
-        if k in ('cold','combined'):units.append('batch_detail_alloc')
+        units+=['aarch64_scan','aarch64_postprocess']
         run('build-'+k,'cmake','--build',b,'--parallel','4','--target','capstone_shared',*units)
         run('unit-'+k,'ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$')
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=(b/'libcapstone.a').is_file(),bytes=path.stat().st_size,
-                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','MipsInstPrinter.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','MipsMapping.c.o','AArch64Disassembler.c.o')})
+                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','MipsInstPrinter.c.o','AArch64InstPrinter.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','MipsMapping.c.o','AArch64Disassembler.c.o')})
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
-        expected={'cold':{'cs.c.o'},'mips':{'MipsInstPrinter.c.o'},'combined':{'MipsInstPrinter.c.o','cs.c.o'}}[k]
+        expected={'mips':{'MipsInstPrinter.c.o'},'a64':{'AArch64InstPrinter.c.o'},'both':{'MipsInstPrinter.c.o','AArch64InstPrinter.c.o'}}[k]
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)

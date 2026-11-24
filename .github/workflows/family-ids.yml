@@ -1,7 +1,7 @@
-name: Check the closed MIPS real-detail pass on classic, microMIPS, MIPS16 and real multi-architecture workloads
+name: Measure AArch64 and MIPS canonical operand printing with observable formatter callbacks
 on:
   push:
-    branches: [codex/mips-skip-unused-canonical-render]
+    branches: [codex/mips-aarch64-alias-formatting]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-canonical-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-aarch64-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
