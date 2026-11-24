@@ -34,7 +34,10 @@ try:
     ice_lib=ad/'target/release/libiced_compare.a'
     shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
-    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
+    original=(w/'driver.cpp').read_text();entry='int main(int argc,char **argv) {'
+    assert original.count(entry)==1
+    (w/'combined-driver.cpp').write_text(original.replace(entry,'int run_foreign(int,char**);\n'+entry+'\n  if(argc==5)return run_foreign(argc,argv);'))
+    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'combined-driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={};objects={}
     cases={'X86VectorOutput.c','X86ImmediateOutput.c','X86EvexMemoryOutput.c','X86MemoryOutput.c','X86OutputIterator.c'}
@@ -44,7 +47,9 @@ try:
     from training import fetch
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     heldout=fetch(r,w);save('foreign-corpus',heldout)
-    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    foreign=(r/'foreign.cpp').read_text().rstrip();assert foreign.endswith('cs_close(&handle);\n}')
+    (w/'combined-foreign.cpp').write_text(foreign[:-1]+'  return 0;\n}\n')
+    run('clang++','-O3','-std=c++17','-Dmain=run_foreign','-I',base/'include','-c',w/'combined-foreign.cpp','-o',w/'foreign.o')
     for label in ('base','candidate','alu','tunedalu'):
         if label!='base':
             run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -54,9 +59,9 @@ try:
             assert get('git','-C',base,'write-tree').strip()==source['tree']
         tuned=label in ('candidate','tunedalu')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        run('clang++','-no-pie',w/'foreign.o',lib,'-lm','-o',w/('foreign-'+label))
-        images[label]=dict(archive=sha(lib),exe=sha(w/label),foreign=sha(w/('foreign-'+label)))
+        run('clang++',w/'driver.o',w/'foreign.o',lib,ice_lib,*flags,'-o',w/label)
+        images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        save('products',images)
         cc=rd(build/'compile_commands.json');active={Path(v['file']).name for v in cc if '-mstringop-strategy=libcall' in v['command']}
         assert active==(cases if tuned else set()),active
         obj={f.name:f for f in build.rglob('*.c.o')}
@@ -82,13 +87,13 @@ try:
     labels_native=('base','duplicate','candidate','alu','alucopy','tunedalu')
     def paths(prefix):
         return {label:w/(prefix+{'alucopy':'alu','duplicate':'base'}.get(label,label)) for label in labels_native}
-    bench=FixedImage(w/'selected',paths(''));foreign_image=FixedImage(w/'selected-foreign',paths('foreign-'))
+    bench=FixedImage(w/'selected',paths(''));foreign_image=bench
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('gcc','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
+    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('gcc','--version').splitlines()[0],os=platform.platform(),combined_driver_sha256=sha(w/'combined-driver.cpp'),combined_foreign_sha256=sha(w/'combined-foreign.cpp'),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
