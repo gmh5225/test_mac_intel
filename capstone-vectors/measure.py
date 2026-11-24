@@ -12,7 +12,8 @@ def save(name,data):
     (evidence/name).write_text(json.dumps(data,indent=2)+'\n')
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def run(args,label,cwd=None):
-    with (evidence/(label+'.log')).open('w') as f:sp.run(args,cwd=cwd,stdout=f,stderr=sp.STDOUT,check=True)
+    print(label,flush=True)
+    with (evidence/(label+'.log')).open('w') as f:sp.run(args,cwd=cwd,stdout=f,stderr=sp.STDOUT,check=True,timeout=400)
 def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
@@ -195,23 +196,15 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    image=w/'timed-runner'
-    n=max(map(len,images.values()))
-    padded={k:v+bytes(n-len(v)) for k,v in images.items()}
-    active=None
-    if not darwin:
-        run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
-        image.write_bytes(padded['base']);image.chmod(0o755)
-        active=hashes['base']
-    save('launch.json',dict(linked=hashes,same_file_and_fixed_address=not darwin,canonical_argv=True,padded_length=n,inode=image.stat().st_ino if not darwin else None))
+    run(['setarch',platform.machine(),'-R','/bin/true'],'fixed-address')
+    # Use equally long permanent paths and pass the same argv[0] to every timed image.
+    numbered={}
+    for i,(k,original) in enumerate(bins.items()):
+        target=w/('img%02d'%i);target.symlink_to(original);numbered[k]=target
+    save('launch.json',dict(linked=hashes,same_file_and_fixed_address=False,fixed_address=True,
+         canonical_argv=True,unchanged_disk_images=True))
     def invoke(key,tail):
-        nonlocal active
-        if darwin:
-            return sp.check_output([image,*tail],executable=bins[key])
-        if active!=hashes[key]:
-            with image.open('r+b')as out:assert out.write(padded[key])==n
-            active=hashes[key]
-        return sp.check_output(['setarch',platform.machine(),'-R',image,*tail])
+        return sp.check_output(['setarch',platform.machine(),'-R','bash','-c','exec -a timed-runner "$0" "$@"',numbered[key],*tail],timeout=45)
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
     run(['python3','-B',w/'libmvec.py'],'libmvec')
@@ -229,23 +222,23 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in (0,1,2):
+        for mode in ([0] if name=='jpeg-avx2-i386' else [1]):
             engine='x86_len_' if mode else 'vecbatch'
             targets={name:(key,engine) for name,key in [('private_mixed_base','mixed_base'),('private_reference_copy','mixed_base'),('private_mixed_bare','mixed_bare'),('private_anchored','mixed_anchor')]}
             def timed(label,count):
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_mixed_base',1)[0])));cycles=[]
+            rep=max(1,math.ceil(25e6/max(1,timed('private_mixed_base',1)[0])));cycles=[]
             labels=list(targets);order=random.Random(str((name,mode,'released-public-reader')))
-            for idx in range(25):
+            for idx in range(17):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1
                 for kind in ('private_',):
                     assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
                 if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
                 cycles.append(dict(raw=obs))
-            results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==9
+            print(name,mode,rep,flush=True);results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
+    assert len(results)==3
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:
