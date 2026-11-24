@@ -1,7 +1,7 @@
-name: Measure bounded XCore ID lookup and corrected operand output in XMOS firmware
+name: Measure XCore uniform halfword scans and operand records on firmware
 on:
   push:
-    branches: [codex/constant-xcore-native-firmware]
+    branches: [codex/xcore-uniform-encoding-firmware]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-mapped-time-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-uniform-time-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
