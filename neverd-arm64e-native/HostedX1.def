@@ -16,6 +16,24 @@
     "machdep.cpu.brand_string"
   ],
   "summary": "### {hardware}\n\nNative arm64e.x1 qualification **{status}** at `{revision}`.\n",
+  "control_command": [
+    "-m", "unittest", "-v",
+    "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_native_scalar_instruction_sites_and_results",
+    "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_native_explicit_cursor_requires_both_instruction_sites",
+    "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_ordered_q_lane_and_signal_controls_with_baseline_instructions"
+  ],
+  "control_log": "native-probe-controls.log",
+  "feature_rows": [
+    ["ordered_probe", "qualified_key", "128-bit LRCPC3"],
+    ["cursor_probe", "explicit_key", "Two-modifier PAuth_LR"],
+    ["cursor_probe", "pacm_pc_key", "PC-sensitive PACM"],
+    ["cursor_probe", "pacm_hint_key", "PACM HINT with active IA and IB"],
+    ["cpta_probe", "scalar_qualified_key", "EL0 checked scalar arithmetic on arm64e.x1"],
+    ["cpta_probe", "writeback_qualified_key", "EL0 checked writeback on arm64e.x1"]
+  ],
+  "feature_heading": "\n| Native observation | Result |\n| --- | --- |",
+  "feature_row": "\n| {feature} | {result} |",
+  "unmeasured": "unmeasured",
   "missing_heading": "\nThe runner did not qualify these features.\n",
   "inconsistent_result": "The native report, source revision and verifier exit status disagree."
 }

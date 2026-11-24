@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -21,7 +22,39 @@ def resolve():
         print(f"revision={revision}", file=output)
 
 
-def summarize(policy, report, revision, exit_code, hardware):
+def feature_summary(policy, report, output):
+    details = {}
+    summary = CONFIG["feature_heading"]
+    for section, key, label in CONFIG["feature_rows"]:
+        probe = policy[section]
+        mode = probe["mode"]
+        if mode not in details:
+            receipt = report["probes"][mode]
+            path = output / mode / policy["report_name"]
+            raw = path.read_bytes()
+            data = json.loads(raw)
+            if (receipt["report"] != path.relative_to(output).as_posix()
+                    or receipt["sha256"] != hashlib.sha256(raw).hexdigest()
+                    or data["source_revision"] != report["source_revision"]
+                    or data["status"] != receipt["status"]
+                    or data["status"] not in policy["exit_codes"]):
+                raise ValueError(CONFIG["inconsistent_result"])
+            details[mode] = data
+        data = details[mode]
+        if data["status"] == policy["failed"]:
+            result = policy["failed"]
+        elif key not in probe:
+            result = CONFIG["unmeasured"]
+        else:
+            observed = data[probe[key]]
+            if type(observed) is not bool or (probe[key] in report and report[probe[key]] is not observed):
+                raise ValueError(CONFIG["inconsistent_result"])
+            result = policy["passed"] if observed else policy["unavailable"]
+        summary += CONFIG["feature_row"].format(feature=label, result=result)
+    return summary + "\n"
+
+
+def summarize(policy, report, revision, exit_code, hardware, output):
     status = report["status"]
     passed = status == policy["passed"]
     if (
@@ -35,6 +68,7 @@ def summarize(policy, report, revision, exit_code, hardware):
     summary = CONFIG["summary"].format(
         hardware=hardware, status=status, revision=revision
     )
+    summary += feature_summary(policy, report, output)
     if report["missing"]:
         summary += CONFIG["missing_heading"]
         for feature in report["missing"]:
@@ -51,10 +85,13 @@ def measure(source, output):
     report = json.loads((output / policy["report_name"]).read_text())
     hardware = subprocess.check_output(CONFIG["hardware_command"], text=True).strip()
     summary = summarize(
-        policy, report, os.environ["SOURCE_REVISION"], result.returncode, hardware
+        policy, report, os.environ["SOURCE_REVISION"], result.returncode, hardware, output
     )
     with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as out:
         print(summary, file=out)
+    with (output / CONFIG["control_log"]).open("w") as log:
+        subprocess.run([sys.executable, *CONFIG["control_command"]], cwd=source,
+                       stdout=log, stderr=subprocess.STDOUT, check=True)
     if report["status"] == policy["failed"]:
         raise SystemExit(result.returncode)
 
