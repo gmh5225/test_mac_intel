@@ -1,7 +1,7 @@
-name: Validate canonical EXTRQ selectors with source-only direct UIDs on nineteen configurations
+name: Check operand access and record writers on nineteen configurations
 on:
   push:
-    branches: [codex/source-only-direct-uid-platforms]
+    branches: [codex/canonical-access-and-writer-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 396483e58bf0bb8f4dd6e36daff8b0458bad2315
+          ref: fa11ca3d930b9e66a919ed4de20affdbc75bd125
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: canonical-extrq-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: operand-access-profiles-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
