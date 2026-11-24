@@ -47,8 +47,6 @@ try:
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        assert sha(r/'released-public.patch')==maps['base']['sha256']
-        run('git','-C',base,'apply','--index',r/'released-public.patch')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -58,6 +56,10 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
+        if label=='base':
+            run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include',r/'model.cpp',lib,ice_lib,*flags,'-o',w/'model')
+            save('stack-model',dict(driver=sha(r/'model.cpp'),library=sha(lib),binary=sha(w/'model')))
+
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
@@ -116,13 +118,18 @@ try:
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         for route in ('private','capstone'):
             def take(engine,mode,n):
-                select(engine)
-                return list(map(int,get(*invoke,route,str(mode),str(n),f,path,str(bits)).split()))
+                other=engine in ('iced','fast')
+                select('base' if other else engine)
+                return list(map(int,get(*invoke,engine if other else route,str(mode),str(n),f,path,str(bits)).split()))
             for mode in (0,1,2):
-                labels=list(imgs)
+                labels=[*imgs,'iced'] + (['fast'] if mode else [])
                 repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
                 expected={k:take(k,mode,repeats)[2:]for k in labels}
-                assert all(v==expected['base'] for v in expected.values())
+                assert all(v[:3]==expected['base'][:3] for v in expected.values())
+                assert expected['base']==expected['duplicate']==expected['candidate']
+                oracle=list(map(int,get(w/'model',route,str(mode),str(repeats),f,path,str(bits)).split()))[2:]
+                assert expected['outlined']==oracle,(name,route,mode,expected['outlined'],oracle)
+                if mode!=2:assert expected['outlined']==expected['base']
                 rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
                 for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
                     rng.shuffle(labels);sample={k:[] for k in labels}
@@ -130,7 +137,7 @@ try:
                         row=take(k,mode,repeats);assert row[2:]==expected[k]
                         sample[k].append(row[:2])
                     rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
+                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,stack_model=oracle,cycles=rows)
                 summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
                 save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==36

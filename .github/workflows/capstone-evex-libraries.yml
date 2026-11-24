@@ -1,7 +1,7 @@
-name: Isolate real-mode register output and replicate the i386 JPEG detail result across six ISAs
+name: Measure i386 condition records and verify actual implicit stack changes against an independent model and iced
 on:
   push:
-    branches: [codex/private-prefixed-register-native-recheck]
+    branches: [codex/released-conditional-bytes-and-stack]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: e55d0c4b18bbe676431aa1fbd12d9013da69c315
+          ref: 236614a333d4bf55faca1960814bb6fbc821a86a
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 5e6d5bf5fecff2ff57729297df9bc368c6ed59a5
+          ref: cf7070f32ef716648478d178390c742cbaec5b21
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-16-record-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: current-i386-condition-stack-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
