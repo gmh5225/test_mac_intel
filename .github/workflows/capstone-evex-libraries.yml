@@ -1,7 +1,7 @@
-name: Measure release-size UID selectors against the two iced formatters
+name: Time six physical input images with the new six-architecture NeverD link and fork iced
 on:
   push:
-    branches: [codex/neutral-selector-iced-score]
+    branches: [codex/six-arch-iced-fork-score]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 84cdbdd109ad5f72e85603dd2dbbb5081020c58a
+          ref: 512ac40f11eda4f1998843f0de8f257723635945
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neutral-selector-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: six-arch-selector-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
