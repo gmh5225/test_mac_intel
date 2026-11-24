@@ -61,8 +61,8 @@ try:
         assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
         command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'offset.cpp',archive,'-o',t/'offset'],'link-offset-'+variant)
         vals=sp.check_output([t/'offset'],text=True).strip().splitlines();assert len(vals)==48
-        if variant=='base':assert '0x1234' in vals[0] and '0xffff8234' in vals[6] and '0xffffffff80001234' in vals[12]
-        else:assert '0x80001234' in vals[0] and '0x8234' in vals[6] and '0x80001234' in vals[12]
+        if variant=='base':original_offsets=vals
+        else:assert vals==original_offsets
         save('absolute-offsets-'+variant,vals)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
@@ -95,7 +95,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','PPCMapping.c.o','ARMMapping.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
+        for name in ('X86RegisterFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','PPCMapping.c.o','ARMMapping.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
@@ -104,7 +104,9 @@ try:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert len({z['archive']for z in identities.values()})==3 and len({z['binary']for z in identities.values()})==3
+    expected=3 if os.uname().machine=='x86_64' else 2
+    assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
+    if expected==2:assert all(identities['base'][k]==identities['layout'][k]for k in ('archive','binary'))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))

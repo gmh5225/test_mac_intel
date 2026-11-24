@@ -1,7 +1,7 @@
-name: Compare two correct absolute address implementations in source-built NeverD across six architectures
+name: Build NeverD and LLVM from source for i386 register and mixed public record paths
 on:
   push:
-    branches: [codex/effective-width-source-llvm-product]
+    branches: [codex/linux-public-and-group3-neverd-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -14,7 +14,7 @@ jobs:
           - os: ubuntu-24.04-arm
             cc: clang
             replica: 1
-          - os: ubuntu-24.04-arm
+          - os: ubuntu-24.04
             cc: clang
             replica: 2
           - os: ubuntu-24.04
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 5e6d5bf5fecff2ff57729297df9bc368c6ed59a5
+          ref: 961146191161cfb1dc1584a1e9c8946d2166ad45
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,11 +51,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "5e6d5bf5fecff2ff57729297df9bc368c6ed59a5"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "e55d0c4b18bbe676431aa1fbd12d9013da69c315"
+          test "$(git rev-parse HEAD)" = "961146191161cfb1dc1584a1e9c8946d2166ad45"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "b7a40bec54cdcb46fd6555b3335e3965a06a3740"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin e55d0c4b18bbe676431aa1fbd12d9013da69c315
-          git -C third_party/capstone checkout --detach e55d0c4b18bbe676431aa1fbd12d9013da69c315
+          git -C third_party/capstone fetch --depth=1 origin b7a40bec54cdcb46fd6555b3335e3965a06a3740
+          git -C third_party/capstone checkout --detach b7a40bec54cdcb46fd6555b3335e3965a06a3740
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: decoded-address-width-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: scoped-group3-public-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

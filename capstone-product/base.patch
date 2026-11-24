@@ -1,143 +1,187 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..a7ce1337 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -160,6 +160,14 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
-     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    # Linux x86-64 retains its inlined initialization for MIPS text throughput.
-+    if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
-+       AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
-+            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")))
-+        add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
-+        set(capstone_storage_source MCInstStorage.c)
-+    endif()
- endif()
+diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
+index 6a6a9753..f778e3b7 100644
+--- a/arch/RISCV/RISCVInstPrinter.c
++++ b/arch/RISCV/RISCVInstPrinter.c
+@@ -491,12 +491,28 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 		}
+ 	}
  
- if(capstone_enabled_architectures STREQUAL "XCORE")
-@@ -1056,7 +1064,7 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
- 
- ## targets
- add_library(capstone_build_settings INTERFACE)
--add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
-+add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${ALL_HEADERS})
- target_link_libraries(capstone PUBLIC capstone_build_settings)
- set_property(TARGET capstone PROPERTY C_STANDARD 99)
- target_include_directories(capstone_build_settings INTERFACE
-@@ -1089,23 +1097,23 @@ endif()
- 
- if(CAPSTONE_BUILD_STATIC_LIBS)
-     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
--    set(capstone_alias_patterns_tail)
-+    set(capstone_static_tail)
-     if(TARGET capstone_x86_iter32)
-         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
-             # Backends reference the alias parser indirectly. Keep its hot code
-             # ahead of the optional native readers even when all are linked.
--            # Keep the opcode rows after the native scanner when both are linked.
--            set(capstone_alias_patterns_tail
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-+            # Keep alias rows and the mixed operand initializer after the native readers.
-+            set(capstone_static_tail
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>")
-             set(capstone_static_objects
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
-                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
-         else()
-             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
-         endif()
--        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
-+        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
-     endif()
-     add_library(capstone_static STATIC ${capstone_static_objects})
-     # Use normal capstone name. Otherwise we get libcapstone_static.a
-diff --git a/MCInstStorage.c b/MCInstStorage.c
-new file mode 100644
-index 00000000..f03bed8f
---- /dev/null
-+++ b/MCInstStorage.c
-@@ -0,0 +1,18 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include "cs_priv.h"
-+
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+/* The mixed decoder calls this for ARM, AArch64, PowerPC and RISC-V.
-+ * Each decoder constructs its active operands before reading them. */
-+#if defined(__ELF__)
-+__attribute__((section(".cs_mcinst_storage_text")))
-+#elif defined(__APPLE__)
-+__attribute__((section("__TEXT,__cs_mcinst,regular,pure_instructions")))
++#ifdef CAPSTONE_RISCV_ONLY
++	/* Group construction and operand compaction only consume detail. */
++	if (!detail_is_set(MI)) {
++		RISCV_set_alias_id(MI, O);
++		return;
++	}
 +#endif
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
++
+ 	bool textAndDetailModesMatch = (isRealSyntax(MI) && isRealDetail(MI)) ||
+ 				       (isUncompressedRealSyntax(MI) &&
+ 					isUncompressedRealDetail(MI)) ||
+ 				       (isAliasSyntax(MI) && isAliasDetail(MI));
+ 
+-	if (detail_is_set(MI) && !textAndDetailModesMatch) {
++	if (detail_is_set(MI) && !textAndDetailModesMatch
++#ifdef CAPSTONE_RISCV_ONLY
++	    /* Both passes select the same canonical instruction when neither
++	     * expansion nor aliasing occurred. A closed stream needs the
++	     * existing detail-only pass. */
++	    && (O->is_closed || is_uncompressed || MCInst_isAlias(MI) ||
++		isAliasDetail(MI))
++#endif
++	) {
+ 		SStream_Close(O);
+ 		// discard the text operands
+ 		memset(MI->flat_insn->detail->riscv.operands, 0,
+diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
+index 45d62be6..a3e2892f 100644
+--- a/arch/RISCV/RISCVMapping.c
++++ b/arch/RISCV/RISCVMapping.c
+@@ -141,9 +141,21 @@ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
+ 		return;
+ 	}
+ 	cs_riscv_op *op = RISCV_get_detail_op_at(MI, OpNum);
++#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
++	/* Type and access come from one generated operand. Only a tied
++	 * operand can change the access recorded in that entry. */
++	assert(MI->Opcode < ARR_SIZE(insn_operands));
++	assert(OpNum < ARR_SIZE(insn_operands[0].ops));
++	const mapping_op *mapped = &insn_operands[MI->Opcode].ops[OpNum];
++	const cs_op_type type = (cs_op_type)mapped->type;
++	op->type = (riscv_op_type)type;
++	op->access = MI->tied_op_idx_size ? map_get_op_access(MI, OpNum) :
++					    (cs_ac_type)mapped->access;
++#else
+ 	const cs_op_type type = map_get_op_type(MI, OpNum);
+ 	op->type = (riscv_op_type)type;
+ 	op->access = (cs_ac_type)map_get_op_access(MI, OpNum);
++#endif
+ 	switch (type) {
+ 	case CS_OP_REG:
+ 		op->reg = MCInst_getOperand(MI, OpNum)->RegVal;
+diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
+index e7f449a4..14362d77 100644
+--- a/arch/RISCV/RISCVScan.h
++++ b/arch/RISCV/RISCVScan.h
+@@ -5,7 +5,7 @@
+ 
+ #include "RISCVModule.h"
+ 
+-#ifdef RISCV_USE_COMPRESSED_DISPATCH
++#ifndef CAPSTONE_DIET
+ /* The ordinary decoder retains reserved immediates, zero-register hints
+  * and encodings whose operation differs between RV32 and RV64. */
+ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
+@@ -13,6 +13,8 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
+ 	const unsigned encoding = ((word >> 13) << 2) | (word & 3);
+ 	const unsigned rd = (word >> 7) & 31;
+ 	switch (encoding) {
++	case 0: /* C.ADDI4SPN requires a nonzero stack offset. */
++		return word & 0x1fe0 ? RISCV_C_ADDI4SPN : 0;
+ 	case (5 << 2) | 1:
+ 		return RISCV_C_J;
+ 	case (6 << 2) | 1:
+@@ -28,8 +30,10 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
+ 	case (2 << 2) | 1:
+ 		return rd ? RISCV_C_LI : 0;
+ 	case (4 << 2) | 2:
+-		if (!rd || !(word & 0x7c))
++		if (!rd)
+ 			return 0;
++		if (!(word & 0x7c))
++			return (word & 0x1000) ? RISCV_C_JALR : RISCV_C_JR;
+ 		return (word & 0x1000) ? RISCV_C_ADD : RISCV_C_MV;
+ 	case (0 << 2) | 1:
+ 		return rd && (word & 0x107c) ? RISCV_C_ADDI : 0;
+@@ -64,7 +68,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+ 			       MCInst *inst, uint16_t *size, uint64_t address,
+ 			       void *info)
+ {
+-#ifdef RISCV_USE_COMPRESSED_DISPATCH
++#ifndef CAPSTONE_DIET
+ 	if (length < 2 || inst->flat_insn->detail)
+ 		goto full;
+ 	if ((code[0] & 3) != 3) {
+diff --git a/tests/unit/riscv_op_count_iter.c b/tests/unit/riscv_op_count_iter.c
+index 0984421a..79f2fe93 100644
+--- a/tests/unit/riscv_op_count_iter.c
++++ b/tests/unit/riscv_op_count_iter.c
+@@ -1,6 +1,7 @@
+ #include "unit_test.h"
+ #include <capstone/capstone.h>
+ #include <stdio.h>
++#include <string.h>
+ #include <inttypes.h>
+ 
+ // c.addi sp, -16 (2 ops) -> addi a0, a1, 1 (3 ops) -> c.addi sp, -16 (2 ops)
+@@ -40,9 +41,58 @@ static bool test_riscv_op_count_no_stale()
+ 	return true;
+ }
+ 
++static size_t decode_view(cs_opt_value syntax, cs_opt_value detail, cs_insn **insns)
 +{
-+	MCInst_InitStorage(inst, arch, false);
++	static const uint8_t code[] = {
++		0x41, 0x11,             /* c.addi sp, -16 */
++		0x13, 0x85, 0x15, 0x00, /* addi a0, a1, 1 */
++		0x13, 0x85, 0x05, 0x00, /* mv a0, a1 */
++	};
++	csh handle;
++	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C,
++		    &handle) != CS_ERR_OK)
++		return 0;
++	/* RISC-V syntax flags accumulate within a handle. */
++	size_t count = 0;
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON | detail) == CS_ERR_OK &&
++	    cs_option(handle, CS_OPT_SYNTAX, syntax) == CS_ERR_OK)
++		count = cs_disasm(handle, code, sizeof(code), 0, 0, insns);
++	cs_close(&handle);
++	return count;
 +}
-+#endif
-diff --git a/Makefile b/Makefile
-index 2720955e..1a644eea 100644
---- a/Makefile
-+++ b/Makefile
-@@ -121,6 +121,17 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
- CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
-+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+# Use the compiler target, including cross builds.
-+MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
-+	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
-+	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
-+	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
-+	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print "yes" }')
-+ifeq ($(MIXED_STORAGE_TARGET),yes)
-+CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
-+MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
-+endif
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
-@@ -449,8 +460,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
- LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
- LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
- LIBOBJ += $(LIBOBJ_X86_NUMBERS)
--LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
--LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
-+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
-+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- LIBOBJ_SHARED := $(LIBOBJ)
- endif
-diff --git a/cs.c b/cs.c
-index 0af815c7..ad07e6c8 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	 * performs better on some full-detail workloads with the shared
- 	 * initializer below. */
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+#elif defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+	MCInst_InitConstructedOperands(&mci, handle->arch);
- #else
- 	MCInst_Init(&mci, handle->arch);
- #endif
-diff --git a/cs_priv.h b/cs_priv.h
-index 84e1c748..19ecedba 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -30,6 +30,10 @@
- 
- #include "MCInst.h"
- #include "SStream.h"
 +
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
-+#endif
- #ifdef CAPSTONE_X86_SCAN_ADAPTER
- #include "arch/X86/X86ScanAdapter.h"
- #endif
++/* Both the compressed and uncompressed operand views must survive a change
++ * of text syntax, including when the printer emits an alias. */
++static bool check_detail_syntax(cs_opt_value detail, cs_opt_value reference)
++{
++	cs_insn *canonical = NULL;
++	size_t count = decode_view(reference, detail, &canonical);
++	bool ok = count == 3;
++	const cs_opt_value syntaxes[] = { CS_OPT_SYNTAX_ALIAS, CS_OPT_SYNTAX_REAL,
++					 CS_OPT_SYNTAX_UNCOMPRESSED_REAL };
++	for (size_t k = 0; ok && k < sizeof(syntaxes) / sizeof(syntaxes[0]); ++k) {
++		cs_insn *other = NULL;
++		size_t n = decode_view(syntaxes[k], detail, &other);
++		ok = n == count;
++		for (size_t i = 0; ok && i < n; ++i) {
++			const cs_riscv *x = &canonical[i].detail->riscv;
++			const cs_riscv *y = &other[i].detail->riscv;
++			ok = x->op_count == y->op_count &&
++			     !memcmp(x->operands, y->operands,
++				     x->op_count * sizeof(*x->operands));
++		}
++		cs_free(other, n);
++	}
++	cs_free(canonical, count);
++	return ok;
++}
++
+ int main(void)
+ {
+ 	bool ret = true;
+ 	ret &= test_riscv_op_count_no_stale();
++	ret &= check_detail_syntax(CS_OPT_DETAIL_REAL, CS_OPT_SYNTAX_REAL);
++	ret &= check_detail_syntax(CS_OPT_DETAIL_UNCOMPRESSED_REAL,
++				   CS_OPT_SYNTAX_UNCOMPRESSED_REAL);
+ 	return ret ? 0 : -1;
+ }
+diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
+index d89f07d6..12b70ff5 100644
+--- a/tests/unit/riscv_scan_options.c
++++ b/tests/unit/riscv_scan_options.c
+@@ -108,6 +108,8 @@ int main(void)
+ 	}
+ 	const unsigned extensions = CS_MODE_RISCV_C | CS_MODE_RISCV_FD |
+ 				    CS_MODE_RISCV_ZICFISS | CS_MODE_RISCV_ZCMP_ZCMT_ZCE;
++	ok &= checkScan(CS_MODE_RISCV32);
++	ok &= checkScan(CS_MODE_RISCV64);
+ 	ok &= checkScan((cs_mode)(CS_MODE_RISCV32 | extensions));
+ 	ok &= checkScan((cs_mode)(CS_MODE_RISCV64 | extensions));
+ 	cs_free(insn, 1);
