@@ -1,7 +1,7 @@
-name: Verify canonical RISC-V operands on 32-bit and 64-bit native ABIs and time the dedicated libraries
+name: Check actual RISC-V operand projections with independent syntax handles and unchanged mixed targets
 on:
   push:
-    branches: [codex/riscv-dedicated-printed-operands]
+    branches: [codex/riscv-canonical-operand-views]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: canonical-operands-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: riscv-canonical-views-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
