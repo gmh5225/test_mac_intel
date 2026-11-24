@@ -1,7 +1,7 @@
-name: Verify MIPS formatting and real detail across native Windows and macOS ABIs
+name: Check dedicated MIPS real operand collection on eight native ABI and DIET builds
 on:
   push:
-    branches: [codex/mips-canonical-output-abi]
+    branches: [codex/dedicated-mips-operand-collection-abi]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
+          ref: 17d578259c044cad6ade810870f2aa1e7d33724a
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mips-canonical-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: dedicated-mips-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
