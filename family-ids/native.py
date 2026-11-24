@@ -2,7 +2,11 @@ from pathlib import Path
 import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
 import corpus
 r=Path(__file__).resolve().parent;src=r.parent/'source';e=r.parent/'evidence';e.mkdir();q=json.loads((r/'tree.json').read_text())
-def sha(f):return hashlib.file_digest(f.open('rb'),'sha256').hexdigest()
+def sha(f):
+    result=hashlib.sha256()
+    with f.open('rb') as stream:
+        while part:=stream.read(1024*1024):result.update(part)
+    return result.hexdigest()
 def save(k,z):(e/(k+'.json')).write_text(json.dumps(z,indent=2)+'\n')
 def run(*args):sp.run(args,check=True)
 def get(*args):return sp.check_output(args,text=True).strip()
