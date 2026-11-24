@@ -113,7 +113,7 @@ def main(w):
         run(['cmake','-S',project,'-B',build,'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',*cfg],'configure-'+key)
         db=json.loads((build/'compile_commands.json').read_text());files={Path(u['file']).name for u in db}
         near={Path(u['file']).name for u in db if '-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in u['command'].split()}
-        assert near==({'X86Sse64Output.c'}if mixed and platform.system()=='Linux' and platform.machine().lower() in ('x86_64','amd64') else set()),near
+        assert near==(({'X86Sse64Output.c','X86VectorFallback64.c'} if kind=='bare' else {'X86Sse64Output.c'})if mixed and platform.system()=='Linux' and platform.machine().lower() in ('x86_64','amd64') else set()),near
         assert ('MipsMapping.c' in files and 'AArch64InstPrinter.c' in files and 'ARMMapping.c' in files)==(mixed )
         save('compile-'+key+'.json',dict(archive_profile=key,near_indirect=sorted(near),neverd=m['neverd'],compile_commands_sha256=sha(build/'compile_commands.json')))
         assert ('X86PublicOutput.c' in files)==(not mixed)
@@ -167,7 +167,7 @@ def main(w):
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert set(changed)<= {'X86MemoryFallback32.c.o'} and (not mixed or changed),(key,changed)
+            assert set(changed)==({'X86VectorFallback64.c.o'} if mixed and not near else set()),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
@@ -193,7 +193,7 @@ def main(w):
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
     assert (hashes['bare']!=hashes['base'])==bool(json.loads((evidence/'object-diff-bare.json').read_text()))
-    assert hashes['mixed_bare']!=hashes['mixed_base']
+    assert (hashes['mixed_bare']!=hashes['mixed_base'])==bool(json.loads((evidence/'object-diff-mixed_bare.json').read_text()))
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}

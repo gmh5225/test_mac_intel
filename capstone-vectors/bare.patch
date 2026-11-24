@@ -1,156 +1,129 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..0e9ebf9d 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -28,9 +28,9 @@
- #undef X86_MEMORY_IMMEDIATE
- #undef X86_IMMEDIATE_WIDE
- 
--#define X86_SEGMENT_LEA32 writeSegmentLea32
-+#define X86_LEA32_MEMORY writeLea32
- #include "X86MemoryOutputImpl.h"
--#undef X86_SEGMENT_LEA32
-+#undef X86_LEA32_MEMORY
- #undef X86_MEMORY32_OUTPUT
- 
- /* The fixed-width iterator delegates uncommon encodings here. */
-@@ -79,22 +79,33 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 				return true;
- 		}
- 		break;
-+#ifndef CAPSTONE_X86_ONLY
-+	/* The mixed-mode writer delegates scale-one SIBs without an index. */
-+	case 0x8d:
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3dc297b9..49c3b628 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1077,6 +1077,10 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
++    if(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
++        set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
++            COMPILE_DEFINITIONS CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
++    endif()
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86")
+         target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+diff --git a/arch/X86/X86IndirectOutput64.h b/arch/X86/X86IndirectOutput64.h
+new file mode 100644
+index 00000000..551bc003
+--- /dev/null
++++ b/arch/X86/X86IndirectOutput64.h
+@@ -0,0 +1,34 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_INDIRECT_OUTPUT64_H
++#define CS_X86_INDIRECT_OUTPUT64_H
++
++#include "X86GenIndirect64Output.inc"
++
++/* FF /2 and /4 have one explicit 64-bit target. The register and memory
++ * forms share their generated access, implicit register and group records. */
++static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
++			    uint16_t *insn_size, uint8_t rex, uint8_t modrm)
++{
++	const struct X86SimpleOutput *row =
++		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
++	if (modrm < 0xc0)
++		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
++					     x86_simple_registers);
++	const struct X86SimpleRegister *reg =
++		&x86_simple_registers[3][((rex & 1) << 3) | (modrm & 7)];
++	*insn_size = insn->size = (uint16_t)(2 + (rex != 0));
++	insn->id = row->id;
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	if (insn->detail)
++		X86_writeSimpleDetail(insn->detail, row, 0xff, rex, modrm,
++				      reg->reg, 0);
++	return true;
++}
++
 +#endif
- 	case 0x26:
- 	case 0x2e:
- 	case 0x36:
- 	case 0x3e:
- 	case 0x64:
--	case 0x65:
--		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
-+	case 0x65: {
-+#ifdef CAPSTONE_X86_ONLY
-+		const unsigned lead = 1;
-+#else
-+		const unsigned lead = opcode != 0x8d;
-+#endif
-+		if (size >= lead + 2 && code[lead] == 0x8d &&
-+		    code[lead + 1] < 0xc0 &&
- 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
- 			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
--			if (writeSegmentLea32(code, size, insn, insn_size,
--					      &x86_simple_outputs[row],
--					      x86_simple_registers))
-+			if (writeLea32(code, size, insn, insn_size, lead,
-+				       &x86_simple_outputs[row],
-+				       x86_simple_registers))
- 				return true;
- 		}
- 		break;
- 	}
-+	}
- 	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..6896154e 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -63,33 +63,7 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
  }
+ 
+ #ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
+-#include "X86GenIndirect64Output.inc"
+-
+-/* FF /2 and /4 have one explicit 64-bit target. The register and memory
+- * forms share their generated access, implicit register and group records. */
+-static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
+-			    uint16_t *insn_size, uint8_t rex, uint8_t modrm)
+-{
+-	const struct X86SimpleOutput *row =
+-		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
+-	if (modrm < 0xc0)
+-		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+-					     x86_simple_registers);
+-	const struct X86SimpleRegister *reg =
+-		&x86_simple_registers[3][((rex & 1) << 3) | (modrm & 7)];
+-	*insn_size = insn->size = (uint16_t)(2 + (rex != 0));
+-	insn->id = row->id;
+-	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+-	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+-	if (insn->detail)
+-		X86_writeSimpleDetail(insn->detail, row, 0xff, rex, modrm,
+-				      reg->reg, 0);
+-	return true;
+-}
+-
++#include "X86IndirectOutput64.h"
+ #define X86_FIXED_INDIRECT writeIndirect64
  #endif
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 76b35f22..22102a89 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -7,8 +7,8 @@
- #ifdef X86_MEMORY_IMMEDIATE
- #include "X86UnsignedImmediate.h"
- static bool X86_MEMORY_IMMEDIATE(
--#elif defined(X86_SEGMENT_LEA32)
--static bool X86_SEGMENT_LEA32(
-+#elif defined(X86_LEA32_MEMORY)
-+static bool X86_LEA32_MEMORY(
- #elif defined(X86_EXTEND64_MEMORY)
- static bool X86_EXTEND64_MEMORY(
- #elif defined(X86_EXTEND32_MEMORY)
-@@ -19,6 +19,9 @@ static bool X86_MEMORY32_OUTPUT(
- bool X86_writeMemoryOutput(
+ 
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..5fe5ef06 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -27,6 +27,9 @@
  #endif
- 	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
-+#ifdef X86_LEA32_MEMORY
-+	unsigned lead,
+ 
+ #include "X86GenSimpleOutput.inc"
++#if !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
++#include "X86IndirectOutput64.h"
 +#endif
- 	const struct X86SimpleOutput *row,
- 	const struct X86SimpleRegister regs[4][16])
- {
-@@ -34,9 +37,9 @@ bool X86_writeMemoryOutput(
- 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
- #ifdef X86_EXTEND64_MEMORY
- 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
--#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
--	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
--#else
-+#elif defined(X86_EXTEND32_MEMORY)
-+	const unsigned lead = 1; /* The caller consumed the opcode escape. */
-+#elif !defined(X86_LEA32_MEMORY)
- 	const unsigned lead = rex != 0;
+ #ifdef CAPSTONE_X86_ONLY
+ #include "X86VexBaseMemory.h"
  #endif
- 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
-@@ -70,7 +73,7 @@ bool X86_writeMemoryOutput(
- 		const unsigned index_reg = ((rex & 2) << 2) |
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
--#if defined(X86_SEGMENT_LEA32) || \
-+#if defined(X86_LEA32_MEMORY) || \
- 	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
- 		/* A scale-one SIB without an index names only its base. */
- 		if ((!mod && base_reg == 5) ||
-@@ -93,7 +96,7 @@ bool X86_writeMemoryOutput(
- 	const bool push = false, load = true;
- 	const unsigned reg_width = 2; /* r32 destination */
- #else
--#ifdef X86_SEGMENT_LEA32
-+#ifdef X86_LEA32_MEMORY
- 	const bool lea = true, load = true, push = false;
- #elif defined(X86_MEMORY_IMMEDIATE)
- 	const bool lea = false, load = false;
-@@ -139,17 +142,21 @@ bool X86_writeMemoryOutput(
- 		out += 10;
+@@ -241,6 +244,20 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	}
- #else
--#ifdef X86_SEGMENT_LEA32
-+#ifdef X86_LEA32_MEMORY
- 	static const struct X86SimpleRegister segments[] = {
- 		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
- 		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
- 		{ X86_REG_FS, 2, "fs" }, { X86_REG_GS, 2, "gs" },
- 	};
--	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
--						   (code[0] >> 3) & 3;
--	memcpy(out, segments[segment].name, 2);
--	out[2] = ':';
--	out += 3;
-+	const struct X86SimpleRegister *segment = NULL;
-+	if (lead) {
-+		const unsigned i = code[0] >= 0x64 ? 4 + (code[0] & 1) :
-+						    (code[0] >> 3) & 3;
-+		segment = &segments[i];
-+		memcpy(out, segment->name, 2);
-+		out[2] = ':';
-+		out += 3;
-+	}
  #endif
- 	if (lea) {
- 		*out++ = '[';
-@@ -227,10 +234,12 @@ bool X86_writeMemoryOutput(
- 			x->opcode[1] = opcode;
- 		}
- 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
--#elif defined(X86_SEGMENT_LEA32)
--		x->prefix[1] = code[0];
--		x->encoding.modrm_offset = 2;
--		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
-+#elif defined(X86_LEA32_MEMORY)
-+		if (segment) {
-+			x->prefix[1] = code[0];
-+			x->encoding.modrm_offset = 2;
-+			x->operands[1].mem.segment = (x86_reg)segment->reg;
+ fallback:
++#if !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
++	/* The primary AMD64 writer already handles near targets when enabled. */
++	{
++		const uint8_t rex = (code[0] & 0xf0) == 0x40 ? code[0] : 0;
++		const unsigned lead = rex != 0;
++		if (size >= lead + 2 && code[lead] == 0xff) {
++			const uint8_t mr = code[lead + 1];
++			if (((mr & 0x38) == 0x10 || (mr & 0x38) == 0x20) &&
++			    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++			    writeIndirect64(code, size, insn, insn_size, rex, mr))
++				return true;
 +		}
- #elif defined(X86_EXTEND32_MEMORY)
- 		x->opcode[0] = 0x0f;
- 		x->opcode[1] = opcode;
++	}
++#endif
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ 	/* The fixed AMD64 decoder has just tried the shared output plans.
