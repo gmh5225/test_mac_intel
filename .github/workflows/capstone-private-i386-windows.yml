@@ -1,7 +1,7 @@
-name: Repeat all firmware scans after shortening XCore instruction mapping
+name: Repeat XCore scan on two Intel Macs and two Apple Silicon Macs
 on:
   push:
-    branches: [codex/xcore-mapped-scan-control]
+    branches: [codex/xcore-mac-scan-confirmation]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, arch: repeat2, profile: full }
-          - { host: ubuntu-24.04, arch: repeat2, profile: full }
-          - { host: ubuntu-22.04, arch: x86_64, profile: full }
-          - { host: ubuntu-24.04, arch: x86_64, profile: full }
+          - { host: macos-15-intel, arch: repeat2, profile: full }
+          - { host: macos-15, arch: repeat2, profile: full }
+          - { host: macos-15-intel, arch: x86_64, profile: full }
+          - { host: macos-15, arch: x86_64, profile: full }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 85
     steps:
@@ -40,6 +40,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-mapped-scan-repeat-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mac-xcore-mapped-scan-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

@@ -27,10 +27,9 @@ try:
         for name in ('time','firmware'):
             run('clang','-D_POSIX_C_SOURCE=200809L','-std=c11','-O3','-I',s/'include',r/(name+'.c'),b/'libcapstone.a','-o',t/(k+name))
         table={}
-        for row in call('nm','-n','-S','--defined-only',t/(k+'time')).splitlines():
+        for row in call('nm','-n',t/(k+'time')).splitlines():
             parts=row.split()
-            if len(parts)==4 and parts[2].lower()=='t':
-                table[parts[3]]=[int(parts[0],16),int(parts[1],16)]
+            if len(parts)==3 and parts[1].lower()=='t':table[parts[2].lstrip('_')]=[int(parts[0],16)]
         assert 'cs_disasm' in table and 'cs_disasm_iter' in table
         put('symbols-'+k,table)
         source[k]=dict(tree=call('git','-C',s,'write-tree'),lib=sha(b/'libcapstone.a'),bin=sha(t/(k+'time')))
@@ -55,7 +54,7 @@ try:
                             selected.write_bytes(programs[k]);args=invoke
                         else:args=[t/(('base' if k=='copy' else k)+'time')]
                         return list(map(int,call(*args,f,str(sect['address']),str(mode),api,str(num)).split()))
-                    n=max(1,ceil(50e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random("mapped-scan-control/"+key+os.environ.get("REPEAT",""));cycles=[]
+                    n=max(1,ceil(50e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random("mac-mapped-scan-control/"+key+os.environ.get("REPEAT",""));cycles=[]
                     for cycle in range(53):
                         order=keys.copy();rng.shuffle(order);obs={k:[]for k in keys}
                         for k in order+order[::-1]:
