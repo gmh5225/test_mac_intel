@@ -80,14 +80,14 @@ def build_profile(r,w,project,build,lib,ice_lib,flags,base,save):
         try:report_inlining(build,w,profile,save)
         except (ValueError,AssertionError,sp.CalledProcessError) as why:
             save('inline-diagnostic',dict(error=str(why)))
-    assemble(parts,build,lib,save)
+    lib=assemble(parts,build,lib,save)
     link_foreign('candidate')
     shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
     save('profile',dict(training_runs=len(seen),profile_bytes=profile.stat().st_size,
          sha256=digest,summary=info,gen_warnings=gen_warnings,use_warnings=use_warnings,profdata=str(prof),
          training_names=[r['name']for r in train],foreign_holdouts=[r['name']for r in rows if r['use']=='holdout']))
     for f in seen+[profile,w/'training-x86',w/'foreign-training']:f.unlink()
-    return [row for row in rows if row['use']=='holdout']
+    return [row for row in rows if row['use']=='holdout'],lib
 
 def holdouts(rows,w,save):
     output={}

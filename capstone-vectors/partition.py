@@ -56,11 +56,21 @@ def report_inlining(build,w,profile,save):
     save('inline-decisions',result)
 
 def assemble(parts,build,lib,save):
-    trained={k:sha(p) for k,(p,old,h,use)in parts.items()};orig=sha(lib)
-    for k,(p,old,h,use)in parts.items():
-        if not use and trained[k]!=h:shutil.copyfile(old,p)
-    sp.run(['cmake','--build',build,'--target','capstone_static','--parallel','4'],check=True)
-    digest={k:sha(p)for k,(p,old,h,use)in parts.items()}
-    assert all(digest[k]==(trained[k] if use else h)for k,(p,old,h,use)in parts.items())
-    assert orig!=sha(lib) and any(trained[k]!=h and use for k,(p,old,h,use)in parts.items())
-    save('partition',dict(full_archive=orig,partial_archive=sha(lib),objects={k:{'apply':use,'baseline':h,'full':trained[k],'selected':digest[k]} for k,(p,old,h,use)in parts.items()}))
+    import os
+    cache=(build/'CMakeCache.txt').read_text()
+    def tool(name):return re.search(r'(?m)^CMAKE_'+name+r':FILEPATH=(.+)$',cache)[1]
+    ar=tool('AR');ranlib=tool('RANLIB');env=dict(os.environ,ZERO_AR_DATE='1')
+    def members(f):return sp.check_output([ar,'t',f],text=True).splitlines()
+    ordered=members(lib);assert len(ordered)==len(set(ordered)) and set(ordered)==set(parts),(len(ordered),len(parts))
+    trained={k:sha(p)for k,(p,old,h,use)in parts.items()}
+    dest=build.parent/'hybrid-capstone.a'
+    selected=[(parts[k][0] if parts[k][3] else parts[k][1])for k in ordered]
+    sp.run([ar,'qc',dest,*selected],check=True,env=env)
+    sp.run([ranlib,dest],check=True,env=env)
+    assert members(dest)==ordered
+    def contents(archive,k):return hashlib.sha256(sp.check_output([ar,'p',archive,k])).hexdigest()
+    digest={k:contents(dest,k)for k in ordered}
+    assert all(contents(lib,k)==trained[k] and digest[k]==(trained[k] if use else h)for k,(p,old,h,use)in parts.items()),'archive member provenance'
+    assert sha(lib)!=sha(dest) and any(trained[k]!=h and use for k,(p,old,h,use)in parts.items())
+    save('partition',dict(full_archive=sha(lib),partial_archive=sha(dest),ordered_members=ordered,objects={k:{'apply':use,'baseline':h,'full':trained[k],'selected':digest[k]} for k,(p,old,h,use)in parts.items()}))
+    return dest

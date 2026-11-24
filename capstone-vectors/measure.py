@@ -40,7 +40,7 @@ try:
     for label in ('base','candidate'):
         if label=='candidate':
             from training import build_profile,holdouts
-            heldout=build_profile(r,w,project,build,lib,ice_lib,flags,base,save)
+            heldout,lib=build_profile(r,w,project,build,lib,ice_lib,flags,base,save)
             assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
