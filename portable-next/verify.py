@@ -29,6 +29,7 @@ try:
         units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access']
     if len(arches)>1:
         units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
+    flags.append('-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
     for name,tree in [('base',None),*q['variants'].items()]:
@@ -50,6 +51,17 @@ try:
             baseline=rows['base'][linkage]['snapshots']
             assert result['snapshots']==baseline,(name,linkage,profile)
         assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
+        if platform.system()=='Darwin' and profile in ('full','noatt'):
+            solo=t/'static-only'
+            run(name+'-static-config','cmake','-G','Ninja','-S',s,'-B',solo,*flags,'-DCAPSTONE_BUILD_SHARED_LIBS=OFF')
+            run(name+'-static-build','cmake','--build',solo,'--parallel','4','--target','capstone_static',*units)
+            run(name+'-static-units','ctest','--test-dir',solo,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
+            for folder,active in ((solo,name=='public'),(b,False)):
+                cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
+                assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
+            result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
+            assert result['snapshots']==rows['base']['static']['snapshots']
+            rows[name]['static_only']=result
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
