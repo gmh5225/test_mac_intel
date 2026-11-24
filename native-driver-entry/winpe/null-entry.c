@@ -83,7 +83,7 @@ static void observe(unsigned int cpu, void *data) {
     }
     gchar *lower = g_ascii_strdown(name, -1);
     gboolean matched = g_str_has_prefix(lower, "\\registry\\machine\\system\\") &&
-                       g_str_has_suffix(lower, "\\services\\null");
+                       g_str_has_suffix(lower, "\\services\\" DRIVER_NAME);
     g_free(lower);
     if (matched && is_entry) {
         entry_image = base;
@@ -100,7 +100,7 @@ static void observe(unsigned int cpu, void *data) {
                                     init == 0 ? "null" :
                                     init >= base && init - base < image_size ? "within_image" : "outside_image";
         char *report = g_strdup_printf("{\"guest\":\"Microsoft Windows PE ARM64\","
-            "\"driver\":\"null.sys\",\"event\":\"PE entry and PDB-identified DriverEntry before their first instructions\","
+            "\"driver\":\"" DRIVER_NAME ".sys\",\"event\":\"PE entry and PDB-identified DriverEntry before their first instructions\","
             "\"entry_rva\":%u,\"driver_object_type\":%u,\"x0_driver_start_matches_image\":true,"
             "\"x1_counted_registry_path\":\"%s\",\"registry_length_bytes\":%u,"
             "\"driver_size\":%u,\"driver_init_location\":\"%s\",\"registry_maximum_bytes\":%u,"

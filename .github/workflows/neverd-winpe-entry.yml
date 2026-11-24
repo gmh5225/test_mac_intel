@@ -1,4 +1,4 @@
-name: Observe the real Windows ARM64 kernel arguments to the inbox Null driver
+name: Observe the real Windows ARM64 kernel arguments to signed inbox drivers
 on:
   push:
     branches: [codex/neverd-windows-native-20261120]
@@ -9,6 +9,14 @@ permissions:
   contents: read
 jobs:
   winpe-guest:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - driver: 'null'
+            artifact: windows-arm64-kernel-entry
+          - driver: disk
+            artifact: windows-arm64-disk-kernel-entry
     runs-on: ubuntu-24.04-arm
     container: ubuntu:26.04
     timeout-minutes: 30
@@ -26,12 +34,12 @@ jobs:
           apt-get install -y --no-install-recommends 7zip msitools wimtools llvm mtools fdisk gcc libc6-dev pkg-config libglib2.0-dev qemu-system-arm qemu-efi-aarch64 python3 ca-certificates
       - name: Boot the original ARM64 WinPE image and observe the signed inbox PE entry
         run: |
-          python3 native-driver-entry/winpe/prepare.py /tmp/neverd-entry
+          python3 native-driver-entry/winpe/prepare.py /tmp/neverd-entry ${{ matrix.driver }}
           python3 native-driver-entry/winpe/observe.py /tmp/neverd-entry
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: windows-arm64-kernel-entry
+          name: ${{ matrix.artifact }}
           path: |
             /tmp/neverd-entry/fixture.json
             /tmp/neverd-entry/kernel-entry.json

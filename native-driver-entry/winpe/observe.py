@@ -89,7 +89,8 @@ fixture=json.loads((work/"fixture.json").read_text())
 assert proof['entry_rva'] == int(fixture['entry_rva'],16)
 assert proof['body_rva'] == int(fixture['driver_entry_rva'],16) and proof['x0_x1_forwarded_unchanged']
 assert proof['x0_driver_start_matches_image'] and proof['both_arguments_distinct_and_aligned']
-assert proof['x1_counted_registry_path'].lower().endswith('\\services\\null')
+assert proof['driver'] == fixture['driver']
+assert proof['x1_counted_registry_path'].lower().endswith("\\services\\" + Path(fixture['driver']).stem)
 assert proof['driver_size'] == fixture['size_of_image']
 assert proof['registry_length_bytes'] == len(proof['x1_counted_registry_path'].encode('utf-16-le'))
 assert proof['registry_length_bytes'] <= proof['registry_maximum_bytes']
