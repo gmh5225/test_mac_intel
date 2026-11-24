@@ -1,0 +1,439 @@
+name: NeverSight LLVM MIPS packages
+on:
+  push:
+    branches: [codex/mips-llvm-elf-qualification]
+    paths: ['.github/workflows/neverd-mips-llvm-packages.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  LLVM_REVISION: f5123d475dccc0853f6815e20644d7d0196d20f4
+jobs:
+  build:
+    name: build ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            platform: macos
+            arch: arm64
+            runner: macos-15
+            pkg: neverd-llvm-macos-arm64
+            archive: tar.xz
+            deploy: '11.0'
+          - name: Linux x86_64
+            platform: linux
+            arch: x86_64
+            runner: ubuntu-24.04
+            pkg: neverd-llvm-linux-x86_64
+            archive: tar.xz
+          - name: Windows x64
+            platform: windows
+            arch: x64
+            runner: windows-latest
+            pkg: neverd-llvm-windows-x64
+            archive: zip
+    timeout-minutes: 210
+    runs-on: ${{ matrix.runner }}
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - name: Checkout llvm-project
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/llvm-project
+          ref: ${{ env.LLVM_REVISION }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Install macOS build tools
+        if: runner.os == 'macOS'
+        shell: bash
+        run: brew install ninja ccache xz
+
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build ccache clang lld xz-utils
+
+      - name: Enable the MSVC x64 environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
+      # windows-latest includes clang-cl, Ninja, and 7-Zip. sccache uses the
+      # GitHub Actions cache backend and is the Windows compiler-cache strategy.
+      - name: Enable Windows sccache
+        if: runner.os == 'Windows'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+        with:
+          version: 'v0.16.0'
+
+      - name: Verify Unix build tools
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cmake --version
+          ninja --version
+          clang --version
+          ccache --version
+
+      - name: Verify Windows build tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --version
+          ninja --version
+          clang-cl --version
+          sccache --version
+          where.exe 7z
+
+      - name: Record source commit
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha=$(git rev-parse HEAD)
+          if [[ "$actual_sha" != "$LLVM_REVISION" ]]; then
+            echo "Checkout mismatch: expected $LLVM_REVISION, found $actual_sha" >&2
+            exit 1
+          fi
+          echo "sha=$actual_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Unix build
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake_args=(
+            -DCMAKE_BUILD_TYPE=Release
+            "-DCMAKE_INSTALL_PREFIX=${RUNNER_TEMP}/pkg/${{ matrix.pkg }}"
+            -DCMAKE_C_COMPILER=clang
+            -DCMAKE_CXX_COMPILER=clang++
+            -DLLVM_CCACHE_BUILD=ON
+            "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64;Mips"
+            "-DLLVM_ENABLE_PROJECTS="
+            "-DLLVM_ENABLE_RUNTIMES="
+            -DLLVM_BUILD_TOOLS=OFF
+            -DLLVM_BUILD_UTILS=OFF
+            -DLLVM_BUILD_TESTS=OFF
+            -DLLVM_BUILD_EXAMPLES=OFF
+            -DLLVM_BUILD_DOCS=OFF
+            -DLLVM_BUILD_BENCHMARKS=OFF
+            -DLLVM_ENABLE_BINDINGS=OFF
+            -DLLVM_INCLUDE_TESTS=OFF
+            -DLLVM_INCLUDE_BENCHMARKS=OFF
+            -DLLVM_INCLUDE_EXAMPLES=OFF
+            -DLLVM_INCLUDE_DOCS=OFF
+            -DLLVM_INCLUDE_TOOLS=OFF
+            -DLLVM_INCLUDE_UTILS=OFF
+            -DLLVM_BUILD_LLVM_DYLIB=OFF
+            -DLLVM_LINK_LLVM_DYLIB=OFF
+            -DBUILD_SHARED_LIBS=OFF
+            -DLLVM_ENABLE_PIC=ON
+            -DLLVM_ENABLE_RTTI=ON
+            -DLLVM_ENABLE_ASSERTIONS=OFF
+            -DLLVM_ENABLE_ZLIB=OFF
+            -DLLVM_ENABLE_ZSTD=OFF
+            -DLLVM_ENABLE_LIBXML2=OFF
+            -DLLVM_ENABLE_TERMINFO=OFF
+            -DLLVM_ENABLE_LIBEDIT=OFF
+            -DLLVM_ENABLE_CURL=OFF
+            -DLLVM_ENABLE_HTTPLIB=OFF
+          )
+          if [[ "${{ matrix.platform }}" == 'macos' ]]; then
+            cmake_args+=(
+              -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.deploy }}
+            )
+          else
+            cmake_args+=(-DLLVM_USE_LINKER=lld)
+          fi
+          cmake -S llvm -B build -G Ninja "${cmake_args[@]}"
+
+      - name: Configure Windows build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
+        run: |
+          $installPrefix = Join-Path $env:RUNNER_TEMP 'pkg/${{ matrix.pkg }}'
+          cmake -S llvm -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            "-DCMAKE_INSTALL_PREFIX=$installPrefix" `
+            -DCMAKE_C_COMPILER=clang-cl `
+            -DCMAKE_CXX_COMPILER=clang-cl `
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+            "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64;Mips" `
+            "-DLLVM_ENABLE_PROJECTS=" `
+            "-DLLVM_ENABLE_RUNTIMES=" `
+            -DLLVM_BUILD_TOOLS=OFF `
+            -DLLVM_BUILD_UTILS=OFF `
+            -DLLVM_BUILD_TESTS=OFF `
+            -DLLVM_BUILD_EXAMPLES=OFF `
+            -DLLVM_BUILD_DOCS=OFF `
+            -DLLVM_BUILD_BENCHMARKS=OFF `
+            -DLLVM_ENABLE_BINDINGS=OFF `
+            -DLLVM_INCLUDE_TESTS=OFF `
+            -DLLVM_INCLUDE_BENCHMARKS=OFF `
+            -DLLVM_INCLUDE_EXAMPLES=OFF `
+            -DLLVM_INCLUDE_DOCS=OFF `
+            -DLLVM_INCLUDE_TOOLS=OFF `
+            -DLLVM_INCLUDE_UTILS=OFF `
+            -DLLVM_BUILD_LLVM_DYLIB=OFF `
+            -DLLVM_LINK_LLVM_DYLIB=OFF `
+            -DBUILD_SHARED_LIBS=OFF `
+            -DLLVM_ENABLE_PIC=ON `
+            -DLLVM_ENABLE_RTTI=ON `
+            -DLLVM_ENABLE_ASSERTIONS=OFF `
+            -DLLVM_ENABLE_ZLIB=OFF `
+            -DLLVM_ENABLE_ZSTD=OFF `
+            -DLLVM_ENABLE_LIBXML2=OFF `
+            -DLLVM_ENABLE_TERMINFO=OFF `
+            -DLLVM_ENABLE_LIBEDIT=OFF `
+            -DLLVM_ENABLE_CURL=OFF `
+            -DLLVM_ENABLE_HTTPLIB=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Build and install on Unix
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake --build build --target install --parallel
+          ccache --show-stats || true
+
+      - name: Build and install on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: 'true'
+        run: |
+          cmake --build build --target install --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          sccache --show-stats
+
+      - name: Verify Unix package and write BUILDINFO.txt
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/pkg/${{ matrix.pkg }}"
+          test -f "$dest/lib/cmake/llvm/LLVMConfig.cmake"
+          test -f "$dest/lib/libLLVMCore.a"
+          test -f "$dest/include/llvm/MC/BinaryRewrite.h"
+          for required in \
+            lib/libLLVMSwiftDemangle.a \
+            lib/libLLVMMipsCodeGen.a \
+            include/llvm/Demangle/SwiftDemangle.h \
+            share/licenses/llvm/LICENSE.TXT \
+            share/licenses/llvm/swift-demangling/LICENSE.txt \
+            share/licenses/llvm/swift-demangling/CONTRIBUTORS.txt \
+            share/licenses/llvm/swift-demangling/UPSTREAM.md; do
+            test -s "$dest/$required"
+          done
+          cat > "$dest/BUILDINFO.txt" <<EOF
+          name: ${{ matrix.pkg }}
+          llvm_version: 23.0.0
+          llvm_commit: ${{ steps.source.outputs.sha }}
+          platform: ${{ matrix.platform }}
+          host_arch: ${{ matrix.arch }}
+          runner: ${{ matrix.runner }}
+          compiler: $(clang --version | head -n1)
+          targets: X86;ARM;AArch64;Mips
+          build_type: Release
+          link: static (.a)
+          swift_demangling: LLVMSwiftDemangle (static; Swift 6.3.3 grammar)
+          built_at: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          built_by: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          EOF
+          cat "$dest/BUILDINFO.txt"
+
+      - name: Verify Windows package and write BUILDINFO.txt
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'pkg/${{ matrix.pkg }}'
+          $llvmConfig = Join-Path $dest 'lib/cmake/llvm/LLVMConfig.cmake'
+          $llvmCore = Join-Path $dest 'lib/LLVMCore.lib'
+          $binaryRewrite = Join-Path $dest 'include/llvm/MC/BinaryRewrite.h'
+          if (!(Test-Path $llvmConfig)) { throw "Missing $llvmConfig" }
+          if (!(Test-Path $llvmCore)) { throw "Missing $llvmCore" }
+          if (!(Test-Path $binaryRewrite)) { throw "Missing $binaryRewrite" }
+          foreach ($required in @(
+            'lib/LLVMSwiftDemangle.lib',
+            'lib/LLVMMipsCodeGen.lib',
+            'include/llvm/Demangle/SwiftDemangle.h',
+            'share/licenses/llvm/LICENSE.TXT',
+            'share/licenses/llvm/swift-demangling/LICENSE.txt',
+            'share/licenses/llvm/swift-demangling/CONTRIBUTORS.txt',
+            'share/licenses/llvm/swift-demangling/UPSTREAM.md'
+          )) {
+            $file = Join-Path $dest $required
+            if (!(Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing $file" }
+            if ((Get-Item -LiteralPath $file).Length -eq 0) { throw "Empty $file" }
+          }
+          $compiler = (clang-cl --version | Select-Object -First 1)
+          @"
+          name: ${{ matrix.pkg }}
+          llvm_version: 23.0.0
+          llvm_commit: ${{ steps.source.outputs.sha }}
+          platform: ${{ matrix.platform }}
+          host_arch: ${{ matrix.arch }}
+          runner: ${{ matrix.runner }}
+          compiler: $compiler
+          targets: X86;ARM;AArch64;Mips
+          build_type: Release
+          link: static (.lib)
+          swift_demangling: LLVMSwiftDemangle (static; Swift 6.3.3 grammar)
+          built_at: $([DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'))
+          built_by: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          "@ | Set-Content -Path (Join-Path $dest 'BUILDINFO.txt') -Encoding utf8NoBOM
+          Get-Content (Join-Path $dest 'BUILDINFO.txt')
+
+      - name: Consume relocated Unix package without external tools
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest="${RUNNER_TEMP}/pkg/${{ matrix.pkg }}"
+          relocated="${RUNNER_TEMP}/relocated llvm package/${{ matrix.pkg }}"
+          smoke_build="${RUNNER_TEMP}/swift-demangle-package-smoke"
+          mkdir -p "$(dirname "$relocated")"
+          test ! -e "$relocated"
+          mv "$dest" "$relocated"
+          trap 'mv "$relocated" "$dest"' EXIT
+          cmake_args=(
+            -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_C_COMPILER=clang
+            -DCMAKE_CXX_COMPILER=clang++
+            "-DNEVERD_LLVM_PACKAGE_ROOT=$relocated"
+          )
+          if [[ "${{ matrix.platform }}" == 'macos' ]]; then
+            cmake_args+=(
+              -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.deploy }}
+            )
+          fi
+          cmake -S llvm/utils/neverd-swift-demangle-smoke -B "$smoke_build" -G Ninja "${cmake_args[@]}"
+          cmake --build "$smoke_build" --parallel 2
+          probe="$smoke_build/neverd-swift-demangle-smoke"
+          if [[ "${{ matrix.platform }}" == 'macos' ]]; then
+            otool -L "$probe" > "$smoke_build/dependencies.txt"
+          else
+            ldd "$probe" > "$smoke_build/dependencies.txt"
+          fi
+          cat "$smoke_build/dependencies.txt"
+          if grep -Ei 'libswift[^[:space:]]*\.(so|dylib)' "$smoke_build/dependencies.txt"; then
+            echo 'Package smoke unexpectedly depends on a Swift runtime library' >&2
+            exit 1
+          fi
+          # CTest gives only the probe an empty PATH and invalid legacy tool
+          # setting, and enforces its 30-second deadline. Build tools retain PATH.
+          ctest --test-dir "$smoke_build" --output-on-failure --no-tests=error
+          mips_smoke_build="${RUNNER_TEMP}/mips-package-smoke"
+          cmake -S llvm/utils/neverd-mips-smoke -B "$mips_smoke_build" -G Ninja "${cmake_args[@]}"
+          cmake --build "$mips_smoke_build" --parallel 2
+          ctest --test-dir "$mips_smoke_build" --output-on-failure --no-tests=error
+
+      - name: Consume relocated Windows package without external tools
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dest = Join-Path $env:RUNNER_TEMP 'pkg/${{ matrix.pkg }}'
+          $relocated = Join-Path $env:RUNNER_TEMP 'relocated llvm package/${{ matrix.pkg }}'
+          $smokeBuild = Join-Path $env:RUNNER_TEMP 'swift-demangle-package-smoke'
+          New-Item -ItemType Directory -Force -Path (Split-Path $relocated) | Out-Null
+          if (Test-Path -LiteralPath $relocated) { throw "Relocation directory already exists: $relocated" }
+          Move-Item -LiteralPath $dest -Destination $relocated
+          try {
+            cmake -S llvm/utils/neverd-swift-demangle-smoke -B $smokeBuild -G Ninja `
+              -DCMAKE_BUILD_TYPE=Release `
+              -DCMAKE_C_COMPILER=clang-cl `
+              -DCMAKE_CXX_COMPILER=clang-cl `
+              "-DNEVERD_LLVM_PACKAGE_ROOT=$relocated"
+            if ($LASTEXITCODE -ne 0) { throw 'Installed LLVM package smoke configuration failed' }
+            cmake --build $smokeBuild --parallel 2
+            if ($LASTEXITCODE -ne 0) { throw 'Installed LLVM package smoke build failed' }
+            $probe = Join-Path $smokeBuild 'neverd-swift-demangle-smoke.exe'
+            $dependencies = & dumpbin /dependents $probe
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect package smoke dependencies' }
+            $dependencies | Set-Content -Path (Join-Path $smokeBuild 'dependencies.txt')
+            $dependencies | Write-Output
+            if ($dependencies -match '(?i)^\s*(?:lib)?swift[^\s]*\.dll\s*$') {
+              throw 'Package smoke unexpectedly depends on a Swift runtime DLL'
+            }
+            # CTest applies the probe's empty PATH, invalid legacy tool setting,
+            # and 30-second deadline without changing the build-tool environment.
+            ctest --test-dir $smokeBuild --output-on-failure --no-tests=error
+            if ($LASTEXITCODE -ne 0) { throw 'Installed LLVM package smoke execution failed' }
+            $mipsSmokeBuild = Join-Path $env:RUNNER_TEMP 'mips-package-smoke'
+            cmake -S llvm/utils/neverd-mips-smoke -B $mipsSmokeBuild -G Ninja `
+              -DCMAKE_BUILD_TYPE=Release `
+              -DCMAKE_C_COMPILER=clang-cl `
+              -DCMAKE_CXX_COMPILER=clang-cl `
+              "-DNEVERD_LLVM_PACKAGE_ROOT=$relocated"
+            if ($LASTEXITCODE -ne 0) { throw 'MIPS package smoke configuration failed' }
+            cmake --build $mipsSmokeBuild --parallel 2
+            if ($LASTEXITCODE -ne 0) { throw 'MIPS package smoke build failed' }
+            ctest --test-dir $mipsSmokeBuild --output-on-failure --no-tests=error
+            if ($LASTEXITCODE -ne 0) { throw 'MIPS package smoke execution failed' }
+          } finally {
+            Move-Item -LiteralPath $relocated -Destination $dest
+          }
+
+      - name: Package Unix archive and checksum
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pkg="${{ matrix.pkg }}"
+          archive="${GITHUB_WORKSPACE}/${pkg}.${{ matrix.archive }}"
+          ( cd "${RUNNER_TEMP}/pkg" && tar -cf - "$pkg" | xz -T0 -6 -c ) > "$archive"
+          ( cd "$GITHUB_WORKSPACE" &&
+            cmake -E sha256sum "${pkg}.${{ matrix.archive }}" ) > "${archive}.sha256"
+          ls -lh "$archive" "${archive}.sha256"
+          cat "${archive}.sha256"
+
+      - name: Package Windows archive and checksum
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $pkg = '${{ matrix.pkg }}'
+          $packageRoot = Join-Path $env:RUNNER_TEMP 'pkg'
+          $archive = Join-Path $env:GITHUB_WORKSPACE "$pkg.${{ matrix.archive }}"
+          Push-Location $packageRoot
+          try {
+            7z a -tzip -mx=7 $archive $pkg
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          } finally {
+            Pop-Location
+          }
+          Push-Location $env:GITHUB_WORKSPACE
+          try {
+            $checksum = cmake -E sha256sum "$pkg.${{ matrix.archive }}"
+            $checksumExitCode = $LASTEXITCODE
+          } finally {
+            Pop-Location
+          }
+          if ($checksumExitCode -ne 0) { exit $checksumExitCode }
+          Set-Content -Path "$archive.sha256" -Value $checksum -Encoding ascii
+          Get-Item $archive, "$archive.sha256" | Format-Table Name, Length
+          Get-Content "$archive.sha256"
+
+      - name: Upload run artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ matrix.pkg }}
+          path: |
+            ${{ matrix.pkg }}.${{ matrix.archive }}
+            ${{ matrix.pkg }}.${{ matrix.archive }}.sha256
+          if-no-files-found: error
+
