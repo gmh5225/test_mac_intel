@@ -26,10 +26,13 @@ try:
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=sha(b/'libcapstone.a'),bytes=path.stat().st_size,
-                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','AArch64Disassembler.c.o')})
+                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','MipsMapping.c.o','AArch64Disassembler.c.o')})
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
-        assert changes=={'cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'},changes
+        expected={'cs.c.o'}
+        if k in ('joint','record'):expected.update(['X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'])
+        if k in ('joint','scan'):expected.add('MipsMapping.c.o')
+        assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)

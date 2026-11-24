@@ -1,8 +1,8 @@
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..1b1b0587 100644
+index 8d827a97..403a5d85 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,11 +30,17 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,11 +30,18 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -10,7 +10,8 @@ index 8d827a97..1b1b0587 100644
 -	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 -	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 -	!defined(_WIN32_WCE)
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 +#define CAPSTONE_X86_PUBLIC_RECORD
@@ -55,7 +56,7 @@ index cec4bec6..e3a77092 100644
 +#endif
  #endif
 diff --git a/cs.c b/cs.c
-index 227458b6..22b59149 100644
+index 696e8d70..dfcbb960 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -1082,7 +1082,13 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
