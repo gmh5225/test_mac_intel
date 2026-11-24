@@ -70,8 +70,10 @@ try:
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
         assert len(regs)==12 and all(int(v[3])==int(v[4])==16 for v in regs)
         if variant!='base':
-            for unit in ('x86_simple_output','x86_reg_access','batch_detail_alloc'):
-                command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
+            unit_names=['x86_simple_output','x86_reg_access','mips16_memory_calls','mips_register_names','mips16e2']
+            if variant=='memory':unit_names.append('batch_detail_alloc')
+            for unit in unit_names:
+                command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
                 command([t/unit],'run-'+unit+'-'+variant)
             save('units-records-'+variant,dict(tree=actual,complete=True))
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'forms.cpp',archive,'-o',t/'forms'],'build-forms-'+variant)

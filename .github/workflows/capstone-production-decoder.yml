@@ -1,7 +1,7 @@
-name: Verify the failure-only detail cleanup in the source-built NeverD decoder
+name: Check real MIPS operand printing and optional batch cleanup in NeverD built from current LLVM source
 on:
   push:
-    branches: [codex/neverd-product-batch-unwind]
+    branches: [codex/mips-unused-detail-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: batch-unwind-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: mips-detail-pass-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
