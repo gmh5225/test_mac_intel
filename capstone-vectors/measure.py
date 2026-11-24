@@ -79,7 +79,7 @@ try:
             labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
+            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate'] and expected['candidate'][3]-expected['base'][3]==(repeats*m['stores'][name] if mode==2 else 0)
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
