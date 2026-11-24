@@ -56,7 +56,7 @@ try:
             run(name+'-static-config','cmake','-G','Ninja','-S',s,'-B',solo,*flags,'-DCAPSTONE_BUILD_SHARED_LIBS=OFF')
             run(name+'-static-build','cmake','--build',solo,'--parallel','4','--target','capstone_static',*units)
             run(name+'-static-units','ctest','--test-dir',solo,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
-            for folder,active in ((solo,name=='public'),(b,False)):
+            for folder,active in ((solo,True),(b,False)):
                 cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
                 assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
