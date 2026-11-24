@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 396ab047..7f9695f0 100644
+index 396ab047..5f787948 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1088,7 +1088,9 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+@@ -1088,13 +1088,18 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
      set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
      if(capstone_enabled_architectures STREQUAL "X86" OR
         (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
@@ -13,8 +13,17 @@ index 396ab047..7f9695f0 100644
          AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
          AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
          if(capstone_enabled_architectures STREQUAL "X86")
+             target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+         else()
+             target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
++            if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
++                target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_ITERATOR_READERS)
++            endif()
+         endif()
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
 diff --git a/Makefile b/Makefile
-index fb13d941..8fe7c4fa 100644
+index fb13d941..3e7dcaa1 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -127,8 +127,9 @@ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev
@@ -29,7 +38,7 @@ index fb13d941..8fe7c4fa 100644
  CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
  MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
  endif
-@@ -304,8 +305,10 @@ endif
+@@ -304,8 +305,13 @@ endif
  	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
  ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
  	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
@@ -37,7 +46,78 @@ index fb13d941..8fe7c4fa 100644
 +else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
 +ifneq ($(filter macos linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
  	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
++ifneq ($(filter linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
++	CFLAGS += -DCAPSTONE_X86_ITERATOR_READERS
++endif
 +endif
  endif
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..25813e5d 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3757,6 +3757,9 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+ #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
+ #define CS_PUBLIC_FIXED_RECORD
++#ifdef CAPSTONE_X86_ITERATOR_READERS
++uint8_t cs_diagnostic_public_text = 1;
++#endif
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+diff --git a/cs.c b/cs.c
+index d0b8b045..cbf7d7f1 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1116,7 +1116,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+ 	if (handle->arch == CS_ARCH_X86) {
+-#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) && !defined(CAPSTONE_X86_ITERATOR_READERS)
+ 		if (request == CS_RECORD_PUBLIC_ITER && !handle->no_text) {
+ 			if (handle->mode == CS_MODE_32)
+ 				return X86_decodeFixedRecord32(handle, code, size,
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 4c4c34f2..307ec6fc 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -26,8 +26,12 @@ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ /* The public iterator can enter a fixed x86 reader once. Misses from that
+  * reader call the same full decoder with the ordinary iterator request. */
+ #ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++#ifdef CAPSTONE_X86_ITERATOR_READERS
++typedef bool cs_record_request;
++#else
+ typedef uint8_t cs_record_request;
+ enum { CS_RECORD_PUBLIC_ITER = 2 };
++#endif
+ CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
+ 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
+ CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
+@@ -186,9 +190,22 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
++#if defined(CS_PUBLIC_FIXED_RECORD) && defined(CAPSTONE_X86_ITERATOR_READERS)
++	/* This public iterator owns cursor advancement and skipdata. Dispatch
++	 * its formatted record once, leaving scan and internal calls intact. */
++	extern uint8_t cs_diagnostic_public_text;
++	if (handle->arch == CS_ARCH_X86 && !handle->no_text && cs_diagnostic_public_text == 2) {
++		if (handle->mode == CS_MODE_32)
++			return X86_decodeFixedRecord32(handle, code, size, insn,
++						       insn_size);
++		if (handle->mode == CS_MODE_64)
++			return X86_decodeFixedRecord64(handle, code, size, insn,
++						       insn_size);
++	}
++#endif
+ #ifdef CS_DECODE_OUTPUT_MISS
+ 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
+-#elif defined(CS_PUBLIC_FIXED_RECORD)
++#elif defined(CS_PUBLIC_FIXED_RECORD) && !defined(CAPSTONE_X86_ITERATOR_READERS)
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size,
+ 				   batch ? true : CS_RECORD_PUBLIC_ITER);
+ #else

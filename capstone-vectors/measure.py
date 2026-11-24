@@ -66,11 +66,29 @@ try:
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert ('CAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and ('CAPSTONE_X86_ITERATOR_READERS' in entry)==(label=='candidate')
+        assert ('CAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and ('CAPSTONE_X86_ITERATOR_READERS' in entry)==(label!='base')
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+    def compare_pair(prefix):
+        pair={}
+        for name,value in (('outlined',1),('candidate',2)):
+            image=w/(prefix+name)
+            with image.open('rb') as src:
+                elf=ELFFile(src);symbol,=elf.get_section_by_name('.symtab').get_symbol_by_name('cs_diagnostic_public_text')
+                secs={sec.name:(sec['sh_addr'],sec['sh_size'],sec.data()) for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+                addr=symbol['st_value'];assert symbol['st_size']==1 and secs['.data'][2][addr-secs['.data'][0]]==value
+                pair[name]=(secs,addr)
+        (left,addr),(right,other)=(pair[k]for k in ('outlined','candidate'))
+        assert addr==other and left.keys()==right.keys()
+        changed=[k for k in left if left[k]!=right[k]]
+        assert set(changed)-{'.note.gnu.build-id'}=={'.data'},changed
+        assert left['.data'][:2]==right['.data'][:2]
+        offsets=[i for i,(x,y) in enumerate(zip(left['.data'][2],right['.data'][2]))if x!=y]
+        assert offsets==[addr-left['.data'][0]]
+        return dict(complete=True,address=addr,data_offsets=offsets,sections=len(left),changes=changed)
+    save('identical-selected-code',{k or 'x86':compare_pair(k) for k in ('','foreign-')})
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
