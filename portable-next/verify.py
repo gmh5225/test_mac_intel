@@ -15,8 +15,8 @@ def run(name,*args):
     if rc.returncode:print((e/(name+'.log')).read_text(errors='replace')[-2200:]);rc.check_returncode()
 try:
     project=t/'project';project.mkdir();b=t/'build';obs={};tests={};images={}
-    (project/'CMakeLists.txt').write_text('\n'.join(['cmake_minimum_required(VERSION 3.22)','project(MipsVerification LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)',f'add_executable(records "{(p/"records.cpp").as_posix()}")','target_compile_features(records PRIVATE cxx_std_17)','target_link_libraries(records PRIVATE capstone_static)'])+'\n')
-    corpus=rd(p/'inputs-mips.json')
+    (project/'CMakeLists.txt').write_text('\n'.join(['cmake_minimum_required(VERSION 3.22)','project(AArch64Verification LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)',f'add_executable(records "{(p/"records.cpp").as_posix()}")','target_compile_features(records PRIVATE cxx_std_17)','target_link_libraries(records PRIVATE capstone_static)'])+'\n')
+    corpus=rd(p/'inputs-a64.json')
     sample=next(iter(corpus.values()));package=t/'coreutils.deb'
     run('fetch','curl','-fsSL','--retry','3','--max-time','110',sample['url'],'-o',package)
     ar=package.read_bytes();assert ar[:8]==b'!<arch>\n' and all(sha(ar)==x['package_sha256'] for x in corpus.values())
@@ -31,9 +31,9 @@ try:
             member,=[m for m in tar.getmembers()if m.name.lstrip('./')in ('usr/bin/'+x['command'],'bin/'+x['command']) and m.isfile()]
             body=elf_text(tar.extractfile(member).read());assert sha(body)==x['text_sha256'];(t/name).write_bytes(body)
     package.unlink()
-    flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_DIET='+('ON' if profile=='diet' else 'OFF')]
-    names=['mips_scan','mips_reglist_offset','mips_msa_control','mips16_word_order','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_frames','mips16e2']
-    if profile=='full':names.append('mips_register_names')
+    flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_DIET='+('ON' if profile=='diet' else 'OFF')]
+    names=['aarch64_scan','aarch64_postprocess']
+    
     for k in ('base',*q):
         git('restore','--source','HEAD','--worktree','--staged','--','.')
         if k!='base':
@@ -52,7 +52,7 @@ try:
                 with log.open('wb')as f:sp.run([exe,o,str(hooks),*extra],stdout=f,stderr=sp.STDOUT,check=True)
                 row=rd(o);row['diagnostics']=sha(log.read_bytes());rows[str(hooks)+'/'+case]=row
         if k!='base':assert rows==obs['base'],(k,[key for key in rows if rows[key]!=obs['base'][key]])
-        assert rows['0/modes']['accepted']+rows['0/modes']['rejected']==204800 and rows['0/mips64el-ls/3']['accepted']==28893
+        assert rows['0/modes']['accepted']+rows['0/modes']['rejected']==51200 and rows['0/arm64-ls/3']['accepted']==23973
         assert (rows['1/modes']['callbacks']>0)==(profile=='full')
         save('checked',obs)
     save('complete',dict(source=q,profile=profile,records=obs,units=tests,images=images))
