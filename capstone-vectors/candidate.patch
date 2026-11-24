@@ -1,18 +1,92 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..8bf1094d 100644
+index 0d9b1a76..955f0895 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1230,6 +1230,9 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
+@@ -988,31 +988,10 @@ legacyOpcode:
+ 	return 0;
+ }
+ 
+-/*
+- * getIDWithAttrMask - Determines the ID of an instruction, consuming
+- *   the ModR/M byte as appropriate for extended and escape opcodes,
+- *   and using a supplied attribute mask.
+- *
+- * @param instructionID - A pointer whose target is filled in with the ID of the
+- *                        instruction.
+- * @param insn          - The instruction whose ID is to be determined.
+- * @param attrMask      - The attribute mask to search.
+- * @return              - 0 if the ModR/M could be read when needed or was not
+- *                        needed; nonzero otherwise.
+- */
+-#if defined(_MSC_VER)
+-static __forceinline int
+-#else
+-#if defined(__GNUC__)
+-__attribute__((always_inline))
+-#endif
+-static inline int
+-#endif
+-getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
+-		  uint16_t attrMask)
++X86_DECODE_INLINE int getIDWithDecision(
++	uint16_t *instructionID, struct InternalInstruction *insn, OpcodeType type,
++	const struct ModRMDecision *decision)
+ {
+-	const struct ModRMDecision *decision = getModRMDecision(
+-		insn->opcodeType, contextForAttrs(attrMask), insn->opcode);
+ 	uint32_t packed;
+ 	bool hasModRMExtension;
+ 
+@@ -1025,7 +1004,9 @@ getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
+ 		(packed & (X86_DECISION_INDEXED | X86_DECISION_SPLIT)) != 0;
+ #ifndef CAPSTONE_X86_REDUCE
+ 	/* The trailing 3DNow opcode always follows a ModR/M byte. */
+-	hasModRMExtension |= insn->opcodeType == THREEDNOW_MAP;
++	hasModRMExtension |= type == THREEDNOW_MAP;
++#else
++	(void)type;
+ #endif
+ 	if (hasModRMExtension && readModRM(insn))
+ 		return -1;
+@@ -1034,6 +1015,27 @@ getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
+ 	return 0;
+ }
+ 
++/*
++ * getIDWithAttrMask - Determines the ID of an instruction, consuming
++ *   the ModR/M byte as appropriate for extended and escape opcodes,
++ *   and using a supplied attribute mask.
++ *
++ * @param instructionID - A pointer whose target is filled in with the ID of the
++ *                        instruction.
++ * @param insn          - The instruction whose ID is to be determined.
++ * @param attrMask      - The attribute mask to search.
++ * @return              - 0 if the ModR/M could be read when needed or was not
++ *                        needed; nonzero otherwise.
++ */
++X86_DECODE_INLINE int getIDWithAttrMask(uint16_t *instructionID,
++					struct InternalInstruction *insn,
++					uint16_t attrMask)
++{
++	const struct ModRMDecision *decision = getModRMDecision(
++		insn->opcodeType, contextForAttrs(attrMask), insn->opcode);
++	return getIDWithDecision(instructionID, insn, insn->opcodeType, decision);
++}
++
+ /*
+  * is16BitEquivalent - Determines whether two instruction names refer to
+  * equivalent instructions but one is 16-bit whereas the other is not.
+@@ -1230,6 +1232,9 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
  	}
  }
  
-+X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode);
++X86_DECODE_INLINE unsigned oneByteRow16(uint8_t opcode, bool override);
 +X86_DECODE_INLINE bool hasMandatoryVector66(OpcodeType map, uint8_t opcode);
 +
  X86_DECODE_INLINE uint16_t mandatoryPrefixAttributes(uint8_t pp)
  {
  	switch (pp) {
-@@ -1323,6 +1326,12 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+@@ -1323,6 +1328,12 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
  		    !rexWOverridesOpSize) {
  			attrMask |= ATTR_OPSIZE;
  		}
@@ -25,18 +99,17 @@ index 0d9b1a76..8bf1094d 100644
  		if (insn->hasAdSize)
  			attrMask |= ATTR_ADSIZE;
  		if (insn->opcodeType == ONEBYTE) {
-@@ -1602,6 +1611,19 @@ X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+@@ -1602,6 +1613,18 @@ X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
  {
  	switch (insn->mode) {
  	case MODE_16BIT:
 +		if (insn->opcodeType == ONEBYTE && !insn->repeatPrefix &&
 +		    insn->vectorExtensionType == TYPE_NO_VEX_XOP) {
-+			const uint8_t context = oneByteContext16(insn->opcode);
-+			if (context) {
-+				uint16_t attr = insn->hasAdSize ? ATTR_ADSIZE : ATTR_NONE;
-+				if (context == 2 && !insn->hasOpSize)
-+					attr |= ATTR_OPSIZE;
-+				if (getIDWithAttrMask(&insn->instructionID, insn, attr))
++			const unsigned row = oneByteRow16(insn->opcode, insn->hasOpSize);
++			if (row) {
++				const struct ModRMDecision *decision =
++					&ONEBYTE_SYM[row - 1].modRMDecisions[insn->opcode];
++				if (getIDWithDecision(&insn->instructionID, insn, ONEBYTE, decision))
 +					return -1;
 +				insn->spec = specifierForUID(insn->instructionID);
 +				return 0;
@@ -46,10 +119,10 @@ index 0d9b1a76..8bf1094d 100644
  	case MODE_32BIT:
  		return getIDForMode(insn, mode, MODE_32BIT);
 diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
-index 5d103efe..376235af 100644
+index 5d103efe..36ccea78 100644
 --- a/arch/X86/X86GenLegacyTerminal.inc
 +++ b/arch/X86/X86GenLegacyTerminal.inc
-@@ -2726,6 +2726,35 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+@@ -2726,6 +2726,55 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
  	return X86_SCAN_COMPLETE;
  }
  
@@ -59,33 +132,53 @@ index 5d103efe..376235af 100644
 +	(void)opcode;
 +	return false;
 +}
-+X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode)
++X86_DECODE_INLINE unsigned oneByteRow16(uint8_t opcode, bool override)
 +{
-+	/* 0 needs both contexts, 1 uses the primary, 2 selects operand size. */
-+	static const uint8_t plans[256] = {
-+		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 1,
-+		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2,
-+		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
-+		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
-+		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-+		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-+		2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 2, 1, 2,
-+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-+		1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2,
-+		1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 2, 2, 1, 1,
-+		0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
-+		1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
-+		1, 2, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2,
-+		1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-+		1, 1, 1, 0, 1, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2,
-+		1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2,
++	/* A nonzero row is valid with either effective address size. */
++	static const uint8_t rows[2][256] = {
++		{
++			1, 3, 1, 3, 1, 3, 3, 3, 1, 3, 1, 3, 1, 3, 3, 1,
++			1, 3, 1, 3, 1, 3, 3, 3, 1, 3, 1, 3, 1, 3, 3, 3,
++			1, 3, 1, 3, 1, 3, 1, 1, 1, 3, 1, 3, 1, 3, 1, 1,
++			1, 3, 1, 3, 1, 3, 1, 1, 1, 3, 1, 3, 1, 3, 1, 1,
++			3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
++			3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
++			3, 3, 3, 1, 1, 1, 1, 1, 3, 3, 3, 3, 1, 3, 1, 3,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 3, 3, 3, 3,
++			1, 3, 3, 3, 3, 3, 3, 3, 1, 1, 3, 1, 3, 3, 1, 1,
++			0, 0, 0, 0, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3,
++			1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3,
++			1, 3, 3, 3, 3, 3, 1, 3, 1, 1, 3, 3, 1, 1, 1, 3,
++			1, 3, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 0, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 3,
++			1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 3,
++		},
++		{
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++		},
 +	};
-+	return plans[opcode];
++	return rows[override][opcode];
 +}
  /* 2205 raw terminals, 81 raw handlers; selected opcodes [220, 111, 182, 111, 182, 111, 220, 109, 220, 111, 220, 111, 182, 109, 181, 111, 181, 111, 182, 111, 215, 107, 215, 107, 215, 109, 215, 109]. */
  /* 2217 public terminals, 14 public handlers; selected opcodes [222, 111, 184, 111, 184, 111, 222, 109, 222, 111, 222, 111, 184, 109, 183, 111, 183, 111, 184, 111, 217, 107, 217, 107, 217, 109, 217, 109]. */
  #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
-@@ -9887,7 +9916,43 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+@@ -9887,7 +9936,63 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
  	return X86_SCAN_COMPLETE;
  }
  
@@ -103,34 +196,54 @@ index 5d103efe..376235af 100644
 +	const unsigned row = (unsigned)map - TWOBYTE;
 +	return row < 3 && ((opcodes[row][opcode >> 5] >> (opcode & 31)) & 1);
 +}
-+X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode)
++X86_DECODE_INLINE unsigned oneByteRow16(uint8_t opcode, bool override)
 +{
-+	/* 0 needs both contexts, 1 uses the primary, 2 selects operand size. */
-+	static const uint8_t plans[256] = {
-+		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 1,
-+		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2,
-+		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
-+		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
-+		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-+		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
-+		2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 2, 1, 2,
-+		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-+		1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2,
-+		1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 2, 2, 1, 1,
-+		0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
-+		1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
-+		1, 2, 2, 2, 2, 2, 1, 0, 1, 1, 2, 2, 1, 1, 1, 2,
-+		1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-+		1, 1, 1, 0, 1, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2,
-+		1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2,
++	/* A nonzero row is valid with either effective address size. */
++	static const uint8_t rows[2][256] = {
++		{
++			1, 3, 1, 3, 1, 3, 3, 3, 1, 3, 1, 3, 1, 3, 3, 1,
++			1, 3, 1, 3, 1, 3, 3, 3, 1, 3, 1, 3, 1, 3, 3, 3,
++			1, 3, 1, 3, 1, 3, 1, 1, 1, 3, 1, 3, 1, 3, 1, 1,
++			1, 3, 1, 3, 1, 3, 1, 1, 1, 3, 1, 3, 1, 3, 1, 1,
++			3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
++			3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
++			3, 3, 3, 1, 1, 1, 1, 1, 3, 3, 3, 3, 1, 3, 1, 3,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 3, 3, 3, 3,
++			1, 3, 3, 3, 3, 3, 3, 3, 1, 1, 3, 1, 3, 3, 1, 1,
++			0, 0, 0, 0, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3,
++			1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3, 3,
++			1, 3, 3, 3, 3, 3, 1, 0, 1, 1, 3, 3, 1, 1, 1, 3,
++			1, 3, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 0, 1, 3, 1, 3, 3, 1, 3, 1, 1, 3, 1, 3,
++			1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 3,
++		},
++		{
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++			1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++		},
 +	};
-+	return plans[opcode];
++	return rows[override][opcode];
 +}
 +/* 2764 raw terminals, 81 raw handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 111, 215, 110, 215, 112, 215, 111]. */
  /* 3296 public terminals, 14 public handlers; selected opcodes [222, 216, 184, 216, 184, 216, 222, 218, 222, 216, 222, 222, 184, 218, 183, 216, 183, 222, 184, 222, 217, 210, 217, 210, 217, 213, 217, 213]. */
  #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
  #define X86_TERMINAL_SPLIT UINT64_C(0x4000000000000000)
-@@ -11835,7 +11900,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
+@@ -11835,7 +11940,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
  	0, 0, 0, 0,
  	0, 0, 0, 0,
  	0, 0, 0, UINT64_C(0x000000000b000558),
@@ -139,7 +252,7 @@ index 5d103efe..376235af 100644
  	0, 0, 0, 0,
  	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
  	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -12103,7 +12168,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
+@@ -12103,7 +12208,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
  	0, 0, 0, 0,
  	0, 0, 0, 0,
  	0, 0, 0, UINT64_C(0x000000000b000558),
@@ -148,7 +261,7 @@ index 5d103efe..376235af 100644
  	0, 0, 0, 0,
  	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
  	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -14102,14 +14167,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14102,14 +14207,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	0, UINT64_C(0x00000000040002d7), UINT64_C(0x000000000400004c), UINT64_C(0x00000000040002db),
  	UINT64_C(0x00000000040000f2), UINT64_C(0x00000000040005c7), 0, UINT64_C(0x00000000040002ec),
  	0, UINT64_C(0x80000000000302ad), UINT64_C(0x00000000040000b2), 0,
@@ -167,7 +280,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x00000000040005cb), UINT64_C(0x0000000004000275), UINT64_C(0x000000000400026d), UINT64_C(0x0000000004000270),
  	UINT64_C(0x00000000040002d8), UINT64_C(0x00000000040002d9), 0, UINT64_C(0x00000000040000d9),
  	0, 0, 0, 0,
-@@ -14118,18 +14183,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14118,18 +14223,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	UINT64_C(0x4080202b01004056), UINT64_C(0x4080202f0100405e), UINT64_C(0x4080202981004053), UINT64_C(0x4080202801004050),
  	UINT64_C(0x4080203401004068), UINT64_C(0x4080203201004064), UINT64_C(0x4080203301004066), UINT64_C(0x4080203081004061),
  	UINT64_C(0x4080202d0100405a), UINT64_C(0x4080202c81004059), UINT64_C(0x4080202d8100405b), UINT64_C(0x4080202c01004058),
@@ -194,7 +307,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
  	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
  	UINT64_C(0x0000000003010110), UINT64_C(0x000000000301010c), UINT64_C(0x000000000301010e), UINT64_C(0x000000000301010b),
-@@ -14147,7 +14212,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14147,7 +14252,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	0, 0, UINT64_C(0x80000000000304d2), UINT64_C(0x4080201d0100403a),
  	UINT64_C(0x4080201b01004036), UINT64_C(0x4080201b81004037), UINT64_C(0x408020f6010041ec), UINT64_C(0x408020f6010041ec),
  	0, 0, 0, 0,
@@ -203,7 +316,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
  	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
  	0, UINT64_C(0x408020dc810041b9), UINT64_C(0x408020db810041b7), UINT64_C(0x408020dc010041b8),
-@@ -14155,11 +14220,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14155,11 +14260,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	UINT64_C(0x408020df810041bf), UINT64_C(0x408020e0010041c0), UINT64_C(0x408020d2010041a4), UINT64_C(0x408020c70100418e),
  	UINT64_C(0x408020c481004189), UINT64_C(0x408020c50100418a), UINT64_C(0x408020d1010041a2), UINT64_C(0x408020c68100418d),
  	UINT64_C(0x408020c78100418f), UINT64_C(0x408020db010041b6), UINT64_C(0x408020da810041b5), UINT64_C(0x408020c801004190),
@@ -217,7 +330,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x408020dd010041ba), UINT64_C(0x408020e0810041c1), UINT64_C(0x408020dd810041bb), UINT64_C(0x408020de010041bc),
  	UINT64_C(0x408020c201004184), UINT64_C(0x408020c58100418b), UINT64_C(0x408020c281004185), UINT64_C(0x00000000040002ea),
  },
-@@ -14370,14 +14435,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14370,14 +14475,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	0, UINT64_C(0x00000000040002d7), UINT64_C(0x000000000400004c), UINT64_C(0x00000000040002db),
  	UINT64_C(0x00000000040000f2), UINT64_C(0x00000000040005c7), 0, UINT64_C(0x00000000040002ec),
  	0, UINT64_C(0x80000000000302ad), UINT64_C(0x00000000040000b2), 0,
@@ -236,7 +349,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x00000000040005cb), UINT64_C(0x0000000004000275), UINT64_C(0x000000000400026d), UINT64_C(0x0000000004000270),
  	UINT64_C(0x00000000040002d8), UINT64_C(0x00000000040002d9), 0, UINT64_C(0x00000000040000d9),
  	0, 0, 0, 0,
-@@ -14386,18 +14451,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14386,18 +14491,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	UINT64_C(0x4080202b01004056), UINT64_C(0x4080202f0100405e), UINT64_C(0x4080202981004053), UINT64_C(0x4080202801004050),
  	UINT64_C(0x4080203401004068), UINT64_C(0x4080203201004064), UINT64_C(0x4080203301004066), UINT64_C(0x4080203081004061),
  	UINT64_C(0x4080202d0100405a), UINT64_C(0x4080202c81004059), UINT64_C(0x4080202d8100405b), UINT64_C(0x4080202c01004058),
@@ -263,7 +376,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
  	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
  	UINT64_C(0x0000000003010110), UINT64_C(0x000000000301010c), UINT64_C(0x000000000301010e), UINT64_C(0x000000000301010b),
-@@ -14415,7 +14480,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14415,7 +14520,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	0, 0, UINT64_C(0x80000000000304d2), UINT64_C(0x4080201d0100403a),
  	UINT64_C(0x4080201b01004036), UINT64_C(0x4080201b81004037), UINT64_C(0x408020f6010041ec), UINT64_C(0x408020f6010041ec),
  	0, 0, 0, UINT64_C(0x40000000010041e0),
@@ -272,7 +385,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
  	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
  	0, UINT64_C(0x408020dc810041b9), UINT64_C(0x408020db810041b7), UINT64_C(0x408020dc010041b8),
-@@ -14423,11 +14488,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+@@ -14423,11 +14528,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
  	UINT64_C(0x408020df810041bf), UINT64_C(0x408020e0010041c0), UINT64_C(0x408020d2010041a4), UINT64_C(0x408020c70100418e),
  	UINT64_C(0x408020c481004189), UINT64_C(0x408020c50100418a), UINT64_C(0x408020d1010041a2), UINT64_C(0x408020c68100418d),
  	UINT64_C(0x408020c78100418f), UINT64_C(0x408020db010041b6), UINT64_C(0x408020da810041b5), UINT64_C(0x408020c801004190),
@@ -287,7 +400,7 @@ index 5d103efe..376235af 100644
  	UINT64_C(0x408020c201004184), UINT64_C(0x408020c58100418b), UINT64_C(0x408020c281004185), UINT64_C(0x00000000040002ea),
  },
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index f1ebc59f..914d62b3 100644
+index f1ebc59f..ea689459 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
 @@ -5,6 +5,7 @@
@@ -298,7 +411,7 @@ index f1ebc59f..914d62b3 100644
  from pathlib import Path
  import re
  
-@@ -563,6 +564,116 @@ def scalar_terminal_form(operands, modrm):
+@@ -563,6 +564,135 @@ def scalar_terminal_form(operands, modrm):
      return True
  
  
@@ -378,13 +491,32 @@ index f1ebc59f..914d62b3 100644
 +                    use.discard(1)
 +                if selected != alt:
 +                    use.discard(2)
-+        plans.append(min(use) if use else 0)
-+    lines = ["X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode)", "{",
-+             "\t/* 0 needs both contexts, 1 uses the primary, 2 selects operand size. */",
-+             "\tstatic const uint8_t plans[256] = {"]
-+    for offset in range(0, 256, 16):
-+        lines.append("\t\t" + ", ".join(map(str, plans[offset:offset + 16])) + ",")
-+    return lines + ["\t};", "\treturn plans[opcode];", "}"]
++        pair = [0, 0]
++        if use:
++            preferred = min(use)
++            for override in (0, 1):
++                sized = preferred == 2 and not override
++                normal = "IC_OPSIZE" if sized else "IC"
++                address = "IC_OPSIZE_ADSIZE" if sized else "IC_ADSIZE"
++                first = decision(normal, opcode)
++                other = decision(address, opcode)
++                if ((first[0] == "MODRM_ONEENTRY") == (other[0] == "MODRM_ONEENTRY")
++                    and all(tables.source_id(ids, *first, byte) ==
++                            tables.source_id(ids, *other, byte) for byte in range(256))):
++                    pair[override] = indices[contexts.index(normal)]
++        plans.append(pair)
++    lines = ["X86_DECODE_INLINE unsigned oneByteRow16(uint8_t opcode, bool override)", "{",
++             "\t/* A nonzero row is valid with either effective address size. */",
++             "\tstatic const uint8_t rows[2][256] = {"]
++    for override in (0, 1):
++        lines.append("\t\t{")
++        for offset in range(0, 256, 16):
++            values = [row[override] for row in plans[offset:offset + 16]]
++            if max(values) > 255:
++                raise ValueError("one-byte decision row exceeds uint8_t")
++            lines.append("\t\t\t" + ", ".join(map(str, values)) + ",")
++        lines.append("\t\t},")
++    return lines + ["\t};", "\treturn rows[override][opcode];", "}"]
 +
 +
 +def emit_legacy_vector66(suffix):
@@ -415,7 +547,7 @@ index f1ebc59f..914d62b3 100644
  def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_ROWS):
  
      common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
-@@ -651,6 +762,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
+@@ -651,6 +781,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
              "Mandatory SSE attribute contexts changed",
          )
      equivalent = equivalents16(suffix)
@@ -423,7 +555,7 @@ index f1ebc59f..914d62b3 100644
      for _, attr_mask, mode16, has_op_size in contexts_to_project:
          context_name = context_values[attr_mask]
          row_maps = []
-@@ -698,8 +810,9 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
+@@ -698,8 +829,9 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
                          len(other_uids) == count,
                          "Incomplete secondary terminal sequence",
                      )
@@ -434,7 +566,7 @@ index f1ebc59f..914d62b3 100644
                          for a, b in zip(uids, other_uids)
                      )
                  if (
-@@ -752,7 +865,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
+@@ -752,7 +884,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
                          second = tables.source_id(
                              ids, second_kind, second_offset, modrm
                          )
@@ -443,7 +575,7 @@ index f1ebc59f..914d62b3 100644
                              expected = second
                      tables.require(
                          terminals[first + delta][0] == expected,
-@@ -1044,6 +1157,8 @@ def emit_terminal(suffix):
+@@ -1044,6 +1176,8 @@ def emit_terminal(suffix):
          legacy_terminal_model(suffix, public=True)
      )
      lines = [

@@ -1,7 +1,7 @@
-name: Measure single proven opcode lookup on real SeaBIOS code and x86 text corpora
+name: Compare direct prevalidated real-mode rows against the scalar context table and released decoder
 on:
   push:
-    branches: [codex/real-mode-first-scalar-context]
+    branches: [codex/real-mode-packed-decision-rows]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4e0ff7ecf35083a51d414bc736be6ab9132c4cf7
+          ref: fb55d5f8c8595cb18bb67d84adf6dc9c3880d311
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-scalar-context-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-mode-packed-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
