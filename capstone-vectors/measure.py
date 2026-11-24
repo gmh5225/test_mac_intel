@@ -15,7 +15,7 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -43,6 +43,9 @@ try:
     from elftools.elf.elffile import ELFFile
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        assert sha(r/'released-public.patch')==maps['base']['sha256']
+        run('git','-C',base,'apply','--index',r/'released-public.patch')
+        assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
             run('git','-C',base,'apply','--index',r/'outlined.patch');assert get('git','-C',base,'write-tree').strip()==maps['outlined']['tree']
@@ -72,6 +75,15 @@ try:
             verified[k]=sha(current);assert verified[k]==hashlib.sha256(imgs[k]).hexdigest()
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     invoke=['setarch',os.uname().machine,'-R',current]
+    mode_probe={};probe=w/'probe.bin';probe.write_bytes(bytes.fromhex('66 b8 78 56 34 12'))
+    span=w/'probe.tsv';span.write_text('0 6 1048576'+chr(10))
+    for tag in images:
+        select(tag)
+        for engine in ('iced','capstone','private'):
+            counts=[list(map(int,get(*invoke,engine,'0','1',probe,span,str(bits)).split()))[2:4] for bits in (16,32,64)]
+            assert counts==[[1,0],[2,0],[2,0]],(tag,engine,counts)
+            mode_probe[tag+'/'+engine]=counts
+    save('mode-probe',mode_probe)
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
@@ -97,30 +109,39 @@ try:
             return rows
         assert audit_engine('base')==audit_engine('outlined')==audit_engine('candidate')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
-        def take(engine,mode,n):
-            select(engine)
-            return list(map(int,get(*invoke,'private',str(mode),str(n),f,path,str(bits)).split()))
-        for mode in (0,1,2):
-            labels=list(imgs)
-            repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
-            expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert all(v==expected['base'] for v in expected.values())
-            rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-            for _ in range(17):
-                rng.shuffle(labels);sample={k:[] for k in labels}
-                for k in labels+labels[::-1]:
-                    row=take(k,mode,repeats);assert row[2:]==expected[k]
-                    sample[k].append(row[:2])
-                rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-            key=name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-            summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
-            save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==18
+        for route in ('private','capstone'):
+            def take(engine,mode,n):
+                select(engine)
+                return list(map(int,get(*invoke,route,str(mode),str(n),f,path,str(bits)).split()))
+            for mode in (0,1,2):
+                labels=list(imgs)
+                repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
+                expected={k:take(k,mode,repeats)[2:]for k in labels}
+                assert all(v==expected['base'] for v in expected.values())
+                rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
+                for _ in range(17):
+                    rng.shuffle(labels);sample={k:[] for k in labels}
+                    for k in labels+labels[::-1]:
+                        row=take(k,mode,repeats);assert row[2:]==expected[k]
+                        sample[k].append(row[:2])
+                    rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
+                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
+                summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
+                save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
+    assert len(summary)==36
+    from firmware16 import compare
+    sources=rd(r/'input-sources.json');assert sha(r/'scalar.c')==sources['c_sha']
+    run('clang',*sources['compile'],r/'scalar.c','-o',w/'scalar.o')
+    with (w/'scalar.o').open('rb')as f:
+        elf=ELFFile(f);assert elf['e_machine']=='EM_386';blob=elf.get_section_by_name('.text').data()
+    path=w/'scalar16.bin';path.write_bytes(blob);spans=w/'scalar16.tsv';spans.write_text(f'0 {len(blob)} 1048576'+chr(10))
+    scalar=compare(path,spans,imgs,invoke,select)
+    save('scalar16',dict(sha256=sha(path),bytes=len(blob),source=sources['c_sha'],results=scalar))
     save('fixed-image',dict(inode=inode,blocks=len(offsets),verified=verified,bytes=length,original_sizes=original_sizes,staged_sha256={k:hashlib.sha256(v).hexdigest()for k,v in imgs.items()}))
     if platform.machine()=='x86_64':
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
+    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

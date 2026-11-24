@@ -1,7 +1,7 @@
-name: Compare direct prevalidated real-mode rows against the scalar context table and released decoder
+name: Measure real-mode operand-override register records and i386 indirect targets on both x86 APIs
 on:
   push:
-    branches: [codex/real-mode-packed-decision-rows]
+    branches: [codex/real-mode-register-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: fa11ca3d930b9e66a919ed4de20affdbc75bd125
+          ref: e55d0c4b18bbe676431aa1fbd12d9013da69c315
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: fb55d5f8c8595cb18bb67d84adf6dc9c3880d311
+          ref: 5e6d5bf5fecff2ff57729297df9bc368c6ed59a5
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-mode-packed-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-mode-register-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

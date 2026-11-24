@@ -42,15 +42,26 @@ def verify(w,images,invoke,select):
         if all(rr[i][3]==rr[i][4] and rr[i][5]==z[1] for rr in traces.values()):chosen.append(z)
         else:rejected.append(dict(symbols=rows[z],extent=z,results={k:v[i][3:] for k,v in traces.items()}))
     assert len(chosen)>=20;emit(chosen)
+    result=compare(image,path,images,invoke,select)
+    return dict(source=rev,target='SeaBIOS 1.17.0 16-bit executable STT_FUNC symbols verified byte-for-byte in out/bios.bin',rom_sha256=sha(rom),elf_sha256=sha((src/'out/rom16.o').read_bytes()),symbol_count=count,unique_extents=len(rows),common_extents=len(chosen),code_bytes=sum(n for _,n,_ in chosen),code_sha256=sha(b''.join(rom[off:off+n]for off,n,a in chosen)),extent_sha256=sha(path.read_bytes()),excluded=rejected,results=result)
+
+def compare(image,path,images,invoke,select):
     def take(k,mode,reps):
-        select('base' if k in ('iced','fast')else k)
-        return list(map(int,get(*invoke,k if k in ('iced','fast')else 'private',str(mode),str(reps),image,path,'16').split()))
+        select('base' if k in ('iced','fast')else k.split('/')[1])
+        return list(map(int,sp.check_output([*invoke,k if k in ('iced','fast')else k.split('/')[0],str(mode),str(reps),image,path,'16'],text=True).split()))
     result={}
     for mode in range(3):
-        reps=max(1,math.ceil(30e6/take('base',mode,1)[0]))
-        keys=[*images,'iced']+(['fast']if mode else[])
+        n=1
+        while True:
+            tick=take('private/base',mode,n)[0]
+            if tick>=3e6:break
+            n*=max(2,min(32,math.ceil(3e6/max(tick,1))))
+        reps=max(1,math.ceil(25e6*n/tick))
+        keys=[route+'/'+k for route in ('capstone','private') for k in images]+['iced']+(['fast']if mode else[])
         expected={k:take(k,mode,reps)[2:] for k in keys}
-        assert len({tuple(expected[k]) for k in images})==1 and len({tuple(row[:3])for row in expected.values()})==1,expected
+        assert len({tuple(row[:3])for row in expected.values()})==1,expected
+        for route in ('capstone','private'):
+            assert len({tuple(expected[route+'/'+k])for k in images})==1,expected
         rng=random.Random(9917+mode);pairs=[]
         for _ in range(17):
             rng.shuffle(keys);v={k:[]for k in keys}
@@ -58,4 +69,4 @@ def verify(w,images,invoke,select):
                 x=take(k,mode,reps);assert x[2:]==expected[k];v[k].append(x[:2])
             pairs.append({k:[sum(t[i]for t in vv)for i in (0,1)]for k,vv in v.items()})
         result[str(mode)]=dict(reps=reps,expected=expected,pairs=pairs)
-    return dict(source=rev,target='SeaBIOS 1.17.0 16-bit executable STT_FUNC symbols verified byte-for-byte in out/bios.bin',rom_sha256=sha(rom),elf_sha256=sha((src/'out/rom16.o').read_bytes()),symbol_count=count,unique_extents=len(rows),common_extents=len(chosen),code_bytes=sum(n for _,n,_ in chosen),code_sha256=sha(b''.join(rom[off:off+n]for off,n,a in chosen)),extent_sha256=sha(path.read_bytes()),excluded=rejected,results=result)
+    return result
