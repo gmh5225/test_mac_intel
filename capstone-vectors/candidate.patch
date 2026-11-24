@@ -1,31 +1,15 @@
-diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
-index 6f3953cc..c78150e3 100644
---- a/arch/X86/X86UnsignedImmediate.h
-+++ b/arch/X86/X86UnsignedImmediate.h
-@@ -4,23 +4,54 @@
- #ifndef CS_X86_UNSIGNED_IMMEDIATE_H
- #define CS_X86_UNSIGNED_IMMEDIATE_H
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index 45de9b87..a02bba54 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -11,6 +11,50 @@
+ #include "X86SimpleOutput.h"
  
+ #include "X86UnsignedImmediate.h"
 +#include "../../MathExtras.h"
 +
- static char *writeUnsignedImmediate(char *out, uint64_t value)
- {
- 	if (value <= HEX_THRESHOLD) {
- 		*out = (char)('0' + value);
- 		return out + 1;
--	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
--		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
--		return out + 2 + (end - start);
- 	}
-+
++CAPSTONE_INTERNAL char *X86_writeHexImmediate(char *out, uint64_t value)
++{
 +	static const char byte_digits[] =
 +		"000102030405060708090a0b0c0d0e0f"
 +		"101112131415161718191a1b1c1d1e1f"
@@ -65,6 +49,41 @@ index 6f3953cc..c78150e3 100644
 +		out += 2;
 +	}
 +	return out;
++}
+ 
+ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 			       const struct X86SimpleOutput *row, bool wide,
+diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
+index 6f3953cc..de267878 100644
+--- a/arch/X86/X86UnsignedImmediate.h
++++ b/arch/X86/X86UnsignedImmediate.h
+@@ -4,23 +4,17 @@
+ #ifndef CS_X86_UNSIGNED_IMMEDIATE_H
+ #define CS_X86_UNSIGNED_IMMEDIATE_H
+ 
+-static char *writeUnsignedImmediate(char *out, uint64_t value)
++/* The decimal case stays with the caller. All hexadecimal immediates
++ * share the digit table in X86ImmediateOutput.c. */
++CAPSTONE_INTERNAL char *X86_writeHexImmediate(char *out, uint64_t value);
++
++static inline char *writeUnsignedImmediate(char *out, uint64_t value)
+ {
+ 	if (value <= HEX_THRESHOLD) {
+ 		*out = (char)('0' + value);
+ 		return out + 1;
+-	} else {
+-		static const char digits[] = "0123456789abcdef";
+-		char temp[16], *end = temp + sizeof(temp), *start = end;
+-		uint64_t n = value;
+-		do {
+-			*--start = digits[n & 15];
+-			n >>= 4;
+-		} while (n);
+-		memcpy(out, "0x", 2);
+-		memcpy(out + 2, start, end - start);
+-		return out + 2 + (end - start);
+ 	}
++	return X86_writeHexImmediate(out, value);
  }
  
  #endif

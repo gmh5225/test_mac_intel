@@ -15,7 +15,9 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert get('git','-C',base,'rev-parse','HEAD').strip()==m['baseline_patch']['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert sha(r/'baseline.patch')==m['baseline_patch']['sha256']
+    run('git','-C',base,'apply','--index',r/'baseline.patch');assert get('git','-C',base,'write-tree').strip()==m['baseline_patch']['tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -37,13 +39,32 @@ try:
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
-    for label in ('base','candidate'):
+    layout={}
+    for label in ('base','inline','candidate'):
+        if label=='inline':
+            assert sha(r/'inline.patch')==m['inline_patch_sha256']
+            run('git','-C',base,'apply','--index',r/'inline.patch');assert get('git','-C',base,'write-tree').strip()==m['inline_tree']
         if label=='candidate':
+            run('git','-C',base,'apply','--reverse','--index',r/'inline.patch');assert get('git','-C',base,'write-tree').strip()==m['baseline_patch']['tree']
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        objects={f.name:sha(f)for f in build.rglob('*.o')}
+        symbols={}
+        for line in get('nm','-an',w/label).splitlines():
+            cols=line.split()
+            if len(cols)!=3:continue
+            name=cols[2].lstrip('_')
+            if name in ('cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','X86_scanNativeBatch','scanBatch32','scanBatch64','X86_scanInstruction','X86_writeHexImmediate','X86_writeImmediateOutput'):symbols[name]=int(cols[0],16)
+        assert 'X86_scanNativeBatch' in symbols
+        # Callable instruction addresses and named digit tables are collected from the actual linked binary.
+        digit_tables=[line for line in get('nm','-an',w/label).splitlines() if 'byte_digits' in line]
+        assert (label=='base')==(len(digit_tables)==0),(label,digit_tables)
+        layout[label]=dict(objects=objects,symbols=symbols,byte_digit_tables=digit_tables)
+        save('layout',layout)
+
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
@@ -69,18 +90,18 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('candidate')
+        assert audit_engine('base')==audit_engine('inline')==audit_engine('candidate')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
+            exe=engine if engine in ('candidate','duplicate','inline')else'base'
             return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
+            labels=['base','duplicate','candidate','inline','iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
-            rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
+            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']==expected['inline']
+            rows=[];rng=random.Random(name+'/shared-hex-immediates/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
                 for k in labels+labels[::-1]:

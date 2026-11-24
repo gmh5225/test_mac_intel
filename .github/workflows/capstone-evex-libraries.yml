@@ -1,7 +1,7 @@
-name: Measure byte-pair immediate output against Capstone and iced on real x86 code
+name: Measure shared hexadecimal immediate output and record exact linked decoder addresses
 on:
   push:
-    branches: [codex/unsigned-immediates-real-isa]
+    branches: [codex/shared-hex-numbers-real]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 799a7b08252f4e0c6d10a918011981c1460d8bf3
+          ref: a91bbc959a6221577742d3f109c03810a8463cb9
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: immediate-numbers-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-hex-numbers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
