@@ -11,8 +11,8 @@ import shutil
 import statistics
 import subprocess
 
-BASE = "0f9776402d2f3aed5daf50e58cdcb820690517cc"
-HEAD = "1c37d515ef3b12e8923390f95dc49052a966f00f"
+BASE = "1c37d515ef3b12e8923390f95dc49052a966f00f"
+HEAD = "a6a6625fe03381886a7da2baab2d340774799cc7"
 WINDOWS = os.name == "nt"
 SUFFIX = ".exe" if WINDOWS else ""
 ROUNDS = 24
@@ -41,7 +41,7 @@ def build(source, work):
         return subprocess.check_output(["git", "-C", source, "rev-parse", "HEAD"], text=True).strip()
     assert revision() == BASE
     run("cmake", "--build", build_dir, "--target", "llvm-objdump", "--parallel", "4")
-    baseline = work/("r9-objdump"+SUFFIX)
+    baseline = work/("r10-objdump"+SUFFIX)
     shutil.copy2(bins/("llvm-objdump"+SUFFIX), baseline)
     run("git", "-C", source, "fetch", "--depth=1", "origin", HEAD)
     run("git", "-C", source, "checkout", "--detach", HEAD)
@@ -68,7 +68,7 @@ def make_inputs(bins, work):
         obj = work/("r6-word-"+suffix+".o")
         asm = obj.with_suffix(".s")
         asm.write_text(".set noreorder\n.set micromips\n.text\n"+"\n".join(
-            f".globl f{i}\n.ent f{i}\nf{i}:\naddu $2,$4,$5\nxor $2,$2,$5\n"
+            f".globl f{i}\n.ent f{i}\nf{i}:\nalign $2,$4,$5,{i%4}\nxor $2,$2,$5\n"
             f"or $2,$2,$4\njrc16 $ra\n.end f{i}" for i in range(160))+"\n")
         run(bins/("llvm-mc"+SUFFIX), "-triple="+("mips64el" if little else "mips64"),
             "-mcpu=mips64r6", "-mattr=+micromips", "-filetype=obj", asm.name, "-o", obj.name, cwd=work)
@@ -99,7 +99,7 @@ def cpu_time_ms(command):
 
 def measure(bins, baseline, work, output):
     cases = make_inputs(bins, work)
-    exe = {"r9":baseline, "candidate":bins/("llvm-objdump"+SUFFIX)}
+    exe = {"r10":baseline, "candidate":bins/("llvm-objdump"+SUFFIX)}
     report = {"host":platform.platform(), "base":BASE, "head":HEAD, "rounds":ROUNDS,
               "functions_per_invocation":2560, "unit":"child CPU milliseconds",
               "program_sha256":{k:sha(p) for k,p in exe.items()}, "cells":{}}
@@ -114,22 +114,24 @@ def measure(bins, baseline, work, output):
         changed = collections.Counter()
         for old,new in zip(a,b):
             if old == new: continue
-            op = new.split(b"\t")[1].decode()
-            assert op in {"addiu","addiur2","addius5","srl","srl16"} and old.startswith(new+b" <") and old.endswith(b">")
-            changed[op] += 1
+            assert case.stem.startswith("r6-word-")
+            assert b"align" in old and b"$2, $5, $4," in old
+            assert old.replace(b"$2, $5, $4,", b"$2, $4, $5,") == new
+            changed["align"] += 1
+        assert changed["align"] == (2560 if case.stem.startswith("r6-word-") else 0)
         report["cells"][case.stem] = {"input_sha256":sha(case), "samples":[],
-                                      "removed_nonbranch_annotations":dict(changed),
+                                      "corrected_align_sources":dict(changed),
                                       "output_sha256":{leg:hashlib.sha256(v).hexdigest() for leg,v in raw.items()}}
     for round_index in range(ROUNDS):
         order = cases.copy()
         randomize.shuffle(order)
         for case in order:
-            legs = ["r9","candidate"] if (round_index+cases.index(case))%2==0 else ["candidate","r9"]
+            legs = ["r10","candidate"] if (round_index+cases.index(case))%2==0 else ["candidate","r10"]
             times = {leg:cpu_time_ms(command(leg,case)) for leg in legs}
             assert min(times.values()) > 0
             report["cells"][case.stem]["samples"].append(times)
     for name, cell in report["cells"].items():
-        ratios = [sample["candidate"]/sample["r9"] for sample in cell["samples"]]
+        ratios = [sample["candidate"]/sample["r10"] for sample in cell["samples"]]
         cell["paired_median_ratio"] = statistics.median(ratios)
         estimates = sorted(statistics.median(randomize.choices(ratios,k=ROUNDS)) for _ in range(5000))
         cell["resampled_95_percent_median_ratio"] = [estimates[125],estimates[4874]]
