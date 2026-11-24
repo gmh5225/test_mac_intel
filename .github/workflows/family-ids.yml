@@ -1,7 +1,7 @@
-name: Keep other architectures on their original decoder when enabling public x86 record writing
+name: Measure public x86 record selection at option changes and unchanged foreign scan contracts
 on:
   push:
-    branches: [codex/mixed-public-architecture-dispatch]
+    branches: [codex/select-x86-public-iterator-at-options]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mixed-public-architecture-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: selected-public-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
