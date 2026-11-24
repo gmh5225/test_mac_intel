@@ -1,7 +1,7 @@
-name: Check common compressed scan and canonical operand paths on dedicated RISC-V builds
+name: Compare real RISC-V canonical operand and compressed jump or stack-offset decoding across hosts
 on:
   push:
-    branches: [codex/riscv-dedicated-compressed-scanner]
+    branches: [codex/riscv-canonical-operands-and-scan-jumps]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-dedicated-compressed-scan-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: riscv-compressed-jump-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7

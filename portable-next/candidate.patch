@@ -59,7 +59,7 @@ index 45d62be6..a3e2892f 100644
  	case CS_OP_REG:
  		op->reg = MCInst_getOperand(MI, OpNum)->RegVal;
 diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
-index e7f449a4..a4fe604e 100644
+index e7f449a4..14362d77 100644
 --- a/arch/RISCV/RISCVScan.h
 +++ b/arch/RISCV/RISCVScan.h
 @@ -5,7 +5,7 @@
@@ -71,7 +71,28 @@ index e7f449a4..a4fe604e 100644
  /* The ordinary decoder retains reserved immediates, zero-register hints
   * and encodings whose operation differs between RV32 and RV64. */
  static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
-@@ -64,7 +64,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+@@ -13,6 +13,8 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
+ 	const unsigned encoding = ((word >> 13) << 2) | (word & 3);
+ 	const unsigned rd = (word >> 7) & 31;
+ 	switch (encoding) {
++	case 0: /* C.ADDI4SPN requires a nonzero stack offset. */
++		return word & 0x1fe0 ? RISCV_C_ADDI4SPN : 0;
+ 	case (5 << 2) | 1:
+ 		return RISCV_C_J;
+ 	case (6 << 2) | 1:
+@@ -28,8 +30,10 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
+ 	case (2 << 2) | 1:
+ 		return rd ? RISCV_C_LI : 0;
+ 	case (4 << 2) | 2:
+-		if (!rd || !(word & 0x7c))
++		if (!rd)
+ 			return 0;
++		if (!(word & 0x7c))
++			return (word & 0x1000) ? RISCV_C_JALR : RISCV_C_JR;
+ 		return (word & 0x1000) ? RISCV_C_ADD : RISCV_C_MV;
+ 	case (0 << 2) | 1:
+ 		return rd && (word & 0x107c) ? RISCV_C_ADDI : 0;
+@@ -64,7 +68,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
  			       MCInst *inst, uint16_t *size, uint64_t address,
  			       void *info)
  {
@@ -151,3 +172,16 @@ index 0984421a..79f2fe93 100644
 +				   CS_OPT_SYNTAX_UNCOMPRESSED_REAL);
  	return ret ? 0 : -1;
  }
+diff --git a/tests/unit/riscv_scan_options.c b/tests/unit/riscv_scan_options.c
+index d89f07d6..12b70ff5 100644
+--- a/tests/unit/riscv_scan_options.c
++++ b/tests/unit/riscv_scan_options.c
+@@ -108,6 +108,8 @@ int main(void)
+ 	}
+ 	const unsigned extensions = CS_MODE_RISCV_C | CS_MODE_RISCV_FD |
+ 				    CS_MODE_RISCV_ZICFISS | CS_MODE_RISCV_ZCMP_ZCMT_ZCE;
++	ok &= checkScan(CS_MODE_RISCV32);
++	ok &= checkScan(CS_MODE_RISCV64);
+ 	ok &= checkScan((cs_mode)(CS_MODE_RISCV32 | extensions));
+ 	ok &= checkScan((cs_mode)(CS_MODE_RISCV64 | extensions));
+ 	cs_free(insn, 1);
