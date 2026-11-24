@@ -1,7 +1,7 @@
-name: Isolate the batch scalar call from scan and measure both PuTTY batch and iterator records
+name: Verify scalar vector writes, masked access and ISA membership on native Windows, macOS and Linux
 on:
   push:
-    branches: [codex/x86-batch-record-call-abi]
+    branches: [codex/scalar-vector-access-native]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,6 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { host: ubuntu-22.04, arch: x86_64, profile: gcc }
+          - { host: ubuntu-24.04, arch: x86_64, profile: clang }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang }
           - { host: windows-2022, arch: amd64, profile: full }
           - { host: windows-2022, arch: amd64, profile: diet }
           - { host: windows-2022, arch: amd64, profile: reduced }
@@ -37,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
+          ref: 17d578259c044cad6ade810870f2aa1e7d33724a
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: independent-batch-entry-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: scalar-vector-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
