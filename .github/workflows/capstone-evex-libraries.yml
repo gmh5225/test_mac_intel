@@ -1,7 +1,7 @@
-name: Measure vector clear and unary register records against native Capstone and iced
+name: Compare mixed Linux public iterator and full decoder placement on identical real records
 on:
   push:
-    branches: [codex/i386-vector-clear-and-group3]
+    branches: [codex/linux-mixed-public-record-caller]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 236614a333d4bf55faca1960814bb6fbc821a86a
+          ref: b7a40bec54cdcb46fd6555b3335e3965a06a3740
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: cf7070f32ef716648478d178390c742cbaec5b21
+          ref: 961146191161cfb1dc1584a1e9c8946d2166ad45
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bare-vector-clear-and-unary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: linux-mixed-public-caller-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

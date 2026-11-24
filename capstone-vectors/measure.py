@@ -41,6 +41,8 @@ try:
     assert maps['prefix']==q and maps['base']['commit']==q['parent']
     layout={}
     from elftools.elf.elffile import ELFFile
+    for stem in ('real','states','guard'):
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/('trial-'+stem+'.cpp'),'-ldl','-o',w/('trial-'+stem))
     from training import fetch
     from foreign_time import measure as time_foreign
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
@@ -61,6 +63,10 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
+        run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
+        commands=rd(build/'compile_commands.json')
+        entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
+        assert ('CAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and ('CAPSTONE_X86_ITERATOR_READERS' in entry)==(label=='candidate')
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -93,6 +99,15 @@ try:
     save('mode-probe',mode_probe)
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
+    guards={};records={}
+    for lbl in ('candidate','outlined'):
+        parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
+        guards[lbl]=dict(states=parts.stderr.count('case arch='),status=parts.returncode,stderr=parts.stderr.splitlines()[-8:])
+        save('extra-states',guards)
+        assert parts.returncode==0 and guards[lbl]['states']==464
+        z=get(w/'trial-guard',w/'base.so',w/(lbl+'.so')).split()
+        assert z==['2162688','999139'];guards[lbl]['scan']=[int(x)for x in z]
+        save('extra-states',guards)
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
@@ -116,6 +131,15 @@ try:
             return rows
         assert audit_engine('base')==audit_engine('outlined')==audit_engine('candidate')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
+        records[name]={}
+        for lbl in ('candidate','outlined'):
+            vals=[]
+            for route_id in range(8):
+                v=list(map(int,get(w/'trial-real',w/'base.so',w/(lbl+'.so'),f,path,str(bits),str(route_id)).split()))
+                assert v[0]>0 and all(x==v[:4] for x in vals);vals.append(v[:4])
+            assert vals[0][2]==spec['bytes']
+            records[name][lbl]=vals[0]
+        save('extra-real',records)
         for route in ('private','capstone'):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')
