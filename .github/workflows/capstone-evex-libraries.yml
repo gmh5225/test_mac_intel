@@ -1,7 +1,7 @@
-name: Measure the public writer against iced with exact linked entry validation
+name: Measure the public reader with native ELF and Mach-O executable-section checks
 on:
   push:
-    branches: [codex/public-record-linked-iced-readers]
+    branches: [codex/record-writer-native-sections]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-record-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: section-verified-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
