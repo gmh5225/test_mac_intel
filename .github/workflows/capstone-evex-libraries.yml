@@ -1,7 +1,7 @@
-name: Measure byte-pair immediate output against Capstone and iced on real x86 code
+name: Time decoded address formatting alongside both iced formatters
 on:
   push:
-    branches: [codex/unsigned-immediates-real-isa]
+    branches: [codex/bounded-decoded-base-address]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d3dcfa80afcb4d0786308a2938659998c54a1453
+          ref: 8347e89a4e9a9e1618009fb8a496e335e857d00f
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 799a7b08252f4e0c6d10a918011981c1460d8bf3
+          ref: 8f7493e97555c1bb764c8d31f41feb9c35d8f403
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: immediate-numbers-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: decoded-base-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
