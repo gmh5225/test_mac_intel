@@ -1,7 +1,7 @@
-name: Profile production Capstone and iced FastFormatter on the same Linux x86 and ARM instruction boundaries
+name: Check EXTRQ register selectors and REX.R on native SSE4a processors
 on:
   push:
-    branches: [codex/native-formatter-stage-ownership]
+    branches: [codex/native-sse4a-extrq-register-selectors]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,8 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 2 }
+          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-24.04, cc: gcc, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -22,39 +24,11 @@ jobs:
         with:
           sparse-checkout: capstone-vectors
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/capstone
-          ref: d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
-          path: source
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/NeverD
-          ref: bbfc6da691392ba8b369812c59624d3769d03676
-          path: neverd-config
-          sparse-checkout: |
-            CMakeLists.txt
-            cmake/NeverDCapstoneCompilerOptions.inc
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/iced
-          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
-          path: iced-source
-          sparse-checkout: src/rust/iced-x86
-          persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
-        run: |
-          python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
-      - if: always()
-        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
+      - name: Check EXTRQ register selectors on SSE4a hardware
+        run: python3 -B capstone-vectors/probe.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: paired-native-profile-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: native-extrq-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
