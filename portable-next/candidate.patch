@@ -1,3 +1,16 @@
+diff --git a/arch/X86/X86GenLegacyPackedMemory.inc b/arch/X86/X86GenLegacyPackedMemory.inc
+index 62381c03..c0796e49 100644
+--- a/arch/X86/X86GenLegacyPackedMemory.inc
++++ b/arch/X86/X86GenLegacyPackedMemory.inc
+@@ -49,7 +49,7 @@ static const struct X86SseRegisterOutput legacy_packed_rows[] = {
+ 	{ { 440, "psrlq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
+ 	{ { 390, "paddq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
+ 	{ { 425, "pmullw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
+-	{ { 378, "movq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 8, 1 }, { 0, 16, 1 } } }, true, true },
++	{ { 378, "movq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 16, 1 } } }, true, true },
+ 	{ { 447, "psubusb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
+ 	{ { 448, "psubusw", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
+ 	{ { 420, "pminub", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 3 }, { 0, 16, 1 } } }, false, true },
 diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
 index ba7fbaeb..42c2a56c 100644
 --- a/arch/X86/X86MappingInsn.inc
@@ -160,16 +173,17 @@ index a137144b..ea7be346 100644
  
  {	/* X86_VMOVSS2DIrr, X86_INS_VMOVD: vmovd	$dst $src */
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index 9cf2eb66..9f6e8ebb 100644
+index 9cf2eb66..c04d3abd 100644
 --- a/suite/auto-sync/README.md
 +++ b/suite/auto-sync/README.md
-@@ -152,6 +152,9 @@ and run `unit_x86_scalar_vector_access`.
+@@ -152,6 +152,10 @@ and run `unit_x86_scalar_vector_access`.
  The VEX `KMOVB/W/D/Q` memory-store rows are maintained by
  `suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch` and covered by
  `unit_x86_kmask_access`.
 +The MOVD/MOVQ and VMOVD/VMOVQ memory access rows and MMX MOVQ public IDs
 +are maintained by `suite/auto-sync/inc_patches/X86/06_integer_vector_moves.patch` and covered by
-+`unit_x86_integer_vector_access`.
++`unit_x86_integer_vector_access`. Regenerate the legacy packed memory output with
++`x86_simple_output --legacy-packed-memory` after updating these rows.
  
  After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
  `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.

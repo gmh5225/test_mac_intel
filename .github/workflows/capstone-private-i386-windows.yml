@@ -1,7 +1,7 @@
-name: Verify MOVD and MOVQ details and public IDs across native x86 configurations
+name: Verify regenerated integer vector stores in all x86 output routes
 on:
   push:
-    branches: [codex/integer-vector-access-abis]
+    branches: [codex/projected-vector-access-abis]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: integer-vector-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: projected-vector-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
