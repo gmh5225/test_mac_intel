@@ -19,6 +19,31 @@ corpora = {
                               0x0085102b, 0x0085102d, 0x00850034]),
     'MIPS64r2': ('mips64', [0x8c820000, 0xac820000, 0x10000001, 0x24020001]),
 }
+def varied_words():
+    generator = random.Random(41598)
+    immediate = (4, 5, 8, 9, 10, 11, 12, 13, 14, 32, 33, 36, 37, 40, 41)
+    alu = (32, 33, 34, 35, 36, 37, 38, 39, 42, 43)
+    for name, count in [('MIPS III varied', 2048), ('MIPS III mixed memory and exceptions', 768)]:
+        words = []
+        for i in range(count):
+            rs, rt, rd = (generator.randrange(32) for _ in range(3))
+            imm = generator.randrange(65536)
+            fmt = i % 3 if name == 'MIPS III varied' else 2
+            if fmt == 0:
+                word = generator.choice(immediate) << 26 | rs << 21 | rt << 16 | imm
+            elif fmt == 1:
+                word = rs << 21 | rt << 16 | rd << 11 | generator.choice(alu)
+            else:
+                registers = rs << 21 | rt << 16
+                word = generator.choice([35 << 26 | registers | imm,
+                                         43 << 26 | registers | imm,
+                                         25 << 26 | registers | imm,
+                                         rd << 11 | 16, registers | (imm & 1023) << 6 | 52,
+                                         (imm & 65535) << 6 | 12])
+            words.append(word)
+        yield name, ('mips3', words)
+
+corpora.update(varied_words())
 rng = random.Random(249035)
 cases = {}
 rows = []
@@ -28,7 +53,7 @@ with tempfile.TemporaryDirectory() as temp:
     for name, (isa, words) in corpora.items():
         for byteorder, suffix in [('big', ''), ('little', 'el')]:
             label = name + '/' + byteorder
-            blob = b''.join(w.to_bytes(4, byteorder) for w in words) * 32
+            blob = b''.join(w.to_bytes(4, byteorder) for w in words) * (1 if len(words) > 32 else 32)
             f = Path(temp) / str(len(cases))
             f.write_bytes(blob)
             cases[label] = (isa + suffix, f)
@@ -39,7 +64,8 @@ with tempfile.TemporaryDirectory() as temp:
         run = subprocess.check_output([binary[version], profile, stage, path, str(repeats)])
         return json.loads(run)
 
-    jobs = [(key, stage) for key in cases for stage in ('capstone', 'decode', 'lift')]
+    jobs = [(key, stage) for key in cases for stage in ('capstone', 'decode', 'lift')
+            if stage != 'lift' or not ('varied' in key or 'memory and exceptions' in key)]
     counts = {}
     for key, stage in jobs:
         probe = measure(key, stage, 'base', 1000)
@@ -55,6 +81,7 @@ with tempfile.TemporaryDirectory() as temp:
 for key in cases:
     sample = [v for v in rows if v['case'] == key]
     assert len({(v['instructions_per_repeat'], v['digest']) for v in sample if v['stage'] != 'lift'}) == 1
-    assert len({(v['instructions_per_repeat'], v['operations_per_repeat'], v['digest']) for v in sample if v['stage'] == 'lift'}) == 1
+    if any(v['stage'] == 'lift' for v in sample):
+        assert len({(v['instructions_per_repeat'], v['operations_per_repeat'], v['digest']) for v in sample if v['stage'] == 'lift'}) == 1
     assert all(v['wall_seconds'] > 0 for v in sample)
 output.write_text(json.dumps(results, indent=2) + '\n')
