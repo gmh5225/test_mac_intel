@@ -1,0 +1,139 @@
+name: Qualify SDK versions against the installed native Windows ARM64 DLLs
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - .github/workflows/neverd-witnessed-sdk-variants.yml
+permissions:
+  contents: read
+jobs:
+  sdk:
+    runs-on: windows-11-arm
+    timeout-minutes: 65
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            native-driver-entry
+            runtime-sdk-evidence
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: d1593462b63385a873fbaa30bb1018c8383444cd
+          path: source
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ${{ runner.temp }}/neverd-provider-tools
+          key: neverd-arm64-provider-tools-180f23d24352f2dfb2b23cd234dd7028ded45ff1-v3
+          fail-on-cache-miss: true
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - name: Generate and authenticate the original WDK, SDK and UCRT catalog
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $cache = "$env:RUNNER_TEMP/sdk-packages"
+          $exe = "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe"
+          $out = "$env:RUNNER_TEMP/sdk-types/arm64"
+          $pe = [IO.File]::ReadAllBytes($exe)
+          $nt = [BitConverter]::ToInt32($pe,60)
+          if ([BitConverter]::ToUInt16($pe,$nt+4) -ne 0xaa64) { throw 'The retained type reader has an unexpected PE machine' }
+          python runtime-sdk-evidence/prefetch_recent_inputs.py --scripts source/scripts --cache $cache
+          Remove-Item Env:INCLUDE -ErrorAction SilentlyContinue
+          python source/scripts/generate_microsoft_windows_types.py --architecture arm64 --ucrt --ucrt-compatibility --legacy-sdk --output $out --cache $cache --neverd $exe --clang clang --llvm-readobj llvm-readobj
+          $manifest = Get-Content -Raw "$out/manifest.json" | ConvertFrom-Json
+          if ($manifest.architecture -ne 'arm64' -or $manifest.libraries.Count -ne 2) { throw 'Incomplete native catalog' }
+          $libraries = @()
+          $selected = @{}
+          $expected = @{RDBSS=285; InternetControlMessage=9; TransactionManager=39; SensorUtilities=40; WebAuthentication=13; SNMPUtilities=26; WebAuthenticationRuntime=29; EventCollector=15; DeviceManagementRegistration=15; NetworkTrafficControl=20; ComputeStorage=14; WebSockets=13; RestartManager=11; FontEmbedding=14; PerformanceCounters=12; QoSTraffic=11; OverlayFiles=11; SetupAdministration=50; RealtimeWorkQueue=34; WindowsRemoteManagement=33}
+          $ordinalExpected = @{AccessControlUI=3; ActiveDirectoryHelpers=12; CabinetArchive=10; CabinetCompression=12; ColorModule=21; ColorProfileOrdinals=8; Direct2DUtilities=13; Direct3D9On12=2; DirectSound=9; DirectorySecurity=4; Hyperlinks=28; MAPIUtilities=66; NetworkProviderOrdinals=5; ODBCBulkCopy=27; OLEDialogOrdinals=12; OLEPictureProperties=12; PrintTicket=11; VideoForWindowsVersion=1; XInput=7}
+          foreach ($name in $ordinalExpected.Keys) { $expected[$name] = $ordinalExpected[$name] }
+          foreach ($lib in $manifest.libraries) {
+            $hash = (Get-FileHash "$out/$($lib.name).h").Hash.ToLower()
+            if ($hash -ne $lib.sha256) { throw "Header digest for $($lib.name) differs" }
+            $libraries += @{name=$lib.name; sha256=$hash; types=$lib.types; prototypes=$lib.prototypes}
+            foreach ($provider in $lib.providers) {
+              if ($provider.name -eq 'RDBSS') { $selected['RDBSS']=$provider.metadata.cpp_header_bridge.verified_functions.Count }
+              elseif ($expected.ContainsKey($provider.name)) {
+                $bridge = if ($provider.name -eq 'WebAuthenticationRuntime') { $provider.metadata.sdk_runtime_bridge } else { $provider.metadata.sdk_import_bridge }
+                $selected[$provider.name]=$bridge.published_abi.verified_functions.Count
+              }
+            }
+          }
+          foreach ($name in $expected.Keys) {
+            if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
+          }
+          @{generator_revision='d1593462b63385a873fbaa30bb1018c8383444cd'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+      - name: Execute the SDK and generated declarations on Windows ARM64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $types = "$env:RUNNER_TEMP/sdk-types"
+          $selected = "$env:RUNNER_TEMP/workqueue-winrm-abi"
+          $runtime = "$env:RUNNER_TEMP/workqueue-winrm-runtime"
+          $arm = Join-Path $types 'arm64'
+          $manifest = Get-Content -Raw "$arm/manifest.json" | ConvertFrom-Json
+          Copy-Item "$arm/manifest.json" "$types/manifest.json"
+          foreach ($lib in $manifest.libraries) {
+            Copy-Item "$arm/$($lib.name).h" "$types/$($lib.name).h"
+          }
+          python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected --provider RealtimeWorkQueue --provider WindowsRemoteManagement
+          New-Item -Type Directory $runtime | Out-Null
+          python -c "import json,sys; from pathlib import Path; sys.path.insert(0, 'native-driver-entry'); from check_native_process_profile import execute_work_queue_and_winrm; p,s,o=map(Path,sys.argv[1:]); rows=execute_work_queue_and_winrm(json.loads((p/'arm64'/'manifest.json').read_text(encoding='utf-8-sig')),s,o); Path('native-api-execution.json').write_text(json.dumps(rows,indent=2),encoding='utf-8')" $types $selected $runtime
+      - name: Compile and resolve documented display and lockdown-policy exports
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $types = "$env:RUNNER_TEMP/sdk-types"
+          $selected = "$env:RUNNER_TEMP/qualified-named-runtime"
+          $catalog = Get-Content 'source/scripts/MicrosoftNamedRuntimeSDKInputs.json' -Raw | ConvertFrom-Json
+          $cpdk = Get-Content 'source/scripts/MicrosoftCPDKInputs.json' -Raw | ConvertFrom-Json
+          $providerArgs = @()
+          foreach ($item in (@($catalog.providers.PSObject.Properties) + @($cpdk.providers.PSObject.Properties))) {
+            if ($null -ne $item.Value.targets.arm64) {
+              $providerArgs += '--provider'
+              $providerArgs += $item.Name
+            }
+          }
+          if ($providerArgs.Count -eq 0) { throw 'No native ARM64 providers in the selected catalog' }
+          python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected @providerArgs
+          python runtime-sdk-evidence/check_named_exports.py source $types $selected native-named-exports.json
+      - name: Match verified ARM64 source declarations against installed system exports
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python runtime-sdk-evidence/check_recent_system_catalog.py source "$env:RUNNER_TEMP/sdk-types" "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" native-system-catalog.json
+      - name: Record the first failing official interface or compiler
+        if: failure()
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP/sdk-types/arm64"
+          if (Test-Path $dir) {
+            Get-ChildItem -Recurse -Filter '*.log' $dir | Sort-Object LastWriteTime -Descending | Select-Object -First 8 | ForEach-Object {
+              Write-Host $_.Name
+              if ($_.Name -like '*.parse.log' -and $_.Length -gt 0) {
+                try { Get-Content -Raw -LiteralPath $_.FullName | ConvertFrom-Json | Select-Object -First 5 | ForEach-Object { Write-Host $_.message } } catch {}
+              }
+              Select-String -Path $_.FullName -Pattern '(fatal error|error:|exception:)' | Select-Object -First 5 | ForEach-Object { Write-Host $_.Line.Trim().Substring(0,[Math]::Min(250,$_.Line.Trim().Length)) }
+            }
+          }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-catalog-evidence
+          path: |
+            native-catalog-evidence.json
+            native-api-execution.json
+            native-named-exports.json
+            native-system-catalog.json
+          if-no-files-found: error
+          retention-days: 14
