@@ -1,0 +1,71 @@
+name: NeverD DTL-H2700 capture
+on:
+  push:
+    branches: [codex/mips-historical-pa-qualification]
+    paths: ['.github/workflows/neverd-mips-pa-trace.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  REVISION: fedbe7d14fdb41e2de3bc982c718a4b8d55ca58f
+jobs:
+  measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.REVISION }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Measure the archived signal recording
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, subprocess, sys, tempfile, time, urllib.request, zlib
+          from pathlib import Path
+
+          head = subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip()
+          assert head == os.environ['REVISION']
+          base = Path('unittests/lift/mips')
+          expected = json.loads((base / 'historical-pa-capture.expected.json').read_text())
+          start, end = 80407448, 84083210
+          url = 'https://psx.arthus.net/sdk/Psy-Q/PSYQ_SDK.zip'
+          chunk = urllib.request.Request(f'{url}?span={start}-{end}',
+                     headers={'Range': f'bytes={start}-{end}', 'Accept-Encoding': 'identity'})
+          for attempt in range(3):
+              try:
+                  with urllib.request.urlopen(chunk, timeout=45) as stream:
+                      assert stream.status == 206 and stream.headers['Content-Range'] == f'bytes {start}-{end}/146287716'
+                      zipped = stream.read(end - start + 2)
+                  break
+              except OSError:
+                  if attempt == 2:
+                      raise
+                  time.sleep(3)
+          assert len(zipped) == end - start + 1
+          assert hashlib.sha256(zipped).hexdigest() == '84e1f9a1a246fa7eb13cb08c7c9c5ac665d87d2fc4917d101025d444dda59a98'
+          with tempfile.TemporaryDirectory() as temp:
+              capture = Path(temp) / 'TUTO3.PAD'
+              capture.write_bytes(zlib.decompress(zipped, -15))
+              run = [sys.executable, str(base / 'historical-pa-capture.py'), str(capture)]
+              observed = json.loads(subprocess.check_output(run, text=True))
+              assert observed == expected
+              capture.write_bytes(b'wrong recording')
+              invalid = subprocess.run(run, capture_output=True, text=True)
+              assert invalid.returncode != 0 and 'unexpected TUTO3.PAD' in invalid.stderr
+          receipt = {'revision': head, 'host': os.environ['RUNNER_OS'], 'measurement': observed}
+          Path('recording.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          print(json.dumps(receipt))
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: DTL-H2700-${{ runner.os }}
+          path: recording.json
