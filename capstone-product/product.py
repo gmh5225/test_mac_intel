@@ -52,6 +52,14 @@ try:
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
+        uid_tables={}
+        for line in sp.check_output(['nm','-S','--defined-only',archive],text=True).splitlines():
+            fields=line.split()
+            if len(fields)==4 and fields[-1] in ('modRMTable','x86PackedUIDs'):
+                uid_tables[fields[-1]]=int(fields[1],16)
+        assert uid_tables==({'modRMTable':40064} if variant=='layout' else {'x86PackedUIDs':39968} if variant=='selector' else {'modRMTable':39968}),uid_tables
+        save('uid-storage-'+variant,uid_tables)
+
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
         for z in foreign:
@@ -74,7 +82,7 @@ try:
         save('forms-'+variant,dict(records=3264,wrong=48 if failure else 0,stdout=v.stdout,stderr=v.stderr))
         command(['clang','-O2','-I',cs/'include',r/'selector.c',archive,'-o',t/'selector-guard'],'link-selector-'+variant)
         command([t/'selector-guard'],'selector-'+variant)
-        assert (out/('selector-'+variant+'.log')).read_text().strip()==('9088 144 1008' if variant!='selector' else '9088 144 0')
+        assert (out/('selector-'+variant+'.log')).read_text().strip()==('9088 144 1008' if variant=='base' else '9088 144 0')
         check=t/'verify-move-scans'
         command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
         p=sp.run([check],capture_output=True,text=True,check=True)

@@ -1,7 +1,7 @@
-name: Isolate decoded selector contents from read-only placement in the current NeverD product
+name: Measure the verified EXTRQ selection with the release-size runtime UID table
 on:
   push:
-    branches: [codex/extrq-same-size-production-control]
+    branches: [codex/reused-uid-storage-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 99eb3b2f473f856f3b3856dbdca7519e3621b2a7
+          ref: 84cdbdd109ad5f72e85603dd2dbbb5081020c58a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,11 +51,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "99eb3b2f473f856f3b3856dbdca7519e3621b2a7"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c"
+          test "$(git rev-parse HEAD)" = "84cdbdd109ad5f72e85603dd2dbbb5081020c58a"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "396483e58bf0bb8f4dd6e36daff8b0458bad2315"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
-          git -C third_party/capstone checkout --detach d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
+          git -C third_party/capstone fetch --depth=1 origin 396483e58bf0bb8f4dd6e36daff8b0458bad2315
+          git -C third_party/capstone checkout --detach 396483e58bf0bb8f4dd6e36daff8b0458bad2315
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-extrq-layout-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: neutral-extrq-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
