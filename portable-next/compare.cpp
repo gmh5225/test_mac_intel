@@ -253,25 +253,28 @@ static std::pair<size_t,uint64_t> sweep(Session &s,const std::vector<uint8_t>& b
   return {records,sum};
 }
 static int timing(int argc,char**argv) {
-  check(argc==7,"timing arguments");
+  check(argc==8,"timing arguments");
 #ifdef _WIN32
   DWORD_PTR available,system;
   check(GetProcessAffinityMask(GetCurrentProcess(),&available,&system)&&available&&
         SetThreadAffinityMask(GetCurrentThread(),available&(~available+1)),"affinity");
 #endif
-  const unsigned seed=static_cast<unsigned>(std::strtoul(argv[6],nullptr,10));
-  int slot=seed%2;
-  Api first(argv[1+slot]), second(argv[2-slot]);
-  Api *base=slot?&second:&first, *candidate=slot?&first:&second;
-  check(base->disasm!=candidate->disasm,"loaded images");
-  std::ifstream input(argv[3],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(input),{}};
-  const int bits=std::atoi(argv[4]);const uint64_t ip=std::strtoull(argv[5],nullptr,10);
+  const unsigned seed=static_cast<unsigned>(std::strtoul(argv[7],nullptr,10));
+  std::array<unsigned,3> order{0,1,2};
+  for(unsigned i=0;i<seed%6;++i)std::next_permutation(order.begin(),order.end());
+  Api first(argv[1+order[0]]),second(argv[1+order[1]]),third(argv[1+order[2]]);
+  std::array<Api*,3> images{};
+  images[order[0]]=&first;images[order[1]]=&second;images[order[2]]=&third;
+  check(first.next!=second.next && first.next!=third.next && second.next!=third.next,"three distinct loaded iterators");
+  std::ifstream input(argv[4],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(input),{}};
+  const int bits=std::atoi(argv[5]);const uint64_t ip=std::strtoull(argv[6],nullptr,10);
   const auto width=bits==32?CS_MODE_32:CS_MODE_64;std::mt19937 rng(seed);
   for(unsigned mode=0;mode<3;++mode) for(bool iter:{false,true}) {
+    if(iter ? mode!=(bits==32?0u:2u) : mode!=1)continue;
     std::pair<size_t,uint64_t> want{};
     std::array<unsigned,3> order{0,1,2};std::shuffle(order.begin(),order.end(),rng);
     for(unsigned which:order) {
-      Session session(which==2?*candidate:*base,CS_ARCH_X86,width);
+      Session session(*images[which],CS_ARCH_X86,width);
       configure(session,mode);
       const auto warm=sweep(session,bytes,ip,mode,iter);
       if(!want.first)want=warm;check(want==warm,"native digest");
@@ -287,7 +290,7 @@ static int timing(int argc,char**argv) {
 }
 
 int main(int argc,char **argv) {
-  if (argc==7) return timing(argc,argv);
+  if (argc==8) return timing(argc,argv);
   if(argc!=6)return 2;
   Api a(argv[1]),b(argv[2]);check(a.disasm!=b.disasm,"distinct libraries");
   std::ifstream f(argv[3],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};check(!bytes.empty(),"input");

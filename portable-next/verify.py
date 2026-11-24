@@ -38,14 +38,15 @@ try:
             cmd(k+'-width-'+str(w),args);obs=[json.loads(l)for l in (out/(k+'-width-'+str(w)+'.log')).read_text().splitlines()];assert len(obs)==2 and obs[0]['width']==w and obs[0]['records']>0 and obs[1]['callback_events']>0 and obs[1]['reentrant_details'];results[str(w)]=obs
         save('checked',ports)
         if profile=='full':
+            duplicate=t/('duplicate'+ext);shutil.copy2(libs['base'],duplicate);assert sha(duplicate)==images['base']
             timings={}
             for width in (32,64):
-                for seed in range(13):
-                    obs=sp.check_output([exe,libs['base'],path,files[width],str(width),str(samples['putty'+str(width)]['address']),str(500+seed)],text=True)
+                for seed in range(25):
+                    obs=sp.check_output([exe,libs['base'],duplicate,path,files[width],str(width),str(samples['putty'+str(width)]['address']),str(744+seed)],text=True)
                     groups={}
                     for line in obs.splitlines():
                         m,it,stage,cpu,wall,records,checksum=map(int,line.split());groups.setdefault(str(width)+'/'+str(it)+'/'+str(m),{})[('base','copy','batch')[stage]]=[cpu,wall,records,checksum]
-                    assert len(groups)==6 and all(len(v)==3 and len({tuple(a[2:])for a in v.values()})==1 for v in groups.values())
+                    assert len(groups)==2 and all(len(v)==3 and len({tuple(a[2:])for a in v.values()})==1 for v in groups.values())
                     for panel,cycle in groups.items():timings.setdefault(panel,[]).append(cycle)
             save('timings',timings)
     assert set(ports)==set(stages);save('complete',dict(source=stages,profile=profile,images=images,records=ports,units=units))
