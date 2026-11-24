@@ -1,7 +1,7 @@
-name: Time classic MIPS register jump and zero-shift scans on eight native hosts
+name: Retest classic MIPS scan gains and small formatting deltas with ELF address controls
 on:
   push:
-    branches: [codex/mips-register-jump-scans]
+    branches: [codex/mips-jump-linux-control-retest]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,14 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
           - { host: ubuntu-24.04, cc: clang, flavor: first }
           - { host: ubuntu-24.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04, cc: clang, flavor: third }
-          - { host: ubuntu-24.04, cc: clang, flavor: fourth }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: macos-15, cc: clang, flavor: first }
-          - { host: macos-15-intel, cc: clang, flavor: first }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 95
     env:
@@ -42,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-register-transfer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-layout-retest-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

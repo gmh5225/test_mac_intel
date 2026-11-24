@@ -33,6 +33,21 @@ try:
         expected={'cold':{'cs.c.o'},'mips':{'MipsMapping.c.o'},'combined':{'MipsInstPrinter.c.o','cs.c.o'}}[k]
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
+    def symbols(lib):
+        data=lib.read_bytes();phoff=struct.unpack_from('<Q',data,32)[0];stride,number=struct.unpack_from('<HH',data,54)
+        loads=[struct.unpack_from('<IIQQQQQQ',data,phoff+i*stride)for i in range(number)]
+        funcs={}
+        for line in get('nm','--defined-only','-S','-n',lib).splitlines():
+            cols=line.split()
+            if len(cols)!=4 or cols[2]not in ('T','t'):continue
+            addr,size=int(cols[0],16),int(cols[1],16)
+            if size==0:continue
+            segment=next(x for x in loads if x[0]==1 and x[3]<=addr and addr+size<=x[3]+x[5]);offset=addr-segment[3]+segment[2]
+            funcs[cols[3]]=dict(address=addr,size=size,sha256=hashlib.sha256(data[offset:offset+size]).hexdigest())
+        return funcs
+    f0=symbols(libs['base']);f1=symbols(libs['mips']);common=set(f0)&set(f1)
+    keep=[k for k in common if any(n in k for n in ('Mips_','getScanInstruction','MCInst_Init','cs_disasm','SStream_','classicScan'))]
+    put('elf-functions',dict(base=f0,candidate=f1,common=len(common),changed_address=[k for k in sorted(common)if f0[k]['address']!=f1[k]['address']],changed_bytes=[k for k in sorted(common)if f0[k]['sha256']!=f1[k]['sha256']],watched=sorted(keep)))
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     cases={}
     manifest=rd(r/'corpus-manifest.json')
@@ -89,8 +104,8 @@ try:
         for mode in (0,1,2):
             for api in ('time','iter'):
                 key='/'.join((n,api,str(mode)));args=[f,arch,str(ip),api,str(mode)]
-                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*q];rng=random.Random(key)
-                for _ in range(17):
+                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*q];rng=random.Random(key+"/independent-linux-retest")
+                for _ in range(31):
                     rng.shuffle(keys);obs=[(k,take(k,args,reps))for k in keys+keys[::-1]]
                     assert all(v[2:]==t0[2:]for k,v in obs)
                     cycles.append({k:[sum(o[i]for l,o in obs if k==l)for i in (0,1)]for k in keys})
