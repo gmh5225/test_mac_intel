@@ -1,7 +1,7 @@
-name: Inspect MIPS caller code and test preserved register initialization on three x86-64 hosts
+name: Measure MIPS formatting with archived object membership and one executable inode
 on:
   push:
-    branches: [codex/mixed-init-call-registers]
+    branches: [codex/mixed-init-call-archive-members]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: preserved-init-caller-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: preserved-init-members-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

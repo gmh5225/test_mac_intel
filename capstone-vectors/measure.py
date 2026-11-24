@@ -52,7 +52,9 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         save(label+'-caller',dict(sha256=capture_init(label),ordinary_call=old_hash))
-        objects[label]={f.name:sha(f)for f in build.rglob('*.c.o')}
+        members=get('ar','t',lib).splitlines()
+        assert len(members)==len(set(members)) and 'cs.c.o' in members
+        objects[label]={name:hashlib.sha256(sp.check_output(['ar','p',lib,name])).hexdigest() for name in members}
         run('clang++','-no-pie',w/'foreign.o',lib,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         run('clang','-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',w/(label+'.library'))
