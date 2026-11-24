@@ -39,7 +39,7 @@ int main() {
             if(row.count!=size_t(ok)||row.bytes!=consumed||result[0]!=(ok?id:0xacefacef)||result[1]!=0x45673210)wrong|=bit;
             bit*=2;
         }
-        std::printf("%u %u\n",id,wrong);
+        std::printf("%u %u %u\n",id,wrong,valid?minimal[i]->id:0);
     }
     for(unsigned i=0;i<3;++i){cs_free(full[i],1);cs_free(minimal[i],1);cs_close(&text[i]);cs_close(&scan[i]);}
 }
