@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','mask'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','sib','prefix','combined'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -20,7 +20,7 @@ t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
 try:
     build=t/'build';cases=corpus.prepare(r,t,out,command)
     foreign=[z for z in cases if z['name'].startswith(('arm64-','mips64el-'))]
-    selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls'}
+    selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','arm-ls'}
     cases=[c for c in cases if c['name'] in selected]
     assert {c['name']for c in cases}==selected
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
@@ -36,7 +36,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','mask'):
+    for variant in ('base','sib','prefix','combined'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/'base.patch'],'apply-correction-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -65,7 +65,7 @@ try:
         save('alias-records-'+variant,records)
         command(['clang','-O2','-I',cs/'include',r/'probe.c',archive,'-o',t/'mask-access'],'verify-build-'+variant)
         command([t/'mask-access'],'verify-memory-'+variant)
-        assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='1728 encodings and syntax cases, 0 incorrect memory accesses'
+        assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
         test=out/('tests-'+variant+'.log')
         assert '100% tests passed' in test.read_text()
         if variant=='base':
@@ -83,7 +83,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert len({z['archive']for z in identities.values()})==2 and len({z['binary']for z in identities.values()})==2
+    assert len({z['archive']for z in identities.values()})==4 and len({z['binary']for z in identities.values()})==4
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
@@ -92,7 +92,7 @@ try:
     length=max(map(len,imgs.values()));imgs={k:v+bytes(length-len(v))for k,v in imgs.items()}
     def execute(k,case,mode,reps):
         image=products[k if k!='copy' else 'base']
-        sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',4:'mips64el'}[case['selector']]
+        sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
         return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
     rows=[];rng=random.Random(1739)
     for c in cases:

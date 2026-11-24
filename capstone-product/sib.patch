@@ -1,15 +1,27 @@
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index f75c3794..c5d400c5 100644
+index 76b35f22..11582041 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -70,8 +70,8 @@ bool X86_writeMemoryOutput(
+@@ -70,7 +70,7 @@ bool X86_writeMemoryOutput(
  		const unsigned index_reg = ((rex & 2) << 2) |
  					   ((encoding >> 3) & 7);
  		base_reg = encoding & 7;
--#ifdef X86_SEGMENT_LEA32
--		/* A scale-one SIB without an index names only its base. */
-+#ifdef X86_MEMORY32_OUTPUT
-+		/* Every scale-one i386 SIB without an index names only its base. */
+-#if defined(X86_SEGMENT_LEA32) || \
++#if defined(X86_SEGMENT_LEA32) || defined(X86_BASE_ONLY_SIB) || \
+ 	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
+ 		/* A scale-one SIB without an index names only its base. */
  		if ((!mod && base_reg == 5) ||
- 		    (index_reg == 4 && (encoding >> 6) != 0))
- #else
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..ade6f2bcf 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -22,7 +22,9 @@
+ #include "X86MemoryOutputImpl.h"
+ #undef X86_IMMEDIATE_WIDE
+ #undef X86_MEMORY_IMMEDIATE
++#define X86_BASE_ONLY_SIB
+ #include "X86MemoryOutputImpl.h"
++#undef X86_BASE_ONLY_SIB
+ 
+ #define X86_EXTEND32_MEMORY writeExtendMemory32
+ #include "X86MemoryOutputImpl.h"
