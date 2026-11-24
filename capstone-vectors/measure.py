@@ -36,7 +36,11 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    images={}
+    from training import fetch,holdouts
+    heldout=fetch(r,w);save('foreign-corpus',heldout)
+    images={};objects={}
+    run('clang++','-std=c++17','-O3','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+
     for label in ('base','candidate'):
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
@@ -44,6 +48,19 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        objects[label]={f.name:sha(f)for f in build.rglob('*.c.o')}
+        run('clang++',w/'foreign.o',lib,'-o',w/('foreign-'+label))
+        args=(['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm'])
+        run('clang',*args,'-o',w/(label+'.library'))
+        if label=='candidate':
+            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert affected==['cs.c.o'],affected
+            save('affected',dict(count=len(objects[label]),changed=affected))
+    shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')
+    v=sp.run([w/'states',w/'base.library',w/'candidate.library','2048'],capture_output=True,text=True)
+    if v.returncode:print(v.stderr[-3000:],flush=True)
+    v.check_returncode();save('states',dict(stdout=v.stdout,iterations=2048,settings=v.stderr.count('case arch=')))
+
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
@@ -91,6 +108,7 @@ try:
             summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
+    holdouts(heldout,w,save)
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
 
 finally:
