@@ -159,35 +159,50 @@ def main(w):
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         save('linked-'+key+'.json',linked)
         if mixed:
-            member='X86Vex32Output.c.o';section='.cs_x86_i386_text'
-            od=w/('control-'+key);od.mkdir()
-            obj=od/member
-            obj.write_bytes(sp.check_output(['ar','p',lib,member]))
-            old_text=od/'original-section'
-            run(['objcopy','--dump-section',section+'='+str(old_text),obj],'read-section-'+key)
-            original=old_text.read_bytes()
+            from elftools.elf.elffile import ELFFile
+            import io,struct
+            member='X86Vex32Output.c.o';section='.cs_x86_i386_text';raw=sp.check_output(['ar','p',lib,member])
+            def elf_section(data):
+                elf=ELFFile(io.BytesIO(data));return elf.get_section_by_name(section).data()
+            def relocs(data):
+                elf=ELFFile(io.BytesIO(data));idx=elf.get_section_index(section);rows=[]
+                for sec in elf.iter_sections():
+                    if sec['sh_type'] not in ('SHT_RELA','SHT_REL') or sec['sh_info']!=idx:continue
+                    symbols=elf.get_section(sec['sh_link'])
+                    for rel in sec.iter_relocations():
+                        sym=symbols.get_symbol(rel['r_info_sym'])
+                        label=sym.name or (elf.get_section(sym['st_shndx']).name if isinstance(sym['st_shndx'],int) else str(sym['st_shndx']))
+                        rows.append([rel['r_offset'],rel['r_info_type'],label,rel.entry.get('r_addend',0)])
+                return rows
+            original=elf_section(raw);true_relocs=relocs(raw);assert true_relocs
             if key=='mixed_base':
                 reference_size=len(original);reference_symbols=linked
             elif key=='mixed_bare':
-                padding=reference_size-len(original)
-                assert padding>0 and padding%4==0,(reference_size,len(original))
-                extra=od/'extra';extra.write_bytes(original+bytes.fromhex('1f2003d5')*(padding//4))
-                run(['objcopy','--update-section',section+'='+str(extra),obj],'update-section-'+key)
-                readback=od/'readback'
-                run(['objcopy','--dump-section',section+'='+str(readback),obj],'read-padded-section-'+key)
-                assert readback.read_bytes()==extra.read_bytes() and extra.read_bytes()[:len(original)]==original
-                anchored=w/'libanchored.a';shutil.copy2(lib,anchored);run(['ar','rcsD',anchored,obj],'rebuild-archive')
-                assert sp.check_output(['ar','t',lib])==sp.check_output(['ar','t',anchored]) and sp.check_output(['ar','p',anchored,member])==obj.read_bytes()
+                padding=reference_size-len(original);assert padding>0 and padding%4==0
+                od=w/'inert-tail';od.mkdir()
+                obj=od/member;obj.write_bytes(raw);extra=od/'extra';extra.write_bytes(original+bytes.fromhex('1f2003d5')*(padding//4))
+                # Diagnose the retired replacement on a disposable copy. Preserve the actual measurement archive byte for byte.
+                legacy=od/'legacy';legacy.mkdir();out_obj=legacy/member
+                run(['objcopy','--update-section',section+'='+str(extra),obj,out_obj],'inspect-legacy-copy')
+                legacy_data=out_obj.read_bytes();old_relocs=relocs(legacy_data);assert elf_section(legacy_data)==extra.read_bytes()
+                broken_lib=legacy/'libcapstone.a';shutil.copy2(lib,broken_lib);run(['ar','rcsD',broken_lib,out_obj],'legacy-archive')
+                broken_exe=legacy/'probe';run(['clang++',w/'driver.o',*flags,broken_lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',broken_exe],'inspect-legacy-relocation-link')
+                source=od/'padding.s';inert=od/'padding.o'
+                source.write_text('.section '+section+',"ax",%progbits\n.balign 4\n.global cs_test_i386_tail\n.hidden cs_test_i386_tail\ncs_test_i386_tail:\n'+('nop\n'*(padding//4))+'.section .note.GNU-stack,"",%progbits\n')
+                run(['clang','-c',source,'-o',inert],'build-independent-padding')
                 shifted=w/'runner-mixed-anchor'
-                run(['clang++',w/'driver.o',*flags,anchored,ad/'target/release/libiced_compare.a',*syslibs,'-o',shifted],'link-mixed-anchor')
+                run(['clang++',w/'driver.o',*flags,lib,inert,ad/'target/release/libiced_compare.a',*syslibs,'-o',shifted],'link-unaltered-candidate')
                 syms={}
                 for line in sp.check_output(['nm','-n',shifted],text=True).splitlines():
-                    cols=line.split()
-                    if len(cols)==3 and cols[1] in ('t','T') and cols[2] in linked:syms[cols[2]]=int(cols[0],16)
-                assert set(syms)==set(reference_symbols)==set(linked)
-                assert any(linked[k]!=reference_symbols[k] for k in ('X86_disasmIterText','X86_scanNativeBatch'))
-                save('placement.json',dict(section=section,original_size=len(original),reference_size=reference_size,added=padding,object_sha=sha(obj),section_before=sha(old_text),section_after=sha(readback),verified_original_bytes=True,
-                    base=reference_symbols,candidate=linked,anchored=syms,restored={k:syms[k]==v for k,v in reference_symbols.items()},images=dict(base=sha(bins['mixed_base']),candidate=sha(exe),anchored=sha(shifted))))
+                    col=line.split()
+                    if len(col)==3 and col[1]in('t','T') and col[2] in names:syms[col[2]]=int(col[0],16)
+                assert raw==sp.check_output(['ar','p',lib,member]) and obj.read_bytes()==raw
+                assert reference_symbols.keys()==syms.keys() and syms==reference_symbols and linked!=syms,(reference_symbols,syms,linked)
+                def loops(exe):
+                    data=elf_section(exe.read_bytes());return [i for i in range(0,len(data)-3,4) if struct.unpack_from('<I',data,i)[0] in (0x14000000,0x94000000)]
+                search={k:loops(file)for k,file in [('candidate',exe),('broken',broken_exe),('anchored',shifted)]}
+                save('legacy-relocations.json',dict(section=section,original=len(true_relocs),replacement=len(old_relocs),equal=old_relocs==true_relocs,original_digest=hashlib.sha256(repr(true_relocs).encode()).hexdigest(),replacement_digest=hashlib.sha256(repr(old_relocs).encode()).hexdigest(),self_branches=search))
+                save('placement.json',dict(section=section,reference_size=reference_size,original_size=len(original),added=padding,verified_original_bytes=True,relocations_unchanged=True,original_object_sha=hashlib.sha256(raw).hexdigest(),base=reference_symbols,candidate=linked,anchored=syms,restored={k:v==syms[k]for k,v in reference_symbols.items()},images=dict(base=sha(bins['mixed_base']),candidate=sha(exe),anchored=sha(shifted))))
                 bins['mixed_anchor']=shifted
 
         if key=='base':
@@ -222,7 +237,7 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        for mode in ([0] if name=='jpeg-avx2-i386' else [1]):
+        for mode in (0,1,2):
             engine='x86_len_' if mode else 'vecbatch'
             targets={name:(key,engine) for name,key in [('private_mixed_base','mixed_base'),('private_reference_copy','mixed_base'),('private_mixed_bare','mixed_bare'),('private_anchored','mixed_anchor')]}
             def timed(label,count):
@@ -238,7 +253,7 @@ def main(w):
                 if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
                 cycles.append(dict(raw=obs))
             print(name,mode,rep,flush=True);results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3
+    assert len(results)==9
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:

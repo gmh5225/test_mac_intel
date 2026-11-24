@@ -1,7 +1,7 @@
-name: Check matched Arm64 formatter and batch scan addresses on three x86 workloads
+name: Measure Arm64 layout with every original i386 writer relocation intact
 on:
   push:
-    branches: [codex/arm64-branch-placement-focused]
+    branches: [codex/i386-preserved-relocations]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -55,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: focused-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: original-relocation-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
