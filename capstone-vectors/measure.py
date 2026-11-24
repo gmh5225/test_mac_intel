@@ -37,7 +37,9 @@ try:
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        objects[label]={f.name:sha(f)for f in build.rglob('*.c.o')}
+        members=get('ar','t',lib).splitlines()
+        assert len(members)==len(set(members))
+        objects[label]={name:hashlib.sha256(sp.check_output(['ar','p',lib,name])).hexdigest() for name in members}
         run('clang++','-no-pie',w/'foreign.o',lib,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         run('clang','-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',w/(label+'.library'))
@@ -54,19 +56,36 @@ try:
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     from elftools.elf.elffile import ELFFile
-    sections={}
-    for name in ('base','candidate'):
-        with (w/name).open('rb')as stream:
+    def exec_sections(image):
+        with image.open('rb') as stream:
             elf=ELFFile(stream)
-            sections[name]={s.name:dict(address=s['sh_addr'],size=s['sh_size'],sha256=hashlib.sha256(s.data()).hexdigest()) for s in elf.iter_sections() if s['sh_flags'] & 4 and s['sh_size']}
+            return {s.name:dict(address=s['sh_addr'],size=s['sh_size'],sha256=hashlib.sha256(s.data()).hexdigest()) for s in elf.iter_sections() if s['sh_flags']&4 and s['sh_size']}
+    sections={label:exec_sections(w/label)for label in ('base','candidate')}
+    alias='.cs_alias_pattern_lookup';helper='.cs_mcinst_storage_text'
+    ordinary=[s for s in sorted(sections['candidate'],key=lambda key:sections['candidate'][key]['address']) if s.startswith('.cs_')]
+    assert len(ordinary)>=2 and ordinary[-2:]==[helper,alias]
+    for label,order in [('original_order',ordinary),('restored',ordinary[:-2]+[alias,helper])]:
+        script=w/(label+'.ld')
+        script.write_text('SECTIONS { '+ ' '.join(f'{name} : {{ *({name}) }}' for name in order)+' } INSERT AFTER .text;'+chr(10))
+        run('clang++','-no-pie',w/'foreign.o',lib,'-Wl,-T,'+str(script),'-o',w/label)
+        sections[label]=exec_sections(w/label)
+        images[label]=dict(archive=sha(lib),exe=sha(w/label))
     save('code-sections',sections)
+    assert sections['original_order']==sections['candidate'],[s for s in sections['candidate'] if sections['candidate'][s]!=sections['original_order'].get(s)]
+    assert sections['restored'][alias]['address']==sections['base'][alias]['address']!=sections['candidate'][alias]['address']
+    assert sections['restored'][alias]['size']==sections['base'][alias]['size'] and sections['restored'][helper]['size']==sections['candidate'][helper]['size']
+    for k in ordinary[:-2]:
+        assert sections['restored'][k]==sections['candidate'][k],k
+    assert sections['restored']['.text']['size']==sections['candidate']['.text']['size'] and sections['restored']['.text']['address']==sections['candidate']['.text']['address']
+    assert images['candidate']['archive']==images['original_order']['archive']==images['restored']['archive']
     launch=w/'timed';shutil.copyfile(w/'base',launch);launch.chmod(0o755)
-    contents={k:(w/k).read_bytes()for k in ('base','candidate')}
+    contents={k:(w/k).read_bytes()for k in ('base','candidate','restored')}
     page=4096;current='base';inode=launch.stat().st_ino
-    changed=[start for start in range(0,max(map(len,contents.values())),page) if contents['base'][start:start+page]!=contents['candidate'][start:start+page]]
+    largest=max(map(len,contents.values()))
+    changed=[start for start in range(0,largest,page) if len({data[start:start+page]for data in contents.values()})>1]
     def select_image(label):
         global current
-        next_image='candidate' if label=='candidate'else'base'
+        next_image='base' if label=='duplicate' else label
         if current!=next_image:
             payload=contents[next_image]
             with launch.open('r+b')as f:
@@ -76,18 +95,18 @@ try:
                 f.truncate(len(payload))
             current=next_image
         return launch
-    for label in ('candidate','base','duplicate'):
-        image=select_image(label)
-        assert image.stat().st_ino==inode and sha(image)==images['candidate'if label=='candidate'else'base']['exe']
+    for label in ('candidate','restored','base','duplicate'):
+        assert select_image(label).stat().st_ino==inode and sha(launch)==images['base' if label=='duplicate' else label]['exe']
     save('fixed-image',dict(inode=inode,changed_blocks=len(changed),page=page,images=images))
     host=dict(cpu=cpu,neverd=dev,compiler=get('clang','--version').splitlines()[0],os=platform.platform())
     rows={}
     for row in heldout:
+        if row["name"]!="mips64el-cat":continue
         for mode in range(3):
             def take(label,n):
                 return list(map(int,get(select_image(label),row['arch'],w/(row['name']+'.text'),str(mode),str(n)).split()))
-            labels=['base','candidate','duplicate']
-            n=max(1,math.ceil(30e6/max(take('base',1)[0],1)))
+            labels=['base','candidate','duplicate','restored']
+            n=max(1,math.ceil(60e6/max(take('base',1)[0],1)))
             expected=take('base',n)[2:];assert expected[0]>0
             rng=random.Random(row['name']+'/mixed-fixed/'+str(mode));cycles=[]
             for _ in range(35):
@@ -98,7 +117,7 @@ try:
                 cycles.append({k:[sum(t[j]for t in ts)for j in (0,1)]for k,ts in pair.items()})
             rows[row['name']+'/'+str(mode)]=dict(checks=expected,repeats=n,cycles=cycles)
             save('foreign-observations',rows)
-    assert len(rows)==15
+    assert len(rows)==3
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=35))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

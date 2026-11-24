@@ -1,7 +1,7 @@
-name: Measure ARM AArch64 MIPS PowerPC and RISC-V on a common executable inode
+name: Compare two ELF code orders linked from identical MIPS-capable archives
 on:
   push:
-    branches: [codex/mixed-operand-foreign-fixed-image]
+    branches: [codex/mips-elf-alias-address-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,8 +12,8 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, replica: 3 }
+          - { host: ubuntu-24.04, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-mixed-foreign-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: linked-mips-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
