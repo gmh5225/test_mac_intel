@@ -30,7 +30,7 @@ try:
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
-        expected={'cold':{'cs.c.o'},'mips':{'MipsInstPrinter.c.o'},'combined':{'MipsInstPrinter.c.o','cs.c.o'}}[k]
+        expected={'cold':{'cs.c.o'},'mips':{'MipsInstPrinter.c.o','MipsMapping.c.o'},'combined':{'MipsInstPrinter.c.o','cs.c.o'}}[k]
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
@@ -96,6 +96,7 @@ try:
                     cycles.append({k:[sum(o[i]for l,o in obs if k==l)for i in (0,1)]for k in keys})
                 timings[key]=dict(cycles=cycles,reps=reps,records=t0[2],value=t0[3]);put('timings',timings)
         put('mappings',dict(sets={k:sorted(v)for k,v in addresses.items()},offsets=offsets,fixed=not darwin,inode=image.stat().st_ino if not darwin else None))
+    put('hardware',dict(cpu=get('sysctl','-n','machdep.cpu.brand_string') if darwin else get('lscpu'),compiler=get('clang','--version'))) 
     put('complete',dict(source=q,panels=len(timings),compiler=get('clang','--version'),cpu=get('sysctl','-n','machdep.cpu.brand_string')if darwin else get('lscpu')))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);put('cleanup',dict(removed=not t.exists(),bytes=size))
