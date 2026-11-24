@@ -1,31 +1,34 @@
-diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 77ae0309..447f3838 100644
---- a/arch/Mips/MipsInstPrinter.c
-+++ b/arch/Mips/MipsInstPrinter.c
-@@ -270,8 +270,11 @@ void Mips_LLVM_printInst(MCInst *MI, uint64_t Address, SStream *O)
- {
- 	bool useAliasDetails = map_use_alias_details(MI);
- 	if (!useAliasDetails) {
--		SStream_Close(O);
--		printInstruction(MI, Address, O);
-+		/* Only requested real operands need the closed printer pass. */
-+		if (MI->csh->detail_opt & CS_OPT_ON) {
-+			SStream_Close(O);
-+			printInstruction(MI, Address, O);
-+		}
- 		SStream_Open(O);
- 		map_set_fill_detail_ops(MI, false);
- 	}
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..3a3e73c7 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-+++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-@@ -2176,7 +2176,7 @@
-     },
-     "Mips_LLVM_printInst": {
-       "apply_type": "OLD",
--      "old_hash": "660b5eba392f6b7738cb3f241e8ff34f2a0137b12c7ca36b1ccbe0832d345d1d",
-+      "old_hash": "623675c5e88cee0d52257be990ca7281b86d926df506f1b14cd2b9b0359706db",
-       "new_hash": "",
-       "edit": ""
-     },
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..cfd22a89 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -188,6 +188,29 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
++#if defined(__aarch64__) && defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
++	!defined(__KERNEL__) && !defined(_KERNEL_MODE)
++#include <arm_neon.h>
++#include "../../MathExtras.h"
++
++/* The 32-bit iterator wraps branch targets before formatting them. Expand
++ * its eight hex digits in print order and shift away the leading zeroes. */
++static void writeRelativeHex32(char *out, uint32_t value)
++{
++	const uint8x8_t bytes = vcreate_u8(__builtin_bswap32(value));
++	const uint8x8_t nibbles = vand_u8(vzip1_u8(vshr_n_u8(bytes, 4), bytes),
++				       vdup_n_u8(15));
++	const uint8x8_t chars =
++		vqtbl1_u8(vld1q_u8((const uint8_t *)"0123456789abcdef"), nibbles);
++	const unsigned leading = CountLeadingZeros_32(value) / 4;
++	const uint64_t digits =
++		vget_lane_u64(vreinterpret_u64_u8(chars), 0) >> (leading * 8);
++	memcpy(out, "0x", 2);
++	memcpy(out + 2, &digits, sizeof(digits));
++}
++#define X86_FIXED_RELATIVE_HEX writeRelativeHex32
++#endif
++
+ #define X86_FIXED_OUTPUT tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32

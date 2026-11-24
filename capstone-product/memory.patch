@@ -1,228 +1,37 @@
-diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 77ae0309..447f3838 100644
---- a/arch/Mips/MipsInstPrinter.c
-+++ b/arch/Mips/MipsInstPrinter.c
-@@ -270,8 +270,11 @@ void Mips_LLVM_printInst(MCInst *MI, uint64_t Address, SStream *O)
- {
- 	bool useAliasDetails = map_use_alias_details(MI);
- 	if (!useAliasDetails) {
--		SStream_Close(O);
--		printInstruction(MI, Address, O);
-+		/* Only requested real operands need the closed printer pass. */
-+		if (MI->csh->detail_opt & CS_OPT_ON) {
-+			SStream_Close(O);
-+			printInstruction(MI, Address, O);
-+		}
- 		SStream_Open(O);
- 		map_set_fill_detail_ops(MI, false);
- 	}
-diff --git a/cs.c b/cs.c
-index 333e7de2..f20055f8 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1560,6 +1560,23 @@ void cs_skipdata_opstr(char *opstr, const uint8_t *buffer, size_t size)
- }
- #endif
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index dceebc42..a611621c 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -22,6 +22,9 @@ struct PaddingOutput {
  
-+/* Allocator callbacks may change CS_OPT_DETAIL after a record acquires its
-+ * detail. Release what each record owns. Preserve calls to custom free(NULL)
-+ * on paths that previously visited every slot. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((cold, noinline))
+ #include "X86GenVectorOutput.inc"
+ #include "X86VectorRegisterOutput.h"
++#ifndef CAPSTONE_X86_ONLY
++#include "X86VexBaseMemory.h"
 +#endif
-+static void free_insn_cache(cs_insn *cache, size_t count, bool free_empty)
-+{
-+	for (size_t i = 0; i < count; i++) {
-+		if (free_empty || cache[i].detail)
-+			cs_mem_free(cache[i].detail);
-+	}
-+	cs_mem_free(cache);
-+}
-+
- // dynamically allocate memory to contain disasm insn
- // NOTE: caller must free() the allocated memory itself to avoid memory leaking
- CAPSTONE_EXPORT
-@@ -1568,7 +1585,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- {
- 	struct cs_struct *handle;
- 	uint16_t insn_size;
--	size_t c = 0, i;
-+	size_t c = 0;
- 	unsigned int f = 0; // index of the next instruction in the cache
- 	cs_insn *insn_cache; // cache contains disassembled instructions
- 	void *total = NULL;
-@@ -1621,11 +1638,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- 			insn_cache->detail =
- 				cs_mem_calloc(1, sizeof(cs_detail));
- 			if (!insn_cache->detail) {
--				insn_cache = (cs_insn *)total;
--				for (i = 0; i < c; i++, insn_cache++)
--					cs_mem_free(insn_cache->detail);
--
--				cs_mem_free(total);
-+				free_insn_cache(total, c, true);
- 				*insn = NULL;
  
- 				handle->errnum = CS_ERR_MEM;
-@@ -1650,8 +1663,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- 		} else {
- 			// encounter a broken instruction
- 
--			// free memory of @detail pointer
--			if (handle->detail_opt) {
-+			// Release detail acquired before a callback changed the option.
-+			if (handle->detail_opt || insn_cache->detail) {
- 				cs_mem_free(insn_cache->detail);
- 			}
- 
-@@ -1714,13 +1727,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- 			total_size += (sizeof(cs_insn) * cache_size);
- 			tmp = cs_mem_realloc(total, total_size);
- 			if (tmp == NULL) { // insufficient memory
--				if (handle->detail_opt) {
--					insn_cache = (cs_insn *)total;
--					for (i = 0; i < c; i++, insn_cache++)
--						cs_mem_free(insn_cache->detail);
--				}
--
--				cs_mem_free(total);
-+				free_insn_cache(total, c, handle->detail_opt);
- 				*insn = NULL;
- 				handle->errnum = CS_ERR_MEM;
- 				return 0;
-@@ -1756,13 +1763,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- 							  sizeof(*insn_cache));
- 		if (tmp == NULL) { // insufficient memory
- 			// free all detail pointers
--			if (handle->detail_opt) {
--				insn_cache = (cs_insn *)total;
--				for (i = 0; i < c; i++, insn_cache++)
--					cs_mem_free(insn_cache->detail);
--			}
--
--			cs_mem_free(total);
-+			free_insn_cache(total, c, handle->detail_opt);
- 			*insn = NULL;
- 
- 			handle->errnum = CS_ERR_MEM;
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..3a3e73c7 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-+++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-@@ -2176,7 +2176,7 @@
-     },
-     "Mips_LLVM_printInst": {
-       "apply_type": "OLD",
--      "old_hash": "660b5eba392f6b7738cb3f241e8ff34f2a0137b12c7ca36b1ccbe0832d345d1d",
-+      "old_hash": "623675c5e88cee0d52257be990ca7281b86d926df506f1b14cd2b9b0359706db",
-       "new_hash": "",
-       "edit": ""
-     },
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 735eaf83..f97cec2c 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -186,7 +186,7 @@ if(CAPSTONE_X86_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES x86_apx_rex2_generated.c)
-     list(APPEND UNIT_TEST_SOURCES x86_avx512_4fmaps_scalar_llig.c)
-     list(APPEND UNIT_TEST_SOURCES text_option.c x86_printer_prechecked.c)
--    list(APPEND UNIT_TEST_SOURCES detail_option.c)
-+    list(APPEND UNIT_TEST_SOURCES detail_option.c batch_detail_alloc.c)
- endif()
- if(CAPSTONE_RISCV_SUPPORT AND Python3_Interpreter_FOUND)
-     add_test(NAME unit_alias_pattern_rows_generator
-diff --git a/tests/unit/batch_detail_alloc.c b/tests/unit/batch_detail_alloc.c
-new file mode 100644
-index 00000000..82943142
---- /dev/null
-+++ b/tests/unit/batch_detail_alloc.c
-@@ -0,0 +1,87 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include <capstone/capstone.h>
-+#include <stdio.h>
-+#include <stdlib.h>
-+#include <string.h>
-+
-+static csh active_handle;
-+static void *detail;
-+static bool fail_resize;
-+static unsigned int detail_allocations, detail_frees, resize_failures;
-+
-+static void *CAPSTONE_API disable_detail_on_allocation(size_t count, size_t size)
-+{
-+	void *p = calloc(count, size);
-+	if (active_handle && p && count == 1 && size == sizeof(cs_detail)) {
-+		detail = p;
-+		++detail_allocations;
-+		cs_option(active_handle, CS_OPT_DETAIL, CS_OPT_OFF);
+ #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -446,9 +449,19 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+ 		return writeVexRipLoad(code, size, insn, insn_size);
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+-	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
+-		return writeVexRegisterOutput(code, size, insn, insn_size,
+-					      prefix);
++	if (size >= prefix + 2) {
++		const unsigned modrm = code[prefix + 1];
++		if (modrm >= 0xc0)
++			return writeVexRegisterOutput(code, size, insn, insn_size,
++						      prefix);
++#ifndef CAPSTONE_X86_ONLY
++		/* Non-SIB memory forms are disjoint from the indexed writer.
++		 * The iterator has already selected the default Intel printer. */
++		if (wide && code[0] == 0xc4 && (modrm & 7) != 4)
++			return writeVexBaseMemory(code, size, 3, insn, insn_size,
++						  regs);
++#endif
 +	}
-+	return p;
-+}
-+
-+static void *CAPSTONE_API resize_batch(void *p, size_t size)
-+{
-+	if (active_handle && fail_resize) {
-+		++resize_failures;
-+		return NULL;
-+	}
-+	return realloc(p, size);
-+}
-+
-+static void CAPSTONE_API release(void *p)
-+{
-+	if (p && p == detail) {
-+		detail = NULL;
-+		++detail_frees;
-+	}
-+	free(p);
-+}
-+
-+static bool check_batch(const uint8_t *code, size_t length, bool resize)
-+{
-+	csh handle = 0;
-+	cs_insn *out = NULL;
-+	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
-+		return false;
-+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK) {
-+		cs_close(&handle);
-+		return false;
-+	}
-+	detail_allocations = detail_frees = resize_failures = 0;
-+	fail_resize = resize;
-+	active_handle = handle;
-+	const size_t n = cs_disasm(handle, code, length, 0x1000, 0, &out);
-+	active_handle = 0;
-+	const bool ok = n == 0 && out == NULL &&
-+			cs_errno(handle) == (resize ? CS_ERR_MEM : CS_ERR_OK) &&
-+			detail_allocations == 1 && detail_frees == 1 &&
-+			resize_failures == (resize ? 1U : 0U);
-+	if (!ok)
-+		fprintf(stderr, "batch of %zu bytes: %u detail allocations, "
-+				"%u frees, %u failed resizes\n",
-+			length, detail_allocations, detail_frees, resize_failures);
-+	if (out)
-+		cs_free(out, n);
-+	cs_close(&handle);
-+	free(detail);
-+	detail = NULL;
-+	return ok;
-+}
-+
-+int main(void)
-+{
-+	cs_opt_mem hooks = { malloc, disable_detail_on_allocation, resize_batch,
-+			     release, vsnprintf };
-+	if (cs_option(0, CS_OPT_MEM, (size_t)&hooks) != CS_ERR_OK)
-+		return 1;
-+	const uint8_t truncated[] = { 0x0f };
-+	uint8_t nops[128];
-+	memset(nops, 0x90, sizeof(nops));
-+	bool ok = check_batch(truncated, sizeof(truncated), false);
-+	ok &= check_batch(nops, 1, true); /* shrink */
-+	ok &= check_batch(nops, sizeof(nops), true); /* grow */
-+	return ok ? 0 : 1;
-+}
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
+ }
+ /* A regular base, an unmasked destination and a full 128-bit memory tuple.

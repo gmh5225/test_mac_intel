@@ -71,7 +71,6 @@ try:
         assert len(regs)==12 and all(int(v[3])==int(v[4])==16 for v in regs)
         if variant!='base':
             unit_names=['x86_simple_output','x86_reg_access','mips16_memory_calls','mips_register_names','mips16e2']
-            if variant=='memory':unit_names.append('batch_detail_alloc')
             for unit in unit_names:
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
                 command([t/unit],'run-'+unit+'-'+variant)
@@ -87,6 +86,9 @@ try:
         if (cs/'arch/X86/X86GenVexBaseMemory.inc').is_file():
             memory=sp.check_output([t/'vector-generator','--vex-base-memory']);assert memory==(cs/'arch/X86/X86GenVexBaseMemory.inc').read_bytes()
             save('generated-vex-memory',dict(bytes=len(memory),sha256=hashlib.sha256(memory).hexdigest()))
+        command(['clang++','-std=c++17','-O2','-I',cs,'-I',cs/'include',r/'branch-targets.cpp',archive,'-o',t/'targets'],'link-branch-targets-'+variant)
+        command([t/'targets'],'branch-targets-'+variant)
+        assert (out/('branch-targets-'+variant+'.log')).read_text().split()[0]=='382340'
         obj,=build.rglob('X86Decoder.cpp.o')
         with obj.open('rb') as f:
             ef=ELFFile(f);sections={se.name:hashlib.sha256(se.data()).hexdigest() for se in ef.iter_sections() if se['sh_flags']&4 and se.data_size}
@@ -153,7 +155,7 @@ try:
     def execute(k,case,mode,reps):
         (t/'selected').write_bytes(imgs[k])
         sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',4:'mips64el'}[case['selector']]
-        return list(map(int,sp.check_output(['setarch','x86_64','-R',t/'selected',case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
+        return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',t/'selected',case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
     rows=[];rng=random.Random(1739)
     for c in cases:
         for mode in (range(4) if c['selector'] in (32,64) else range(3)):

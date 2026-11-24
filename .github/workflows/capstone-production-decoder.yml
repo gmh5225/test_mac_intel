@@ -1,7 +1,7 @@
-name: Measure request-gated MIPS operand collection and linked x86 positions in the source-built NeverD decoder
+name: Measure real NeverD branch formatting and vector memory on source-built Arm64 products
 on:
   push:
-    branches: [codex/mips-requested-operands-product]
+    branches: [codex/arm64-product-formats-and-scans]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             cc: clang
             replica: 1
-          - os: ubuntu-24.04
+          - os: ubuntu-24.04-arm
             cc: clang
             replica: 2
     runs-on: ${{ matrix.os }}
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: a3f1802f4be4bbd2860dce6638b435efe3047721
+          ref: cc8b85befc76880ec626411ecef44c55706a0f1e
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "a3f1802f4be4bbd2860dce6638b435efe3047721"
+          test "$(git rev-parse HEAD)" = "cc8b85befc76880ec626411ecef44c55706a0f1e"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-requested-operands-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: arm64-text-and-scan-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
