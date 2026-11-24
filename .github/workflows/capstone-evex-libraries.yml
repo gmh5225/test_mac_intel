@@ -1,7 +1,7 @@
-name: Measure fixed register and separator fragments in PE32 and vector text
+name: Check all prefix and writemask records and scan cursors against fork iced and released Capstone
 on:
   push:
-    branches: [codex/i386-register-pair-fragments]
+    branches: [codex/native-decoded-selector-corpus]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -45,7 +45,9 @@ jobs:
           repository: NeverSight/iced
           ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
           path: iced-source
-          sparse-checkout: src/rust/iced-x86
+          sparse-checkout: |
+            src/rust/iced-x86
+            src/UnitTests/Intel/Decoder
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
@@ -57,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: register-fragments32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: independent-decoded-corpus-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

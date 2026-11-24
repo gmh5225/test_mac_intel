@@ -1,0 +1,1552 @@
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..75403f40 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -706,13 +706,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			if (x86HasWritemaskOperand(insn.instructionID))
+ 				Flags |= X86_IP_HAS_EVEX_OPMASK;
+ #else
+-			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+-				if (insn.operands[i].encoding ==
+-				    ENCODING_WRITEMASK) {
+-					Flags |= X86_IP_HAS_EVEX_OPMASK;
+-					break;
+-				}
+-			}
++			if (insn.writemask)
++				Flags |= X86_IP_HAS_EVEX_OPMASK;
+ #endif
+ 
+ 			instr->flags = Flags;
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..468f0938 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2272,8 +2272,7 @@ static int readMaskRegister(struct InternalInstruction *insn)
+ 	if (insn->vectorExtensionType != TYPE_EVEX)
+ 		return -1;
+ 
+-	insn->writemask =
+-		(Reg)(aaaFromEVEX4of4(insn->vectorExtensionPrefix[3]));
++	insn->writemask = X86_K0 + aaaFromEVEX4of4(insn->vectorExtensionPrefix[3]);
+ 
+ 	return 0;
+ }
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..860d1e9d 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -646,8 +646,8 @@ typedef struct InternalInstruction {
+      instructions */
+ 	Reg vvvv;
+ 
+-	/* The writemask for AVX-512 instructions which is contained in EVEX.aaa */
+-	Reg writemask;
++	/* MC register for a decoded EVEX writemask, or zero when absent. */
++	unsigned writemask;
+ 
+ 	/* The ModR/M byte, which contains most register operands and some portion of
+      all memory operands */
+diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
+index a56ed486..7397fa6e 100644
+--- a/arch/X86/X86DisassemblerTranslator.h
++++ b/arch/X86/X86DisassemblerTranslator.h
+@@ -1295,25 +1295,6 @@ static void translateFPRegister(MCInst *mcInst, uint8_t stackPos,
+ 	createRegisterOperand(mcInst, X86_ST0 + stackPos, emitOperands);
+ }
+ 
+-/// translateMaskRegister - Translates a 3-bit mask register number to
+-///   LLVM form, and appends it to an MCInst.
+-///
+-/// @param mcInst       - The MCInst to append to.
+-/// @param maskRegNum   - Number of mask register from 0 to 7.
+-/// @return             - false on success; true otherwise.
+-X86_TRANSLATE_INLINE bool
+-translateMaskRegister(MCInst *mcInst, uint8_t maskRegNum, bool emitOperands)
+-{
+-	if (maskRegNum >= 8) {
+-		// debug("Invalid mask register number");
+-		return true;
+-	}
+-
+-	createRegisterOperand(mcInst, X86_K0 + maskRegNum, emitOperands);
+-
+-	return false;
+-}
+-
+ /// translateOperand - Translates an operand stored in an internal instruction
+ ///   to LLVM's format and appends it to an MCInst.
+ ///
+@@ -1329,8 +1310,8 @@ static bool translateOperand(MCInst *mcInst, const OperandSpecifier *operand,
+ 		return translateRegRegister(mcInst, operand, insn,
+ 					    emitOperands);
+ 	case ENCODING_WRITEMASK:
+-		return translateMaskRegister(mcInst, insn->writemask,
+-					     emitOperands);
++		createRegisterOperand(mcInst, insn->writemask, emitOperands);
++		return false;
+ CASE_ENCODING_RM:
+ CASE_ENCODING_VSIB:
+ 		return translateRM(mcInst, operand, insn, emitOperands);
+diff --git a/arch/X86/X86GenOperandTranslate.inc b/arch/X86/X86GenOperandTranslate.inc
+index dff912d0..35a71159 100644
+--- a/arch/X86/X86GenOperandTranslate.inc
++++ b/arch/X86/X86GenOperandTranslate.inc
+@@ -3311,8 +3311,7 @@ case 244:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -3346,8 +3345,7 @@ case 238:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -3402,8 +3400,7 @@ case 239:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3434,8 +3431,7 @@ case 256:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -3449,8 +3445,7 @@ case 257:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3468,8 +3463,7 @@ case 906:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -3484,8 +3478,7 @@ case 907:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3500,8 +3493,7 @@ case 221:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -3513,8 +3505,7 @@ case 222:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3543,8 +3534,7 @@ case 912:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3574,8 +3564,7 @@ case 667:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -3589,8 +3578,7 @@ case 668:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_ZMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3625,8 +3613,7 @@ case 636:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3662,8 +3649,7 @@ case 634:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3702,8 +3688,7 @@ case 645:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3735,8 +3720,7 @@ case 278:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3777,8 +3761,7 @@ case 657:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3813,8 +3796,7 @@ case 919:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -3854,8 +3836,7 @@ case 718:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -3872,8 +3853,7 @@ case 719:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -3904,8 +3884,7 @@ case 849:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -3919,8 +3898,7 @@ case 850:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -3956,8 +3934,7 @@ case 721:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -3974,8 +3951,7 @@ case 722:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4003,8 +3979,7 @@ case 852:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4017,8 +3992,7 @@ case 853:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4037,8 +4011,7 @@ case 715:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4054,8 +4027,7 @@ case 716:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4072,8 +4044,7 @@ case 846:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4087,8 +4058,7 @@ case 847:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4103,8 +4073,7 @@ case 778:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4121,8 +4090,7 @@ case 829:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4136,8 +4104,7 @@ case 830:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4168,8 +4135,7 @@ case 819:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4194,8 +4160,7 @@ case 387:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4206,8 +4171,7 @@ case 388:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4240,8 +4204,7 @@ case 824:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_ZMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4265,8 +4228,7 @@ case 392:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4277,8 +4239,7 @@ case 393:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_ZMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4304,8 +4265,7 @@ case 447:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4317,8 +4277,7 @@ case 448:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4343,8 +4302,7 @@ case 416:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4355,8 +4313,7 @@ case 417:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4384,8 +4341,7 @@ case 498:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4398,8 +4354,7 @@ case 499:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4424,8 +4379,7 @@ case 432:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4436,8 +4390,7 @@ case 433:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4463,8 +4416,7 @@ case 492:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4476,8 +4428,7 @@ case 493:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -4519,8 +4470,7 @@ case 452:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4553,8 +4503,7 @@ case 454:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4569,8 +4518,7 @@ case 455:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4585,8 +4533,7 @@ case 457:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4604,8 +4551,7 @@ case 459:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4620,8 +4566,7 @@ case 460:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4652,8 +4597,7 @@ case 501:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4687,8 +4631,7 @@ case 467:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4704,8 +4647,7 @@ case 468:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4761,8 +4703,7 @@ case 503:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4777,8 +4718,7 @@ case 504:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -4996,8 +4936,7 @@ case 567:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5030,8 +4969,7 @@ case 571:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5060,8 +4998,7 @@ case 561:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5090,8 +5027,7 @@ case 565:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5122,12 +5058,10 @@ case 578:
+ 	static const OperandSpecifier op4 = { ENCODING_RM, TYPE_MVSIBX };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5139,12 +5073,10 @@ case 574:
+ 	static const OperandSpecifier op4 = { ENCODING_RM, TYPE_MVSIBX };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5156,12 +5088,10 @@ case 575:
+ 	static const OperandSpecifier op4 = { ENCODING_RM, TYPE_MVSIBY };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5204,12 +5134,10 @@ case 584:
+ 	static const OperandSpecifier op4 = { ENCODING_RM, TYPE_MVSIBY };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5222,12 +5150,10 @@ case 585:
+ 	static const OperandSpecifier op4 = { ENCODING_RM, TYPE_MVSIBZ };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5235,8 +5161,7 @@ case 585:
+ case 581:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBY };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5245,8 +5170,7 @@ case 582:
+ case 583:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBZ };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5273,12 +5197,10 @@ case 587:
+ 	static const OperandSpecifier op4 = { ENCODING_RM, TYPE_MVSIBY };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5290,12 +5212,10 @@ case 588:
+ 	static const OperandSpecifier op4 = { ENCODING_RM, TYPE_MVSIBZ };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5312,8 +5232,7 @@ case 620:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5330,8 +5249,7 @@ case 621:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5349,8 +5267,7 @@ case 596:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5365,8 +5282,7 @@ case 597:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5403,8 +5319,7 @@ case 623:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5421,8 +5336,7 @@ case 624:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5455,8 +5369,7 @@ case 605:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5471,8 +5384,7 @@ case 606:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5508,8 +5420,7 @@ case 626:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5526,8 +5437,7 @@ case 627:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5563,8 +5473,7 @@ case 629:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5581,8 +5490,7 @@ case 630:
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -5613,8 +5521,7 @@ case 648:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -5645,8 +5552,7 @@ case 654:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -5677,8 +5583,7 @@ case 660:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -5740,8 +5645,7 @@ case 683:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRegRegister(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -5753,8 +5657,7 @@ case 684:
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_XMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -5789,8 +5692,7 @@ case 695:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5801,8 +5703,7 @@ case 696:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R32 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5826,8 +5727,7 @@ case 698:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5838,8 +5738,7 @@ case 699:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R32 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5863,8 +5762,7 @@ case 701:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5875,8 +5773,7 @@ case 702:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R32 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5920,8 +5817,7 @@ case 706:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5932,8 +5828,7 @@ case 707:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R64 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5957,8 +5852,7 @@ case 709:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5969,8 +5863,7 @@ case 710:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R64 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -5994,8 +5887,7 @@ case 712:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6006,8 +5898,7 @@ case 713:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R64 };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6033,8 +5924,7 @@ case 760:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -6057,8 +5947,7 @@ case 744:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -6085,8 +5974,7 @@ case 762:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -6109,8 +5997,7 @@ case 748:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -6137,8 +6024,7 @@ case 764:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -6161,8 +6047,7 @@ case 752:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_ZMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -6253,8 +6138,7 @@ case 832:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6267,8 +6151,7 @@ case 833:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6294,8 +6177,7 @@ case 835:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6307,8 +6189,7 @@ case 836:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_ZMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6332,8 +6213,7 @@ case 826:
+ 		return true;
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6344,8 +6224,7 @@ case 827:
+ 	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_ZMM };
+ 	if (translateRM(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6372,8 +6251,7 @@ case 882:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6388,8 +6266,7 @@ case 883:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6416,8 +6293,7 @@ case 861:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6430,8 +6306,7 @@ case 862:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6461,8 +6336,7 @@ case 885:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6477,8 +6351,7 @@ case 886:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6505,8 +6378,7 @@ case 870:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6519,8 +6391,7 @@ case 871:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_YMM };
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6550,8 +6421,7 @@ case 888:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6566,8 +6436,7 @@ case 889:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6593,8 +6462,7 @@ case 879:
+ 	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6607,8 +6475,7 @@ case 880:
+ 	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
+ 	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op2, insn, emitOperands))
+ 		return true;
+ 	translateImmediate(
+@@ -6643,12 +6510,10 @@ case 895:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBX };
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_XMM };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6658,12 +6523,10 @@ case 900:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBY };
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_YMM };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6673,12 +6536,10 @@ case 901:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBZ };
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_ZMM };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6687,12 +6548,10 @@ case 896:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBX };
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_YMM };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6701,12 +6560,10 @@ case 897:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBY };
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_ZMM };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6715,12 +6572,10 @@ case 898:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBY };
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_XMM };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6729,12 +6584,10 @@ case 899:
+ {
+ 	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_MVSIBZ };
+ 	static const OperandSpecifier op3 = { ENCODING_REG, TYPE_YMM };
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRM(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	if (translateRegRegister(mcInst, &op3, insn, emitOperands))
+ 		return true;
+ 	return false;
+@@ -6760,8 +6613,7 @@ case 909:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -6773,8 +6625,7 @@ case 910:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+@@ -6800,8 +6651,7 @@ case 914:
+ 		return true;
+ 	if (translateRegRegister(mcInst, &op1, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op4, insn, emitOperands))
+ 		return true;
+@@ -6813,8 +6663,7 @@ case 915:
+ 	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, emitOperands))
+ 		return true;
+-	if (translateMaskRegister(mcInst, insn->writemask, emitOperands))
+-		return true;
++	createRegisterOperand(mcInst, insn->writemask, emitOperands);
+ 	translateRegister(mcInst, insn->vvvv, emitOperands);
+ 	if (translateRM(mcInst, &op3, insn, emitOperands))
+ 		return true;
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index f1ebc59f..15e34ac1 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -267,11 +267,8 @@ def translation_body(operands, *, emit_operands="emitOperands", failure_result="
+             lines.append(f"\ttranslateRegister(mcInst, insn->vvvv, {emit_operands});")
+             continue
+         if encoding == "ENCODING_WRITEMASK":
+-            lines.extend(
+-                [
+-                    f"\tif (translateMaskRegister(mcInst, insn->writemask, {emit_operands}))",
+-                    f"\t\treturn {failure_result};",
+-                ]
++            lines.append(
++                f"\tcreateRegisterOperand(mcInst, insn->writemask, {emit_operands});"
+             )
+             continue
+         if encoding in IMMEDIATES:
