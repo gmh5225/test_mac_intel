@@ -1,13 +1,12 @@
 name: NeverSight LLVM MIPS packages
 on:
   push:
-    branches: [codex/mips-llvm-elf-qualification]
+    branches: [codex/micromips64-fork-native]
     paths: ['.github/workflows/neverd-mips-llvm-packages.yml']
-  workflow_dispatch:
 permissions:
   contents: read
 env:
-  LLVM_REVISION: e03b3a2cd27615bd9a8d193b37f36da80d56355b
+  LLVM_REVISION: 718e0f9082d06f3dd3e506e1d317a75fd58f3bff
 jobs:
   build:
     name: build ${{ matrix.name }}
