@@ -1,7 +1,7 @@
-name: Check prefix semantics and PE32 fragment costs in source-built NeverD
+name: Measure independent EXTRQ correction and direct size lookup in current NeverD from LLVM source
 on:
   push:
-    branches: [codex/verify-prefix-fragment-products]
+    branches: [codex/verify-decoded-size-and-extrq-products]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 36c24ed9842919dfdeb0672cafd95fefb04c312f
+          ref: 53ac2a9d6d2ad99dff0dbadff424fa00607ec84c
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "36c24ed9842919dfdeb0672cafd95fefb04c312f"
+          test "$(git rev-parse HEAD)" = "53ac2a9d6d2ad99dff0dbadff424fa00607ec84c"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: prefix-fragments-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: lookup-selector-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
