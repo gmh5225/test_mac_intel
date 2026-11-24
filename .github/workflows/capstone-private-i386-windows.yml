@@ -1,7 +1,7 @@
-name: Validate RISC-V text-only and canonical operand paths and compare all mixed product objects
+name: Measure shared RISC-V operand metadata lookup and check mixed and dedicated binaries
 on:
   push:
-    branches: [codex/riscv-finish-by-detail-option]
+    branches: [codex/riscv-operand-map-access]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-detail-finalization-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: riscv-shared-operand-field-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7
