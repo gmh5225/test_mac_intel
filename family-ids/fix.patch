@@ -1,0 +1,130 @@
+diff --git a/Mapping.c b/Mapping.c
+index d3bb3e3d..b5769b50 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -439,7 +439,7 @@ DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
+ bool map_use_alias_details(const MCInst *MI)
+ {
+ 	assert(MI);
+-	return (MI->csh->detail_opt & CS_OPT_ON) &&
++	return MI->csh->detail_opt != CS_OPT_OFF &&
+ 	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
+ }
+ 
+diff --git a/Mapping.h b/Mapping.h
+index dd340ed5..3c04b8da 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -265,7 +265,7 @@ DEFINE_check_safe_inc(Sparc, SPARC);
+ static inline bool detail_is_set(const MCInst *MI)
+ {
+ 	assert(MI && MI->flat_insn);
+-	return MI->flat_insn->detail != NULL && MI->csh->detail_opt & CS_OPT_ON;
++	return MI->flat_insn->detail != NULL && MI->csh->detail_opt != CS_OPT_OFF;
+ }
+ 
+ static inline cs_detail *get_detail(const MCInst *MI)
+diff --git a/include/capstone/capstone.h b/include/capstone/capstone.h
+index 80f8ce9e..6da7468b 100644
+--- a/include/capstone/capstone.h
++++ b/include/capstone/capstone.h
+@@ -384,7 +384,7 @@ typedef struct cs_opt_mnem {
+ typedef enum cs_opt_type {
+ 	CS_OPT_INVALID = 0, ///< No option specified
+ 	CS_OPT_SYNTAX, ///< Assembly output syntax
+-	CS_OPT_DETAIL, ///< Break down instruction structure into details
++	CS_OPT_DETAIL, ///< A nonzero detail flag enables instruction details. CS_OPT_OFF clears all detail flags.
+ 	CS_OPT_MODE, ///< Change engine's mode at run-time
+ 	CS_OPT_MEM, ///< User-defined dynamic memory related functions
+ 	CS_OPT_SKIPDATA, ///< Skip data when disassembling. Then engine is in SKIPDATA mode.
+diff --git a/tests/unit/api.c b/tests/unit/api.c
+index 0a86e462..d0fb371d 100644
+--- a/tests/unit/api.c
++++ b/tests/unit/api.c
+@@ -3,6 +3,7 @@
+ 
+ #include "../../include/capstone/capstone.h"
+ #include "unit_test.h"
++#include <stddef.h>
+ #include <stdio.h>
+ #include <string.h>
+ 
+@@ -197,12 +198,78 @@ static bool test_iterator_results(void)
+ 	return true;
+ }
+ 
++static bool test_detail_modifiers(cs_arch arch, cs_mode mode,
++				  const uint8_t *code, size_t size,
++				  size_t detail_size)
++{
++	if (!cs_support(arch))
++		return true;
++	csh handle;
++	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = true;
++	for (unsigned flags = 2; ok && flags < 16; flags += 2) {
++		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
++		cs_option(handle, CS_OPT_DETAIL, flags | CS_OPT_ON);
++		cs_insn *expected = NULL;
++		if (cs_disasm(handle, code, size, 0x1000, 1, &expected) != 1) {
++			ok = false;
++			break;
++		}
++		cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF);
++		cs_option(handle, CS_OPT_DETAIL, flags);
++		cs_insn *actual = cs_malloc(handle);
++		ok = actual && actual->detail && expected->detail;
++		if (ok) {
++			// Reusing a record must clear counts from its last instruction.
++			memset(actual->detail, 0, sizeof(*actual->detail));
++			actual->detail->groups_count = 1;
++			const uint8_t *cursor = code;
++			size_t left = size;
++			uint64_t address = 0x1000;
++			ok = cs_disasm_iter(handle, &cursor, &left, &address,
++					    actual) &&
++			     left == 0 && actual->id == expected->id &&
++			     actual->alias_id == expected->alias_id &&
++			     actual->usesAliasDetails ==
++				     expected->usesAliasDetails &&
++			     !memcmp(actual->detail, expected->detail,
++				     detail_size);
++		}
++		if (!ok)
++			fprintf(stderr,
++				"Detail modifiers: arch=%u flags=0x%x\n",
++				(unsigned)arch, flags);
++		if (actual)
++			cs_free(actual, 1);
++		cs_free(expected, 1);
++	}
++	cs_close(&handle);
++	return ok;
++}
++
+ int main()
+ {
+ 	bool result = true;
+ 	result &= test_cs_mem_setup_fail();
+ 	result &= test_iterator_allocation();
+ 	result &= test_iterator_results();
++	static const uint8_t bl[] = { 0x00, 0x00, 0x00, 0x94 };
++	static const uint8_t mov[] = { 0x01, 0x00, 0xa0, 0xe1 };
++	static const uint8_t addiu[] = { 0x01, 0x00, 0x82, 0x24 };
++	static const uint8_t c_nop[] = { 0x01, 0x00 };
++	result &= test_detail_modifiers(
++		CS_ARCH_AARCH64, CS_MODE_ARM, bl, sizeof(bl),
++		offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
++	result &= test_detail_modifiers(
++		CS_ARCH_ARM, CS_MODE_ARM, mov, sizeof(mov),
++		offsetof(cs_detail, arm) + sizeof(cs_arm));
++	result &= test_detail_modifiers(
++		CS_ARCH_MIPS, CS_MODE_MIPS32, addiu, sizeof(addiu),
++		offsetof(cs_detail, mips) + sizeof(cs_mips));
++	result &= test_detail_modifiers(
++		CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C, c_nop,
++		sizeof(c_nop), offsetof(cs_detail, riscv) + sizeof(cs_riscv));
+ 
+ 	if (result) {
+ 		printf("All tests passed.\n");

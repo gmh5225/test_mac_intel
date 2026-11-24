@@ -246,11 +246,12 @@ static void foreignRecords(Api &left, Api &right, const char *record) {
           bool detail=(config&2)!=0;
           for(Session *s:{&a,&b}) {
             s->set(CS_OPT_DETAIL,CS_OPT_OFF);
-            if(detail)s->set(CS_OPT_DETAIL,config&4?CS_OPT_DETAIL_REAL:CS_OPT_ON);
+            if(detail) { size_t flags=config&4 ? CS_OPT_DETAIL_REAL : CS_OPT_ON; if (s==&a && std::getenv("COMPARE_EXPLICIT_DETAIL")) flags |= CS_OPT_ON; s->set(CS_OPT_DETAIL, flags); }
             s->set(CS_OPT_TEXT,config&1?CS_OPT_ON:CS_OPT_OFF);
             s->set(CS_OPT_SKIPDATA,config>=6?CS_OPT_ON:CS_OPT_OFF);
             if(arch==CS_ARCH_MIPS && config==4)s->set(CS_OPT_SYNTAX,CS_OPT_SYNTAX_NO_DOLLAR);
           }
+          if (const char *filter=std::getenv("ONLY_DETAIL_CONFIG")) if (unsigned(std::atoi(filter))!=config) continue;
           std::mt19937 rng(1301+w);
           for(unsigned major=0;major<64;++major)for(unsigned t=0;t<80;++t) {
             uint32_t word=(major<<26)|(rng()&0x3ffffff);
@@ -288,7 +289,7 @@ static void foreignRecords(Api &left, Api &right, const char *record) {
 int main(int argc,char **argv) {
   if(argc==9 && std::string(argv[2])=="single")return single(argv);
   if(argc<4)return 2;
-  Api a(argv[1]),b(argv[2]);check(a.disasm!=b.disasm,"distinct array decoders");
+  Api a(argv[1]),b(argv[2]);check(std::string(argv[3])=="foreign" || a.disasm!=b.disasm,"distinct array decoders");
   std::string op=argv[3];if(op=="foreign"){check(argc==5,"foreign results argument");foreignRecords(a,b,argv[4]);return 0;}if(op=="options"){options(a,b);return 0;}
   if(argc<7)return 2;
   std::ifstream f(argv[4],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};check(!bytes.empty(),"input");

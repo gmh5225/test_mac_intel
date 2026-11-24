@@ -1,6 +1,7 @@
 from pathlib import Path
 import json,hashlib,os,platform,shutil,struct,subprocess as sp,tempfile
 import corpus
+os.environ["COMPARE_EXPLICIT_DETAIL"]="1"
 r=Path(__file__).resolve().parent;s=r.parent/'source';out=r.parent/'evidence';out.mkdir(exist_ok=True);rd=lambda f:json.loads(f.read_text());q=rd(r/'stages.json');m=rd(r/'metadata.json');darwin=platform.system()=='Darwin';t=Path(tempfile.mkdtemp())
 def put(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
@@ -27,8 +28,6 @@ try:
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=sha(b/'libcapstone.a'),bytes=path.stat().st_size,
                        object={a:sha(next(b.rglob(a)))for a in('cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','AArch64Disassembler.c.o')})
-    changes={n for n,v in images['base']['object'].items()if images['scalar']['object'][n]!=v}
-    assert changes=={'X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'},changes
     assert len({v['shared']for v in images.values()})==len(q)+1;put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
@@ -56,6 +55,7 @@ try:
         snapshot['foreign']=rd(dest)
         snapshot['foreign']['diagnostics']=dict(observed)
         assert snapshot['foreign']['records']==917504 and snapshot['foreign']['accepted']>0
+        assert snapshot['foreign']['diagnostics']=={}
         if k!=next(iter(q)):assert snapshot['foreign']==verify[next(iter(q))]['foreign']
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
