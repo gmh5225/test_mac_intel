@@ -1,0 +1,85 @@
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index 45de9b87..ddd60ad0 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -39,10 +39,13 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 	writeUnsignedImmediate(out,
+ 			       value < 0 ? (uint64_t)-value : (uint64_t)value);
+ 	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
++		X86_writeSimpleDetailRegisters(insn->detail, row, code[0], 0,
++					       0, 0, 0, 0);
+ 		cs_x86_op *op = &insn->detail->x86.operands[0];
+ 		op->type = X86_OP_IMM;
+ 		op->imm = value;
++		op->size = row->ops[0].size;
++		op->access = (cs_ac_type)row->ops[0].access;
+ 	}
+ }
+ 
+@@ -90,15 +93,16 @@ static void writeRegisterImmediate(cs_insn *insn,
+ 		*out++ = '-';
+ 	writeUnsignedImmediate(out, value);
+ 	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+-				      reg->reg, 0);
++		X86_writeSimpleDetailRegisters(insn->detail, row, opcode, rex,
++					       modrm, reg->reg, 0, 1);
+ 		cs_x86 *x = &insn->detail->x86;
+ 		x->operands[1].type = X86_OP_IMM;
+ 		x->operands[1].imm = logical && !wide ?
+ 					     (int64_t)(uint32_t)immediate :
+ 					     immediate;
+-		if (!shift)
+-			x->operands[1].access = 0;
++		x->operands[1].size = row->ops[1].size;
++		if (shift)
++			x->operands[1].access = (cs_ac_type)row->ops[1].access;
+ 		x->encoding.imm_offset = (uint8_t)offset;
+ 		x->encoding.imm_size = (uint8_t)imm_size;
+ 	}
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..7957ba44 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -173,11 +173,11 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+ 	return out + length;
+ }
+ 
+-static inline void X86_writeSimpleDetail(cs_detail *detail,
+-					 const struct X86SimpleOutput *row,
+-					 uint8_t opcode, uint8_t rex,
+-					 uint8_t modrm, uint16_t first,
+-					 uint16_t second)
++/* Each form initializes its register operands before filling any immediate. */
++static inline void X86_writeSimpleDetailRegisters(
++	cs_detail *detail, const struct X86SimpleOutput *row, uint8_t opcode,
++	uint8_t rex, uint8_t modrm, uint16_t first, uint16_t second,
++	unsigned register_count)
+ {
+ 	memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 	memcpy(detail->regs_read, row->reads, sizeof(row->reads));
+@@ -196,7 +196,7 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	x86->encoding.imm_offset = row->imm_offset;
+ 	x86->encoding.imm_size = row->imm_size;
+ 	x86->op_count = row->operand_count;
+-	for (unsigned i = 0; i < x86->op_count; ++i) {
++	for (unsigned i = 0; i < register_count; ++i) {
+ 		cs_x86_op *op = &x86->operands[i];
+ 		op->type = X86_OP_REG;
+ 		op->reg = (x86_reg)(i ? second : first);
+@@ -205,4 +205,14 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	}
+ }
+ 
++static inline void X86_writeSimpleDetail(cs_detail *detail,
++					 const struct X86SimpleOutput *row,
++					 uint8_t opcode, uint8_t rex,
++					 uint8_t modrm, uint16_t first,
++					 uint16_t second)
++{
++	X86_writeSimpleDetailRegisters(detail, row, opcode, rex, modrm, first,
++				       second, row->operand_count);
++}
++
+ #endif

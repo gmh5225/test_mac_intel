@@ -13,6 +13,32 @@ def interval(values):
     def rank(q):
         return next(k for k in range(1,n+1) if 40*sum(math.comb(n,i)*k**i*(n-k)**(n-i) for i in range(n//2+1,n+1))>=q*n**n)-1
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
+def instruction_digest(path):
+    import struct
+    b=path.read_bytes()
+    def u(fmt,p):return struct.unpack_from('<'+fmt,b,p)
+    sections=[]
+    def add(name,start,size):
+        sections.append([name.decode(),size,hashlib.sha256(b[start:start+size]).hexdigest()])
+    if b.startswith(bytes.fromhex('7f454c46')):
+        assert b[4:6]==bytes((2,1))
+        base,=u('Q',40);stride,n,strings=u('HHH',58);headers=[u('IIQQQQIIQQ',base+i*stride)for i in range(n)]
+        strings=headers[strings];names=b[strings[4]:strings[4]+strings[5]]
+        for name,ty,flags,_,offset,size,*_ in headers:
+            if flags&4:add(names[name:].split(bytes(1),1)[0],offset,size)
+    else:
+        assert u('I',0)==(0xfeedfacf,)
+        count,=u('I',16);p=32
+        for _ in range(count):
+            cmd,size=u('II',p)
+            if cmd==0x19:
+                n,=u('I',p+64)
+                for i in range(n):
+                    name,seg,_,length,offset,_,_,_,flags,*_=u('16s16sQQIIIIIIII',p+72+i*80)
+                    if flags&0x80000400:add(seg.rstrip(bytes(1))+b','+name.rstrip(bytes(1)),offset,length)
+            p+=size
+    return hashlib.sha256(json.dumps(sections).encode()).hexdigest()
+layouts={}
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
@@ -37,14 +63,27 @@ try:
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
-    for label in ('base','candidate'):
-        if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+    for label in ('base','digits','details'):
+        if label!='base':
+            run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','arch/X86')
+            spec=m['variants'][label];patch=r/(label+'.patch')
+            assert sha(patch)==spec['sha256'];run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==spec['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
-    assert images['base']['exe']!=images['candidate']['exe']
+        objects={str(f.relative_to(build)):dict(raw=sha(f),instructions=instruction_digest(f)) for f in build.rglob('*.c.o')}
+        symbols={}
+        for line in get('nm','-an',w/label).splitlines():
+            cols=line.split()
+            if len(cols)==3 and cols[2].lstrip('_') in ('X86_writeImmediateOutput','X86_disasmIterText','X86_disasmIter32','X86_scanNativeBatch','cs_disasm_iter'):
+                symbols[cols[2].lstrip('_')]=int(cols[0],16)
+        assert len(symbols)>=4
+        layouts[label]=dict(objects=objects,symbols=symbols)
+        save('layout',layouts)
+
+    assert len({v['exe']for v in images.values()})==3
+    for method in ('instructions','raw'):
+        a=layouts['base']['objects'];b=layouts['digits']['objects'];deltas=[Path(k).name for k in a if a[k][method]!=b[k][method]];assert deltas==['X86ImmediateOutput.c.o'],(method,deltas)
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
@@ -69,18 +108,18 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('candidate')
+        assert audit_engine('base')==audit_engine('digits')==audit_engine('details')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
+            exe=engine if engine in ('digits','duplicate','details')else'base'
             return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
+            labels=['base','duplicate','digits','details','iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
-            rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
+            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['digits']==expected['details']
+            rows=[];rng=random.Random(name+'/independent-scalar-fields/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
                 for k in labels+labels[::-1]:
@@ -88,7 +127,7 @@ try:
                     sample[k].append(row[:2])
                 rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
             key=name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-            summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
+            summary[key]={label:{k:interval([x[k][i]/x['digits'][i]for x in rows])for k in labels if k!='digits'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
