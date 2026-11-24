@@ -180,7 +180,7 @@ def main(w):
             if len(cols)!=3 or cols[1] not in ('t','T'):continue
             name=cols[2][1:] if darwin and cols[2].startswith('_') else cols[2]
             if name in names:linked[name]=int(cols[0],16)
-        assert ('X86_decodePublicRecord' in linked)==(not mixed)
+        assert ('X86_decodePublicRecord' in linked)==(not mixed or kind=='bare'),(key,linked)
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         assert ('X86_tryBulkOutput' in linked)==active_tail,(key,linked)
         assert ('X86_tryRecord32' in linked)==active_tail,(key,linked)
