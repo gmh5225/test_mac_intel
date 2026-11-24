@@ -1,7 +1,7 @@
-name: Time base-only SIB decoding in the mixed ordinary i386 memory writer
+name: Time the corrected full and compact x86 move decoders against iced
 on:
   push:
-    branches: [codex/i386-ordinary-scale-one-sib]
+    branches: [codex/x86-move-prefix-projections-speed]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8347e89a4e9a9e1618009fb8a496e335e857d00f
+          ref: 7db5af38d02d193688bccd2b45e58627979979bb
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ea5295dcaa778c335fc7755f63f42f37f0eb548b
+          ref: 886f481145d46b6daae6b3b064e313b5ab65d0fe
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-ordinary-sib-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-projected-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
