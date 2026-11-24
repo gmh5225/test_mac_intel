@@ -1,7 +1,7 @@
-name: Measure shared RISC-V operand metadata lookup and check mixed and dedicated binaries
+name: Check common compressed scan and canonical operand paths on dedicated RISC-V builds
 on:
   push:
-    branches: [codex/riscv-operand-map-access]
+    branches: [codex/riscv-dedicated-compressed-scanner]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-shared-operand-field-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: riscv-dedicated-compressed-scan-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7

@@ -32,11 +32,11 @@ def measure(rows, w, save):
     for row in rows:
         assert row['arch']=='riscv64'
         for mode in range(6):
-            n=max(1,math.ceil(25e6/run('base',row,mode,1)[0]))
+            n=max(1,math.ceil((50e6 if mode==0 else 25e6)/run('base',row,mode,1)[0]))
             expected=run('base',row,mode,n)[2:]
             assert expected[0]>0
             cycles=[];labels=list(images);rng=random.Random(row['name']+'/'+str(mode))
-            for _ in range(17):
+            for _ in range(35 if mode==0 else 17):
                 rng.shuffle(labels);pairs={k:[]for k in labels}
                 for k in labels+labels[::-1]:
                     x=run(k,row,mode,n);assert x[2:]==expected

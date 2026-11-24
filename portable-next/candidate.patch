@@ -58,6 +58,28 @@ index 45d62be6..a3e2892f 100644
  	switch (type) {
  	case CS_OP_REG:
  		op->reg = MCInst_getOperand(MI, OpNum)->RegVal;
+diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
+index e7f449a4..a4fe604e 100644
+--- a/arch/RISCV/RISCVScan.h
++++ b/arch/RISCV/RISCVScan.h
+@@ -5,7 +5,7 @@
+ 
+ #include "RISCVModule.h"
+ 
+-#ifdef RISCV_USE_COMPRESSED_DISPATCH
++#ifndef CAPSTONE_DIET
+ /* The ordinary decoder retains reserved immediates, zero-register hints
+  * and encodings whose operation differs between RV32 and RV64. */
+ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
+@@ -64,7 +64,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+ 			       MCInst *inst, uint16_t *size, uint64_t address,
+ 			       void *info)
+ {
+-#ifdef RISCV_USE_COMPRESSED_DISPATCH
++#ifndef CAPSTONE_DIET
+ 	if (length < 2 || inst->flat_insn->detail)
+ 		goto full;
+ 	if ((code[0] & 3) != 3) {
 diff --git a/tests/unit/riscv_op_count_iter.c b/tests/unit/riscv_op_count_iter.c
 index 0984421a..79f2fe93 100644
 --- a/tests/unit/riscv_op_count_iter.c
