@@ -1,98 +1,59 @@
-diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 77ae0309..5c23890c 100644
---- a/arch/Mips/MipsInstPrinter.c
-+++ b/arch/Mips/MipsInstPrinter.c
-@@ -270,8 +270,16 @@ void Mips_LLVM_printInst(MCInst *MI, uint64_t Address, SStream *O)
- {
- 	bool useAliasDetails = map_use_alias_details(MI);
- 	if (!useAliasDetails) {
--		SStream_Close(O);
--		printInstruction(MI, Address, O);
-+#ifdef CAPSTONE_MIPS_ONLY
-+		/* The closed pass collects operands of the real instruction. */
-+		const bool collectRealOperands = MI->csh->detail_opt & CS_OPT_ON;
-+#else
-+		const bool collectRealOperands = true;
-+#endif
-+		if (collectRealOperands) {
-+			SStream_Close(O);
-+			printInstruction(MI, Address, O);
-+		}
- 		SStream_Open(O);
- 		map_set_fill_detail_ops(MI, false);
- 	}
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 0676899d..7df6e761 100644
+index 7df6e761..fe55f053 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
-@@ -419,9 +419,8 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -987,6 +987,28 @@ void Mips_set_mem_access(MCInst *MI, bool status)
  }
  
- /* The classic three-register ALU forms reserve bits 10..6 as zero. */
--static inline unsigned classicDetailOpcode(MCInst *instr, const uint8_t *code)
-+static inline unsigned classicMappedOpcode(MCInst *instr, uint32_t word)
- {
--	const uint32_t word = readBytes32(instr, code);
- 	const unsigned major = word >> 26;
- 	/* The DSP table precedes the base table for these two full primary
- 	 * opcodes. Its mapping supplies the advertised DSP instruction groups. */
-@@ -470,7 +469,7 @@ bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
- 		Mips_init_cs_detail(&instr);
- 		return false;
- 	}
--	const unsigned opcode = classicDetailOpcode(&instr, code);
-+	const unsigned opcode = classicMappedOpcode(&instr, readBytes32(&instr, code));
- 	if (opcode) {
- 		Mips_init_cs_detail(&instr);
- 		MCInst_setOpcode(&instr, opcode);
-@@ -997,8 +996,13 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
- 	if (length >= 4 && (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64) &&
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
++/* The classic scan only needs the public opcode. Register jumps reserve
++ * rt, and JR also reserves rd. A zero shift leaves all hint encodings
++ * (SSNOP, EHB and PAUSE) to the ordinary decoder. */
++static inline unsigned classicScanOpcode(MCInst *instr, uint32_t word,
++					 cs_mode mode)
++{
++	const unsigned major = word >> 26;
++	if (major)
++		return major == 8 ? Mips_ADDi : standardScanOpcode(major, mode);
++
++	switch (word & 0x7ff) {
++	case 0x00:
++		return (word >> 21) == 0 ? Mips_SLL : 0;
++	case 0x08:
++		return (word & 0x001ff800) == 0 ? Mips_JR : 0;
++	case 0x09:
++		return (word & 0x001f0000) == 0 ? Mips_JALR : 0;
++	default:
++		return classicMappedOpcode(instr, word);
++	}
++}
++
+ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+ 			       MCInst *instr, uint16_t *size, uint64_t address,
+ 			       void *info)
+@@ -997,12 +1019,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
  	    h->disasm == getScanInstruction && h->insn_id == Mips_get_insn_id &&
  	    h->no_text && !instr->flat_insn->detail) {
--		const unsigned opcode =
--			standardScanOpcode(readBytes32(instr, code) >> 26, mode);
-+		const uint32_t word = readBytes32(instr, code);
-+		const unsigned major = word >> 26;
-+		/* SPECIAL needs the function and reserved shift bits. ADDI
-+		 * and the register forms share the classic detail mapping. */
-+		const unsigned opcode = major == 0 || major == 8 ?
-+						classicMappedOpcode(instr, word) :
-+						standardScanOpcode(major, mode);
+ 		const uint32_t word = readBytes32(instr, code);
+-		const unsigned major = word >> 26;
+-		/* SPECIAL needs the function and reserved shift bits. ADDI
+-		 * and the register forms share the classic detail mapping. */
+-		const unsigned opcode = major == 0 || major == 8 ?
+-						classicMappedOpcode(instr, word) :
+-						standardScanOpcode(major, mode);
++		const unsigned opcode = classicScanOpcode(instr, word, mode);
  		if (opcode) {
  			Mips_init_cs_detail(instr);
  			MCInst_setOpcode(instr, opcode);
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..bdafe888 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-+++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-@@ -2176,7 +2176,7 @@
-     },
-     "Mips_LLVM_printInst": {
-       "apply_type": "OLD",
--      "old_hash": "660b5eba392f6b7738cb3f241e8ff34f2a0137b12c7ca36b1ccbe0832d345d1d",
-+      "old_hash": "05931959d60cdf5ceabc15f6faabc3b8a8359a48d6297ada1f12d9ae88e6f960",
-       "new_hash": "",
-       "edit": ""
-     },
 diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
-index acf6e7ac..d4a344e7 100644
+index d4a344e7..7a7c6658 100644
 --- a/tests/unit/mips_scan.c
 +++ b/tests/unit/mips_scan.c
-@@ -77,6 +77,9 @@ static bool check_option_changes(csh handles[2], bool big_endian)
- static bool check_mode(cs_mode mode)
- {
- 	static const uint32_t words[] = {
-+		0x2128ffff, 0x012a4020, 0x012a4021, 0x012a4022,
-+		0x012a4023, 0x012a4024, 0x012a4025, 0x012a4026,
-+		0x012a4027, 0x012a402a, 0x012a402b,
- 		0x24080001, 0x3128ffff, 0x35080000,
- 		0x3928ffff, 0x8fa80000, 0xafa8fffc,
- 		0x10000000, 0x1109ffff, 0x15000004, 0x29080000,
-@@ -84,6 +87,7 @@ static bool check_mode(cs_mode mode)
- 		0x95a8ffff, 0xa1a80000, 0xa5a8ffff,
- 	};
+@@ -89,6 +89,7 @@ static bool check_mode(cs_mode mode)
  	static const uint32_t others[] = {
-+		0x012a4060, 0x012a4067, 0x012a47eb,
+ 		0x012a4060, 0x012a4067, 0x012a47eb,
  		0x6508ffff, 0xdfa80000, 0xffa8fffc, 0x10000002,
++		0x000a4000, 0x0320f809, 0x03e04009,
  		0,	    0x03e00008, 0xffffffff,
  	};
+ 	csh handles[2] = { 0 };
