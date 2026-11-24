@@ -1,15 +1,22 @@
 import hashlib,json,os,re,subprocess as sp
 from pathlib import Path
 
-def snapshots(src, bench, build, temp, profile, label, run):
-    exe=temp/('snapshot.exe' if os.name=='nt' else 'snapshot')
-    library=build/('capstone.lib' if os.name=='nt' else 'libcapstone.a')
+def snapshots(src, bench, build, temp, profile, label, run, linkage):
+    shared=linkage=='shared'
+    if os.name=='nt':
+        library=build/('capstone.lib' if shared else 'capstone_static.lib')
+        exe=(build if shared else temp)/'snapshot.exe'
+    else:
+        import sys
+        library=build/(('libcapstone.dylib' if sys.platform=='darwin' else 'libcapstone.so') if shared else 'libcapstone.a')
+        exe=temp/'snapshot'
+    assert library.is_file(),library
     if os.name=='nt':
         runtime='/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (build/'CMakeCache.txt').read_text() else '/MD'
         run(label+'-snapshot-link','cl','/nologo','/O2',runtime,'/EHsc','/std:c++17','/I'+str(src/'include'),bench/'snapshot.cpp',library,'/Fo:'+str(temp/'snapshot.obj'),'/Fe:'+str(exe))
     else:
         cxx='g++' if profile=='gcc' else 'clang++'
-        run(label+'-snapshot-link',cxx,'-O2','-std=c++17','-I',src/'include',bench/'snapshot.cpp',library,'-o',exe)
+        run(label+'-snapshot-link',cxx,'-O2','-std=c++17','-I',src/'include',bench/'snapshot.cpp',library,*(['-Wl,-rpath,'+str(build)] if shared else []),'-o',exe)
     raw=library.read_bytes()
     records={str(bits):('X86_decodeFixedRecord'+str(bits)).encode() in raw for bits in (32,64)}
     source=bytearray()
@@ -34,7 +41,8 @@ def snapshots(src, bench, build, temp, profile, label, run):
                 digest=hashlib.sha256()
                 for chunk in iter(lambda: proc.stdout.read(1<<16),b''):digest.update(chunk)
                 diag=proc.stderr.read().decode()
-                assert proc.wait()==0,(args,diag)
+                status=proc.wait()
+                assert status==0,(linkage,args,status,diag)
             counts=json.loads(diag)
             assert counts['accepted']>0 and len(source)==sum(counts.values())
             results['/'.join(args[:4])]=dict(sha256=digest.hexdigest(),counts=counts)

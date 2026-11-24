@@ -1,7 +1,7 @@
-name: Validate real-mode mandatory-vector and fixed-record readers across static and shared builds
+name: Check static and shared real-mode prefix and scalar opcode records on nineteen configurations
 on:
   push:
-    branches: [codex/legacy16-vector-register-profiles]
+    branches: [codex/real-mode-static-shared-snapshots]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: legacy16-register-prefix-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: real-mode-shared-static-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

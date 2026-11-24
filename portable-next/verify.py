@@ -44,13 +44,17 @@ try:
         log=(e/(name+'-units.log')).read_text(errors='replace')
         assert '100% tests passed' in log and all('unit_'+n in log for n in units)
         rows[name]=dict(units=units,skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
-        result=snapshots(s,p,b,t,profile,name,run)
-        rows[name]['public']=result
-        baseline=rows['base']['public']['snapshots']
-        for key,x in result['snapshots'].items():
-            if name!='prefix' or not key.startswith('16/'):
-                assert x==baseline[key],(name,profile,key,x,baseline[key])
-        assert set(result['snapshots'])==set(baseline)
+        for linkage in ('static','shared'):
+            result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
+            rows[name][linkage]=result
+            baseline=rows['base'][linkage]['snapshots']
+            for key,x in result['snapshots'].items():
+                if name not in ('prefix','scalar') or not key.startswith('16/'):
+                    assert x==baseline[key],(name,linkage,profile,key,x,baseline[key])
+                if name=='scalar':
+                    assert x==rows['prefix'][linkage]['snapshots'][key],(linkage,profile,key,x)
+            assert set(result['snapshots'])==set(baseline)
+        assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
