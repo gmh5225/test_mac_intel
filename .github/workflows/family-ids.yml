@@ -1,7 +1,7 @@
-name: Balance runtime image order for classic MIPS register jump scans
+name: Compare MIPS opcode scan with balanced macOS image order
 on:
   push:
-    branches: [codex/mips-jump-mac-host-orders]
+    branches: [codex/mips-default-mac]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -36,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-jump-mac-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: mips-default-mac-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
