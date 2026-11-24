@@ -7,7 +7,7 @@ def run(*a,**kw):sp.run(a,check=True,**kw)
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def save(k,z):(e/(k+'.json')).write_text(json.dumps(z,indent=2)+'\n')
 def git(*a):return get('git','-C',src,*a)
-assert git('rev-parse','HEAD')==q['baseline'] and get('git','-C',iced,'rev-parse','HEAD')==q['iced'] and get('git','-C',dev,'rev-parse','HEAD')==q['neverd']
+assert git('rev-parse','HEAD')==q['checkout'] and get('git','-C',iced,'rev-parse','HEAD')==q['iced'] and get('git','-C',dev,'rev-parse','HEAD')==q['neverd']
 t=Path(tempfile.mkdtemp());inputs=t/'inputs';records={}
 try:
     for bits in (16,32,64):
@@ -39,12 +39,30 @@ try:
                         records.setdefault((bits,raw[:2*end]),'extrq-encoding')
     with inputs.open('w')as f:
         for bits,raw in records:print(bits,raw or "-",file=f)
-    assert len(records)==651593;save('inputs',dict(cases=len(records),sha256=sha(inputs),iced=q['iced']))
+    assert len(records)==651593;official=len(records)
+    for bits in (16,32,64):
+        for pred in range(256):
+            for mr in ('d0','10'):
+                for pp in range(4):
+                    for prefix in ('c5'+format(0xe8|pp,'02x'),'c4e1'+format(0x68|pp,'02x')):
+                        records.setdefault((bits,prefix+'c2'+mr+format(pred,'02x')),'vex-fp')
+                for ll in (0x08,0x28,0x48):
+                    for mask in (0,3):
+                        p2=format(ll|mask,'02x')
+                        for pp in range(4):
+                            p1=(0x6c|pp)|(0x80 if pp in (1,3) else 0)
+                            records.setdefault((bits,'62f1'+format(p1,'02x')+p2+'c2'+mr+format(pred,'02x')),'evex-fp')
+                        for op in ('1e','1f','3e','3f'):
+                            for wbit in (0x6d,0xed):
+                                records.setdefault((bits,'62f3'+format(wbit,'02x')+p2+op+mr+format(pred,'02x')),'evex-int')
+    with inputs.open('w')as f:
+        for bits,raw in records:print(bits,raw or '-',file=f)
+    save('inputs',dict(cases=len(records),official=official,sha256=sha(inputs),iced=q['iced']))
     a=t/'ice';a.mkdir();shutil.copyfile(r/'oracle.rs',a/'iced.rs')
     (a/'Cargo.toml').write_text('[package]\nname="check"\nversion="0.1.0"\nedition="2021"\n[[bin]]\nname="check"\npath="iced.rs"\n[dependencies]\niced-x86={path="'+str(iced/'src/rust/iced-x86')+'",default-features=false,features=["std","decoder","instr_info"]}\n')
     run('cargo','build','--release','--manifest-path',a/'Cargo.toml')
-    def capture(exe,path):
-        with inputs.open('rb')as inp,path.open('wb')as out:run(exe,stdin=inp,stdout=out)
+    def capture(exe,path,*args):
+        with inputs.open('rb')as inp,path.open('wb')as out:run(exe,*args,stdin=inp,stdout=out)
     capture(a/'target/release/check',t/'oracle')
     project=t/'product';build=t/'build';(project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(src);(project/'cmake').mkdir()
     cm='cmake/NeverDCapstoneCompilerOptions.inc';(project/cm).write_bytes(sp.check_output(['git','-C',dev,'show',q['neverd']+':'+cm]))
@@ -52,43 +70,50 @@ try:
     (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Grid LANGUAGES C CXX)\n'+cmake[cmake.index('# --- Capstone (our fork'):cmake.index('# --- NeverD CMake helpers')])
     run('cmake','-S',project,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     verdict={}
-    for label in ('base','prefix','selector','mask'):
+    for label in ('base','candidate'):
         git('restore','--source','HEAD','--staged','--worktree','--','.')
-        if label!='base':
-            trial=q[label];patch=r/(label+'.patch');assert sha(patch)==trial['sha256'];git('apply','--index',patch);assert git('write-tree')==trial['tree']
+        patch=r/(label+'.patch');git('apply','--index',patch);assert git('write-tree')==q[label]['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
         objects={Path(c['file']).name for c in json.loads((build/'compile_commands.json').read_text())};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c'}<=objects
         for exe,code in [('cap','cap.cpp'),('scan','corpus-scan.cpp')]:
             run('clang++','-O2','-std=c++17','-I',src,'-I',src/'include',r/code,lib,'-o',t/exe);capture(t/exe,t/(label+'-'+exe))
-        if label in ('base','mask'):
-            run('clang','-O2','-DNDEBUG','-DCAPSTONE_HAS_X86','-I',src,'-I',src/'include',r/'mask.c',lib,'-o',t/'private')
-            d=hashlib.sha256();size=0
-            with sp.Popen([t/'private'],stdout=sp.PIPE,stderr=sp.PIPE)as proc:
-                while chunk:=proc.stdout.read(1024*1024):size+=len(chunk);d.update(chunk)
-                line=proc.stderr.read().decode().strip();assert proc.wait()==0
-            mask=dict(sha256=d.hexdigest(),bytes=size,stats=line)
-            if label=='base':original=mask
-            assert mask==original and mask['bytes']>1572864*12;save('mask-'+label,mask)
+        capture(t/'cap',t/(label+'-bulk'),'bulk')
         if label=='base':continue
-        with contextlib.ExitStack()as files:
-            streams=[files.enter_context((t/f).open()) for f in ('base-cap',label+'-cap','oracle','base-scan',label+'-scan')]
-            delta=[];new=collections.Counter();all_errors=[0,0];new_examples=[]
-            for ((bits,raw),origin),*values in zip(records.items(),*streams,strict=True):
-                before,after,ref,bs,cs=[v.strip()for v in values]
-                x,y=map(int,bs.split());j,k=map(int,cs.split())
-                all_errors[0]+=bool(y);all_errors[1]+=bool(k)
-                if (k & ~y) or (before==after and (x,y)!=(j,k)):
-                    if len(new_examples)<12:new_examples.append([bits,raw,bs,cs,before,after])
-                    new['added-or-unexplained']+=1
-                if before!=after:
-                    assert after==ref,(bits,raw,before,after,ref)
-                    if k:new['changed-input-scan-disagreement']+=1
-                    delta.append([raw,before,after,ref,origin,'fixed',bits])
-        actual=hashlib.sha256((json.dumps(delta,indent=2)+'\n').encode()).hexdigest()
-        v=dict(records=len(records),changes=len(delta),sha256=actual,scan_disagreements=all_errors,new=new,examples=new_examples)
-        save('case-'+label,v);assert not new,v
-        assert dict(prefix=62743,selector=3648,mask=0)[label]==len(delta) and actual==q['expected'][label],v
-        verdict[label]=v
-    save('complete',dict(source=q,host=platform.platform(),cases=len(records),verdict=verdict))
+        groups=collections.Counter();errors=[];by_mode=collections.Counter();kept=collections.Counter()
+        paths=('base-cap','base-bulk','candidate-cap','candidate-bulk','base-scan','candidate-scan','oracle')
+        with contextlib.ExitStack()as opened:
+            lines=[opened.enter_context((t/f).open())for f in paths]
+            for ((bits,raw),origin),*v in zip(records.items(),*lines,strict=True):
+                before,bulk,now,current,bs,cs,oracle=[l.strip()for l in v]
+                bx,bm,oldscan=map(int,bs.split());cx,cm,newscan=map(int,cs.split())
+                def record_problem(reason):
+                    groups['errors']+=1
+                    if len(errors)<25:errors.append([reason,bits,raw,origin,before,bulk,now,current,bs,cs,oracle])
+                def corrected_float(old,new):
+                    if old=='-' or new=='-':return False
+                    a,oldid=old.rsplit('|',1);b,newid=new.rsplit('|',1)
+                    oldlen,_,oa=a.split(' ',2);newlen,op,ob=b.split(' ',2)
+                    # Predicate spelling, conditions, explicit operands and cursor length agree.
+                    offset=int(newlen)*2
+                    if oldlen!=newlen or oa!=ob or oldscan!=int(newid) or op not in ('vcmp','vcmpss','vcmpsd','vcmpps','vcmppd'):return False
+                    return int(oldid)==int(newid)+1+(int(raw[offset-2:offset],16)&31)
+                if before!=bulk:groups['old-iterator-bulk']+=1
+                if before!=now:
+                    by_mode[str(bits)+'/'+origin]+=1
+                    if not corrected_float(before,now):record_problem('changed-public-record')
+                if bulk!=current and not corrected_float(bulk,current):record_problem('changed-bulk-record')
+                if now!=current:record_problem('bulk-iterator')
+                if cm or ((bx>>8)!=(cx>>8) and before==now) or (bx&255)!=(cx&255):record_problem('scan')
+                if bm:groups['old-scan']+=1
+                if origin.startswith(('vex-','evex-')) and now!='-' and oracle!='-':
+                    op=oracle.split()[1]
+                    if now.split()[0]!=oracle.split()[0]:record_problem('oracle-length')
+                    if origin=='evex-int' and now.split()[1]!=op:record_problem('integer-family')
+                    if origin.endswith('-fp') and now.split()[1] not in ('vcmp',op): record_problem('floating-family')
+                    kept[op]+=1
+                if origin.startswith('DecoderTest') and bm:groups['original-corpus-differences']+=1
+        proof=dict(cases=len(records),groups=groups,examples=errors,changed=by_mode,iced_overlap=kept)
+        save('case-proof',proof);assert not errors and groups['original-corpus-differences']==152 and len(kept)==12,proof
+        save('complete',dict(source=q,host=platform.platform(),proof=proof))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(bytes=n,removed=not t.exists()))
