@@ -1,0 +1,33 @@
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..de36152a 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -27,17 +27,22 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 			cs_insn *insn, uint16_t *insn_size, bool batch);
+ 
+-/* Keep the mode, option and callback checks in a single short-circuit chain
+- * in both instantiations of the scalar writer. */
++/* These callbacks may change between instructions. Compare their current
++ * values together on the usual path that uses the Intel formatter. */
++static inline bool X86_hasCustomOutputCallbacks(const cs_struct *handle)
++{
++	return (unsigned)(handle->disasm != X86_getInstruction) |
++	       (unsigned)(handle->printer != X86_Intel_printInst) |
++	       (unsigned)(handle->insn_id != X86_get_insn_id) |
++	       (unsigned)(handle->post_printer != X86_postprinter);
++}
++
+ #define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
+ 	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
+ 	 (handle)->mnem_list || (handle)->doing_mem || \
+ 	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
+ 	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
+-	 (handle)->disasm != X86_getInstruction || \
+-	 (handle)->insn_id != X86_get_insn_id || \
+-	 (handle)->printer != X86_Intel_printInst || \
+-	 (handle)->post_printer != X86_postprinter || \
++	 X86_hasCustomOutputCallbacks(handle) || \
+ 	 cs_vsnprintf != cs_default_vsnprintf)
+ 
+ #endif
