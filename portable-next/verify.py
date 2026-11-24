@@ -33,9 +33,24 @@ try:
         lines.extend([f'add_executable(rv_time "{(d/"riscv_options.cpp").as_posix()}")','target_compile_features(rv_time PRIVATE cxx_std_17)','target_link_libraries(rv_time PRIVATE capstone_static)','target_link_options(rv_time PRIVATE -no-pie)'])
     (project/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
     cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    chosen=os.environ.get('NATIVE_COMPILER','')
+    if chosen in ('gcc','clang'):
+        os.environ.update(CC=chosen,CXX='g++' if chosen=='gcc' else 'clang++')
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
     if profile=='diet':cfg.append('-DCAPSTONE_BUILD_DIET=ON')
-    variants={}
+    mixed_sources=d.parent/'neverd-config'
+    verify_mixed=linux and profile=='full'
+    if verify_mixed:
+        expected_dev='cf7070f32ef716648478d178390c742cbaec5b21'
+        assert sp.check_output(['git','-C',mixed_sources,'rev-parse','HEAD'],text=True).strip()==expected_dev
+        product=t/'consumer';(product/'third_party').mkdir(parents=True);(product/'third_party/capstone').symlink_to(s)
+        (product/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
+        shutil.copyfile(mixed_sources/cm,product/cm)
+        code=(mixed_sources/'CMakeLists.txt').read_text()
+        opts=code[code.index('# --- Capstone (our fork'):code.index('# --- NeverD CMake helpers')]
+        (product/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\\nproject(Mixed LANGUAGES C CXX)\\n'+opts+'\\nadd_executable(consumer reader.cpp)\\ntarget_link_libraries(consumer PRIVATE capstone_static)\\n')
+        shutil.copyfile(d/'riscv_options.cpp',product/'reader.cpp')
+    variants={};mixed={}
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
@@ -58,6 +73,18 @@ try:
             outputs[suffix]=rows
         assert outputs['static']==outputs['shared']
         variants[stage]=outputs
+        if verify_mixed:
+            bmix=t/'mixed'
+            cmd('mixed-config-'+stage,['cmake','-S',product,'-B',bmix,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON'])
+            cmd('mixed-build-'+stage,['cmake','--build',bmix,'--parallel','4','--target','consumer'])
+            commands=json.loads((bmix/'compile_commands.json').read_text())
+            names={Path(c['file']).name for c in commands};assert {'X86Mapping.c','MipsMapping.c','PPCMapping.c','ARMMapping.c','AArch64Mapping.c','RISCVInstPrinter.c'}<=names
+            assert all('CAPSTONE_RISCV_ONLY' not in row['command']for row in commands if row['file'].endswith('/RISCVInstPrinter.c'))
+            objects={str(p.relative_to(bmix)):sha(p.read_bytes())for p in bmix.rglob('*.o')};lib,=bmix.rglob('libcapstone.a')
+            mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
+            save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
+    if verify_mixed:assert mixed['base']==mixed['candidate']
+
     if linux and profile=='full':
         from riscv_time import measure
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

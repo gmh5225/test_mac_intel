@@ -1,7 +1,7 @@
-name: Check actual RISC-V operand projections with independent syntax handles and unchanged mixed targets
+name: Validate RISC-V text-only and canonical operand paths and compare all mixed product objects
 on:
   push:
-    branches: [codex/riscv-canonical-operand-views]
+    branches: [codex/riscv-finish-by-detail-option]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -15,9 +15,11 @@ jobs:
           - { host: windows-2022, arch: amd64, profile: diet }
           - { host: windows-2022, arch: amd64_x86, profile: full }
           - { host: windows-2022, arch: amd64_x86, profile: diet }
-          - { host: ubuntu-24.04, arch: amd64, profile: full }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: clang }
           - { host: ubuntu-24.04, arch: amd64, profile: diet }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: full }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: full, compiler: gcc }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: full, compiler: clang }
           - { host: ubuntu-24.04-arm, arch: arm64, profile: diet }
           - { host: macos-15, arch: arm64, profile: full }
           - { host: macos-15, arch: arm64, profile: diet }
@@ -40,13 +42,24 @@ jobs:
         if: runner.os == 'Windows'
         with:
           arch: ${{ matrix.arch }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        if: runner.os == 'Linux' && matrix.profile == 'full'
+        with:
+          repository: NeverSight/NeverD
+          ref: cf7070f32ef716648478d178390c742cbaec5b21
+          path: neverd-config
+          sparse-checkout: |
+            cmake
+            CMakeLists.txt
+          persist-credentials: false
       - name: Compare original and candidate bytes and native tests
         env:
           SCAN_PROFILE: ${{ matrix.profile }}
+          NATIVE_COMPILER: ${{ matrix.compiler }}
         run: python -B portable-next/verify.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-canonical-views-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: riscv-detail-finalization-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7

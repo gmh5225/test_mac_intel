@@ -1,8 +1,21 @@
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index 6a6a9753..0237ea4b 100644
+index 6a6a9753..f778e3b7 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
-@@ -496,7 +496,15 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+@@ -491,12 +491,28 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 		}
+ 	}
+ 
++#ifdef CAPSTONE_RISCV_ONLY
++	/* Group construction and operand compaction only consume detail. */
++	if (!detail_is_set(MI)) {
++		RISCV_set_alias_id(MI, O);
++		return;
++	}
++#endif
++
+ 	bool textAndDetailModesMatch = (isRealSyntax(MI) && isRealDetail(MI)) ||
+ 				       (isUncompressedRealSyntax(MI) &&
  					isUncompressedRealDetail(MI)) ||
  				       (isAliasSyntax(MI) && isAliasDetail(MI));
  
