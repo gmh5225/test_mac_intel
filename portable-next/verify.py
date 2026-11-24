@@ -47,13 +47,16 @@ try:
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
-            expected='offset' if name=='public_offset' else 'base'
-            baseline=rows[expected][linkage]['snapshots']
+            if name=='base':
+                ref=t/'model';ref.mkdir(exist_ok=True);shutil.copyfile(p/'model.cpp',ref/'snapshot.cpp')
+                reference=snapshots(s,ref,b,t,profile,'model-'+linkage,run,linkage)
+                rows[name]['model_'+linkage]=reference['snapshots']
+            expected=(rows['offset'][linkage]['snapshots'] if name=='width' else
+                      rows['base']['model_'+linkage] if name=='stack' else
+                      rows['base'][linkage]['snapshots'])
             for case,view in result['snapshots'].items():
-                assert view['counts']==baseline[case]['counts'],(name,linkage,case)
-                if name!='offset' or case.split('/')[2]=='0':
-                    assert view==baseline[case],(name,linkage,case)
-
+                assert view['counts']==expected[case]['counts'],(name,linkage,case)
+                if name!='offset' or case.split('/')[2]=='0':assert view==expected[case],(name,linkage,case)
         assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
