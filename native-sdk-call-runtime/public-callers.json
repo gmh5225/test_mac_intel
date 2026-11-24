@@ -1,0 +1,62 @@
+{
+  "revision": "5942008068426ed1d0b7daba6772cf013755546f",
+  "cases": {
+    "x86": {
+      "MFCreateSourceReaderFromURL": {
+        "highc": "1e626bfa18d0c6f19d2e585b90f3c02c1d8d04bdb2ee986c60f0696582e333a6",
+        "llvmc": "2d1de82d9feeb0a00da4151b8325dae3b2019b1567af64dad612b603375cc2b7"
+      },
+      "McastApiCleanup": {
+        "highc": "7f3b941e513b6abefd47e979d58087993b0e63258e6918eaac9badc8fc449af3",
+        "llvmc": "c63e58c4f646369e9536bca5e299985025a8dcc9b06e7a4d4167b3adcb49a44b"
+      },
+      "McastApiStartup": {
+        "highc": "e4c78826d09f47edfb9759e321cd75c6e48c85892519b8352598730bbed3e4eb",
+        "llvmc": "01972cac6ff680b7c634d236ba4636d76f82b1c3b648a630fd7a5f0b51388223"
+      }
+    },
+    "x64": {
+      "MFCreateSourceReaderFromURL": {
+        "highc": "0ce1627815a3a533e759f8f70d3f5e79e6ad7e63aabccdcb4d3c30b1ed0e2f1f",
+        "llvmc": "3ed179a4269e37344eee9ae74fd0311d5330c1f877fba273477c799ad4b2f834"
+      },
+      "McastApiCleanup": {
+        "highc": "2eb84773a513b19001d2479d3da28bb937909d7c856b88adb6d14006cce5d0a7",
+        "llvmc": "56e6ae893c798e724cbc0fbfe081fd6ffdd1cce1a8efb9f432bf6de24b78520f"
+      },
+      "McastApiStartup": {
+        "highc": "626601ad77762b7846ddc8cae7e7d8ee172e94817af6f76e253fdb77a5038045",
+        "llvmc": "717cd730fa296c7f0b3548b178226f730f9cc460e4b0b400ea2ed76a30e31692"
+      }
+    },
+    "arm64": {
+      "MFCreateSourceReaderFromURL": {
+        "highc": "0ce1627815a3a533e759f8f70d3f5e79e6ad7e63aabccdcb4d3c30b1ed0e2f1f",
+        "llvmc": "3ed179a4269e37344eee9ae74fd0311d5330c1f877fba273477c799ad4b2f834"
+      },
+      "McastApiCleanup": {
+        "highc": "2eb84773a513b19001d2479d3da28bb937909d7c856b88adb6d14006cce5d0a7",
+        "llvmc": "56e6ae893c798e724cbc0fbfe081fd6ffdd1cce1a8efb9f432bf6de24b78520f"
+      },
+      "McastApiStartup": {
+        "highc": "626601ad77762b7846ddc8cae7e7d8ee172e94817af6f76e253fdb77a5038045",
+        "llvmc": "6a68f448ed4610d2630bf956b94270a7aefb7ca773bd568b1a05465422dcd8fe"
+      }
+    }
+  },
+  "sources": {
+    "1e626bfa18d0c6f19d2e585b90f3c02c1d8d04bdb2ee986c60f0696582e333a6": "typedef struct IMFAttributes IMFAttributes;\ntypedef struct IMFSourceReader IMFSourceReader;\n\n#include <stdint.h>\n\n/* Scalars are read and written through plain pointer casts at any address:\n   build for a target with unaligned access, with -fno-strict-aliasing. */\n\nextern __attribute__((stdcall)) int32_t MFCreateSourceReaderFromURL(const uint16_t *pwszURL, struct IMFAttributes *pAttributes, struct IMFSourceReader **ppSourceReader);\n\n/* neverd.entry: 0x10001000 */\nint32_t InspectMFCreateSourceReaderFromURL(int32_t arg0, int32_t arg1, int32_t arg2) {\n    return MFCreateSourceReaderFromURL((const uint16_t *)(uintptr_t)arg0, (struct IMFAttributes *)(uintptr_t)arg1, (struct IMFSourceReader **)(uintptr_t)arg2);\n}\n",
+    "2d1de82d9feeb0a00da4151b8325dae3b2019b1567af64dad612b603375cc2b7": "#include <stdint.h>\n\n#if !defined(__SIZEOF_INT128__) && defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 128\ntypedef unsigned _BitInt(128) __uint128_t;\ntypedef _BitInt(128) __int128_t;\n#endif\n\n\ntypedef struct IMFAttributes IMFAttributes;\ntypedef struct IMFSourceReader IMFSourceReader;\n__attribute__((stdcall)) int32_t MFCreateSourceReaderFromURL(const uint16_t *pwszURL, struct IMFAttributes *pAttributes, struct IMFSourceReader **ppSourceReader);\nuint32_t InspectMFCreateSourceReaderFromURL(uint32_t arg0, uint32_t arg1, uint32_t arg2) {\n    return ((uint32_t)(uint32_t)(MFCreateSourceReaderFromURL((const uint16_t *)(uintptr_t)(arg0), (struct IMFAttributes *)(uintptr_t)(arg1), (struct IMFSourceReader **)(uintptr_t)(arg2))));\n}\n\n",
+    "7f3b941e513b6abefd47e979d58087993b0e63258e6918eaac9badc8fc449af3": "#include <stdint.h>\n\nextern __attribute__((stdcall)) void McastApiCleanup(void);\n\n/* neverd.entry: 0x10001000 */\nvoid InspectMcastApiCleanup(void) {\n    McastApiCleanup();\n    return;\n}\n",
+    "c63e58c4f646369e9536bca5e299985025a8dcc9b06e7a4d4167b3adcb49a44b": "#include <stdint.h>\n\n#if !defined(__SIZEOF_INT128__) && defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 128\ntypedef unsigned _BitInt(128) __uint128_t;\ntypedef _BitInt(128) __int128_t;\n#endif\n\n\n__attribute__((stdcall)) void McastApiCleanup(void);\nvoid InspectMcastApiCleanup() {\n    McastApiCleanup();\n    return;\n}\n\n",
+    "e4c78826d09f47edfb9759e321cd75c6e48c85892519b8352598730bbed3e4eb": "#include <stdint.h>\n\n/* Scalars are read and written through plain pointer casts at any address:\n   build for a target with unaligned access, with -fno-strict-aliasing. */\n\nextern __attribute__((stdcall)) __typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) McastApiStartup(__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *Version);\n\n/* neverd.entry: 0x10001000 */\nint32_t InspectMcastApiStartup(int32_t arg0) {\n    return McastApiStartup((void*)(uintptr_t)(__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *)(uintptr_t)arg0);\n}\n",
+    "01972cac6ff680b7c634d236ba4636d76f82b1c3b648a630fd7a5f0b51388223": "#include <stdint.h>\n\n#if !defined(__SIZEOF_INT128__) && defined(__BITINT_MAXWIDTH__) && __BITINT_MAXWIDTH__ >= 128\ntypedef unsigned _BitInt(128) __uint128_t;\ntypedef _BitInt(128) __int128_t;\n#endif\n\n\n__attribute__((stdcall)) __typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) McastApiStartup(__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *Version);\nuint32_t InspectMcastApiStartup(uint32_t arg0) {\n    return ((uint32_t)(uint32_t)(McastApiStartup((__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *)(uintptr_t)(arg0))));\n}\n\n",
+    "0ce1627815a3a533e759f8f70d3f5e79e6ad7e63aabccdcb4d3c30b1ed0e2f1f": "typedef struct IMFAttributes IMFAttributes;\ntypedef struct IMFSourceReader IMFSourceReader;\n\n#include <stdint.h>\n\nextern int32_t MFCreateSourceReaderFromURL(const uint16_t *pwszURL, struct IMFAttributes *pAttributes, struct IMFSourceReader **ppSourceReader);\n\n/* neverd.entry: 0x180001000 */\nint64_t InspectMFCreateSourceReaderFromURL(uint16_t* arg0, IMFAttributes* arg1, IMFSourceReader** arg2) {\n    return (uint64_t)((uint32_t)MFCreateSourceReaderFromURL(arg0, arg1, (struct IMFSourceReader **)arg2));\n}\n",
+    "3ed179a4269e37344eee9ae74fd0311d5330c1f877fba273477c799ad4b2f834": "#include <stdint.h>\n\n\ntypedef struct IMFAttributes IMFAttributes;\ntypedef struct IMFSourceReader IMFSourceReader;\nint32_t MFCreateSourceReaderFromURL(const uint16_t *pwszURL, struct IMFAttributes *pAttributes, struct IMFSourceReader **ppSourceReader);\nuint64_t InspectMFCreateSourceReaderFromURL(uint16_t* arg0, IMFAttributes* arg1, IMFSourceReader** arg2) {\n    uint64_t call0;\n\n    call0 = ((uint64_t)(uint32_t)(MFCreateSourceReaderFromURL((const uint16_t *)(uintptr_t)((uint64_t)arg0), (struct IMFAttributes *)(uintptr_t)((uint64_t)arg1), (struct IMFSourceReader **)(uintptr_t)((uint64_t)arg2))));\n    return call0;\n}\n\n",
+    "2eb84773a513b19001d2479d3da28bb937909d7c856b88adb6d14006cce5d0a7": "#include <stdint.h>\n\nextern void McastApiCleanup(void);\n\n/* neverd.entry: 0x180001000 */\nvoid InspectMcastApiCleanup(void) {\n    McastApiCleanup();\n    return;\n}\n",
+    "56e6ae893c798e724cbc0fbfe081fd6ffdd1cce1a8efb9f432bf6de24b78520f": "#include <stdint.h>\n\n\nvoid McastApiCleanup(void);\nvoid InspectMcastApiCleanup() {\n    McastApiCleanup();\n    return;\n}\n\n",
+    "626601ad77762b7846ddc8cae7e7d8ee172e94817af6f76e253fdb77a5038045": "#include <stdint.h>\n\nextern __typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) McastApiStartup(__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *Version);\n\n/* neverd.entry: 0x180001000 */\nint64_t InspectMcastApiStartup(__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0))* arg0) {\n    return (uint64_t)((uint32_t)McastApiStartup((void*)arg0));\n}\n",
+    "717cd730fa296c7f0b3548b178226f730f9cc460e4b0b400ea2ed76a30e31692": "#include <stdint.h>\n\n\n__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) McastApiStartup(__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *Version);\nuint64_t InspectMcastApiStartup(void* arg0) {\n    uint64_t call0;\n\n    call0 = ((uint64_t)(uint32_t)(McastApiStartup((__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *)(uintptr_t)((uint64_t)arg0))));\n    return call0;\n}\n\n",
+    "6a68f448ed4610d2630bf956b94270a7aefb7ca773bd568b1a05465422dcd8fe": "#include <stdint.h>\n\n\n__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) McastApiStartup(__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *Version);\nuint64_t InspectMcastApiStartup(void* arg0) {\n    return ((uint64_t)(uint32_t)(McastApiStartup((__typeof__(__builtin_choose_expr(sizeof(unsigned long) == 4, (unsigned long)0, (uint32_t)0)) *)(uintptr_t)((uint64_t)arg0))));\n}\n\n"
+  }
+}

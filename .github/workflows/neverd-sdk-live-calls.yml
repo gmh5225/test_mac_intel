@@ -1,0 +1,38 @@
+name: Exercise lifted multicast and media calls on Windows
+on:
+  push:
+    branches: [codex/neverd-api-runtime-20261124]
+    paths:
+      - .github/workflows/neverd-sdk-live-calls.yml
+      - native-sdk-call-runtime/**
+permissions:
+  contents: read
+jobs:
+  execute:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: arm64, os: windows-11-arm}
+          - {arch: x64, os: windows-2022}
+          - {arch: x86, os: windows-2022}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: native-sdk-call-runtime
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Compare the SDK caller with both decompiled callers
+        shell: pwsh
+        run: python native-sdk-call-runtime/qualify.py ${{ matrix.arch }} observed.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: sdk-live-${{ matrix.arch }}
+          path: observed.json
+          if-no-files-found: warn
+          retention-days: 14
