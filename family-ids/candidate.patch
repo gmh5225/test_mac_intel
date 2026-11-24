@@ -1,42 +1,13 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3dc297b9..1a99df90 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -187,7 +187,7 @@ if(capstone_enabled_architectures STREQUAL "LOONGARCH")
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "PPC")
--    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS CAPSTONE_PPC_PRIMARY_DISPATCH)
-+    add_compile_definitions(CAPSTONE_PPC_ONLY CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS CAPSTONE_PPC_PRIMARY_DISPATCH)
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "RISCV")
-diff --git a/MCInstPrinter.c b/MCInstPrinter.c
-index 62dd338d..d901aa68 100644
---- a/MCInstPrinter.c
-+++ b/MCInstPrinter.c
-@@ -142,8 +142,9 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
- 		count = handle->alias_opcode_count;
- 	unsigned MIOpcode = MI->Opcode;
- 	size_t i = 0;
--#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
--	/* The generated RISC-V index passes a suffix starting at the
-+#if !defined(CAPSTONE_DIET) && (defined(CAPSTONE_RISCV_ONLY) || \
-+	defined(CAPSTONE_MIPS_ONLY) || defined(CAPSTONE_PPC_ONLY))
-+	/* The generated alias index can supply a suffix starting at the
- 	 * selected opcode. Zero can also be the sentinel. */
- 	if (MIOpcode && M->OpToPatterns[0].Opcode == MIOpcode)
- 		count = 1;
-diff --git a/Makefile b/Makefile
-index 0fe49035..7a1044e9 100644
---- a/Makefile
-+++ b/Makefile
-@@ -144,7 +144,7 @@ CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),powerpc)
--CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPATCH
-+CFLAGS += -DCAPSTONE_PPC_ONLY -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPATCH
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
+index 6712b300..2c917b26 100644
+--- a/arch/PowerPC/PPCMapping.c
++++ b/arch/PowerPC/PPCMapping.c
+@@ -297,6 +297,8 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
+ void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
+ {
+ 	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, ppc_insns);
+ 	map_implicit_writes(MI, ppc_insns);
+ 	map_groups(MI, ppc_insns);
