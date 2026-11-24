@@ -1,0 +1,93 @@
+name: NeverD classic MIPS paired CPU timing
+on:
+  push:
+    branches: [codex/mips-classic-release-qualification]
+    paths: ['.github/workflows/neverd-mips-classic-timing.yml', 'neverd-mips-qualification/classic-release-timing.py']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  REVISION: 9e46317bed64bf8f33416f803c3eac8cef60e9c9
+  LLVM_REVISION: e03b3a2cd27615bd9a8d193b37f36da80d56355b
+  HOMEBREW_NO_AUTO_UPDATE: '1'
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18, pkg: neverd-llvm-linux-x86_64}
+          - {os: macos-15, cc: clang, cxx: clang++, pkg: neverd-llvm-macos-arm64}
+          - {os: windows-latest, cc: clang-cl, cxx: clang-cl, pkg: neverd-llvm-windows-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 125
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.REVISION }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Verify source identities
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          test "$(git rev-parse HEAD:third_party/llvm-project)" = "$LLVM_REVISION"
+          git submodule update --init --depth 1 third_party/capstone signatures
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14
+      - if: runner.os == 'macOS'
+        run: brew install cmake ninja lld
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+      - name: Select the Windows compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
+      - name: Build the decoder benchmark with the public LLVM package
+        run: |
+          args=()
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            args+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14')
+          fi
+          cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF "${args[@]}"
+          python scripts/build.py build-check --config Release --parallel 4 --target neverd-mips-bench
+      - name: Check out the timing harness from the trusted workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: timing-controller
+          sparse-checkout: neverd-mips-qualification/classic-release-timing.py
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+      - name: Time long paired runs of both decoders
+        run: |
+          mkdir -p evidence
+          binary=build-check/bin/neverd-mips-bench
+          if [[ "$RUNNER_OS" == Windows ]]; then binary+=.exe; fi
+          python timing-controller/neverd-mips-qualification/classic-release-timing.py "$binary" evidence/timing.json
+          python - <<'PYTHON'
+          from pathlib import Path
+          import re
+          cache = Path('build-check/CMakeCache.txt').read_text()
+          path = re.search(r'^LLVM_DIR:[^=]+=(.+)$', cache, re.M)
+          info = (Path(path[1].strip()).parents[2] / 'BUILDINFO.txt').read_text()
+          assert 'llvm_commit: e03b3a2cd27615bd9a8d193b37f36da80d56355b' in info
+          Path('evidence/BUILDINFO.txt').write_text(info)
+          PYTHON
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: classic-timing-${{ runner.os }}
+          path: evidence/
