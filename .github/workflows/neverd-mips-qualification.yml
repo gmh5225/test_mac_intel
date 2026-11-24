@@ -20,6 +20,7 @@ jobs:
       runners: ${{ steps.input.outputs.runners }}
       reference: ${{ steps.input.outputs.reference }}
       benchmark: ${{ steps.input.outputs.benchmark }}
+      paired_base: ${{ steps.input.outputs.paired_base }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -42,6 +43,9 @@ jobs:
               print('runners=' + json.dumps({'include': matrix}), file=out)
               print('reference=' + str(config.get('r4000_reference', False)).lower(), file=out)
               print('benchmark=' + str(config.get('measure_decode', False)).lower(), file=out)
+              base = config.get('paired_base', '')
+              assert not base or re.fullmatch(r'[0-9a-f]{40}', base)
+              print('paired_base=' + base, file=out)
               for key in ('revision', 'target', 'filter', 'required'):
                   value = config[key]
                   assert value and '\n' not in value and '\r' not in value
@@ -63,6 +67,8 @@ jobs:
       TEST_FILTER: ${{ needs.source.outputs.filter }}
       REQUIRED_TEST: ${{ needs.source.outputs.required }}
       BENCHMARK: ${{ needs.source.outputs.benchmark }}
+      PAIRED_BASE: ${{ needs.source.outputs.paired_base }}
+      NEVERD_THREADS: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -106,6 +112,23 @@ jobs:
             -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
             -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS="$semantic" "${args[@]}"
+          if [[ -n "$PAIRED_BASE" ]]; then
+            mkdir -p evidence
+            git fetch --quiet --depth 1 origin "$PAIRED_BASE"
+            git checkout --quiet --detach "$PAIRED_BASE"
+            git submodule update --init --depth 1 third_party/capstone signatures third_party/unicorn
+            test "$(git rev-parse HEAD:third_party/capstone)" = "$(git -C third_party/capstone rev-parse HEAD)"
+            python scripts/build.py build-check --config Release --parallel 4 --target neverd-mips-bench
+            suffix=
+            if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
+            cp "build-check/bin/neverd-mips-bench$suffix" "build-check/bin/neverd-mips-bench-base$suffix"
+            git rev-parse HEAD > evidence/source-base.txt
+            git -C third_party/capstone rev-parse HEAD >> evidence/source-base.txt
+            cp build-check/neverd-dependency-inputs.json evidence/dependencies-base.json
+            git checkout --quiet --detach "$REVISION"
+            git submodule update --init --depth 1 third_party/capstone signatures third_party/unicorn
+            test "$(git rev-parse HEAD:third_party/capstone)" = "$(git -C third_party/capstone rev-parse HEAD)"
+          fi
           targets=("$TEST_TARGET")
           if [[ "$TEST_TARGET" == NeverDLocalTypesDebugContextTests ]]; then targets+=(NeverDDebugInfoTests); fi
           if [[ "$BENCHMARK" == true ]]; then targets+=(neverd-mips-bench NeverDMIPSFlowTests); fi
@@ -145,6 +168,17 @@ jobs:
           build-check/bin/NeverDMIPSFlowTests --gtest_output=xml:evidence/flow.xml
           python qualification-driver/neverd-mips-qualification/native-benchmark.py build-check/bin/neverd-mips-bench evidence/performance.json
           cp build-check/neverd-dependency-inputs.json build-check/neverd-build-receipt.json evidence/
+      - name: Measure baseline and candidate on this native host
+        if: needs.source.outputs.paired_base != ''
+        run: |
+          suffix=
+          if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
+          cp "build-check/bin/neverd-mips-bench$suffix" "build-check/bin/neverd-mips-bench-candidate$suffix"
+          git rev-parse HEAD > evidence/source-candidate.txt
+          git -C third_party/capstone rev-parse HEAD >> evidence/source-candidate.txt
+          cp build-check/neverd-dependency-inputs.json evidence/dependencies-candidate.json
+          cmp evidence/dependencies-base.json evidence/dependencies-candidate.json
+          python qualification-driver/neverd-mips-qualification/paired-classic.py build-check/bin evidence/measurements.json
       - name: Measure both edges in the published hardware waveforms
         if: env.REQUIRED_TEST == 'MIPSHistoricalScheduling.R4300AndR4600BootFetchesMatchBusCaptures'
         run: |
