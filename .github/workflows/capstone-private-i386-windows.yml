@@ -1,7 +1,7 @@
-name: Verify XCore constant opcode mapping and immediate syntax on native ABI profiles
+name: Exhaust short XCore scan encodings on twelve full and DIET ABI builds
 on:
   push:
-    branches: [codex/constant-xcore-native-qualification]
+    branches: [codex/xcore-uniform-encoding-validation]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-mapped-native-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-uniform-native-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

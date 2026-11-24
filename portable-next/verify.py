@@ -18,6 +18,7 @@ try:
     results={};units=['api','mcinst','sstream','instruction_bytes'];b=t/'build';sample=t/'op.bin';sample.write_bytes(bytes((0,0)))
     for k in ('base','candidate'):
         if k=='candidate':
+            units.append('xcore_scan')
             stage(k,q);run('generated',sys.executable,s/'suite/synctools/xcore_literal_operands.py','--check')
         flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_XCORE_SUPPORT=ON','-DCAPSTONE_BUILD_DIET='+('ON'if profile=='diet' else 'OFF')]
         if sys.platform.startswith('linux'):flags.append('-DCMAKE_C_COMPILER=clang')
