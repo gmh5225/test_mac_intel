@@ -1,7 +1,7 @@
-name: Time decoded address formatting alongside both iced formatters
+name: Measure ordinary 32-bit and 64-bit code on the 16-bit prefix correction
 on:
   push:
-    branches: [codex/bounded-decoded-base-address]
+    branches: [codex/native-32-64-readers-after-prefix16]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 8f7493e97555c1bb764c8d31f41feb9c35d8f403
+          ref: ea5295dcaa778c335fc7755f63f42f37f0eb548b
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: decoded-base-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: sse-transfer-prefix16-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
