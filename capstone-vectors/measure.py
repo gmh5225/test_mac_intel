@@ -37,15 +37,41 @@ try:
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
-    for label in ('base','candidate'):
+    maps=rd(r/'source.json')
+    assert maps['stable']==q and maps['base']['commit']==q['parent']
+    layout={}
+    from elftools.elf.elffile import ELFFile
+    for label in ('base','compact','candidate'):
+        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        if label=='compact':
+            assert sha(r/'compact.patch')==maps['prefix']['sha256']
+            run('git','-C',base,'apply','--index',r/'compact.patch');assert get('git','-C',base,'write-tree').strip()==maps['prefix']['tree']
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
-    assert images['base']['exe']!=images['candidate']['exe']
-    shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
+        with (w/label).open('rb')as f:
+            elf=ELFFile(f)
+            layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+    save('linked-sections',layout)
+    imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
+    original_sizes={k:len(v) for k,v in imgs.items()}
+    imgs={k:v+bytes(length-len(v)) for k,v in imgs.items()};imgs['duplicate']=imgs['base']
+    current=w/'selected';shutil.copy2(w/'base',current);current.write_bytes(imgs['base'])
+    inode=current.stat().st_ino;verified={}
+    offsets=[pos for pos in range(0,length,4096) if len({v[pos:pos+4096] for v in imgs.values()})>1];assert offsets
+    def select(k):
+        with current.open('r+b',buffering=0) as out:
+            for at in offsets:
+                out.seek(at);part=imgs[k][at:at+4096];assert out.write(part)==len(part)
+        assert current.stat().st_ino==inode and current.stat().st_size==length
+        if k not in verified:
+            assert hashlib.sha256(current.read_bytes()[:original_sizes.get(k,original_sizes['base'])]).hexdigest()==images['base' if k=='duplicate' else k]['exe']
+            verified[k]=sha(current);assert verified[k]==hashlib.sha256(imgs[k]).hexdigest()
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    invoke=['setarch',os.uname().machine,'-R',current]
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
@@ -69,19 +95,18 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('candidate')
+        assert audit_engine('base')==audit_engine('compact')==audit_engine('candidate')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
-            comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
-            return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
+            select(engine)
+            return list(map(int,get(*invoke,'private',str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
-            repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
+            labels=list(imgs)
+            repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
+            assert all(v==expected['base'] for v in expected.values())
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-            for _ in range(13):
+            for _ in range(17):
                 rng.shuffle(labels);sample={k:[] for k in labels}
                 for k in labels+labels[::-1]:
                     row=take(k,mode,repeats);assert row[2:]==expected[k]
@@ -91,7 +116,8 @@ try:
             summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
+    save('fixed-image',dict(inode=inode,blocks=len(offsets),verified=verified,bytes=length,original_sizes=original_sizes))
+    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
