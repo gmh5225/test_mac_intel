@@ -40,15 +40,25 @@ try:
     cases={'X86VectorOutput.c','X86ImmediateOutput.c','X86EvexMemoryOutput.c','X86MemoryOutput.c','X86OutputIterator.c'}
     assert os.environ['CC']=='gcc' and sys.platform.startswith('linux')
 
-    for label in ('base','candidate'):
-        if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+    from fixed_image import FixedImage
+    from training import fetch
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    heldout=fetch(r,w);save('foreign-corpus',heldout)
+    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    for label in ('base','candidate','alu','tunedalu'):
+        if label!='base':
+            run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+            source=m['variants'][label];patch=r/(label+'.patch')
+            assert sha(patch)==source['sha256']
+            run('git','-C',base,'apply','--index',patch)
+            assert get('git','-C',base,'write-tree').strip()==source['tree']
+        tuned=label in ('candidate','tunedalu')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        run('clang++','-no-pie',w/'foreign.o',lib,'-lm','-o',w/('foreign-'+label))
+        images[label]=dict(archive=sha(lib),exe=sha(w/label),foreign=sha(w/('foreign-'+label)))
         cc=rd(build/'compile_commands.json');active={Path(v['file']).name for v in cc if '-mstringop-strategy=libcall' in v['command']}
-        assert active==(cases if label=='candidate' else set()),active
+        assert active==(cases if tuned else set()),active
         obj={f.name:f for f in build.rglob('*.c.o')}
         objects[label]={k:sha(v)for k,v in obj.items()}
         stores={}
@@ -59,15 +69,20 @@ try:
         save('stores-'+label,stores)
         # Use the exact real target from Make's dry run as a second build-system check.
         recipe=get('make','-s','-n','V=1','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CC=gcc','CAPSTONE_BUILD_CORE_ONLY=yes','OBJDIR='+str(w/'make-objects'),str(w/'make-objects/arch/X86/X86ImmediateOutput.o'),cwd=base)
-        assert ('-mstringop-strategy=libcall' in recipe)==(label=='candidate'),recipe
-        if label=='candidate':
-            delta=[n for n in obj if objects['base'][n]!=objects[label][n]]
+        assert ('-mstringop-strategy=libcall' in recipe)==tuned,recipe
+        if tuned:
+            other='base' if label=='candidate' else 'alu'
+            delta=[n for n in obj if objects[other][n]!=objects[label][n]]
             assert delta and set(delta)<={k+'.o'for k in cases},delta
-            save('affected-objects',dict(changed=delta,total=len(obj),active_flags=sorted(active)))
+            save('affected-'+label,dict(changed=delta,total=len(obj),active_flags=sorted(active)))
             unit=w/'x86-records';run('gcc','-O2','-I',base/'include',base/'tests/unit/x86_simple_output.c',lib,'-lm','-o',unit);run(unit)
 
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
+    labels_native=('base','duplicate','candidate','alu','alucopy','tunedalu')
+    def paths(prefix):
+        return {label:w/(prefix+{'alucopy':'alu','duplicate':'base'}.get(label,label)) for label in labels_native}
+    bench=FixedImage(w/'selected',paths(''));foreign_image=FixedImage(w/'selected-foreign',paths('foreign-'))
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
@@ -91,19 +106,20 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('candidate')
+        original_rows=audit_engine('base')
+        assert all(audit_engine(k)==original_rows for k in ('candidate','alu','tunedalu'))
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
-            return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
+            exe=engine if engine in labels_native else 'base'
+            return bench.run(exe,comparator,str(mode),str(n),f,path,str(bits))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
+            labels=[*labels_native,'iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
+            assert len({tuple(x[:3])for x in expected.values()})==1 and len({tuple(expected[k])for k in labels_native})==1
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-            for _ in range(13):
+            for _ in range(41 if name=='libssl3t64-amd64' and mode==0 else 13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
                 for k in labels+labels[::-1]:
                     row=take(k,mode,repeats);assert row[2:]==expected[k]
@@ -113,6 +129,24 @@ try:
             summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
+    raw_foreign={}
+    for row in heldout:
+        for mode in range(3):
+            labels=list(labels_native);args=(row['arch'],w/(row['name']+'.text'),str(mode))
+            n=max(1,math.ceil(18e6/max(foreign_image.run('base',*args,'1')[0],1)))
+            expected=foreign_image.run('base',*args,str(n))[2:]
+            assert expected[0]>0
+            rng=random.Random(row['name']+str(mode));cycles=[]
+            for i in range(13):
+                rng.shuffle(labels);pair={k:[] for k in labels}
+                for k in labels+labels[::-1]:
+                    got=foreign_image.run(k,*args,str(n));assert got[2:]==expected
+                    pair[k].append(got[:2])
+                cycles.append({k:[sum(t[j]for t in ts)for j in (0,1)]for k,ts in pair.items()})
+            raw_foreign[row['name']+'/'+str(mode)]=dict(repeats=n,checks=expected,cycles=cycles)
+            save('foreign-observations',raw_foreign)
+    save('fixed-images',dict(x86=bench.checked,foreign=foreign_image.checked,affinity=sorted(os.sched_getaffinity(0)),disable_aslr=True))
+
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
 
 finally:
