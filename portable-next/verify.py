@@ -18,7 +18,7 @@ try:
  flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arches]]
  flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
  units=['x86_reg_access','x86_scan_batch','x86_mapping_counts','x86_buffer_bounds']
- if profile not in ('diet','reduced'):units+=['x86_scalar_vector_access','x86_packed_move_access','x86_evex_move_access','x86_simple_output']
+ if profile not in ('diet','reduced'):units+=['x86_integer_vector_access','x86_scalar_vector_access','x86_packed_move_access','x86_evex_move_access','x86_simple_output']
  if profile not in ('noatt','diet','reduced'):units+=['x86_kmask_access','x86_apx_evex_kmov']
  run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
  run('build','cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
@@ -33,8 +33,8 @@ try:
     exe=t/('probe.exe' if os.name=='nt' else 'probe')
     if os.name=='nt':run('probe-build','cl','/nologo','/O2','/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (b/'CMakeCache.txt').read_text() else '/MD','/std:c11','/I'+str(s/'include'),p/'probe.c',target,'/Fo:'+str(t/'probe.obj'),'/Fe:'+str(exe))
     else:run('probe-build',profile if profile in ('gcc','clang') else 'clang','-O2','-I',s/'include',p/'probe.c',target,'-o',exe)
-    run('probe',exe);cases=864 if profile=='noatt' else 1728
-    assert (e/'probe.log').read_text().strip()==str(cases)+' encodings and syntax cases, 0 incorrect memory accesses'
+    run('probe',exe);cases=1560 if profile=='noatt' else 3120
+    assert (e/'probe.log').read_text().strip()==str(cases)+' encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
  save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units,case_count=cases))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))

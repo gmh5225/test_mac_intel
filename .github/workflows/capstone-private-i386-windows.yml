@@ -1,7 +1,7 @@
-name: Verify VEX mask store details on Windows macOS Linux in both x86 widths
+name: Verify MOVD and MOVQ details and public IDs across native x86 configurations
 on:
   push:
-    branches: [codex/kmov-memory-access-runtime]
+    branches: [codex/integer-vector-access-abis]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d3dcfa80afcb4d0786308a2938659998c54a1453
+          ref: 8347e89a4e9a9e1618009fb8a496e335e857d00f
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mask-memory-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: integer-vector-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
