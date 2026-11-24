@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','prefix','selector'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','layout','selector'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -36,7 +36,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','prefix','selector'):
+    for variant in ('base','layout','selector'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -67,14 +67,14 @@ try:
         command([t/'mask-access'],'verify-memory-'+variant)
         assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
         command(['clang','-O2','-I',cs/'include',r/'forms.c',archive,'-o',t/'forms'],'compile-forms-'+variant)
-        v=sp.run([t/'forms'],text=True,capture_output=True);failure=variant!='prefix'
+        v=sp.run([t/'forms'],text=True,capture_output=True);failure=True
         expected_errors=[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(2)] if failure else []
         expected_stdout=f'3264 encodings and syntax cases, 0 incorrect memory accesses, {48 if failure else 0} incorrect shapes'
         assert (v.returncode,v.stderr.splitlines(),v.stdout.splitlines())==(int(failure),expected_errors,[expected_stdout]),(v.returncode,v.stdout,v.stderr)
         save('forms-'+variant,dict(records=3264,wrong=48 if failure else 0,stdout=v.stdout,stderr=v.stderr))
         command(['clang','-O2','-I',cs/'include',r/'selector.c',archive,'-o',t/'selector-guard'],'link-selector-'+variant)
         command([t/'selector-guard'],'selector-'+variant)
-        assert (out/('selector-'+variant+'.log')).read_text().strip()==('9088 144 1008' if variant=='base' else '9088 144 0')
+        assert (out/('selector-'+variant+'.log')).read_text().strip()==('9088 144 1008' if variant!='selector' else '9088 144 0')
         check=t/'verify-move-scans'
         command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
         p=sp.run([check],capture_output=True,text=True,check=True)
@@ -140,7 +140,8 @@ try:
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            for rep in range(13):
+            pairs=35 if (c['name'],mode)==('libssl3t64-amd64',3) else 13
+            for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
@@ -152,7 +153,7 @@ try:
             save('timings',rows)
     assert set(checked)==set(imgs) and checked['copy']==checked['base']
     save('fixed-image',dict(inode=inode,verified=checked,bytes=length,block=block,blocks=len(offsets)))
-    save('complete',dict(done=True,pairs=13,panels=len(rows),source=llvm))
+    save('complete',dict(done=True,pairs=13,ssl_pairs=35,panels=len(rows),source=llvm))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())
     shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))
