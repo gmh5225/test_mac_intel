@@ -52,10 +52,10 @@ try:
     cursor=32;sections=[]
     for _ in range(ncmds):
         cmd,extent=struct.unpack_from('<II',mach,cursor)
-        if cmd==0x19 and mach[cursor+8:cursor+24].rstrip(b'\\x00')==b'__TEXT':
+        if cmd==0x19 and mach[cursor+8:cursor+24].rstrip(b'\x00')==b'__TEXT':
             for i in range(struct.unpack_from('<I',mach,cursor+64)[0]):
                 offset=cursor+72+80*i
-                if mach[offset:offset+16].rstrip(b'\\x00')!=b'__text':continue
+                if mach[offset:offset+16].rstrip(b'\x00')!=b'__text':continue
                 addr,n,foff=struct.unpack_from('<QQI',mach,offset+32);assert foff+n<=len(mach);sections.append(mach[foff:foff+n])
         cursor+=extent
     assert len(sections)==1 and len(sections[0])>50000
@@ -82,7 +82,7 @@ try:
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']!=images['candidate']['exe']
     audit={};results={}
     for name,bits in [('scalar16',16),('sqlite64',64),('putty32',32)]:
-        f=w/name;size=f.stat().st_size;spans=w/(name+'.tsv');spans.write_text(f'0 {size} 1048576\\n')
+        f=w/name;size=f.stat().st_size;spans=w/(name+'.tsv');spans.write_text(f'0 {size} 1048576\n')
         def take(exe,n):return list(map(int,get(w/exe,'capstone','0',str(n),f,spans,str(bits)).split()))
         n=1
         while True:
