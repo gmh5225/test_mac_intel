@@ -41,7 +41,7 @@ try:
         if label=='candidate':
             cfg=project/'CMakeLists.txt';cm=cfg.read_text();a='add_subdirectory(third_party/capstone)'
             assert cm.count(a)==1
-            cfg.write_text(cm.replace(a,'set(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT ON)\\n'+a))
+            cfg.write_text(cm.replace(a,'set(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT ON)\n'+a))
             run('cmake','-S',project,'-B',build)
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
