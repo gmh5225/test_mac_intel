@@ -1,7 +1,7 @@
-name: Verify dedicated MIPS and PowerPC alias rows with portable binary hashing
+name: Measure one indexed PowerPC opcode for public IDs and detail in real workloads
 on:
   push:
-    branches: [codex/mips-powerpc-alias-portable-measurement]
+    branches: [codex/powerpc-indexed-public-mapping]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: portable-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: ppc-detail-map-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
