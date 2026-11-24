@@ -59,7 +59,11 @@ try:
         args=(['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm'])
         run('clang',*args,'-o',w/(label+'.library'))
         if label=='candidate':
-            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert set(affected)=={'X86RegisterFallback32.c.o','X86MemoryFallback32.c.o'},affected
+            assert set(objects[label])==set(objects['base'])
+            affected=sorted(k for k,h in objects[label].items() if h!=objects['base'][k])
+            selected=sys.platform=='darwin'
+            expected={'cs.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o','X86DisassemblerDecoder.c.o'} if selected else set()
+            assert set(affected)==expected,affected
             save('affected',dict(count=len(objects[label]),changed=affected))
     shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')
@@ -67,6 +71,13 @@ try:
     if v.returncode:print(v.stderr[-3000:],flush=True)
     v.check_returncode();save('states',dict(stdout=v.stdout,iterations=2048,settings=v.stderr.count('case arch=')))
 
+    if not selected:
+        foreign_hash={k:sha(w/('foreign-'+k)) for k in ('base','candidate')}
+        assert images['base']==images['candidate'] and foreign_hash['base']==foreign_hash['candidate'],(images,foreign_hash)
+        assert v.stderr.count('case arch=')==464
+        save('identity',dict(images=images,foreign=foreign_hash,objects=len(objects['base']),settings=464,static_archive=True))
+        save('complete',dict(complete=True,source=q,neverd=dev,identical=True))
+        sys.exit(0)
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
