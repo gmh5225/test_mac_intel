@@ -21,7 +21,7 @@ jobs:
           $chosen = @($names | Where-Object { $_ -match 'Driver|WDF|IoTrace|Kernel|PnP|CodeIntegrity' })
           $scanned = @()
           $inaccessible = @()
-          $matches = @()
+          $templatesWithFields = @()
           foreach ($name in $chosen) {
             try {
               $p = Get-WinEvent -ListProvider $name -ErrorAction Stop
@@ -39,12 +39,12 @@ jobs:
               $joined = $fields -join ' '
               if ($joined -notmatch 'DriverObject|RegistryPath|DriverEntry|DriverStart|EntryPoint' -and
                   -not ($fields -contains 'X0' -and $fields -contains 'X1')) { continue }
-              $matches += [ordered]@{publisher=$name; id=$evt.Id; version=$evt.Version; fields=$fields}
+              $templatesWithFields += [ordered]@{publisher=$name; id=$evt.Id; version=$evt.Version; fields=$fields}
             }
           }
           if ($scanned.Count -eq 0) { throw 'No kernel or driver publisher was readable' }
           [ordered]@{machine=$arch; os_build=[Environment]::OSVersion.Version.Build;
-            installed_publishers=$names.Count; scanned=$scanned; unreadable=$inaccessible; matches=$matches
+            installed_publishers=$names.Count; scanned=$scanned; unreadable=$inaccessible; matches=$templatesWithFields
           } | ConvertTo-Json -Depth 8 | Set-Content native-driver-event-fields.json -Encoding utf8
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
