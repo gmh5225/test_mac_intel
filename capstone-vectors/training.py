@@ -46,6 +46,8 @@ def build_profile(r,w,project,build,lib,ice_lib,flags,base,save):
         if log.returncode: print(log.stdout[-4500:],flush=True)
         log.check_returncode()
         return warnings
+    from partition import preserve,report_inlining,assemble
+    parts=preserve(base,build,w)
     link_foreign('base')
     gen_warnings=config('-fprofile-generate')
     sp.run(['clang++',w/'driver.o',lib,ice_lib,*flags,'-fprofile-generate','-o',w/'training-x86'],check=True)
@@ -72,6 +74,13 @@ def build_profile(r,w,project,build,lib,ice_lib,flags,base,save):
     assert profile.stat().st_size>0 and 'IR' in info and 'Total functions' in info,info
     digest=hashlib.sha256(profile.read_bytes()).hexdigest()
     use_warnings=config('-fprofile-use='+str(profile)+' -Werror=profile-instr-out-of-date')
+    link_foreign('full')
+    sp.run(['clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'full'],check=True)
+    if sys.platform.startswith('linux'):
+        try:report_inlining(build,w,profile,save)
+        except (ValueError,AssertionError,sp.CalledProcessError) as why:
+            save('inline-diagnostic',dict(error=str(why)))
+    assemble(parts,build,lib,save)
     link_foreign('candidate')
     shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
     save('profile',dict(training_runs=len(seen),profile_bytes=profile.stat().st_size,
@@ -86,7 +95,7 @@ def holdouts(rows,w,save):
         for mode in range(3):
             def take(label,n):
                 return list(map(int,sp.check_output([w/('foreign-'+label),row['arch'],w/(row['name']+'.text'),str(mode),str(n)]).split()))
-            labels=['base','candidate','duplicate']
+            labels=['base','candidate','duplicate','full']
             n=max(1,math.ceil(18e6/max(take('base',1)[0],1)))
             expected=take('base',n)[2:];assert expected[0]>0
             rng=random.Random(row['name']+'/'+str(mode));cycles=[]

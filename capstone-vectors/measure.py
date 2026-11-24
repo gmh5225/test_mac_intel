@@ -45,7 +45,7 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
-    assert images['base']['exe']!=images['candidate']['exe']
+    assert len({images['base']['exe'],images['candidate']['exe'],sha(w/'full')})==3
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
@@ -74,13 +74,13 @@ try:
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
+            exe=engine if engine in ('candidate','duplicate','full')else'base'
             return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
+            labels=['base','duplicate','candidate','iced','full']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
+            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']==expected['full']
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
@@ -92,7 +92,7 @@ try:
             summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
-    for label in ('base','candidate'):
+    for label in ('base','candidate','full'):
         symbols=get('nm',w/label)
         assert '__llvm_profile_write_file' not in symbols and '__llvm_profile_register_function' not in symbols
     holdouts(heldout,w,save)
