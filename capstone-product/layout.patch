@@ -11,6 +11,23 @@ index bd513f27..6c808481 100644
  endif()
  
  if(capstone_enabled_architectures STREQUAL "XCORE")
+diff --git a/MCInst.c b/MCInst.c
+index cda912d1..36bbc2bd 100644
+--- a/MCInst.c
++++ b/MCInst.c
+@@ -206,3 +206,12 @@ void MCInst_setSoftFail(MCInst *MI)
+ 	assert(MI && MI->flat_insn);
+ 	MI->flat_insn->illegal = true;
+ }
++
++#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
++/* The mixed decoder calls this for ARM, AArch64, PowerPC and RISC-V.
++ * Each decoder constructs its active operands before reading them. */
++CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
++{
++	MCInst_InitStorage(inst, arch, false);
++}
++#endif
 diff --git a/Makefile b/Makefile
 index 2720955e..18653e18 100644
 --- a/Makefile
@@ -25,26 +42,30 @@ index 2720955e..18653e18 100644
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
 diff --git a/cs.c b/cs.c
-index 0af815c7..eb5c53f1 100644
+index 0af815c7..ad07e6c8 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1117,6 +1117,11 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		MCInst_InitX86(&mci);
- 	else
- #endif
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+	/* ARM, AArch64, MIPS, PowerPC and RISC-V construct each MCOperand
-+	 * before reading it. Operand zero and common defaults stay initialized. */
-+	MCInst_InitStorage(&mci, handle->arch, false);
-+#else
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
- 		/* MIPS constructs each MCOperand before reading it. The public
-@@ -1161,6 +1166,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	 * performs better on some full-detail workloads with the shared
+ 	 * initializer below. */
  	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
++#elif defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
++	MCInst_InitConstructedOperands(&mci, handle->arch);
  #else
  	MCInst_Init(&mci, handle->arch);
-+#endif
  #endif
- 	mci.csh = handle;
- 	mci.address = insn->address;
+diff --git a/cs_priv.h b/cs_priv.h
+index 84e1c748..19ecedba 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -30,6 +30,10 @@
+ 
+ #include "MCInst.h"
+ #include "SStream.h"
++
++#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
++CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
++#endif
+ #ifdef CAPSTONE_X86_SCAN_ADAPTER
+ #include "arch/X86/X86ScanAdapter.h"
+ #endif

@@ -1,7 +1,7 @@
-name: Qualify native six-backend operand construction in complete NeverD binaries
+name: Test the mixed operand initializer outside decoder sections in NeverD
 on:
   push:
-    branches: [codex/real-six-backend-construction]
+    branches: [codex/isolated-mixed-operand-initializer]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: constructed-storage-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: isolated-operand-storage-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
