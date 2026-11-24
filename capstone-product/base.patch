@@ -1,284 +1,155 @@
-diff --git a/arch/XCore/XCoreDisassembler.c b/arch/XCore/XCoreDisassembler.c
-index 579a1dc5..bbc57122 100644
---- a/arch/XCore/XCoreDisassembler.c
-+++ b/arch/XCore/XCoreDisassembler.c
-@@ -767,6 +767,46 @@ static DecodeStatus DecodeL4RSrcDstSrcDstInstruction(MCInst *Inst,
- 	return S;
+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
+index b774119d..a137144b 100644
+--- a/arch/X86/X86MappingInsnOp.inc
++++ b/arch/X86/X86MappingInsnOp.inc
+@@ -5105,7 +5105,7 @@
+ 
+ {	/* X86_KMOVBmk, X86_INS_KMOVB: kmovb */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVBrk, X86_INS_KMOVB: kmovb */
+@@ -5130,7 +5130,7 @@
+ 
+ {	/* X86_KMOVDmk, X86_INS_KMOVD: kmovd */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVDrk, X86_INS_KMOVD: kmovd */
+@@ -5155,7 +5155,7 @@
+ 
+ {	/* X86_KMOVQmk, X86_INS_KMOVQ: kmovq */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVQrk, X86_INS_KMOVQ: kmovq */
+@@ -5180,7 +5180,7 @@
+ 
+ {	/* X86_KMOVWmk, X86_INS_KMOVW: kmovw */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVWrk, X86_INS_KMOVW: kmovw */
+diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
+index c414d6d3..9cf2eb66 100644
+--- a/suite/auto-sync/README.md
++++ b/suite/auto-sync/README.md
+@@ -149,6 +149,9 @@ If regenerated `VMOVSS` or `VMOVSD` metadata loses operand accesses or AVX512
+ group membership, apply `suite/auto-sync/inc_patches/X86/04_scalar_vector_access.patch`,
+ regenerate the mapping counts with `python3 suite/synctools/x86_mapping_counts.py`,
+ and run `unit_x86_scalar_vector_access`.
++The VEX `KMOVB/W/D/Q` memory-store rows are maintained by
++`suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch` and covered by
++`unit_x86_kmask_access`.
+ 
+ After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
+ `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
+diff --git a/suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch b/suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch
+new file mode 100644
+index 00000000..1c119e58
+--- /dev/null
++++ b/suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch
+@@ -0,0 +1,31 @@
++diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
++--- a/arch/X86/X86MappingInsnOp.inc
+++++ b/arch/X86/X86MappingInsnOp.inc
++@@ -5106,4 +5106,4 @@
++ {	/* X86_KMOVBmk, X86_INS_KMOVB: kmovb */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
++@@ -5131,4 +5131,4 @@
++ {	/* X86_KMOVDmk, X86_INS_KMOVD: kmovd */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
++@@ -5156,4 +5156,4 @@
++ {	/* X86_KMOVQmk, X86_INS_KMOVQ: kmovq */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
++@@ -5181,4 +5181,4 @@
++ {	/* X86_KMOVWmk, X86_INS_KMOVW: kmovw */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
+diff --git a/tests/unit/x86_kmask_access.c b/tests/unit/x86_kmask_access.c
+index 13eeb649..43745a79 100644
+--- a/tests/unit/x86_kmask_access.c
++++ b/tests/unit/x86_kmask_access.c
+@@ -148,6 +148,51 @@ static bool test_case(csh handle, const kmask_case *test, size_t case_index,
+ 	return success;
  }
  
-+#ifdef CAPSTONE_XCORE_ONLY
-+/* Indexed by bits 15:9 of the little-endian instruction. Each nonzero
-+ * entry has the same valid short opcode for all 512 operand encodings.
-+ * The xcore_scan unit checks every halfword against the full decoder. */
-+const uint16_t XCore_shortOpcodes[128] = {
-+	XCore_STW_2rus, XCore_STW_2rus, XCore_STW_2rus, 0,
-+	XCore_LDW_2rus, XCore_LDW_2rus, XCore_LDW_2rus, 0,
-+	XCore_ADD_3r, XCore_ADD_3r, XCore_ADD_3r, 0,
-+	XCore_SUB_3r, XCore_SUB_3r, XCore_SUB_3r, 0,
-+	XCore_SHL_3r, XCore_SHL_3r, XCore_SHL_3r, 0,
-+	XCore_SHR_3r, XCore_SHR_3r, XCore_SHR_3r, 0,
-+	XCore_EQ_3r, XCore_EQ_3r, XCore_EQ_3r, 0,
-+	XCore_AND_3r, XCore_AND_3r, XCore_AND_3r, 0,
-+	XCore_OR_3r, XCore_OR_3r, XCore_OR_3r, 0,
-+	XCore_LDW_3r, XCore_LDW_3r, XCore_LDW_3r, 0,
-+	XCore_STWDP_ru6, XCore_STWDP_ru6, XCore_STWSP_ru6, XCore_STWSP_ru6,
-+	XCore_LDWDP_ru6, XCore_LDWDP_ru6, XCore_LDWSP_ru6, XCore_LDWSP_ru6,
-+	XCore_LDAWDP_ru6, XCore_LDAWDP_ru6, XCore_LDAWSP_ru6, XCore_LDAWSP_ru6,
-+	XCore_LDC_ru6, XCore_LDC_ru6, XCore_LDWCP_ru6, XCore_LDWCP_ru6,
-+	XCore_BRFT_ru6, 0, XCore_BRBT_ru6, 0,
-+	XCore_BRFF_ru6, 0, XCore_BRBF_ru6, 0,
-+	XCore_LD16S_3r, XCore_LD16S_3r, XCore_LD16S_3r, 0,
-+	XCore_LD8U_3r, XCore_LD8U_3r, XCore_LD8U_3r, 0,
-+	XCore_ADD_2rus, XCore_ADD_2rus, XCore_ADD_2rus, 0,
-+	XCore_SUB_2rus, XCore_SUB_2rus, XCore_SUB_2rus, 0,
-+	XCore_SHL_2rus, XCore_SHL_2rus, XCore_SHL_2rus, 0,
-+	XCore_SHR_2rus, XCore_SHR_2rus, XCore_SHR_2rus, 0,
-+	XCore_EQ_2rus, XCore_EQ_2rus, XCore_EQ_2rus, 0,
-+	XCore_TSETR_3r, XCore_TSETR_3r, XCore_TSETR_3r, 0,
-+	XCore_LSS_3r, XCore_LSS_3r, XCore_LSS_3r, 0,
-+	XCore_LSU_3r, XCore_LSU_3r, XCore_LSU_3r, 0,
-+	XCore_BLRF_u10, XCore_BLRF_u10, XCore_BLRB_u10, XCore_BLRB_u10,
-+	XCore_LDAPF_u10, XCore_LDAPF_u10, XCore_LDAPB_u10, XCore_LDAPB_u10,
-+	XCore_BLACP_u10, XCore_BLACP_u10, XCore_LDWCP_u10, XCore_LDWCP_u10,
-+	XCore_SETC_ru6, 0, 0, 0,
-+	0, 0, 0, 0,
-+	0, 0, 0, 0,
-+};
-+#endif
-+
- #define GET_SUBTARGETINFO_ENUM
- #include "XCoreGenInstrInfo.inc"
- bool XCore_getInstruction(csh ud, const uint8_t *code, size_t code_len,
-diff --git a/arch/XCore/XCoreDisassembler.h b/arch/XCore/XCoreDisassembler.h
-index 0854a89d..74bfe907 100644
---- a/arch/XCore/XCoreDisassembler.h
-+++ b/arch/XCore/XCoreDisassembler.h
-@@ -8,6 +8,11 @@
- #include "../../MCRegisterInfo.h"
- #include "../../MCInst.h"
- 
-+#ifdef CAPSTONE_XCORE_ONLY
-+#include "../../cs_priv.h"
-+extern CAPSTONE_INTERNAL const uint16_t XCore_shortOpcodes[128];
-+#endif
-+
- void XCore_init(MCRegisterInfo *MRI);
- 
- bool XCore_getInstruction(csh ud, const uint8_t *code, size_t code_len,
-diff --git a/arch/XCore/XCoreInstPrinter.c b/arch/XCore/XCoreInstPrinter.c
-index 13bad59f..30f60aff 100644
---- a/arch/XCore/XCoreInstPrinter.c
-+++ b/arch/XCore/XCoreInstPrinter.c
-@@ -28,6 +28,9 @@
- #include "../../MathExtras.h"
- #include "XCoreMapping.h"
- 
-+#define GET_INSTRINFO_ENUM
-+#include "XCoreGenInstrInfo.inc"
-+
- static const char *getRegisterName(unsigned RegNo);
- 
- static void set_mem_access(MCInst *MI, bool status, int reg)
-@@ -148,7 +151,25 @@ static void _printOperand(MCInst *MI, MCOperand *MO, SStream *O)
- 	} else if (MCOperand_isImm(MO)) {
- 		int32_t Imm = (int32_t)MCOperand_getImm(MO);
- 
--		printInt32(O, Imm);
-+		/* The selector is a register number in the other thread. */
-+		unsigned int opcode = MCInst_getOpcode(MI);
-+		if (opcode == XCore_TSETR_3r || opcode == XCore_TSETMR_2r) {
-+			if (O->unsigned_num)
-+				SStream_concat(O, "%" PRIu32, (uint32_t)Imm);
-+			else
-+				SStream_concat(O, "%" PRId32, Imm);
-+		} else {
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+			/* The stream's integer writer skips printf for the stock
-+			 * formatter. Keep 32-bit printf formats for callbacks. */
-+			if (cs_vsnprintf == cs_default_vsnprintf)
-+				printInt64(O, O->unsigned_num ? (int64_t)(uint32_t)Imm : Imm);
-+			else
-+#endif
-+				printInt32(O, Imm);
-+		}
- 
- 		if (MI->csh->detail_opt) {
- 			if (MI->csh->doing_mem) {
-diff --git a/arch/XCore/XCoreMapping.c b/arch/XCore/XCoreMapping.c
-index 2a5158a5..013222d7 100644
---- a/arch/XCore/XCoreMapping.c
-+++ b/arch/XCore/XCoreMapping.c
-@@ -84,29 +84,31 @@ const unsigned int XCore_insn_count = ARR_SIZE(insns);
- // given internal insn id, return public instruction info
- void XCore_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- {
--	insn_map const *insn_map = NULL;
-+	const unsigned short opcode = (unsigned short)id;
- 
--	if ((insn_map = lookup_insn_map(h, id))) {
--		insn->id = insn_map->mapid;
-+	/* The handle's opcode index addresses this backend's immutable rows. */
-+	if (opcode <= insns[ARR_SIZE(insns) - 1].id) {
-+		const insn_map *row = &insns[h->insn_cache[opcode]];
-+		insn->id = row->mapid;
- 
- 		if (h->detail_opt) {
- #ifndef CAPSTONE_DIET
--			memcpy(insn->detail->regs_read, insn_map->regs_use,
--			       sizeof(insn_map->regs_use));
-+			memcpy(insn->detail->regs_read, row->regs_use,
-+			       sizeof(row->regs_use));
- 			insn->detail->regs_read_count =
--				(uint8_t)count_positive(insn_map->regs_use);
-+				(uint8_t)count_positive(row->regs_use);
- 
--			memcpy(insn->detail->regs_write, insn_map->regs_mod,
--			       sizeof(insn_map->regs_mod));
-+			memcpy(insn->detail->regs_write, row->regs_mod,
-+			       sizeof(row->regs_mod));
- 			insn->detail->regs_write_count =
--				(uint8_t)count_positive(insn_map->regs_mod);
-+				(uint8_t)count_positive(row->regs_mod);
- 
--			memcpy(insn->detail->groups, insn_map->groups,
--			       sizeof(insn_map->groups));
-+			memcpy(insn->detail->groups, row->groups,
-+			       sizeof(row->groups));
- 			insn->detail->groups_count =
--				(uint8_t)count_positive8(insn_map->groups);
-+				(uint8_t)count_positive8(row->groups);
- 
--			if (insn_map->branch || insn_map->indirect_branch) {
-+			if (row->branch || row->indirect_branch) {
- 				// this insn also belongs to JUMP group. add JUMP group
- 				insn->detail
- 					->groups[insn->detail->groups_count] =
-diff --git a/cs.c b/cs.c
-index 696e8d70..333e7de2 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1137,9 +1137,21 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	/* These decoders construct each operand before their built-in
- 	 * printer reads it. Other callbacks retain the full initialization. */
- 	if (handle->disasm == CS_PRIVATE_DECODER &&
--	    handle->printer == CS_PRIVATE_PRINTER && !handle->post_printer)
-+	    handle->printer == CS_PRIVATE_PRINTER && !handle->post_printer) {
-+#ifdef CAPSTONE_XCORE_ONLY
-+		if (handle->no_text && !handle->detail_opt && !insn->detail &&
-+		    size >= 2) {
-+			const unsigned opcode = XCore_shortOpcodes[code[1] >> 1];
-+			if (opcode) {
-+				*insn_size = insn->size = 2;
-+				map_insn_id(handle, insn, opcode);
-+				fill_insn_without_text(insn, 0, code, true);
-+				return true;
-+			}
-+		}
-+#endif
- 		MCInst_InitStorage(&mci, CS_PRIVATE_ARCH, false);
--	else
-+	} else
- 		MCInst_Init(&mci, handle->arch);
- #elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
- 	(defined(__clang__) || (defined(__GNUC__) && defined(__aarch64__)))
-diff --git a/tests/details/xcore.yaml b/tests/details/xcore.yaml
-index b2bd5030..2bbe6e48 100644
---- a/tests/details/xcore.yaml
-+++ b/tests/details/xcore.yaml
-@@ -183,3 +183,16 @@ test_cases:
-                 mem_base: cp
-                 mem_disp: 9
-                 mem_direct: 1
-+
-+  -
-+    input:
-+      bytes: [ 0xf8, 0x1e, 0xfc, 0x1e, 0xa0, 0xb8, 0xb0, 0xb8 ]
-+      arch: "xcore"
-+      options: [ CS_OPT_DETAIL ]
-+      address: 0x0
-+    expected:
-+      insns:
-+        - asm_text: "tsetmr r10, r4"
-+        - asm_text: "tsetmr r11, r4"
-+        - asm_text: "set t[r0]:r10, r0"
-+        - asm_text: "set t[r0]:r11, r0"
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 8b413445..735eaf83 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -192,6 +192,10 @@ if(CAPSTONE_RISCV_SUPPORT AND Python3_Interpreter_FOUND)
-     add_test(NAME unit_alias_pattern_rows_generator
-         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_pattern_rows.py" --check)
- endif()
-+if(CAPSTONE_XCORE_SUPPORT)
-+    list(APPEND UNIT_TEST_SOURCES xcore_scan.c)
-+endif()
-+
- if(CAPSTONE_RISCV_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES riscv_mapping_index.c riscv_scan_options.c)
-     list(APPEND UNIT_TEST_SOURCES riscv_instruction_groups.c)
-diff --git a/tests/unit/xcore_scan.c b/tests/unit/xcore_scan.c
-new file mode 100644
-index 00000000..46937d8d
---- /dev/null
-+++ b/tests/unit/xcore_scan.c
-@@ -0,0 +1,57 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include <capstone/capstone.h>
-+#include <stdio.h>
-+#include <string.h>
-+
-+static bool compare_halfwords(csh scan, cs_insn *a, csh full, cs_insn *b)
++static bool test_memory_moves(csh handle, cs_opt_value syntax)
 +{
-+	for (uint32_t word = 0; word <= UINT16_MAX; ++word) {
-+		const uint8_t bytes[] = { (uint8_t)word, (uint8_t)(word >> 8),
-+					  0x49, 0x7f };
-+		/* Two bytes check standalone encodings and truncated long forms.
-+		 * Four bytes also check the priority of a short instruction. */
-+		for (size_t length = 2; length <= 4; length += 2) {
-+			const uint8_t *pa = bytes, *pb = bytes;
-+			size_t na = length, nb = length;
-+			uint64_t pc = 0x10000, ip = pc;
-+			bool accepted = cs_disasm_iter(scan, &pa, &na, &pc, a);
-+			bool reference = cs_disasm_iter(full, &pb, &nb, &ip, b);
-+			if (accepted == reference && pa == pb && na == nb &&
-+			    pc == ip && (!accepted ||
-+				(a->id == b->id && a->size == b->size &&
-+				 a->address == b->address && a->illegal == b->illegal &&
-+				 a->is_alias == b->is_alias && !a->mnemonic[0] &&
-+				 !a->op_str[0] && !memcmp(a->bytes, b->bytes, a->size))))
-+				continue;
-+			fprintf(stderr, "word 0x%04x, %zu bytes\n", (unsigned)word, length);
-+			return false;
++	static const struct {
++		uint8_t vex;
++		uint8_t size;
++		x86_insn id;
++	} forms[] = { { 0x79, 1, X86_INS_KMOVB },
++		      { 0x78, 2, X86_INS_KMOVW },
++		      { 0xf9, 4, X86_INS_KMOVD },
++		      { 0xf8, 8, X86_INS_KMOVQ } };
++	for (size_t i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i) {
++		for (unsigned store = 0; store < 2; ++store) {
++			/* Move between k2 and memory at [rbx]. */
++			const uint8_t code[] = { 0xc4, 0xe1, forms[i].vex,
++						 (uint8_t)(0x90 + store),
++						 0x13 };
++			cs_insn *insn = NULL;
++			if (!check(cs_disasm(handle, code, sizeof(code), 0, 1,
++					     &insn) == 1,
++				   "decode mask memory move", i, syntax))
++				return false;
++			const cs_x86 *x = &insn->detail->x86;
++			const unsigned mem_index =
++				syntax == CS_OPT_SYNTAX_ATT ? store : !store;
++			const cs_x86_op *mem = &x->operands[mem_index];
++			const cs_x86_op *reg = &x->operands[1 - mem_index];
++			bool ok = check(
++				insn->id == forms[i].id && x->op_count == 2 &&
++					mem->type == X86_OP_MEM &&
++					mem->size == forms[i].size &&
++					mem->access == (store ? CS_AC_WRITE :
++								CS_AC_READ) &&
++					reg->type == X86_OP_REG &&
++					reg->reg == X86_REG_K2 &&
++					reg->access == (store ? CS_AC_READ :
++								CS_AC_WRITE),
++				"mask memory move access", i, syntax);
++			cs_free(insn, 1);
++			if (!ok)
++				return false;
 +		}
 +	}
 +	return true;
 +}
 +
-+int main(void)
-+{
-+	csh scan = 0, full = 0;
-+	cs_insn *a = NULL, *b = NULL;
-+	bool ok = false;
-+	if (cs_open(CS_ARCH_XCORE, CS_MODE_LITTLE_ENDIAN, &scan) ||
-+	    cs_open(CS_ARCH_XCORE, CS_MODE_LITTLE_ENDIAN, &full) ||
-+	    cs_option(scan, CS_OPT_TEXT, CS_OPT_OFF))
-+		goto done;
-+	a = cs_malloc(scan);
-+	b = cs_malloc(full);
-+	ok = a && b && compare_halfwords(scan, a, full, b);
-+done:
-+	if (a)
-+		cs_free(a, 1);
-+	if (b)
-+		cs_free(b, 1);
-+	if (scan)
-+		cs_close(&scan);
-+	if (full)
-+		cs_close(&full);
-+	return ok ? 0 : 1;
-+}
+ int main(void)
+ {
+ 	static const kmask_case test_cases[] = {
+@@ -267,6 +312,7 @@ int main(void)
+ 		for (size_t i = 0;
+ 		     i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
+ 			success &= test_case(handle, &test_cases[i], i, syntax);
++		success &= test_memory_moves(handle, syntax);
+ 	}
+ 
+ 	cs_close(&handle);

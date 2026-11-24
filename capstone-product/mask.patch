@@ -1,0 +1,22 @@
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..8177be82 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12847,11 +12847,15 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 			set_mask_register_operand_size(x86, mask_operand_size);
+ 		else
+ 			repair_vector_mask_sizes(x86, mnem, insn->id);
++		/* K-register operations share width and access repair. The
++		 * vector, x87 and rotate repairs apply to other instruction IDs. */
++		if (insn->id >= X86_INS_KADDB && insn->id <= X86_INS_KXORW) {
++			repair_kmask_access(handle, insn);
++			return;
++		}
+ 		repair_vector_mask_conversion_access(x86, insn->id);
+ 	}
+ 	repair_vector_narrow_access(x86, insn->id);
+-	if (has_mask)
+-		repair_kmask_access(handle, insn);
+ 	if (memory)
+ 		repair_x87_environment_detail(handle, insn);
+ 	if (has_mask)

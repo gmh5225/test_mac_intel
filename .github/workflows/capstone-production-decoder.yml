@@ -1,7 +1,7 @@
-name: Measure real NeverD branch formatting and vector memory on source-built Arm64 products
+name: Verify real NeverD mask details and time the source-built decoder
 on:
   push:
-    branches: [codex/arm64-product-formats-and-scans]
+    branches: [codex/mask-detail-source-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: cc8b85befc76880ec626411ecef44c55706a0f1e
+          ref: a91bbc959a6221577742d3f109c03810a8463cb9
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "cc8b85befc76880ec626411ecef44c55706a0f1e"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2"
+          test "$(git rev-parse HEAD)" = "a91bbc959a6221577742d3f109c03810a8463cb9"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "d3dcfa80afcb4d0786308a2938659998c54a1453"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
-          git -C third_party/capstone checkout --detach 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
+          git -C third_party/capstone fetch --depth=1 origin d3dcfa80afcb4d0786308a2938659998c54a1453
+          git -C third_party/capstone checkout --detach d3dcfa80afcb4d0786308a2938659998c54a1453
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm64-text-and-scan-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: mask-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
