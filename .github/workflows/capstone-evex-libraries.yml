@@ -1,7 +1,7 @@
-name: Measure byte-pair immediate output against Capstone and iced on real x86 code
+name: Separate hexadecimal conversion time from changes to the linked program
 on:
   push:
-    branches: [codex/unsigned-immediates-real-isa]
+    branches: [codex/immediate-format-same-image]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: immediate-numbers-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: immediate-single-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
