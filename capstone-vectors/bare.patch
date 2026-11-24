@@ -1,38 +1,34 @@
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..18fed986 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -31,6 +31,33 @@ static void writeRelativeHex(char *out, uint64_t value)
- 	memcpy(out + 2, digits + CountLeadingZeros_64(value) / 4, 16);
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..cfd22a89 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -188,6 +188,29 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
  }
- #define X86_FIXED_RELATIVE_HEX writeRelativeHex
-+#elif defined(X86_FIXED_OUTPUT) && defined(__aarch64__) && \
-+	defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
-+	!defined(__KERNEL__) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE)
+ 
++#if defined(__aarch64__) && defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
++	!defined(__KERNEL__) && !defined(_KERNEL_MODE)
 +#include <arm_neon.h>
 +#include "../../MathExtras.h"
 +
-+static void writeRelativeHex(char *out, uint64_t value)
++/* The 32-bit iterator wraps branch targets before formatting them. Expand
++ * its eight hex digits in print order and shift away the leading zeroes. */
++static void writeRelativeHex32(char *out, uint32_t value)
 +{
-+	static const uint8_t positions[16] = {
-+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-+	};
-+	const uint8x8_t bytes = vrev64_u8(vcreate_u8(value));
-+	const uint8x16_t both = vcombine_u8(bytes, bytes);
-+	const uint8x16_t nibbles = vandq_u8(
-+		vzip1q_u8(vshrq_n_u8(both, 4), both), vdupq_n_u8(15));
-+	const uint8x16_t digits = vqtbl1q_u8(
-+		vld1q_u8((const uint8_t *)"0123456789abcdef"), nibbles);
-+	/* TBL clears lanes beyond digit 15, including the string terminator
-+	 * for short targets. A full-width target uses the cleared op_str tail. */
-+	const unsigned leading = CountLeadingZeros_64(value) / 4;
-+	const uint8x16_t indices =
-+		vaddq_u8(vld1q_u8(positions), vdupq_n_u8((uint8_t)leading));
++	const uint8x8_t bytes = vcreate_u8(__builtin_bswap32(value));
++	const uint8x8_t nibbles = vand_u8(vzip1_u8(vshr_n_u8(bytes, 4), bytes),
++				       vdup_n_u8(15));
++	const uint8x8_t chars =
++		vqtbl1_u8(vld1q_u8((const uint8_t *)"0123456789abcdef"), nibbles);
++	const unsigned leading = CountLeadingZeros_32(value) / 4;
++	const uint64_t digits =
++		vget_lane_u64(vreinterpret_u64_u8(chars), 0) >> (leading * 8);
 +	memcpy(out, "0x", 2);
-+	vst1q_u8((uint8_t *)out + 2, vqtbl1q_u8(digits, indices));
++	memcpy(out + 2, &digits, sizeof(digits));
 +}
-+#define X86_FIXED_RELATIVE_HEX writeRelativeHex
- #endif
- 
- #ifdef X86_MEMORY32_OUTPUT
++#define X86_FIXED_RELATIVE_HEX writeRelativeHex32
++#endif
++
+ #define X86_FIXED_OUTPUT tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32

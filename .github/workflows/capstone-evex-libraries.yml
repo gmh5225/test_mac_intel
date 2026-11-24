@@ -1,7 +1,7 @@
-name: Measure matched native AArch64 Linux and macOS branch formatting profiles
+name: Measure wrapped i386 target digits in standalone and NeverD builds on native macOS and Linux Arm64
 on:
   push:
-    branches: [codex/arm64-native-relative-branches]
+    branches: [codex/arm64-wrapped-i386-targets]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6de392819bbc0d468ad7c30531271823416f655e
+          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 2eb5cf73722a3c2a4956d26815428d79c2b47d18
+          ref: 6dc251461e86243703d0a74ed5c581b428cd1596
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-arm64-relative-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wrapped-i386-targets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
