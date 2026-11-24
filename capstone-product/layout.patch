@@ -1,132 +1,135 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..9aaa065c 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -160,6 +160,11 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
-     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-+        add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
-+        set(capstone_storage_source MCInstStorage.c)
-+    endif()
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "XCORE")
-@@ -1056,7 +1061,7 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
- 
- ## targets
- add_library(capstone_build_settings INTERFACE)
--add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
-+add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${ALL_HEADERS})
- target_link_libraries(capstone PUBLIC capstone_build_settings)
- set_property(TARGET capstone PROPERTY C_STANDARD 99)
- target_include_directories(capstone_build_settings INTERFACE
-@@ -1089,23 +1094,23 @@ endif()
- 
- if(CAPSTONE_BUILD_STATIC_LIBS)
-     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
--    set(capstone_alias_patterns_tail)
-+    set(capstone_static_tail)
-     if(TARGET capstone_x86_iter32)
-         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
-             # Backends reference the alias parser indirectly. Keep its hot code
-             # ahead of the optional native readers even when all are linked.
--            # Keep the opcode rows after the native scanner when both are linked.
--            set(capstone_alias_patterns_tail
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-+            # Keep alias rows and the mixed operand initializer after the native readers.
-+            set(capstone_static_tail
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>")
-             set(capstone_static_objects
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
-                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
-         else()
-             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
-         endif()
--        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
-+        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
-     endif()
-     add_library(capstone_static STATIC ${capstone_static_objects})
-     # Use normal capstone name. Otherwise we get libcapstone_static.a
-diff --git a/MCInstStorage.c b/MCInstStorage.c
-new file mode 100644
-index 00000000..49e499f8
---- /dev/null
-+++ b/MCInstStorage.c
-@@ -0,0 +1,18 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include "cs_priv.h"
-+
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+/* The mixed decoder calls this for ARM, AArch64, PowerPC and RISC-V.
-+ * Each decoder constructs its active operands before reading them. */
-+#if defined(__ELF__)
-+__attribute__((section(".cs_mcinst_storage_text")))
-+#elif defined(__APPLE__)
-+__attribute__((section("__TEXT,__cs_mcinst")))
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..fb4079bf 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -68,14 +68,19 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++		if (size >= 2 && code[1] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const unsigned group = code[1] & 0x38;
+ 			const unsigned row =
+-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+-				2;
+-			if (writeCompare32(code, size, insn, insn_size,
+-					   &x86_simple_outputs[row],
+-					   x86_simple_registers))
++				x86_simple_plans[0][0][group | (opcode & 1)] >> 2;
++			if (group == 0x38) {
++				if (writeCompare32(code, size, insn, insn_size,
++						   &x86_simple_outputs[row],
++						   x86_simple_registers))
++					return true;
++			} else if (X86_writeAluImmediate32(
++					   code, size, insn, insn_size,
++					   &x86_simple_outputs[row], x86_simple_registers))
+ 				return true;
+ 		}
+ 		break;
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 11582041..6ac0d7ca 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -6,7 +6,11 @@
+ /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
+ #ifdef X86_MEMORY_IMMEDIATE
+ #include "X86UnsignedImmediate.h"
++#ifdef X86_ALU32_IMMEDIATE
++CAPSTONE_INTERNAL bool X86_MEMORY_IMMEDIATE(
++#else
+ static bool X86_MEMORY_IMMEDIATE(
 +#endif
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
-+{
-+	MCInst_InitStorage(inst, arch, false);
-+}
-+#endif
-diff --git a/Makefile b/Makefile
-index 2720955e..5d98f613 100644
---- a/Makefile
-+++ b/Makefile
-@@ -121,6 +121,9 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
- CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
-+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
-+	MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
-@@ -449,8 +452,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
- LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
- LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
- LIBOBJ += $(LIBOBJ_X86_NUMBERS)
--LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
--LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
-+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
-+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- LIBOBJ_SHARED := $(LIBOBJ)
- endif
-diff --git a/cs.c b/cs.c
-index 0af815c7..ad07e6c8 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	 * performs better on some full-detail workloads with the shared
- 	 * initializer below. */
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+#elif defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+	MCInst_InitConstructedOperands(&mci, handle->arch);
+ #elif defined(X86_SEGMENT_LEA32)
+ static bool X86_SEGMENT_LEA32(
+ #elif defined(X86_EXTEND64_MEMORY)
+@@ -45,7 +49,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-#ifdef X86_COMPARE_IMMEDIATE
++#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
+ 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
  #else
- 	MCInst_Init(&mci, handle->arch);
- #endif
-diff --git a/cs_priv.h b/cs_priv.h
-index 84e1c748..19ecedba 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -30,6 +30,10 @@
- 
- #include "MCInst.h"
- #include "SStream.h"
-+
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
+@@ -187,12 +191,18 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-#ifdef X86_COMPARE_IMMEDIATE
+-	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
++#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
++	/* Opcode 83 sign-extends its imm8. Logical operations print it as a
++	 * mask of the destination width. */
+ 	int64_t value = encoded;
+-	if (opcode == 0x83)
++	if (opcode == 0x83) {
+ 		value = (int8_t)encoded;
+-	else if (imm_size == 4 && row->ops[0].size == 8)
++#ifdef X86_ALU32_IMMEDIATE
++		const unsigned operation = (modrm >> 3) & 7;
++		if (operation == 1 || operation == 4 || operation == 6)
++			value = (uint32_t)value;
 +#endif
- #ifdef CAPSTONE_X86_SCAN_ADAPTER
- #include "arch/X86/X86ScanAdapter.h"
++	} else if (imm_size == 4 && row->ops[0].size == 8)
+ 		value = (int32_t)encoded;
+ 	memcpy(out, ", ", 2);
+ 	out += 2;
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index ee9b645b..7d9db022 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -36,5 +36,15 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 	}
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
++
++#define X86_MEMORY32_OUTPUT
++#define X86_MEMORY_IMMEDIATE X86_writeAluImmediate32
++#define X86_IMMEDIATE_WIDE 0
++#define X86_ALU32_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_ALU32_IMMEDIATE
++#undef X86_IMMEDIATE_WIDE
++#undef X86_MEMORY_IMMEDIATE
++#undef X86_MEMORY32_OUTPUT
  #endif
+ #endif
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..2d757368 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -60,6 +60,11 @@ enum X86SimpleForm {
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
++CAPSTONE_INTERNAL bool
++X86_writeAluImmediate32(const uint8_t *code, size_t size, cs_insn *insn,
++		      uint16_t *insn_size, const struct X86SimpleOutput *row,
++		      const struct X86SimpleRegister regs[4][16]);
++
+ CAPSTONE_INTERNAL bool
+ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 0c9329b4..7e3e8b69 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1021,6 +1021,16 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
+ 				    !compare(handles, b + !p,
+ 					     (mr + j) % (sizeof(b) - !p), v))
+ 					return false;
++				/* Exercise the memory forms with an imm8 and with
++				 * an imm8 sign-extended to the operand width. */
++				if (mode == CS_MODE_32 && mr < 0xc0) {
++					b[1] = 0x80;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++					b[1] = 0x83;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++				}
+ 			}
+ 		}
+ 	}
