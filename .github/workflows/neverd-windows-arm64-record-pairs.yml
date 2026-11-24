@@ -20,7 +20,12 @@ jobs:
           $kitRoot = Split-Path $kit
           $ver = Split-Path -Leaf $inc
           $env:NEVERD_TEST_SDK_LIBDIR = Join-Path $kitRoot "Lib\$ver\um\arm64"
-          $env:INCLUDE = @('um','shared','ucrt','winrt') | ForEach-Object { Join-Path $inc $_ } | Join-String -Separator ';'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = (& $vswhere -latest -products '*' -property installationPath | Select-Object -First 1)
+          $vc = (Get-ChildItem (Join-Path $vs 'VC\Tools\MSVC') -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'include\excpt.h') } | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1).FullName
+          if (!$vc) { throw "Visual C++ ARM64-compatible headers missing" }
+          $sdkHeaders = @('um','shared','ucrt','winrt') | ForEach-Object { Join-Path $inc $_ }
+          $env:INCLUDE = (@((Join-Path $vc 'include')) + $sdkHeaders) -join ';'
           $llvm = Join-Path $env:ProgramFiles 'LLVM\bin'
           if (Test-Path (Join-Path $llvm 'clang.exe')) { $env:Path = "$llvm;$env:Path" }
           python native-arm64-source-records/check.py native-record-output
