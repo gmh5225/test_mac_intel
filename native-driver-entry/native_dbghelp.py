@@ -125,3 +125,68 @@ def check_boolean_tag(engine, manifest, out, cache):
             observations.append(dict(route=route,opt=opt,observed=results,sha256=hashlib.sha256(dll.read_bytes()).hexdigest()))
     return dict(name=name,module=module,source="original Microsoft SDK declaration and import library", import_library_sha256=hashlib.sha256(imp.read_bytes()).hexdigest(),
                 expected=expected,observations=observations)
+
+def check_metadata_calendar(engine, manifest, out):
+    import ctypes
+    import hashlib
+    from pathlib import Path
+    import subprocess
+    import shutil
+    import re
+    path=Path(out);path.mkdir()
+    groups={"AccessibleWindowProcess","CLRMetaHostExports","CLRShimExports","CalendarExports",
+            "CatalogDefinitionExports","ConsolePrivateExports","SignerExports"}
+    providers={p["name"]:p["metadata"]["sdk_runtime_bridge"] for lib in manifest["libraries"]
+               for p in lib["providers"] if p["name"] in groups}
+    assert set(providers)==groups
+    names={}
+    for group,proof in providers.items():
+        exports=proof["runtime_exports"]
+        dll=ctypes.WinDLL(exports["module"])
+        names[group]={f:bool(getattr(dll,f)) for f in exports["names"]}
+        assert all(names[group].values())
+    assert sum(map(len,names.values()))==77
+    pr=providers["CalendarExports"]
+    api="GetCalendarSupportedDateRange"
+    source=path/"caller.c"
+    source.write_text('#include "'+Path(pr['source']).resolve().as_posix()+'"\n'
+        '__declspec(dllexport) BOOL InspectCalendar(CALID calendar, LPCALDATETIME lo, LPCALDATETIME hi) {\n'
+        '    return GetCalendarSupportedDateRange(calendar, lo, hi);\n}\n',encoding="utf-8")
+    link=shutil.which("lld-link");tool=shutil.which("llvm-dlltool");read=shutil.which("llvm-readobj")
+    assert link and tool and read
+    lib=path/"kernel32-test.lib";defs=path/"imports.def";defs.write_text("LIBRARY kernel32.dll\nEXPORTS\nGetCalendarSupportedDateRange\n")
+    subprocess.run([tool,"-m","arm64","-d",defs,"-l",lib],check=True)
+    def build(src,opt,dll):
+        obj=dll.with_suffix(".obj")
+        args=[*pr["arguments"],opt,"-fno-stack-protector","-fno-optimize-sibling-calls","-c",src,"-o",obj]
+        subprocess.run(args,check=True)
+        subprocess.run([link,"/dll","/noentry","/machine:arm64","/nodefaultlib","/export:InspectCalendar","/out:"+str(dll),obj,lib],check=True)
+        data=subprocess.check_output([read,"--coff-imports",dll],text=True)
+        assert [v.strip().lower() for v in re.findall(r"^  Name: (.*)$",data,re.M)]==["kernel32.dll"]
+        assert re.findall(r"^  Symbol: ([^ \r\n]+) \(",data,re.M)==[api]
+    class Date(ctypes.Structure):
+        _fields_=[(v,ctypes.c_uint32) for v in ("CalId","Era","Year","Month","Day","DayOfWeek","Hour","Minute","Second","Tick")]
+    assert ctypes.sizeof(Date)==40
+    def call(dll,func):
+        f=getattr(ctypes.WinDLL(str(dll)),func)
+        f.argtypes=[ctypes.c_uint32,ctypes.POINTER(Date),ctypes.POINTER(Date)];f.restype=ctypes.c_int32
+        cases=[]
+        for cid in (1,3,0):
+            lo,hi=Date(),Date()
+            ok=f(cid,ctypes.byref(lo),ctypes.byref(hi))
+            cases.append(dict(calendar=cid,result=ok,low=bytes(lo).hex(),high=bytes(hi).hex()))
+        return cases
+    expected=call("kernel32.dll",api)
+    assert expected[0]["result"] and expected[0]["low"]!=expected[0]["high"] and not expected[-1]["result"],expected
+    image=path/"original-probe.dll";build(source,"-O1",image)
+    observations=[]
+    for name in ("original","highc","llvmc"):
+        src=source
+        if name!="original":
+            src=path/(name+".c")
+            subprocess.run([engine,"decompile",image,"--func","InspectCalendar",*(["--llvm"] if name=="llvmc" else []),"-o",src],check=True)
+        for opt in ["-O0","-O2"]:
+            dll=path/(name+opt+".dll");build(src,opt,dll)
+            got=call(dll.resolve(),"InspectCalendar");assert got==expected,(name,opt,got,expected)
+            observations.append(dict(route=name,opt=opt,observed=got,sha256=hashlib.sha256(dll.read_bytes()).hexdigest()))
+    return dict(api=api,expected=expected,observations=observations,providers=names)

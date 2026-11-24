@@ -9,6 +9,7 @@ import struct
 import subprocess
 import sys
 
+from native_dbghelp import check_metadata_calendar
 from native_dbghelp import check_boolean_tag
 from native_dbghelp import check_legacy_module_base
 from native_record_input import check_record_input
@@ -156,6 +157,7 @@ def main():
                   catalog={lib["name"]: lib["sha256"] for lib in manifest["libraries"]},
                   linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}
                                        for r in rows])
+    report["metadata_calendar"] = check_metadata_calendar(args.engine, manifest, args.output / "metadata-calendar")
     report["sdk_boolean"] = check_boolean_tag(args.engine, manifest, args.output / "sdk-bool", args.cache)
     report["dbghelp_legacy"] = check_legacy_module_base(args.engine, manifest, args.output / "dbghelp-legacy")
     report["register_record"] = check_record_input(args.engine, manifest, args.output / "record-input")
