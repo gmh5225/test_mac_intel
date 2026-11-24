@@ -22,8 +22,8 @@ def pair(build,t,products,archive,save):
     begin=next(i for i,v in enumerate(args)if Path(v).name in ('clang++','clang++-18','c++') or Path(v).name.startswith('clang++-'))
     end=next((i for i in range(begin+1,len(args))if args[i]=='&&'),len(args))
     link=args[begin:end];pos=link.index('-o')+1
-    idx,=[i for i,v in enumerate(link)if v.endswith('.a') and (build/v).resolve()==archive.resolve()]
-    save('link-command',dict(argv=link,archive_argument=idx,output_argument=pos))
+    archive_arg,=[i for i,v in enumerate(link)if v.endswith('.a') and (build/v).resolve()==archive.resolve()]
+    save('link-command',dict(argv=link,archive_argument=archive_arg,output_argument=pos))
     for k,original in archives.items():
         directory=t/('match-'+k);directory.mkdir();obj=directory/MEMBER
         obj.write_bytes(sp.check_output(['ar','p',original,MEMBER]))
@@ -41,15 +41,15 @@ def pair(build,t,products,archive,save):
             relocations['preserved']=extend(obj,SECTION,size-len(body))
             # Compare the discarded experimental objcopy image to its input.
             with tmp.open('rb')as f:
-                e=ELFFile(f);idx=e.get_section_index(SECTION)
+                e=ELFFile(f);section_index=e.get_section_index(SECTION)
                 relocations['objcopy']={z.name:z.num_relocations()for z in e.iter_sections()
-                    if z['sh_type'] in ('SHT_RELA','SHT_REL') and z['sh_info']==idx}
+                    if z['sh_type'] in ('SHT_RELA','SHT_REL') and z['sh_info']==section_index}
             sp.run(['ar','rDs',new,obj],check=True)
         assert get('ar','t',new).splitlines()==names
         assert all(sp.check_output(['ar','p',original,n])==sp.check_output(['ar','p',new,n]) for n in names if n!=MEMBER)
         raw=directory/'raw'
         for archive_path,target in [(original,raw),(new,directory/'matched')]:
-            argv=list(link);argv[pos]=str(target);argv[idx]=str(archive_path)
+            argv=list(link);argv[pos]=str(target);argv[archive_arg]=str(archive_path)
             sp.run(argv,check=True,cwd=build)
         assert sha(raw)==sha(products[k]),('link replay changed executable',k)
         products['matched-'+k]=directory/'matched';before=read_sections(raw);after=read_sections(products['matched-'+k])
