@@ -1,0 +1,50 @@
+name: Verify microMIPS64 execution
+on:
+  push:
+    branches: [codex/micromips64-unicorn-model]
+    paths: ['.github/workflows/neverd-unicorn-micromips64.yml']
+permissions:
+  contents: read
+env:
+  UNICORN_REVISION: 5707f08444319743a30965bc3433343afff4c7eb
+jobs:
+  mips:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/unicorn
+          ref: ${{ env.UNICORN_REVISION }}
+          persist-credentials: false
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+      - name: Build MIPS-only Release targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$UNICORN_REVISION"
+          if [[ "$RUNNER_OS" == Windows ]]; then
+            export CC=cl CXX=cl
+          fi
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DUNICORN_ARCH=mips -DUNICORN_BUILD_TESTS=ON -DUNICORN_INSTALL=OFF
+          cmake --build build --parallel 4 --target test_mips test_mips_msa_integer \
+            test_mips_dsp_zero test_mips64_dsp_extract test_mips_scalar_fp
+      - name: Execute the MIPS suites
+        shell: bash
+        run: |
+          ctest --test-dir build --build-config Release -R '^test_mips' \
+            --no-tests=error --output-on-failure --output-junit mips-result.xml
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: unicorn-mips-${{ runner.os }}
+          path: build/mips-result.xml
+          if-no-files-found: warn
