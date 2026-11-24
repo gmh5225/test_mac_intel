@@ -70,7 +70,7 @@ try:
         regs=[v.split() for v in (out/('registers-'+variant+'.log')).read_text().splitlines()]
         assert len(regs)==12 and all(int(v[3])==int(v[4])==16 for v in regs)
         if variant!='base':
-            for unit in ('x86_simple_output','x86_reg_access'):
+            for unit in ('x86_simple_output','x86_reg_access','batch_detail_alloc'):
                 command(['clang','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',cs,'-I',cs/'include',cs/('tests/unit/'+unit+'.c'),archive,'-lm','-o',t/unit],'compile-'+unit+'-'+variant)
                 command([t/unit],'run-'+unit+'-'+variant)
             save('units-records-'+variant,dict(tree=actual,complete=True))
