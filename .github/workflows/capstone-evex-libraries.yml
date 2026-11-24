@@ -1,7 +1,7 @@
-name: Measure canonical x86 access rows in public and native detail readers
+name: Measure public and fixed x86 record readers on six real binaries
 on:
   push:
-    branches: [codex/canonical-operand-access-rows]
+    branches: [codex/fixed-readers-in-public-record]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-access-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-public-operand-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
