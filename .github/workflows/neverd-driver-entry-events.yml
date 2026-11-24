@@ -1,0 +1,53 @@
+name: Inspect published driver entry event fields on Windows ARM64
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths: ['.github/workflows/neverd-driver-entry-events.yml']
+permissions:
+  contents: read
+jobs:
+  manifests:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    steps:
+      - name: Read installed ETW event definitions for kernel and driver providers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $arch = [Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
+          if ($arch -ne 'Arm64') { throw "Unexpected process machine $arch" }
+          $names = @(& wevtutil.exe ep)
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to enumerate installed event publishers' }
+          $chosen = @($names | Where-Object { $_ -match 'Driver|WDF|IoTrace|Kernel|PnP|CodeIntegrity' })
+          $scanned = @()
+          $inaccessible = @()
+          $matches = @()
+          foreach ($name in $chosen) {
+            try {
+              $p = Get-WinEvent -ListProvider $name -ErrorAction Stop
+              $events = @($p.Events)
+            } catch {
+              $inaccessible += $name
+              continue
+            }
+            $scanned += [ordered]@{publisher=$name; definitions=$events.Count}
+            foreach ($evt in $events) {
+              $template = $evt.Template
+              if (-not $template) { continue }
+              $xml = [xml]$template
+              $fields = @($xml.SelectNodes("//*[local-name()='data' or local-name()='struct']") | ForEach-Object { $_.GetAttribute('name') })
+              $joined = $fields -join ' '
+              if ($joined -notmatch 'DriverObject|RegistryPath|DriverEntry|DriverStart|EntryPoint' -and
+                  -not ($fields -contains 'X0' -and $fields -contains 'X1')) { continue }
+              $matches += [ordered]@{publisher=$name; id=$evt.Id; version=$evt.Version; fields=$fields}
+            }
+          }
+          if ($scanned.Count -eq 0) { throw 'No kernel or driver publisher was readable' }
+          [ordered]@{machine=$arch; os_build=[Environment]::OSVersion.Version.Build;
+            installed_publishers=$names.Count; scanned=$scanned; unreadable=$inaccessible; matches=$matches
+          } | ConvertTo-Json -Depth 8 | Set-Content native-driver-event-fields.json -Encoding utf8
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: driver-event-fields
+          path: native-driver-event-fields.json
+          if-no-files-found: error
