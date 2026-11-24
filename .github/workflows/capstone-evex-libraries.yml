@@ -1,7 +1,7 @@
-name: Measure public and fixed x86 record readers on six real binaries
+name: Compare the late i386 memory writer with iced and published public records
 on:
   push:
-    branches: [codex/fixed-readers-in-public-record]
+    branches: [codex/late-i386-memory-iced-score]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-public-operand-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: late-i386-writer-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
