@@ -1,7 +1,7 @@
-name: Test late i386 indirect registers against the same fast-path semantics and measure zero-hit JPEG with symbol placement
+name: Measure late i386 admission with identical linked code and two placements per algorithm
 on:
   push:
-    branches: [codex/i386-indirect-register-placement]
+    branches: [codex/i386-common-image-register-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-indirect-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-fallback-single-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

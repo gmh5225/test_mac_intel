@@ -36,61 +36,45 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    images={}
-    maps=rd(r/'source.json')
-    assert maps['prefix']==q and maps['base']['commit']==q['parent']
-    layout={}
+    import shlex
+    row,=[x for x in rd(build/'compile_commands.json')if Path(x['file']).name=='X86RegisterFallback32.c']
+    argv=shlex.split(row['command']);source=Path(row['file'])
+    def compile_one(name):
+        args=argv.copy();args[args.index('-o')+1]=str(w/(name+'.o'))
+        args+=['-DX86_decodeRegisterFallback32='+name]
+        run(*args,cwd=row['directory'])
+    original=sha(lib)
+    for name in ('original_a','original_b'):compile_one(name)
+    assert sha(r/'candidate.patch')==q['sha256']
+    run('git','-C',base,'apply','--index',r/'candidate.patch')
+    assert get('git','-C',base,'write-tree').strip()==q['tree']
+    for name in ('late_a','late_b'):compile_one(name)
+    src=source.read_text()
+    def inject(a,b):
+        global src
+        assert src.count(a)==1,a
+        src=src.replace(a,b)
+    inject('const unsigned opcode = code[0];','extern unsigned long long reader_entries, admission_checks, group_ff, register_hits;\n\t++reader_entries;\n\tconst unsigned opcode = code[0];')
+    inject('if (opcode == 0xff && size >= 2','++admission_checks;\n\tgroup_ff += opcode == 0xff;\n\tif (opcode == 0xff && size >= 2')
+    inject('!X86_OUTPUT_UNSUPPORTED(handle, false))\n\t\t\treturn X86_writeIndirectRegister(', '!X86_OUTPUT_UNSUPPORTED(handle, false) && (++register_hits, true))\n\t\t\treturn X86_writeIndirectRegister(')
+    source.write_text(src);compile_one('measured_probe')
+    run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+    assert get('git','-C',base,'write-tree').strip()==m['checkout_tree'] and sha(lib)==original
+    args=argv.copy();args[args.index(str(source))]=str(r/'select.c');args[args.index('-o')+1]=str(w/'choose.o')
+    run(*args,'-I',str(base),cwd=row['directory'])
+    order=['original_a','late_a','late_b','original_b','measured_probe']
+    run('clang++',w/'driver.o',w/'choose.o',*[w/(n+'.o')for n in order],
+        '-Wl,--wrap=X86_decodeRegisterFallback32',lib,ice_lib,*flags,'-o',w/'image')
     from elftools.elf.elffile import ELFFile
-    from training import fetch
-    from foreign_time import measure as time_foreign
-    foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
-    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
-    for label in ('base','outlined','candidate'):
-        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
-        if label=='outlined':
-            assert sha(r/'outlined.patch')==maps['outlined']['sha256']
-            run('git','-C',base,'apply','--index',r/'outlined.patch');assert get('git','-C',base,'write-tree').strip()==maps['outlined']['tree']
-        if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
-        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
-        from symbol_layout import symbols
-        section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
-        assert len(section_data)>=45
-        save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
-        images[label]=dict(archive=sha(lib),exe=sha(w/label))
-        with (w/label).open('rb')as f:
-            elf=ELFFile(f)
-            layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-    save('linked-sections',layout)
-    imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
-    original_sizes={k:len(v) for k,v in imgs.items()}
-    imgs={k:v+bytes(length-len(v)) for k,v in imgs.items()};imgs['duplicate']=imgs['base']
-    current=w/'selected';shutil.copy2(w/'base',current);current.write_bytes(imgs['base'])
-    inode=current.stat().st_ino;verified={}
-    offsets=[pos for pos in range(0,length,4096) if len({v[pos:pos+4096] for v in imgs.values()})>1] or [0]
-    def select(k):
-        with current.open('r+b',buffering=0) as out:
-            for at in offsets:
-                out.seek(at);part=imgs[k][at:at+4096];assert out.write(part)==len(part)
-        assert current.stat().st_ino==inode and current.stat().st_size==length
-        if k not in verified:
-            assert hashlib.sha256(current.read_bytes()[:original_sizes.get(k,original_sizes['base'])]).hexdigest()==images['base' if k=='duplicate' else k]['exe']
-            verified[k]=sha(current);assert verified[k]==hashlib.sha256(imgs[k]).hexdigest()
+    with (w/'image').open('rb')as stream:
+        elf=ELFFile(stream);assert elf.header['e_type']=='ET_EXEC'
+        symbols={v.name: [v['st_value'],v['st_size']] for v in elf.get_section_by_name('.symtab').iter_symbols()if v.name in set(order)|{'__wrap_X86_decodeRegisterFallback32','X86_disasmIter32','X86_decodeOutputMiss32','tryOutput32','cs_decode_full_insn'}}
+    assert set(order)<=set(symbols) and len({symbols[k][0]for k in order})==5
+    assert symbols['original_a'][1]==symbols['original_b'][1]and symbols['late_a'][1]==symbols['late_b'][1]
+    images=dict(archive=original,exe=sha(w/'image'),inode=(w/'image').stat().st_ino,symbols=symbols)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    invoke=['setarch',os.uname().machine,'-R',current]
-    mode_probe={};probe=w/'probe.bin';probe.write_bytes(bytes.fromhex('66 b8 78 56 34 12'))
-    span=w/'probe.tsv';span.write_text('0 6 1048576'+chr(10))
-    for tag in images:
-        select(tag)
-        for engine in ('iced','capstone','private'):
-            counts=[list(map(int,get(*invoke,engine,'0','1',probe,span,str(bits)).split()))[2:4] for bits in (16,32,64)]
-            assert counts==[[1,0],[2,0],[2,0]],(tag,engine,counts)
-            mode_probe[tag+'/'+engine]=counts
-    save('mode-probe',mode_probe)
+    invoke=['setarch',os.uname().machine,'-R',w/'image']
+    save('image',images);counter={}
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
@@ -110,49 +94,40 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
-        def audit_engine(exe):
-            rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
-            assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
-            return rows
-        assert audit_engine('base')==audit_engine('outlined')==audit_engine('candidate')
-        audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
-        for route in ('private','capstone'):
-            def take(engine,mode,n):
-                other=engine in ('iced','fast')
-                select('base' if other else engine)
-                return list(map(int,get(*invoke,engine if other else route,str(mode),str(n),f,path,str(bits)).split()))
-            for mode in (0,1,2):
-                labels=[*imgs,'iced'] + (['fast'] if mode else [])
-                repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
-                expected={k:take(k,mode,repeats)[2:]for k in labels}
-                assert all(v[:3]==expected['base'][:3] for v in expected.values())
-                assert expected['base']==expected['duplicate']==expected['candidate']
-                assert expected['outlined']==expected['base']
-                rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-                for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
-                    rng.shuffle(labels);sample={k:[] for k in labels}
-                    for k in labels+labels[::-1]:
-                        row=take(k,mode,repeats);assert row[2:]==expected[k]
-                        sample[k].append(row[:2])
-                    rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-                summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
-                save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==36
-    from firmware16 import compare
-    sources=rd(r/'input-sources.json');assert sha(r/'scalar.c')==sources['c_sha']
-    run('clang',*sources['compile'],r/'scalar.c','-o',w/'scalar.o')
-    with (w/'scalar.o').open('rb')as f:
-        elf=ELFFile(f);assert elf['e_machine']=='EM_386';blob=elf.get_section_by_name('.text').data()
-    path=w/'scalar16.bin';path.write_bytes(blob);spans=w/'scalar16.tsv';spans.write_text(f'0 {len(blob)} 1048576'+chr(10))
-    scalar=compare(path,spans,imgs,invoke,select)
-    save('scalar16',dict(sha256=sha(path),bytes=len(blob),source=sources['c_sha'],results=scalar))
-    save('fixed-image',dict(inode=inode,blocks=len(offsets),verified=verified,bytes=length,original_sizes=original_sizes,staged_sha256={k:hashlib.sha256(v).hexdigest()for k,v in imgs.items()}))
-    if platform.machine()=='x86_64':
-        from firmware16 import verify
-        save('seabios16',verify(w,imgs,invoke,select))
-    time_foreign(foreign_rows,w,save)
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
+        if bits!=32:continue
+        labels=['baseA','baseB','lateA','lateB'];index={k:str(i)for i,k in enumerate(labels+['probe'])}
+        def take(label,mode,reps,route='private'):
+            engine=label if label in ('iced','fast')else route
+            result=sp.run([*invoke,engine,str(mode),str(reps),f,path,str(bits)],check=True,capture_output=True,text=True,
+                          env=dict(os.environ,CS_READER=index.get(label,'0')))
+            if label=='probe':
+                counts=list(map(int,result.stderr.split()));assert len(counts)==4 and all(x%(reps+1)==0 for x in counts)
+                counter[name+'/'+route+'/'+str(mode)]=[x//(reps+1) for x in counts]
+                save('probe',counter)
+            return list(map(int,result.stdout.split()))
+        audits[name]=dict(extents=len(selected),extent_sha256=sha(path),sha256=sha(f))
+        for mode in (0,1,2):
+            for route in ('private','capstone'):
+                assert take('probe',mode,1,route)[2:]==take('baseA',mode,1,route)[2:]
+            presult=counter[name+'/private/'+str(mode)]
+            ceiling=0 if mode==0 else {'putty-32-0.85':390,'libssl3t64-i386':1114,'jpeg-avx2-i386':0}[name]
+            assert 0<=presult[-1]<=ceiling and presult[0]>=presult[1]>=presult[2]>=presult[3]
+            if ceiling:assert presult[-1]>0
+            if mode==0:continue
+            repeats=max(1,math.ceil(26e6/take('baseA',mode,1)[0]))
+            others=['iced','fast'];all_keys=labels+others
+            expected={k:take(k,mode,repeats)[2:]for k in all_keys}
+            assert all(v[:3]==expected['baseA'][:3] for v in expected.values()) and len({tuple(expected[k])for k in labels})==1
+            key=name+'/'+str(mode);n=35 if name=='jpeg-avx2-i386' else 17
+            rng=random.Random(key);cycles=[]
+            for _ in range(n):
+                rng.shuffle(all_keys);pair={k:[]for k in all_keys}
+                for k in all_keys+all_keys[::-1]:
+                    row=take(k,mode,repeats);assert row[2:]==expected[k];pair[k].append(row[:2])
+                cycles.append({k:[sum(v[j]for v in a)for j in (0,1)]for k,a in pair.items()})
+            observations[key]=dict(cycles=cycles,checks=expected,reps=repeats);save('observations',observations)
+    assert len(audits)==3 and len(observations)==6 and len(counter)==18 and sha(w/'image')==images['exe']
+    save('complete',dict(complete=True,source=q,host=host,audits=audits,columns=['fallback calls','reached FF check','FF opcode','admitted register CALL or JMP'],image=images))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

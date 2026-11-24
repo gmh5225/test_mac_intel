@@ -174,7 +174,10 @@ static void add_result(Result &total,const Result &span,const Span &range) {
   total.values += span.values;
 }
 
+extern "C" void choose_reader(unsigned);
 int main(int argc,char **argv) {
+  const char *choice=std::getenv("CS_READER");
+  choose_reader(choice ? unsigned(std::atoi(choice)) : 0);
   if(argc!=7) return 2;
   std::string engine=argv[1];
   unsigned mode=std::stoul(argv[2]), reps=std::stoul(argv[3]);
