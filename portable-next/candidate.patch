@@ -50,15 +50,16 @@ index 579a1dc5..bbc57122 100644
  #include "XCoreGenInstrInfo.inc"
  bool XCore_getInstruction(csh ud, const uint8_t *code, size_t code_len,
 diff --git a/arch/XCore/XCoreDisassembler.h b/arch/XCore/XCoreDisassembler.h
-index 0854a89d..3c892dd2 100644
+index 0854a89d..74bfe907 100644
 --- a/arch/XCore/XCoreDisassembler.h
 +++ b/arch/XCore/XCoreDisassembler.h
-@@ -8,6 +8,10 @@
+@@ -8,6 +8,11 @@
  #include "../../MCRegisterInfo.h"
  #include "../../MCInst.h"
  
 +#ifdef CAPSTONE_XCORE_ONLY
-+extern const uint16_t XCore_shortOpcodes[128];
++#include "../../cs_priv.h"
++extern CAPSTONE_INTERNAL const uint16_t XCore_shortOpcodes[128];
 +#endif
 +
  void XCore_init(MCRegisterInfo *MRI);
@@ -155,7 +156,7 @@ index 2a5158a5..013222d7 100644
  				insn->detail
  					->groups[insn->detail->groups_count] =
 diff --git a/cs.c b/cs.c
-index 227458b6..487e1b6b 100644
+index 696e8d70..333e7de2 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -1137,9 +1137,21 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
