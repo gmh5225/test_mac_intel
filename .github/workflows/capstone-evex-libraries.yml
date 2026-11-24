@@ -1,7 +1,7 @@
-name: Measure mandatory XMM and table-validated EXTRQ on the latest Capstone next
+name: Measure fixed register and separator fragments in PE32 and vector text
 on:
   push:
-    branches: [codex/x86-mandatory-vector-table]
+    branches: [codex/i386-register-pair-fragments]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-xmm-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: register-fragments32-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

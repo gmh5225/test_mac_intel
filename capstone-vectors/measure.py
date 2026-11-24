@@ -44,6 +44,12 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+    run('clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'reg-generator')
+    table=sp.check_output([w/'reg-generator','--register-fragments32'])
+    assert table==(base/'arch/X86/X86GenRegisterFragments32.inc').read_bytes()
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'guard.cpp',lib,'-o',w/'reg-guard')
+    checks=int(get(w/'reg-guard').strip());assert checks==860160
+    save('fragment-proof',dict(sha256=hashlib.sha256(table).hexdigest(),checked=checks))
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
