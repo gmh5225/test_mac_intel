@@ -9,9 +9,9 @@ def run(label,*args):
     with (e/(label+'.log')).open('wb')as f:z=sp.run(args,stdout=f,stderr=sp.STDOUT)
     if z.returncode:print((e/(label+'.log')).read_text(errors='replace')[-1800:]);z.check_returncode()
 try:
-    records={};patch=t/'batch.patch';patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/batch.patch']))
+    records={};patch=t/'mips.patch';patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/mips.patch']))
     assert sha(patch)==q['sha256'] and git('rev-parse','HEAD')==q['parent']
-    for tag,arches,unit in [('standalone',['X86'],'x86_reg_access'),('mixed',['X86','ARM','AARCH64','MIPS'],'x86_buffer_bounds'),('mips',['MIPS'],'mips_scan')]:
+    for tag,arches,unit in [('standalone',['X86'],'x86_reg_access'),('mixed',['X86','ARM','AARCH64','MIPS'],'x86_buffer_bounds'),('x86_mips',['X86','MIPS'],'mips_scan'),('arm_mips',['ARM','MIPS'],'mips_scan'),('riscv',['RISCV'],'instruction_bytes')]:
         b=t/tag;rows=records[tag]={}
         for k in ('base','candidate'):
             git('restore','--source','HEAD','--staged','--worktree','--','.')
