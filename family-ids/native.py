@@ -56,25 +56,37 @@ try:
     sizes={k:len(z[1])for k,z in section.items()}
     small=min(sizes,key=sizes.get);large=max(sizes,key=sizes.get);delta=sizes[large]-sizes[small]
     if delta:
-        name,original=section[small];ext=t/'held-text';ext.write_bytes(original+b'\x90'*delta)
-        obj,=b.rglob('MipsInstPrinter.c.o');run('controlled-object','objcopy','--update-section',name+'='+str(ext),t/(small+'.o'),obj)
-        assert text_section(obj)==(name,original+b'\x90'*delta)
         import shlex
+        obj,=b.rglob('MipsInstPrinter.c.o')
         cmds=get('ninja','-C',b,'-t','commands','capstone_shared').splitlines()
-        # Execute only the link command. Rebuilding the target can regenerate
-        # the substituted object from the source and erase the control.
         actions=[shlex.split(part) for cmd in cmds for part in cmd.split(' && ') if ' -shared ' in part and ' -o ' in part]
         link,=actions
-        libs['placed']=t/'placed.so'
-        link[link.index('-o')+1]=str(libs['placed'])
-        check_obj=sha(obj)
-        with (out/'relink.log').open('wb')as log:sp.run(link,cwd=b,stdout=log,stderr=sp.STDOUT,check=True)
-        assert sha(obj)==check_obj and len({sha(v) for v in libs.values()})==3
-        syms['placed']=symbols(libs['placed'])
-        assert syms['placed']['Mips_LLVM_printInst'][1]==syms[small]['Mips_LLVM_printInst'][1]
-        assert syms['placed']['Mips_selectScanDecoder']==syms[large]['Mips_selectScanDecoder']
-
-    put('placement',dict(section=section['base'][0],bytes=sizes,padding=delta,derived_from=small,matched_to=large,symbols=syms,images={k:sha(v) for k,v in libs.items()}))
+        index,=[i for i,v in enumerate(link) if Path(v).name=='MipsInstPrinter.c.o']
+        assert (b/link[index]).resolve()==obj.resolve()
+        # Hold the entire input object, including relocations, byte-identical.
+        pristine=t/(small+'.o');obj.write_bytes(pristine.read_bytes());unchanged=sha(obj)
+        libs['placed']=t/'placed.so';link[link.index('-o')+1]=str(libs['placed'])
+        asm=t/'inert.s';shim=t/'inert.o';geometry=[]
+        key='Mips_selectScanDecoder';printer='Mips_LLVM_printInst'
+        for extra in [0,delta,*[n for n in range(1,2*delta+65) if n!=delta]]:
+            words=link[:]
+            if extra:
+                asm.write_text('.section .text,"ax",@progbits\n.fill '+str(extra)+',1,0x90\n.section .note.GNU-stack,"",@progbits\n')
+                run('assemble','clang','-c',asm,'-o',shim)
+                words.insert(index+1,str(shim))
+            with (out/'direct-link.log').open('wb')as log:sp.run(words,cwd=b,stdout=log,stderr=sp.STDOUT,check=True)
+            sm=symbols(libs['placed']);assert sha(obj)==unchanged and sm[printer][1]==syms[small][printer][1]
+            geometry.append(dict(extra=extra,scan=sm[key],printer=sm[printer]))
+            put('geometry',dict(source=q,history=geometry,small={k:syms[small][k]for k in (key,printer)},large={k:syms[large][k]for k in (key,printer)}))
+            if not extra:
+                assert sm[key]==syms[small][key],(sm[key],syms[small][key])
+                continue
+            if sm[key]==syms[large][key]:
+                break
+        else:raise ValueError(('unmatched scan entry',geometry))
+        assert len({sha(v) for v in libs.values()})==3
+        syms['placed']=sm
+    put('placement',dict(section=section['base'][0],bytes=sizes,padding=extra if delta else 0,derived_from=small,matched_to=large,symbols=syms,images={k:sha(v) for k,v in libs.items()}))
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     cases={}
     manifest=rd(r/'corpus-manifest.json')

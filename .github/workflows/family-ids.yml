@@ -1,7 +1,7 @@
-name: Isolate MIPS scan layout using a direct link with verified object identity
+name: Test dedicated MIPS scan entry geometry using a pristine input object and a separate inert section
 on:
   push:
-    branches: [codex/mips-linked-object-scan-control]
+    branches: [codex/mips-pristine-input-layout-control]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-mips-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-mips-pristine-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
