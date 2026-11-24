@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 env:
-  LLVM_REVISION: f5123d475dccc0853f6815e20644d7d0196d20f4
+  LLVM_REVISION: dc37d6738b965665bbc10194958293057f110dc2
 jobs:
   build:
     name: build ${{ matrix.name }}
@@ -66,6 +66,21 @@ jobs:
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
           arch: x64
+
+      - name: Checkout the Windows compiler bootstrap
+        if: runner.os == 'Windows'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: 9f40f81d1458de3e44c1de0b35f5e2d33e5d8966
+          path: neverd-host-tools
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+
+      - name: Select Clang compatible with the MSVC standard library
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./neverd-host-tools/scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
 
       # windows-latest includes clang-cl, Ninja, and 7-Zip. sccache uses the
       # GitHub Actions cache backend and is the Windows compiler-cache strategy.
