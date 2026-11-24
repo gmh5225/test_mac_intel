@@ -1,7 +1,7 @@
-name: Compare shared full-decoder choices across Windows and macOS ABIs
+name: Verify allocation callback ownership, errors and real x86 records on Windows and macOS
 on:
   push:
-    branches: [codex/shared-record-native-abi]
+    branches: [codex/batch-detail-ownership-abi]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: shared-record-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: batch-detail-ownership-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
