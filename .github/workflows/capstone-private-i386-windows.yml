@@ -1,7 +1,7 @@
-name: Check XCore numeric output and thread registers on native Windows macOS and Linux
+name: Verify XCore constant opcode mapping and immediate syntax on native ABI profiles
 on:
   push:
-    branches: [codex/xcore-integer-writing-profiles]
+    branches: [codex/constant-xcore-native-qualification]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -47,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-direct-integers-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-mapped-native-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
