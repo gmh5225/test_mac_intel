@@ -66,8 +66,25 @@ try:
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert ('CAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and ('CAPSTONE_X86_ITERATOR_READERS' in entry)==(label=='candidate')
+        assert 'CAPSTONE_STATIC_X86_READERS' not in entry
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        if label=='candidate':
+            if platform.machine()=='x86_64':
+                unscoped=rd(r/'unscoped.json')
+                assert sha(r/'unscoped.c')==unscoped['file_sha256']
+                f=base/'arch/X86/X86RegisterFallback32.c';original=f.read_bytes()
+                try:
+                    f.write_bytes((r/'unscoped.c').read_bytes());run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+                    unscoped_objects={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
+                    assert unscoped_objects==section_data and sha(lib)==images[label]['archive']
+                    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'unscoped')
+                    assert sha(w/'unscoped')==images[label]['exe']
+                finally:
+                    f.write_bytes(original)
+                save('scope-proof',dict(complete=True,active=True,reference=unscoped,objects=len(section_data),image=images[label]))
+            else:
+                assert images[label]==images['base']
+                save('scope-proof',dict(complete=True,active=False,objects=len(section_data),image=images[label]))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
