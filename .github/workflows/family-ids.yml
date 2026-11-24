@@ -1,7 +1,7 @@
-name: Measure RISC-V alias rows with all eight backend tests
+name: Measure unconditional RISC-V operand-reader projections and verify DIET
 on:
   push:
-    branches: [codex/riscv-index-and-scan-test]
+    branches: [codex/derived-riscv-scan-ids]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-only-indexed-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: derived-riscv-ids-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

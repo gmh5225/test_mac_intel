@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
             if (!option(CS_OPT_TEXT,text ? CS_OPT_ON : CS_OPT_OFF) || !option(CS_OPT_DETAIL,detail ? CS_OPT_ON : CS_OPT_OFF) ||
                 !option(CS_OPT_MODE,unsigned(bits) | (step==3 ? unsigned(CS_MODE_RISCV_E) : step==4 ? unsigned(CS_MODE_BIG_ENDIAN) : 0U)) ||
                 !option(CS_OPT_SKIPDATA, step == 6 ? CS_OPT_ON : CS_OPT_OFF)) return 4;
-            for (unsigned major : {0x17U,0x37U,0x6fU,0x13U,0x1fU}) for (unsigned rd = 0; rd < 32; ++rd)
+            for (unsigned major : {0x03U,0x13U,0x17U,0x23U,0x37U,0x63U,0x67U,0x6fU,0x73U,0x1fU}) for (unsigned rd = 0; rd < 32; ++rd)
             for (unsigned seed = 0; seed < 97; ++seed) for (unsigned n = 0; n <= 5; ++n) {
                 uint32_t word = (uint32_t(seed * 0x9e3779b9U) & 0xfffff000U) | rd << 7 | major;
                 auto raw = area + page - n;

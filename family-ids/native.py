@@ -32,6 +32,7 @@ def measure(t):
             info=next(z for z in manifest if z['name']==key);load_input(key,info,'ls');cases[key]=code
     save('inputs',inputs)
     run('guard-link',['c++','-std=c++17','-O2','-I',source/'include',r/'guard.cpp','-ldl','-o',t/'guard'])
+    run('scan-guard-link',['c++','-std=c++17','-O2','-I',source/'include',r/'scan-guard.cpp','-ldl','-o',t/'scan-guard'])
     flags='-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'
     def config(b,arch,extra):
         return ['cmake','-S',source,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF',*['-DCAPSTONE_'+n+'_SUPPORT=ON' for n in arch],*extra]
@@ -44,35 +45,46 @@ def measure(t):
             if k!='base':
                 patch=r/'candidate.patch';assert sha(patch)==meta['sha256'];git('apply','--index',str(patch));assert git('write-tree')==meta['tree']
             run(profile+k+'-config',config(b,arch,extra))
-            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else [])])
-            if profile=='full' and k=='candidate':run('generated-aliases',['python3','-B',source/'suite/synctools/alias_pattern_rows.py','--check'])
+            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else ['riscv_scan_options'] if profile=='diet' else [])])
+            if profile=='full' and k=='candidate':run('generated-decoders',['python3','-B',source/'suite/synctools/fixed_len_decoder.py','--check'])
+            if profile=='diet':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_scan_options$'])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
             variants[k]=dict(so=sha(so),archive=sha(b/'libcapstone.a'),objects=files)
+            if profile=='diet':shutil.copy2(so,t/('diet-'+k+'.so'))
             if profile=='full':libs[k]=t/(k+'.so');shutil.copy2(so,libs[k])
         before,after=variants['base'],variants['candidate']
-        if profile!='full' or mixed:
+        if profile=='neverd' or (profile=='full' and mixed):
             assert after==before,(profile,mixed)
         else:
             assert set(after['objects'])==set(before['objects'])
             changes=[Path(n).name for n,h in before['objects'].items() if after['objects'][n]!=h]
-            assert changes==['MCInstPrinter.c.o'],changes
+            assert changes==['RISCVDisassembler.c.o'],changes
         info[profile]=variants;shutil.rmtree(b)
     save('profiles',info)
     proof=list(map(int,sp.check_output([t/'guard',libs['base'],libs['candidate']]).split()))
     assert proof[0]==checks['guards']['width'][0] and all(proof);save('guard',proof)
+    randomized={}
+    for tag,left,right in [('full',libs['base'],libs['candidate']),('diet',t/'diet-base.so',t/'diet-candidate.so')]:
+        counts=list(map(int,sp.check_output([t/'scan-guard',left,right]).split()));assert counts[0]==2*8*10*32*97*6 and sum(counts[1:])==counts[0] and all(counts)
+        randomized[tag]=counts
+    save('scan-guard',randomized)
     lib=t/'libcapstone.so.6';(t/'libcapstone.so').symlink_to(lib.name)
     images={k:f.read_bytes() for k,f in libs.items()};length=max(map(len,images.values()));images={k:v+bytes(length-len(v))for k,v in images.items()};images['copy']=images['base'];lib.write_bytes(images['base'])
     for f in ('time','raw'):run(f,['c++','-O3','-std=c++17','-I',source/'include',r/(f+'.cpp'),'-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/f])
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     run('fixed',['setarch',platform.machine(),'-R','true'])
-    current=None
+    inode=lib.stat().st_ino
+    offsets=[i for i in range(0,length,4096)if images['base'][i:i+4096]!=images['candidate'][i:i+4096]]
+    verified={}
     def select(k):
-        nonlocal current
-        if current!=k:
-            with lib.open('r+b')as f:assert f.write(images[k])==length
-            current=k
+        with lib.open('r+b',buffering=0) as f:
+            for pos in offsets:
+                f.seek(pos);part=images[k][pos:pos+4096];assert f.write(part)==len(part)
+        assert lib.stat().st_ino==inode and lib.stat().st_size==length
+        if k not in verified:
+            assert sha(lib)==hashlib.sha256(images[k]).hexdigest();verified[k]=sha(lib)
     signatures={}
     for name,bits in cases.items():
         f=t/(name+'.text')
@@ -81,7 +93,7 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-indexed-alias-'+flavor)
+    save('raw',signatures);rows={};rng=random.Random('RISCV-projected-scan-'+flavor)
     for name,bits in ({} if mixed else cases).items():
         def sample(k,mode,reps):
             select(k);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(bits),str(mode),t/(name+'.text'),'1048576',str(reps)]).split()))
@@ -91,6 +103,7 @@ def measure(t):
                 rng.shuffle(keys);obs=[(k,sample(k,mode,reps))for k in keys+keys[::-1]];assert len(set(y[2]for _,y in obs))==1
                 cycles.append({k:[sum(a[i]for n,a in obs if n==k)for i in (0,1)]for k in keys})
             rows[name+'/'+str(mode)]=dict(cycles=cycles,reps=reps,checksum=obs[0][1][2]);save('timings',rows)
+    save('fixed-image',dict(verified=verified,bytes=length,blocks=len(offsets),inode=inode))
     save('complete',dict(source=meta,mixed=mixed,cases=cases,cc=cc,clock=platform.platform(),cpu=sp.check_output(['lscpu'],text=True),fixed_inode=lib.stat().st_ino))
 t=Path(tempfile.mkdtemp())
 try:measure(t)
