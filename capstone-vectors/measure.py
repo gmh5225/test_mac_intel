@@ -39,8 +39,9 @@ try:
     images={}
     for label in ('base','candidate'):
         if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+            from training import build_profile,holdouts
+            heldout=build_profile(r,w,project,build,lib,ice_lib,flags,base,save)
+            assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
@@ -91,6 +92,10 @@ try:
             summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
+    for label in ('base','candidate'):
+        symbols=get('nm',w/label)
+        assert '__llvm_profile_write_file' not in symbols and '__llvm_profile_register_function' not in symbols
+    holdouts(heldout,w,save)
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
 
 finally:
