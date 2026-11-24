@@ -1,135 +1,223 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..fb4079bf 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -68,14 +68,19 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 	case 0x80:
- 	case 0x81:
- 	case 0x83:
--		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
-+		if (size >= 2 && code[1] < 0xc0 &&
- 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			const unsigned group = code[1] & 0x38;
- 			const unsigned row =
--				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
--				2;
--			if (writeCompare32(code, size, insn, insn_size,
--					   &x86_simple_outputs[row],
--					   x86_simple_registers))
-+				x86_simple_plans[0][0][group | (opcode & 1)] >> 2;
-+			if (group == 0x38) {
-+				if (writeCompare32(code, size, insn, insn_size,
-+						   &x86_simple_outputs[row],
-+						   x86_simple_registers))
-+					return true;
-+			} else if (X86_writeAluImmediate32(
-+					   code, size, insn, insn_size,
-+					   &x86_simple_outputs[row], x86_simple_registers))
- 				return true;
- 		}
- 		break;
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..6ac0d7ca 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -6,7 +6,11 @@
- /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
- #ifdef X86_MEMORY_IMMEDIATE
- #include "X86UnsignedImmediate.h"
-+#ifdef X86_ALU32_IMMEDIATE
-+CAPSTONE_INTERNAL bool X86_MEMORY_IMMEDIATE(
-+#else
- static bool X86_MEMORY_IMMEDIATE(
-+#endif
- #elif defined(X86_SEGMENT_LEA32)
- static bool X86_SEGMENT_LEA32(
- #elif defined(X86_EXTEND64_MEMORY)
-@@ -45,7 +49,7 @@ bool X86_writeMemoryOutput(
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
- #ifdef X86_MEMORY_IMMEDIATE
--#ifdef X86_COMPARE_IMMEDIATE
-+#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
- 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
- #else
- 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
-@@ -187,12 +191,18 @@ bool X86_writeMemoryOutput(
- 	const uint32_t encoded =
- 		imm_size == 1 ? code[imm_offset] :
- 				(uint32_t)X86_readDisp32(code + imm_offset);
--#ifdef X86_COMPARE_IMMEDIATE
--	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
-+#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
-+	/* Opcode 83 sign-extends its imm8. Logical operations print it as a
-+	 * mask of the destination width. */
- 	int64_t value = encoded;
--	if (opcode == 0x83)
-+	if (opcode == 0x83) {
- 		value = (int8_t)encoded;
--	else if (imm_size == 4 && row->ops[0].size == 8)
-+#ifdef X86_ALU32_IMMEDIATE
-+		const unsigned operation = (modrm >> 3) & 7;
-+		if (operation == 1 || operation == 4 || operation == 6)
-+			value = (uint32_t)value;
-+#endif
-+	} else if (imm_size == 4 && row->ops[0].size == 8)
- 		value = (int32_t)encoded;
- 	memcpy(out, ", ", 2);
- 	out += 2;
-diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index ee9b645b..7d9db022 100644
---- a/arch/X86/X86RegisterFallback32.c
-+++ b/arch/X86/X86RegisterFallback32.c
-@@ -36,5 +36,15 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 	}
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
-+
-+#define X86_MEMORY32_OUTPUT
-+#define X86_MEMORY_IMMEDIATE X86_writeAluImmediate32
-+#define X86_IMMEDIATE_WIDE 0
-+#define X86_ALU32_IMMEDIATE
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_ALU32_IMMEDIATE
-+#undef X86_IMMEDIATE_WIDE
-+#undef X86_MEMORY_IMMEDIATE
-+#undef X86_MEMORY32_OUTPUT
- #endif
- #endif
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..2d757368 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -60,6 +60,11 @@ enum X86SimpleForm {
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+diff --git a/MCInst.c b/MCInst.c
+index cda912d1..3d608c97 100644
+--- a/MCInst.c
++++ b/MCInst.c
+@@ -75,9 +75,7 @@ MCOperand *MCOperand_CreateReg1(MCInst *mcInst, unsigned Reg)
+ {
+ 	MCOperand *op = &(mcInst->Operands[MCINST_CACHE]);
  
-+CAPSTONE_INTERNAL bool
-+X86_writeAluImmediate32(const uint8_t *code, size_t size, cs_insn *insn,
-+		      uint16_t *insn_size, const struct X86SimpleOutput *row,
-+		      const struct X86SimpleRegister regs[4][16]);
+-	op->MachineOperandType = kRegister;
+-	op->Kind = kRegister;
+-	op->RegVal = Reg;
++	MCOperand_initReg(op, Reg);
+ 
+ 	return op;
+ }
+@@ -86,9 +84,7 @@ MCOperand *MCOperand_CreateImm1(MCInst *mcInst, int64_t Val)
+ {
+ 	MCOperand *op = &(mcInst->Operands[MCINST_CACHE]);
+ 
+-	op->MachineOperandType = kImmediate;
+-	op->Kind = kImmediate;
+-	op->ImmVal = Val;
++	MCOperand_initImm(op, Val);
+ 
+ 	return op;
+ }
+diff --git a/MCInst.h b/MCInst.h
+index e0409109..57c0cec7 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -183,13 +183,8 @@ struct MCInst {
+ 	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
+ };
+ 
+-// create Reg operand in the next slot
+-CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
++static inline void MCOperand_initReg(MCOperand *op, unsigned Reg)
+ {
+-	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
+-	MCOperand *op = &(mcInst->Operands[mcInst->size]);
+-	mcInst->size++;
+-
+ #ifdef __cplusplus
+ 	op->MachineOperandType = MCOperand::kRegister;
+ #else
+@@ -199,13 +194,15 @@ CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
+ 	op->RegVal = Reg;
+ }
+ 
+-// create Imm operand in the next slot
+-CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
++// create Reg operand in the next slot
++CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
+ {
+ 	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
+-	MCOperand *op = &(mcInst->Operands[mcInst->size]);
+-	mcInst->size++;
++	MCOperand_initReg(&mcInst->Operands[mcInst->size++], Reg);
++}
+ 
++static inline void MCOperand_initImm(MCOperand *op, int64_t Val)
++{
+ #ifdef __cplusplus
+ 	op->MachineOperandType = MCOperand::kImmediate;
+ #else
+@@ -215,6 +212,13 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
+ 	op->ImmVal = Val;
+ }
+ 
++// create Imm operand in the next slot
++CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
++{
++	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
++	MCOperand_initImm(&mcInst->Operands[mcInst->size++], Val);
++}
 +
- CAPSTONE_INTERNAL bool
- X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 0c9329b4..7e3e8b69 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1021,6 +1021,16 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
- 				    !compare(handles, b + !p,
- 					     (mr + j) % (sizeof(b) - !p), v))
- 					return false;
-+				/* Exercise the memory forms with an imm8 and with
-+				 * an imm8 sign-extended to the operand width. */
-+				if (mode == CS_MODE_32 && mr < 0xc0) {
-+					b[1] = 0x80;
-+					if (!compare(handles, b + 1, sizeof(b) - 1, v))
-+						return false;
-+					b[1] = 0x83;
-+					if (!compare(handles, b + 1, sizeof(b) - 1, v))
-+						return false;
-+				}
+ /* Callers that construct every operand before reading it may leave unused
+  * slots untouched. MCInst_Init retains complete initialization. */
+ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
+index a56ed486..3b56eb13 100644
+--- a/arch/X86/X86DisassemblerTranslator.h
++++ b/arch/X86/X86DisassemblerTranslator.h
+@@ -27,6 +27,8 @@
+ #include "X86GenInstrInfo.inc"
+ #endif
+ 
++#include "X86BaseInfo.h"
++
+ // Fill-ins to make the compiler happy.  These constants are never actually
+ //   assigned; they are just filler to make an automatically-generated switch
+ //   statement work.
+@@ -1036,6 +1038,7 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+ 	//   5. segmentreg    (register)  x86_registerNONE for now, but could be set
+ 	//                                if we have segment overrides
+ 	int scaleAmount, indexReg;
++	unsigned int baseReg;
+ 
+ 	if (insn->eaBase == EA_BASE_sib || insn->eaBase == EA_BASE_sib64) {
+ 		if (insn->sibBase != SIB_BASE_NONE) {
+@@ -1050,15 +1053,14 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+ 					16 | (extension << 3) |
+ 					(insn->sib & 7);
+ 
+-				if (appendFeatureGpr(mcInst, number,
+-						     insn->addressSize,
+-						     emitOperands))
++				baseReg = X86_featureExtensionMCGPR(number, insn->addressSize);
++				if (!baseReg)
+ 					return true;
+ 			} else {
+ 				switch (insn->sibBase) {
+ #define ENTRY(x) \
+ 	case SIB_BASE_##x: \
+-		createRegisterOperand(mcInst, X86_##x, emitOperands); \
++		baseReg = X86_##x; \
+ 		break;
+ 					ALL_SIB_BASES
+ #undef ENTRY
+@@ -1068,7 +1070,7 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+ 				}
  			}
+ 		} else {
+-			createRegisterOperand(mcInst, 0, emitOperands);
++			baseReg = 0;
  		}
+ 
+ 		if (type == TYPE_M &&
+@@ -1137,8 +1139,8 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+ 				16 | (extension << 3) |
+ 				(insn->orgModRM & 7);
+ 
+-			if (appendFeatureGpr(mcInst, number, insn->addressSize,
+-					     emitOperands))
++			baseReg = X86_featureExtensionMCGPR(number, insn->addressSize);
++			if (!baseReg)
+ 				return true;
+ 			indexReg = 0;
+ 		} else {
+@@ -1148,39 +1150,27 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+ 				//debug("EA_BASE_NONE and EA_DISP_NONE for ModR/M base");
+ 				return true;
+ 			}
+-			if (insn->mode == MODE_64BIT) {
+-				if (insn->prefix3 ==
+-				    0x67) // address-size prefix overrides RIP relative addressing
+-					createRegisterOperand(mcInst, X86_EIP,
+-							      emitOperands);
+-				else
+-					// Section 2.2.1.6
+-					createRegisterOperand(
+-						mcInst,
+-						insn->addressSize == 4 ?
+-							X86_EIP :
+-							X86_RIP,
+-						emitOperands);
+-			} else {
+-				createRegisterOperand(mcInst, 0, emitOperands);
+-			}
++			baseReg = 0;
++			if (insn->mode == MODE_64BIT)
++				baseReg = insn->prefix3 == 0x67 || insn->addressSize == 4 ?
++						  X86_EIP : X86_RIP;
+ 
+ 			indexReg = 0;
+ 			break;
+ 		case EA_BASE_BX_SI:
+-			createRegisterOperand(mcInst, X86_BX, emitOperands);
++			baseReg = X86_BX;
+ 			indexReg = X86_SI;
+ 			break;
+ 		case EA_BASE_BX_DI:
+-			createRegisterOperand(mcInst, X86_BX, emitOperands);
++			baseReg = X86_BX;
+ 			indexReg = X86_DI;
+ 			break;
+ 		case EA_BASE_BP_SI:
+-			createRegisterOperand(mcInst, X86_BP, emitOperands);
++			baseReg = X86_BP;
+ 			indexReg = X86_SI;
+ 			break;
+ 		case EA_BASE_BP_DI:
+-			createRegisterOperand(mcInst, X86_BP, emitOperands);
++			baseReg = X86_BP;
+ 			indexReg = X86_DI;
+ 			break;
+ 		default:
+@@ -1195,7 +1185,7 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+ 				//   placeholders to keep the compiler happy.
+ #define ENTRY(x) \
+ 	case EA_BASE_##x: \
+-		createRegisterOperand(mcInst, X86_##x, emitOperands); \
++		baseReg = X86_##x; \
+ 		break;
+ 				ALL_EA_BASES
+ #undef ENTRY
+@@ -1212,13 +1202,19 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
+ 		scaleAmount = 1;
  	}
+ 
+-	createImmediateOperand(mcInst, scaleAmount, emitOperands);
+-	createRegisterOperand(mcInst, indexReg, emitOperands);
+-	createImmediateOperand(mcInst, insn->displacement, emitOperands);
+-
+-	createRegisterOperand(mcInst, segmentRegnums[insn->segmentOverride],
+-			      emitOperands);
+-
++	if (emitOperands) {
++		/* Every memory address occupies five consecutive MC operands. */
++		CS_ASSERT_RET_VAL(mcInst->size <= MAX_MC_OPS - X86_AddrNumOperands,
++				  true);
++		MCOperand *address = &mcInst->Operands[mcInst->size];
++		MCOperand_initReg(&address[X86_AddrBaseReg], baseReg);
++		MCOperand_initImm(&address[X86_AddrScaleAmt], scaleAmount);
++		MCOperand_initReg(&address[X86_AddrIndexReg], indexReg);
++		MCOperand_initImm(&address[X86_AddrDisp], insn->displacement);
++		MCOperand_initReg(&address[X86_AddrSegmentReg],
++				  segmentRegnums[insn->segmentOverride]);
++		mcInst->size += X86_AddrNumOperands;
++	}
+ 	return false;
+ }
+ 
