@@ -72,11 +72,39 @@ try:
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
+    from elftools.elf.elffile import ELFFile
+    sections={}
+    for name in ('base','candidate'):
+        with (w/name).open('rb')as stream:
+            elf=ELFFile(stream)
+            sections[name]={s.name:dict(address=s['sh_addr'],size=s['sh_size'],sha256=hashlib.sha256(s.data()).hexdigest()) for s in elf.iter_sections() if s['sh_flags'] & 4 and s['sh_size']}
+    save('code-sections',sections)
+    launch=w/'timed';shutil.copyfile(w/'base',launch);launch.chmod(0o755)
+    contents={k:(w/k).read_bytes()for k in ('base','candidate')}
+    page=4096;current='base';inode=launch.stat().st_ino
+    changed=[start for start in range(0,max(map(len,contents.values())),page) if contents['base'][start:start+page]!=contents['candidate'][start:start+page]]
+    def select_image(label):
+        global current
+        next_image='candidate' if label=='candidate'else'base'
+        if current!=next_image:
+            payload=contents[next_image]
+            with launch.open('r+b')as f:
+                for start in changed:
+                    if start<len(payload):
+                        f.seek(start);f.write(payload[start:start+page])
+                f.truncate(len(payload))
+            current=next_image
+        return launch
+    for label in ('candidate','base','duplicate'):
+        image=select_image(label)
+        assert image.stat().st_ino==inode and sha(image)==images['candidate'if label=='candidate'else'base']['exe']
+    save('fixed-image',dict(inode=inode,changed_blocks=len(changed),page=page,images=images))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
     host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
+        if name not in ('putty-32-0.85','jpeg-avx2-i386','libssl3t64-i386'):continue
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
@@ -97,7 +125,7 @@ try:
         def take(engine,mode,n):
             comparator='capstone' if engine.startswith('public-') else engine if engine in ('iced','fast') else 'private'
             label=engine.removeprefix('public-');exe=label if label in ('candidate','duplicate')else'base'
-            return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
+            return list(map(int,get(select_image(exe),comparator,str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
             labels=['base','duplicate','candidate','public-base','public-duplicate','public-candidate','iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
@@ -105,7 +133,7 @@ try:
             assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
             assert expected['public-base']==expected['public-duplicate']==expected['public-candidate']
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-            for _ in range(13):
+            for _ in range(29):
                 rng.shuffle(labels);sample={k:[] for k in labels}
                 for k in labels+labels[::-1]:
                     row=take(k,mode,repeats);assert row[2:]==expected[k]
@@ -114,9 +142,9 @@ try:
             key=name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
             summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==18
+    assert len(summary)==9
     holdouts(heldout,w,save)
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
+    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=29,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

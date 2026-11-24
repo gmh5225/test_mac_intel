@@ -1,7 +1,7 @@
-name: Compare the late i386 memory writer with iced and published public records
+name: Check the i386 memory writer at one executable path on three fresh Linux runners
 on:
   push:
-    branches: [codex/late-i386-memory-iced-score]
+    branches: [codex/fixed-image-i386-late-writer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,7 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -33,7 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 9f35a102e0ae78ff20e0f0e0b443d275f975abf7
+          ref: 9813768e70ada58586c715a219ccf9395b8e8d45
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-i386-writer-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-image-i386-retest-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
