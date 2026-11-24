@@ -1,7 +1,7 @@
-name: Measure direct RISC-V alias rows and verify mixed libraries byte for byte
+name: Measure RISC-V alias rows with all eight backend tests
 on:
   push:
-    branches: [codex/riscv-only-indexed-alias]
+    branches: [codex/riscv-index-and-scan-test]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-only-alias-index-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-only-indexed-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
