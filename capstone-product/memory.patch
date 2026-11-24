@@ -1,32 +1,3 @@
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d4ee5a37..1c07659d 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -1009,6 +1009,10 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
- 
- void Mips_selectScanDecoder(cs_struct *handle)
- {
-+#ifndef CAPSTONE_MIPS_ONLY
-+	if (handle->arch != CS_ARCH_MIPS)
-+		return;
-+#endif
- 	/* An installed callback owns its MC operands and its dispatch. */
- 	if (handle->disasm == Mips_getInstruction ||
- 	    handle->disasm == getScanInstruction)
-diff --git a/arch/Mips/MipsMapping.h b/arch/Mips/MipsMapping.h
-index b745afb2..2e850c6a 100644
---- a/arch/Mips/MipsMapping.h
-+++ b/arch/Mips/MipsMapping.h
-@@ -17,7 +17,8 @@ bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
- bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
- 			 cs_insn *insn);
- 
--#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
-+#if (defined(CAPSTONE_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
-+	!defined(CAPSTONE_DIET)
- #define CAPSTONE_MIPS_SCAN_BY_OPTION
- void Mips_selectScanDecoder(cs_struct *handle);
- #endif
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index 8d827a97..403a5d85 100644
 --- a/arch/X86/X86Disassembler.h
@@ -85,7 +56,7 @@ index cec4bec6..e3a77092 100644
 +#endif
  #endif
 diff --git a/cs.c b/cs.c
-index 696e8d70..dfcbb960 100644
+index 333e7de2..54f5390c 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -1082,7 +1082,13 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
@@ -120,7 +91,7 @@ index 696e8d70..dfcbb960 100644
  #endif
  #ifdef CAPSTONE_HAS_MIPS
  	if (handle->arch == CS_ARCH_MIPS)
-@@ -1216,6 +1227,34 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1228,6 +1239,34 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  	return true;
  }
  
