@@ -1,153 +1,116 @@
-diff --git a/arch/X86/X86GenTest32Registers.inc b/arch/X86/X86GenTest32Registers.inc
-index 7a2ad08c..6168f0bf 100644
---- a/arch/X86/X86GenTest32Registers.inc
-+++ b/arch/X86/X86GenTest32Registers.inc
-@@ -27,3 +27,15 @@ static const struct X86SimpleRegister test32_regs[2][8] = {
- 		{ 23, 3, "edi" },
- 	},
- };
-+
-+static const struct X86SimpleOutput offset32_mov_rows[2] = {
-+	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 1, 2 }, { 0, 1, 1 } } },
-+	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
-+};
-+
-+static const struct X86OffsetSpelling offset32_spelling[4] = {
-+	{ 14, "al, byte ptr [", "]" },
-+	{ 16, "eax, dword ptr [", "]" },
-+	{ 10, "byte ptr [", "], al" },
-+	{ 11, "dword ptr [", "], eax" },
-+};
-diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index ee9b645b..3b100502 100644
---- a/arch/X86/X86RegisterFallback32.c
-+++ b/arch/X86/X86RegisterFallback32.c
-@@ -13,9 +13,48 @@
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
- #include "X86RegisterImmediateOutput.h"
-+struct X86OffsetSpelling {
-+	uint8_t length;
-+	char before[17], after[8];
-+};
- #include "X86GenTest32Registers.inc"
- #include "../../cs_disasm_internal.h"
- 
-+/* A0 through A3 encode an unsigned absolute address without a ModR/M byte.
-+ * The table holds the text on either side of that address. */
-+static void writeOffsetMove32(const uint8_t *code, cs_insn *insn,
-+			      uint16_t *insn_size)
-+{
-+	const uint8_t opcode = code[0];
-+	const bool store = (opcode & 2) != 0;
-+	const unsigned wide = opcode & 1;
-+	const uint32_t address = (uint32_t)X86_readDisp32(code + 1);
-+	const struct X86SimpleOutput *row = &offset32_mov_rows[wide];
-+	const struct X86OffsetSpelling *text = &offset32_spelling[opcode & 3];
-+	*insn_size = insn->size = 5;
-+	insn->id = row->id;
-+	memcpy(insn->bytes, code, 5);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	memcpy(insn->op_str, text->before, sizeof(text->before));
-+	char *end = writeUnsignedImmediate(insn->op_str + text->length, address);
-+	memcpy(end, text->after, sizeof(text->after));
-+	if (insn->detail) {
-+		const uint16_t acc = test32_regs[wide][0].reg;
-+		X86_writeSimpleDetail(insn->detail, row, opcode, 0, 0,
-+				      store ? 0 : acc, store ? acc : 0);
-+		cs_x86 *x = &insn->detail->x86;
-+		x->encoding.modrm_offset = 0;
-+		x->encoding.disp_offset = 1;
-+		x->encoding.disp_size = 4;
-+		cs_x86_op *mem = &x->operands[store ? 0 : 1];
-+		mem->type = X86_OP_MEM;
-+		mem->mem.scale = 1;
-+		mem->mem.disp = x->disp = address;
-+	}
-+}
-+
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 			     size_t size, cs_insn *insn, uint16_t *insn_size,
-@@ -34,6 +73,11 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 			return true;
- 		}
- 	}
-+	if ((opcode & 0xfc) == 0xa0 && size >= 5 &&
-+	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+		writeOffsetMove32(code, insn, insn_size);
-+		return true;
-+	}
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
- #endif
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index cce3e23d..c0636650 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -542,6 +542,30 @@ void emit_register(const X86SimpleRegister &v)
- 		  << v.name << "\" },\n";
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 1cc3d3a9..34666027 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				// only immediate as address of memory
+ 				if (DispVal < 0) {
+ 					SStream_concat(O, "0x%" PRIx64,
+-						       x86_get_address_mask(
+-							       MI->csh->mode) &
+-							       DispVal);
++						       x86_absolute_address(MI, DispVal));
+ 				} else {
+ 					if (DispVal > HEX_THRESHOLD)
+ 						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..78ba0cf5 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -1236,9 +1236,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 					MI->op1_size = 8;
+ 				if (DispVal < 0) {
+ 					printImm(MI, O,
+-						 x86_get_address_mask(
+-							 MI->csh->mode) &
+-							 DispVal,
++						 x86_absolute_address(MI, DispVal),
+ 						 true);
+ 				} else {
+ 					printImm(MI, O, DispVal, true);
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index 380faa79..22142c46 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -154,13 +154,16 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+ 	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
-+void emit_offset32(Decoder &decoder, const PlanTable &plans,
-+		   const std::vector<std::string> &rows)
-+{
-+	std::cout << "\nstatic const struct X86SimpleOutput offset32_mov_rows[2] = {\n";
-+	for (unsigned opcode : { 0x88u, 0x89u })
-+		std::cout << '\t' << rows.at(plans[0][0][opcode] >> 2) << ",\n";
-+	std::cout << "};\n\nstatic const struct X86OffsetSpelling offset32_spelling[4] = {\n";
-+	for (unsigned opcode = 0xa0; opcode <= 0xa3; ++opcode) {
-+		uint8_t code[] = { static_cast<uint8_t>(opcode), 0, 0, 0, 0 };
-+		decoder.decode(code, sizeof(code), sizeof(code), 0);
-+		const std::string text(decoder.insn->op_str);
-+		const auto address = text.find("[0]");
-+		if (decoder.insn->id != X86_INS_MOV || address == std::string::npos)
-+			throw std::runtime_error("unexpected i386 offset MOV");
-+		const auto before = text.substr(0, address + 1);
-+		const auto after = text.substr(address + 2);
-+		if (before.size() > 16 || after.size() > 7)
-+			throw std::runtime_error("offset MOV spelling does not fit");
-+		std::cout << "\t{ " << before.size() << ", \"" << before
-+			  << "\", \"" << after << "\" },\n";
-+	}
-+	std::cout << "};\n";
-+}
-+
- void emit_test32(const PlanTable &plans, const RegisterTable &regs,
- 		 const std::vector<std::string> &rows)
+-static inline uint64_t x86_get_address_mask(cs_mode mode)
++/* An absolute displacement is an offset of the effective address width. */
++static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
  {
-@@ -1319,6 +1343,7 @@ int main(int argc, char **argv)
- 	add_rex_stack(x64, regs, plans, rows, checked, admitted);
- 	if (test32) {
- 		emit_test32(plans, regs, rows);
-+		emit_offset32(x86, plans, rows);
- 		return 0;
- 	}
- 	emit_tables(plans, regs, rows);
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 0c9329b4..d1954416 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1062,6 +1062,20 @@ static bool check_absolute_addresses32(csh handles[2])
- 	};
- 	static const uint8_t opcodes[] = { 0x00, 0x03, 0x38, 0x3b, 0x84, 0x89,
- 					   0x8b, 0x8d, 0xc6, 0xc7, 0xff };
-+	for (unsigned op = 0xa0; op < 0xa4; ++op) {
-+		for (size_t i = 0; i < sizeof(addresses) / sizeof(addresses[0]);
-+		     ++i) {
-+			const uint32_t a = addresses[i];
-+			const uint8_t bytes[] = { (uint8_t)op, (uint8_t)a,
-+						  (uint8_t)(a >> 8),
-+						  (uint8_t)(a >> 16),
-+						  (uint8_t)(a >> 24) };
-+			for (size_t n = 1; n <= sizeof(bytes); ++n)
-+				if (!compare(handles, bytes, n,
-+					     op + (unsigned)i))
-+					return false;
++	const cs_mode mode = mi->csh->mode;
++	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
+ 	if (x86_has_feature(mode, CS_MODE_16))
+-		return UINT16_MAX;
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
+ 	if (x86_has_feature(mode, CS_MODE_32))
+-		return UINT32_MAX;
+-	return UINT64_MAX;
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
+ }
+ 
+ #endif
+diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
+index cfd13cba..3b436991 100644
+--- a/tests/unit/x86_legacy_address_size.c
++++ b/tests/unit/x86_legacy_address_size.c
+@@ -279,9 +279,56 @@ static bool check_other_opcodes(void)
+ 	return ok;
+ }
+ 
++static bool check_absolute_offsets(void)
++{
++	static const struct {
++		cs_mode mode;
++		uint8_t code[8];
++		uint8_t size;
++		const char *intel, *att;
++	} cases[] = {
++		{ CS_MODE_16, { 0x67, 0x8b, 0x05, 0x34, 0x12, 0x00, 0x80 },
++		  7, "ax, word ptr [0x80001234]", "0x80001234, %ax" },
++		{ CS_MODE_32, { 0x67, 0x8b, 0x06, 0x34, 0x82 },
++		  5, "eax, dword ptr [0x8234]", "0x8234, %eax" },
++		{ CS_MODE_64, { 0x67, 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  8, "eax, dword ptr [0x80001234]", "0x80001234, %eax" },
++		{ CS_MODE_64, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
++	};
++	bool ok = true;
++	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
++		csh handle;
++		if (cs_open(CS_ARCH_X86, cases[i].mode, &handle) != CS_ERR_OK)
++			return false;
++		for (unsigned att = 0; att < 2; ++att) {
++			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
++					       att ? CS_OPT_SYNTAX_ATT : CS_OPT_SYNTAX_INTEL);
++			if (att && err == CS_ERR_X86_ATT)
++				continue;
++			cs_insn *insn = NULL;
++			size_t count = cs_disasm(handle, cases[i].code, cases[i].size,
++						 0x1000, 1, &insn);
++			const char *expected = att ? cases[i].att : cases[i].intel;
++			if (err != CS_ERR_OK || count != 1 ||
++			    insn->size != cases[i].size ||
++			    strcmp(insn->op_str, expected) != 0) {
++				fprintf(stderr, "absolute offset mode %u: expected %s, got %s\n",
++					(unsigned)cases[i].mode, expected,
++					count == 1 ? insn->op_str : "(invalid)");
++				ok = false;
++			}
++			cs_free(insn, count);
 +		}
++		cs_close(&handle);
 +	}
- 	for (unsigned op = 0; op < sizeof(opcodes); ++op) {
- 		for (unsigned group = 0; group < 8; ++group) {
- 			for (unsigned i = 0;
++	return ok;
++}
++
+ int main(void)
+ {
+ 	bool ok = check_conversions();
+ 	ok &= check_other_opcodes();
++	ok &= check_absolute_offsets();
+ 	return ok ? 0 : 1;
+ }

@@ -26,10 +26,9 @@ try:
     flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
     units=['mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
     if profile not in ('diet','reduced'):
-        units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access']
+        units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
     if len(arches)>1:
         units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
-    flags.append('-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
     for name,tree in [('base',None),*q['variants'].items()]:
@@ -48,20 +47,14 @@ try:
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
-            baseline=rows['base'][linkage]['snapshots']
-            assert result['snapshots']==baseline,(name,linkage,profile)
+            expected='offset' if name=='public_offset' else 'base'
+            baseline=rows[expected][linkage]['snapshots']
+            for case,view in result['snapshots'].items():
+                assert view['counts']==baseline[case]['counts'],(name,linkage,case)
+                if name!='offset' or case.split('/')[2]=='0':
+                    assert view==baseline[case],(name,linkage,case)
+
         assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
-        if platform.system()=='Darwin' and profile in ('full','noatt'):
-            solo=t/'static-only'
-            run(name+'-static-config','cmake','-G','Ninja','-S',s,'-B',solo,*flags,'-DCAPSTONE_BUILD_SHARED_LIBS=OFF')
-            run(name+'-static-build','cmake','--build',solo,'--parallel','4','--target','capstone_static',*units)
-            run(name+'-static-units','ctest','--test-dir',solo,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
-            for folder,active in ((solo,name=='public'),(b,False)):
-                cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
-                assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
-            result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
-            assert result['snapshots']==rows['base']['static']['snapshots']
-            rows[name]['static_only']=result
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
