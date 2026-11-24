@@ -1,7 +1,7 @@
-name: Measure real-mode operand-override register records and i386 indirect targets on both x86 APIs
+name: Isolate real-mode register output and replicate the i386 JPEG detail result across six ISAs
 on:
   push:
-    branches: [codex/real-mode-register-output]
+    branches: [codex/private-prefixed-register-native-recheck]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-mode-register-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: isolated-16-record-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

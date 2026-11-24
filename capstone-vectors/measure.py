@@ -41,6 +41,10 @@ try:
     assert maps['prefix']==q and maps['base']['commit']==q['parent']
     layout={}
     from elftools.elf.elffile import ELFFile
+    from training import fetch
+    from foreign_time import measure as time_foreign
+    foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
+    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         assert sha(r/'released-public.patch')==maps['base']['sha256']
@@ -54,6 +58,7 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
+        run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -119,7 +124,7 @@ try:
                 expected={k:take(k,mode,repeats)[2:]for k in labels}
                 assert all(v==expected['base'] for v in expected.values())
                 rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-                for _ in range(17):
+                for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
                     rng.shuffle(labels);sample={k:[] for k in labels}
                     for k in labels+labels[::-1]:
                         row=take(k,mode,repeats);assert row[2:]==expected[k]
@@ -141,6 +146,7 @@ try:
     if platform.machine()=='x86_64':
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
+    time_foreign(foreign_rows,w,save)
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:

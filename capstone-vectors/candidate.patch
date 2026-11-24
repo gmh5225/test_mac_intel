@@ -1,57 +1,24 @@
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 06cc61ae..27b94943 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -20,6 +20,15 @@
- #include "../../MCRegisterInfo.h"
- #include "X86DisassemblerDecoderCommon.h"
- 
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CAPSTONE_X86_OPERAND_OVERRIDE_OUTPUT
-+CAPSTONE_INTERNAL bool X86_tryOperandOverride16(struct cs_struct *handle,
-+					      const uint8_t *code, size_t size,
-+					      cs_insn *insn, uint16_t *insn_size);
-+#endif
-+
- #if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
- 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..fd1c2ce0 100644
+index 8c6444ab..265869ef 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
 @@ -15,6 +15,53 @@
  
  #include "X86SimpleOutputImpl.h"
  
-+#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
-+CAPSTONE_INTERNAL
-+#else
-+static
-+#endif
-+bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
-+			 cs_insn *insn, uint16_t *insn_size)
-+{
-+	return trySimpleOutputForMode(handle, code, size, insn, insn_size,
-+				      handle->mode);
-+}
-+
-+bool X86_tryOperandOverride16(cs_struct *handle, const uint8_t *code, size_t size,
++static bool tryOperandOverride16(cs_struct *handle, const uint8_t *code, size_t size,
 +			     cs_insn *insn, uint16_t *insn_size)
 +{
 +	if (size < 2 || code[0] != 0x66)
 +		return false;
 +	const uint8_t opcode = code[1];
-+	const bool stack_reg = (opcode & 0xf0) == 0x50;
 +	const bool mov_imm32 = (opcode & 0xf8) == 0xb8;
 +	const bool pair = (opcode < 0x40 && (opcode & 7) <= 3) ||
 +			  (opcode >= 0x84 && opcode <= 0x8b);
-+	if (!stack_reg && !mov_imm32 && !(pair && size >= 3 && code[2] >= 0xc0))
++	if (!mov_imm32 && !(pair && size >= 3 && code[2] >= 0xc0))
 +		return false;
 +
-+	/* These register forms have the same operands and implicit registers
++	/* These non-stack register forms have the same operands and implicit registers
 +	 * as their unprefixed 32-bit records. Keep the original handle for
 +	 * syntax, callbacks, custom names, and detail policy. */
 +	if (!trySimpleOutputForMode(handle, code + 1, size - 1, insn,
@@ -72,15 +39,28 @@ index 8c6444ab..fd1c2ce0 100644
 +	return true;
 +}
 +
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
++CAPSTONE_INTERNAL
++#else
++static
++#endif
++bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size)
++{
++	if (handle->mode == CS_MODE_16)
++		return tryOperandOverride16(handle, code, size, insn, insn_size);
++	return trySimpleOutputForMode(handle, code, size, insn, insn_size,
++				      handle->mode);
++}
 +
  #ifdef CAPSTONE_X86_BATCH_OUTPUT
  CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code,
  					 size_t size, cs_insn *insn,
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..dbd121b0 100644
+index 21414e7a..ea945bf4 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -40,19 +40,16 @@ static void writeRelativeHex(char *out, uint64_t value)
+@@ -40,19 +40,17 @@ static void writeRelativeHex(char *out, uint64_t value)
  static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
  			     size_t size, cs_insn *insn, uint16_t *insn_size)
  #else
@@ -98,35 +78,27 @@ index 21414e7a..dbd121b0 100644
  {
  #ifdef X86_FIXED_OUTPUT
  	const bool wide = X86_FIXED_WIDE;
-+	const cs_mode output_mode = handle->mode;
++#define X86_OUTPUT_MODE handle->mode
  #else
 -	const bool wide = handle->mode == CS_MODE_64;
++#define X86_OUTPUT_MODE output_mode
 +	const bool wide = output_mode == CS_MODE_64;
  #endif
  	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
  	const uint8_t rex = has_rex ? code[0] : 0;
-@@ -111,7 +108,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -111,7 +109,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
  		}
  	}
 -	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
-+	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && output_mode != CS_MODE_32))
++	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && X86_OUTPUT_MODE != CS_MODE_32))
  		return false;
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
-diff --git a/cs.c b/cs.c
-index d0b8b045..b084c2f4 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1125,6 +1125,11 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 				return X86_decodeFixedRecord64(handle, code, size,
- 							       insn, insn_size);
- 		}
-+#endif
-+#ifdef CAPSTONE_X86_OPERAND_OVERRIDE_OUTPUT
-+		if (handle->mode == CS_MODE_16 &&
-+		    X86_tryOperandOverride16(handle, code, size, insn, insn_size))
-+			return true;
+@@ -266,5 +264,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	}
+ 	return true;
+ }
++#undef X86_OUTPUT_MODE
+ 
  #endif
- 		MCInst_InitX86(&mci);
- 	} else
