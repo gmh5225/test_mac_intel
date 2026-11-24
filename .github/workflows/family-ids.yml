@@ -1,7 +1,7 @@
-name: Separate public x86 formatting and classic MIPS scan effects in four-ISA builds
+name: Time the public x86 writer independently on current MIPS and XCore next
 on:
   push:
-    branches: [codex/four-isa-record-and-mips-scan]
+    branches: [codex/record-only-at-current-next]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: f708153a80b54ffad3c915622007ffd10f95d914
+          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: four-isa-record-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: four-isa-record-only-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
