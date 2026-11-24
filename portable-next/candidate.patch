@@ -1,627 +1,70 @@
-diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
-index ea9309f4..bc315806 100644
---- a/arch/X86/X86GenMappingCounts.inc
-+++ b/arch/X86/X86GenMappingCounts.inc
-@@ -9298,14 +9298,14 @@ static const uint16_t x86_mapping_counts[] = {
- 	1024, // X86_VMOVSDZmr
- 	1024, // X86_VMOVSDZmrk
- 	1024, // X86_VMOVSDZrm
--	0, // X86_VMOVSDZrmk
--	0, // X86_VMOVSDZrmkz
-+	1024, // X86_VMOVSDZrmk
-+	1024, // X86_VMOVSDZrmkz
- 	1024, // X86_VMOVSDZrr
- 	1024, // X86_VMOVSDZrr_REV
- 	1024, // X86_VMOVSDZrrk
--	0, // X86_VMOVSDZrrk_REV
--	0, // X86_VMOVSDZrrkz
--	0, // X86_VMOVSDZrrkz_REV
-+	1024, // X86_VMOVSDZrrk_REV
-+	1024, // X86_VMOVSDZrrkz
-+	1024, // X86_VMOVSDZrrkz_REV
- 	1024, // X86_VMOVSDmr
- 	1024, // X86_VMOVSDrm
- 	1024, // X86_VMOVSDrr
-@@ -9365,14 +9365,14 @@ static const uint16_t x86_mapping_counts[] = {
- 	1024, // X86_VMOVSSZmr
- 	1024, // X86_VMOVSSZmrk
- 	1024, // X86_VMOVSSZrm
--	0, // X86_VMOVSSZrmk
--	0, // X86_VMOVSSZrmkz
-+	1024, // X86_VMOVSSZrmk
-+	1024, // X86_VMOVSSZrmkz
- 	1024, // X86_VMOVSSZrr
- 	1024, // X86_VMOVSSZrr_REV
- 	1024, // X86_VMOVSSZrrk
--	0, // X86_VMOVSSZrrk_REV
--	0, // X86_VMOVSSZrrkz
--	0, // X86_VMOVSSZrrkz_REV
-+	1024, // X86_VMOVSSZrrk_REV
-+	1024, // X86_VMOVSSZrrkz
-+	1024, // X86_VMOVSSZrrkz_REV
- 	1024, // X86_VMOVSSmr
- 	1024, // X86_VMOVSSrm
- 	1024, // X86_VMOVSSrr
-diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
-index 7e5e7f51..ba7fbaeb 100644
---- a/arch/X86/X86MappingInsn.inc
-+++ b/arch/X86/X86MappingInsn.inc
-@@ -54193,14 +54193,14 @@
- {
- 	X86_VMOVSDZrmk, X86_INS_VMOVSD, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
+diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
+index 6f3953cc..c78150e3 100644
+--- a/arch/X86/X86UnsignedImmediate.h
++++ b/arch/X86/X86UnsignedImmediate.h
+@@ -4,23 +4,54 @@
+ #ifndef CS_X86_UNSIGNED_IMMEDIATE_H
+ #define CS_X86_UNSIGNED_IMMEDIATE_H
  
- {
- 	X86_VMOVSDZrmkz, X86_INS_VMOVSD, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
-@@ -54228,21 +54228,21 @@
- {
- 	X86_VMOVSDZrrk_REV, X86_INS_VMOVSD, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
- {
- 	X86_VMOVSDZrrkz, X86_INS_VMOVSD, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
- {
- 	X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
-@@ -54662,14 +54662,14 @@
- {
- 	X86_VMOVSSZrmk, X86_INS_VMOVSS, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
- {
- 	X86_VMOVSSZrmkz, X86_INS_VMOVSS, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
-@@ -54697,21 +54697,21 @@
- {
- 	X86_VMOVSSZrrk_REV, X86_INS_VMOVSS, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
- {
- 	X86_VMOVSSZrrkz, X86_INS_VMOVSS, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
- {
- 	X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS, 0,
- #ifndef CAPSTONE_DIET
--	{ 0 }, { 0 }, { 0 }, 0, 0
-+	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
- #endif
- },
- 
-diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
-index a082891f..b774119d 100644
---- a/arch/X86/X86MappingInsnOp.inc
-+++ b/arch/X86/X86MappingInsnOp.inc
-@@ -38695,12 +38695,12 @@
- 
- {	/* X86_VMOVSDZmr, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDZmrk, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDZrm, X86_INS_VMOVSD: vmovsd */
-@@ -38710,12 +38710,12 @@
- 
- {	/* X86_VMOVSDZrmk, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDZrmkz, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDZrr, X86_INS_VMOVSD: vmovsd */
-@@ -38730,27 +38730,27 @@
- 
- {	/* X86_VMOVSDZrrk, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDZrrk_REV, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDZrrkz, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDmr, X86_INS_VMOVSD: vmovsd */
- 	0,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSDrm, X86_INS_VMOVSD: vmovsd */
-@@ -39030,12 +39030,12 @@
- 
- {	/* X86_VMOVSSZmr, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSZmrk, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSZrm, X86_INS_VMOVSS: vmovss */
-@@ -39045,12 +39045,12 @@
- 
- {	/* X86_VMOVSSZrmk, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSZrmkz, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSZrr, X86_INS_VMOVSS: vmovss */
-@@ -39065,27 +39065,27 @@
- 
- {	/* X86_VMOVSSZrrk, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSZrrk_REV, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSZrrkz, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSmr, X86_INS_VMOVSS: vmovss */
- 	0,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_VMOVSSrm, X86_INS_VMOVSS: vmovss */
-diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index 9c1dbe81..c414d6d3 100644
---- a/suite/auto-sync/README.md
-+++ b/suite/auto-sync/README.md
-@@ -145,6 +145,10 @@ Apply `suite/auto-sync/inc_patches/X86/03_vector_compare_flags.patch` if regener
- SSE `CMPPD`/`CMPPS`/`CMPSD`/`CMPSS` rows incorrectly modify arithmetic flags.
- `unit_x86_reg_access` checks predicate aliases and retains the flag effects of
- integer/string comparisons and `(U)COMISD`/`(U)COMISS`.
-+If regenerated `VMOVSS` or `VMOVSD` metadata loses operand accesses or AVX512
-+group membership, apply `suite/auto-sync/inc_patches/X86/04_scalar_vector_access.patch`,
-+regenerate the mapping counts with `python3 suite/synctools/x86_mapping_counts.py`,
-+and run `unit_x86_scalar_vector_access`.
- 
- After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
- `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
-diff --git a/suite/auto-sync/inc_patches/X86/04_scalar_vector_access.patch b/suite/auto-sync/inc_patches/X86/04_scalar_vector_access.patch
-new file mode 100644
-index 00000000..6b5dd9ac
---- /dev/null
-+++ b/suite/auto-sync/inc_patches/X86/04_scalar_vector_access.patch
-@@ -0,0 +1,222 @@
-+diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
-+--- a/arch/X86/X86MappingInsn.inc
-++++ b/arch/X86/X86MappingInsn.inc
-+@@ -54193,6 +54193,6 @@
-+ {
-+-	X86_VMOVSDZrmk, X86_INS_VMOVSD, 0,
-++	X86_VMOVSDZrmk, X86_INS_VMOVSD, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54200,6 +54200,6 @@
-+ {
-+-	X86_VMOVSDZrmkz, X86_INS_VMOVSD, 0,
-++	X86_VMOVSDZrmkz, X86_INS_VMOVSD, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54228,6 +54228,6 @@
-+ {
-+-	X86_VMOVSDZrrk_REV, X86_INS_VMOVSD, 0,
-++	X86_VMOVSDZrrk_REV, X86_INS_VMOVSD, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54235,6 +54235,6 @@
-+ {
-+-	X86_VMOVSDZrrkz, X86_INS_VMOVSD, 0,
-++	X86_VMOVSDZrrkz, X86_INS_VMOVSD, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54242,6 +54242,6 @@
-+ {
-+-	X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD, 0,
-++	X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54662,6 +54662,6 @@
-+ {
-+-	X86_VMOVSSZrmk, X86_INS_VMOVSS, 0,
-++	X86_VMOVSSZrmk, X86_INS_VMOVSS, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54669,6 +54669,6 @@
-+ {
-+-	X86_VMOVSSZrmkz, X86_INS_VMOVSS, 0,
-++	X86_VMOVSSZrmkz, X86_INS_VMOVSS, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54697,6 +54697,6 @@
-+ {
-+-	X86_VMOVSSZrrk_REV, X86_INS_VMOVSS, 0,
-++	X86_VMOVSSZrrk_REV, X86_INS_VMOVSS, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54704,6 +54704,6 @@
-+ {
-+-	X86_VMOVSSZrrkz, X86_INS_VMOVSS, 0,
-++	X86_VMOVSSZrrkz, X86_INS_VMOVSS, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+@@ -54711,6 +54711,6 @@
-+ {
-+-	X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS, 0,
-++	X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS, 0,
-+ #ifndef CAPSTONE_DIET
-+-	{ 0 }, { 0 }, { 0 }, 0, 0
-++	{ 0 }, { 0 }, { X86_GRP_AVX512, 0 }, 0, 0
-+ #endif
-+ },
-+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
-+--- a/arch/X86/X86MappingInsnOp.inc
-++++ b/arch/X86/X86MappingInsnOp.inc
-+@@ -38696,4 +38696,4 @@
-+ {	/* X86_VMOVSDZmr, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -38701,4 +38701,4 @@
-+ {	/* X86_VMOVSDZmrk, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -38711,4 +38711,4 @@
-+ {	/* X86_VMOVSDZrmk, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -38716,4 +38716,4 @@
-+ {	/* X86_VMOVSDZrmkz, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -38731,4 +38731,4 @@
-+ {	/* X86_VMOVSDZrrk, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -38736,4 +38736,4 @@
-+ {	/* X86_VMOVSDZrrk_REV, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -38741,4 +38741,4 @@
-+ {	/* X86_VMOVSDZrrkz, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -38746,4 +38746,4 @@
-+ {	/* X86_VMOVSDZrrkz_REV, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -38751,4 +38751,4 @@
-+ {	/* X86_VMOVSDmr, X86_INS_VMOVSD: vmovsd */
-+-	0,
-++	0,
-+-	{ CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -39031,4 +39031,4 @@
-+ {	/* X86_VMOVSSZmr, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -39036,4 +39036,4 @@
-+ {	/* X86_VMOVSSZmrk, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -39046,4 +39046,4 @@
-+ {	/* X86_VMOVSSZrmk, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -39051,4 +39051,4 @@
-+ {	/* X86_VMOVSSZrmkz, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -39066,4 +39066,4 @@
-+ {	/* X86_VMOVSSZrrk, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -39071,4 +39071,4 @@
-+ {	/* X86_VMOVSSZrrk_REV, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_READ_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -39076,4 +39076,4 @@
-+ {	/* X86_VMOVSSZrrkz, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -39081,4 +39081,4 @@
-+ {	/* X86_VMOVSSZrrkz_REV, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, CS_AC_READ, CS_AC_READ, 0 }
-+ },
-+@@ -39086,4 +39086,4 @@
-+ {	/* X86_VMOVSSmr, X86_INS_VMOVSS: vmovss */
-+-	0,
-++	0,
-+-	{ CS_AC_READ, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 735eaf83..7bca57ed 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -96,6 +96,7 @@ if(CAPSTONE_X86_SUPPORT)
-         list(APPEND UNIT_TEST_SOURCES x86_valign_access.c)
-         list(APPEND UNIT_TEST_SOURCES x86_evex_move_access.c)
-         list(APPEND UNIT_TEST_SOURCES x86_packed_move_access.c)
-+        list(APPEND UNIT_TEST_SOURCES x86_scalar_vector_access.c)
-     endif()
-     list(APPEND UNIT_TEST_SOURCES x86_memory_scale.c)
-     list(APPEND UNIT_TEST_SOURCES x86_reg_access.c)
-diff --git a/tests/unit/x86_scalar_vector_access.c b/tests/unit/x86_scalar_vector_access.c
-new file mode 100644
-index 00000000..9d2fb64f
---- /dev/null
-+++ b/tests/unit/x86_scalar_vector_access.c
-@@ -0,0 +1,104 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
++#include "../../MathExtras.h"
 +
-+#include <capstone/capstone.h>
-+#include <stdio.h>
+ static char *writeUnsignedImmediate(char *out, uint64_t value)
+ {
+ 	if (value <= HEX_THRESHOLD) {
+ 		*out = (char)('0' + value);
+ 		return out + 1;
+-	} else {
+-		static const char digits[] = "0123456789abcdef";
+-		char temp[16], *end = temp + sizeof(temp), *start = end;
+-		uint64_t n = value;
+-		do {
+-			*--start = digits[n & 15];
+-			n >>= 4;
+-		} while (n);
+-		memcpy(out, "0x", 2);
+-		memcpy(out + 2, start, end - start);
+-		return out + 2 + (end - start);
+ 	}
 +
-+static bool check_move(csh handle, unsigned bits, unsigned encoding, bool fp64,
-+		       bool store, bool registers, unsigned mask, bool att)
-+{
-+	uint8_t bytes[8], *end = bytes;
-+	const uint8_t flags = (registers ? 0x70 : 0x78) | (2 + fp64);
-+	if (encoding == 2) {
-+		*end++ = 0x62;
-+		*end++ = 0xf1;
-+		*end++ = flags | 4 | (fp64 ? 0x80 : 0);
-+		*end++ = 8 | (mask ? 3 : 0) | (mask == 2 ? 0x80 : 0);
-+	} else if (encoding == 1) {
-+		*end++ = 0xc4;
-+		*end++ = 0xe1;
-+		*end++ = flags;
-+	} else {
-+		*end++ = 0xc5;
-+		*end++ = flags | 0x80;
++	static const char byte_digits[] =
++		"000102030405060708090a0b0c0d0e0f"
++		"101112131415161718191a1b1c1d1e1f"
++		"202122232425262728292a2b2c2d2e2f"
++		"303132333435363738393a3b3c3d3e3f"
++		"404142434445464748494a4b4c4d4e4f"
++		"505152535455565758595a5b5c5d5e5f"
++		"606162636465666768696a6b6c6d6e6f"
++		"707172737475767778797a7b7c7d7e7f"
++		"808182838485868788898a8b8c8d8e8f"
++		"909192939495969798999a9b9c9d9e9f"
++		"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
++		"b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
++		"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
++		"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
++		"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
++		"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
++	memcpy(out, "0x", 2);
++	out += 2;
++	if (value < 256) {
++		const char *pair = byte_digits + 2 * (unsigned)value;
++		if (value >= 16)
++			*out++ = pair[0];
++		*out++ = pair[1];
++		return out;
 +	}
-+	*end++ = store ? 0x11 : 0x10;
-+	*end++ = registers ? 0xd4 : 0x14;
-+	if (!registers && bits != 16)
-+		*end++ = 0x88;
 +
-+	cs_insn *insn = NULL;
-+	if (cs_disasm(handle, bytes, end - bytes, 0x1000, 1, &insn) != 1)
-+		return false;
-+	const cs_x86 *x = &insn->detail->x86;
-+	const unsigned count = 2 + registers + (mask != 0);
-+	const unsigned dst = att ? count - 1 - (mask != 0) : 0;
-+	bool ok = insn->size == end - bytes &&
-+		  insn->id == (fp64 ? X86_INS_VMOVSD : X86_INS_VMOVSS) &&
-+		  x->op_count == count && !x->eflags &&
-+		  cs_insn_group(handle, insn,
-+				encoding == 2 ? X86_GRP_AVX512 : X86_GRP_AVX);
-+	for (unsigned i = 0; i < x->op_count && ok; ++i) {
-+		const cs_x86_op *op = &x->operands[i];
-+		const bool memory = !registers && i == (store ? dst :
-+							att   ? 0 :
-+								count - 1);
-+		const bool predicate = mask && i == (att ? count - 1 : 1);
-+		const bool merge = mask == 1 && !memory;
-+		const cs_ac_type access =
-+			i == dst ? (merge ? CS_AC_READ_WRITE : CS_AC_WRITE) :
-+				   CS_AC_READ;
-+		ok = op->type == (memory ? X86_OP_MEM : X86_OP_REG) &&
-+		     op->access == access &&
-+		     op->size == (memory    ? (fp64 ? 8 : 4) :
-+				  predicate ? 1 :
-+					      16);
-+		if (predicate)
-+			ok = ok && op->reg == X86_REG_K3;
++	/* Write the significant digits directly into the operand string. */
++	unsigned bits = (67 - CountLeadingZeros_64(value)) & ~3u;
++	if (bits & 4) {
++		bits -= 4;
++		*out++ = byte_digits[2 * (unsigned)(value >> bits) + 1];
 +	}
-+	if (!ok)
-+		fprintf(stderr, "%s %s (mode %u, encoding %u, mask %u)\n",
-+			insn->mnemonic, insn->op_str, bits, encoding, mask);
-+	cs_free(insn, 1);
-+	return ok;
-+}
-+
-+int main(void)
-+{
-+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
-+	for (unsigned mode = 0; mode < 3; ++mode) {
-+		csh handle;
-+		if (cs_open(CS_ARCH_X86, modes[mode], &handle))
-+			return 1;
-+		bool ok = cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ==
-+			  CS_ERR_OK;
-+		for (unsigned att = 0; ok && att < 2; ++att) {
-+			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
-+					       att ? CS_OPT_SYNTAX_ATT :
-+						     CS_OPT_SYNTAX_INTEL);
-+			if (att && err == CS_ERR_X86_ATT)
-+				continue;
-+			ok = err == CS_ERR_OK;
-+			for (unsigned enc = 0; ok && enc < 3; ++enc)
-+				for (unsigned form = 0; ok && form < 8;
-+				     ++form) {
-+					bool store = (form & 2) != 0;
-+					bool regs = (form & 4) != 0;
-+					unsigned masks = enc != 2	? 1 :
-+							 store && !regs ? 2 :
-+									  3;
-+					for (unsigned mask = 0;
-+					     ok && mask < masks; ++mask)
-+						ok = check_move(handle,
-+								16u << mode,
-+								enc, form & 1,
-+								store, regs,
-+								mask, att);
-+				}
-+		}
-+		cs_close(&handle);
-+		if (!ok)
-+			return 1;
++	while (bits) {
++		bits -= 8;
++		memcpy(out, byte_digits + 2 * (uint8_t)(value >> bits), 2);
++		out += 2;
 +	}
-+	return 0;
-+}
++	return out;
+ }
+ 
+ #endif

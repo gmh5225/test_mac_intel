@@ -1,7 +1,7 @@
-name: Verify scalar vector writes, masked access and ISA membership on native Windows, macOS and Linux
+name: Verify unsigned immediate formatting and operand access across native ABIs
 on:
   push:
-    branches: [codex/scalar-vector-access-native]
+    branches: [codex/immediate-pairs-native-abis]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 17d578259c044cad6ade810870f2aa1e7d33724a
+          ref: d3dcfa80afcb4d0786308a2938659998c54a1453
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scalar-vector-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: immediate-pairs-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

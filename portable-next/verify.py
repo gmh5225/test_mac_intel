@@ -22,7 +22,14 @@ try:
  run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
  run('build','cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
  run('units','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units+['x86_mapping_counts_generator','x86_mapping_counts_validation'])+')$')
+ cc=os.environ.get('CC','clang')
+ exe=t/('numbers.exe' if os.name=='nt' else 'numbers')
+ if os.name=='nt':
+    run('number-build','cl','/nologo','/O2','/std:c11','/I'+str(s),'/I'+str(s/'include'),p/'numbers.c','/Fo:'+str(t/'numbers.obj'),'/Fe:'+str(exe))
+ else:
+    run('number-build',profile if profile in ('gcc','clang') else cc,'-O3','-I',s,'-I',s/'include',p/'numbers.c','-o',exe)
+ run('numbers',exe);assert (e/'numbers.log').read_text().strip()=='1593216'
  text=(e/'units.log').read_text(errors='replace');assert '100% tests passed' in text and all('unit_'+n in text for n in units)
- save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units))
+ save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units,number_buffers=1593216))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
