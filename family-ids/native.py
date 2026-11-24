@@ -4,7 +4,7 @@ from math import ceil
 import hashlib, json, os, platform, random, shutil, subprocess as sp, tempfile
 import corpus
 r=Path(__file__).resolve().parent; source=r.parent/'source'; out=r.parent/'evidence';out.mkdir()
-rd=lambda f:json.loads(f.read_text());meta=rd(r/'tree.json');stages=rd(r/'stages.json')
+rd=lambda f:json.loads(f.read_text());meta=rd(r/'tree.json')
 cc=os.environ['CC']; flavor=os.environ['FLAVOR']; mixed=flavor=='second'
 def save(name,data):(out/(name+'.json')).write_text(json.dumps(data,indent=2)+'\n')
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
@@ -39,39 +39,29 @@ def measure(t):
     info={};libs={};units=checks['tests']
     for profile,arch,extra in [('full',arches,[]),('diet',['RISCV'],['-DCAPSTONE_BUILD_DIET=ON']),('neverd',['ARM','AARCH64','MIPS','X86'],[])]:
         b=t/profile;variants={}
-        for k in (('base','lazy','width') if profile=='full' else ('base','width')):
+        for k in ('base','candidate'):
             git('restore','--source','HEAD','--worktree','--staged','--','.')
             if k!='base':
-                patch=r/(k+'.patch');assert sha(patch)==stages[k]['sha256'];git('apply','--index',str(patch));assert git('write-tree')==stages[k]['tree']
+                patch=r/'candidate.patch';assert sha(patch)==meta['sha256'];git('apply','--index',str(patch));assert git('write-tree')==meta['tree']
             run(profile+k+'-config',config(b,arch,extra))
-            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else []),*(['riscv_scan_options'] if profile=='full' and k=='width' else [])])
-            if profile=='full' and k=='width':run('generated-aliases',['python3','-B',source/'suite/synctools/alias_pattern_rows.py','--check'])
+            run(profile+k+'-build',['cmake','--build',b,'--parallel','4','--target','capstone_shared','capstone_static',*(units if profile=='full' else [])])
+            if profile=='full' and k=='candidate':run('generated-aliases',['python3','-B',source/'suite/synctools/alias_pattern_rows.py','--check'])
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
             variants[k]=dict(so=sha(so),archive=sha(b/'libcapstone.a'),objects=files)
             if profile=='full':libs[k]=t/(k+'.so');shutil.copy2(so,libs[k])
-        if profile=='neverd':assert variants['base']==variants['width']
+        before,after=variants['base'],variants['candidate']
+        if profile!='full' or mixed:
+            assert after==before,(profile,mixed)
         else:
-            for k,row in variants.items():
-                assert set(row['objects'])==set(variants['base']['objects'])
-                changed=[f for f,v in row['objects'].items() if v!=variants['base']['objects'][f]]
-                actual={Path(f).name for f in changed}
-                allowed={'RISCVInstPrinter.c.o'} if k=='lazy' else {'RISCVInstPrinter.c.o','cs.c.o','RISCVDisassembler.c.o','RISCVModule.c.o'} if k=='width' else set()
-                if profile=='full' and mixed and k=='width':
-                    allowed=set()
-                    assert row==variants['base']
-                assert actual<=allowed and (profile!='full' or actual==allowed),(profile,k,actual,allowed)
+            assert set(after['objects'])==set(before['objects'])
+            changes=[Path(n).name for n,h in before['objects'].items() if after['objects'][n]!=h]
+            assert changes==['MCInstPrinter.c.o'],changes
         info[profile]=variants;shutil.rmtree(b)
     save('profiles',info)
-    for k in ('lazy','width'):
-        proof=list(map(int,sp.check_output([t/'guard',libs['base'],libs[k]]).split()))
-        assert proof[0]==checks['guards'][k][0] and all(proof);save('guard-'+k,proof)
-    run('scan-guard-build',['c++','-std=c++17','-O2','-I',source/'include',r/'scan-guard.cpp','-ldl','-o',t/'scan-guard'])
-    for k in ('width','lazy'):
-        counts=list(map(int,sp.check_output([t/'scan-guard',libs['base'],libs[k]]).split()))
-        assert counts==[1489920,338432,1151488],counts
-        save('scan-proof-'+k,counts)
+    proof=list(map(int,sp.check_output([t/'guard',libs['base'],libs['candidate']]).split()))
+    assert proof[0]==checks['guards']['width'][0] and all(proof);save('guard',proof)
     lib=t/'libcapstone.so.6';(t/'libcapstone.so').symlink_to(lib.name)
     images={k:f.read_bytes() for k,f in libs.items()};length=max(map(len,images.values()));images={k:v+bytes(length-len(v))for k,v in images.items()};images['copy']=images['base'];lib.write_bytes(images['base'])
     for f in ('time','raw'):run(f,['c++','-O3','-std=c++17','-I',source/'include',r/(f+'.cpp'),'-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/f])
@@ -83,16 +73,6 @@ def measure(t):
         if current!=k:
             with lib.open('r+b')as f:assert f.write(images[k])==length
             current=k
-    run('census',['c++','-O2','-std=c++17','-I',source/'include',r/'scan-census.cpp','-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/'census'])
-    census={}
-    for name in cases:
-        if not name.startswith('riscv64-'):continue
-        data=[]
-        for k in ('base','width'):
-            select(k);data.append(list(map(int,sp.check_output([t/'census',t/(name+'.text')]).split())))
-        assert data[0]==data[1] and sum(data[0][2:])>0
-        census[name]=data[0]
-    save('scan-census',census)
     signatures={}
     for name,bits in cases.items():
         f=t/(name+'.text')
@@ -101,8 +81,8 @@ def measure(t):
             for k in libs:
                 select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
             assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-2260-'+flavor)
-    for name,bits in cases.items():
+    save('raw',signatures);rows={};rng=random.Random('RISCV-indexed-alias-'+flavor)
+    for name,bits in ({} if mixed else cases).items():
         def sample(k,mode,reps):
             select(k);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(bits),str(mode),t/(name+'.text'),'1048576',str(reps)]).split()))
         for mode in (0,1,2):

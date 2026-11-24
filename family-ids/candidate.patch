@@ -1,49 +1,18 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6f3ff5f..d36460a3 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -174,6 +174,10 @@ if(capstone_enabled_architectures STREQUAL "SYSTEMZ")
-     add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING)
- endif()
- 
-+if(capstone_enabled_architectures STREQUAL "SPARC")
-+    add_compile_definitions(CAPSTONE_SPARC_ONLY)
-+endif()
-+
- if(capstone_enabled_architectures STREQUAL "LOONGARCH")
-     add_compile_definitions(CAPSTONE_LOONGARCH_DEDICATED_MAPPING)
- endif()
-diff --git a/Makefile b/Makefile
-index 8118f71d..f225ca2c 100644
---- a/Makefile
-+++ b/Makefile
-@@ -135,6 +135,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),systemz)
- CFLAGS += -DCAPSTONE_SYSTEMZ_DEDICATED_MAPPING
- endif
- 
-+ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
-+CFLAGS += -DCAPSTONE_SPARC_ONLY
-+endif
-+
- ifeq ($(sort $(CAPSTONE_ARCHS)),loongarch)
- CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
- endif
-diff --git a/cs.c b/cs.c
-index b84486e0..65ae1a9d 100644
---- a/cs.c
-+++ b/cs.c
-@@ -93,6 +93,14 @@
- #define CS_PRIVATE_DECODER LoongArch_getInstruction
- #define CS_PRIVATE_PRINTER LoongArch_printer
- #define CS_KNOWN_PRINTER_EXTENT
-+#elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#include "arch/Sparc/SparcMapping.h"
-+#define CS_PRIVATE_ARCH CS_ARCH_SPARC
-+#define CS_PRIVATE_DECODER Sparc_getInstruction
-+#define CS_PRIVATE_PRINTER Sparc_printer
-+#define CS_KNOWN_PRINTER_EXTENT
- #endif
- #include "arch/TMS320C64x/TMS320C64xModule.h"
- #include "arch/TriCore/TriCoreModule.h"
+diff --git a/MCInstPrinter.c b/MCInstPrinter.c
+index 97d26582..62dd338d 100644
+--- a/MCInstPrinter.c
++++ b/MCInstPrinter.c
+@@ -142,6 +142,13 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
+ 		count = handle->alias_opcode_count;
+ 	unsigned MIOpcode = MI->Opcode;
+ 	size_t i = 0;
++#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
++	/* The generated RISC-V index passes a suffix starting at the
++	 * selected opcode. Zero can also be the sentinel. */
++	if (MIOpcode && M->OpToPatterns[0].Opcode == MIOpcode)
++		count = 1;
++	else
++#endif
+ 	if (!count || M->OpToPatterns[count - 1].Opcode < MIOpcode) {
+ 		i = count;
+ 		while (validOpToPatter(&M->OpToPatterns[i]) &&
