@@ -26,7 +26,7 @@ try:
             q=stages[k];assert g('rev-parse','HEAD')==q['parent']
             patch=t/'trial.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/'+k+'.patch']));assert sha(patch)==q['sha256'];g('apply','--index',patch);assert g('write-tree')==q['tree']
         cmd('configure-'+k,['cmake','-G','Ninja','-S',project,'-B',b,*flags])
-        if k!='base':units.append('batch_detail_alloc')
+        if k!='base' and 'batch_detail_alloc' not in units:units.append('batch_detail_alloc')
         cmd('build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_shared','checker',*units])
         cmd('unit-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         lib,=[f for f in b.rglob('*.dll' if win else '*.dylib')if 'capstone'in f.name.lower()and f.is_file()and not f.is_symlink()]

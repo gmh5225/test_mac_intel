@@ -1,7 +1,7 @@
-name: Verify allocation callback ownership, errors and real x86 records on Windows and macOS
+name: Check conditional batch detail releases on native Windows and macOS configurations
 on:
   push:
-    branches: [codex/batch-detail-ownership-abi]
+    branches: [codex/batch-unwind-windows-and-mac]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: batch-detail-ownership-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: batch-unwind-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
