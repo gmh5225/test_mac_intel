@@ -285,7 +285,45 @@ static void foreignRecords(Api &left, Api &right, const char *record) {
   check(bool(out),"foreign results file");
 }
 
+static int paired_images(char **argv) {
+  unsigned seed = static_cast<unsigned>(std::strtoul(argv[7], nullptr, 10));
+  unsigned order[] = {0,1,2};
+  for (unsigned n=0; n<seed%6; ++n) std::next_permutation(order,order+3);
+  Api first(argv[1+order[0]]), second(argv[1+order[1]]), third(argv[1+order[2]]);
+  Api *images[3]; images[order[0]]=&first; images[order[1]]=&second; images[order[2]]=&third;
+  check(first.next!=second.next && first.next!=third.next && second.next!=third.next, "separate images");
+  std::ifstream f(argv[5],std::ios::binary);
+  std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};
+  check(!bytes.empty(),"input");
+  uint64_t ip=std::strtoull(argv[6],nullptr,10);
+  std::mt19937 rng(seed);
+  for (int mode=0;mode<3;++mode) for (int iter=0;iter<2;++iter) {
+    std::shuffle(order,order+3,rng);
+    unsigned reps=0;
+    uint64_t expected=0;
+    size_t seen=0;
+    auto work = iter ? iter_work : visit;
+    for(unsigned which:order) {
+      Session s(*images[which],CS_ARCH_MIPS,CS_MODE_MIPS64);configure(s,mode);
+      size_t records=0;uint64_t start=clk(CLOCK_PROCESS_CPUTIME_ID);
+      auto value=work(s,bytes,ip,mode,4,records);
+      auto ns=clk(CLOCK_PROCESS_CPUTIME_ID)-start;
+      check(records && ns,"warm");
+      if(!reps){seen=records;expected=value;reps=static_cast<unsigned>((25000000+ns-1)/ns);}
+      check(seen==records && expected==value,"warm digest");
+      uint64_t w=clk(CLOCK_MONOTONIC),c=clk(CLOCK_PROCESS_CPUTIME_ID),sum=0;
+      for(unsigned j=0;j<reps;++j)sum+=work(s,bytes,ip,mode,4,records);
+      c=clk(CLOCK_PROCESS_CPUTIME_ID)-c;w=clk(CLOCK_MONOTONIC)-w;
+      check(records==seen && sum==expected*reps,"measured digest");
+      std::printf("%d %d %u %" PRIu64 " %" PRIu64 " %u %zu %" PRIu64 "\n",
+                  mode,iter,which,c,w,reps,records,value);
+    }
+  }
+  return 0;
+}
+
 int main(int argc,char **argv) {
+  if(argc==8 && std::string(argv[4])=="paired")return paired_images(argv);
   if(argc==9 && std::string(argv[2])=="single")return single(argv);
   if(argc<4)return 2;
   Api a(argv[1]),b(argv[2]);check(a.disasm!=b.disasm,"distinct array decoders");

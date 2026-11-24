@@ -47,55 +47,20 @@ try:
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
-    if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    launch=[]if darwin else['setarch',platform.machine(),'-R'];timings={}
-    import random,math
-    image=t/('timed.dylib' if darwin else 'timed.so')
-    images={k:f.read_bytes()for k,f in libs.items()};maxlen=max(map(len,images.values()))
-    if not darwin:
-        # Every process maps the same pathname, inode, length and load base.
-        loads={};spans={}
-        for k,v in images.items():
-            assert v[:6]==bytes((127,69,76,70,2,1))
-            phoff=struct.unpack_from('<Q',v,32)[0];ent,num=struct.unpack_from('<HH',v,54)
-            last=max((struct.unpack_from('<IIQQQQQQ',v,pos)[3],pos)for pos in range(phoff,phoff+ent*num,ent)if struct.unpack_from('<I',v,pos)[0]==1)[1]
-            pva,psize=struct.unpack_from('<Q',v,last+16)[0],struct.unpack_from('<Q',v,last+40)[0]
-            loads[k]=(last,pva,psize);spans[k]=(pva+psize+4095)//4096
-        data={};pad={}
-        for k,v in images.items():
-            buf=bytearray(v+bytes(maxlen-len(v)));off,va,sz=loads[k]
-            extra=(max(spans.values())-spans[k])*4096
-            if extra:struct.pack_into('<Q',buf,off+40,sz+extra)
-            data[k]=buf;pad[k]=extra
-        put('load-spans',dict(pages=spans,extra_zero_fill=pad))
-        image.write_bytes(data['base']);image.chmod(0o755)
-    curr=None;addresses={};offsets={}
-    def take(stage,args,reps):
-        global curr
-        src='base'if stage=='copy'else stage
-        if src!=curr:
-            if darwin:
-                if image.is_symlink():image.unlink()
-                image.symlink_to(libs[src])
-            else:
-                with image.open('r+b')as out_file:assert out_file.write(data[src])==maxlen
-            curr=src
-        vals=list(map(int,get(*launch,driver,image,'single',*args,str(reps)).split()))
-        assert len(vals)==6 and min(vals[0:3])>0
-        addresses.setdefault(src,set()).add(vals[4]);assert offsets.setdefault(src,vals[5])==vals[5]
-        if not darwin:assert len(set.union(*addresses.values()))==1,addresses
-        return vals[:4]
-    for n,(f,arch,ip) in cases.items():
-        for mode in (0,1,2):
-            for api in ('time','iter'):
-                key='/'.join((n,api,str(mode)));args=[f,arch,str(ip),api,str(mode)]
-                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*q];rng=random.Random(key)
-                for _ in range(17):
-                    rng.shuffle(keys);obs=[(k,take(k,args,reps))for k in keys+keys[::-1]]
-                    assert all(v[2:]==t0[2:]for k,v in obs)
-                    cycles.append({k:[sum(o[i]for l,o in obs if k==l)for i in (0,1)]for k in keys})
-                timings[key]=dict(cycles=cycles,reps=reps,records=t0[2],value=t0[3]);put('timings',timings)
-        put('mappings',dict(sets={k:sorted(v)for k,v in addresses.items()},offsets=offsets,fixed=not darwin,inode=image.stat().st_ino if not darwin else None))
+    assert darwin
+    copy=t/'independent.dylib';shutil.copy2(libs['base'],copy);assert sha(copy)==sha(libs['base'])
+    timings={}
+    for name,(f,arch,ip) in cases.items():
+        panels={}
+        for seed in range(24):
+            raw=[list(map(int,line.split()))for line in get(driver,libs['base'],copy,libs['mips'],'paired',f,str(ip),str(seed+612)).splitlines()]
+            assert len(raw)==18
+            for mode in (0,1,2):
+                for api in (0,1):
+                    rows=[v for v in raw if v[:2]==[mode,api]]
+                    assert {x[2]for x in rows}=={0,1,2} and len({tuple(x[5:])for x in rows})==1
+                    panels.setdefault(name+'/'+('iter' if api else 'time')+'/'+str(mode),[]).append({('base','copy','mips')[x[2]]:x[3:]for x in rows})
+        timings.update(panels);put('timings',timings)
     put('hardware',dict(cpu=get('sysctl','-n','machdep.cpu.brand_string') if darwin else get('lscpu'),compiler=get('clang','--version'))) 
     put('complete',dict(source=q,panels=len(timings),compiler=get('clang','--version'),cpu=get('sysctl','-n','machdep.cpu.brand_string')if darwin else get('lscpu')))
 finally:
