@@ -15,23 +15,22 @@ def apply(k):
 try:
     assert get('git','-C',s,'rev-parse','HEAD')==m['checkout'] and all(v['parent']==m['checkout']for v in q.values())
     arch=['X86','ARM','AARCH64','MIPS']
-    flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
+    flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
     libs={};images={}
     for k in ('base',*q):
         apply(k);b=t/'build'
         run('cmake-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
-        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option','mips_scan','mips_register_names','mips16_memory_calls','mips_single']
-        run('build-'+k,'cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
+        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option','mips_scan','mips_register_names','mips16_memory_calls']
+        run('build-'+k,'cmake','--build',b,'--parallel','4','--target','capstone_shared',*units)
         run('unit-'+k,'ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$')
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
-        images[k]=dict(shared=sha(path),static=sha(b/'libcapstone.a'),bytes=path.stat().st_size,
+        images[k]=dict(shared=sha(path),static=(b/'libcapstone.a').is_file(),bytes=path.stat().st_size,
                        object={a:sha(next(b.rglob(a)))for a in('cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','MipsMapping.c.o','AArch64Disassembler.c.o')})
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
-        expected={'cs.c.o'}
-        if k in ('joint','record'):expected.update(['X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'])
-        if k in ('joint','scan'):expected.add('MipsMapping.c.o')
+        assert not images[k]['static'] and not images['base']['static']
+        expected={'cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'}
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)

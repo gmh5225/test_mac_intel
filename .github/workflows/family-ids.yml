@@ -1,7 +1,7 @@
-name: Time the public x86 writer independently on current MIPS and XCore next
+name: Compare shared public formatting with one or two full decoders
 on:
   push:
-    branches: [codex/record-only-at-current-next]
+    branches: [codex/shared-public-record-and-single-full-decoder]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: four-isa-record-only-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: shared-public-writers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

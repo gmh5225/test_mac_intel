@@ -1,0 +1,119 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..74b482b5 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,11 +30,19 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
+ 
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
+-	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_RECORD
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
++#else
++#define CAPSTONE_X86_MIXED_PUBLIC_RECORD
++CAPSTONE_INTERNAL bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code,
++					   size_t size, cs_insn *insn,
++					   uint16_t *length);
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..ed00d9d8 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3755,6 +3755,10 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 
+ #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
++#elif defined(CAPSTONE_X86_MIXED_PUBLIC_RECORD)
++#define CS_DECODE_OUTPUT_MISS(handle, code, size, insn, length, batch) \
++	cs_decode_full_insn(handle, code, size, insn, length, \
++			    (batch) ? CS_RECORD_BATCH : CS_RECORD_PUBLIC_ITERATOR)
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..e3a77092 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -32,4 +32,12 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *length)
++{
++	return X86_trySimpleOutput(handle, code, size, insn, length);
++}
++#endif
+ #endif
+diff --git a/cs.c b/cs.c
+index 333e7de2..febe3351 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1104,8 +1104,13 @@ __attribute__((noinline))
+ #endif
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, cs_record_kind kind)
+ {
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
++	const bool batch = kind == CS_RECORD_BATCH;
++#else
++	const bool batch = kind;
++#endif
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+@@ -1113,9 +1118,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
++		if (kind == CS_RECORD_PUBLIC_ITERATOR && !handle->no_text &&
++		    X86_tryPublicOutput(handle, code, size, insn, insn_size))
++			return true;
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..6e64c7ad 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -23,9 +23,17 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ #endif
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
++/* Existing single/batch callers pass false/true. The public iterator can try
++ * the formatted writer before falling back to the same full decoder. */
++typedef uint8_t cs_record_kind;
++enum { CS_RECORD_BATCH = 1, CS_RECORD_PUBLIC_ITERATOR = 2 };
++#else
++typedef bool cs_record_kind;
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size, cs_record_kind kind);
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
