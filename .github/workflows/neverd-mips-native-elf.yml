@@ -55,14 +55,28 @@ jobs:
         run: ./scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
       - name: Build the native ELF test owners against the hash-pinned SDK
         run: |
+          set -o pipefail
           args=()
           if [[ "$RUNNER_OS" == Linux ]]; then
             args+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14')
           fi
-          cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
-            -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
-            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON "${args[@]}"
+          configure() {
+            cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+              -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+              -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON "${args[@]}"
+          }
+          for delay in 0 15 45; do
+            sleep "$delay"
+            if configure 2>&1 | tee configure.log; then
+              break
+            fi
+            if ! grep -Fq "Failed to download" configure.log || ! grep -Fq "https://github.com/NeverSight/llvm-project/releases/download/" configure.log; then
+              exit 1
+            fi
+            if [[ "$delay" == 45 ]]; then exit 1; fi
+            echo "Retrying the public LLVM release download after an HTTP failure."
+          done
           python scripts/build.py build-check --config Release --parallel 4 --target \
             NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDNativeExceptionRewriteContractTests NeverDLowScalarConstantTests NeverDFiniteScalarBranchTests
       - name: Run MIPS decoding, lifting, native object and public SDK suites
