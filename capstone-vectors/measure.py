@@ -15,7 +15,9 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    frozen=rd(r/'base.json');assert get('git','-C',base,'rev-parse','HEAD').strip()==frozen['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert sha(r/'base.patch')==frozen['sha256'] and frozen['commit']==q['parent']
+    run('git','-C',base,'apply','--index',r/'base.patch');assert get('git','-C',base,'write-tree').strip()==frozen['tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -37,6 +39,7 @@ try:
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'ids.cpp',lib,'-o',w/'id-oracle')
     for label in ('base','candidate'):
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
@@ -70,6 +73,9 @@ try:
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
         assert audit_engine('base')==audit_engine('candidate')
+        observed=list(map(int,get(w/'id-oracle',str(bits),f,path).split()));assert len(observed)==8
+        n,invalid,*shifts=observed;assert n>0;save(name+'-untimed-ids',dict(accepted=n,rejected=invalid,counts=shifts[::2],deltas=shifts[1::2]))
+
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
@@ -79,7 +85,8 @@ try:
             labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
+            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']
+            assert expected['base'][:2]==[repeats*n,repeats*invalid] and expected['candidate'][3]==(expected['base'][3]+repeats*shifts[2*mode+1])%(1<<64),(name,mode,expected,observed,repeats)
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
@@ -91,7 +98,7 @@ try:
             summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
+    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and the untimed original decoder independently accounts for every corrected public ID in the output checksum.'))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
