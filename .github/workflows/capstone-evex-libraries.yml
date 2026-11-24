@@ -1,7 +1,7 @@
-name: Measure complete register-indirect i386 output against released public and private iterators
+name: Time i386 near register writers and capture both changed AMD64 objects
 on:
   push:
-    branches: [codex/near-register-output-i386]
+    branches: [codex/i386-indirect-gpr-linux-objects]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +54,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: indirect-register-hosts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: indirect-register-two-objects-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
