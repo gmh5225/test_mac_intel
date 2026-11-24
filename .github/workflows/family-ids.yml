@@ -1,7 +1,7 @@
-name: Measure complete RISC-V scan and print paths including DIET
+name: Measure dedicated MIPS and PowerPC alias lookup across real coreutils and configurations
 on:
   push:
-    branches: [codex/riscv-validated-readers-alias]
+    branches: [codex/dedicated-mips-powerpc-alias-entries]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 1a1075b8bff460c3bd4da0b93f8e0a091c09039a
+          ref: d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: riscv-validated-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: indexed-mips-ppc-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
