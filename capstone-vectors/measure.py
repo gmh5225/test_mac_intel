@@ -1,17 +1,3 @@
-from pathlib import Path as _Path
-import hashlib as _hashlib, subprocess as _sp
-_base_dir = _Path(__file__).resolve().parent
-_source_dir = _base_dir.parent / 'source'
-def _git(*args, data=None):
-    return _sp.check_output(['git','-C',_source_dir,*args],input=data).decode().strip()
-assert _git('rev-parse','HEAD') == '8347e89a4e9a9e1618009fb8a496e335e857d00f'
-_patch = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:capstone-vectors/corrected-parent.patch'])
-assert _hashlib.sha256(_patch).hexdigest() == 'c462aa5959d9fe71006d84e6f3f2206d72ea347c945c85b6683de69621430369'
-_git('apply','--index','-',data=_patch)
-assert _git('write-tree') == 'ca4d4512e65bdf432ea1eb3f76d69d66a07cc211'
-_commit = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:capstone-vectors/parent.commit'])
-assert _git('hash-object','-w','-t','commit','--stdin',data=_commit) == '7db5af38d02d193688bccd2b45e58627979979bb'
-_git('checkout','-q','--detach','7db5af38d02d193688bccd2b45e58627979979bb')
 from pathlib import Path
 import hashlib,itertools,json,math,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
 r=Path(__file__).resolve().parent;p=r.parent
@@ -29,7 +15,7 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -50,15 +36,25 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    images={}
+    images={};flags_by_label={};objects={}
     for label in ('base','candidate'):
         if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+            cfg=project/'CMakeLists.txt';cm=cfg.read_text();a='add_subdirectory(third_party/capstone)'
+            assert cm.count(a)==1
+            cfg.write_text(cm.replace(a,'set(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT ON)\\n'+a))
+            run('cmake','-S',project,'-B',build)
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
+        c,=[x for x in rd(build/'compile_commands.json') if Path(x['file']).name=='X86Sse64Output.c']
+        flags_by_label[label]='-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in c['command']
+        objects[label]={str(x.relative_to(build)):sha(x) for x in build.rglob('*.o')}
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
-    assert images['base']['exe']!=images['candidate']['exe']
+    assert flags_by_label['candidate'] and set(objects['base'])==set(objects['candidate'])
+    delta=[Path(k).name for k,v in objects['base'].items() if v!=objects['candidate'][k]]
+    assert delta==([] if flags_by_label['base'] else ['X86Sse64Output.c.o']),delta
+    if not delta:assert images['base']==images['candidate']
+    else:assert images['base']['exe']!=images['candidate']['exe']
+    save('selection',dict(flags=flags_by_label,objects=len(objects['base']),changed=delta,release=q['commit']))
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
