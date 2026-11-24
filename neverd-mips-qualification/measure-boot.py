@@ -49,6 +49,7 @@ with tempfile.TemporaryDirectory() as directory:
         [sys.executable, "unittests/lift/mips/historical-reset-capture.py", *inputs]
     )
     got = json.loads(output)
-    for board, bounds in [("R4300", [196, 204]), ("R4600", [62, 66])]:
-        assert got[board]["raster_bounds_ns"] == bounds
+    expected = json.loads(Path("unittests/lift/mips/historical-reset-capture.expected.json").read_text())
+    if got != expected:
+        raise ValueError(f"waveform measurements differ from the published figure readings: {got}")
     Path("evidence/reset-waveforms.json").write_bytes(output)
