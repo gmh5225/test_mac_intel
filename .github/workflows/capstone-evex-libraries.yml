@@ -1,7 +1,7 @@
-name: Isolate EXTRQ ModRM selection from the 16-bit mandatory-prefix repair on real firmware and applications
+name: Benchmark real-mode vector prefix selection and direct register formatting on SeaBIOS and six x86 corpora
 on:
   push:
-    branches: [codex/standalone-extrq-firmware]
+    branches: [codex/real-mode-vector-prefix-and-register-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
+          ref: fa11ca3d930b9e66a919ed4de20affdbc75bd125
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: bbfc6da691392ba8b369812c59624d3769d03676
+          ref: 9813768e70ada58586c715a219ccf9395b8e8d45
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-only-extrq-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: legacy16-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

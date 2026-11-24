@@ -1,883 +1,315 @@
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..101cce6d 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1034,6 +1034,9 @@ getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
- 	return 0;
- }
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 039ad47a..474fda4f 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,6 +20,15 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
  
-+/* Generated from the operand descriptors used by the 66 context. */
-+X86_DECODE_INLINE bool hasLegacyXmmOperand(unsigned operands);
-+
- /*
-  * is16BitEquivalent - Determines whether two instruction names refer to
-  * equivalent instructions but one is 16-bit whereas the other is not.
-@@ -1543,8 +1546,29 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 			return 0;
- 		}
- 
--		if (is16BitEquivalent(instructionID, instructionIDWithOpsize) &&
--		    (decoderMode == MODE_16BIT) ^ insn->hasOpSize) {
-+		/* A size-equivalent pair follows the default operand size.
-+		 * A different legacy XMM form selected by 66 instead uses
-+		 * that byte as part of its opcode, also in 16-bit mode. */
-+		const bool sizeEquivalent = is16BitEquivalent(
-+			instructionID, instructionIDWithOpsize);
-+		bool useOpSize = sizeEquivalent &&
-+				 ((decoderMode == MODE_16BIT) ^ insn->hasOpSize);
-+		if (!sizeEquivalent && decoderMode == MODE_16BIT &&
-+		    insn->hasOpSize && !insn->repeatPrefix &&
-+		    insn->opcodeType != ONEBYTE &&
-+		    instructionIDWithOpsize != instructionID) {
-+			const struct InstructionSpecifier *alt =
-+				specifierForUID(instructionIDWithOpsize);
-+			useOpSize = hasLegacyXmmOperand(alt->operands);
-+#ifndef CAPSTONE_X86_REDUCE
-+			/* For 66 0F 78 a reserved EXTRQ selector must not
-+			 * fall back to the unprefixed register VMREAD form. */
-+			if (!instructionIDWithOpsize &&
-+			    instructionID == X86_VMREAD32rr)
-+				return -1;
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_LEGACY16_OUTPUT
++CAPSTONE_INTERNAL bool X86_writeLegacy16(struct cs_struct *handle,
++					 const uint8_t *code, size_t size,
++					 cs_insn *insn, uint16_t *insn_size);
 +#endif
-+		}
-+		if (useOpSize) {
- 			insn->instructionID = instructionIDWithOpsize;
- 			insn->spec = specifierForUID(instructionIDWithOpsize);
- 		} else {
-diff --git a/arch/X86/X86GenDisassemblerTables.inc b/arch/X86/X86GenDisassemblerTables.inc
-index 5f4a1fd4..24e41b4b 100644
---- a/arch/X86/X86GenDisassemblerTables.inc
-+++ b/arch/X86/X86GenDisassemblerTables.inc
-@@ -112986,6 +112986,57 @@ static const InstrUID modRMTable[] = {
- /* Table19981 */
-   0x3bb7, /* MOVSX16rm32 */
-   0x3bb8, /* MOVSX16rr32 */
-+/* Table19983: immediate EXTRQ requires a register and /0. */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x37c, /* EXTRQI */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+/* Table19999: immediate EXTRQ requires a register and /0. */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x37c, /* EXTRQI */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+/* Table20015: immediate EXTRQ requires a register and /0. */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x37c, /* EXTRQI */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-   0x0
- };
- 
-diff --git a/arch/X86/X86GenDisassemblerTables2.inc b/arch/X86/X86GenDisassemblerTables2.inc
-index 69c8c75e..c8293344 100644
---- a/arch/X86/X86GenDisassemblerTables2.inc
-+++ b/arch/X86/X86GenDisassemblerTables2.inc
-@@ -5920,7 +5920,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 0 },
--    { MODRM_SPLITRM, 2950 },
-+    { MODRM_SPLITREG, 19983 },
-     { MODRM_SPLITRM, 2952 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -6436,7 +6436,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3175 },
-+    { MODRM_SPLITREG, 19999 },
-     { MODRM_SPLITRM, 3177 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -7984,7 +7984,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3897 },
-+    { MODRM_SPLITREG, 20015 },
-     { MODRM_SPLITRM, 3899 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -8242,7 +8242,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 0 },
--    { MODRM_SPLITRM, 2950 },
-+    { MODRM_SPLITREG, 19983 },
-     { MODRM_SPLITRM, 2952 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -8758,7 +8758,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3897 },
-+    { MODRM_SPLITREG, 20015 },
-     { MODRM_SPLITRM, 3899 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -10822,7 +10822,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3897 },
-+    { MODRM_SPLITREG, 20015 },
-     { MODRM_SPLITRM, 3899 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-diff --git a/arch/X86/X86GenDisassemblerTablesPacked.inc b/arch/X86/X86GenDisassemblerTablesPacked.inc
-index 7d781fb9..436c6a45 100644
---- a/arch/X86/X86GenDisassemblerTablesPacked.inc
-+++ b/arch/X86/X86GenDisassemblerTablesPacked.inc
-@@ -640,7 +640,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x00000000u },
--    { 0x41be0000u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 19983u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -674,7 +674,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f78u }, { 0x41bd9fe3u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 19999u }, { 0x41bd9fe3u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -878,7 +878,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x42b10561u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f7au }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x42ae055bu }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 20015u }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x42ae055bu }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -912,7 +912,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x00000000u },
--    { 0x41be0000u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 19983u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -946,7 +946,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f7au }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 20015u }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -1150,7 +1150,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43208640u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f7au }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x4347068du }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 20015u }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x4347068du }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
-index 515ecdcc..0de2bcdb 100644
---- a/arch/X86/X86GenLegacyTerminal.inc
-+++ b/arch/X86/X86GenLegacyTerminal.inc
-@@ -2726,6 +2726,12 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
- 	return X86_SCAN_COMPLETE;
++
+ #if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+ 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
+diff --git a/arch/X86/X86GenLegacy16Output.inc b/arch/X86/X86GenLegacy16Output.inc
+new file mode 100644
+index 00000000..937ff2f9
+--- /dev/null
++++ b/arch/X86/X86GenLegacy16Output.inc
+@@ -0,0 +1,129 @@
++/* Generated by suite/synctools/x86_simple_output.cpp --legacy16. */
++static const uint16_t legacy16_plans[256] = {
++	5, 9, 6, 10, 0, 0, 0, 0, 13, 17, 14, 18, 0, 0, 0, 0,
++	21, 25, 22, 26, 0, 0, 0, 0, 29, 33, 30, 34, 0, 0, 0, 0,
++	37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 0, 0,
++	53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
++	68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
++	132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 197, 201, 205, 209, 213, 217, 214, 218, 0, 0, 0, 0,
++	220, 224, 228, 232, 236, 240, 244, 248, 252, 256, 0, 0, 260, 264, 268, 272,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 276, 0, 0, 0, 0, 0, 280, 0, 284, 288, 0, 0, 292,
++	0, 0, 0, 0, 0, 0, 0, 296, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 300, 304, 308, 312,
++	0, 0, 0, 0, 316, 320, 0, 0, 324, 328, 332, 336, 340, 344, 0, 0,
++};
++static const struct X86SimpleOutput legacy16_rows[] = {
++	{ 8, "add", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
++	{ 8, "add", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 1 } } },
++	{ 512, "or", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
++	{ 512, "or", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 1 } } },
++	{ 6, "adc", "", UINT64_C(137438953535), { 25, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
++	{ 6, "adc", "", UINT64_C(137438953535), { 25, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 1 } } },
++	{ 652, "sbb", "", UINT64_C(137438953535), { 25, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
++	{ 652, "sbb", "", UINT64_C(137438953535), { 25, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 1 } } },
++	{ 24, "and", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
++	{ 24, "and", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 1 } } },
++	{ 715, "sub", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
++	{ 715, "sub", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 1 } } },
++	{ 1503, "xor", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
++	{ 1503, "xor", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 1 } } },
++	{ 105, "cmp", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 1 }, { 0, 1, 1 } } },
++	{ 105, "cmp", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 1 }, { 0, 2, 1 } } },
++	{ 230, "inc", "ax", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 3, 2, 3 }, { 0, 0, 0 } } },
++	{ 230, "inc", "cx", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 12, 2, 3 }, { 0, 0, 0 } } },
++	{ 230, "inc", "dx", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 18, 2, 3 }, { 0, 0, 0 } } },
++	{ 230, "inc", "bx", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 8, 2, 3 }, { 0, 0, 0 } } },
++	{ 230, "inc", "sp", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 47, 2, 3 }, { 0, 0, 0 } } },
++	{ 230, "inc", "bp", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 6, 2, 3 }, { 0, 0, 0 } } },
++	{ 230, "inc", "si", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 45, 2, 3 }, { 0, 0, 0 } } },
++	{ 230, "inc", "di", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 14, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "ax", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 3, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "cx", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 12, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "dx", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 18, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "bx", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 8, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "sp", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 47, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "bp", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 6, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "si", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 45, 2, 3 }, { 0, 0, 0 } } },
++	{ 147, "dec", "di", UINT64_C(61), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 1, 1, 1, 2, 0, 0, 0, { { 14, 2, 3 }, { 0, 0, 0 } } },
++	{ 609, "push", "ax", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 3, 2, 1 }, { 0, 0, 0 } } },
++	{ 609, "push", "cx", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 12, 2, 1 }, { 0, 0, 0 } } },
++	{ 609, "push", "dx", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 18, 2, 1 }, { 0, 0, 0 } } },
++	{ 609, "push", "bx", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 8, 2, 1 }, { 0, 0, 0 } } },
++	{ 609, "push", "sp", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 47, 2, 1 }, { 0, 0, 0 } } },
++	{ 609, "push", "bp", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 6, 2, 1 }, { 0, 0, 0 } } },
++	{ 609, "push", "si", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 45, 2, 1 }, { 0, 0, 0 } } },
++	{ 609, "push", "di", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 14, 2, 1 }, { 0, 0, 0 } } },
++	{ 585, "pop", "ax", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 3, 2, 2 }, { 0, 0, 0 } } },
++	{ 585, "pop", "cx", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 12, 2, 2 }, { 0, 0, 0 } } },
++	{ 585, "pop", "dx", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 18, 2, 2 }, { 0, 0, 0 } } },
++	{ 585, "pop", "bx", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 8, 2, 2 }, { 0, 0, 0 } } },
++	{ 585, "pop", "sp", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 47, 2, 2 }, { 0, 0, 0 } } },
++	{ 585, "pop", "bp", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 6, 2, 2 }, { 0, 0, 0 } } },
++	{ 585, "pop", "si", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 45, 2, 2 }, { 0, 0, 0 } } },
++	{ 585, "pop", "di", UINT64_C(0), { 47, 0, 0, 0 }, { 47, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 1, 2, 0, 0, 0, { { 14, 2, 2 }, { 0, 0, 0 } } },
++	{ 734, "test", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 1, 1 }, { 0, 1, 1 } } },
++	{ 734, "test", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 2, 1, 0, 0, { { 0, 2, 1 }, { 0, 2, 1 } } },
++	{ 1493, "xchg", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 3 } } },
++	{ 1493, "xchg", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 1, 0, 0, { { 0, 2, 3 }, { 0, 2, 3 } } },
++	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 1, 0, 0, { { 0, 1, 2 }, { 0, 1, 1 } } },
++	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 1, 0, 0, { { 0, 2, 2 }, { 0, 2, 1 } } },
++	{ 510, "nop", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 1493, "xchg", "cx, ax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 0, 0, 0, { { 12, 2, 3 }, { 3, 2, 3 } } },
++	{ 1493, "xchg", "dx, ax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 0, 0, 0, { { 18, 2, 3 }, { 3, 2, 3 } } },
++	{ 1493, "xchg", "bx, ax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 0, 0, 0, { { 8, 2, 3 }, { 3, 2, 3 } } },
++	{ 1493, "xchg", "sp, ax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 0, 0, 0, { { 47, 2, 3 }, { 3, 2, 3 } } },
++	{ 1493, "xchg", "bp, ax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 0, 0, 0, { { 6, 2, 3 }, { 3, 2, 3 } } },
++	{ 1493, "xchg", "si, ax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 0, 0, 0, { { 45, 2, 3 }, { 3, 2, 3 } } },
++	{ 1493, "xchg", "di, ax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 2, 0, 0, 0, { { 14, 2, 3 }, { 3, 2, 3 } } },
++	{ 143, "cwde", "", UINT64_C(0), { 3, 0, 0, 0 }, { 19, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 64, "cdq", "", UINT64_C(0), { 19, 0, 0, 0 }, { 19, 24, 0, 0 }, { 0, 0, 0, 0 }, 1, 2, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 612, "pushf", "", UINT64_C(0), { 30, 25, 0, 0 }, { 30, 0, 0, 0 }, { 0, 0, 0, 0 }, 2, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 589, "popf", "", UINT64_C(2047), { 30, 0, 0, 0 }, { 30, 25, 0, 0 }, { 0, 0, 0, 0 }, 1, 2, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 646, "sahf", "", UINT64_C(31), { 1, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 324, "lahf", "", UINT64_C(0), { 25, 0, 0, 0 }, { 1, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 633, "ret", "", UINT64_C(0), { 47, 49, 0, 0 }, { 47, 34, 0, 0 }, { 3, 161, 0, 0 }, 2, 2, 2, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 333, "leave", "", UINT64_C(0), { 6, 47, 0, 0 }, { 6, 47, 0, 0 }, { 161, 0, 0, 0 }, 2, 2, 1, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 351, "retf", "", UINT64_C(0), { 47, 49, 0, 0 }, { 47, 34, 11, 0 }, { 3, 145, 0, 0 }, 2, 3, 2, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 240, "int3", "", UINT64_C(70368878396032), { 25, 30, 0, 0 }, { 25, 26, 30, 0 }, { 4, 0, 0, 0 }, 2, 3, 1, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 248, "iret", "", UINT64_C(2047), { 47, 49, 25, 0 }, { 34, 47, 25, 0 }, { 6, 5, 0, 0 }, 3, 3, 2, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 1502, "xlatb", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 229, "in", "al, dx", UINT64_C(0), { 18, 0, 0, 0 }, { 2, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 2, 2, 0, 0, 0, { { 2, 1, 2 }, { 18, 2, 1 } } },
++	{ 229, "in", "ax, dx", UINT64_C(0), { 18, 0, 0, 0 }, { 3, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 2, 2, 0, 0, 0, { { 3, 2, 2 }, { 18, 2, 1 } } },
++	{ 515, "out", "dx, al", UINT64_C(0), { 18, 2, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 2, 0, 0, 2, 2, 0, 0, 0, { { 18, 2, 1 }, { 2, 1, 1 } } },
++	{ 515, "out", "dx, ax", UINT64_C(0), { 18, 3, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 2, 0, 0, 2, 2, 0, 0, 0, { { 18, 2, 1 }, { 3, 2, 1 } } },
++	{ 223, "hlt", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 6, 0, 0, 0 }, 0, 0, 1, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 79, "cmc", "", UINT64_C(2), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 68, "clc", "", UINT64_C(4194304), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 703, "stc", "", UINT64_C(1073741824), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 74, "cli", "", UINT64_C(16777216), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 6, 0, 0, 0 }, 0, 0, 1, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 706, "sti", "", UINT64_C(4294967296), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 6, 0, 0, 0 }, 0, 0, 1, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 69, "cld", "", UINT64_C(8388608), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++	{ 704, "std", "", UINT64_C(2147483648), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 0, 2, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
++};
++static const struct X86SimpleRegister legacy16_regs[2][8] = {
++	{
++		{ 2, 2, "al" },
++		{ 10, 2, "cl" },
++		{ 16, 2, "dl" },
++		{ 5, 2, "bl" },
++		{ 1, 2, "ah" },
++		{ 9, 2, "ch" },
++		{ 13, 2, "dh" },
++		{ 4, 2, "bh" },
++	},
++	{
++		{ 3, 2, "ax" },
++		{ 12, 2, "cx" },
++		{ 18, 2, "dx" },
++		{ 8, 2, "bx" },
++		{ 47, 2, "sp" },
++		{ 6, 2, "bp" },
++		{ 45, 2, "si" },
++		{ 14, 2, "di" },
++	},
++};
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 8c6444ab..32d49456 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -41,4 +41,49 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
  }
- 
-+X86_DECODE_INLINE bool hasLegacyXmmOperand(unsigned operands)
++#ifdef CAPSTONE_X86_LEGACY16_OUTPUT
++#include "X86GenLegacy16Output.inc"
++
++CAPSTONE_INTERNAL bool X86_writeLegacy16(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn, uint16_t *insn_size)
 +{
-+	(void)operands;
-+	return false;
-+}
++	const uint8_t opcode = code[0];
++	const unsigned plan = legacy16_plans[opcode];
++	if (!plan || X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	const unsigned form = plan & 3;
++	const bool pair = form != X86_SIMPLE_FIXED;
++	if (pair && (size < 2 || code[1] < 0xc0))
++		return false;
 +
- /* 2205 raw terminals, 81 raw handlers; selected opcodes [220, 111, 182, 111, 182, 111, 220, 109, 220, 111, 220, 111, 182, 109, 181, 111, 181, 111, 182, 111, 215, 107, 215, 107, 215, 109, 215, 109]. */
- /* 2217 public terminals, 14 public handlers; selected opcodes [222, 111, 184, 111, 184, 111, 222, 109, 222, 111, 222, 111, 184, 109, 183, 111, 183, 111, 184, 111, 217, 107, 217, 107, 217, 109, 217, 109]. */
- #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
-@@ -9887,8 +9893,25 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
- 	return X86_SCAN_COMPLETE;
- }
- 
--/* 2764 raw terminals, 81 raw handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 112, 215, 112, 215, 113, 215, 113]. */
--/* 3296 public terminals, 14 public handlers; selected opcodes [222, 216, 184, 216, 184, 216, 222, 218, 222, 216, 222, 222, 184, 218, 183, 216, 183, 222, 184, 222, 217, 211, 217, 211, 217, 214, 217, 214]. */
-+X86_DECODE_INLINE bool hasLegacyXmmOperand(unsigned operands)
-+{
-+	static const uint8_t sets[] = {
-+		0x00, 0x00, 0x00, 0xcc, 0x03, 0x00, 0x30, 0x00, 0x00, 0x00, 0x43, 0x07,
-+		0x07, 0x40, 0x00, 0x00, 0x38, 0x00, 0x00, 0x00, 0x00, 0xe6, 0xf0, 0x04,
-+		0x00, 0xcc, 0x3f, 0x00, 0x00, 0xf8, 0x00, 0xfe, 0xff, 0x3f, 0x00, 0x00,
-+		0x07, 0x98, 0xe1, 0x38, 0x80, 0xff, 0x01, 0x7e, 0x00, 0xe0, 0x81, 0xff,
-+		0x00, 0x0c, 0x1f, 0x0e, 0x00, 0xf8, 0x03, 0x00, 0xfc, 0x1c, 0x20, 0xec,
-+		0xdf, 0x06, 0xc0, 0x3f, 0x40, 0x78, 0x06, 0x1c, 0xcf, 0x30, 0x00, 0x2f,
-+		0x05, 0xec, 0x3f, 0x00, 0x00, 0x38, 0x80, 0x1f, 0xc4, 0x71, 0x40, 0x20,
-+		0x43, 0x3f, 0x83, 0x81, 0x0c, 0x1c, 0x78, 0x80, 0xe1, 0x01, 0x86, 0x61,
-+		0x38, 0x06, 0x78, 0xfe, 0xf3, 0xf3, 0x73, 0xf0, 0xff, 0xff, 0xff, 0x7f,
-+		0x00, 0x00, 0x0e, 0x9c, 0x84, 0x71, 0x0e, 0x00,
-+	};
-+	return (sets[operands >> 3] >> (operands & 7)) & 1;
-+}
-+
-+/* 2764 raw terminals, 81 raw handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 111, 215, 110, 215, 112, 215, 111]. */
-+/* 3300 public terminals, 14 public handlers; selected opcodes [222, 216, 184, 216, 184, 216, 222, 218, 222, 216, 222, 222, 184, 218, 183, 216, 183, 222, 184, 222, 217, 210, 217, 210, 217, 213, 217, 213]. */
- #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
- #define X86_TERMINAL_SPLIT UINT64_C(0x4000000000000000)
- #define X86_TERMINAL_MASK UINT64_C(0x7fffffff)
-@@ -11701,7 +11724,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -11835,7 +11858,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -11969,7 +11992,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -12103,7 +12126,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -12554,6 +12577,7 @@ static const uint32_t x86LegacyPublicTerminals[] X86_DECODE_ALIGN = {
- 	0x030105d4u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
- 	0x00000000u, 0x01004073u, 0x00000000u, 0x010045e5u, 0x010045e9u, 0x010045edu, 0x0100441du, 0x0100441eu,
- 	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x01004271u, 0x01004272u,
-+	0x01004176u, 0x01004175u, 0x01004174u, 0x01004171u,
- };
- static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X86_DECODE_ALIGN = {
- {
-@@ -13994,7 +14018,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
-+	0, UINT64_C(0x4080221381004427), 0, 0,
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
-@@ -14102,14 +14126,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, UINT64_C(0x00000000040002d7), UINT64_C(0x000000000400004c), UINT64_C(0x00000000040002db),
- 	UINT64_C(0x00000000040000f2), UINT64_C(0x00000000040005c7), 0, UINT64_C(0x00000000040002ec),
- 	0, UINT64_C(0x80000000000302ad), UINT64_C(0x00000000040000b2), 0,
--	UINT64_C(0x408020f7810041ef), UINT64_C(0x408020f7810041ef), UINT64_C(0x408020eb010041db), UINT64_C(0x40000000010041db),
--	UINT64_C(0x40802179010042f2), UINT64_C(0x40802178010042f0), UINT64_C(0x408020ec810041d8), UINT64_C(0x40000000010041d8),
-+	UINT64_C(0x408020f7010041ee), UINT64_C(0x408020f7010041ee), UINT64_C(0x408020eb010041da), UINT64_C(0x40000000010041da),
-+	UINT64_C(0x40802178810042f1), UINT64_C(0x40802177810042ef), UINT64_C(0x408020ec810041d7), UINT64_C(0x40000000010041d7),
- 	UINT64_C(0x80000000000302ce), UINT64_C(0x408020ff010041fe), 0, 0,
- 	0, UINT64_C(0x40000000010041fe), UINT64_C(0x40000000010041fe), UINT64_C(0x408020ff010041fe),
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
--	UINT64_C(0x408020e7810041cf), UINT64_C(0x408020e7810041cf), UINT64_C(0x408020b981004173), UINT64_C(0x40000000010041e2),
--	UINT64_C(0x408020bb01004176), UINT64_C(0x408020ba01004174), UINT64_C(0x40802172010042e4), UINT64_C(0x4080203a81004075),
-+	UINT64_C(0x408020e7010041ce), UINT64_C(0x408020e7010041ce), UINT64_C(0x408020b901004172), UINT64_C(0x40000000010041e1),
-+	UINT64_C(0x408020ba81004176), UINT64_C(0x408020b881004174), UINT64_C(0x40802171810042e3), UINT64_C(0x4080203a01004074),
- 	UINT64_C(0x00000000040005cb), UINT64_C(0x0000000004000275), UINT64_C(0x000000000400026d), UINT64_C(0x0000000004000270),
- 	UINT64_C(0x00000000040002d8), UINT64_C(0x00000000040002d9), 0, UINT64_C(0x00000000040000d9),
- 	0, 0, 0, 0,
-@@ -14118,18 +14142,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	UINT64_C(0x4080202b01004056), UINT64_C(0x4080202f0100405e), UINT64_C(0x4080202981004053), UINT64_C(0x4080202801004050),
- 	UINT64_C(0x4080203401004068), UINT64_C(0x4080203201004064), UINT64_C(0x4080203301004066), UINT64_C(0x4080203081004061),
- 	UINT64_C(0x4080202d0100405a), UINT64_C(0x4080202c81004059), UINT64_C(0x4080202d8100405b), UINT64_C(0x4080202c01004058),
--	UINT64_C(0x408020ee80000000), UINT64_C(0x4080215d010042ba), 0, 0,
--	UINT64_C(0x4080200e8100401d), UINT64_C(0x4080200d8100401b), UINT64_C(0x4080210101004202), UINT64_C(0x408022f0810045e1),
--	UINT64_C(0x408020050100400a), UINT64_C(0x408020fa010041f4), UINT64_C(0x4080204181004083), UINT64_C(0x4080203f8100407f),
--	UINT64_C(0x40802166810042cd), UINT64_C(0x408020b70100416e), UINT64_C(0x4080204b01004096), UINT64_C(0x408020b481004169),
-+	UINT64_C(0x408020ee00000000), UINT64_C(0x4080215c810042b9), 0, 0,
-+	UINT64_C(0x4080200e0100401c), UINT64_C(0x4080200d0100401a), UINT64_C(0x4080210081004201), UINT64_C(0x408022f0010045e0),
-+	UINT64_C(0x4080200481004009), UINT64_C(0x408020f9810041f3), UINT64_C(0x4080204081004081), UINT64_C(0x4080204101004082),
-+	UINT64_C(0x40802166010042cc), UINT64_C(0x408020b68100416d), UINT64_C(0x4080204a81004095), UINT64_C(0x408020b401004168),
- 	UINT64_C(0x408020e2810041c5), UINT64_C(0x408020e3810041c7), UINT64_C(0x408020e3010041c6), UINT64_C(0x408020c101004182),
- 	UINT64_C(0x408020ca01004194), UINT64_C(0x408020cb01004196), UINT64_C(0x408020ca81004195), UINT64_C(0x408020c181004183),
- 	UINT64_C(0x408020e1010041c2), UINT64_C(0x408020e2010041c4), UINT64_C(0x408020e1810041c3), UINT64_C(0x408020c081004181),
--	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
--	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
-+	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
-+	UINT64_C(0x4300612b8600c257), UINT64_C(0x8000000000030a06), UINT64_C(0x8000000000030a16), UINT64_C(0x8000000000030a26),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
--	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
-+	0, UINT64_C(0x4080205401004427), 0, 0,
-+	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
- 	UINT64_C(0x0000000003010110), UINT64_C(0x000000000301010c), UINT64_C(0x000000000301010e), UINT64_C(0x000000000301010b),
-@@ -14147,7 +14171,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x80000000000304d2), UINT64_C(0x4080201d0100403a),
- 	UINT64_C(0x4080201b01004036), UINT64_C(0x4080201b81004037), UINT64_C(0x408020f6010041ec), UINT64_C(0x408020f6010041ec),
- 	0, 0, 0, 0,
--	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061590600c2b2), UINT64_C(0x80000000000304f4),
-+	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061588600c2b1), UINT64_C(0x80000000000304f4),
- 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
- 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
- 	0, UINT64_C(0x408020dc810041b9), UINT64_C(0x408020db810041b7), UINT64_C(0x408020dc010041b8),
-@@ -14155,11 +14179,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	UINT64_C(0x408020df810041bf), UINT64_C(0x408020e0010041c0), UINT64_C(0x408020d2010041a4), UINT64_C(0x408020c70100418e),
- 	UINT64_C(0x408020c481004189), UINT64_C(0x408020c50100418a), UINT64_C(0x408020d1010041a2), UINT64_C(0x408020c68100418d),
- 	UINT64_C(0x408020c78100418f), UINT64_C(0x408020db010041b6), UINT64_C(0x408020da810041b5), UINT64_C(0x408020c801004190),
--	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x400000000100417c),
-+	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x40000000010041df),
- 	UINT64_C(0x408020de810041bd), UINT64_C(0x408020df010041be), UINT64_C(0x408020d1810041a3), UINT64_C(0x408020d5810041ab),
- 	UINT64_C(0x408020c381004187), UINT64_C(0x408020c401004188), UINT64_C(0x408020d0810041a1), UINT64_C(0x408020e4010041c8),
- 	0, UINT64_C(0x408020da010041b4), UINT64_C(0x408020d9010041b2), UINT64_C(0x408020d9810041b3),
--	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020bc00000000),
-+	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020b380000000),
- 	UINT64_C(0x408020dd010041ba), UINT64_C(0x408020e0810041c1), UINT64_C(0x408020dd810041bb), UINT64_C(0x408020de010041bc),
- 	UINT64_C(0x408020c201004184), UINT64_C(0x408020c58100418b), UINT64_C(0x408020c281004185), UINT64_C(0x00000000040002ea),
- },
-@@ -14262,7 +14286,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
-+	0, UINT64_C(0x4080221381004427), 0, 0,
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
-@@ -14370,14 +14394,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, UINT64_C(0x00000000040002d7), UINT64_C(0x000000000400004c), UINT64_C(0x00000000040002db),
- 	UINT64_C(0x00000000040000f2), UINT64_C(0x00000000040005c7), 0, UINT64_C(0x00000000040002ec),
- 	0, UINT64_C(0x80000000000302ad), UINT64_C(0x00000000040000b2), 0,
--	UINT64_C(0x408020f7810041ef), UINT64_C(0x408020f7810041ef), UINT64_C(0x408020eb010041db), UINT64_C(0x40000000010041db),
--	UINT64_C(0x40802179010042f2), UINT64_C(0x40802178010042f0), UINT64_C(0x408020ec810041d8), UINT64_C(0x40000000010041d8),
-+	UINT64_C(0x408020f7010041ee), UINT64_C(0x408020f7010041ee), UINT64_C(0x408020eb010041da), UINT64_C(0x40000000010041da),
-+	UINT64_C(0x40802178810042f1), UINT64_C(0x40802177810042ef), UINT64_C(0x408020ec810041d7), UINT64_C(0x40000000010041d7),
- 	UINT64_C(0x80000000000302ce), UINT64_C(0x408020ff010041fe), 0, 0,
- 	0, UINT64_C(0x40000000010041fe), UINT64_C(0x40000000010041fe), UINT64_C(0x408020ff010041fe),
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
--	UINT64_C(0x408020e7810041cf), UINT64_C(0x408020e7810041cf), UINT64_C(0x408020b981004173), UINT64_C(0x40000000010041e2),
--	UINT64_C(0x408020bb01004176), UINT64_C(0x408020ba01004174), UINT64_C(0x40802172010042e4), UINT64_C(0x4080203a81004075),
-+	UINT64_C(0x408020e7010041ce), UINT64_C(0x408020e7010041ce), UINT64_C(0x408020b901004172), UINT64_C(0x40000000010041e1),
-+	UINT64_C(0x408020ba81004176), UINT64_C(0x408020b881004174), UINT64_C(0x40802171810042e3), UINT64_C(0x4080203a01004074),
- 	UINT64_C(0x00000000040005cb), UINT64_C(0x0000000004000275), UINT64_C(0x000000000400026d), UINT64_C(0x0000000004000270),
- 	UINT64_C(0x00000000040002d8), UINT64_C(0x00000000040002d9), 0, UINT64_C(0x00000000040000d9),
- 	0, 0, 0, 0,
-@@ -14386,18 +14410,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	UINT64_C(0x4080202b01004056), UINT64_C(0x4080202f0100405e), UINT64_C(0x4080202981004053), UINT64_C(0x4080202801004050),
- 	UINT64_C(0x4080203401004068), UINT64_C(0x4080203201004064), UINT64_C(0x4080203301004066), UINT64_C(0x4080203081004061),
- 	UINT64_C(0x4080202d0100405a), UINT64_C(0x4080202c81004059), UINT64_C(0x4080202d8100405b), UINT64_C(0x4080202c01004058),
--	UINT64_C(0x408020ee80000000), UINT64_C(0x4080215d010042ba), UINT64_C(0x4080214181004283), UINT64_C(0x4080213401004268),
--	UINT64_C(0x4080200e8100401d), UINT64_C(0x4080200d8100401b), UINT64_C(0x4080210101004202), UINT64_C(0x408022f0810045e1),
--	UINT64_C(0x408020050100400a), UINT64_C(0x408020fa010041f4), UINT64_C(0x4080204181004083), UINT64_C(0x4080203f8100407f),
--	UINT64_C(0x40802166810042cd), UINT64_C(0x408020b70100416e), UINT64_C(0x4080204b01004096), UINT64_C(0x408020b481004169),
-+	UINT64_C(0x408020ee00000000), UINT64_C(0x4080215c810042b9), UINT64_C(0x4080214181004283), UINT64_C(0x4080213401004268),
-+	UINT64_C(0x4080200e0100401c), UINT64_C(0x4080200d0100401a), UINT64_C(0x4080210081004201), UINT64_C(0x408022f0010045e0),
-+	UINT64_C(0x4080200481004009), UINT64_C(0x408020f9810041f3), UINT64_C(0x4080204081004081), UINT64_C(0x4080204101004082),
-+	UINT64_C(0x40802166010042cc), UINT64_C(0x408020b68100416d), UINT64_C(0x4080204a81004095), UINT64_C(0x408020b401004168),
- 	UINT64_C(0x408020e2810041c5), UINT64_C(0x408020e3810041c7), UINT64_C(0x408020e3010041c6), UINT64_C(0x408020c101004182),
- 	UINT64_C(0x408020ca01004194), UINT64_C(0x408020cb01004196), UINT64_C(0x408020ca81004195), UINT64_C(0x408020c181004183),
- 	UINT64_C(0x408020e1010041c2), UINT64_C(0x408020e2010041c4), UINT64_C(0x408020e1810041c3), UINT64_C(0x408020c081004181),
--	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
--	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
-+	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
-+	UINT64_C(0x4300612b8600c257), UINT64_C(0x8000000000030a06), UINT64_C(0x8000000000030a16), UINT64_C(0x8000000000030a26),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
--	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
-+	0, UINT64_C(0x4080205401004427), 0, 0,
-+	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
- 	UINT64_C(0x0000000003010110), UINT64_C(0x000000000301010c), UINT64_C(0x000000000301010e), UINT64_C(0x000000000301010b),
-@@ -14415,7 +14439,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x80000000000304d2), UINT64_C(0x4080201d0100403a),
- 	UINT64_C(0x4080201b01004036), UINT64_C(0x4080201b81004037), UINT64_C(0x408020f6010041ec), UINT64_C(0x408020f6010041ec),
- 	0, 0, 0, UINT64_C(0x40000000010041e0),
--	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061590600c2b2), UINT64_C(0x80000000000304f4),
-+	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061588600c2b1), UINT64_C(0x80000000000304f4),
- 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
- 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
- 	0, UINT64_C(0x408020dc810041b9), UINT64_C(0x408020db810041b7), UINT64_C(0x408020dc010041b8),
-@@ -14423,11 +14447,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	UINT64_C(0x408020df810041bf), UINT64_C(0x408020e0010041c0), UINT64_C(0x408020d2010041a4), UINT64_C(0x408020c70100418e),
- 	UINT64_C(0x408020c481004189), UINT64_C(0x408020c50100418a), UINT64_C(0x408020d1010041a2), UINT64_C(0x408020c68100418d),
- 	UINT64_C(0x408020c78100418f), UINT64_C(0x408020db010041b6), UINT64_C(0x408020da810041b5), UINT64_C(0x408020c801004190),
--	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x400000000100417c),
-+	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x40000000010041df),
- 	UINT64_C(0x408020de810041bd), UINT64_C(0x408020df010041be), UINT64_C(0x408020d1810041a3), UINT64_C(0x408020d5810041ab),
- 	UINT64_C(0x408020c381004187), UINT64_C(0x408020c401004188), UINT64_C(0x408020d0810041a1), UINT64_C(0x408020e4010041c8),
- 	0, UINT64_C(0x408020da010041b4), UINT64_C(0x408020d9010041b2), UINT64_C(0x408020d9810041b3),
--	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020bc00000000),
-+	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020b380000000),
- 	UINT64_C(0x408020dd010041ba), UINT64_C(0x408020e0810041c1), UINT64_C(0x408020dd810041bb), UINT64_C(0x408020de010041bc),
- 	UINT64_C(0x408020c201004184), UINT64_C(0x408020c58100418b), UINT64_C(0x408020c281004185), UINT64_C(0x00000000040002ea),
- },
-diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index f1ebc59f..eb476b85 100644
---- a/suite/synctools/x86_operand_specializations.py
-+++ b/suite/synctools/x86_operand_specializations.py
-@@ -563,6 +563,11 @@ def scalar_terminal_form(operands, modrm):
-     return True
- 
- 
-+def legacy_xmm_operand_sets(suffix):
-+    rows = read_sets(X86 / f"X86GenDisassemblerTables{suffix}.inc")
-+    return [any(kind == "TYPE_XMM" for _, kind in row) for row in rows]
-+
-+
- def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_ROWS):
- 
-     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
-@@ -651,6 +656,13 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
-             "Mandatory SSE attribute contexts changed",
-         )
-     equivalent = equivalents16(suffix)
-+    xmm = legacy_xmm_operand_sets(suffix)
-+
-+    def use_secondary(primary, secondary, has_op_size, two_byte):
-+        if (primary, secondary) in equivalent:
-+            return not has_op_size
-+        return has_op_size and two_byte and primary != secondary and xmm[specifiers[secondary]]
-+
-     for _, attr_mask, mode16, has_op_size in contexts_to_project:
-         context_name = context_values[attr_mask]
-         row_maps = []
-@@ -699,7 +711,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
-                         "Incomplete secondary terminal sequence",
-                     )
-                     uids = tuple(
--                        b if not has_op_size and (a, b) in equivalent else a
-+                        b if use_secondary(a, b, has_op_size, name == names[1]) else a
-                         for a, b in zip(uids, other_uids)
-                     )
-                 if (
-@@ -752,7 +764,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
-                         second = tables.source_id(
-                             ids, second_kind, second_offset, modrm
-                         )
--                        if not has_op_size and (expected, second) in equivalent:
-+                        if use_secondary(expected, second, has_op_size, name == names[1]):
-                             expected = second
-                     tables.require(
-                         terminals[first + delta][0] == expected,
-@@ -1036,6 +1048,23 @@ def emit_batch_primary(suffix):
-     return "\n".join(lines + ["};"])
- 
- 
-+def emit_legacy_xmm_operands(suffix):
-+    flags = legacy_xmm_operand_sets(suffix)
-+    lines = ["X86_DECODE_INLINE bool hasLegacyXmmOperand(unsigned operands)", "{"]
-+    if any(flags):
-+        packed = [
-+            sum(int(bit) << i for i, bit in enumerate(flags[start : start + 8]))
-+            for start in range(0, len(flags), 8)
-+        ]
-+        lines.append("\tstatic const uint8_t sets[] = {")
-+        for start in range(0, len(packed), 12):
-+            lines.append("\t\t" + ", ".join(f"0x{b:02x}" for b in packed[start : start + 12]) + ",")
-+        lines.extend(["\t};", "\treturn (sets[operands >> 3] >> (operands & 7)) & 1;"])
-+    else:
-+        lines.extend(["\t(void)operands;", "\treturn false;"])
-+    return [*lines, "}", ""]
-+
-+
- def emit_terminal(suffix):
-     groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
-         suffix
-@@ -1044,6 +1073,7 @@ def emit_terminal(suffix):
-         legacy_terminal_model(suffix, public=True)
-     )
-     lines = [
-+        *emit_legacy_xmm_operands(suffix),
-         f"/* {len(terminals)} raw terminals, {len(groups)} raw handlers; selected opcodes {selected_counts}. */",
-         f"/* {len(public_terminals)} public terminals, {len(public_groups)} public handlers; selected opcodes {public_counts}. */",
-         f"#define X86_TERMINAL_INDEXED UINT64_C(0x{TERMINAL_INDEXED:x})",
-diff --git a/tests/unit/x86_integer_vector_access.c b/tests/unit/x86_integer_vector_access.c
-index 85ee1b93..b35bd8b2 100644
---- a/tests/unit/x86_integer_vector_access.c
-+++ b/tests/unit/x86_integer_vector_access.c
-@@ -8,67 +8,210 @@ struct move {
- 	uint8_t bytes[6], length, width;
- 	x86_insn id;
- 	bool store, wide_only;
-+	x86_reg vector_reg;
- };
- 
- static const struct move moves[] = {
--	{ { 0x0f, 0x6e, 0x0b }, 3, 4, X86_INS_MOVD, false, false },
--	{ { 0x0f, 0x7e, 0x0b }, 3, 4, X86_INS_MOVD, true, false },
--	{ { 0x0f, 0x6f, 0x0b }, 3, 8, X86_INS_MOVQ, false, false },
--	{ { 0x0f, 0x7f, 0x0b }, 3, 8, X86_INS_MOVQ, true, false },
--	{ { 0x48, 0x0f, 0x6e, 0x0b }, 4, 8, X86_INS_MOVQ, false, true },
--	{ { 0x48, 0x0f, 0x7e, 0x0b }, 4, 8, X86_INS_MOVQ, true, true },
--	{ { 0x66, 0x0f, 0x6e, 0x0b }, 4, 4, X86_INS_MOVD, false, false },
--	{ { 0x66, 0x0f, 0x7e, 0x0b }, 4, 4, X86_INS_MOVD, true, false },
--	{ { 0x66, 0x48, 0x0f, 0x6e, 0x0b }, 5, 8, X86_INS_MOVQ, false, true },
--	{ { 0x66, 0x48, 0x0f, 0x7e, 0x0b }, 5, 8, X86_INS_MOVQ, true, true },
--	{ { 0xf3, 0x0f, 0x7e, 0x0b }, 4, 8, X86_INS_MOVQ, false, false },
--	{ { 0x66, 0x0f, 0xd6, 0x0b }, 4, 8, X86_INS_MOVQ, true, false },
--	{ { 0xc5, 0xf9, 0x6e, 0x0b }, 4, 4, X86_INS_VMOVD, false, false },
--	{ { 0xc5, 0xf9, 0x7e, 0x0b }, 4, 4, X86_INS_VMOVD, true, false },
--	{ { 0xc5, 0xfa, 0x7e, 0x0b }, 4, 8, X86_INS_VMOVQ, false, false },
--	{ { 0xc5, 0xf9, 0xd6, 0x0b }, 4, 8, X86_INS_VMOVQ, true, false },
--	{ { 0xc4, 0xe1, 0x79, 0x6e, 0x0b }, 5, 4, X86_INS_VMOVD, false, false },
--	{ { 0xc4, 0xe1, 0x79, 0x7e, 0x0b }, 5, 4, X86_INS_VMOVD, true, false },
--	{ { 0xc4, 0xe1, 0xf9, 0x6e, 0x0b }, 5, 8, X86_INS_VMOVQ, false, true },
--	{ { 0xc4, 0xe1, 0xf9, 0x7e, 0x0b }, 5, 8, X86_INS_VMOVQ, true, true },
--	{ { 0xc4, 0xe1, 0x7a, 0x7e, 0x0b }, 5, 8, X86_INS_VMOVQ, false, false },
--	{ { 0xc4, 0xe1, 0x79, 0xd6, 0x0b }, 5, 8, X86_INS_VMOVQ, true, false },
-+	{ { 0x0f, 0x6e, 0x0b }, 3, 4, X86_INS_MOVD, false, false, X86_REG_MM1 },
-+	{ { 0x0f, 0x7e, 0x0b }, 3, 4, X86_INS_MOVD, true, false, X86_REG_MM1 },
-+	{ { 0x0f, 0x6f, 0x0b }, 3, 8, X86_INS_MOVQ, false, false, X86_REG_MM1 },
-+	{ { 0x0f, 0x7f, 0x0b }, 3, 8, X86_INS_MOVQ, true, false, X86_REG_MM1 },
-+	{ { 0x48, 0x0f, 0x6e, 0x0b },
-+	  4,
-+	  8,
-+	  X86_INS_MOVQ,
-+	  false,
-+	  true,
-+	  X86_REG_MM1 },
-+	{ { 0x48, 0x0f, 0x7e, 0x0b },
-+	  4,
-+	  8,
-+	  X86_INS_MOVQ,
-+	  true,
-+	  true,
-+	  X86_REG_MM1 },
-+	{ { 0x66, 0x0f, 0x6e, 0x0b },
-+	  4,
-+	  4,
-+	  X86_INS_MOVD,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0x66, 0x0f, 0x7e, 0x0b },
-+	  4,
-+	  4,
-+	  X86_INS_MOVD,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0x66, 0x48, 0x0f, 0x6e, 0x0b },
-+	  5,
-+	  8,
-+	  X86_INS_MOVQ,
-+	  false,
-+	  true,
-+	  X86_REG_XMM1 },
-+	{ { 0x66, 0x48, 0x0f, 0x7e, 0x0b },
-+	  5,
-+	  8,
-+	  X86_INS_MOVQ,
-+	  true,
-+	  true,
-+	  X86_REG_XMM1 },
-+	{ { 0xf3, 0x0f, 0x7e, 0x0b },
-+	  4,
-+	  8,
-+	  X86_INS_MOVQ,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0x66, 0x0f, 0xd6, 0x0b },
-+	  4,
-+	  8,
-+	  X86_INS_MOVQ,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc5, 0xf9, 0x6e, 0x0b },
-+	  4,
-+	  4,
-+	  X86_INS_VMOVD,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc5, 0xf9, 0x7e, 0x0b },
-+	  4,
-+	  4,
-+	  X86_INS_VMOVD,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc5, 0xfa, 0x7e, 0x0b },
-+	  4,
-+	  8,
-+	  X86_INS_VMOVQ,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc5, 0xf9, 0xd6, 0x0b },
-+	  4,
-+	  8,
-+	  X86_INS_VMOVQ,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc4, 0xe1, 0x79, 0x6e, 0x0b },
-+	  5,
-+	  4,
-+	  X86_INS_VMOVD,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc4, 0xe1, 0x79, 0x7e, 0x0b },
-+	  5,
-+	  4,
-+	  X86_INS_VMOVD,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc4, 0xe1, 0xf9, 0x6e, 0x0b },
-+	  5,
-+	  8,
-+	  X86_INS_VMOVQ,
-+	  false,
-+	  true,
-+	  X86_REG_XMM1 },
-+	{ { 0xc4, 0xe1, 0xf9, 0x7e, 0x0b },
-+	  5,
-+	  8,
-+	  X86_INS_VMOVQ,
-+	  true,
-+	  true,
-+	  X86_REG_XMM1 },
-+	{ { 0xc4, 0xe1, 0x7a, 0x7e, 0x0b },
-+	  5,
-+	  8,
-+	  X86_INS_VMOVQ,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xc4, 0xe1, 0x79, 0xd6, 0x0b },
-+	  5,
-+	  8,
-+	  X86_INS_VMOVQ,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
- 	{ { 0x62, 0xf1, 0x7d, 0x08, 0x6e, 0x0b },
- 	  6,
- 	  4,
- 	  X86_INS_VMOVD,
- 	  false,
--	  false },
-+	  false,
-+	  X86_REG_XMM1 },
- 	{ { 0x62, 0xf1, 0x7d, 0x08, 0x7e, 0x0b },
- 	  6,
- 	  4,
- 	  X86_INS_VMOVD,
- 	  true,
--	  false },
-+	  false,
-+	  X86_REG_XMM1 },
- 	{ { 0x62, 0xf1, 0xfd, 0x08, 0x6e, 0x0b },
- 	  6,
- 	  8,
- 	  X86_INS_VMOVQ,
- 	  false,
--	  true },
-+	  true,
-+	  X86_REG_XMM1 },
- 	{ { 0x62, 0xf1, 0xfd, 0x08, 0x7e, 0x0b },
- 	  6,
- 	  8,
- 	  X86_INS_VMOVQ,
- 	  true,
--	  true },
-+	  true,
-+	  X86_REG_XMM1 },
- 	{ { 0x62, 0xf1, 0xfe, 0x08, 0x7e, 0x0b },
- 	  6,
- 	  8,
- 	  X86_INS_VMOVQ,
- 	  false,
--	  false },
-+	  false,
-+	  X86_REG_XMM1 },
- 	{ { 0x62, 0xf1, 0xfd, 0x08, 0xd6, 0x0b },
- 	  6,
- 	  8,
- 	  X86_INS_VMOVQ,
- 	  true,
--	  false },
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0x66, 0x0f, 0x6f, 0x0b },
-+	  4,
-+	  16,
-+	  X86_INS_MOVDQA,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0x66, 0x0f, 0x7f, 0x0b },
-+	  4,
-+	  16,
-+	  X86_INS_MOVDQA,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xf3, 0x0f, 0x6f, 0x0b },
-+	  4,
-+	  16,
-+	  X86_INS_MOVDQU,
-+	  false,
-+	  false,
-+	  X86_REG_XMM1 },
-+	{ { 0xf3, 0x0f, 0x7f, 0x0b },
-+	  4,
-+	  16,
-+	  X86_INS_MOVDQU,
-+	  true,
-+	  false,
-+	  X86_REG_XMM1 },
- };
- 
- static bool check_moves(csh handle, bool wide, bool att)
-@@ -89,6 +232,7 @@ static bool check_moves(csh handle, bool wide, bool att)
- 			  x86->op_count == 2 && memory->type == X86_OP_MEM &&
- 			  memory->size == move->width &&
- 			  reg->type == X86_OP_REG &&
-+			  reg->reg == move->vector_reg &&
- 			  memory->access ==
- 				  (move->store ? CS_AC_WRITE : CS_AC_READ) &&
- 			  reg->access ==
-@@ -131,15 +275,70 @@ static bool check_scan(csh handle, bool wide)
- 	return ok;
- }
- 
-+static bool check_legacy_vector_prefix(csh handle)
-+{
-+	static const struct {
-+		uint8_t raw[6];
-+		uint8_t size;
-+		unsigned id;
-+		x86_reg first, second;
-+	} cases[] = {
-+		{ { 0x0f, 0x60, 0xcd }, 3, X86_INS_PUNPCKLBW, X86_REG_MM1, X86_REG_MM5 },
-+		{ { 0x66, 0x0f, 0x60, 0xcd }, 4, X86_INS_PUNPCKLBW, X86_REG_XMM1, X86_REG_XMM5 },
-+		{ { 0x66, 0x0f, 0x38, 0x00, 0xcd }, 5, X86_INS_PSHUFB, X86_REG_XMM1, X86_REG_XMM5 },
-+		{ { 0x66, 0x0f, 0x3a, 0x0f, 0xcd, 0xa5 }, 6, X86_INS_PALIGNR, X86_REG_XMM1, X86_REG_XMM5 },
-+	};
-+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-+		cs_insn *insn;
-+		size_t count = cs_disasm(handle, cases[i].raw, cases[i].size,
-+					 0x1000, 1, &insn);
-+		if (!count)
-+			return false;
-+		cs_x86 *x = &insn->detail->x86;
-+		bool ok = insn->size == cases[i].size && insn->id == cases[i].id &&
-+			  x->op_count >= 2 && x->operands[0].type == X86_OP_REG &&
-+			  x->operands[1].type == X86_OP_REG &&
-+			  x->operands[0].reg == cases[i].first &&
-+			  x->operands[1].reg == cases[i].second;
-+		cs_free(insn, count);
-+		if (!ok)
-+			return false;
++	const struct X86SimpleOutput *row = &legacy16_rows[(plan >> 2) - 1];
++	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
++	const uint8_t modrm = pair ? code[1] : 0;
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(1 + pair);
++	insn->bytes[0] = opcode;
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	if (pair) {
++		const struct X86SimpleRegister *regs = legacy16_regs[opcode & 1];
++		const unsigned reg = (modrm >> 3) & 7, rm = modrm & 7;
++		const struct X86SimpleRegister *a = &regs[form == X86_SIMPLE_REG_RM ? reg : rm];
++		const struct X86SimpleRegister *b = &regs[form == X86_SIMPLE_REG_RM ? rm : reg];
++		insn->bytes[1] = modrm;
++		memcpy(insn->op_str, a->name, sizeof(a->name));
++		char *sep = insn->op_str + a->length;
++		memcpy(sep, ", ", 2);
++		memcpy(sep + 2, b->name, sizeof(b->name));
++		first = a->reg;
++		second = b->reg;
++	} else {
++		memcpy(insn->op_str, row->operands, sizeof(row->operands));
 +	}
++	if (insn->detail)
++		X86_writeSimpleDetail(insn->detail, row, opcode, 0, modrm, first, second);
 +	return true;
 +}
++#endif
 +
-+static bool check_extrq_selector(csh handle)
+ #endif
+diff --git a/cs.c b/cs.c
+index 0af815c7..b1694a08 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1113,9 +1113,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#ifdef CAPSTONE_X86_LEGACY16_OUTPUT
++		if (handle->mode == CS_MODE_16 && size &&
++		    X86_writeLegacy16(handle, code, size, insn, insn_size))
++			return true;
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index cce3e23d..98518b6b 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -542,6 +542,69 @@ void emit_register(const X86SimpleRegister &v)
+ 		  << v.name << "\" },\n";
+ }
+ 
++void emit_legacy16()
 +{
-+	uint8_t code[] = { 0x66, 0x0f, 0x78, 0xc0, 0x04, 0x02 };
-+	for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
-+		code[3] = (uint8_t)mr;
-+		cs_insn *insn;
-+		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
-+		if (!count) {
-+			if (mr < 0xc8)
-+				return false;
++	Decoder decoder(CS_MODE_16);
++	RegisterTable regs{};
++	for (unsigned bank : { 0u, 2u }) {
++		for (unsigned i = 0; i < 8; ++i) {
++			decode_pair(decoder, 0, bank ? 0x89 : 0x88,
++				    static_cast<uint8_t>(0xc0 + 9 * i));
++			auto &reg = regs[bank][i];
++			const cs_x86 &x = decoder.insn->detail->x86;
++			if (x.op_count != 2 || x.operands[0].type != X86_OP_REG ||
++			    x.operands[1].type != X86_OP_REG ||
++			    x.operands[0].reg != x.operands[1].reg)
++				throw std::runtime_error("unexpected real-mode register move");
++			reg.reg = x.operands[0].reg;
++			const char *name = cs_reg_name(decoder.handle, reg.reg);
++			if (!name || strlen(name) >= sizeof(reg.name))
++				throw std::runtime_error("unexpected real-mode register name");
++			strcpy(reg.name, name);
++			reg.length = static_cast<uint8_t>(strlen(name));
++		}
++	}
++	uint16_t plans[256]{};
++	std::vector<std::string> rows;
++	unsigned encodings = 0;
++	for (unsigned op = 0; op < 256; ++op) {
++		X86SimpleForm form = X86_SIMPLE_FIXED;
++		CheckedRow row;
++		if (fixed_opcode(op, false))
++			row = check_fixed(decoder, op);
++		else if (pair_opcode(op))
++			row = check_pair(decoder, op, 0, regs, form);
++		else
 +			continue;
-+		}
-+		bool ok = mr < 0xc8 && insn->id == X86_INS_EXTRQ &&
-+			  insn->size == sizeof(code);
-+		cs_free(insn, count);
-+		if (!ok)
-+			return false;
++		auto it = std::find(rows.begin(), rows.end(), row.fields);
++		unsigned index = static_cast<unsigned>(it - rows.begin());
++		if (it == rows.end())
++			rows.push_back(row.fields);
++		plans[op] = static_cast<uint16_t>(((index + 1) << 2) | form);
++		encodings += row.encodings;
 +	}
-+	return true;
++	std::cout << "/* Generated by suite/synctools/x86_simple_output.cpp --legacy16. */\n"
++		  << "static const uint16_t legacy16_plans[256] = {\n";
++	for (unsigned i = 0; i < 256; i += 16) {
++		std::cout << '\t';
++		for (unsigned j = i; j < i + 16; ++j)
++			std::cout << plans[j] << (j == i + 15 ? "," : ", ");
++		std::cout << '\n';
++	}
++	std::cout << "};\nstatic const struct X86SimpleOutput legacy16_rows[] = {\n";
++	for (const auto &row : rows)
++		std::cout << '\t' << row << ",\n";
++	std::cout << "};\nstatic const struct X86SimpleRegister legacy16_regs[2][8] = {\n";
++	for (unsigned bank : { 0u, 2u }) {
++		std::cout << "\t{\n";
++		for (unsigned i = 0; i < 8; ++i)
++			emit_register(regs[bank][i]);
++		std::cout << "\t},\n";
++	}
++	std::cout << "};\n";
++	std::cerr << encodings << " canonical encodings, " << rows.size() << " rows\n";
 +}
 +
- int main(void)
+ void emit_test32(const PlanTable &plans, const RegisterTable &regs,
+ 		 const std::vector<std::string> &rows)
  {
--	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
--	for (unsigned i = 0; i < 2; ++i) {
-+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
-+	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i) {
- 		csh handle;
- 		if (cs_open(CS_ARCH_X86, modes[i], &handle))
- 			return 1;
- 		bool ok = cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ==
- 			  CS_ERR_OK;
-+		ok = ok && check_legacy_vector_prefix(handle) &&
-+		     check_extrq_selector(handle);
- 		for (unsigned att = 0; att < 2 && ok; ++att) {
- 			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
- 					       att ? CS_OPT_SYNTAX_ATT :
-@@ -147,7 +346,8 @@ int main(void)
- 			if (att && err == CS_ERR_X86_ATT)
- 				continue;
- 			ok = err == CS_ERR_OK &&
--			     check_moves(handle, i != 0, att != 0);
-+			     check_moves(handle, modes[i] == CS_MODE_64,
-+					 att != 0);
- 		}
- 		ok = ok && check_scan(handle, modes[i] == CS_MODE_64);
- 		cs_close(&handle);
+@@ -1157,6 +1220,10 @@ void emit_indirect64(Decoder &decoder, const RegisterTable &regs)
+ 
+ int main(int argc, char **argv)
+ {
++	if (argc == 2 && std::strcmp(argv[1], "--legacy16") == 0) {
++		emit_legacy16();
++		return 0;
++	}
+ 	if (argc == 2 && std::strcmp(argv[1], "--vex64-packed-memory") == 0) {
+ 		Decoder decoder(CS_MODE_64);
+ 		emit_packed_memory(decoder, false);

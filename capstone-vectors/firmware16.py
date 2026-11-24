@@ -43,13 +43,15 @@ def verify(w,images,invoke,select):
         else:rejected.append(dict(symbols=rows[z],extent=z,results={k:v[i][3:] for k,v in traces.items()}))
     assert len(chosen)>=20;emit(chosen)
     def take(k,mode,reps):
-        select(k)
-        return list(map(int,get(*invoke,'private',str(mode),str(reps),image,path,'16').split()))
+        select('base' if k in ('iced','fast')else k)
+        return list(map(int,get(*invoke,k if k in ('iced','fast')else 'private',str(mode),str(reps),image,path,'16').split()))
     result={}
     for mode in range(3):
         reps=max(1,math.ceil(30e6/take('base',mode,1)[0]))
-        expected={k:take(k,mode,reps)[2:] for k in images};assert len({tuple(x)for x in expected.values()})==1,expected
-        rng=random.Random(9917+mode);pairs=[];keys=list(images)
+        keys=[*images,'iced']+(['fast']if mode else[])
+        expected={k:take(k,mode,reps)[2:] for k in keys}
+        assert len({tuple(expected[k]) for k in images})==1 and len({tuple(row[:3])for row in expected.values()})==1,expected
+        rng=random.Random(9917+mode);pairs=[]
         for _ in range(17):
             rng.shuffle(keys);v={k:[]for k in keys}
             for k in keys+keys[::-1]:
