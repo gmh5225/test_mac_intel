@@ -8,7 +8,7 @@ permissions:
   contents: read
   actions: read
 env:
-  REVISION: 99248eefcf10218be0b8de353b0bcf7a1d4b3bea
+  REVISION: 9e46317bed64bf8f33416f803c3eac8cef60e9c9
   LLVM_REVISION: e03b3a2cd27615bd9a8d193b37f36da80d56355b
   HOMEBREW_NO_AUTO_UPDATE: '1'
 jobs:
@@ -108,13 +108,15 @@ jobs:
           qemu-mips --version
           mips-linux-gnu-as --version
           python unittests/lift/mips/native-object-roundtrip.py \
-            --sdk build-check/bin/libneverd.so --output evidence/mips-native-execution.json
+            --sdk build-check/bin/libneverd.so --clang clang-18 --output evidence/mips-native-execution.json
           python - <<'PYTHON'
           import json
           rows = json.load(open('evidence/mips-native-execution.json'))
           assert len(rows) == len({(r['abi'], r['endian'], r['mode']) for r in rows}) == 50
           assert all(r['original'] == 37 for r in rows)
           assert sum(r.get('rebuilt') == 37 for r in rows) == 42
+          projected = [r for r in rows if r['mode'] in ('classic', 'r1', 'r3', 'r5')]
+          assert len(projected) == 24 and all(r['high_c'] == r['llvm_c'] == 37 for r in projected)
           assert sum('authenticated execution context' in r.get('diagnostic', '') for r in rows) == 8
           PYTHON
       - name: Verify the public LLVM release
