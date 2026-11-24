@@ -43,7 +43,8 @@ try:
         run('clang','-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',w/(label+'.library'))
         if label=='candidate':
             affected=sorted(k for k,h in objects[label].items() if h!=objects['base'].get(k))
-            assert affected==['MCInstStorage.c.o','cs.c.o'] and set(objects['base'])<=set(objects[label]),affected
+            assert affected==['AliasPatternLookup.c.o'] and set(objects['base'])==set(objects[label]),affected
+            run(sys.executable,base/'suite/synctools/alias_pattern_rows.py','--check')
             save('affected',dict(count=len(objects[label]),changed=affected))
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')
     v=sp.run([w/'states',w/'base.library',w/'candidate.library','2048'],capture_output=True,text=True)

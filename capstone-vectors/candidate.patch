@@ -1,132 +1,338 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..9aaa065c 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -160,6 +160,11 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
-     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
-+        add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
-+        set(capstone_storage_source MCInstStorage.c)
-+    endif()
- endif()
+diff --git a/AliasPatternLookup.c b/AliasPatternLookup.c
+index dc90385f..0a35bf42 100644
+--- a/AliasPatternLookup.c
++++ b/AliasPatternLookup.c
+@@ -26,6 +26,14 @@ typedef struct {
  
- if(capstone_enabled_architectures STREQUAL "XCORE")
-@@ -1056,7 +1061,7 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
- 
- ## targets
- add_library(capstone_build_settings INTERFACE)
--add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
-+add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${ALL_HEADERS})
- target_link_libraries(capstone PUBLIC capstone_build_settings)
- set_property(TARGET capstone PROPERTY C_STANDARD 99)
- target_include_directories(capstone_build_settings INTERFACE
-@@ -1089,23 +1094,23 @@ endif()
- 
- if(CAPSTONE_BUILD_STATIC_LIBS)
-     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
--    set(capstone_alias_patterns_tail)
-+    set(capstone_static_tail)
-     if(TARGET capstone_x86_iter32)
-         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
-             # Backends reference the alias parser indirectly. Keep its hot code
-             # ahead of the optional native readers even when all are linked.
--            # Keep the opcode rows after the native scanner when both are linked.
--            set(capstone_alias_patterns_tail
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-+            # Keep alias rows and the mixed operand initializer after the native readers.
-+            set(capstone_static_tail
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>")
-             set(capstone_static_objects
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
-                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
-         else()
-             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
-         endif()
--        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
-+        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
-     endif()
-     add_library(capstone_static STATIC ${capstone_static_objects})
-     # Use normal capstone name. Otherwise we get libcapstone_static.a
-diff --git a/MCInstStorage.c b/MCInstStorage.c
-new file mode 100644
-index 00000000..f03bed8f
---- /dev/null
-+++ b/MCInstStorage.c
-@@ -0,0 +1,18 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include "cs_priv.h"
-+
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+/* The mixed decoder calls this for ARM, AArch64, PowerPC and RISC-V.
-+ * Each decoder constructs its active operands before reading them. */
-+#if defined(__ELF__)
-+__attribute__((section(".cs_mcinst_storage_text")))
-+#elif defined(__APPLE__)
-+__attribute__((section("__TEXT,__cs_mcinst,regular,pure_instructions")))
-+#endif
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
+ /* The matcher accepts a suffix of its sorted table and owns all operand,
+  * feature and alias-printing decisions. */
++static inline const char *matchAliasRow(MCInst *MI, const AliasMatchingData *data,
++					unsigned row)
 +{
-+	MCInst_InitStorage(inst, arch, false);
++	AliasMatchingData suffix = *data;
++	suffix.OpToPatterns += row;
++	return matchAliasPatterns(MI, &suffix);
 +}
-+#endif
-diff --git a/Makefile b/Makefile
-index 2720955e..5d98f613 100644
---- a/Makefile
-+++ b/Makefile
-@@ -121,6 +121,9 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
- CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
-+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
-+	MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
-@@ -449,8 +452,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
- LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
- LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
- LIBOBJ += $(LIBOBJ_X86_NUMBERS)
--LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
--LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
-+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
-+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- LIBOBJ_SHARED := $(LIBOBJ)
- endif
-diff --git a/cs.c b/cs.c
-index 0af815c7..ad07e6c8 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	 * performs better on some full-detail workloads with the shared
- 	 * initializer below. */
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+#elif defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+	MCInst_InitConstructedOperands(&mci, handle->arch);
- #else
- 	MCInst_Init(&mci, handle->arch);
- #endif
-diff --git a/cs_priv.h b/cs_priv.h
-index 84e1c748..19ecedba 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -30,6 +30,10 @@
- 
- #include "MCInst.h"
- #include "SStream.h"
 +
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
-+#endif
- #ifdef CAPSTONE_X86_SCAN_ADAPTER
- #include "arch/X86/X86ScanAdapter.h"
+ static inline const char *matchAliasBlock(MCInst *MI, const AliasMatchingData *data,
+ 					  unsigned offset, const AliasOpcodeBlock *blocks,
+ 					  size_t block_count)
+@@ -37,9 +45,8 @@ static inline const char *matchAliasBlock(MCInst *MI, const AliasMatchingData *d
+ 	const AliasOpcodeBlock block = blocks[index];
+ 	if (!(block.mask & bit))
+ 		return NULL;
+-	AliasMatchingData suffix = *data;
+-	suffix.OpToPatterns += block.first_row + CountPopulation_32(block.mask & (bit - 1));
+-	return matchAliasPatterns(MI, &suffix);
++	return matchAliasRow(MI, data, block.first_row +
++					      CountPopulation_32(block.mask & (bit - 1)));
+ }
+ 
+ #ifdef CAPSTONE_HAS_AARCH64
+@@ -57,8 +64,12 @@ const char *matchAArch64AliasPatterns(MCInst *MI, const AliasMatchingData *data)
+ ALIAS_PATTERN_CODE
+ const char *matchMipsAliasPatterns(MCInst *MI, const AliasMatchingData *data)
+ {
+-	return matchAliasBlock(MI, data, MI->Opcode - Mips_FIRST_ALIAS_OPCODE,
+-			       Mips_alias_blocks, ARR_SIZE(Mips_alias_blocks));
++	const unsigned offset = MI->Opcode - Mips_FIRST_ALIAS_OPCODE;
++	const unsigned block = offset / 16;
++	if (block >= ARR_SIZE(Mips_alias_pages))
++		return NULL;
++	const unsigned row = Mips_alias_rows[Mips_alias_pages[block]][offset % 16];
++	return row ? matchAliasRow(MI, data, row - 1) : NULL;
+ }
  #endif
+ 
+diff --git a/arch/Mips/MipsGenAliasPatternRows.inc b/arch/Mips/MipsGenAliasPatternRows.inc
+index 64f1c070..790f36a9 100644
+--- a/arch/Mips/MipsGenAliasPatternRows.inc
++++ b/arch/Mips/MipsGenAliasPatternRows.inc
+@@ -1,168 +1,74 @@
+ /* Generated by suite/synctools/alias_pattern_rows.py. */
+ #define Mips_FIRST_ALIAS_OPCODE 521u
+-static const AliasOpcodeBlock Mips_alias_blocks[] ALIAS_PATTERN_DATA = {
+-	{ 0, 0x3c0f },
+-	{ 8, 0xc0f0 },
+-	{ 14, 0x3003 },
+-	{ 18, 0x0000 },
+-	{ 18, 0x0000 },
+-	{ 18, 0x0000 },
+-	{ 18, 0x0000 },
+-	{ 18, 0x0000 },
+-	{ 18, 0x0000 },
+-	{ 18, 0x0000 },
+-	{ 18, 0x0006 },
+-	{ 20, 0x0000 },
+-	{ 20, 0x0000 },
+-	{ 20, 0x0000 },
+-	{ 20, 0x0000 },
+-	{ 20, 0x0570 },
+-	{ 25, 0x0000 },
+-	{ 25, 0x0000 },
+-	{ 25, 0x0000 },
+-	{ 25, 0x0000 },
+-	{ 25, 0x0020 },
+-	{ 26, 0x0000 },
+-	{ 26, 0x0000 },
+-	{ 26, 0x0000 },
+-	{ 26, 0x0000 },
+-	{ 26, 0xe000 },
+-	{ 29, 0x001c },
+-	{ 32, 0x1240 },
+-	{ 35, 0x0000 },
+-	{ 35, 0x0210 },
+-	{ 37, 0x0000 },
+-	{ 37, 0x0000 },
+-	{ 37, 0x0000 },
+-	{ 37, 0x0000 },
+-	{ 37, 0x0090 },
+-	{ 39, 0x0004 },
+-	{ 40, 0x4400 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0x0000 },
+-	{ 42, 0xfff8 },
+-	{ 55, 0xffff },
+-	{ 71, 0xffff },
+-	{ 87, 0xffff },
+-	{ 103, 0xffff },
+-	{ 119, 0xffff },
+-	{ 135, 0x0207 },
+-	{ 139, 0x2000 },
+-	{ 140, 0x8006 },
+-	{ 143, 0x0803 },
+-	{ 146, 0x0002 },
+-	{ 147, 0x0000 },
+-	{ 147, 0x0000 },
+-	{ 147, 0x0000 },
+-	{ 147, 0x3000 },
+-	{ 149, 0x7e03 },
+-	{ 157, 0x0180 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0000 },
+-	{ 159, 0x0006 },
+-	{ 161, 0x0000 },
+-	{ 161, 0xc728 },
+-	{ 168, 0x0360 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0000 },
+-	{ 172, 0x0400 },
+-	{ 173, 0x0020 },
+-	{ 174, 0x0000 },
+-	{ 174, 0x0000 },
+-	{ 174, 0x0000 },
+-	{ 174, 0x0080 },
+-	{ 175, 0x0000 },
+-	{ 175, 0x0000 },
+-	{ 175, 0x0000 },
+-	{ 175, 0x0000 },
+-	{ 175, 0x0040 },
+-	{ 176, 0x0004 },
+-	{ 177, 0x0000 },
+-	{ 177, 0x0000 },
+-	{ 177, 0x0000 },
+-	{ 177, 0x0000 },
+-	{ 177, 0x0100 },
+-	{ 178, 0x0000 },
+-	{ 178, 0x4408 },
+-	{ 181, 0x0000 },
+-	{ 181, 0x0000 },
+-	{ 181, 0x0000 },
+-	{ 181, 0x0000 },
+-	{ 181, 0x0000 },
+-	{ 181, 0x03c0 },
+-	{ 185, 0x3800 },
+-	{ 188, 0x0100 },
+-	{ 189, 0x0000 },
+-	{ 189, 0x00c0 },
+-	{ 191, 0x0000 },
+-	{ 191, 0x0284 },
+-	{ 194, 0x0000 },
+-	{ 194, 0x0000 },
+-	{ 194, 0x0000 },
+-	{ 194, 0x0000 },
+-	{ 194, 0x0000 },
+-	{ 194, 0x0000 },
+-	{ 194, 0x0180 },
+-	{ 196, 0x0004 },
+-	{ 197, 0x000c },
+-	{ 199, 0x0000 },
+-	{ 199, 0x0000 },
+-	{ 199, 0x0000 },
+-	{ 199, 0x0000 },
+-	{ 199, 0x0080 },
+-	{ 200, 0x0000 },
+-	{ 200, 0x1000 },
+-	{ 201, 0x6000 },
+-	{ 203, 0x0005 },
+-	{ 205, 0x0000 },
+-	{ 205, 0x0400 },
+-	{ 206, 0xbc10 },
+-	{ 212, 0x0000 },
+-	{ 212, 0x0a40 },
+-	{ 215, 0x0007 },
+-	{ 218, 0x0000 },
+-	{ 218, 0x09e2 },
+-	{ 224, 0x0000 },
+-	{ 224, 0x3a00 },
+-	{ 228, 0x0000 },
+-	{ 228, 0x0018 },
++static const uint8_t Mips_alias_pages[] ALIAS_PATTERN_DATA = {
++	1, 2, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 5,
++	0, 0, 0, 0, 6, 0, 0, 0, 0, 7, 8, 9, 0, 10, 0, 0,
++	0, 0, 11, 12, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
++	0, 0, 0, 25, 26, 27, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 28, 0, 29, 30, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 31, 32, 0, 0, 0, 33, 0, 0, 0,
++	0, 34, 35, 0, 0, 0, 0, 36, 0, 37, 0, 0, 0, 0, 0, 38,
++	39, 40, 0, 41, 0, 42, 0, 0, 0, 0, 0, 0, 43, 44, 45, 0,
++	0, 0, 0, 46, 0, 47, 48, 49, 0, 50, 51, 0, 52, 53, 0, 54,
++	0, 55, 0, 56,
++};
++static const uint8_t Mips_alias_rows[][16] ALIAS_PATTERN_DATA = {
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 5, 6, 7, 8, 0, 0 },
++	{ 0, 0, 0, 0, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 13, 14 },
++	{ 15, 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 17, 18, 0, 0 },
++	{ 0, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 21, 22, 23, 0, 24, 0, 25, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 27, 28, 29 },
++	{ 0, 0, 30, 31, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 33, 0, 0, 34, 0, 0, 35, 0, 0, 0 },
++	{ 0, 0, 0, 0, 36, 0, 0, 0, 0, 37, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 38, 0, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 41, 0, 0, 0, 42, 0 },
++	{ 0, 0, 0, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55 },
++	{ 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71 },
++	{ 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87 },
++	{ 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103 },
++	{ 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119 },
++	{ 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135 },
++	{ 136, 137, 138, 0, 0, 0, 0, 0, 0, 139, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 140, 0, 0 },
++	{ 0, 141, 142, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 143 },
++	{ 144, 145, 0, 0, 0, 0, 0, 0, 0, 0, 0, 146, 0, 0, 0, 0 },
++	{ 0, 147, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 148, 149, 0, 0 },
++	{ 150, 151, 0, 0, 0, 0, 0, 0, 0, 152, 153, 154, 155, 156, 157, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 158, 159, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 160, 161, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 162, 0, 163, 0, 0, 164, 165, 166, 0, 0, 0, 167, 168 },
++	{ 0, 0, 0, 0, 0, 169, 170, 0, 171, 172, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 173, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 174, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 175, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 176, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 177, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 178, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 179, 0, 0, 0, 0, 0, 0, 180, 0, 0, 0, 181, 0 },
++	{ 0, 0, 0, 0, 0, 0, 182, 183, 184, 185, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 186, 187, 188, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 189, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 190, 191, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 192, 0, 0, 0, 0, 193, 0, 194, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 195, 196, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 197, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 198, 199, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 200, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 201, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 202, 203, 0 },
++	{ 204, 0, 205, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 206, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 207, 0, 0, 0, 0, 0, 208, 209, 210, 211, 0, 212 },
++	{ 0, 0, 0, 0, 0, 0, 213, 0, 0, 214, 0, 215, 0, 0, 0, 0 },
++	{ 216, 217, 218, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
++	{ 0, 219, 0, 0, 0, 220, 221, 222, 223, 0, 0, 224, 0, 0, 0, 0 },
++	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 225, 0, 226, 227, 228, 0, 0 },
++	{ 0, 0, 0, 229, 230, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+ };
+diff --git a/suite/synctools/alias_pattern_rows.py b/suite/synctools/alias_pattern_rows.py
+old mode 100755
+new mode 100644
+index 118fa9d3..30b65870
+--- a/suite/synctools/alias_pattern_rows.py
++++ b/suite/synctools/alias_pattern_rows.py
+@@ -24,12 +24,41 @@ def entries(directory):
+     return opcodes
+ 
+ 
++def mips_row_pages(opcodes):
++    # A zero page is shared by all empty opcode blocks. Nonempty entries
++    # contain the one-based row in the generated OpToPatterns table.
++    first = opcodes[0]
++    page_ids = [0] * ((opcodes[-1] - first) // 16 + 1)
++    pages = [[0] * 16]
++    for row, opcode in enumerate(opcodes, 1):
++        block, slot = divmod(opcode - first, 16)
++        if not page_ids[block]:
++            page_ids[block] = len(pages)
++            pages.append([0] * 16)
++        pages[page_ids[block]][slot] = row
++
++    index_type = "uint8_t" if len(opcodes) <= 255 else "uint16_t"
++    lines = [
++        "/* Generated by suite/synctools/alias_pattern_rows.py. */",
++        f"#define Mips_FIRST_ALIAS_OPCODE {first}u",
++        f"static const {index_type} Mips_alias_pages[] ALIAS_PATTERN_DATA = {{",
++    ]
++    for start in range(0, len(page_ids), 16):
++        lines.append("\t" + ", ".join(map(str, page_ids[start:start + 16])) + ",")
++    lines += ["};", f"static const {index_type} Mips_alias_rows[][16] ALIAS_PATTERN_DATA = {{"]
++    for page in pages:
++        lines.append("\t{ " + ", ".join(map(str, page)) + " },")
++    return "\n".join(lines + ["};", ""])
++
++
+ def generate(directory):
+     opcodes = entries(directory)
+     arch = "PPC" if directory.name == "PowerPC" else directory.name
+     first = opcodes[0]
+     if len(opcodes) > 65535:
+         raise ValueError("Alias row index exceeds uint16_t")
++    if arch == "Mips":
++        return mips_row_pages(opcodes)
+     # Each entry records the table row of its first opcode and which of the
+     # next sixteen instruction IDs have a pattern.
+     masks = [0] * ((opcodes[-1] - first) // 16 + 1)
