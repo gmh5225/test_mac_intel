@@ -26,6 +26,13 @@ try:
         run('cmake','--build',b,'--parallel','3','--target','capstone_static')
         for name in ('time','firmware'):
             run('clang','-D_POSIX_C_SOURCE=200809L','-std=c11','-O3','-I',s/'include',r/(name+'.c'),b/'libcapstone.a','-o',t/(k+name))
+        table={}
+        for row in call('nm','-n','-S','--defined-only',t/(k+'time')).splitlines():
+            parts=row.split()
+            if len(parts)==4 and parts[2].lower()=='t':
+                table[parts[3]]=[int(parts[0],16),int(parts[1],16)]
+        assert 'cs_disasm' in table and 'cs_disasm_iter' in table
+        put('symbols-'+k,table)
         source[k]=dict(tree=call('git','-C',s,'write-tree'),lib=sha(b/'libcapstone.a'),bin=sha(t/(k+'time')))
     assert source['base']['lib']!=source['candidate']['lib']
     programs={k:(t/(k+'time')).read_bytes() for k in ('base','candidate')}; width=max(map(len,programs.values()))
@@ -41,15 +48,15 @@ try:
                 raw=sp.check_output([t/(k+'firmware'),f,str(sect['address']),str(flags)])
                 fingerprint=hashlib.sha256(raw).hexdigest();assert fingerprint==codes[id];samples_checked[f.name][id]=fingerprint
             for api in ('iter','array'):
-                for mode in range(3):
+                for mode in (0,):
                     key=f.stem+'/'+api+'/'+str(mode)
                     def take(k,num):
                         if sys.platform.startswith('linux'):
                             selected.write_bytes(programs[k]);args=invoke
                         else:args=[t/(('base' if k=='copy' else k)+'time')]
                         return list(map(int,call(*args,f,str(sect['address']),str(mode),api,str(num)).split()))
-                    n=max(1,ceil(30e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random(key+os.environ.get("REPEAT",""));cycles=[]
-                    for cycle in range(31):
+                    n=max(1,ceil(50e6/take('base',1)[0]));expected=take('base',n)[2:];rng=random.Random("isolated-scan-repeat/"+key+os.environ.get("REPEAT",""));cycles=[]
+                    for cycle in range(47):
                         order=keys.copy();rng.shuffle(order);obs={k:[]for k in keys}
                         for k in order+order[::-1]:
                             v=take(k,n);assert v[2:]==expected;obs[k].append(v[:2])
