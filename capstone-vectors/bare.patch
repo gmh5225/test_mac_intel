@@ -1,12 +1,13 @@
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 443b2f86..cfd22a89 100644
+index 443b2f86..0e57e3ea 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
-@@ -188,6 +188,29 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+@@ -188,6 +188,30 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
  	return true;
  }
  
-+#if defined(__aarch64__) && defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
++#if defined(__ELF__) && defined(__clang__) && defined(__aarch64__) && \
++	defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
 +	!defined(__KERNEL__) && !defined(_KERNEL_MODE)
 +#include <arm_neon.h>
 +#include "../../MathExtras.h"

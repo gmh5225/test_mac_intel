@@ -1,70 +1,53 @@
-diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
-index 6f3953cc..c78150e3 100644
---- a/arch/X86/X86UnsignedImmediate.h
-+++ b/arch/X86/X86UnsignedImmediate.h
-@@ -4,23 +4,54 @@
- #ifndef CS_X86_UNSIGNED_IMMEDIATE_H
- #define CS_X86_UNSIGNED_IMMEDIATE_H
- 
-+#include "../../MathExtras.h"
-+
- static char *writeUnsignedImmediate(char *out, uint64_t value)
- {
- 	if (value <= HEX_THRESHOLD) {
- 		*out = (char)('0' + value);
- 		return out + 1;
--	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
--		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
--		return out + 2 + (end - start);
- 	}
-+
-+	static const char byte_digits[] =
-+		"000102030405060708090a0b0c0d0e0f"
-+		"101112131415161718191a1b1c1d1e1f"
-+		"202122232425262728292a2b2c2d2e2f"
-+		"303132333435363738393a3b3c3d3e3f"
-+		"404142434445464748494a4b4c4d4e4f"
-+		"505152535455565758595a5b5c5d5e5f"
-+		"606162636465666768696a6b6c6d6e6f"
-+		"707172737475767778797a7b7c7d7e7f"
-+		"808182838485868788898a8b8c8d8e8f"
-+		"909192939495969798999a9b9c9d9e9f"
-+		"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
-+		"b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
-+		"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
-+		"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
-+		"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
-+		"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
-+	memcpy(out, "0x", 2);
-+	out += 2;
-+	if (value < 256) {
-+		const char *pair = byte_digits + 2 * (unsigned)value;
-+		if (value >= 16)
-+			*out++ = pair[0];
-+		*out++ = pair[1];
-+		return out;
-+	}
-+
-+	/* Write the significant digits directly into the operand string. */
-+	unsigned bits = (67 - CountLeadingZeros_64(value)) & ~3u;
-+	if (bits & 4) {
-+		bits -= 4;
-+		*out++ = byte_digits[2 * (unsigned)(value >> bits) + 1];
-+	}
-+	while (bits) {
-+		bits -= 8;
-+		memcpy(out, byte_digits + 2 * (uint8_t)(value >> bits), 2);
-+		out += 2;
-+	}
-+	return out;
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3dc297b9..3cc1d304 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1106,6 +1106,13 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+         endif()
+         list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
++        # Keep the optional i386 reader after the other native ELF sections
++        # so changes to its size do not move the scanner and AMD64 reader.
++        if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++           AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
++            list(REMOVE_ITEM capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32>)
++            list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32>)
++        endif()
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 443b2f86..0e57e3ea 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -188,6 +188,30 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
  }
  
- #endif
++#if defined(__ELF__) && defined(__clang__) && defined(__aarch64__) && \
++	defined(__ARM_NEON) && !defined(__AARCH64EB__) && \
++	!defined(__KERNEL__) && !defined(_KERNEL_MODE)
++#include <arm_neon.h>
++#include "../../MathExtras.h"
++
++/* The 32-bit iterator wraps branch targets before formatting them. Expand
++ * its eight hex digits in print order and shift away the leading zeroes. */
++static void writeRelativeHex32(char *out, uint32_t value)
++{
++	const uint8x8_t bytes = vcreate_u8(__builtin_bswap32(value));
++	const uint8x8_t nibbles = vand_u8(vzip1_u8(vshr_n_u8(bytes, 4), bytes),
++				       vdup_n_u8(15));
++	const uint8x8_t chars =
++		vqtbl1_u8(vld1q_u8((const uint8_t *)"0123456789abcdef"), nibbles);
++	const unsigned leading = CountLeadingZeros_32(value) / 4;
++	const uint64_t digits =
++		vget_lane_u64(vreinterpret_u64_u8(chars), 0) >> (leading * 8);
++	memcpy(out, "0x", 2);
++	memcpy(out + 2, &digits, sizeof(digits));
++}
++#define X86_FIXED_RELATIVE_HEX writeRelativeHex32
++#endif
++
+ #define X86_FIXED_OUTPUT tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32

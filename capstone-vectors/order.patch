@@ -1,0 +1,18 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3dc297b9..3cc1d304 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1106,6 +1106,13 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+         endif()
+         list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
++        # Keep the optional i386 reader after the other native ELF sections
++        # so changes to its size do not move the scanner and AMD64 reader.
++        if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++           AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
++            list(REMOVE_ITEM capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32>)
++            list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32>)
++        endif()
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a

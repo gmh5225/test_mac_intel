@@ -36,14 +36,29 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    images={}
-    for label in ('base','candidate'):
-        if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+    images={};layout={}
+    for label in ('base','bare','order','candidate'):
+        if label!='base':
+            run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','arch/X86/X86Vex32Output.c','CMakeLists.txt')
+            spec=m['variants'][label];patch=r/(label+'.patch')
+            assert sha(patch)==spec['sha256'];run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==spec['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'targets.cpp',lib,'-o',w/'targets')
+        record=get(w/'targets').strip();assert record=='382340 complete public/private records and independent target strings agree',record
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        members=get('ar','t',lib).splitlines();symbols={}
+        for line in get('nm','-an',w/label).splitlines():
+            cols=line.split()
+            if len(cols)==3 and cols[2] in ('cs_disasm_iter','cs_decode_full_insn','X86_disasmIter32','X86_disasmIterText','tryOutput64','tryOutput32','X86_scanNativeBatch'):
+                symbols[cols[2]]=int(cols[0],16)
+        assert len(symbols)>=6
+        objects={f.name:sha(f)for f in build.rglob('*.c.o')}
+        if label!='base':
+            diff=sorted(k for k,v in layout['base']['objects'].items()if v!=objects[k])
+            assert diff==(['X86Vex32Output.c.o'] if label in ('bare','candidate') else []),(label,diff)
+        assert (members[-1]=='X86Vex32Output.c.o')==(label in ('order','candidate'))
+        layout[label]=dict(objects=objects,members=members,symbols=symbols,record=record);save('layout',layout)
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
@@ -69,18 +84,18 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('candidate')
+        assert audit_engine('base')==audit_engine('candidate')==audit_engine('bare')==audit_engine('order')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
+            exe=engine if engine in ('candidate','duplicate','order','bare')else'base'
             return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
+            labels=['base','duplicate','candidate','bare','order']
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
-            rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
+            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']==expected['bare']==expected['order']
+            rows=[];rng=random.Random(name+'/i386-trailing-object/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
                 for k in labels+labels[::-1]:
