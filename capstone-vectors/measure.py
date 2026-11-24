@@ -161,7 +161,9 @@ def main(w):
         earlier=['X86PublicOutput.c.o','X86BatchScan.c.o']
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
-        expected=base_orders[orig]+(['X86Vex3Operands.c.o'] if mixed and kind=='bare' else [])
+        expected=list(base_orders[orig])
+        if mixed and kind=='bare':
+            expected.insert(expected.index('X86RegisterFallback32.c.o')+1,'X86Vex3Operands.c.o')
         active_tail=False
         assert members==expected,(key,members,expected)
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
@@ -173,7 +175,7 @@ def main(w):
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
         syslibs=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv'] if darwin else ['-ldl'])
         run(['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',w/'linked-runner'],'link-'+key);(w/'linked-runner').rename(exe);bins[key]=exe
-        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','X86_tryRecord32','X86_tryRecord64','cs_disasm_iter','cs_decode_full_insn','X86_tryBulkOutput','X86_decodePublicRecord','X86_scanNativeBatch'}
+        names={'X86_disasmIter32','X86_disasmIterText','tryOutput32','tryOutput64','X86_tryRecord32','X86_tryRecord64','cs_disasm_iter','cs_decode_full_insn','X86_tryBulkOutput','X86_decodePublicRecord','X86_writeVex3Operands','X86_scanNativeBatch'}
         linked={}
         for line in sp.check_output(['nm','-n',exe],text=True).splitlines():
             cols=line.split()
@@ -181,6 +183,7 @@ def main(w):
             name=cols[2][1:] if darwin and cols[2].startswith('_') else cols[2]
             if name in names:linked[name]=int(cols[0],16)
         assert ('X86_decodePublicRecord' in linked)==(not mixed)
+        assert ('X86_writeVex3Operands' in linked)==(mixed and kind=='bare')
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         assert ('X86_tryBulkOutput' in linked)==active_tail,(key,linked)
         assert ('X86_tryRecord32' in linked)==active_tail,(key,linked)

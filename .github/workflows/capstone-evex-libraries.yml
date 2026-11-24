@@ -1,7 +1,7 @@
-name: Measure isolated VEX3 operand formatting against iced on PE and ELF
+name: Measure isolated VEX3 formatting with verified static archive order
 on:
   push:
-    branches: [codex/isolated-vex3-iced]
+    branches: [codex/vex3-native-archive-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-vex3-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: verified-vex3-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
