@@ -1,7 +1,7 @@
-name: Measure the table-only EXTRQ fix against iced Intel and FastFormatter
+name: Measure release-size UID selectors against the two iced formatters
 on:
   push:
-    branches: [codex/extrq-selector-iced-score]
+    branches: [codex/neutral-selector-iced-score]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
+          ref: 396483e58bf0bb8f4dd6e36daff8b0458bad2315
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 53ac2a9d6d2ad99dff0dbadff424fa00607ec84c
+          ref: 84cdbdd109ad5f72e85603dd2dbbb5081020c58a
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-extrq-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: neutral-selector-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
