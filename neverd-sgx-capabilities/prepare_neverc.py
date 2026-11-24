@@ -18,9 +18,16 @@ def main():
     compiler = args.compiler.resolve()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
+    resource_dir = Path(subprocess.check_output(
+        [compiler, "--print-resource-dir"], text=True).strip())
+    resource_header = resource_dir / "include" / "stddef.h"
+    if not resource_header.is_file():
+        raise RuntimeError(f"NeverC resource header is missing: {resource_header}")
     source = output / "x64.c"
     source.write_text('#include <stdint.h>\n'
+                      '#include <stddef.h>\n'
                       '_Static_assert(sizeof(void *) == 8, "x64 ABI");\n'
+                      '_Static_assert(offsetof(struct { char c; int v; }, v) >= 1, "stddef resource");\n'
                       'int pointer_bytes(void) { return sizeof(void *); }\n'
                       'int64_t reinterpret_bits(uint64_t v) { return __builtin_bit_cast(int64_t, v); }\n')
     library = output / "x64.so"
@@ -53,6 +60,7 @@ def main():
                 ["git", "-C", args.source, "rev-parse", "HEAD"], text=True).strip(),
             "version": subprocess.check_output([compiler, "--version"], text=True).strip(),
             "binary_sha256": digest, "compiler_execution": "native",
+            "resource_stddef_sha256": hashlib.sha256(resource_header.read_bytes()).hexdigest(),
             "generated_library_pointer_bytes": 8, "bit_cast_result": -7,
             "rejected_source_targets": rejected}
     report = json.dumps(info, indent=2)

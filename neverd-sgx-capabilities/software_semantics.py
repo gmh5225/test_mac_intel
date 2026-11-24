@@ -12,6 +12,7 @@ TESTS = {
     "NeverDX86PagingTests": [
         "X86PagingTest.EnclavePrivatePagesEnforcePagingIdentityAndEpcmPermissions",
         "X86LegacyExecutionTest.UD1FaultsWithoutReadingItsAddress",
+        "X86LegacyExecutionTest.UD0FetchProfileSelectsTheOriginalFault",
     ],
     "NeverDX64PagedExecutionTests": [
         MODE + "TaskGateAndNestedIretPublishBothTaskBanks",
@@ -47,8 +48,13 @@ TESTS = {
         "Compilers/X86LegacySourceTest.OriginalUD1FaultsWithoutReadingMemory/ClangO2",
         "Compilers/X86LegacySourceTest.OriginalUD1FaultsWithoutReadingMemory/NeverCO0",
         "Compilers/X86LegacySourceTest.OriginalUD1FaultsWithoutReadingMemory/NeverCO2",
+        "Compilers/X86LegacySourceTest.OriginalUD0UsesTheBoundFetchProfile/ClangO0",
+        "Compilers/X86LegacySourceTest.OriginalUD0UsesTheBoundFetchProfile/ClangO2",
+        "Compilers/X86LegacySourceTest.OriginalUD0UsesTheBoundFetchProfile/NeverCO0",
+        "Compilers/X86LegacySourceTest.OriginalUD0UsesTheBoundFetchProfile/NeverCO2",
     ],
 }
+KVM_ORACLE = "X86ModeExecutionTest.OriginalModeWritesChooseTheNativeEventFrame"
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -77,19 +83,27 @@ def main():
                 name = case.get("classname") + "." + case.get("name")
                 status = "failed" if case.find("failure") is not None else (
                     "skipped" if case.find("skipped") is not None else "passed")
-                report["cases"].append({"name": name, "status": status})
-                failed |= status != "passed" or name in seen
+                skip = case.find("skipped")
+                reason = skip.get("message", "") if skip is not None else ""
+                unavailable_oracle = (name == KVM_ORACLE and status == "skipped"
+                                      and "KVM unavailable:" in reason)
+                report["cases"].append({"name": name, "status": status,
+                                        **({"reason": reason} if unavailable_oracle else {})})
+                failed |= (status != "passed" and not unavailable_oracle) or name in seen
                 seen.add(name)
         failed |= bool(code) or seen != set(names)
         if seen != set(names):
             print("Missing cases:", sorted(set(names) - seen), flush=True)
     report["passed"] = sum(case["status"] == "passed" for case in report["cases"])
     report["expected"] = sum(map(len, TESTS.values()))
+    report["hardware_skipped"] = sum(case["status"] == "skipped"
+                                      for case in report["cases"])
     (output / "software.json").write_text(json.dumps(report, indent=2) + "\n")
     if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
         with open(summary, "a") as stream:
             stream.write(f"NeverD software semantics at `{revision}`: "
-                         f"**{report['passed']}/{report['expected']} passed**.\n")
+                         f"**{report['passed']}/{report['expected']} passed**, "
+                         f"{report['hardware_skipped']} explicit KVM skip.\n")
     return int(failed)
 
 if __name__ == "__main__":
