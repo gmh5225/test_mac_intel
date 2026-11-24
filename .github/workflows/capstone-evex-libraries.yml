@@ -1,7 +1,7 @@
-name: Measure selective training with every original and trained archive member verified independently
+name: Verify selected GNU and BSD archive payloads and reproduce the comparison on four hosts
 on:
   push:
-    branches: [codex/prove-trained-archive-members]
+    branches: [codex/portable-trained-archive-members]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-selective-pgo-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: portable-selective-pgo-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

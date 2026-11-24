@@ -60,7 +60,12 @@ def assemble(parts,build,lib,save):
     cache=(build/'CMakeCache.txt').read_text()
     def tool(name):return re.search(r'(?m)^CMAKE_'+name+r':FILEPATH=(.+)$',cache)[1]
     ar=tool('AR');ranlib=tool('RANLIB');env=dict(os.environ,ZERO_AR_DATE='1')
-    def members(f):return sp.check_output([ar,'t',f],text=True).splitlines()
+    def members(f):
+        rows=sp.check_output([ar,'t',f],text=True).splitlines()
+        # Apple's ar reports the BSD symbol index as the first member.
+        if rows and rows[0] in ('__.SYMDEF','__.SYMDEF SORTED','__.SYMDEF_64','__.SYMDEF_64 SORTED'):
+            rows=rows[1:]
+        return rows
     ordered=members(lib);assert len(ordered)==len(set(ordered)) and set(ordered)==set(parts),(len(ordered),len(parts))
     trained={k:sha(p)for k,(p,old,h,use)in parts.items()}
     dest=build.parent/'hybrid-capstone.a'
