@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','sib','prefix','combined'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','prefix'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -36,7 +36,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','sib','prefix','combined'):
+    for variant in ('base','prefix'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         command(['git','apply','--index',r/'base.patch'],'apply-correction-'+variant,cs)
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -66,6 +66,15 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'probe.c',archive,'-o',t/'mask-access'],'verify-build-'+variant)
         command([t/'mask-access'],'verify-memory-'+variant)
         assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
+        check=t/'verify-move-scans'
+        command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
+        p=sp.run([check],capture_output=True,text=True,check=True)
+        counts=[row.split() for row in p.stdout.splitlines()]
+        assert len(counts)==15
+        wrong=[sum(int(row[col]) for row in counts) for col in (4,5,6)]
+        if variant=='prefix':assert not any(wrong),wrong
+        else:assert wrong[2]>0,wrong
+        save('scan-'+variant,dict(counts=counts,total=sum(int(row[2]) for row in counts),mismatches=wrong))
         test=out/('tests-'+variant+'.log')
         assert '100% tests passed' in test.read_text()
         if variant=='base':
@@ -83,7 +92,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert len({z['archive']for z in identities.values()})==4 and len({z['binary']for z in identities.values()})==4
+    assert len({z['archive']for z in identities.values()})==2 and len({z['binary']for z in identities.values()})==2
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))

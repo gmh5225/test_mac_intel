@@ -1,7 +1,7 @@
-name: Verify ordinary i386 addresses and SSE prefixes with the source-built NeverD decoder
+name: Verify all x86 integer move scan routes in source-built NeverD
 on:
   push:
-    branches: [codex/ordinary-sib-and-prefix-neverd]
+    branches: [codex/mandatory-move-scans-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: ea5295dcaa778c335fc7755f63f42f37f0eb548b
+          ref: 886f481145d46b6daae6b3b064e313b5ab65d0fe
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "ea5295dcaa778c335fc7755f63f42f37f0eb548b"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "8347e89a4e9a9e1618009fb8a496e335e857d00f"
+          test "$(git rev-parse HEAD)" = "886f481145d46b6daae6b3b064e313b5ab65d0fe"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "7db5af38d02d193688bccd2b45e58627979979bb"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 8347e89a4e9a9e1618009fb8a496e335e857d00f
-          git -C third_party/capstone checkout --detach 8347e89a4e9a9e1618009fb8a496e335e857d00f
+          git -C third_party/capstone fetch --depth=1 origin 7db5af38d02d193688bccd2b45e58627979979bb
+          git -C third_party/capstone checkout --detach 7db5af38d02d193688bccd2b45e58627979979bb
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: address-and-prefix-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: move-scan-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
