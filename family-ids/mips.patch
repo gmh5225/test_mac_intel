@@ -1,5 +1,5 @@
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 7df6e761..df7e53b0 100644
+index 7df6e761..6ed6b0f2 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
 @@ -419,7 +419,8 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
@@ -12,22 +12,27 @@ index 7df6e761..df7e53b0 100644
  {
  	const unsigned major = word >> 26;
  	/* The DSP table precedes the base table for these two full primary
-@@ -430,6 +431,14 @@ static inline unsigned classicMappedOpcode(MCInst *instr, uint32_t word)
- 	if (major)
- 		return major == 8 ? Mips_ADDi : classicScalarOpcode(major);
- 	switch (word & 0x7ff) {
-+	/* The zero shift excludes the SSNOP, EHB and PAUSE encodings.
-+	 * JR reserves both rt and rd, while JALR only reserves rt. */
+@@ -450,6 +451,19 @@ static inline unsigned classicMappedOpcode(MCInst *instr, uint32_t word)
+ 		return Mips_SLT;
+ 	case 0x2b:
+ 		return Mips_SLTu;
++	}
++	if (!opcode_only)
++		return 0;
++
++	/* A zero shift excludes the SSNOP, EHB and PAUSE hints. JR also
++	 * reserves rd, while both jump-register forms reserve rt. */
++	switch (word & 0x7ff) {
 +	case 0x00:
-+		return opcode_only && (word >> 21) == 0 ? Mips_SLL : 0;
++		return (word >> 21) == 0 ? Mips_SLL : 0;
 +	case 0x08:
-+		return opcode_only && (word & 0x001ff800) == 0 ? Mips_JR : 0;
++		return (word & 0x001ff800) == 0 ? Mips_JR : 0;
 +	case 0x09:
-+		return opcode_only && (word & 0x001f0000) == 0 ? Mips_JALR : 0;
- 	case 0x20:
- 		return Mips_ADD;
- 	case 0x21:
-@@ -469,7 +478,8 @@ bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
++		return (word & 0x001f0000) == 0 ? Mips_JALR : 0;
+ 	default:
+ 		return 0;
+ 	}
+@@ -469,7 +483,8 @@ bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
  		Mips_init_cs_detail(&instr);
  		return false;
  	}
@@ -37,7 +42,7 @@ index 7df6e761..df7e53b0 100644
  	if (opcode) {
  		Mips_init_cs_detail(&instr);
  		MCInst_setOpcode(&instr, opcode);
-@@ -1001,7 +1011,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+@@ -1001,7 +1016,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
  		/* SPECIAL needs the function and reserved shift bits. ADDI
  		 * and the register forms share the classic detail mapping. */
  		const unsigned opcode = major == 0 || major == 8 ?

@@ -105,7 +105,7 @@ try:
         for mode in (0,1,2):
             for api in ('time','iter'):
                 key='/'.join((n,api,str(mode)));args=[f,arch,str(ip),api,str(mode)]
-                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*q];rng=random.Random(key+"/single-switch")
+                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*q];rng=random.Random(key+"/after-shared-opcodes")
                 for _ in range(31):
                     rng.shuffle(keys);obs=[(k,take(k,args,reps))for k in keys+keys[::-1]]
                     assert all(v[2:]==t0[2:]for k,v in obs)
