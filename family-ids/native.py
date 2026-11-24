@@ -27,12 +27,43 @@ try:
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=(b/'libcapstone.a').is_file(),bytes=path.stat().st_size,
                        object={a:sha(next(b.rglob(a)))for a in('cs.c.o','MipsInstPrinter.c.o','MipsDisassembler.c.o','MipsMapping.c.o')})
+        shutil.copy2(next(b.rglob('MipsInstPrinter.c.o')),t/(k+'.o'))
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
         expected={'cold':{'cs.c.o'},'mips':{'MipsInstPrinter.c.o'},'combined':{'MipsInstPrinter.c.o','cs.c.o'}}[k]
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
+    def text_section(obj):
+        lines=get('readelf','-sW',obj).splitlines()
+        ident,=[int(line.split()[6]) for line in lines if line.split() and line.split()[-1]=='Mips_LLVM_printInst']
+        import re
+        names=[re.search(r'^\s*\[\s*(\d+)\]\s+(\S+)',line) for line in get('readelf','-SW',obj).splitlines()]
+        name,=[v.group(2)for v in names if v and int(v.group(1))==ident]
+        assert name.startswith('.text')
+        data=t/(obj.name+'.text');run('extract-'+obj.stem,'objcopy','--dump-section',name+'='+str(data),obj,t/(obj.name+'.copy'))
+        return name,data.read_bytes()
+    section={k:text_section(t/(k+'.o')) for k in ('base','mips')}
+    assert section['base'][0]==section['mips'][0]
+    def symbols(lib):
+        z={}
+        for line in get('nm','--defined-only','-S','-n',lib).splitlines():
+            f=line.split()
+            if len(f)==4 and f[2] in ('T','t') and int(f[1],16)>0:
+                z[f[3]]=[int(f[0],16),int(f[1],16)]
+        return z
+    syms={k:symbols(v)for k,v in libs.items()}
+    sizes={k:len(z[1])for k,z in section.items()}
+    small=min(sizes,key=sizes.get);large=max(sizes,key=sizes.get);delta=sizes[large]-sizes[small]
+    if delta:
+        name,original=section[small];ext=t/'held-text';ext.write_bytes(original+b'\x90'*delta)
+        obj,=b.rglob('MipsInstPrinter.c.o');run('controlled-object','objcopy','--update-section',name+'='+str(ext),t/(small+'.o'),obj)
+        assert text_section(obj)==(name,original+b'\x90'*delta)
+        run('relink','cmake','--build',b,'--parallel','4','--target','capstone_shared')
+        lib,=[f for f in b.glob('libcapstone.so*')if f.is_file()and not f.is_symlink()]
+        libs['placed']=t/'placed.so';shutil.copy2(lib,libs['placed'])
+        syms['placed']=symbols(libs['placed'])
+    put('placement',dict(section=section['base'][0],bytes=sizes,padding=delta,derived_from=small,matched_to=large,symbols=syms,images={k:sha(v) for k,v in libs.items()}))
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     cases={}
     manifest=rd(r/'corpus-manifest.json')
@@ -43,7 +74,8 @@ try:
         cases[n]=(f,arch,sect[3])
     put('inputs',{n:dict(hash=sha(f),arch=arch,ip=ip,bytes=f.stat().st_size)for n,(f,arch,ip) in cases.items()})
     verify={}
-    for k in q:
+    for k in libs:
+        if k=='base':continue
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
@@ -89,8 +121,8 @@ try:
         for mode in (0,1,2):
             for api in ('time','iter'):
                 key='/'.join((n,api,str(mode)));args=[f,arch,str(ip),api,str(mode)]
-                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*q];rng=random.Random(key)
-                for _ in range(17):
+                t0=take('base',args,1);reps=max(1,math.ceil(35e6/t0[0]));cycles=[];keys=['base','copy',*[k for k in libs if k!='base']];rng=random.Random(key)
+                for _ in range(25):
                     rng.shuffle(keys);obs=[(k,take(k,args,reps))for k in keys+keys[::-1]]
                     assert all(v[2:]==t0[2:]for k,v in obs)
                     cycles.append({k:[sum(o[i]for l,o in obs if k==l)for i in (0,1)]for k in keys})
