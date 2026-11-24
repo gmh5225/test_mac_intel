@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 17772e408a708799e4a1863e2aed36ba1efb5d55
+          ref: 5942008068426ed1d0b7daba6772cf013755546f
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -70,7 +70,7 @@ jobs:
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='17772e408a708799e4a1863e2aed36ba1efb5d55'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='5942008068426ed1d0b7daba6772cf013755546f'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Execute the SDK and generated declarations on Windows ARM64
         shell: pwsh
         run: |
@@ -95,7 +95,16 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $types = "$env:RUNNER_TEMP/sdk-types"
           $selected = "$env:RUNNER_TEMP/qualified-named-runtime"
-          python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected --provider DisplayControl --provider DisplayDriverFunctions --provider LockdownPolicy
+          $catalog = Get-Content 'source/scripts/MicrosoftNamedRuntimeSDKInputs.json' -Raw | ConvertFrom-Json
+          $providerArgs = @()
+          foreach ($item in $catalog.providers.PSObject.Properties) {
+            if ($null -ne $item.Value.targets.arm64) {
+              $providerArgs += '--provider'
+              $providerArgs += $item.Name
+            }
+          }
+          if ($providerArgs.Count -eq 0) { throw 'No native ARM64 providers in the selected catalog' }
+          python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected @providerArgs
           python runtime-sdk-evidence/check_named_exports.py source $types $selected native-named-exports.json
       - name: Match verified ARM64 source declarations against installed system exports
         shell: pwsh
