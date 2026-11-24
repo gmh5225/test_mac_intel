@@ -1,0 +1,48 @@
+name: Verify Win32 file offsets through the original and regenerated callers
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - .github/workflows/neverd-win32-file-position.yml
+      - runtime-sdk-evidence/files32/**
+permissions:
+  contents: read
+jobs:
+  file-position:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: runtime-sdk-evidence/files32
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x86
+      - name: Call SetFilePointerEx with 64-bit offsets and observe the resulting file position
+        working-directory: runtime-sdk-evidence/files32
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $inputs = Get-Content inputs.json | ConvertFrom-Json
+          foreach ($p in $inputs.emitter_source_sha256.PSObject.Properties) {
+            if ((Get-FileHash $p.Name -Algorithm SHA256).Hash.ToLowerInvariant() -ne $p.Value) { throw "source hash $($p.Name)" }
+          }
+          foreach ($pair in @(@('original.c','OriginalSeek'), @('high.c','HighSeek'), @('llvmc.c','LLVMSeek'))) {
+            clang-cl --target=i686-pc-windows-msvc /nologo /TC /std:c11 /O1 /c "/DSeek=$($pair[1])" "/Fo$($pair[1]).obj" $pair[0]
+            if ($LASTEXITCODE -ne 0) { throw "compile $($pair[0])" }
+          }
+          clang-cl --target=i686-pc-windows-msvc /nologo /TC /std:c11 /O1 seek-runtime.c OriginalSeek.obj HighSeek.obj LLVMSeek.obj kernel32.lib /Feseek-runtime.exe
+          if ($LASTEXITCODE -ne 0) { throw "link" }
+          $output = & .\seek-runtime.exe
+          if ($LASTEXITCODE -ne 0 -or "$output" -notmatch 'PASS 264 .*3 invalid-handle calls') { throw "file position check returned $LASTEXITCODE $output" }
+          [ordered]@{ host = [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString(); target='x86'; original_input=$inputs.fixture_sha256; neverd=$inputs.neverd_commit; output=$output; input_hashes=$inputs.emitter_source_sha256; executable=(Get-FileHash seek-runtime.exe).Hash.ToLowerInvariant() } | ConvertTo-Json -Depth 4 | Set-Content proof.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: win32-file-position-${{ matrix.os }}
+          path: runtime-sdk-evidence/files32/proof.json
+          if-no-files-found: error
