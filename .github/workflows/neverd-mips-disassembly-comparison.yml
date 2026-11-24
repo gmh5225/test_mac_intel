@@ -1,0 +1,65 @@
+name: NeverSight MIPS disassembly comparison
+on:
+  push:
+    branches: [codex/micromips64r6-native-timing]
+permissions:
+  contents: read
+env:
+  LLVM_REVISION: 0f9776402d2f3aed5daf50e58cdcb820690517cc
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 210
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: llvm-fork
+          repository: NeverSight/llvm-project
+          ref: ${{ env.LLVM_REVISION }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build clang lld
+      - if: runner.os == 'macOS'
+        run: brew install ninja
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+      - name: Checkout the Windows compiler bootstrap
+        if: runner.os == 'Windows'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: 9f40f81d1458de3e44c1de0b35f5e2d33e5d8966
+          path: neverd-host-tools
+          sparse-checkout: scripts/ci
+          persist-credentials: false
+
+      - name: Select Clang compatible with the MSVC standard library
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./neverd-host-tools/scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
+
+      - name: Compare both revisions on the same host
+        shell: bash
+        run: python scripts/measure-micromips64-disassembly.py --source llvm-fork --work "$RUNNER_TEMP/mips-decoder" --output evidence/paired.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: r6-paired-disassembly-${{ runner.os }}
+          path: evidence/
+          if-no-files-found: error
