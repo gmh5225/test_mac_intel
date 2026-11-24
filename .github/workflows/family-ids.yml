@@ -1,7 +1,7 @@
-name: Compare direct alias pattern evaluation across ten native library targets
+name: Measure the exact first opcode path in the shared alias matcher
 on:
   push:
-    branches: [codex/indexed-operand-pattern-range]
+    branches: [codex/first-opcode-alias-row]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: resolved-alias-range-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: first-alias-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

@@ -1,68 +1,45 @@
-diff --git a/AliasPatternLookup.c b/AliasPatternLookup.c
-index dc90385f..ab74fee2 100644
---- a/AliasPatternLookup.c
-+++ b/AliasPatternLookup.c
-@@ -24,8 +24,7 @@ typedef struct {
- 	uint16_t mask;
- } AliasOpcodeBlock;
- 
--/* The matcher accepts a suffix of its sorted table and owns all operand,
-- * feature and alias-printing decisions. */
-+/* Rank the opcode within its occupied block to locate its pattern row. */
- static inline const char *matchAliasBlock(MCInst *MI, const AliasMatchingData *data,
- 					  unsigned offset, const AliasOpcodeBlock *blocks,
- 					  size_t block_count)
-@@ -37,9 +36,9 @@ static inline const char *matchAliasBlock(MCInst *MI, const AliasMatchingData *d
- 	const AliasOpcodeBlock block = blocks[index];
- 	if (!(block.mask & bit))
- 		return NULL;
--	AliasMatchingData suffix = *data;
--	suffix.OpToPatterns += block.first_row + CountPopulation_32(block.mask & (bit - 1));
--	return matchAliasPatterns(MI, &suffix);
-+	const unsigned row = block.first_row +
-+		CountPopulation_32(block.mask & (bit - 1));
-+	return matchAliasPatternRange(MI, data, &data->OpToPatterns[row]);
- }
- 
- #ifdef CAPSTONE_HAS_AARCH64
-diff --git a/AliasPatternLookup.h b/AliasPatternLookup.h
-index a6e22cb5..c47feb99 100644
---- a/AliasPatternLookup.h
-+++ b/AliasPatternLookup.h
-@@ -7,6 +7,9 @@
- #include "cs_priv.h"
- #include "MCInstPrinter.h"
- 
-+CAPSTONE_INTERNAL const char *matchAliasPatternRange(
-+	MCInst *MI, const AliasMatchingData *data, const PatternsForOpcode *row);
-+
- CAPSTONE_INTERNAL const char *
- matchAArch64AliasPatterns(MCInst *MI, const AliasMatchingData *data);
- CAPSTONE_INTERNAL const char *
 diff --git a/MCInstPrinter.c b/MCInstPrinter.c
-index 97d26582..668d84e2 100644
+index 97d26582..2133745a 100644
 --- a/MCInstPrinter.c
 +++ b/MCInstPrinter.c
-@@ -3,6 +3,7 @@
+@@ -131,8 +131,15 @@ static inline bool validOpToPatter(const PatternsForOpcode *P)
+ 	return !(P->Opcode == 0 && P->PatternStart == 0 && P->NumPatterns == 0);
+ }
  
- #include "MCInstPrinter.h"
- #include "cs_priv.h"
-+#include "AliasPatternLookup.h"
- #include <capstone/platform.h>
- 
- extern bool ARM_getFeatureBits(unsigned int mode, unsigned int feature);
-@@ -165,12 +166,17 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
+-const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
++static const PatternsForOpcode *
++findAliasPatternRow(MCInst *MI, const AliasMatchingData *M)
+ {
++	const unsigned MIOpcode = MI->Opcode;
++	/* Indexed backends pass a suffix beginning at the matching opcode.
++	 * Opcode zero can also be the table's sentinel. */
++	if (MIOpcode && M->OpToPatterns[0].Opcode == MIOpcode)
++		return M->OpToPatterns;
++
+ 	// Generated tables are sorted, immutable, and end in an all-zero sentinel.
+ 	// Cache only the prefix needed by previous lookups so a new handle does
+ 	// not scan the entire table when decoding a short instruction sequence.
+@@ -140,7 +147,6 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
+ 	size_t count = 0;
+ 	if (handle && handle->alias_opcode_table == M->OpToPatterns)
+ 		count = handle->alias_opcode_count;
+-	unsigned MIOpcode = MI->Opcode;
+ 	size_t i = 0;
+ 	if (!count || M->OpToPatterns[count - 1].Opcode < MIOpcode) {
+ 		i = count;
+@@ -165,12 +171,18 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
  	if (i == count || M->OpToPatterns[i].Opcode != MIOpcode)
  		return NULL;
  
 -	// // Try all patterns for this opcode.
-+	return matchAliasPatternRange(MI, M, &M->OpToPatterns[i]);
++	return &M->OpToPatterns[i];
 +}
 +
-+/* For an indexed backend the opcode lookup has already selected this row. */
-+const char *matchAliasPatternRange(MCInst *MI, const AliasMatchingData *M,
-+				  const PatternsForOpcode *row)
++const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M)
 +{
++	const PatternsForOpcode *row = findAliasPatternRow(MI, M);
++	if (!row)
++		return NULL;
  	uint32_t AsmStrOffset = ~0U;
 -	const AliasPattern *Patterns =
 -		M->Patterns + M->OpToPatterns[i].PatternStart;
