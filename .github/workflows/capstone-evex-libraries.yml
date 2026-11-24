@@ -1,7 +1,7 @@
-name: Measure corrected MMX IDs with stable register group indices
+name: Measure mandatory XMM and table-validated EXTRQ on the latest Capstone next
 on:
   push:
-    branches: [codex/stable-group-scan-hosts]
+    branches: [codex/x86-mandatory-vector-table]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 1a1075b8bff460c3bd4da0b93f8e0a091c09039a
+          ref: d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: d435a992844193f968dcb21e96bb9a0d3ecd487d
+          ref: bbfc6da691392ba8b369812c59624d3769d03676
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: stable-mmx-group-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: table-xmm-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
