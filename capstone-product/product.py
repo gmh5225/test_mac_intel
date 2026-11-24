@@ -59,6 +59,17 @@ try:
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
         assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
+        if variant in ('base','selector'):
+            command(['clang','-fPIC','-shared','-O2','-I',cs/'include',r/'export.c','-Wl,--whole-archive',archive,'-Wl,--no-whole-archive','-lm','-o',t/(variant+'.so')],'grid-lib-'+variant)
+        if variant=='selector':
+            command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'grid.cpp','-ldl','-o',t/'grid'],'grid-link')
+            command([t/'grid',t/'base.so',t/'selector.so'],'grid-result')
+            grid=json.loads((out/'grid-result.log').read_text())
+            save('grid',grid)
+            command(['clang++','-std=c++17','-O2','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-lm','-o',t/'emit-alu'],'generate-link')
+            generated=sp.check_output([t/'emit-alu','--test32-registers'])
+            assert generated==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
+            save('regenerated',dict(sha256=hashlib.sha256(generated).hexdigest(),bytes=len(generated)))
         uid_tables={}
         for line in sp.check_output(['nm','-S','--defined-only',archive],text=True).splitlines():
             fields=line.split()
@@ -155,7 +166,7 @@ try:
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if (c['name'],mode) in (('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
+            pairs=35 if (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:

@@ -1,7 +1,7 @@
-name: Qualify native six-backend operand construction in complete NeverD binaries
+name: Compare both i386 memory writers and scanner addresses in real NeverD products
 on:
   push:
-    branches: [codex/real-six-backend-construction]
+    branches: [codex/final-i386-memory-records]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: constructed-storage-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: final-i386-writer-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

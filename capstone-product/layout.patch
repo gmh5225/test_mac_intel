@@ -1,50 +1,93 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..6c808481 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -160,6 +160,8 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
-     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
- endif()
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..1cdbbe17 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -20,11 +20,11 @@
+ #include "X86GenSimpleOutput.inc"
+ #include "../../cs_disasm_internal.h"
+ #define X86_MEMORY32_OUTPUT
+-#define X86_MEMORY_IMMEDIATE writeCompare32
++#define X86_MEMORY_IMMEDIATE writeMemoryAlu32
+ #define X86_IMMEDIATE_WIDE 0
+-#define X86_COMPARE_IMMEDIATE
++#define X86_ALU32_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
+-#undef X86_COMPARE_IMMEDIATE
++#undef X86_ALU32_IMMEDIATE
+ #undef X86_MEMORY_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
  
- if(capstone_enabled_architectures STREQUAL "XCORE")
-diff --git a/Makefile b/Makefile
-index 2720955e..18653e18 100644
---- a/Makefile
-+++ b/Makefile
-@@ -121,6 +121,8 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
- CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
-+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
-diff --git a/cs.c b/cs.c
-index 0af815c7..eb5c53f1 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1117,6 +1117,11 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		MCInst_InitX86(&mci);
- 	else
- #endif
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+	/* ARM, AArch64, MIPS, PowerPC and RISC-V construct each MCOperand
-+	 * before reading it. Operand zero and common defaults stay initialized. */
-+	MCInst_InitStorage(&mci, handle->arch, false);
-+#else
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
- 		/* MIPS constructs each MCOperand before reading it. The public
-@@ -1161,6 +1166,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
+@@ -68,12 +68,11 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++		if (size >= 2 && code[1] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+-			const unsigned row =
+-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+-				2;
+-			if (writeCompare32(code, size, insn, insn_size,
++			const unsigned opcode_reg = (code[1] & 0x38) | (opcode & 1);
++			const unsigned row = x86_simple_plans[0][0][opcode_reg] >> 2;
++			if (writeMemoryAlu32(code, size, insn, insn_size,
+ 					   &x86_simple_outputs[row],
+ 					   x86_simple_registers))
+ 				return true;
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 11582041..400b217a 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -45,7 +45,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-#ifdef X86_COMPARE_IMMEDIATE
++#ifdef X86_ALU32_IMMEDIATE
+ 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
  #else
- 	MCInst_Init(&mci, handle->arch);
-+#endif
- #endif
- 	mci.csh = handle;
- 	mci.address = insn->address;
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
+@@ -187,13 +187,17 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-#ifdef X86_COMPARE_IMMEDIATE
+-	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
++#ifdef X86_ALU32_IMMEDIATE
++	/* Group 1 opcode 83 sign-extends its immediate. The Intel printer
++	 * spells logical masks as unsigned values of the destination width. */
+ 	int64_t value = encoded;
+-	if (opcode == 0x83)
++	if (opcode == 0x83) {
++		const unsigned operation = (modrm >> 3) & 7;
++		const bool logical = operation == 1 || operation == 4 || operation == 6;
+ 		value = (int8_t)encoded;
+-	else if (imm_size == 4 && row->ops[0].size == 8)
+-		value = (int32_t)encoded;
++		if (logical)
++			value = (uint32_t)value;
++	}
+ 	memcpy(out, ", ", 2);
+ 	out += 2;
+ 	if (value < 0)
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 0c9329b4..7e3e8b69 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1021,6 +1021,16 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
+ 				    !compare(handles, b + !p,
+ 					     (mr + j) % (sizeof(b) - !p), v))
+ 					return false;
++				/* Exercise the memory forms with an imm8 and with
++				 * an imm8 sign-extended to the operand width. */
++				if (mode == CS_MODE_32 && mr < 0xc0) {
++					b[1] = 0x80;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++					b[1] = 0x83;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++				}
+ 			}
+ 		}
+ 	}
