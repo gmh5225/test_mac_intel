@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..1d2696d8 100644
+index bd513f27..d280a42b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1078,8 +1078,14 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+@@ -1078,8 +1078,15 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
      add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
      target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
      set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
@@ -15,176 +15,118 @@ index bd513f27..1d2696d8 100644
 +            target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
 +        else()
 +            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
++            target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicIterator.c)
 +        endif()
          set(capstone_x86_objects
              $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
              $<TARGET_OBJECTS:capstone_x86_native>)
 diff --git a/Makefile b/Makefile
-index 2720955e..81fa1088 100644
+index 2720955e..c48fd600 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -293,6 +293,8 @@ endif
+@@ -293,6 +293,9 @@ endif
  	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
  ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
  	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
 +else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
 +	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
++	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicIterator.o
  endif
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 039ad47a..06cc61ae 100644
+index 039ad47a..b8abca8b 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -45,6 +45,12 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+@@ -45,6 +45,15 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
  #endif
  #endif
  
 +#if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+#define CAPSTONE_X86_PUBLIC_FIXED_RECORD
++#define CAPSTONE_X86_STATIC_ITERATOR
++CAPSTONE_INTERNAL bool cs_disasm_iter_generic(csh ud, const uint8_t **code,
++					      size_t *size, uint64_t *address,
++					      cs_insn *insn);
 +#endif
 +
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..197453cb 100644
+index 0d9b1a76..d11c2c93 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3755,6 +3755,8 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3793,10 +3793,16 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
  
- #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
- #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
-+#elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
-+#define CS_PUBLIC_FIXED_RECORD
- #endif
- #define CS_DECODE_SCAN_IMPL decodeIteratorScan
- #include "../../cs_disasm_internal.h"
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 96ce9f72..7afca7e4 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -260,6 +260,14 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- #define CS_DECODE_TRY_OUTPUT tryOutput64
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
-+
-+#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
-+			     cs_insn *insn, uint16_t *length)
-+{
-+	return decode_insn(handle, code, size, insn, length, false, false);
-+}
-+#endif
- #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index ade6f2bcf..7bbf1c0d 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -201,6 +201,14 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
-+
-+#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
-+			     cs_insn *insn, uint16_t *length)
-+{
-+	return decode_insn(handle, code, size, insn, length, false, false);
-+}
-+#endif
- #endif
- 
- CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
-diff --git a/cs.c b/cs.c
-index 0af815c7..d90296fa 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1085,8 +1085,9 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
- CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch)
-+		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
- {
-+	const bool batch = request == true;
- 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
- 		return true;
- 	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
-@@ -1104,8 +1105,9 @@ __attribute__((noinline))
- #endif
- CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch)
-+		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
- {
-+	const bool batch = request == true;
- #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
- 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
- 		return true;
-@@ -1113,9 +1115,19 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- #endif
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
--	if (handle->arch == CS_ARCH_X86)
-+	if (handle->arch == CS_ARCH_X86) {
-+#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+		if (request == CS_RECORD_PUBLIC_ITER && !handle->no_text) {
-+			if (handle->mode == CS_MODE_32)
-+				return X86_decodeFixedRecord32(handle, code, size,
-+							       insn, insn_size);
-+			if (handle->mode == CS_MODE_64)
-+				return X86_decodeFixedRecord64(handle, code, size,
-+							       insn, insn_size);
-+		}
-+#endif
- 		MCInst_InitX86(&mci);
--	else
-+	} else
- #endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b0f4a6ce..4c4c34f2 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -23,9 +23,21 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
- 		       cs_insn *insn, uint16_t *insn_size, bool batch);
- #endif
-+/* The public iterator can enter a fixed x86 reader once. Misses from that
-+ * reader call the same full decoder with the ordinary iterator request. */
-+#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+typedef uint8_t cs_record_request;
-+enum { CS_RECORD_PUBLIC_ITER = 2 };
-+CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
-+		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
-+CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
-+		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
++#ifdef CAPSTONE_X86_STATIC_ITERATOR
++CAPSTONE_INTERNAL X86_DECODE_ALIGN
++bool cs_disasm_iter_generic(csh ud, const uint8_t **code, size_t *size,
++			    uint64_t *address, cs_insn *insn)
 +#else
-+typedef bool cs_record_request;
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
 +#endif
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
--		    cs_insn *insn, uint16_t *insn_size, bool batch);
-+		    cs_insn *insn, uint16_t *insn_size, cs_record_request request);
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
- 	defined(__x86_64__)
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-@@ -176,6 +188,9 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ {
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 8c6444ab..d834a1fc 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -39,6 +39,10 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ 	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
  #endif
- #ifdef CS_DECODE_OUTPUT_MISS
- 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
-+#elif defined(CS_PUBLIC_FIXED_RECORD)
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size,
-+				   batch ? true : CS_RECORD_PUBLIC_ITER);
- #else
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++#ifdef CAPSTONE_X86_STATIC_ITERATOR
++	return cs_disasm_iter_generic(ud, code, size, address, insn);
++#else
+ 	return cs_disasm_iter(ud, code, size, address, insn);
++#endif
+ }
  #endif
+diff --git a/arch/X86/X86PublicIterator.c b/arch/X86/X86PublicIterator.c
+new file mode 100644
+index 00000000..7d00b9fe
+--- /dev/null
++++ b/arch/X86/X86PublicIterator.c
+@@ -0,0 +1,31 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "../../cs_priv.h"
++#include "X86Disassembler.h"
++#include "X86ScanAdapter.h"
++
++#ifdef CAPSTONE_X86_STATIC_ITERATOR
++/* In a mixed static library the two private text readers already implement
++ * the entire public iterator contract for their respective address sizes. */
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((section(".cs_x86_public_iterator_text")))
++#elif defined(__APPLE__) && defined(__clang__)
++__attribute__((section("__TEXT,__cs_x86_iter,regular,pure_instructions")))
++#endif
++CAPSTONE_EXPORT
++bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
++				 uint64_t *address, cs_insn *insn)
++{
++	if (!*size || !ud)
++		return false;
++	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
++	if (handle->arch == CS_ARCH_X86 && !handle->no_text) {
++		if (handle->mode == CS_MODE_32)
++			return X86_disasmIter32(ud, code, size, address, insn);
++		if (handle->mode == CS_MODE_64)
++			return X86_disasmIterText(ud, code, size, address, insn);
++	}
++	return cs_disasm_iter_generic(ud, code, size, address, insn);
++}
++#endif
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 77c4c5e4..1d2a80c3 100644
 --- a/tests/unit/CMakeLists.txt

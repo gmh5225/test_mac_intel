@@ -59,7 +59,7 @@ try:
         args=(['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm'])
         run('clang',*args,'-o',w/(label+'.library'))
         if label=='candidate':
-            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert {'cs.c.o','X86DisassemblerDecoder.c.o','X86Sse64Output.c.o','X86Vex32Output.c.o'}<=set(affected),affected
+            affected=[k for k,h in objects[label].items()if h!=objects['base'].get(k)];assert set(affected)==set(['X86DisassemblerDecoder.c.o', 'X86OutputIterator.c.o', 'X86PublicIterator.c.o']),affected
             save('affected',dict(count=len(objects[label]),changed=affected))
     shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')
