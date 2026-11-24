@@ -1,15 +1,18 @@
 diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 77ae0309..864621d1 100644
+index 77ae0309..447f3838 100644
 --- a/arch/Mips/MipsInstPrinter.c
 +++ b/arch/Mips/MipsInstPrinter.c
-@@ -271,7 +271,9 @@ void Mips_LLVM_printInst(MCInst *MI, uint64_t Address, SStream *O)
+@@ -270,8 +270,11 @@ void Mips_LLVM_printInst(MCInst *MI, uint64_t Address, SStream *O)
+ {
  	bool useAliasDetails = map_use_alias_details(MI);
  	if (!useAliasDetails) {
- 		SStream_Close(O);
+-		SStream_Close(O);
 -		printInstruction(MI, Address, O);
-+		/* This pass only collects operands of the real instruction. */
-+		if (detail_is_set(MI))
++		/* Only requested real operands need the closed printer pass. */
++		if (MI->csh->detail_opt & CS_OPT_ON) {
++			SStream_Close(O);
 +			printInstruction(MI, Address, O);
++		}
  		SStream_Open(O);
  		map_set_fill_detail_ops(MI, false);
  	}
@@ -105,7 +108,7 @@ index 333e7de2..f20055f8 100644
  
  			handle->errnum = CS_ERR_MEM;
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c94daecb..aab4466f 100644
+index c94daecb..3a3e73c7 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 @@ -2176,7 +2176,7 @@
@@ -113,7 +116,7 @@ index c94daecb..aab4466f 100644
      "Mips_LLVM_printInst": {
        "apply_type": "OLD",
 -      "old_hash": "660b5eba392f6b7738cb3f241e8ff34f2a0137b12c7ca36b1ccbe0832d345d1d",
-+      "old_hash": "7dae2f3e8c8cee2fb9e2def492c7381e7578d2c159210376914e5ecd592ed745",
++      "old_hash": "623675c5e88cee0d52257be990ca7281b86d926df506f1b14cd2b9b0359706db",
        "new_hash": "",
        "edit": ""
      },
