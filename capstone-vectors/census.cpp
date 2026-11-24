@@ -1,42 +1,47 @@
 #include <capstone/capstone.h>
-#include <algorithm>
-#include <cstdint>
+#include "arch/X86/X86ScanAdapter.h"
+#include <array>
+#include <cinttypes>
 #include <fstream>
 #include <iostream>
 #include <iterator>
-#include <map>
-#include <sstream>
-#include <string>
 #include <vector>
-extern "C" bool census_output(csh h, const uint8_t *p, size_t n, cs_insn *i);
-int main(int argc, char **argv) {
-  if (argc != 4) return 1;
-  unsigned bits = std::stoul(argv[3]);
-  csh h;
-  if (cs_open(CS_ARCH_X86,bits==32 ? CS_MODE_32 : CS_MODE_64,&h) ||
-      cs_option(h,CS_OPT_DETAIL,CS_OPT_ON)) return 2;
-  auto *i = cs_malloc(h);
-  std::ifstream file(argv[1],std::ios::binary),spans(argv[2]);
-  const std::vector<uint8_t> data{std::istreambuf_iterator<char>(file),{}};
-  std::map<std::string,uint64_t> counts;
-  uint64_t off,n,ip;
-  while (spans >> off >> n >> ip) {
-    if(off > data.size() || n > data.size()-off) return 3;
-    const auto *p = data.data()+off;size_t left=n;
-    while(left) {
-      auto *start=p;size_t before=left;
-      if(!cs_disasm_iter(h,&p,&left,&ip,i)) break;
-      const auto &x=i->detail->x86;
-      std::ostringstream key;
-      key << i->mnemonic;
-      for(unsigned j=0;j<x.op_count;++j) {
-        const auto &op=x.operands[j];
-        key << (op.type==X86_OP_REG?"/r":op.type==X86_OP_IMM?"/i":op.type==X86_OP_MEM?"/m":"/?") << unsigned(op.size);
-        if(op.type==X86_OP_MEM) key<<(op.mem.base?"B":"-")<<(op.mem.index?"I":"-")<<unsigned(x.encoding.disp_size);
-      }
-      ++counts[(census_output(h,start,before,i)?"hit ":"miss ")+key.str()];
+#include <cstring>
+extern "C" uint64_t probe_miss[4096], probe_hit[4096], primary_hit[4096];
+
+int main(int argc,char **argv){
+    if(argc!=3)return 1;
+    std::ifstream text(argv[1],std::ios::binary);
+    std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(text),{}};
+    if(bytes.empty())return 2;
+    for(unsigned path=0;path<2;++path){
+        csh handle; if(cs_open(CS_ARCH_X86,CS_MODE_64,&handle)||cs_option(handle,CS_OPT_TEXT,CS_OPT_OFF))return 3;
+        cs_insn *record=cs_malloc(handle);if(!record)return 3;
+        memset(probe_miss,0,sizeof(probe_miss));memset(probe_hit,0,sizeof(probe_hit));memset(primary_hit,0,sizeof(primary_hit));
+        uint64_t hash=14695981039346656037ULL, count=0, size=0;
+        std::ifstream ranges(argv[2]);size_t start,length;uint64_t address;
+        while(ranges>>start>>length>>address){
+            if(!length || start>bytes.size()||length>bytes.size()-start)return 4;
+            const uint8_t *p=bytes.data()+start;size_t left=length;
+            while(left){
+                if(!path){
+                    if(!cs_disasm_iter(handle,&p,&left,&address,record))return 5;
+                    hash=(hash^((record->id<<8)|record->size))*1099511628211ULL;
+                    size+=record->size;++count;
+                }else{
+                    std::array<uint32_t,256> out;
+                    auto n=X86_scanNativeBatch(handle,p,left,address,out.data(),out.size());
+                    if(!n.count||n.count>out.size()||n.bytes>left||!n.bytes)return 6;
+                    size_t consumed=0;
+                    for(size_t i=0;i<n.count;i++){hash=(hash^out[i])*1099511628211ULL;consumed+=out[i]&255;}
+                    if(consumed!=n.bytes)return 7;
+                    size+=n.bytes;count+=n.count;p+=n.bytes;left-=n.bytes;address+=n.bytes;
+                }
+            }
+        }
+        std::cout<<"path "<<path<<" "<<count<<" "<<size<<" "<<hash<<"\n";
+        for(unsigned i=0;i<4096;i++)if(probe_miss[i]||primary_hit[i])
+            std::cout<<i<<" "<<probe_miss[i]<<" "<<probe_hit[i]<<" "<<primary_hit[i]<<"\n";
+        cs_free(record,1);cs_close(&handle);
     }
-  }
-  for(const auto &[k,v]:counts) std::cout << v << ' ' << k << '\n';
-  cs_free(i,1);cs_close(&h);
 }
