@@ -1,7 +1,7 @@
-name: Measure shared public iteration and batch formatting on PE32, PE32+, SIMD, MIPS and AArch64
+name: Separate public and batch formatting from allocation sizing and decoder duplication
 on:
   push:
-    branches: [codex/shared-public-batch-and-iterator]
+    branches: [codex/format-batches-preserve-allocation-strategy]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: shared-batch-format-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: ordinary-storage-format-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

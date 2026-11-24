@@ -31,7 +31,9 @@ try:
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
-        expected={'cs.c.o'} if k=='ownership' else {'cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'}
+        expected={'cs.c.o'}
+        if k!='cold':expected.add('X86OutputIterator.c.o')
+        if k=='clone':expected.add('X86DisassemblerDecoder.c.o')
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
