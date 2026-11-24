@@ -1,7 +1,7 @@
-name: Measure public x86 record selection at option changes and unchanged foreign scan contracts
+name: Measure scalar output at full-record architecture selection without changing the public scan entry
 on:
   push:
-    branches: [codex/select-x86-public-iterator-at-options]
+    branches: [codex/public-scalar-at-full-record]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: selected-public-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-full-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
