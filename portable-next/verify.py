@@ -17,6 +17,10 @@ try:
             git('restore','--source','HEAD','--staged','--worktree','--','.')
             if k=='candidate':
                 git('apply','--index',patch);assert git('write-tree')==q['tree']
+            # Keep the binary comparison on the exact same regression client.
+            # The base is otherwise the unmodified parent verified above.
+            if k=='base' and unit=='mips_scan':
+                git('apply','--include=tests/unit/mips_scan.c',patch)
             run(tag+'-'+k+'-configure','cmake','-G','Ninja','-S',s,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+compiler,'-DCMAKE_CXX_COMPILER='+('clang++' if compiler=='clang' else 'g++'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in arches])
             run(tag+'-'+k+'-build','cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',unit)
             run(tag+'-'+k+'-unit','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_'+unit+'$')
