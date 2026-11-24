@@ -1,7 +1,7 @@
-name: Measure i386 condition records and verify actual implicit stack changes against an independent model and iced
+name: Compare RISC-V canonical operands and x86 implicit stack modes against separate record models
 on:
   push:
-    branches: [codex/released-conditional-bytes-and-stack]
+    branches: [codex/scoped-stack-and-riscv-operands]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-i386-condition-stack-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: riscv-operands-and-stack-mode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

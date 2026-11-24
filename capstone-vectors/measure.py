@@ -44,6 +44,11 @@ try:
     from training import fetch
     from foreign_time import measure as time_foreign
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
+    from riscv_option_time import measure as time_riscv
+    opt=w/'riscv-corpus';opt.mkdir()
+    shutil.copyfile(r/'options-training.json',opt/'training.json')
+    opt_rows=fetch(opt,w);save('riscv-option-corpus',opt_rows)
+    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'riscv_options.cpp','-o',w/'options.o')
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -61,6 +66,7 @@ try:
             save('stack-model',dict(driver=sha(r/'model.cpp'),library=sha(lib),binary=sha(w/'model')))
 
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        run('clang++',w/'options.o',lib,'-no-pie','-o',w/('riscv-option-'+label))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -154,6 +160,7 @@ try:
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
     time_foreign(foreign_rows,w,save)
+    time_riscv(opt_rows,w,save)
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
