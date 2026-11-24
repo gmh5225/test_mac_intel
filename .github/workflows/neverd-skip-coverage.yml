@@ -1,0 +1,39 @@
+name: Execute NeverD arm64e return oracles on the Arm model
+on:
+  push:
+    branches: [codex/arm64e-skip-coverage-returns-d9dfc97ffa]
+permissions:
+  contents: read
+jobs:
+  model:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: neverd-skip-coverage
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gmh5225/test_mac_intel
+          ref: 71b8ed7301f4e73fe63e1519fe926ba9405da55b
+          path: model
+          sparse-checkout: neverd-cpta
+          persist-credentials: false
+      - name: Retrieve verified original execution inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p reports inputs
+          gh release download neverd-skip-coverage-returns-d9dfc97ffa --repo gmh5225/test_mac_intel --pattern returns-frames.tgz
+          echo 'd9dfc97ffa6373a8ff4c1c3ed2c1614dba1db39563b12c51f50a3b87e9a2d7ff  returns-frames.tgz' | sha256sum --check
+          tar -xzf returns-frames.tgz -C inputs
+      - name: Execute every generated route at EL0 and EL1
+        run: python3 neverd-skip-coverage/run.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: return-model
+          path: reports/
+          if-no-files-found: error
+          retention-days: 7
