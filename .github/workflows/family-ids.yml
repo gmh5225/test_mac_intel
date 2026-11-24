@@ -1,7 +1,7 @@
-name: Qualify AArch64 Linux packed EVEX scans on native GCC and Clang real binaries
+name: Check the late EVEX transfer reader against the full decoder on native Linux compilers
 on:
   push:
-    branches: [codex/aarch64-linux-evex-public]
+    branches: [codex/evex-packed-miss-oracle]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,8 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: gcc, flavor: second }
+          - { host: ubuntu-22.04, cc: clang, flavor: first }
+          - { host: ubuntu-24.04, cc: gcc, flavor: second }
           - { host: ubuntu-24.04-arm, cc: gcc, flavor: first }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
     runs-on: ${{ matrix.host }}
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: arm-packed-public-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: outlined-packed-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
