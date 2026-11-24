@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..1306bbad 100644
+index 0d9b1a76..edcef9d4 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -1244,6 +1244,9 @@ X86_DECODE_INLINE uint16_t mandatoryPrefixAttributes(uint8_t pp)
@@ -30,6 +30,30 @@ index 0d9b1a76..1306bbad 100644
  
  	/*
  	 * Preserve legacy decoding unless an explicit CPU mode selects its
+@@ -1598,11 +1606,22 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	return 0;
+ }
+ 
++/* Share the 16-bit prefix and operand-size rules across decoder entry points. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static int getID16(struct InternalInstruction *insn, cs_mode mode)
++{
++	return getIDForMode(insn, mode, MODE_16BIT);
++}
++
+ X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+ {
+ 	switch (insn->mode) {
+ 	case MODE_16BIT:
+-		return getIDForMode(insn, mode, MODE_16BIT);
++		return getID16(insn, mode);
+ 	case MODE_32BIT:
+ 		return getIDForMode(insn, mode, MODE_32BIT);
+ 	default:
 diff --git a/arch/X86/X86GenBatchPrimary.inc b/arch/X86/X86GenBatchPrimary.inc
 index 699f7fa9..5ac77604 100644
 --- a/arch/X86/X86GenBatchPrimary.inc

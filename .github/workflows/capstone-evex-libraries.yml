@@ -1,7 +1,7 @@
-name: Repeat x86 move projection timings on the published parent
+name: Measure a shared 16-bit opcode selector on x86 real programs
 on:
   push:
-    branches: [codex/released-parent-move-projection-replica]
+    branches: [codex/shared-16bit-opcode-selection]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: released-parent-prefix-replica-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-16bit-selector-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
