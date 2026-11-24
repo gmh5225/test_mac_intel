@@ -1,146 +1,141 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3dc297b9..48c8d991 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1064,6 +1064,15 @@ target_include_directories(capstone_build_settings INTERFACE
- )
- set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..403a5d85 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,11 +30,18 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
  
-+# Keep the optional packed transfer fallback after the existing static readers.
-+if(CAPSTONE_X86_SUPPORT)
-+    add_library(capstone_x86_evex_packed OBJECT arch/X86/X86EvexPackedScan.c)
-+    target_link_libraries(capstone_x86_evex_packed PRIVATE capstone_build_settings)
-+    set_target_properties(capstone_x86_evex_packed PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-+    set(capstone_evex_packed_object $<TARGET_OBJECTS:capstone_x86_evex_packed>)
-+    target_sources(capstone INTERFACE ${capstone_evex_packed_object})
-+endif()
-+
- # The x86-only public iterator uses the fixed-mode readers in both library forms.
- if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_enabled_architectures STREQUAL "X86"))
-     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
-@@ -1107,7 +1116,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
-         endif()
-         list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
-     endif()
--    add_library(capstone_static STATIC ${capstone_static_objects})
-+    add_library(capstone_static STATIC ${capstone_static_objects} ${capstone_evex_packed_object})
-     # Use normal capstone name. Otherwise we get libcapstone_static.a
-     set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")
-     if(MSVC AND CAPSTONE_BUILD_SHARED_LIBS)
-@@ -1120,7 +1129,7 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
- endif()
- 
- if(CAPSTONE_BUILD_SHARED_LIBS)
--    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects})
-+    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects} ${capstone_evex_packed_object})
-     # Use normal capstone name. Otherwise we get libcapstone_shared.so
-     set_target_properties(capstone_shared PROPERTIES OUTPUT_NAME "capstone")
-     set_target_properties(capstone_shared PROPERTIES
-diff --git a/Makefile b/Makefile
-index 0fe49035..7771bc5f 100644
---- a/Makefile
-+++ b/Makefile
-@@ -289,6 +289,7 @@ endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
-+	LIBOBJ_X86_PACKED_SCAN = $(OBJDIR)/arch/X86/X86EvexPackedScan.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
- 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
-@@ -449,8 +450,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
- LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
- LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
- LIBOBJ += $(LIBOBJ_X86_NUMBERS)
--LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
--LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
-+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(LIBOBJ_X86_PACKED_SCAN)
-+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(LIBOBJ_X86_PACKED_SCAN)
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- LIBOBJ_SHARED := $(LIBOBJ)
- endif
-diff --git a/arch/X86/X86EvexPackedScan.c b/arch/X86/X86EvexPackedScan.c
-new file mode 100644
-index 00000000..5e2ed8e6
---- /dev/null
-+++ b/arch/X86/X86EvexPackedScan.c
-@@ -0,0 +1,37 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifdef CAPSTONE_HAS_X86
-+#include "X86FeatureExtension.h"
-+#ifdef X86_EVEX_REGISTER_SCAN
-+#define X86_EVEX_BATCH_PACKED
-+#define X86_EVEX_ONLY_PACKED
-+#define X86_EVEX_SCAN_RODATA ".cs_x86_evex_packed_rodata"
-+#define X86_EVEX_TRANSFER_RODATA ".cs_x86_evex_packed_rodata"
-+#include "X86EvexScanPlan.h"
-+
-+/* Entry after the ordinary register plan declines a complete EVEX prefix.
-+ * Keep the native batch reader's IDs, reserved fields and SIB lengths. */
-+__attribute__((section(".cs_x86_evex_packed_text")))
-+x86_feature_decode_result
-+X86_decodePackedScanFeature(csh ud, const uint8_t *code, size_t code_len,
-+			    MCInst *instr, uint16_t *size, uint8_t opcode)
-+{
-+	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
-+	unsigned id, length;
-+	if (handle->mode == CS_MODE_64 &&
-+#ifdef CAPSTONE_X86_SCAN_ADAPTER
-+	    !handle->x86_scan_adapter &&
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
+-	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_RECORD
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
++#else
++CAPSTONE_INTERNAL bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code,
++					   size_t size, cs_insn *insn,
++					   uint16_t *length);
 +#endif
-+	    X86_readEvexScanPlan(code, code_len, &id, &length)) {
-+		instr->Opcode = 0;
-+		instr->OpcodePub = id;
-+		instr->popcode_adjust = 0;
-+		*size = (uint16_t)length;
-+		return X86_FEATURE_DECODED;
-+	}
-+	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
-+					  opcode);
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..ffc4379a 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifdef CAPSTONE_X86_PUBLIC_RECORD
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..e3a77092 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -32,4 +32,12 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *length)
++{
++	return X86_trySimpleOutput(handle, code, size, insn, length);
 +}
 +#endif
+ #endif
+diff --git a/cs.c b/cs.c
+index 696e8d70..dfcbb960 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1082,7 +1082,13 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+-#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++CS_DECODE_INLINE bool decode_full_record(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size, bool batch,
++					 bool public_x86_output)
++{
++#elif defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+@@ -1113,9 +1119,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++		if (public_x86_output && !handle->no_text &&
++		    X86_tryPublicOutput(handle, code, size, insn, insn_size))
++			return true;
 +#endif
-diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
-index 7b8535ac..efcdfea6 100644
---- a/arch/X86/X86EvexScan.c
-+++ b/arch/X86/X86EvexScan.c
-@@ -27,7 +27,7 @@ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
- 		*size = (uint16_t)length;
- 		return X86_FEATURE_DECODED;
- 	}
--	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
-+	return X86_decodePackedScanFeature(ud, code, code_len, instr, size,
- 					  opcode);
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+@@ -1216,6 +1227,34 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	return true;
  }
  
-diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
-index a60fc089..fa0cd470 100644
---- a/arch/X86/X86EvexScanPlan.h
-+++ b/arch/X86/X86EvexScanPlan.h
-@@ -33,6 +33,10 @@ static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
- 		return false;
- 	const unsigned map = code[1] & 15;
- 	const unsigned index = evex_scan_index[code[4]];
-+#ifdef X86_EVEX_ONLY_PACKED
-+	if (index < EVEX_SCAN_PACKED)
-+		return false;
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
 +#endif
- 	unsigned id, length;
- 	if (index & 128) {
- 		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
-diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 15ac5a2d..b8652713 100644
---- a/arch/X86/X86FeatureExtension.h
-+++ b/arch/X86/X86FeatureExtension.h
-@@ -320,6 +320,9 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
- 	!defined(_WIN32_WCE)
- #define X86_EVEX_REGISTER_SCAN
- CAPSTONE_INTERNAL x86_feature_decode_result
-+X86_decodePackedScanFeature(csh handle, const uint8_t *code, size_t code_len,
-+			    MCInst *instr, uint16_t *size, uint8_t opcode);
-+CAPSTONE_INTERNAL x86_feature_decode_result
- X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
- 			       MCInst *instr, uint16_t *size, uint8_t opcode);
- #endif
++CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_full_record(handle, code, size, insn, insn_size, batch, false);
++}
++
++/* Only the public iterator reaches this entry. Private readers have attempted
++ * their own writer, and batch records keep their existing output rules. */
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_public_record_text")))
++#elif defined(__APPLE__) && defined(__clang__)
++__attribute__((section("__TEXT,__cs_x86_record")))
++#endif
++CS_PRESERVE_MOST bool
++X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_full_record(handle, code, size, insn, insn_size, batch, true);
++}
++#endif
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..acb2c08b 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,7 +18,7 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifdef CAPSTONE_X86_PUBLIC_RECORD
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);

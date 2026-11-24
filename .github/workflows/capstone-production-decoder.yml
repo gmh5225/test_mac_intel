@@ -1,7 +1,7 @@
-name: Compare the selected public decoder and outlined EVEX with the current Capstone gitlink
+name: Verify public x86 records and MIPS scan selection in source-built NeverD
 on:
   push:
-    branches: [codex/selected-public-and-outlined-evex-product]
+    branches: [codex/public-record-mips-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4e9134e054c9d5300a56b4f2adbe61f8e8ed4ee2
+          ref: 3aadb0280313735c3ba5fb96ca84f9a180e273e5
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,11 +48,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "4e9134e054c9d5300a56b4f2adbe61f8e8ed4ee2"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "eda656187b91970987b016629023b894bf83ce2f"
+          test "$(git rev-parse HEAD)" = "3aadb0280313735c3ba5fb96ca84f9a180e273e5"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "f708153a80b54ffad3c915622007ffd10f95d914"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin eda656187b91970987b016629023b894bf83ce2f
-          git -C third_party/capstone checkout --detach eda656187b91970987b016629023b894bf83ce2f
+          git -C third_party/capstone fetch --depth=1 origin f708153a80b54ffad3c915622007ffd10f95d914
+          git -C third_party/capstone checkout --detach f708153a80b54ffad3c915622007ffd10f95d914
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: selected-record-evex-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: public-record-mips-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

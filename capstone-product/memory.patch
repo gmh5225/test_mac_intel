@@ -1,8 +1,37 @@
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index d4ee5a37..1c07659d 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -1009,6 +1009,10 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+ 
+ void Mips_selectScanDecoder(cs_struct *handle)
+ {
++#ifndef CAPSTONE_MIPS_ONLY
++	if (handle->arch != CS_ARCH_MIPS)
++		return;
++#endif
+ 	/* An installed callback owns its MC operands and its dispatch. */
+ 	if (handle->disasm == Mips_getInstruction ||
+ 	    handle->disasm == getScanInstruction)
+diff --git a/arch/Mips/MipsMapping.h b/arch/Mips/MipsMapping.h
+index b745afb2..2e850c6a 100644
+--- a/arch/Mips/MipsMapping.h
++++ b/arch/Mips/MipsMapping.h
+@@ -17,7 +17,8 @@ bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
+ bool Mips_disasm16NoText(cs_struct *handle, const uint8_t *code, size_t length,
+ 			 cs_insn *insn);
+ 
+-#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
++#if (defined(CAPSTONE_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++	!defined(CAPSTONE_DIET)
+ #define CAPSTONE_MIPS_SCAN_BY_OPTION
+ void Mips_selectScanDecoder(cs_struct *handle);
+ #endif
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..6247e463 100644
+index 8d827a97..403a5d85 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,12 +30,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,11 +30,18 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -10,115 +39,124 @@ index 8d827a97..6247e463 100644
 -	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 -	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 -	!defined(_WIN32_WCE)
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 +#define CAPSTONE_X86_PUBLIC_RECORD
 +#ifdef CAPSTONE_X86_ONLY
  #define CAPSTONE_X86_PUBLIC_OUTPUT
- #endif
++#else
++CAPSTONE_INTERNAL bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code,
++					   size_t size, cs_insn *insn,
++					   uint16_t *length);
 +#endif
+ #endif
  
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			MCInst *instr, uint16_t *size, uint64_t address,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..aac67b19 100644
+index 0d9b1a76..ffc4379a 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3755,10 +3755,13 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
  
- #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifdef CAPSTONE_X86_PUBLIC_RECORD
  #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
-+#elif defined(CAPSTONE_X86_PUBLIC_RECORD)
-+#define CS_DECODE_MIXED_X86_OUTPUT
  #endif
  #define CS_DECODE_SCAN_IMPL decodeIteratorScan
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_SCAN_IMPL
-+#undef CS_DECODE_MIXED_X86_OUTPUT
- #ifdef CS_DECODE_OUTPUT_MISS
- #undef CS_DECODE_OUTPUT_MISS
- #endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..619719ce 100644
+index cec4bec6..e3a77092 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -32,4 +32,18 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+@@ -32,4 +32,12 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
  #endif
  	return cs_disasm_iter(ud, code, size, address, insn);
  }
 +
 +#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch)
++bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *length)
 +{
-+	/* The public iterator has checked the input extent and hidden any
-+	 * inactive detail storage before calling the formatted-record path. */
-+	if (X86_trySimpleOutput(handle, code, size, insn, length))
-+		return true;
-+	return cs_decode_full_insn(handle, code, size, insn, length, batch);
++	return X86_trySimpleOutput(handle, code, size, insn, length);
 +}
 +#endif
  #endif
 diff --git a/cs.c b/cs.c
-index 227458b6..2fb90402 100644
+index 696e8d70..dfcbb960 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -856,6 +856,20 @@ const char *CAPSTONE_API cs_strerror(cs_err code)
- 	}
+@@ -1082,7 +1082,13 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+-#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++CS_DECODE_INLINE bool decode_full_record(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size, bool batch,
++					 bool public_x86_output)
++{
++#elif defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+@@ -1113,9 +1119,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++		if (public_x86_output && !handle->no_text &&
++		    X86_tryPublicOutput(handle, code, size, insn, insn_size))
++			return true;
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+@@ -1216,6 +1227,34 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	return true;
  }
  
 +#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+static void select_x86_iterator(cs_struct *handle)
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
 +{
-+	if (handle->arch != CS_ARCH_X86)
-+		handle->x86_iterator_kind = CS_X86_ITER_FULL;
-+	else if (!handle->no_text)
-+		handle->x86_iterator_kind = CS_X86_ITER_OUTPUT;
-+	else
-+		handle->x86_iterator_kind = handle->detail_opt ?
-+						    CS_X86_ITER_FULL :
-+						    CS_X86_ITER_SCAN;
++	return decode_full_record(handle, code, size, insn, insn_size, batch, false);
++}
++
++/* Only the public iterator reaches this entry. Private readers have attempted
++ * their own writer, and batch records keep their existing output rules. */
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_public_record_text")))
++#elif defined(__APPLE__) && defined(__clang__)
++__attribute__((section("__TEXT,__cs_x86_record")))
++#endif
++CS_PRESERVE_MOST bool
++X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_full_record(handle, code, size, insn, insn_size, batch, true);
 +}
 +#endif
 +
- CAPSTONE_EXPORT
- cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
- {
-@@ -891,6 +905,9 @@ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
- 	ud->mode = mode;
- 	// by default, do not break instruction into details
- 	ud->detail_opt = CS_OPT_OFF;
-+#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+	select_x86_iterator(ud);
-+#endif
- 	ud->PrintBranchImmAsAddress = true;
- 
- 	// default skipdata setup
-@@ -1378,6 +1395,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 
- 	case CS_OPT_TEXT:
- 		handle->no_text = value == CS_OPT_OFF;
-+#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+		select_x86_iterator(handle);
-+#endif
- #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
- 		Mips_selectScanDecoder(handle);
- #endif
-@@ -1393,6 +1413,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 			handle->detail_opt = CS_OPT_OFF;
- 		else
- 			handle->detail_opt |= (cs_opt_value)value;
-+#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+		select_x86_iterator(handle);
-+#endif
- #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
- 		Mips_selectScanDecoder(handle);
- #endif
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b0f4a6ce..10f9ea84 100644
+index b0f4a6ce..acb2c08b 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -18,7 +18,7 @@
@@ -130,55 +168,3 @@ index b0f4a6ce..10f9ea84 100644
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
  		       cs_insn *insn, uint16_t *insn_size, bool batch);
-@@ -65,8 +65,12 @@ static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
- 
- static inline bool use_x86_scan(const cs_struct *handle)
- {
-+#ifdef CS_DECODE_MIXED_X86_OUTPUT
-+	return handle->x86_iterator_kind == CS_X86_ITER_SCAN;
-+#else
- 	return handle->arch == CS_ARCH_X86 && handle->no_text &&
- 	       !handle->detail_opt;
-+#endif
- }
- 
- /* Keep the compact decode and bounded copy in the caller. Outlining either
-@@ -177,6 +181,11 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- #ifdef CS_DECODE_OUTPUT_MISS
- 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
- #else
-+#ifdef CS_DECODE_MIXED_X86_OUTPUT
-+	if (handle->x86_iterator_kind == CS_X86_ITER_OUTPUT)
-+		return X86_decodePublicRecord(handle, code, size, insn,
-+					     insn_size, batch);
-+#endif
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- #endif
- }
-diff --git a/cs_priv.h b/cs_priv.h
-index 84e1c748..e229e76d 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -104,6 +104,12 @@ typedef struct insn_map {
- #endif
- } insn_map;
- 
-+enum cs_x86_iterator_kind {
-+	CS_X86_ITER_FULL,
-+	CS_X86_ITER_SCAN,
-+	CS_X86_ITER_OUTPUT,
-+};
-+
- struct cs_struct {
- 	cs_arch arch;
- 	cs_mode mode;
-@@ -138,6 +144,9 @@ struct cs_struct {
- 	bool no_text; // CS_OPT_TEXT is off: instructions are not printed
- 	bool skipdata; // set this to True if we skip data when disassembling
- 	uint8_t skipdata_size; // how many bytes to skip
-+#ifdef CAPSTONE_HAS_X86
-+	uint8_t x86_iterator_kind;
-+#endif
- 	cs_opt_skipdata skipdata_setup; // user-defined skipdata setup
- 	const uint8_t *regsize_map; // map to register size (x86-only for now)
- 	GetRegisterAccess_t reg_access;
