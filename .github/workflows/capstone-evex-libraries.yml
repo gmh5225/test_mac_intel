@@ -1,7 +1,7 @@
-name: Compare VEX3 operand records with iced on real PE and ELF libraries
+name: Measure public and native x86 writers against both iced formatters on current next
 on:
   push:
-    branches: [codex/amd64-vex3-memory-readers]
+    branches: [codex/public-record-iced-at-integrated-next]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: eda656187b91970987b016629023b894bf83ce2f
+          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 67dc5459e38411aecbb1c10e6372cc005ffc2f96
+          ref: 5ba34aa1e7544d2ee6999f6ec582174e74f9343f
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: amd64-vex3-memory-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: native-public-record-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
