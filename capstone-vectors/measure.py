@@ -13,6 +13,32 @@ def interval(values):
     def rank(q):
         return next(k for k in range(1,n+1) if 40*sum(math.comb(n,i)*k**i*(n-k)**(n-i) for i in range(n//2+1,n+1))>=q*n**n)-1
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
+def instruction_digest(path):
+    import struct
+    b=path.read_bytes()
+    def u(fmt,p):return struct.unpack_from('<'+fmt,b,p)
+    sections=[]
+    def add(name,start,size):
+        sections.append([name.decode(),size,hashlib.sha256(b[start:start+size]).hexdigest()])
+    if b.startswith(b'\\x7fELF'):
+        assert b[4:6]==b'\\x02\\x01'
+        base,=u('Q',40);stride,n,strings=u('HHH',58);headers=[u('IIQQQQIIQQ',base+i*stride)for i in range(n)]
+        strings=headers[strings];names=b[strings[4]:strings[4]+strings[5]]
+        for name,ty,flags,_,offset,size,*_ in headers:
+            if flags&4:add(names[name:].split(b'\\0',1)[0],offset,size)
+    else:
+        assert u('I',0)==(0xfeedfacf,)
+        count,=u('I',16);p=32
+        for _ in range(count):
+            cmd,size=u('II',p)
+            if cmd==0x19:
+                n,=u('I',p+64)
+                for i in range(n):
+                    name,seg,_,length,offset,_,_,_,flags,*_=u('16s16sQQIIIIIIII',p+72+i*80)
+                    if flags&0x80000400:add(seg.rstrip(b'\\0')+b','+name.rstrip(b'\\0'),offset,length)
+            p+=size
+    return hashlib.sha256(json.dumps(sections).encode()).hexdigest()
+layouts={}
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
@@ -44,6 +70,16 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        objects={str(f.relative_to(build)):dict(raw=sha(f),instructions=instruction_digest(f)) for f in build.rglob('*.c.o')}
+        symbols={}
+        for line in get('nm','-an',w/label).splitlines():
+            cols=line.split()
+            if len(cols)==3 and cols[2].lstrip('_') in ('X86_writeImmediateOutput','X86_disasmIterText','X86_disasmIter32','X86_scanNativeBatch','cs_disasm_iter'):
+                symbols[cols[2].lstrip('_')]=int(cols[0],16)
+        assert len(symbols)>=4
+        layouts[label]=dict(objects=objects,symbols=symbols)
+        save('layout',layouts)
+
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
@@ -80,7 +116,7 @@ try:
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
             assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
-            rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
+            rows=[];rng=random.Random(name+'/scalar-byte-immediate/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
                 for k in labels+labels[::-1]:
