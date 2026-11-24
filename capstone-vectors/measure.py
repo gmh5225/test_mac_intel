@@ -1,139 +1,66 @@
 from pathlib import Path
-import hashlib,itertools,json,math,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
-r=Path(__file__).resolve().parent;p=r.parent
-e=p/'evidence';e.mkdir(exist_ok=True);rd=lambda f:json.loads(f.read_text())
-q=rd(r/'tree.json');m=rd(r/'experiment.json');dev=m['neverd'];base=p/'source';root=p/'neverd-config';ice=p/'iced-source'
-def save(name,value):
-    f=e/(name+'.json');temp=f.with_suffix('.tmp');temp.write_text(json.dumps(value,indent=2)+'\n');temp.replace(f)
-def get(*args,**kwargs):return sp.check_output(args,text=True,**kwargs)
-def run(*args,**kwargs):sp.run(args,check=True,**kwargs)
+import hashlib,json,os,platform,shutil,subprocess as sp,sys,tempfile
+r=Path(__file__).resolve().parent;p=r.parent;s=p/'source';nd=p/'neverd-config';e=p/'evidence';e.mkdir(exist_ok=True)
+rd=lambda f:json.loads(f.read_text())
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-def interval(values):
-    x=sorted(values);n=len(x)
-    def rank(q):
-        return next(k for k in range(1,n+1) if 40*sum(math.comb(n,i)*k**i*(n-k)**(n-i) for i in range(n//2+1,n+1))>=q*n**n)-1
-    return [statistics.median(x),x[rank(1)],x[rank(39)]]
-w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
+def save(k,v):(e/(k+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+def get(*a):return sp.check_output(a,text=True)
+def run(*a,cwd=None,log=None):
+    if log:
+        with log.open('wb')as output:out=sp.run(a,cwd=cwd,stdout=output,stderr=sp.STDOUT,env=dict(os.environ,ZERO_AR_DATE='1',SOURCE_DATE_EPOCH='1735689600'))
+        if out.returncode:print(log.read_text(errors='replace')[-4000:],flush=True)
+        out.check_returncode()
+    else:sp.run(a,cwd=cwd,check=True)
+q=rd(r/'source.json');assert get('git','-C',s,'rev-parse','HEAD').strip()==q['base'] and get('git','-C',nd,'rev-parse','HEAD').strip()==q['dev']
+t=Path(tempfile.mkdtemp());project=t/'project';b=t/'cmake-build';obj=t/'make-build'
+arch=platform.machine().lower();enabled=sys.platform=='darwin' or arch in ('arm64','aarch64');before=q['original'] if enabled else None
+images={};bins={};cost=0
+def bytes_used(d):return sum(f.stat().st_size for f in d.rglob('*') if f.is_file() and not f.is_symlink())
+def attest(file):
+    return dict(sha256=sha(file),bytes=file.stat().st_size)
+def archive(lib):
+    members=get('ar','t',lib).splitlines()
+    assert ('MCInstStorage.c.o' in members or 'MCInstStorage.o' in members)==enabled,(lib,members,enabled)
+    return dict(file=attest(lib),members=members,contents={m:hashlib.sha256(sp.check_output(['ar','p',lib,m])).hexdigest() for m in members if not m.startswith('__.SYMDEF')})
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
-    assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
-    assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
-    assert all(sha(r/f)==v for f,v in m['drivers'].items())
-    (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(base)
-    (project/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
-    (project/cm).write_bytes(sp.check_output(['git','-C',root,'show',dev+':'+cm]))
-    v=get('git','-C',root,'show',dev+':CMakeLists.txt')
-    (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Layers LANGUAGES C CXX)\n'+v[v.index('# --- Capstone (our fork'):v.index('# --- NeverD CMake helpers')])
-    run('cmake','-G','Ninja','-S',project,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
-    run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
-    files={Path(c['file']).name for c in rd(build/'compile_commands.json')};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c','PPCMapping.c','RISCVMapping.c'}<=files and 'X86PublicOutput.c' not in files
-    ad.mkdir()
-    for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
-    (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
-    run('cargo','build','--release','--locked',cwd=ad)
-    ice_lib=ad/'target/release/libiced_compare.a'
-    shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
-    flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
-    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
-    for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    from training import fetch,holdouts
-    heldout=fetch(r,w);save('foreign-corpus',heldout)
-    images={};objects={}
-    run('clang++','-std=c++17','-O3','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
-
-    for label in ('base','candidate'):
-        if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
-        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        images[label]=dict(archive=sha(lib),exe=sha(w/label))
-        run('clang','-O2','-I',base,'-I',base/'include',r/'access.c',lib,'-o',w/'access')
-        uid_dump=sp.check_output([w/'access']);count=int.from_bytes(uid_dump[:4],'little');assert count>15000 and len(uid_dump)==4+2*(count+4)*15
-        if label=='base':reference=uid_dump
-        else:assert uid_dump==reference
-        save('access-'+label,dict(uids=count,queries=2*(count+4),sha256=hashlib.sha256(uid_dump).hexdigest()))
-
-        objects[label]={f.name:sha(f)for f in build.rglob('*.c.o')}
-        run('clang++',w/'foreign.o',lib,'-o',w/('foreign-'+label))
-        args=(['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm'])
-        run('clang',*args,'-o',w/(label+'.library'))
-        if label=='candidate':
-            affected=sorted(k for k,h in objects[label].items() if h!=objects['base'].get(k))
-            assert set(objects[label])-set(objects['base'])=={'MCInstStorage.c.o'} and 'cs.c.o' in affected
-            member,=build.rglob('MCInstStorage.c.o')
-            if sys.platform=='darwin':
-                cmd=get('otool','-l',member)
-                lines=cmd.split('sectname __cs_mcinst',1)[1].split('Section',1)[0].splitlines()
-                flags=int(next(line.strip().split()[1] for line in lines if line.strip().startswith('flags ')),16)
-                assert flags&0x80000000,flags
-                save('storage-identity',dict(flags=flags,pure_instructions=True,sha256=sha(member)))
-            else:
-                src=base/'MCInstStorage.c';correct=src.read_bytes();old=(r/'original-storage.c').read_bytes()
-                assert correct.replace(b'__TEXT,__cs_mcinst,regular,pure_instructions', b'__TEXT,__cs_mcinst')==old
-                archive_hash=sha(lib);member_hash=sha(member)
-                for source in (old,correct):
-                    src.write_bytes(source)
-                    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-                    assert sha(lib)==archive_hash and sha(member)==member_hash
-                save('storage-identity',dict(original_elf_archive=archive_hash,candidate_elf_archive=sha(lib),member=member_hash))
-            save('affected',dict(count=len(objects[label]),changed=affected))
-    shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
-    run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')
-    v=sp.run([w/'states',w/'base.library',w/'candidate.library','2048'],capture_output=True,text=True)
-    if v.returncode:print(v.stderr[-3000:],flush=True)
-    v.check_returncode();save('states',dict(stdout=v.stdout,iterations=2048,settings=v.stderr.count('case arch=')))
-
-    assert images['base']['exe']!=images['candidate']['exe']
-    shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
-    cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
-    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
-    sys.path.insert(0,str(w));import pe_panels,frozen_deb
-    run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
-    save('host',host);observations={};summary={};audits={}
-    for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
-        spec=m['provenance'][name]
-        assert sha(f)==spec['text_sha256']
-        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
-        path=w/(name+'.tsv')
-        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-        emit(selected)
-        if m['samples'][name]=='simd-functions':
-            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-            assert len(view)==len(selected)
-            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-        assert sha(path)==spec['extent_sha256']
-        def audit_engine(exe):
-            rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
-            assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
-            return rows
-        assert audit_engine('base')==audit_engine('candidate')
-        audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
-        def take(engine,mode,n):
-            comparator='capstone' if engine.startswith('public-') else engine if engine in ('iced','fast') else 'private'
-            label=engine.removeprefix('public-');exe=label if label in ('candidate','duplicate')else'base'
-            return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
-        for mode in (0,1,2):
-            labels=['base','duplicate','candidate','public-base','public-duplicate','public-candidate','iced']+(['fast']if mode else[])
-            repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
-            expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
-            assert expected['public-base']==expected['public-duplicate']==expected['public-candidate']
-            rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-            for _ in range(13):
-                rng.shuffle(labels);sample={k:[] for k in labels}
-                for k in labels+labels[::-1]:
-                    row=take(k,mode,repeats);assert row[2:]==expected[k]
-                    sample[k].append(row[:2])
-                rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-            key=name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-            summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
-            save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==18
-    holdouts(heldout,w,save)
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
-
+    (project/'cmake').mkdir(parents=True);(project/'third_party').mkdir();(project/'third_party/capstone').symlink_to(s)
+    cm='cmake/NeverDCapstoneCompilerOptions.inc';(project/cm).write_bytes((nd/cm).read_bytes());menu=(nd/'CMakeLists.txt').read_text()
+    (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Identity LANGUAGES C CXX)\n'+menu[menu.index('# --- Capstone (our fork'):menu.index('# --- NeverD CMake helpers')])
+    for label,tree in [('reference',before),('final',q['final'])]:
+        run('git','-C',s,'restore','--staged','--worktree','--source=HEAD','--','.')
+        if tree is not None:
+            patch=r/('original.patch' if label=='reference' else 'candidate.patch')
+            assert sha(patch)==tree['sha256'];run('git','-C',s,'apply','--index',patch);assert get('git','-C',s,'write-tree').strip()==tree['tree']
+        else:assert get('git','-C',s,'write-tree').strip()==q['base_tree']
+        run('cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++',log=e/(label+'-configure.log'))
+        run('cmake','--build',b,'--target','capstone_static','--parallel','4',log=e/(label+'-cmake.log'))
+        units=rd(b/'compile_commands.json');assert any('MCInstStorage.c' in f['file'] for f in units)==enabled
+        assert ('CAPSTONE_MIXED_CONSTRUCTED_OPERANDS' in next(f['command'] for f in units if Path(f['file']).name=='cs.c'))==enabled
+        lib,=b.rglob('libcapstone.a');cmake=archive(lib)
+        args=['make','-j4','V=1','CC=clang','AR=ar','BUILDDIR='+str(obj),'CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_BUILD_MACOS_THIN=yes','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CAPSTONE_STATIC=yes','CAPSTONE_SHARED=yes']
+        make_log=e/(label+'-make.log');run(*args,cwd=s,log=make_log)
+        log=make_log.read_text(errors='replace');assert ('-DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS' in log)==enabled
+        assert not any('__cs_mcinst' in l and 'not a code section' in l for l in log.splitlines())
+        lib,=[x for x in obj.rglob('libcapstone.a') if not x.is_symlink()]
+        dynamic,=[x for x in obj.rglob('libcapstone*') if x.is_file() and not x.is_symlink() and ('.so' in x.name or x.name.endswith('.dylib'))]
+        make=archive(lib);images[label]=dict(cmake=cmake,make=make,shared=attest(dynamic))
+        wrapper=t/(label+'.library')
+        opts=['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm']
+        run('clang',*opts,'-o',wrapper);bins[label]=wrapper
+        for name in ('x86_buffer_bounds','x86_simple_output'):
+            exe=t/name;run('clang','-O2','-I',s/'include',s/('tests/unit/'+name+'.c'),lib,'-o',exe);run(exe,log=e/(label+'-'+name+'.log'))
+        save('images',images)
+        for bed in (b,obj):
+            cost+=bytes_used(bed);shutil.rmtree(bed)
+    for system in ('cmake','make'):
+        a=images['reference'][system];z=images['final'][system]
+        assert a['members']==z['members'] and a['contents']==z['contents'],(arch,system,[m for m in a['contents'] if a['contents'][m]!=z['contents'].get(m)])
+        assert a['file']==z['file'],(arch,system,a['file'],z['file'])
+    assert images['reference']['shared']==images['final']['shared'],(arch,images['reference']['shared'],images['final']['shared'])
+    run('clang++','-std=c++17','-O2','-I',s/'include',r/'states.cpp',*(['-ldl'] if sys.platform=='linux' else []),'-o',t/'states')
+    ptest=sp.run([t/'states',bins['reference'],bins['final'],'2048'],text=True,capture_output=True)
+    if ptest.returncode:print(ptest.stderr[-1500:])
+    ptest.check_returncode();assert ptest.stderr.count('case arch=')==464
+    save('complete',dict(complete=True,source=q,host=arch,system=sys.platform,enabled=enabled,compared_to=before['commit'] if before else q['base'],settings=464,checks=ptest.stdout.strip(),images={k:{'cmake':a['cmake']['file'],'make':a['make']['file'],'shared':a['shared']}for k,a in images.items()}))
 finally:
-    n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
+    cost+=bytes_used(t);shutil.rmtree(t);save('cleanup',dict(bytes=cost,removed=not t.exists()))

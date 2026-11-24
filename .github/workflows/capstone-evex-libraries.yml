@@ -1,7 +1,7 @@
-name: Qualify mixed operand initialization and verify Mach-O code sections and identical ELF archives
+name: Verify exact Capstone static and shared images for the measured mixed compiler targets
 on:
   push:
-    branches: [codex/mixed-operand-storage-object-identity]
+    branches: [codex/verified-mixed-storage-targets]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f96ca7d5ae203fda295d143fa89583685fe28861
+          ref: fb55d5f8c8595cb18bb67d84adf6dc9c3880d311
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-storage-final-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: selected-mixed-target-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
