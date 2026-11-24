@@ -1,7 +1,7 @@
-name: Compare the outlined EVEX fallback against iced and measure linked i386 and batch reader addresses
+name: Measure opcode-selected EVEX scans on private, public and independent iced readers
 on:
   push:
-    branches: [codex/isolated-packed-evex-vs-iced]
+    branches: [codex/classified-packed-evex-vs-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-packed-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: classified-packed-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
