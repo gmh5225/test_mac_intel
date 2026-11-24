@@ -1,7 +1,7 @@
-name: Verify raw operands and time six-architecture default storage on real programs
+name: Time constructed operand initialization with existing x86 and MIPS call paths
 on:
   push:
-    branches: [codex/constructed-operand-six-architecture]
+    branches: [codex/mixed-decoder-outlined-storage]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 396483e58bf0bb8f4dd6e36daff8b0458bad2315
+          ref: fa11ca3d930b9e66a919ed4de20affdbc75bd125
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 512ac40f11eda4f1998843f0de8f257723635945
+          ref: 9f35a102e0ae78ff20e0f0e0b443d275f975abf7
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: constructed-six-arch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: outlined-storage-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
