@@ -59,10 +59,21 @@ try:
         name,original=section[small];ext=t/'held-text';ext.write_bytes(original+b'\x90'*delta)
         obj,=b.rglob('MipsInstPrinter.c.o');run('controlled-object','objcopy','--update-section',name+'='+str(ext),t/(small+'.o'),obj)
         assert text_section(obj)==(name,original+b'\x90'*delta)
-        run('relink','cmake','--build',b,'--parallel','4','--target','capstone_shared')
-        lib,=[f for f in b.glob('libcapstone.so*')if f.is_file()and not f.is_symlink()]
-        libs['placed']=t/'placed.so';shutil.copy2(lib,libs['placed'])
+        import shlex
+        cmds=get('ninja','-C',b,'-t','commands','capstone_shared').splitlines()
+        # Execute only the link command. Rebuilding the target can regenerate
+        # the substituted object from the source and erase the control.
+        actions=[shlex.split(part) for cmd in cmds for part in cmd.split(' && ') if ' -shared ' in part and ' -o ' in part]
+        link,=actions
+        libs['placed']=t/'placed.so'
+        link[link.index('-o')+1]=str(libs['placed'])
+        check_obj=sha(obj)
+        with (out/'relink.log').open('wb')as log:sp.run(link,cwd=b,stdout=log,stderr=sp.STDOUT,check=True)
+        assert sha(obj)==check_obj and len({sha(v) for v in libs.values()})==3
         syms['placed']=symbols(libs['placed'])
+        assert syms['placed']['Mips_LLVM_printInst'][1]==syms[small]['Mips_LLVM_printInst'][1]
+        assert syms['placed']['Mips_selectScanDecoder']==syms[large]['Mips_selectScanDecoder']
+
     put('placement',dict(section=section['base'][0],bytes=sizes,padding=delta,derived_from=small,matched_to=large,symbols=syms,images={k:sha(v) for k,v in libs.items()}))
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
     cases={}

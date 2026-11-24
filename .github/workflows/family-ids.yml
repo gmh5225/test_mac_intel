@@ -1,7 +1,7 @@
-name: Measure MIPS scan and formatting with independent code placement on two Linux Clang hosts
+name: Isolate MIPS scan layout using a direct link with verified object identity
 on:
   push:
-    branches: [codex/mips-dedicated-scan-text-layout]
+    branches: [codex/mips-linked-object-scan-control]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -13,6 +13,10 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, flavor: first }
           - { host: ubuntu-24.04, cc: clang, flavor: second }
+          - { host: ubuntu-24.04, cc: clang, flavor: third }
+          - { host: ubuntu-24.04, cc: clang, flavor: fourth }
+          - { host: ubuntu-24.04, cc: clang, flavor: fifth }
+          - { host: ubuntu-24.04, cc: clang, flavor: sixth }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 95
     env:
@@ -36,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-mips-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-mips-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
