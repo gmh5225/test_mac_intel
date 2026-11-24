@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','layout','selector'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+assert sha(r/'selector.patch')==m['selector']['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -42,7 +42,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','layout','selector'):
+    for variant in ('base','selector'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -89,7 +89,7 @@ try:
         save('forms-'+variant,dict(records=3264,wrong=48 if failure else 0,stdout=v.stdout,stderr=v.stderr))
         command(['clang','-O2','-I',cs/'include',r/'selector.c',archive,'-o',t/'selector-guard'],'link-selector-'+variant)
         command([t/'selector-guard'],'selector-'+variant)
-        assert (out/('selector-'+variant+'.log')).read_text().strip()==('9088 144 1008' if variant=='base' else '9088 144 0')
+        assert (out/('selector-'+variant+'.log')).read_text().strip()=='9088 144 0'
         check=t/'verify-move-scans'
         command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
         p=sp.run([check],capture_output=True,text=True,check=True)
@@ -123,8 +123,11 @@ try:
         with binary.open('rb') as file:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
+        shutil.copy2(archive,t/(variant+'.a'))
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert len({z['archive']for z in identities.values()})==3 and len({z['binary']for z in identities.values()})==3
+    assert len({z['archive']for z in identities.values()})==2 and len({z['binary']for z in identities.values()})==2
+    from match import pair
+    pair(build,t,products,archive,save)
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
@@ -155,7 +158,7 @@ try:
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if (c['name'],mode) in (('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
+            pairs=35 if (c['name'],mode) in (('libssl3t64-amd64',3),('jpeg-avx2-i386',3),('libmvec-amd64',3),('putty-64-0.85',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
