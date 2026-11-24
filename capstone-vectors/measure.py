@@ -157,6 +157,38 @@ def main(w):
         assert ('X86_decodePublicRecord' in linked)==(not mixed)
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         save('linked-'+key+'.json',linked)
+        if mixed:
+            member='X86Vex32Output.c.o';section='.cs_x86_i386_text'
+            od=w/('control-'+key);od.mkdir()
+            obj=od/member
+            obj.write_bytes(sp.check_output(['ar','p',lib,member]))
+            old_text=od/'original-section'
+            run(['objcopy','--dump-section',section+'='+str(old_text),obj],'read-section-'+key)
+            original=old_text.read_bytes()
+            if key=='mixed_base':
+                reference_size=len(original);reference_symbols=linked
+            elif key=='mixed_bare':
+                padding=reference_size-len(original)
+                assert padding>0 and padding%4==0,(reference_size,len(original))
+                extra=od/'extra';extra.write_bytes(original+bytes.fromhex('1f2003d5')*(padding//4))
+                run(['objcopy','--update-section',section+'='+str(extra),obj],'update-section-'+key)
+                readback=od/'readback'
+                run(['objcopy','--dump-section',section+'='+str(readback),obj],'read-padded-section-'+key)
+                assert readback.read_bytes()==extra.read_bytes() and extra.read_bytes()[:len(original)]==original
+                anchored=w/'libanchored.a';shutil.copy2(lib,anchored);run(['ar','rcsD',anchored,obj],'rebuild-archive')
+                assert sp.check_output(['ar','t',lib])==sp.check_output(['ar','t',anchored]) and sp.check_output(['ar','p',anchored,member])==obj.read_bytes()
+                shifted=w/'runner-mixed-anchor'
+                run(['clang++',w/'driver.o',*flags,anchored,ad/'target/release/libiced_compare.a',*syslibs,'-o',shifted],'link-mixed-anchor')
+                syms={}
+                for line in sp.check_output(['nm','-n',shifted],text=True).splitlines():
+                    cols=line.split()
+                    if len(cols)==3 and cols[1] in ('t','T') and cols[2] in linked:syms[cols[2]]=int(cols[0],16)
+                assert set(syms)==set(reference_symbols)==set(linked)
+                assert any(linked[k]!=reference_symbols[k] for k in ('X86_disasmIterText','X86_scanNativeBatch'))
+                save('placement.json',dict(section=section,original_size=len(original),reference_size=reference_size,added=padding,object_sha=sha(obj),section_before=sha(old_text),section_after=sha(readback),verified_original_bytes=True,
+                    base=reference_symbols,candidate=linked,anchored=syms,restored={k:syms[k]==v for k,v in reference_symbols.items()},images=dict(base=sha(bins['mixed_base']),candidate=sha(exe),anchored=sha(shifted))))
+                bins['mixed_anchor']=shifted
+
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         shutil.rmtree(build)
@@ -186,11 +218,11 @@ def main(w):
     glibc=json.loads((w/'libmvec.json').read_text());extra=[('libmvec-amd64',64,w/'libmvec.text',[(0,glibc['bytes'],glibc['address'])],glibc)]
     results=[]
     for name,bits,f,spans,source in itertools.chain(extra,pe_panels.prepare(w),frozen_deb.prepare(w)):
-        if name not in m['samples']:continue
+        if name not in ('putty-32-0.85','putty-64-0.85','jpeg-avx2-i386'):continue
         expected=m['provenance'][name];assert sha(f)==expected['text_sha256']
         intervals=w/(name+'.tsv');emit=lambda rows:intervals.write_text(''.join('%d %d %d\n'%tuple(a)for a in rows))
         emit(spans)
-        audit=[sp.check_output([v,'audit','0','1',f,intervals,str(bits)],text=True)for k,v in bins.items()if k in trees]
+        audit=[sp.check_output([v,'audit','0','1',f,intervals,str(bits)],text=True)for k,v in bins.items()]
         assert len(set(audit))==1
         trace=[list(map(int,l.split()))for l in audit[0].splitlines()]
         views=[list(map(int,l.split()))for l in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
@@ -198,25 +230,22 @@ def main(w):
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         for mode in (0,1,2):
-            targets={'copy':('base','x86_len_' if mode else 'vecbatch'),'iced':('base','iced____')}
-            if mode:targets['fast']=('base','fast____')
-            for k in trees:
-                targets['private_'+k]=(k,'x86_len_' if mode else 'vecbatch')
-                targets['public_'+k]=(k,'capstone')
+            engine='x86_len_' if mode else 'vecbatch'
+            targets={name:(key,engine) for name,key in [('private_mixed_base','mixed_base'),('private_reference_copy','mixed_base'),('private_mixed_bare','mixed_bare'),('private_anchored','mixed_anchor')]}
             def timed(label,count):
                 key,engine=targets[label]
                 return list(map(int,invoke(key,[engine,str(mode),str(count),f,intervals,str(bits)]).split()))
-            rep=max(1,math.ceil(50e6/max(1,timed('private_base',1)[0])));cycles=[]
+            rep=max(1,math.ceil(50e6/max(1,timed('private_mixed_base',1)[0])));cycles=[]
             labels=list(targets);order=random.Random(str((name,mode,'released-public-reader')))
-            for idx in range(13):
+            for idx in range(25):
                 order.shuffle(labels);obs=[(k,timed(k,rep))for k in labels+labels[::-1]]
                 assert len({tuple(v[2:5])for k,v in obs})==1
-                for kind in ('public_','private_'):
+                for kind in ('private_',):
                     assert len({tuple(v[2:])for k,v in obs if k.startswith(kind) or k=='copy' and kind=='private_'})==1
                 if mode:assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1
                 cycles.append(dict(raw=obs))
             results.append(dict(case=name,mode=mode,bits=bits,extent_sha256=sha(intervals),counts=len(selected),rep=rep,cycles=cycles));save('timings.json',results)
-    assert len(results)==3*len(m['samples'])
+    assert len(results)==9
     save('complete.json',dict(trees=trees,iced=iced,records=len(results),neverd=m['neverd'],native=platform.platform(),machine=platform.machine()))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
 try:

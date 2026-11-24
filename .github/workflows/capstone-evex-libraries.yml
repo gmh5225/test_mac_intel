@@ -1,7 +1,7 @@
-name: Retest the macOS Arm64 branch writer with verified fork source checkout
+name: Measure identical Arm64 code with independent batch and text entry addresses restored
 on:
   push:
-    branches: [codex/arm64-targets-verified-iced-source]
+    branches: [codex/arm64-scan-address-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,7 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -54,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-fork-targets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: branch-placement-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
