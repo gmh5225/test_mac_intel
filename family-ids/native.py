@@ -29,7 +29,7 @@ try:
                        object={a:sha(next(b.rglob(a)))for a in('X86EvexScan.c.o','cs.c.o','X86OutputIterator.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','AArch64Disassembler.c.o')})
     assert len({v['shared']for v in images.values()})==len(q)+1;put('images',images)
     changed=[n for n in images['base']['object']if images['moves']['object'][n]!=images['base']['object'][n]]
-    assert changed==['X86EvexScan.c.o'],changed
+    assert changed==['X86DisassemblerDecoder.c.o'],changed
     run('guard-moves','clang++','-O2','-std=c++17','-I',s/'include',r/'guard-packed.cpp','-ldl','-o',t/'moves')
     run('compile-oracle','g++','-O2','-std=c++17','-I',s/'include',r/'oracle.cpp','-ldl','-o',t/'oracle')
     run('guard-driver','clang++','-O2','-std=c++17','-I',s/'include',r/'guard.cpp','-ldl','-o',t/'guard')

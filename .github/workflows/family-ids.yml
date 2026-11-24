@@ -1,7 +1,7 @@
-name: Validate opcode-selected EVEX packed moves against the full decoder and real scans
+name: Compare public EVEX result dispatch with the generic decoder on four native hosts
 on:
   push:
-    branches: [codex/classify-evex-before-packed-reader]
+    branches: [codex/public-only-evex-result]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: classified-packed-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: public-only-evex-result-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
