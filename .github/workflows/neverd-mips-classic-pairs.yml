@@ -1,0 +1,89 @@
+name: NeverD classic MIPS paired performance
+on:
+  push:
+    branches: [codex/neverd-mips-classic-pairs-nov24]
+    paths: ['.github/workflows/neverd-mips-classic-pairs.yml', 'neverd-mips-qualification/paired-classic.py']
+permissions:
+  contents: read
+jobs:
+  paired:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18}
+          - {os: macos-15, cc: clang, cxx: clang++}
+          - {os: windows-2025-vs2026, cc: clang-cl, cxx: clang-cl}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+    env:
+      BASE: 67dc5459e38411aecbb1c10e6372cc005ffc2f96
+      CANDIDATE: 03e4cc9057e63ce0218844e1f55e84f2ee7ef429
+      NEVERD_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.BASE }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: qualification-driver
+          sparse-checkout: neverd-mips-qualification
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14
+      - if: runner.os == 'macOS'
+        run: brew install cmake ninja lld
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+        with:
+          arch: x64
+      - name: Install the pinned Clang for the Windows SDK and STL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
+      - name: Build both pinned revisions with one toolchain
+        run: |
+          mkdir -p evidence
+          git fetch --quiet --depth 1 origin "$CANDIDATE"
+          git submodule update --init --depth 1 third_party/capstone signatures
+          args=()
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            args+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14')
+          fi
+          cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF "${args[@]}"
+          for rev in base candidate; do
+            sha="$BASE"
+            if [[ "$rev" == candidate ]]; then sha="$CANDIDATE"; fi
+            git checkout --quiet --detach "$sha"
+            git submodule update --init --depth 1 third_party/capstone
+            test "$(git rev-parse HEAD)" = "$sha"
+            test "$(git rev-parse "$sha":third_party/capstone)" = "$(git -C third_party/capstone rev-parse HEAD)"
+            python scripts/build.py build-check --config Release --parallel 4 --target neverd-mips-bench
+            suffix=
+            if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
+            cp "build-check/bin/neverd-mips-bench$suffix" "build-check/bin/neverd-mips-bench-$rev$suffix"
+            git rev-parse HEAD > "evidence/source-$rev.txt"
+            git -C third_party/capstone rev-parse HEAD >> "evidence/source-$rev.txt"
+            cp build-check/neverd-dependency-inputs.json "evidence/dependencies-$rev.json"
+          done
+          cmp evidence/dependencies-base.json evidence/dependencies-candidate.json
+      - name: Time both native binaries on the same workload
+        run: python qualification-driver/neverd-mips-qualification/paired-classic.py build-check/bin evidence/measurements.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: paired-${{ matrix.os }}-${{ env.CANDIDATE }}
+          path: evidence/
+          retention-days: 14
