@@ -1,14 +1,19 @@
 diff --git a/cs.c b/cs.c
-index 333e7de2..c8c71373 100644
+index 333e7de2..f20055f8 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1560,6 +1560,18 @@ void cs_skipdata_opstr(char *opstr, const uint8_t *buffer, size_t size)
+@@ -1560,6 +1560,23 @@ void cs_skipdata_opstr(char *opstr, const uint8_t *buffer, size_t size)
  }
  #endif
  
 +/* Allocator callbacks may change CS_OPT_DETAIL after a record acquires its
 + * detail. Release what each record owns. Preserve calls to custom free(NULL)
 + * on paths that previously visited every slot. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((cold, noinline))
++#endif
 +static void free_insn_cache(cs_insn *cache, size_t count, bool free_empty)
 +{
 +	for (size_t i = 0; i < count; i++) {
@@ -21,7 +26,7 @@ index 333e7de2..c8c71373 100644
  // dynamically allocate memory to contain disasm insn
  // NOTE: caller must free() the allocated memory itself to avoid memory leaking
  CAPSTONE_EXPORT
-@@ -1568,7 +1580,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+@@ -1568,7 +1585,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  {
  	struct cs_struct *handle;
  	uint16_t insn_size;
@@ -30,7 +35,7 @@ index 333e7de2..c8c71373 100644
  	unsigned int f = 0; // index of the next instruction in the cache
  	cs_insn *insn_cache; // cache contains disassembled instructions
  	void *total = NULL;
-@@ -1621,11 +1633,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+@@ -1621,11 +1638,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  			insn_cache->detail =
  				cs_mem_calloc(1, sizeof(cs_detail));
  			if (!insn_cache->detail) {
@@ -43,18 +48,18 @@ index 333e7de2..c8c71373 100644
  				*insn = NULL;
  
  				handle->errnum = CS_ERR_MEM;
-@@ -1650,8 +1658,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+@@ -1650,8 +1663,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  		} else {
  			// encounter a broken instruction
  
 -			// free memory of @detail pointer
 -			if (handle->detail_opt) {
 +			// Release detail acquired before a callback changed the option.
-+			if (insn_cache->detail || handle->detail_opt) {
++			if (handle->detail_opt || insn_cache->detail) {
  				cs_mem_free(insn_cache->detail);
  			}
  
-@@ -1714,13 +1722,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+@@ -1714,13 +1727,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  			total_size += (sizeof(cs_insn) * cache_size);
  			tmp = cs_mem_realloc(total, total_size);
  			if (tmp == NULL) { // insufficient memory
@@ -69,7 +74,7 @@ index 333e7de2..c8c71373 100644
  				*insn = NULL;
  				handle->errnum = CS_ERR_MEM;
  				return 0;
-@@ -1756,13 +1758,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+@@ -1756,13 +1763,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  							  sizeof(*insn_cache));
  		if (tmp == NULL) { // insufficient memory
  			// free all detail pointers
@@ -84,22 +89,6 @@ index 333e7de2..c8c71373 100644
  			*insn = NULL;
  
  			handle->errnum = CS_ERR_MEM;
-@@ -1780,14 +1776,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- CAPSTONE_EXPORT
- void CAPSTONE_API cs_free(cs_insn *insn, size_t count)
- {
--	size_t i;
--
--	// free all detail pointers
--	for (i = 0; i < count; i++)
--		cs_mem_free(insn[i].detail);
--
--	// then free pointer to cs_insn array
--	cs_mem_free(insn);
-+	free_insn_cache(insn, count, true);
- }
- 
- CAPSTONE_EXPORT
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 735eaf83..f97cec2c 100644
 --- a/tests/unit/CMakeLists.txt

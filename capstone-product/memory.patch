@@ -1,36 +1,18 @@
 diff --git a/cs.c b/cs.c
-index 333e7de2..2f85e8ae 100644
+index 333e7de2..85795a22 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1560,6 +1560,18 @@ void cs_skipdata_opstr(char *opstr, const uint8_t *buffer, size_t size)
- }
- #endif
- 
-+/* Allocator callbacks may change CS_OPT_DETAIL after a record acquires its
-+ * detail. Release what each record owns. Preserve calls to custom free(NULL)
-+ * on paths that previously visited every slot. */
-+static void free_insn_cache(cs_insn *cache, size_t count, bool free_empty)
-+{
-+	for (size_t i = 0; i < count; i++) {
-+		if (free_empty || cache[i].detail)
-+			cs_mem_free(cache[i].detail);
-+	}
-+	cs_mem_free(cache);
-+}
-+
- // dynamically allocate memory to contain disasm insn
- // NOTE: caller must free() the allocated memory itself to avoid memory leaking
- CAPSTONE_EXPORT
-@@ -1568,7 +1580,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+@@ -1568,7 +1568,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  {
  	struct cs_struct *handle;
  	uint16_t insn_size;
 -	size_t c = 0, i;
 +	size_t c = 0;
++	bool free_empty;
  	unsigned int f = 0; // index of the next instruction in the cache
  	cs_insn *insn_cache; // cache contains disassembled instructions
  	void *total = NULL;
-@@ -1621,11 +1633,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+@@ -1621,15 +1622,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  			insn_cache->detail =
  				cs_mem_calloc(1, sizeof(cs_detail));
  			if (!insn_cache->detail) {
@@ -39,42 +21,27 @@ index 333e7de2..2f85e8ae 100644
 -					cs_mem_free(insn_cache->detail);
 -
 -				cs_mem_free(total);
-+				free_insn_cache(total, c, true);
- 				*insn = NULL;
- 
- 				handle->errnum = CS_ERR_MEM;
-@@ -1650,8 +1658,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+-				*insn = NULL;
+-
+-				handle->errnum = CS_ERR_MEM;
+-				return 0;
++				free_empty = true;
++				goto out_of_memory;
+ 			}
+ 		} else {
+ 			insn_cache->detail = NULL;
+@@ -1650,8 +1644,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  		} else {
  			// encounter a broken instruction
  
 -			// free memory of @detail pointer
 -			if (handle->detail_opt) {
 +			// Release detail acquired before a callback changed the option.
-+			if (insn_cache->detail || handle->detail_opt) {
++			if (handle->detail_opt || insn_cache->detail) {
  				cs_mem_free(insn_cache->detail);
  			}
  
-@@ -1709,18 +1717,26 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- 
- 		if (f == cache_size) {
- 			// full cache, so expand the cache to contain incoming insns
--			cache_size = cache_size * 8 / 5; // * 1.6 ~ golden ratio
-+			unsigned int next_cache_size = cache_size * 8 / 5;
-+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE)
-+			/* Each remaining instruction consumes at least one byte. */
-+			const size_t bytes_left = size - next_offset;
-+			const size_t limit = count ? MIN(bytes_left, count - c) : bytes_left;
-+			if (limit < next_cache_size && cs_mem_realloc == realloc &&
-+			    cs_mem_calloc == calloc && cs_mem_free == free &&
-+			    cs_mem_malloc == malloc) {
-+				if (!limit)
-+					break;
-+				next_cache_size = (unsigned int)limit;
-+			}
-+#endif
-+			cache_size = next_cache_size;
- 			size_t old_total_size = total_size;
+@@ -1714,16 +1708,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  			total_size += (sizeof(cs_insn) * cache_size);
  			tmp = cs_mem_realloc(total, total_size);
  			if (tmp == NULL) { // insufficient memory
@@ -85,11 +52,15 @@ index 333e7de2..2f85e8ae 100644
 -				}
 -
 -				cs_mem_free(total);
-+				free_insn_cache(total, c, handle->detail_opt);
- 				*insn = NULL;
- 				handle->errnum = CS_ERR_MEM;
- 				return 0;
-@@ -1756,13 +1772,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+-				*insn = NULL;
+-				handle->errnum = CS_ERR_MEM;
+-				return 0;
++				free_empty = handle->detail_opt;
++				goto out_of_memory;
+ 			}
+ 			// Zero reallocated memory to prevent
+ 			// access to uninitialized memory down the line.
+@@ -1756,25 +1742,27 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
  							  sizeof(*insn_cache));
  		if (tmp == NULL) { // insufficient memory
  			// free all detail pointers
@@ -100,23 +71,32 @@ index 333e7de2..2f85e8ae 100644
 -			}
 -
 -			cs_mem_free(total);
-+			free_insn_cache(total, c, handle->detail_opt);
- 			*insn = NULL;
+-			*insn = NULL;
+-
+-			handle->errnum = CS_ERR_MEM;
+-			return 0;
++			free_empty = handle->detail_opt;
++			goto out_of_memory;
+ 		}
  
- 			handle->errnum = CS_ERR_MEM;
-@@ -1780,14 +1790,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
- CAPSTONE_EXPORT
- void CAPSTONE_API cs_free(cs_insn *insn, size_t count)
- {
--	size_t i;
+ 		total = tmp;
+ 	}
+ 
+ 	*insn = total;
 -
--	// free all detail pointers
--	for (i = 0; i < count; i++)
--		cs_mem_free(insn[i].detail);
--
--	// then free pointer to cs_insn array
--	cs_mem_free(insn);
-+	free_insn_cache(insn, count, true);
+ 	return c;
++
++out_of_memory:
++	/* An allocator callback can change CS_OPT_DETAIL between records. */
++	insn_cache = total;
++	for (size_t i = 0; i < c; i++) {
++		if (free_empty || insn_cache[i].detail)
++			cs_mem_free(insn_cache[i].detail);
++	}
++	cs_mem_free(total);
++	*insn = NULL;
++	handle->errnum = CS_ERR_MEM;
++	return 0;
  }
  
  CAPSTONE_EXPORT

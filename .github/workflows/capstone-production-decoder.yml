@@ -1,7 +1,7 @@
-name: Check allocation callback lifetime and bounded batch storage with the actual NeverD decoder and source LLVM
+name: Verify the failure-only detail cleanup in the source-built NeverD decoder
 on:
   push:
-    branches: [codex/product-real-batch-storage]
+    branches: [codex/neverd-product-batch-unwind]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 0b77af9937e829f515c4feecda97b08e61d3d426
+          ref: 220551a8b0c9494051883a4c2753972dc79c8b80
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "0b77af9937e829f515c4feecda97b08e61d3d426"
+          test "$(git rev-parse HEAD)" = "220551a8b0c9494051883a4c2753972dc79c8b80"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: batch-storage-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: batch-unwind-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
