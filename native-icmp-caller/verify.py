@@ -11,6 +11,7 @@ inputs = json.loads((root / "inputs.json").read_text())
 digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
 repo = Path(subprocess.check_output(["git", "-C", fixture.parent, "rev-parse", "--show-toplevel"],
                                    text=True).strip())
+assert subprocess.check_output(["git", "-C", repo, "rev-parse", "HEAD"], text=True).strip() == inputs["fixture_revision"]
 tracked = fixture.relative_to(repo).as_posix()
 blob = subprocess.check_output(["git", "-C", repo, "show", "HEAD:" + tracked])
 assert hashlib.sha256(blob).hexdigest() == inputs["fixture_source_sha256"]
