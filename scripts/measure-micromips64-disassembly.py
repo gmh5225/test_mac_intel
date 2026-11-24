@@ -12,7 +12,7 @@ import statistics
 import subprocess
 
 BASE = "0f9776402d2f3aed5daf50e58cdcb820690517cc"
-HEAD = "255b867d82beb9bc1e8c50e374fa6d637929d136"
+HEAD = "47ec0c4e5010a7927de9dbd351d29f4b68744044"
 WINDOWS = os.name == "nt"
 SUFFIX = ".exe" if WINDOWS else ""
 ROUNDS = 24
