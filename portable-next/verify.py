@@ -18,7 +18,10 @@ def extract(pkg):
         pos+=60+size+(size%2)
     raise ValueError('missing package member')
 try:
-    assert g('rev-parse','HEAD')==q['parent']
+    anchor=json.loads((d/'anchor.json').read_text())
+    assert g('rev-parse','HEAD')==anchor['parent'] and anchor['commit']==q['parent']
+    patch=t/'anchor.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/anchor.patch']))
+    assert sha(patch.read_bytes())==anchor['sha256'];g('apply','--index',str(patch));assert g('write-tree')==anchor['tree']
     pkg=t/'sample.deb';cmd('download',['curl','--retry','3','--retry-all-errors','-fsSL',source['url'],'-o',pkg]);data=pkg.read_bytes();assert sha(data)==source['package_sha256']
     texts={}
     for name,elf in extract(data).items():
@@ -36,8 +39,7 @@ try:
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-        units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_instruction_groups', 'riscv_op_count_iter'] if profile=='full' else []
-        if profile=='full' and stage=='candidate':units.append('riscv_scan_options')
+        units=['riscv_scan_options']+(['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_instruction_groups', 'riscv_op_count_iter', 'riscv_sysreg', 'riscv_reg_access', 'riscv_insn_name_segv'] if profile=='full' else [])
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*units])
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
