@@ -147,5 +147,11 @@ preserving evidence. The maintained source profile pins this tested implementati
 Run **Measure hosted Apple arm64e.x1 support** from the Actions tab to probe
 current hosted Macs. Each runner uses the same resolved NeverD dev commit and
 writes its CPU and qualification result in the job summary. The artifact contains
-the compiler, original PAC call, cursor and checked-writeback probe reports. A
-runner with missing features reports each one as unavailable.
+the compiler, original PAC call, cursor, scalar arithmetic, checked writeback
+and ordered-memory probe reports. The summary verifies component report hashes
+and revisions. It reports 128-bit LRCPC3, explicit PAuth_LR, PC-sensitive PACM,
+PACM HINT, scalar CPTA and checked writeback separately, including capabilities
+that ran on a host with an unavailable aggregate x1 result. The artifact also
+contains the native scalar, explicit-signer and Q-lane regression log. These
+tests exercise the probes with baseline instructions, wrong results and
+misplaced faults. They have no effect on hardware qualification.
