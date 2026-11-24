@@ -1,0 +1,152 @@
+name: NeverD MIPS native ELF
+on:
+  push:
+    branches: [codex/mips-llvm-elf-qualification]
+    paths: ['.github/workflows/neverd-mips-native-elf.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+env:
+  REVISION: b5b6f39a70862cde29b23d64d69245dafe396e37
+  LLVM_REVISION: e03b3a2cd27615bd9a8d193b37f36da80d56355b
+  HOMEBREW_NO_AUTO_UPDATE: '1'
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18, pkg: neverd-llvm-linux-x86_64}
+          - {os: macos-15, cc: clang, cxx: clang++}
+          - {os: windows-latest, cc: clang-cl, cxx: clang-cl, pkg: neverd-llvm-windows-x64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 150
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.REVISION }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Verify source identities
+        run: |
+          test "$(git rev-parse HEAD)" = "$REVISION"
+          test "$(git rev-parse HEAD:third_party/llvm-project)" = "$LLVM_REVISION"
+          git submodule update --init --depth 1 third_party/capstone signatures
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14 qemu-user \
+            binutils-mips-linux-gnu binutils-mipsel-linux-gnu \
+            binutils-mips64-linux-gnuabi64 binutils-mips64el-linux-gnuabi64
+      - if: runner.os == 'macOS'
+        run: brew install cmake ninja lld
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+      - name: Select the Windows compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
+      - name: Download the SDK from the exact installed-consumer run
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          repository: gmh5225/test_mac_intel
+          run-id: 45373589385
+          name: ${{ matrix.pkg }}
+          path: ${{ runner.temp }}/mips-qualified-package
+          github-token: ${{ github.token }}
+      - name: Build the native ELF test owners against the hash-pinned SDK
+        run: |
+          args=()
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            args+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14')
+          fi
+          archive_url=$(python -c 'import os; from pathlib import Path; print((Path(os.environ["RUNNER_TEMP"])/"mips-qualified-package").as_uri())')
+          args+=("-DNEVERD_LLVM_PREBUILT_BASE_URL=$archive_url")
+          cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF "${args[@]}"
+          python scripts/build.py build-check --config Release --parallel 4 --target \
+            NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDMIPSPipelineTests \
+            NeverDLLVMTargetInitializationTests NeverDCodegenDiagnosticTests
+      - name: Run the registered MIPS, SDK, pipeline and codegen suites
+        run: |
+          mkdir -p evidence
+          ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error \
+            -L '^(NeverDMIPSObjectTests|NeverDMIPSSDKTests|NeverDMIPSPipelineTests|NeverDLLVMTargetInitializationTests|NeverDCodegenDiagnosticTests)$' \
+            --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/results.xml"
+          python - <<'PY'
+          import os, re, subprocess
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          cases = ET.parse('evidence/results.xml').findall('.//testcase')
+          assert cases and all(c.find('failure') is None and c.find('error') is None and c.find('skipped') is None for c in cases)
+          names = [t.get('name', '') for t in cases]
+          for name in ('FixedAddressEmissionKeepsEntryPointersAndFunctionRanges',
+                       'InvalidFunctionFeaturesReturnDiagnosticsToTheCaller',
+                       'FileInstallationRequiresAnArchitectureSpecificWriter',
+                       'LiftToObjectRetainsABIAndReportsTheEntryBody',
+                       'RegistersExactlyTheLinkedCodegenBackends',
+                       'AllocationErrorsCannotPublishAnIncompleteObject'):
+              assert any(name in n for n in names), name
+          assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == os.environ['REVISION']
+          cache = Path('build-check/CMakeCache.txt').read_text()
+          path = re.search(r'^LLVM_DIR:[^=]+=(.+)$', cache, re.M)
+          assert path, 'missing LLVM package path'
+          info = (Path(path[1].strip()).parents[2] / 'BUILDINFO.txt').read_text()
+          assert ('llvm_commit: ' + os.environ['LLVM_REVISION']) in info
+          Path('evidence/BUILDINFO.txt').write_text(info)
+          Path('evidence/neverd.txt').write_text(os.environ['REVISION'] + '\n')
+          print(len(names), 'registered cases on', os.environ['RUNNER_OS'])
+          PY
+      - name: Execute GNU originals and SDK objects in QEMU
+        if: runner.os == 'Linux'
+        run: |
+          qemu-mips --version
+          mips-linux-gnu-as --version
+          python unittests/lift/mips/native-object-roundtrip.py \
+            --sdk build-check/bin/libneverd.so --output evidence/mips-native-execution.json
+          python - <<'PYTHON'
+          import json
+          rows = json.load(open('evidence/mips-native-execution.json'))
+          assert len(rows) == len({(r['abi'], r['endian'], r['mode']) for r in rows}) == 32
+          assert all(r['original'] == 37 for r in rows)
+          assert sum(r.get('rebuilt') == 37 for r in rows) == 24
+          assert sum('authenticated execution context' in r.get('diagnostic', '') for r in rows) == 8
+          PYTHON
+      - name: Verify the published archives through the default release configuration
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/audit_prebuilt_llvm_release.py
+          published_cache=$(python -c 'import os; from pathlib import Path; print((Path(os.environ["RUNNER_TEMP"])/"mips-published-sdk").as_posix())')
+          cmake -S . -B build-check -DNEVERD_LLVM_PREBUILT_BASE_URL= \
+            "-DNEVERD_LLVM_PREBUILT_CACHE_DIR=$published_cache"
+          python - <<'PYTHON'
+          from pathlib import Path
+          import os, re
+          info = Path('evidence/BUILDINFO.txt').read_bytes()
+          cache = Path('build-check/CMakeCache.txt').read_text()
+          path = re.search(r'^LLVM_DIR:[^=]+=(.+)$', cache, re.M)
+          assert path
+          prefix = Path(path[1].strip()).parents[2]
+          assert (Path(os.environ['RUNNER_TEMP']) / 'mips-published-sdk').resolve() in prefix.resolve().parents
+          assert info.decode().splitlines() == (prefix / 'BUILDINFO.txt').read_text().splitlines()
+          PYTHON
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-elf-${{ runner.os }}
+          path: |
+            evidence/
+            build-check/Testing/Temporary/LastTest.log
+            build-check/neverd-build-receipt.json
