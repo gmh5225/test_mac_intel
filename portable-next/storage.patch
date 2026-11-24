@@ -55,7 +55,7 @@ index bd513f27..9aaa065c 100644
      # Use normal capstone name. Otherwise we get libcapstone_static.a
 diff --git a/MCInstStorage.c b/MCInstStorage.c
 new file mode 100644
-index 00000000..49e499f8
+index 00000000..f03bed8f
 --- /dev/null
 +++ b/MCInstStorage.c
 @@ -0,0 +1,18 @@
@@ -70,7 +70,7 @@ index 00000000..49e499f8
 +#if defined(__ELF__)
 +__attribute__((section(".cs_mcinst_storage_text")))
 +#elif defined(__APPLE__)
-+__attribute__((section("__TEXT,__cs_mcinst")))
++__attribute__((section("__TEXT,__cs_mcinst,regular,pure_instructions")))
 +#endif
 +CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
 +{

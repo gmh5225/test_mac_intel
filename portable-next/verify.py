@@ -48,12 +48,7 @@ try:
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
             baseline=rows['base'][linkage]['snapshots']
-            for key,x in result['snapshots'].items():
-                if name not in ('prefix','scalar') or not key.startswith('16/'):
-                    assert x==baseline[key],(name,linkage,profile,key,x,baseline[key])
-                if name=='scalar':
-                    assert x==rows['prefix'][linkage]['snapshots'][key],(linkage,profile,key,x)
-            assert set(result['snapshots'])==set(baseline)
+            assert result['snapshots']==baseline,(name,linkage,profile)
         assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
