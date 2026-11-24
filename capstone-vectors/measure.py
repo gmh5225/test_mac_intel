@@ -161,13 +161,13 @@ def main(w):
         earlier=['X86PublicOutput.c.o','X86BatchScan.c.o']
         orig='mixed_base' if mixed else 'base'
         if key==orig:base_orders[orig]=members
-        expected=base_orders[orig]+(['X86EvexPackedScan.c.o'] if kind=='bare' else [])
+        expected=base_orders[orig]+(['X86PublicEvexScan.c.o'] if kind=='bare' else [])
         active_tail=False
         assert members==expected,(key,members,expected)
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert {'X86EvexScan.c.o','X86EvexPackedScan.c.o'} == set(changed),(key,changed)
+            assert {'X86DisassemblerDecoder.c.o','X86PublicEvexScan.c.o'} == set(changed),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]

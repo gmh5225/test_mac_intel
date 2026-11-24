@@ -1,18 +1,18 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3dc297b9..48c8d991 100644
+index 3dc297b9..3a6987fe 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1064,6 +1064,15 @@ target_include_directories(capstone_build_settings INTERFACE
  )
  set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
  
-+# Keep the optional packed transfer fallback after the existing static readers.
++# Keep the public EVEX scan fallback after the existing static readers.
 +if(CAPSTONE_X86_SUPPORT)
-+    add_library(capstone_x86_evex_packed OBJECT arch/X86/X86EvexPackedScan.c)
-+    target_link_libraries(capstone_x86_evex_packed PRIVATE capstone_build_settings)
-+    set_target_properties(capstone_x86_evex_packed PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-+    set(capstone_evex_packed_object $<TARGET_OBJECTS:capstone_x86_evex_packed>)
-+    target_sources(capstone INTERFACE ${capstone_evex_packed_object})
++    add_library(capstone_x86_public_evex OBJECT arch/X86/X86PublicEvexScan.c)
++    target_link_libraries(capstone_x86_public_evex PRIVATE capstone_build_settings)
++    set_target_properties(capstone_x86_public_evex PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++    set(capstone_public_evex_object $<TARGET_OBJECTS:capstone_x86_public_evex>)
++    target_sources(capstone INTERFACE ${capstone_public_evex_object})
 +endif()
 +
  # The x86-only public iterator uses the fixed-mode readers in both library forms.
@@ -23,7 +23,7 @@ index 3dc297b9..48c8d991 100644
          list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
      endif()
 -    add_library(capstone_static STATIC ${capstone_static_objects})
-+    add_library(capstone_static STATIC ${capstone_static_objects} ${capstone_evex_packed_object})
++    add_library(capstone_static STATIC ${capstone_static_objects} ${capstone_public_evex_object})
      # Use normal capstone name. Otherwise we get libcapstone_static.a
      set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")
      if(MSVC AND CAPSTONE_BUILD_SHARED_LIBS)
@@ -32,19 +32,19 @@ index 3dc297b9..48c8d991 100644
  
  if(CAPSTONE_BUILD_SHARED_LIBS)
 -    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects})
-+    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects} ${capstone_evex_packed_object})
++    add_library(capstone_shared SHARED $<TARGET_OBJECTS:capstone> ${capstone_x86_objects} ${capstone_public_evex_object})
      # Use normal capstone name. Otherwise we get libcapstone_shared.so
      set_target_properties(capstone_shared PROPERTIES OUTPUT_NAME "capstone")
      set_target_properties(capstone_shared PROPERTIES
 diff --git a/Makefile b/Makefile
-index 0fe49035..7771bc5f 100644
+index 0fe49035..780cf351 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -289,6 +289,7 @@ endif
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
-+	LIBOBJ_X86_PACKED_SCAN = $(OBJDIR)/arch/X86/X86EvexPackedScan.o
++	LIBOBJ_X86_PUBLIC_EVEX_SCAN = $(OBJDIR)/arch/X86/X86PublicEvexScan.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
  	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
  ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
@@ -54,93 +54,139 @@ index 0fe49035..7771bc5f 100644
  LIBOBJ += $(LIBOBJ_X86_NUMBERS)
 -LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
 -LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
-+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(LIBOBJ_X86_PACKED_SCAN)
-+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(LIBOBJ_X86_PACKED_SCAN)
++LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(LIBOBJ_X86_PUBLIC_EVEX_SCAN)
++LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(LIBOBJ_X86_PUBLIC_EVEX_SCAN)
  ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
  LIBOBJ_SHARED := $(LIBOBJ)
  endif
-diff --git a/arch/X86/X86EvexPackedScan.c b/arch/X86/X86EvexPackedScan.c
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..87ceaf00 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3355,8 +3355,13 @@ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static CS_PRESERVE_MOST bool
+-decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
++#ifdef X86_EVEX_REGISTER_SCAN
++CAPSTONE_INTERNAL
++#else
++static
++#endif
++CS_PRESERVE_MOST bool
++X86_decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			 cs_insn *insn, X86ScanResult *result, uint8_t opcode,
+ 			 bool tryExtension)
+ {
+@@ -3431,7 +3436,7 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ 					       &instructionID, &result->length,
+ 					       true, false, false);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+-		return decodeScanResultFallback(ud, code, code_len, insn,
++		return X86_decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, 0, false);
+ 	return completeTerminalScanResult(result, instructionID, status);
+ }
+@@ -3509,7 +3514,7 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+ {
+ 	int status = tryVexTerminalScan(code, code_len, prefix, result);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+-		return decodeScanResultFallback(ud, code, code_len, insn,
++		return X86_decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, prefix, false);
+ 	return status == X86_SCAN_COMPLETE;
+ }
+@@ -3684,9 +3689,15 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	bool extension = X86_mayDecodeFeatureExtensionImpl(
+ 		code, code_len, (handle->mode & CS_MODE_64) != 0, &opcode,
+ 		&opcodeOffset);
+-	if (extension || opcode == 0x62)
+-		return decodeScanResultFallback(ud, code, code_len, insn,
+-						result, opcode, extension);
++	if (extension || opcode == 0x62) {
++#ifdef X86_EVEX_REGISTER_SCAN
++		if (readerFlags)
++			return X86_decodePublicScanExtension(
++				ud, code, code_len, insn, result, opcode, extension);
++#endif
++		return X86_decodeScanResultFallback(ud, code, code_len, insn,
++						    result, opcode, extension);
++	}
+ 	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
+ 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+ 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+@@ -3721,7 +3732,7 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+ 		return decodeVexTerminalResult(ud, code, code_len, insn, result,
+ 					       opcode);
+-	return decodeScanResultFallback(ud, code, code_len, insn, result,
++	return X86_decodeScanResultFallback(ud, code, code_len, insn, result,
+ 					opcode, false);
+ }
+ 
+diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
+index 15ac5a2d..0e440c06 100644
+--- a/arch/X86/X86FeatureExtension.h
++++ b/arch/X86/X86FeatureExtension.h
+@@ -319,6 +319,15 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #define X86_EVEX_REGISTER_SCAN
++struct X86ScanResult;
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodePublicScanExtension(csh ud, const uint8_t *code, size_t code_len,
++			      cs_insn *insn, struct X86ScanResult *result,
++			      uint8_t opcode, bool tryExtension);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
++			     cs_insn *insn, struct X86ScanResult *result,
++			     uint8_t opcode, bool tryExtension);
+ CAPSTONE_INTERNAL x86_feature_decode_result
+ X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+ 			       MCInst *instr, uint16_t *size, uint8_t opcode);
+diff --git a/arch/X86/X86PublicEvexScan.c b/arch/X86/X86PublicEvexScan.c
 new file mode 100644
-index 00000000..15e3120a
+index 00000000..1c8f177f
 --- /dev/null
-+++ b/arch/X86/X86EvexPackedScan.c
-@@ -0,0 +1,22 @@
++++ b/arch/X86/X86PublicEvexScan.c
+@@ -0,0 +1,39 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#ifdef CAPSTONE_HAS_X86
 +#include "X86FeatureExtension.h"
 +#ifdef X86_EVEX_REGISTER_SCAN
++#include "X86Disassembler.h"
 +#define X86_EVEX_BATCH_PACKED
-+#define X86_EVEX_ONLY_PACKED
-+#define X86_EVEX_SCAN_RODATA ".cs_x86_evex_packed_rodata"
-+#define X86_EVEX_TRANSFER_RODATA ".cs_x86_evex_packed_rodata"
++#define X86_EVEX_SCAN_RODATA ".cs_x86_public_evex_rodata"
++#define X86_EVEX_TRANSFER_RODATA X86_EVEX_SCAN_RODATA
 +#include "X86EvexScanPlan.h"
 +
-+/* The ordinary reader selects these transfer opcodes from its existing
-+ * opcode table. Invalid encodings retain its feature and decoder fallback. */
-+__attribute__((section(".cs_x86_evex_packed_text")))
-+bool X86_readPackedEvexPlan(const uint8_t *code, size_t code_len,
-+			    unsigned *id, unsigned *length)
++/* The generic iterator reaches this after its initial terminal lookup. The
++ * native batch reader already consumes these plans at its own primary entry. */
++__attribute__((section(".cs_x86_public_evex_text")))
++CS_PRESERVE_MOST bool
++X86_decodePublicScanExtension(csh ud, const uint8_t *code, size_t code_len,
++			      cs_insn *insn, X86ScanResult *result,
++			      uint8_t opcode, bool tryExtension)
 +{
-+	return X86_readEvexScanPlan(code, code_len, id, length);
++	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
++	unsigned id, length;
++	if (tryExtension && opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
++	    handle->mode == CS_MODE_64 &&
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++	    !handle->x86_scan_adapter &&
++#endif
++	    X86_readEvexScanPlan(code, code_len, &id, &length)) {
++		result->opcode = 0;
++		result->opcode_pub = id;
++		result->length = (uint16_t)length;
++		result->popcode_adjust = 0;
++		return true;
++	}
++	return X86_decodeScanResultFallback(ud, code, code_len, insn, result,
++					    opcode, tryExtension);
 +}
 +#endif
 +#endif
-diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
-index 7b8535ac..1d1227a4 100644
---- a/arch/X86/X86EvexScan.c
-+++ b/arch/X86/X86EvexScan.c
-@@ -4,6 +4,8 @@
- #ifdef CAPSTONE_HAS_X86
- #include "X86FeatureExtension.h"
- #ifdef X86_EVEX_REGISTER_SCAN
-+#define X86_EVEX_BATCH_PACKED
-+#define X86_EVEX_OUTLINED_PACKED
- #include "X86EvexScanPlan.h"
- 
- /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
-diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
-index a60fc089..91f0d48f 100644
---- a/arch/X86/X86EvexScanPlan.h
-+++ b/arch/X86/X86EvexScanPlan.h
-@@ -33,6 +33,10 @@ static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
- 		return false;
- 	const unsigned map = code[1] & 15;
- 	const unsigned index = evex_scan_index[code[4]];
-+#ifdef X86_EVEX_ONLY_PACKED
-+	if (index < EVEX_SCAN_PACKED)
-+		return false;
-+#endif
- 	unsigned id, length;
- 	if (index & 128) {
- 		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
-@@ -45,9 +49,14 @@ static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
- 
- #ifdef X86_EVEX_BATCH_PACKED
- 		} else if (index >= EVEX_SCAN_PACKED) {
-+#ifdef X86_EVEX_OUTLINED_PACKED
-+			return X86_readPackedEvexPlan(code, code_len, instruction_id,
-+						      instruction_length);
-+#else
- 			if (map != 1 || pp > 1)
- 				return false;
- 			kind = 4 + (index - EVEX_SCAN_PACKED) * 2 + pp;
-+#endif
- #endif
- 		} else {
- 			if (map != 2 || pp != 1 || code[5] >= 0xc0)
-diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 15ac5a2d..ea22ef1d 100644
---- a/arch/X86/X86FeatureExtension.h
-+++ b/arch/X86/X86FeatureExtension.h
-@@ -319,6 +319,9 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #define X86_EVEX_REGISTER_SCAN
-+CAPSTONE_INTERNAL bool X86_readPackedEvexPlan(const uint8_t *code,
-+					      size_t code_len, unsigned *id,
-+					      unsigned *length);
- CAPSTONE_INTERNAL x86_feature_decode_result
- X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
- 			       MCInst *instr, uint16_t *size, uint8_t opcode);
