@@ -1,7 +1,7 @@
-name: Measure constant-width relative branch output against Capstone and iced on four hosts
+name: Verify real i386 group dispatch against iced on macOS Intel and Arm and Linux
 on:
   push:
-    branches: [codex/branch-displacement-byte-copy]
+    branches: [codex/group1-canonical-pe32-four-hosts]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4e0ff7ecf35083a51d414bc736be6ab9132c4cf7
+          ref: f96ca7d5ae203fda295d143fa89583685fe28861
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: relative-branch-encoding-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: group1-four-hosts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

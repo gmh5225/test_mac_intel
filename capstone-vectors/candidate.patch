@@ -1,32 +1,135 @@
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..3858a677 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -196,13 +196,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		const uint8_t *bytes = code + row->imm_offset;
- 		int64_t delta;
- 		if (row->imm_size == 1) {
-+			insn->bytes[1] = bytes[0];
- 			delta = (int8_t)bytes[0];
- 		} else {
--			uint32_t raw = (uint32_t)bytes[0] |
--				       ((uint32_t)bytes[1] << 8) |
--				       ((uint32_t)bytes[2] << 16) |
--				       ((uint32_t)bytes[3] << 24);
--			delta = (int32_t)raw;
-+			/* The two-byte opcode and the one-byte opcode share
-+			 * this copy. For the latter, byte 1 is the displacement. */
-+			insn->bytes[1] = code[1];
-+			memcpy(insn->bytes + row->imm_offset, bytes, 4);
-+			delta = X86_readDisp32(bytes);
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..fb4079bf 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -68,14 +68,19 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++		if (size >= 2 && code[1] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const unsigned group = code[1] & 0x38;
+ 			const unsigned row =
+-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+-				2;
+-			if (writeCompare32(code, size, insn, insn_size,
+-					   &x86_simple_outputs[row],
+-					   x86_simple_registers))
++				x86_simple_plans[0][0][group | (opcode & 1)] >> 2;
++			if (group == 0x38) {
++				if (writeCompare32(code, size, insn, insn_size,
++						   &x86_simple_outputs[row],
++						   x86_simple_registers))
++					return true;
++			} else if (X86_writeAluImmediate32(
++					   code, size, insn, insn_size,
++					   &x86_simple_outputs[row], x86_simple_registers))
+ 				return true;
  		}
- 		const uint16_t length = row->imm_offset + row->imm_size;
- 		target = X86_relativeBranchTarget(handle->mode, insn->address,
-@@ -226,7 +227,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			memcpy(insn->op_str + 2, p, (size_t)(end - p));
+ 		break;
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 11582041..6ac0d7ca 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -6,7 +6,11 @@
+ /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
+ #ifdef X86_MEMORY_IMMEDIATE
+ #include "X86UnsignedImmediate.h"
++#ifdef X86_ALU32_IMMEDIATE
++CAPSTONE_INTERNAL bool X86_MEMORY_IMMEDIATE(
++#else
+ static bool X86_MEMORY_IMMEDIATE(
++#endif
+ #elif defined(X86_SEGMENT_LEA32)
+ static bool X86_SEGMENT_LEA32(
+ #elif defined(X86_EXTEND64_MEMORY)
+@@ -45,7 +49,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-#ifdef X86_COMPARE_IMMEDIATE
++#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
+ 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
+ #else
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
+@@ -187,12 +191,18 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-#ifdef X86_COMPARE_IMMEDIATE
+-	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
++#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
++	/* Opcode 83 sign-extends its imm8. Logical operations print it as a
++	 * mask of the destination width. */
+ 	int64_t value = encoded;
+-	if (opcode == 0x83)
++	if (opcode == 0x83) {
+ 		value = (int8_t)encoded;
+-	else if (imm_size == 4 && row->ops[0].size == 8)
++#ifdef X86_ALU32_IMMEDIATE
++		const unsigned operation = (modrm >> 3) & 7;
++		if (operation == 1 || operation == 4 || operation == 6)
++			value = (uint32_t)value;
++#endif
++	} else if (imm_size == 4 && row->ops[0].size == 8)
+ 		value = (int32_t)encoded;
+ 	memcpy(out, ", ", 2);
+ 	out += 2;
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index ee9b645b..7d9db022 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -36,5 +36,15 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 	}
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
++
++#define X86_MEMORY32_OUTPUT
++#define X86_MEMORY_IMMEDIATE X86_writeAluImmediate32
++#define X86_IMMEDIATE_WIDE 0
++#define X86_ALU32_IMMEDIATE
++#include "X86MemoryOutputImpl.h"
++#undef X86_ALU32_IMMEDIATE
++#undef X86_IMMEDIATE_WIDE
++#undef X86_MEMORY_IMMEDIATE
++#undef X86_MEMORY32_OUTPUT
  #endif
+ #endif
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..2d757368 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -60,6 +60,11 @@ enum X86SimpleForm {
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
++CAPSTONE_INTERNAL bool
++X86_writeAluImmediate32(const uint8_t *code, size_t size, cs_insn *insn,
++		      uint16_t *insn_size, const struct X86SimpleOutput *row,
++		      const struct X86SimpleRegister regs[4][16]);
++
+ CAPSTONE_INTERNAL bool
+ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 0c9329b4..7e3e8b69 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1021,6 +1021,16 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
+ 				    !compare(handles, b + !p,
+ 					     (mr + j) % (sizeof(b) - !p), v))
+ 					return false;
++				/* Exercise the memory forms with an imm8 and with
++				 * an imm8 sign-extended to the operand width. */
++				if (mode == CS_MODE_32 && mr < 0xc0) {
++					b[1] = 0x80;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++					b[1] = 0x83;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++				}
+ 			}
  		}
--		memcpy(insn->bytes, code, length);
- 		*insn_size = insn->size = length;
- 	} else {
- 		const unsigned width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
+ 	}
