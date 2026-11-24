@@ -1,7 +1,7 @@
-name: Test projected RISC-V scan IDs in release and DIET builds
+name: Measure complete RISC-V scan and print paths including DIET
 on:
   push:
-    branches: [codex/checked-riscv-projected-ids]
+    branches: [codex/riscv-validated-readers-alias]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: checked-riscv-projection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: riscv-validated-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

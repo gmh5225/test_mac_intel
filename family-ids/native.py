@@ -13,7 +13,10 @@ def run(name,args):
     with (out/(name+'.log')).open('w') as log:q=sp.run(args,stdout=log,stderr=sp.STDOUT)
     if q.returncode: print((out/(name+'.log')).read_text(errors='replace')[-1800:]);q.check_returncode()
 def measure(t):
-    assert git('rev-parse','HEAD')==meta['parent']
+    anchor=rd(r/'anchor.json')
+    assert git('rev-parse','HEAD')==anchor['parent'] and meta['parent']==anchor['commit']
+    assert sha(r/'anchor.patch')==anchor['sha256']
+    git('apply','--index',str(r/'anchor.patch'));assert git('write-tree')==anchor['tree']
     manifest=rd(r/'manifest.json')['inputs']; inputs={}
     def load_input(key,info,binary):
         pkg=t/(info['package_sha256']+'.deb')
@@ -41,7 +44,7 @@ def measure(t):
     for profile,arch,extra in [('full',arches,[]),('diet',['RISCV'],['-DCAPSTONE_BUILD_DIET=ON']),('neverd',['ARM','AARCH64','MIPS','X86'],[])]:
         b=t/profile;variants={}
         for k in ('base','candidate'):
-            git('restore','--source','HEAD','--worktree','--staged','--','.')
+            git('restore','--source',anchor['tree'],'--worktree','--staged','--','.')
             if k!='base':
                 patch=r/'candidate.patch';assert sha(patch)==meta['sha256'];git('apply','--index',str(patch));assert git('write-tree')==meta['tree']
             run(profile+k+'-config',config(b,arch,extra))
@@ -51,6 +54,9 @@ def measure(t):
             if profile=='full':run(profile+k+'-test',['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_riscv_'])
             files={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o') if '/tests/' not in str(f)}
             so,=[v for v in b.glob('libcapstone.so.*')if not v.is_symlink()]
+            syms=sp.check_output(['nm','-nS','--defined-only',so],text=True).splitlines()
+            important=('getScanInstruction','RISCV_LLVM_getInstruction','RISCV_get_insn_id','RISCV_printInst','matchAliasPatterns','RISCVScanOpcodes')
+            save(profile+'-'+k+'-symbols',[line for line in syms if any(term in line for term in important)])
             variants[k]=dict(so=sha(so),archive=sha(b/'libcapstone.a'),objects=files)
             if profile=='diet':shutil.copy2(so,t/('diet-'+k+'.so'))
             if profile=='full':libs[k]=t/(k+'.so');shutil.copy2(so,libs[k])
@@ -60,7 +66,7 @@ def measure(t):
         else:
             assert set(after['objects'])==set(before['objects'])
             changes=[Path(n).name for n,h in before['objects'].items() if after['objects'][n]!=h]
-            assert changes==['RISCVDisassembler.c.o'],changes
+            assert sorted(changes)==(['MCInstPrinter.c.o','RISCVDisassembler.c.o'] if profile=='full' else ['RISCVDisassembler.c.o']),changes
         info[profile]=variants;shutil.rmtree(b)
     save('profiles',info)
     proof=list(map(int,sp.check_output([t/'guard',libs['base'],libs['candidate']]).split()))
@@ -71,39 +77,42 @@ def measure(t):
         randomized[tag]=counts
     save('scan-guard',randomized)
     lib=t/'libcapstone.so.6';(t/'libcapstone.so').symlink_to(lib.name)
-    images={k:f.read_bytes() for k,f in libs.items()};length=max(map(len,images.values()));images={k:v+bytes(length-len(v))for k,v in images.items()};images['copy']=images['base'];lib.write_bytes(images['base'])
+    lib.write_bytes(libs['base'].read_bytes())
     for f in ('time','raw'):run(f,['c++','-O3','-std=c++17','-I',source/'include',r/(f+'.cpp'),'-L',t,'-Wl,-rpath,'+str(t),'-lcapstone','-o',t/f])
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     run('fixed',['setarch',platform.machine(),'-R','true'])
-    inode=lib.stat().st_ino
-    offsets=[i for i in range(0,length,4096)if images['base'][i:i+4096]!=images['candidate'][i:i+4096]]
-    verified={}
-    def select(k):
-        with lib.open('r+b',buffering=0) as f:
-            for pos in offsets:
-                f.seek(pos);part=images[k][pos:pos+4096];assert f.write(part)==len(part)
-        assert lib.stat().st_ino==inode and lib.stat().st_size==length
-        if k not in verified:
-            assert sha(lib)==hashlib.sha256(images[k]).hexdigest();verified[k]=sha(lib)
-    signatures={}
-    for name,bits in cases.items():
-        f=t/(name+'.text')
-        for opt in range(5):
-            data=[]
-            for k in libs:
-                select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
-            assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
-    save('raw',signatures);rows={};rng=random.Random('RISCV-projected-scan-'+flavor)
-    for name,bits in ({} if mixed else cases).items():
-        def sample(k,mode,reps):
-            select(k);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(bits),str(mode),t/(name+'.text'),'1048576',str(reps)]).split()))
-        for mode in (0,1,2):
-            v=sample('base',mode,1);reps=max(1,ceil(40e6/max(1,v[0])));cycles=[];keys=list(images)
-            for _ in range(17):
-                rng.shuffle(keys);obs=[(k,sample(k,mode,reps))for k in keys+keys[::-1]];assert len(set(y[2]for _,y in obs))==1
-                cycles.append({k:[sum(a[i]for n,a in obs if n==k)for i in (0,1)]for k in keys})
-            rows[name+'/'+str(mode)]=dict(cycles=cycles,reps=reps,checksum=obs[0][1][2]);save('timings',rows)
-    save('fixed-image',dict(verified=verified,bytes=length,blocks=len(offsets),inode=inode))
+    for profile,paths in [('full',libs),('diet',{k:t/('diet-'+k+'.so') for k in libs})]:
+        if profile=='diet' and mixed:continue
+        images={k:f.read_bytes() for k,f in paths.items()};length=max(map(len,images.values()));images={k:v+bytes(length-len(v))for k,v in images.items()};images['copy']=images['base'];lib.write_bytes(images['base'])
+        inode=lib.stat().st_ino
+        offsets=[i for i in range(0,length,4096)if images['base'][i:i+4096]!=images['candidate'][i:i+4096]]
+        verified={}
+        def select(k):
+            with lib.open('r+b',buffering=0) as f:
+                for pos in offsets:
+                    f.seek(pos);part=images[k][pos:pos+4096];assert f.write(part)==len(part)
+            assert lib.stat().st_ino==inode and lib.stat().st_size==length
+            if k not in verified:
+                assert sha(lib)==hashlib.sha256(images[k]).hexdigest();verified[k]=sha(lib)
+        signatures={}
+        for name,bits in (cases if profile=='full' else {}).items():
+            f=t/(name+'.text')
+            for opt in range(5):
+                data=[]
+                for k in libs:
+                    select(k);data.append(sp.check_output([t/'raw',str(bits),f,str(opt)],text=True).strip())
+                assert len(set(data))==1;signatures[name+'/'+str(opt)]=data[0]
+        save('raw' if profile=='full' else 'diet-raw',signatures);rows={};rng=random.Random('RISCV-scan-and-alias-'+flavor)
+        for name,bits in ({} if mixed else cases).items():
+            def sample(k,mode,reps):
+                select(k);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time',str(bits),str(mode),t/(name+'.text'),'1048576',str(reps)]).split()))
+            for mode in ((0,1,2) if profile=='full' else (0,)):
+                v=sample('base',mode,1);reps=max(1,ceil(40e6/max(1,v[0])));cycles=[];keys=list(images)
+                for _ in range(17):
+                    rng.shuffle(keys);obs=[(k,sample(k,mode,reps))for k in keys+keys[::-1]];assert len(set(y[2]for _,y in obs))==1
+                    cycles.append({k:[sum(a[i]for n,a in obs if n==k)for i in (0,1)]for k in keys})
+                rows[name+'/'+str(mode)]=dict(cycles=cycles,reps=reps,checksum=obs[0][1][2]);save('timings' if profile=='full' else 'diet-timings',rows)
+        save('fixed-image' if profile=='full' else 'diet-fixed-image',dict(verified=verified,bytes=length,blocks=len(offsets),inode=inode))
     save('complete',dict(source=meta,mixed=mixed,cases=cases,cc=cc,clock=platform.platform(),cpu=sp.check_output(['lscpu'],text=True),fixed_inode=lib.stat().st_ino))
 t=Path(tempfile.mkdtemp())
 try:measure(t)
