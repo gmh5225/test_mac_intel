@@ -1,7 +1,7 @@
-name: Measure byte-sized scalar immediates on real PE and ELF workloads
+name: Measure small scalar operands on two Linux architectures
 on:
   push:
-    branches: [codex/scalar-byte-numbers-real]
+    branches: [codex/scalar-byte-linux-retest]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:

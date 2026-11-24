@@ -20,12 +20,12 @@ def instruction_digest(path):
     sections=[]
     def add(name,start,size):
         sections.append([name.decode(),size,hashlib.sha256(b[start:start+size]).hexdigest()])
-    if b.startswith(b'\\x7fELF'):
-        assert b[4:6]==b'\\x02\\x01'
+    if b.startswith(bytes.fromhex('7f454c46')):
+        assert b[4:6]==bytes((2,1))
         base,=u('Q',40);stride,n,strings=u('HHH',58);headers=[u('IIQQQQIIQQ',base+i*stride)for i in range(n)]
         strings=headers[strings];names=b[strings[4]:strings[4]+strings[5]]
         for name,ty,flags,_,offset,size,*_ in headers:
-            if flags&4:add(names[name:].split(b'\\0',1)[0],offset,size)
+            if flags&4:add(names[name:].split(bytes(1),1)[0],offset,size)
     else:
         assert u('I',0)==(0xfeedfacf,)
         count,=u('I',16);p=32
@@ -35,7 +35,7 @@ def instruction_digest(path):
                 n,=u('I',p+64)
                 for i in range(n):
                     name,seg,_,length,offset,_,_,_,flags,*_=u('16s16sQQIIIIIIII',p+72+i*80)
-                    if flags&0x80000400:add(seg.rstrip(b'\\0')+b','+name.rstrip(b'\\0'),offset,length)
+                    if flags&0x80000400:add(seg.rstrip(bytes(1))+b','+name.rstrip(bytes(1)),offset,length)
             p+=size
     return hashlib.sha256(json.dumps(sections).encode()).hexdigest()
 layouts={}
