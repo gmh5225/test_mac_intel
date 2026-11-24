@@ -190,7 +190,7 @@ int main(int argc,char **argv) {
   if(!table.eof() || spans.empty()) return 3;
   unsigned bits=std::stoul(argv[6]);
   csh handle=0;
-  if(cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,&handle)!=CS_ERR_OK ||
+  if(cs_open(CS_ARCH_X86,bits==16 ? CS_MODE_16 : bits==32 ? CS_MODE_32 : CS_MODE_64,&handle)!=CS_ERR_OK ||
      cs_option(handle,CS_OPT_DETAIL,mode>=2 ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK ||
      cs_option(handle,CS_OPT_TEXT,mode ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK) return 4;
   cs_insn *insn=cs_malloc(handle);

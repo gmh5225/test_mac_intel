@@ -80,6 +80,14 @@ try:
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']!=images['candidate']['exe']
+    probe_bytes=w/'probe.bin';probe_bytes.write_bytes(bytes.fromhex('66 b8 78 56 34 12'))
+    probe_span=w/'probe.tsv';probe_span.write_text('0 6 1048576'+chr(10));mode_counts={}
+    for label in ('base','candidate'):
+        for engine in ('iced','capstone'):
+            counts=[list(map(int,get(w/label,engine,'0','1',probe_bytes,probe_span,str(bits)).split()))[2:4]for bits in (16,32,64)]
+            assert counts==[[1,0],[2,0],[2,0]],(counts,label,engine)
+            mode_counts[label+'/'+engine]=counts
+    save('mode-probe',mode_counts)
     audit={};results={}
     for name,bits in [('scalar16',16),('sqlite64',64),('putty32',32)]:
         f=w/name;size=f.stat().st_size;spans=w/(name+'.tsv');spans.write_text(f'0 {size} 1048576\n')
