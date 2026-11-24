@@ -12,7 +12,8 @@ QEMU_PLUGIN_EXPORT int qemu_plugin_version = QEMU_PLUGIN_VERSION;
 static struct qemu_plugin_register *x0, *x1;
 static GByteArray *scratch;
 static gboolean published;
-static uint64_t entry_image, entry_object, entry_path;
+static uint64_t entry_image, entry_object, entry_path, entry_init;
+static uint32_t entry_size;
 
 static void registers(qemu_plugin_id_t id, unsigned int cpu) {
     (void)id;
@@ -50,7 +51,8 @@ static void observe(unsigned int cpu, void *data) {
     uint64_t pc = (uintptr_t)data, object, string, owner, buffer;
     gboolean is_entry = (pc & 4095) == (ENTRY_RVA & 4095);
     uint64_t base = pc - (is_entry ? ENTRY_RVA : BODY_RVA);
-    uint32_t image_size, timestamp, actual_entry;
+    uint32_t image_size, timestamp, actual_entry, loaded_size;
+    uint64_t init;
     uint16_t type, length, maximum, machine;
     unsigned char prefix[sizeof(entry_bytes)];
     if (cpu || published || !read_field(pc, prefix, sizeof(prefix)) ||
@@ -64,6 +66,8 @@ static void observe(unsigned int cpu, void *data) {
         !(string >> 63) || object == string || (object & 7) || (string & 7) ||
         !read_field(object, &type, 2) || type != DRIVER_TYPE ||
         !read_field(object + DRIVER_START_OFFSET, &owner, 8) || owner != base ||
+        !read_field(object + DRIVER_SIZE_OFFSET, &loaded_size, sizeof(loaded_size)) ||
+        !read_field(object + DRIVER_INIT_OFFSET, &init, sizeof(init)) ||
         !read_field(string, &length, 2) || !read_field(string+2, &maximum, 2) ||
         !length || length > maximum || (length & 1) || length > 512 ||
         !read_field(string + UNICODE_BUFFER_OFFSET, &buffer, 8) || !(buffer >> 63))
@@ -85,15 +89,23 @@ static void observe(unsigned int cpu, void *data) {
         entry_image = base;
         entry_object = object;
         entry_path = string;
+        entry_size = loaded_size;
+        entry_init = init;
     }
     if (matched && !is_entry && entry_image == base &&
-        entry_object == object && entry_path == string) {
+        entry_object == object && entry_path == string &&
+        entry_init == init && entry_size == loaded_size) {
         gchar *escaped = g_strescape(name, NULL);
+        const char *init_location = init == base + ENTRY_RVA ? "pe_entry" :
+                                    init == 0 ? "null" :
+                                    init >= base && init - base < image_size ? "within_image" : "outside_image";
         char *report = g_strdup_printf("{\"guest\":\"Microsoft Windows PE ARM64\","
             "\"driver\":\"null.sys\",\"event\":\"PE entry and PDB-identified DriverEntry before their first instructions\","
             "\"entry_rva\":%u,\"driver_object_type\":%u,\"x0_driver_start_matches_image\":true,"
             "\"x1_counted_registry_path\":\"%s\",\"registry_length_bytes\":%u,"
-            "\"both_arguments_distinct_and_aligned\":true,\"x0_x1_forwarded_unchanged\":true,\"body_rva\":%u}\n", ENTRY_RVA, type, escaped, length, BODY_RVA);
+            "\"driver_size\":%u,\"driver_init_location\":\"%s\",\"registry_maximum_bytes\":%u,"
+            "\"both_arguments_distinct_and_aligned\":true,\"x0_x1_forwarded_unchanged\":true,\"body_rva\":%u}\n",
+            ENTRY_RVA, type, escaped, length, loaded_size, init_location, maximum, BODY_RVA);
         if (g_file_set_contents("observed.json", report, -1, &error))
             published = TRUE;
         else {

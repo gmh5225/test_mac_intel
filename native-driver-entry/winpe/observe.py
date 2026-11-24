@@ -90,6 +90,10 @@ assert proof['entry_rva'] == int(fixture['entry_rva'],16)
 assert proof['body_rva'] == int(fixture['driver_entry_rva'],16) and proof['x0_x1_forwarded_unchanged']
 assert proof['x0_driver_start_matches_image'] and proof['both_arguments_distinct_and_aligned']
 assert proof['x1_counted_registry_path'].lower().endswith('\\services\\null')
+assert proof['driver_size'] == fixture['size_of_image']
+assert proof['registry_length_bytes'] == len(proof['x1_counted_registry_path'].encode('utf-16-le'))
+assert proof['registry_length_bytes'] <= proof['registry_maximum_bytes']
+assert proof['driver_init_location'] in ('pe_entry', 'within_image', 'outside_image', 'null')
 result={"host_architecture":platform.machine(),"execution":"unmodified Windows ARM64 kernel in a QEMU TCG guest",
         "emulator":version,"seconds_to_original_entry":time.monotonic()-begin,"fixture":fixture,"observed":proof}
 (work/"kernel-entry.json").write_text(json.dumps(result,indent=2)+"\n")
