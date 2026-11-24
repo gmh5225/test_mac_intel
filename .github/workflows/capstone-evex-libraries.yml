@@ -1,7 +1,7 @@
-name: Measure packed FMA output without changing the 32-bit or immediate reader
+name: Qualify mixed operand initialization and verify Mach-O code sections and identical ELF archives
 on:
   push:
-    branches: [codex/late-packed-fma-on-x64]
+    branches: [codex/mixed-operand-storage-object-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 9f35a102e0ae78ff20e0f0e0b443d275f975abf7
+          ref: f96ca7d5ae203fda295d143fa89583685fe28861
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-packed-fma64-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mixed-storage-final-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

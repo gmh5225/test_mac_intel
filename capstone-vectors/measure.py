@@ -59,7 +59,24 @@ try:
         args=(['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm'])
         run('clang',*args,'-o',w/(label+'.library'))
         if label=='candidate':
-            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert affected==['X86VectorFallback64.c.o'],affected
+            affected=sorted(k for k,h in objects[label].items() if h!=objects['base'].get(k))
+            assert set(objects[label])-set(objects['base'])=={'MCInstStorage.c.o'} and 'cs.c.o' in affected
+            member,=build.rglob('MCInstStorage.c.o')
+            if sys.platform=='darwin':
+                cmd=get('otool','-l',member)
+                lines=cmd.split('sectname __cs_mcinst',1)[1].split('Section',1)[0].splitlines()
+                flags=int(next(line.strip().split()[1] for line in lines if line.strip().startswith('flags ')),16)
+                assert flags&0x80000000,flags
+                save('storage-identity',dict(flags=flags,pure_instructions=True,sha256=sha(member)))
+            else:
+                src=base/'MCInstStorage.c';correct=src.read_bytes();old=(r/'original-storage.c').read_bytes()
+                assert correct.replace(b'__TEXT,__cs_mcinst,regular,pure_instructions', b'__TEXT,__cs_mcinst')==old
+                archive_hash=sha(lib);member_hash=sha(member)
+                for source in (old,correct):
+                    src.write_bytes(source)
+                    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+                    assert sha(lib)==archive_hash and sha(member)==member_hash
+                save('storage-identity',dict(original_elf_archive=archive_hash,candidate_elf_archive=sha(lib),member=member_hash))
             save('affected',dict(count=len(objects[label]),changed=affected))
     shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')
