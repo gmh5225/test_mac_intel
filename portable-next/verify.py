@@ -48,7 +48,7 @@ try:
         shutil.copyfile(mixed_sources/cm,product/cm)
         code=(mixed_sources/'CMakeLists.txt').read_text()
         opts=code[code.index('# --- Capstone (our fork'):code.index('# --- NeverD CMake helpers')]
-        (product/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\\nproject(Mixed LANGUAGES C CXX)\\n'+opts+'\\nadd_executable(consumer reader.cpp)\\ntarget_link_libraries(consumer PRIVATE capstone_static)\\n')
+        (product/'CMakeLists.txt').write_text(chr(10).join(('cmake_minimum_required(VERSION 3.22)','project(Mixed LANGUAGES C CXX)',opts,'add_executable(consumer reader.cpp)','target_link_libraries(consumer PRIVATE capstone_static)','')))
         shutil.copyfile(d/'riscv_options.cpp',product/'reader.cpp')
     variants={};mixed={}
     for stage in ('base','candidate'):
