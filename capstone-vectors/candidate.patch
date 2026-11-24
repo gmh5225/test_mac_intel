@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..8bf1094d 100644
+index 0d9b1a76..4a9d134e 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -1230,6 +1230,9 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
@@ -25,26 +25,27 @@ index 0d9b1a76..8bf1094d 100644
  		if (insn->hasAdSize)
  			attrMask |= ATTR_ADSIZE;
  		if (insn->opcodeType == ONEBYTE) {
-@@ -1602,6 +1611,19 @@ X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
- {
- 	switch (insn->mode) {
- 	case MODE_16BIT:
-+		if (insn->opcodeType == ONEBYTE && !insn->repeatPrefix &&
-+		    insn->vectorExtensionType == TYPE_NO_VEX_XOP) {
-+			const uint8_t context = oneByteContext16(insn->opcode);
-+			if (context) {
-+				uint16_t attr = insn->hasAdSize ? ATTR_ADSIZE : ATTR_NONE;
-+				if (context == 2 && !insn->hasOpSize)
-+					attr |= ATTR_OPSIZE;
-+				if (getIDWithAttrMask(&insn->instructionID, insn, attr))
-+					return -1;
-+				insn->spec = specifierForUID(insn->instructionID);
-+				return 0;
-+			}
-+		}
- 		return getIDForMode(insn, mode, MODE_16BIT);
- 	case MODE_32BIT:
- 		return getIDForMode(insn, mode, MODE_32BIT);
+@@ -1501,11 +1510,19 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 
+ 		return 0;
+ 	}
++	/* A proved one-byte context needs only the primary table read. */
++	uint8_t context16 = 0;
++	if (decoderMode == MODE_16BIT && insn->opcodeType == ONEBYTE &&
++	    !insn->repeatPrefix && insn->vectorExtensionType == TYPE_NO_VEX_XOP) {
++		context16 = oneByteContext16(insn->opcode);
++		if (context16 == 2 && !insn->hasOpSize)
++			attrMask |= ATTR_OPSIZE;
++	}
+ 	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
+ 		return -1;
+ 	}
+ 
+-	if ((decoderMode == MODE_16BIT ||
++	if (!context16 && (decoderMode == MODE_16BIT ||
+ 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
+ 	    !(attrMask & ATTR_OPSIZE)) {
+ 		/*
 diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
 index 5d103efe..376235af 100644
 --- a/arch/X86/X86GenLegacyTerminal.inc

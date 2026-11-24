@@ -1,7 +1,7 @@
-name: Measure single proven opcode lookup on real SeaBIOS code and x86 text corpora
+name: Compare shared primary and isolated real-mode opcode tables across SeaBIOS and real x86 binaries
 on:
   push:
-    branches: [codex/real-mode-first-scalar-context]
+    branches: [codex/paired-scalar-context-placement]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-scalar-context-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-real-mode-id-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
