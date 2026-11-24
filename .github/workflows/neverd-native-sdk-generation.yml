@@ -76,6 +76,12 @@ jobs:
           $types = "$env:RUNNER_TEMP/sdk-types"
           $selected = "$env:RUNNER_TEMP/workqueue-winrm-abi"
           $runtime = "$env:RUNNER_TEMP/workqueue-winrm-runtime"
+          $arm = Join-Path $types 'arm64'
+          $manifest = Get-Content -Raw "$arm/manifest.json" | ConvertFrom-Json
+          Copy-Item "$arm/manifest.json" "$types/manifest.json"
+          foreach ($lib in $manifest.libraries) {
+            Copy-Item "$arm/$($lib.name).h" "$types/$($lib.name).h"
+          }
           python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected --provider RealtimeWorkQueue --provider WindowsRemoteManagement
           New-Item -Type Directory $runtime | Out-Null
           python -c "import json,sys; from pathlib import Path; sys.path.insert(0, 'native-driver-entry'); from check_native_process_profile import execute_work_queue_and_winrm; p,s,o=map(Path,sys.argv[1:]); rows=execute_work_queue_and_winrm(json.loads((p/'arm64'/'manifest.json').read_text(encoding='utf-8-sig')),s,o); Path('native-api-execution.json').write_text(json.dumps(rows,indent=2),encoding='utf-8')" $types $selected $runtime
