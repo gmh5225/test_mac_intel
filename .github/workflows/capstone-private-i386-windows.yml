@@ -1,7 +1,7 @@
-name: Verify original-alias selection and scan options on native Macs and both Windows targets
+name: Verify canonical RISC-V operands on 32-bit and 64-bit native ABIs and time the dedicated libraries
 on:
   push:
-    branches: [codex/riscv-dedicated-original-alias-ports]
+    branches: [codex/riscv-dedicated-printed-operands]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -15,6 +15,10 @@ jobs:
           - { host: windows-2022, arch: amd64, profile: diet }
           - { host: windows-2022, arch: amd64_x86, profile: full }
           - { host: windows-2022, arch: amd64_x86, profile: diet }
+          - { host: ubuntu-24.04, arch: amd64, profile: full }
+          - { host: ubuntu-24.04, arch: amd64, profile: diet }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: full }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: diet }
           - { host: macos-15, arch: arm64, profile: full }
           - { host: macos-15, arch: arm64, profile: diet }
           - { host: macos-15-intel, arch: x86_64, profile: full }
@@ -29,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6977f9ad6412b1ed3a4431700ebdb989580efe46
+          ref: 236614a333d4bf55faca1960814bb6fbc821a86a
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -43,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-dedicated-original-alias-ports-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: canonical-operands-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

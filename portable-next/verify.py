@@ -28,6 +28,9 @@ try:
     lines=['cmake_minimum_required(VERSION 3.22)','project(RiscvRecords LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)']
     for suffix in ('static','shared'):
         lines.extend([f'add_executable(records_{suffix} "{(d/"raw.cpp").as_posix()}")',f'target_compile_features(records_{suffix} PRIVATE cxx_std_17)',f'target_link_libraries(records_{suffix} PRIVATE capstone_{suffix})'])
+    linux=platform.system()=='Linux'
+    if linux and profile=='full':
+        lines.extend([f'add_executable(rv_time "{(d/"riscv_options.cpp").as_posix()}")','target_compile_features(rv_time PRIVATE cxx_std_17)','target_link_libraries(rv_time PRIVATE capstone_static)','target_link_options(rv_time PRIVATE -no-pie)'])
     (project/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
     cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
@@ -36,9 +39,10 @@ try:
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-        units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_instruction_groups', 'riscv_op_count_iter'] if profile=='full' else []
-        if profile=='full' and stage=='candidate':units.append('riscv_scan_options')
-        cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*units])
+        units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_scan_options', 'riscv_instruction_groups', 'riscv_op_count_iter', 'riscv_sysreg', 'riscv_reg_access', 'riscv_insn_name_segv'] if profile=='full' else ['riscv_scan_options']
+        targets=['records_static','records_shared',*units]+(['rv_time'] if linux and profile=='full' else [])
+        cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target',*targets])
+        if linux and profile=='full':shutil.copyfile(b/'rv_time',t/('riscv-option-'+stage))
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
@@ -48,12 +52,16 @@ try:
             exe,=[f for f in b.rglob('records_'+suffix+('.exe'if win else'')) if f.is_file()]
             rows={}
             for name,path in texts.items():
-                for opt in range(5):
+                for opt in range(8):
                     v=list(map(int,sp.check_output([exe,'105',path,str(opt)],text=True,env=env).split()));assert v[0]>0
                     rows[name+'/'+str(opt)]=v
             outputs[suffix]=rows
         assert outputs['static']==outputs['shared']
         variants[stage]=outputs
+    if linux and profile=='full':
+        from riscv_time import measure
+        os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+        measure([dict(arch='riscv64',name=n)for n in texts],t,save)
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))

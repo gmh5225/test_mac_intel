@@ -31,9 +31,12 @@ int main(int argc,char **argv){
  }
  csh h=0;if(cs_open(arch,mode,&h))return 3;
  const bool with_detail=opt!=0;
- const size_t det=opt==2?CS_OPT_ON|CS_OPT_DETAIL_REAL:opt==3?CS_OPT_ON|CS_OPT_DETAIL_ALIAS:opt?CS_OPT_ON:CS_OPT_OFF;
+ const size_t det=opt==6?CS_OPT_ON|CS_OPT_DETAIL_UNCOMPRESSED_REAL:(opt==2||opt==5||opt==7)?CS_OPT_ON|CS_OPT_DETAIL_REAL:opt==3?CS_OPT_ON|CS_OPT_DETAIL_ALIAS:opt?CS_OPT_ON:CS_OPT_OFF;
  if(cs_option(h,CS_OPT_DETAIL,det)!=CS_ERR_OK)return 4;
  if(opt==4&&cs_option(h,CS_OPT_TEXT,CS_OPT_OFF)!=CS_ERR_OK)return 5;
+ if(opt==5 && cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ALIAS)!=CS_ERR_OK)return 6;
+ if(opt==6 && cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_REAL)!=CS_ERR_OK)return 7;
+ if(opt==7 && cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_UNCOMPRESSED_REAL)!=CS_ERR_OK)return 8;
  cs_insn i;cs_detail detail;std::memset(&i,0xa5,sizeof(i));std::memset(&detail,0xa5,sizeof(detail));i.detail=with_detail?&detail:nullptr;
  const uint8_t *p=bytes.data();size_t left=bytes.size();uint64_t ip=0x10000000,ok=0,bad=0,v=14695981039346656037ull,alias=0;
  while(left){
