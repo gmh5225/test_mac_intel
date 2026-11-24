@@ -1,7 +1,7 @@
-name: Check the i386 memory writer at one executable path on three fresh Linux runners
+name: Measure the i386 opcode-group memory writer using shared row and register tables
 on:
   push:
-    branches: [codex/fixed-image-i386-late-writer]
+    branches: [codex/group1-switch-shared-address-writer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 9813768e70ada58586c715a219ccf9395b8e8d45
+          ref: 4e0ff7ecf35083a51d414bc736be6ab9132c4cf7
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-image-i386-retest-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-switch-group1-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
