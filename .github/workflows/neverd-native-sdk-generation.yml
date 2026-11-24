@@ -9,19 +9,20 @@ permissions:
 jobs:
   sdk:
     runs-on: windows-11-arm
-    timeout-minutes: 22
+    timeout-minutes: 65
     env:
       PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          persist-credentials: false
           sparse-checkout: |
             native-driver-entry
             runtime-sdk-evidence
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 7f1c5cad05c06889dd60a52f2fa03a63e5cb7d56
+          ref: 101f4e33d7f50a5e679b0224e41c52aaa19ab619
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -69,7 +70,7 @@ jobs:
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='7f1c5cad05c06889dd60a52f2fa03a63e5cb7d56'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='101f4e33d7f50a5e679b0224e41c52aaa19ab619'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Execute the SDK and generated declarations on Windows ARM64
         shell: pwsh
         run: |
@@ -96,6 +97,12 @@ jobs:
           $selected = "$env:RUNNER_TEMP/qualified-named-runtime"
           python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected --provider DisplayControl --provider DisplayDriverFunctions --provider LockdownPolicy
           python runtime-sdk-evidence/check_named_exports.py source $types $selected native-named-exports.json
+      - name: Match verified ARM64 source declarations against installed system exports
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python runtime-sdk-evidence/check_system_catalog.py source "$env:RUNNER_TEMP/sdk-types" native-system-catalog.json
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
@@ -117,5 +124,6 @@ jobs:
             native-catalog-evidence.json
             native-api-execution.json
             native-named-exports.json
+            native-system-catalog.json
           if-no-files-found: error
           retention-days: 14
