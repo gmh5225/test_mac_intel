@@ -1,7 +1,7 @@
-name: Measure generated operand details and live operand initialization on six native firmware readers
+name: Measure XCore thread register spelling on original XS2 and XS3 code sections
 on:
   push:
-    branches: [codex/xcore-live-operand-firmware]
+    branches: [codex/xcore-register-text-firmware]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 567e62d3ff038035ea62ac460cc894f480065bee
+          ref: eda656187b91970987b016629023b894bf83ce2f
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -42,6 +42,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-live-firmware-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-register-text-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
