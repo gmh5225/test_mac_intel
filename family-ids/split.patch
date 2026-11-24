@@ -1,50 +1,160 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..6247e463 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,12 +30,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
+ 
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
+-	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_RECORD
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
+ #endif
++#endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..b0d65516 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,12 +3753,16 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifdef CAPSTONE_X86_PUBLIC_RECORD
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+ #endif
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++#define CS_DECODE_X86_ITERATOR
++#endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_SCAN_IMPL
++#undef CS_DECODE_X86_ITERATOR
+ #ifdef CS_DECODE_OUTPUT_MISS
+ #undef CS_DECODE_OUTPUT_MISS
+ #endif
+@@ -3793,10 +3797,15 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
+ 
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++CAPSTONE_INTERNAL bool X86_disasmMixed(csh ud, const uint8_t **code,
++				      size_t *size, uint64_t *address, cs_insn *insn)
++#else
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
++#endif
+ {
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..8dfdb842 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -32,4 +32,19 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
++					    const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *length,
++					    bool batch)
++{
++	/* The public iterator has checked the input extent and hidden any
++	 * inactive detail storage before calling the formatted-record path. */
++	if (!handle->no_text &&
++	    X86_trySimpleOutput(handle, code, size, insn, length))
++		return true;
++	return cs_decode_full_insn(handle, code, size, insn, length, batch);
++}
++#endif
+ #endif
 diff --git a/cs.c b/cs.c
-index ede7c2aa..895b6158 100644
+index 227458b6..05ade17d 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -980,7 +980,19 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 			     PostPrinter_t postprinter, const uint8_t *code,
- 			     bool stream_length_valid)
+@@ -975,7 +975,11 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ }
+ #endif
+ 
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++#define CS_DECODE_FOREIGN_ITERATOR
++#endif
+ #include "cs_disasm_internal.h"
++#undef CS_DECODE_FOREIGN_ITERATOR
+ 
+ /* Keep the generic copy specialized without the private x86 length checks. */
+ #if defined(__GNUC__)
+@@ -1811,11 +1815,18 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
+ 	return insn;
+ }
+ 
+-#ifndef CAPSTONE_HAS_X86
++#if !defined(CAPSTONE_HAS_X86) || (defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY))
+ CAPSTONE_EXPORT
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
  {
-+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && !defined(CAPSTONE_DIET)
-+	const char *text = OS->buffer;
-+	if (!postprinter && !stream_length_valid) {
-+		while (*text == ' ' || *text == '\t')
-+			++text;
-+	} else
-+		SStream_trimls(OS);
++#ifdef CAPSTONE_HAS_X86
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (!*size || !handle)
++		return false;
++	if (handle->arch == CS_ARCH_X86)
++		return X86_disasmMixed(ud, code, size, address, insn);
++#endif
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ #endif
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..9d295c02 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,7 +18,7 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifdef CAPSTONE_X86_PUBLIC_RECORD
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+@@ -63,6 +63,11 @@ static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
+ 	handle->insn_id(handle, insn, id);
+ }
+ 
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++CAPSTONE_INTERNAL bool X86_disasmMixed(csh ud, const uint8_t **code,
++				      size_t *size, uint64_t *address, cs_insn *insn);
++#endif
++
+ static inline bool use_x86_scan(const cs_struct *handle)
+ {
+ 	return handle->arch == CS_ARCH_X86 && handle->no_text &&
+@@ -191,7 +196,13 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
++#ifdef CS_DECODE_FOREIGN_ITERATOR
++	const bool scan = false;
++#elif defined(CS_DECODE_X86_ITERATOR)
++	const bool scan = handle->no_text && !handle->detail_opt;
 +#else
- 	SStream_trimls(OS);
-+#ifndef CAPSTONE_DIET
-+	const char *text = OS->buffer;
+ 	const bool scan = use_x86_scan(handle);
 +#endif
-+#endif
- 	// Copy only decoded instruction bytes before the postprinter observes them.
- 	uint16_t copy_size = copy_insn_bytes(insn, code, false);
- 	insn->op_str[0] = '\0';
-@@ -998,18 +1010,18 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
- 	memset(insn->op_str, '\0', sizeof(insn->op_str));
- 	size_t off = 0;
--	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
--	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
--		char c = OS->buffer[off];
-+	while (off < sizeof(insn->mnemonic) - 1 && text[off] &&
-+	       text[off] != ' ' && text[off] != '\t') {
-+		char c = text[off];
- 		insn->mnemonic[off] = c == '|' ? ' ' : c;
- 		off++;
- 	}
--	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
--	       OS->buffer[off] != '\t')
-+	while (text[off] && text[off] != ' ' &&
-+	       text[off] != '\t')
- 		off++;
--	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
-+	while (text[off] == ' ' || text[off] == '\t')
- 		off++;
--	const char *operands = OS->buffer + off;
-+	const char *operands = text + off;
- 	if (stream_length_valid) {
- #ifdef CS_MIPS_VISIBLE_OPERANDS
- 		/* MIPS can remove the MIPS16 comment or a '$' after printing.
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
