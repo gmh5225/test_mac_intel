@@ -20,7 +20,7 @@ try:
     flags+=['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in ('X86','ARM','AARCH64','MIPS')]
     flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'])[profile]
     ports={};images={};libs={};units=['x86_buffer_bounds','x86_scan_batch','x86_reg_access','x86_x87_environment']if profile in ('full','noatt')else['x86_buffer_bounds','x86_scan_batch']
-    for k in ('base','batch','all'):
+    for k in ('base','record'):
         g('restore','--source','HEAD','--worktree','--staged','--','.')
         if k!='base':
             q=stages[k];assert g('rev-parse','HEAD')==q['parent']
@@ -37,6 +37,6 @@ try:
             args=[exe,libs['base'],path,files[sample],str(w),str(samples['putty'+str(sample)]['address'])]
             cmd(k+'-width-'+str(w),args);obs=[json.loads(l)for l in (out/(k+'-width-'+str(w)+'.log')).read_text().splitlines()];assert len(obs)==2 and obs[0]['width']==w and obs[0]['records']>0 and obs[1]['callback_events']>0 and obs[1]['reentrant_details'];results[str(w)]=obs
         save('checked',ports)
-    assert ports['batch']==ports['all'];save('complete',dict(source=stages,profile=profile,images=images,records=ports,units=units))
+    assert set(ports)=={'record'};save('complete',dict(source=stages,profile=profile,images=images,records=ports,units=units))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
