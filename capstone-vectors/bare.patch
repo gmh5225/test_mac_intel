@@ -1,156 +1,74 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..0e9ebf9d 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -28,9 +28,9 @@
- #undef X86_MEMORY_IMMEDIATE
- #undef X86_IMMEDIATE_WIDE
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..f3f917f7 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -82,6 +82,13 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 			      bool wide);
  
--#define X86_SEGMENT_LEA32 writeSegmentLea32
-+#define X86_LEA32_MEMORY writeLea32
- #include "X86MemoryOutputImpl.h"
--#undef X86_SEGMENT_LEA32
-+#undef X86_LEA32_MEMORY
- #undef X86_MEMORY32_OUTPUT
- 
- /* The fixed-width iterator delegates uncommon encodings here. */
-@@ -79,22 +79,33 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 				return true;
- 		}
- 		break;
+ /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
 +#ifndef CAPSTONE_X86_ONLY
-+	/* The mixed-mode writer delegates scale-one SIBs without an index. */
-+	case 0x8d:
++CAPSTONE_INTERNAL bool
++X86_writeVex3Output64(cs_struct *handle, const uint8_t *code, size_t size,
++		      cs_insn *insn, uint16_t *insn_size,
++		      const struct X86SimpleRegister regs[4][16]);
 +#endif
- 	case 0x26:
- 	case 0x2e:
- 	case 0x36:
- 	case 0x3e:
- 	case 0x64:
--	case 0x65:
--		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
-+	case 0x65: {
++
+ CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
+ 						   const uint8_t *code,
+ 						   size_t size, cs_insn *insn,
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..5ccf8b47 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -196,10 +196,17 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
 +#ifdef CAPSTONE_X86_ONLY
-+		const unsigned lead = 1;
+ 	if (code[0] == 0xc4 &&
+ 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
+ 		return true;
 +#else
-+		const unsigned lead = opcode != 0x8d;
++	if (code[0] == 0xc4 &&
++	    X86_writeVex3Output64(handle, code, size, insn, insn_size,
++				  x86_simple_registers))
++		return true;
 +#endif
-+		if (size >= lead + 2 && code[lead] == 0x8d &&
-+		    code[lead + 1] < 0xc0 &&
- 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
- 			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
--			if (writeSegmentLea32(code, size, insn, insn_size,
--					      &x86_simple_outputs[row],
--					      x86_simple_registers))
-+			if (writeLea32(code, size, insn, insn_size, lead,
-+				       &x86_simple_outputs[row],
-+				       x86_simple_registers))
- 				return true;
- 		}
- 		break;
- 	}
-+	}
- 	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+ 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
+ 		const unsigned offset = 4 + (rex != 0);
+diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
+index 3fe8460f..4dbdf13e 100644
+--- a/arch/X86/X86VexRegisterImmediate.c
++++ b/arch/X86/X86VexRegisterImmediate.c
+@@ -108,5 +108,29 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 	writeUnsignedImmediate(out, code[5]);
+ 	return true;
  }
- #endif
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 76b35f22..22102a89 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -7,8 +7,8 @@
- #ifdef X86_MEMORY_IMMEDIATE
- #include "X86UnsignedImmediate.h"
- static bool X86_MEMORY_IMMEDIATE(
--#elif defined(X86_SEGMENT_LEA32)
--static bool X86_SEGMENT_LEA32(
-+#elif defined(X86_LEA32_MEMORY)
-+static bool X86_LEA32_MEMORY(
- #elif defined(X86_EXTEND64_MEMORY)
- static bool X86_EXTEND64_MEMORY(
- #elif defined(X86_EXTEND32_MEMORY)
-@@ -19,6 +19,9 @@ static bool X86_MEMORY32_OUTPUT(
- bool X86_writeMemoryOutput(
- #endif
- 	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
-+#ifdef X86_LEA32_MEMORY
-+	unsigned lead,
++#ifndef CAPSTONE_X86_ONLY
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_vex3_memory_text" rodata = ".cs_x86_vex3_memory_rodata"
 +#endif
- 	const struct X86SimpleOutput *row,
- 	const struct X86SimpleRegister regs[4][16])
- {
-@@ -34,9 +37,9 @@ bool X86_writeMemoryOutput(
- 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
- #ifdef X86_EXTEND64_MEMORY
- 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
--#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
--	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
--#else
-+#elif defined(X86_EXTEND32_MEMORY)
-+	const unsigned lead = 1; /* The caller consumed the opcode escape. */
-+#elif !defined(X86_LEA32_MEMORY)
- 	const unsigned lead = rex != 0;
- #endif
- 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
-@@ -70,7 +73,7 @@ bool X86_writeMemoryOutput(
- 		const unsigned index_reg = ((rex & 2) << 2) |
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
--#if defined(X86_SEGMENT_LEA32) || \
-+#if defined(X86_LEA32_MEMORY) || \
- 	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
- 		/* A scale-one SIB without an index names only its base. */
- 		if ((!mod && base_reg == 5) ||
-@@ -93,7 +96,7 @@ bool X86_writeMemoryOutput(
- 	const bool push = false, load = true;
- 	const unsigned reg_width = 2; /* r32 destination */
- #else
--#ifdef X86_SEGMENT_LEA32
-+#ifdef X86_LEA32_MEMORY
- 	const bool lea = true, load = true, push = false;
- #elif defined(X86_MEMORY_IMMEDIATE)
- 	const bool lea = false, load = false;
-@@ -139,17 +142,21 @@ bool X86_writeMemoryOutput(
- 		out += 10;
- 	}
- #else
--#ifdef X86_SEGMENT_LEA32
-+#ifdef X86_LEA32_MEMORY
- 	static const struct X86SimpleRegister segments[] = {
- 		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
- 		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
- 		{ X86_REG_FS, 2, "fs" }, { X86_REG_GS, 2, "gs" },
- 	};
--	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
--						   (code[0] >> 3) & 3;
--	memcpy(out, segments[segment].name, 2);
--	out[2] = ':';
--	out += 3;
-+	const struct X86SimpleRegister *segment = NULL;
-+	if (lead) {
-+		const unsigned i = code[0] >= 0x64 ? 4 + (code[0] & 1) :
-+						    (code[0] >> 3) & 3;
-+		segment = &segments[i];
-+		memcpy(out, segment->name, 2);
-+		out[2] = ':';
-+		out += 3;
++#include "X86VexBaseMemory.h"
++
++/* The AMD64 caller has identified the three-byte VEX prefix. The register
++ * writer and the memory writer consume disjoint ModR/M encodings. */
++bool X86_writeVex3Output64(cs_struct *handle, const uint8_t *code, size_t size,
++			   cs_insn *insn, uint16_t *insn_size,
++			   const struct X86SimpleRegister regs[4][16])
++{
++	if (size < 5)
++		return false;
++	if (code[4] < 0xc0) {
++		if (X86_OUTPUT_UNSUPPORTED(handle, false))
++			return false;
++		return writeVexBaseMemory(code, size, 3, insn, insn_size, regs[3]);
 +	}
++	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
++					     regs, true);
++}
++#endif
++
  #endif
- 	if (lea) {
- 		*out++ = '[';
-@@ -227,10 +234,12 @@ bool X86_writeMemoryOutput(
- 			x->opcode[1] = opcode;
- 		}
- 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
--#elif defined(X86_SEGMENT_LEA32)
--		x->prefix[1] = code[0];
--		x->encoding.modrm_offset = 2;
--		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
-+#elif defined(X86_LEA32_MEMORY)
-+		if (segment) {
-+			x->prefix[1] = code[0];
-+			x->encoding.modrm_offset = 2;
-+			x->operands[1].mem.segment = (x86_reg)segment->reg;
-+		}
- #elif defined(X86_EXTEND32_MEMORY)
- 		x->opcode[0] = 0x0f;
- 		x->opcode[1] = opcode;
+ #endif

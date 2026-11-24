@@ -1,7 +1,7 @@
-name: Compare i386 LEA addressing and detail construction with iced on exact OpenSSL JPEG and PuTTY extents
+name: Compare VEX3 operand records with iced on real PE and ELF libraries
 on:
   push:
-    branches: [codex/i386-fallback-lea-vs-iced]
+    branches: [codex/amd64-vex3-memory-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-i386-lea-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-vex3-memory-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
