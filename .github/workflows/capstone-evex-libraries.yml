@@ -1,7 +1,7 @@
-name: Time six physical input images with the new six-architecture NeverD link and fork iced
+name: Isolate AMD64 register double shifts in the current six-architecture static configuration
 on:
   push:
-    branches: [codex/six-arch-iced-fork-score]
+    branches: [codex/amd64-legacy-double-shift-six-arch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: six-arch-selector-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-shift-six-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
