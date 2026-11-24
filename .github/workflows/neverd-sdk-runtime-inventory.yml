@@ -1,0 +1,31 @@
+name: Inventory Windows SDK exports on installed systems
+on:
+  push:
+    branches: [codex/windows-sdk-runtime-inventory-20261124]
+permissions:
+  contents: read
+jobs:
+  observe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86, runner: windows-2025 }
+          - { arch: x64, runner: windows-2025 }
+          - { arch: arm64, runner: windows-11-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Resolve SDK names in a process of the requested architecture
+        shell: pwsh
+        run: |
+          if ("${{ matrix.arch }}" -eq "x86") {
+            & "$env:WINDIR/SysWOW64/WindowsPowerShell/v1.0/powershell.exe" -NoProfile -ExecutionPolicy Bypass -File sdk-runtime-inventory/observe.ps1 -Architecture x86
+            exit $LASTEXITCODE
+          }
+          & ./sdk-runtime-inventory/observe.ps1 -Architecture ${{ matrix.arch }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: sdk-runtime-${{ matrix.arch }}
+          path: sdk-runtime-inventory/observed-${{ matrix.arch }}.json
