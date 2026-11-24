@@ -11,6 +11,7 @@ MODE = "X86ModeInterruptTest."
 TESTS = {
     "NeverDX86PagingTests": [
         "X86PagingTest.EnclavePrivatePagesEnforcePagingIdentityAndEpcmPermissions",
+        "X86LegacyExecutionTest.UD1FaultsWithoutReadingItsAddress",
     ],
     "NeverDX64PagedExecutionTests": [
         MODE + "TaskGateAndNestedIretPublishBothTaskBanks",
@@ -19,6 +20,7 @@ TESTS = {
         MODE + "CompatibilityReturnsSelectTheDestinationCodeWidth",
         "X86ModeExecutionTest.CompiledFastCallReturnsToTheOriginalCompatibilityStream",
         "X86ModeExecutionTest.FarTransfersRetireTheirContinuationAfterDescriptorRepair",
+        "X86ModeExecutionTest.OriginalModeWritesChooseTheNativeEventFrame",
         "X86ModeFastSystemTest.TransfersUseFullMsrsAndSelectDestinationWidth",
         "X86ModeFastSystemTest.SysenterMsrsUseProcessorAddressWidthBeforeTransfer",
         "X86ModeFastSystemTest.FaultsPrecedeFastTransferStateWrites",
@@ -39,6 +41,12 @@ TESTS = {
         "X86ModeSgxThreadTest.DebugOptInSelectsTrapAndBreakpointState",
         "X86ModeSgxThreadTest.NestedHandlerRepairsDivideAtOriginalInstruction",
         "X86ModeSgxTest.SoftwareEnclaveResumesFromSSAAfterIRQAndInstructionFaults",
+    ],
+    "NeverDX86LegacySourceTests": [
+        "Compilers/X86LegacySourceTest.OriginalUD1FaultsWithoutReadingMemory/ClangO0",
+        "Compilers/X86LegacySourceTest.OriginalUD1FaultsWithoutReadingMemory/ClangO2",
+        "Compilers/X86LegacySourceTest.OriginalUD1FaultsWithoutReadingMemory/NeverCO0",
+        "Compilers/X86LegacySourceTest.OriginalUD1FaultsWithoutReadingMemory/NeverCO2",
     ],
 }
 
