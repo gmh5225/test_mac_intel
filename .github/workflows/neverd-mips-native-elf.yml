@@ -1,14 +1,14 @@
-name: NeverD microMIPS64 r9 native ELF
+name: NeverD microMIPS64 R6 native ELF
 on:
   push:
-    branches: [codex/micromips64-neverd-r9]
+    branches: [codex/micromips64-neverd-r10]
     paths: ['.github/workflows/neverd-mips-native-elf.yml']
 permissions:
   contents: read
 env:
-  REVISION: 5ce34d0d85e8fd845e6d966eb44392eed7f3e842
-  LLVM_REVISION: 0f9776402d2f3aed5daf50e58cdcb820690517cc
-  UNICORN_REVISION: 3e0374d3c2ec95aa0639677c8e8db7c71096d60f
+  REVISION: 5f80feeafdfb216392e67da627aa8dd22a671258
+  LLVM_REVISION: 1c37d515ef3b12e8923390f95dc49052a966f00f
+  UNICORN_REVISION: 34afc42471e2aa56428ee0bc5b9687ef7729d94b
   HOMEBREW_NO_AUTO_UPDATE: '1'
 jobs:
   native:
@@ -64,13 +64,15 @@ jobs:
             -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
             -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON "${args[@]}"
           python scripts/build.py build-check --config Release --parallel 4 --target \
-            NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests NeverDMIPSObjectTests NeverDMIPSSDKTests
+            NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDNativeExceptionRewriteContractTests NeverDLowScalarConstantTests NeverDFiniteScalarBranchTests
       - name: Run MIPS decoding, lifting, native object and public SDK suites
         run: |
           mkdir -p evidence
           ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error \
             -L '^(NeverDMIPSFlowTests|NeverDMIPSPipelineTests|NeverDMIPSIntegerTests|NeverDMIPSObjectTests|NeverDMIPSSDKTests)$' \
             --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/results.xml"
+          ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error -R '^(ReplacementNativeCode[.]|ELFPatchSections[.]|MachOExceptionPatch[.])' --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/layout.xml"
+          ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error -L '^(NeverDLowScalarConstantTests|NeverDFiniteScalarBranchTests)$' --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/scalar.xml"
           python - <<'PY'
           import os, re, subprocess
           from pathlib import Path
@@ -78,10 +80,19 @@ jobs:
           cases = ET.parse('evidence/results.xml').findall('.//testcase')
           assert cases and all(c.find('failure') is None and c.find('error') is None and c.find('skipped') is None for c in cases)
           names = [t.get('name', '') for t in cases]
+          assert len(names)>=1078 and len(names)==len(set(names))
+          for group,minimum in [('layout',23),('scalar',39)]:
+              group_cases=ET.parse('evidence/'+group+'.xml').findall('.//testcase')
+              assert len(group_cases)>=minimum and all(t.find(s) is None for t in group_cases for s in ('skipped','failure','error'))
+              if group=='scalar':
+                  assert sum('LowScalarConstant.Subbytes' in t.get('name','') for t in group_cases)==2
           for name in ('DoublewordProductsWriteBothAccumulatorHalves',
                        'DoublewordProductsRequirePreR6WideGPRs',
                        'FixedAddressMicroMIPS64LeafWithoutUnwindHasAnExactRange',
-                       'LiftToObjectPreservesMicroEntryAndDelaySlot'):
+                       'LiftToObjectPreservesMicroEntryAndDelaySlot',
+                       'FixedAddressMicroMIPS64R6LeafReturnsWithoutADelaySlot',
+                       'PlacedR6ImageUsesELFProfileForCodeAndFunctionPointers',
+                       'N32RegisterCallUsesTheELFAddressAndCalleeMode'):
               assert any(name in n for n in names), name
           assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == os.environ['REVISION']
           for directory, variable in [('third_party/llvm-project','LLVM_REVISION'), ('third_party/unicorn','UNICORN_REVISION')]:
@@ -91,12 +102,13 @@ jobs:
           checked_out = subprocess.check_output(['git', '-C', 'third_party/unicorn', 'rev-parse', 'HEAD'], text=True).strip()
           assert checked_out == os.environ['UNICORN_REVISION']
           assert sum('LiftToObjectPreservesMicroEntryAndDelaySlot' in n for n in names) == 6
+          assert sum('LiftToObjectRetainsMicroR6ISAAndCompactReturn' in n for n in names) == 6
           cache = Path('build-check/CMakeCache.txt').read_text()
           path = re.search(r'^LLVM_DIR:[^=]+=(.+)$', cache, re.M)
           assert path, 'missing LLVM package path'
           info = (Path(path[1].strip()).parents[2] / 'BUILDINFO.txt').read_text()
           assert ('llvm_commit: ' + os.environ['LLVM_REVISION']) in info
-          assert 'targets: X86;ARM;AArch64;Mips' in info and 'neverd-llvm-v23.0.0-r9' in path[1]
+          assert 'targets: X86;ARM;AArch64;Mips' in info and 'neverd-llvm-v23.0.0-r10' in path[1]
           Path('evidence/unicorn.txt').write_text(checked_out + '\n')
           Path('evidence/BUILDINFO.txt').write_text(info)
           Path('evidence/neverd.txt').write_text(os.environ['REVISION'] + '\n')
@@ -105,8 +117,9 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: micromips64-r9-${{ runner.os }}
+          name: micromips64-r10-${{ runner.os }}
           path: |
             evidence/
             build-check/Testing/Temporary/LastTest.log
             build-check/neverd-build-receipt.json
+            build-check/neverd-dependency-inputs.json
