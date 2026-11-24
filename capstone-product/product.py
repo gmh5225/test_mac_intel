@@ -20,9 +20,15 @@ t=Path(tempfile.mkdtemp(dir=os.environ['RUNNER_TEMP']))
 try:
     build=t/'build';cases=corpus.prepare(r,t,out,command)
     foreign=[z for z in cases if z['name'].startswith(('arm64-','mips64el-'))]
-    selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','arm-ls'}
+    selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','arm-ls','ppc64el-ls','riscv64-ls'}
     cases=[c for c in cases if c['name'] in selected]
     assert {c['name']for c in cases}==selected
+    rv=next(c for c in cases if c['name']=='riscv64-ls')
+    elf=corpus.deb_binary(t/'corpus'/rv['package_sha256'],'ls')
+    assert corpus.digest(elf)==rv['binary_sha256'] and corpus.digest(corpus.elf_text(elf))==rv['text_sha256']
+    assert elf[:6]==b'\x7fELF\x02\x01' and int.from_bytes(elf[48:52],'little')&1
+    assert b'rv64i2p1_m2p0_a2p1_f2p2_d2p2_c2p0_' in elf
+    save('new-architectures',dict(riscv=rv['binary_sha256'],ppc=next(c['binary_sha256'] for c in cases if c['name']=='ppc64el-ls')))
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
     command([sys.executable,t/'libmvec.py'],'libmvec')
     glibc=json.loads((t/'libmvec.json').read_text());cases.append(dict(name='libmvec-amd64',selector=64,path=str(t/'libmvec.text'),text_sha256=glibc['text_sha256']))
@@ -52,6 +58,7 @@ try:
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
+        assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
         uid_tables={}
         for line in sp.check_output(['nm','-S','--defined-only',archive],text=True).splitlines():
             fields=line.split()
@@ -139,7 +146,7 @@ try:
         if k not in checked:
             checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
 
-        sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
+        sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
         return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
     rows=[];rng=random.Random(1739)
     for c in cases:

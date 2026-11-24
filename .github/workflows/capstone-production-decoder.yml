@@ -1,7 +1,7 @@
-name: Measure the verified EXTRQ selection with the release-size runtime UID table
+name: Verify release-size UID tables in the current six-architecture NeverD product
 on:
   push:
-    branches: [codex/reused-uid-storage-product]
+    branches: [codex/six-arch-neutral-uid-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 84cdbdd109ad5f72e85603dd2dbbb5081020c58a
+          ref: 512ac40f11eda4f1998843f0de8f257723635945
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "84cdbdd109ad5f72e85603dd2dbbb5081020c58a"
+          test "$(git rev-parse HEAD)" = "512ac40f11eda4f1998843f0de8f257723635945"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "396483e58bf0bb8f4dd6e36daff8b0458bad2315"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 396483e58bf0bb8f4dd6e36daff8b0458bad2315
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neutral-extrq-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: six-arch-extrq-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
