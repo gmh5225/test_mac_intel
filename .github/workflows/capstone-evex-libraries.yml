@@ -1,7 +1,7 @@
-name: Measure allocated memory operands on real x86 code and all mixed decoder holdouts
+name: Time x86 address construction with unchanged other architecture objects
 on:
   push:
-    branches: [codex/x86-address-tuple-throughput]
+    branches: [codex/x86-address-existing-constructors-native]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checked-address-timing-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: existing-address-constructors-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
