@@ -1,0 +1,57 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..f71fbb4f 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -35,6 +35,14 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
++/* Linux already selects the scalar writer in its full decode entry. */
++#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
++#include "../../cs_priv.h"
++#define CAPSTONE_X86_BATCH_OUTPUT
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeBatchRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		      cs_insn *insn, uint16_t *length, bool batch);
++#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..9c1bba35 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -32,4 +32,19 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_BATCH_OUTPUT
++CS_PRESERVE_MOST bool
++X86_decodeBatchRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		      cs_insn *insn, uint16_t *length, bool batch)
++{
++	/* The caller selected scan mode before allocating the detail slot.
++	 * An allocator which then disables detail leaves that slot owned by
++	 * the full decoder. */
++	if (batch && (!insn->detail || handle->detail_opt) &&
++	    X86_trySimpleOutput(handle, code, size, insn, length))
++		return true;
++	return cs_decode_full_insn(handle, code, size, insn, length, batch);
++}
++#endif
+ #endif
+diff --git a/cs.c b/cs.c
+index 333e7de2..69a0b90c 100644
+--- a/cs.c
++++ b/cs.c
+@@ -975,6 +975,9 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ }
+ #endif
+ 
++#ifdef CAPSTONE_X86_BATCH_OUTPUT
++#define CS_DECODE_OUTPUT_MISS X86_decodeBatchRecord
++#endif
+ #include "cs_disasm_internal.h"
+ 
+ /* Keep the generic copy specialized without the private x86 length checks. */

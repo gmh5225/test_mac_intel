@@ -1,7 +1,7 @@
-name: Measure standalone x86 batch formatting on PE32 and PE64 across native Windows and macOS ABIs
+name: Isolate the batch scalar call from scan and measure both PuTTY batch and iterator records
 on:
   push:
-    branches: [codex/standalone-batch-scalar-output]
+    branches: [codex/x86-batch-record-call-abi]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
           - { host: macos-15-intel, arch: x86_64, profile: reduced }
           - { host: macos-15-intel, arch: x86_64, profile: noatt }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 85
+    timeout-minutes: 175
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: standalone-batch-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: independent-batch-entry-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
