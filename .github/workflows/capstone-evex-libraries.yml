@@ -1,7 +1,7 @@
-name: Measure mandatory XMM and table-validated EXTRQ on the latest Capstone next
+name: Profile production Capstone and iced FastFormatter on the same Linux x86 and ARM instruction boundaries
 on:
   push:
-    branches: [codex/x86-mandatory-vector-table]
+    branches: [codex/native-formatter-stage-ownership]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-xmm-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: paired-native-profile-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
