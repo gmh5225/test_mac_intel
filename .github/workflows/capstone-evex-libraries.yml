@@ -1,7 +1,7 @@
-name: Measure public and native x86 writers against both iced formatters on current next
+name: Time the public and private iterators sharing one full decoder
 on:
   push:
-    branches: [codex/public-record-iced-at-integrated-next]
+    branches: [codex/single-full-decoder-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-public-record-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-full-decoder-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
