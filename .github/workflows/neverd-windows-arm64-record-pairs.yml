@@ -1,0 +1,30 @@
+name: Verify NeverD ARM64 SDK value records and bool
+on:
+  push:
+    branches: [codex/windows-arm64-source-record-witness-20261124]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Compile and execute original, HighC and LLVMC callers
+        shell: pwsh
+        run: |
+          $kit = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\Include'
+          $inc = (Get-ChildItem $kit -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'um\eaphostpeerconfigapis.h') } | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1).FullName
+          if (!$inc) { throw "Windows SDK headers missing" }
+          $kitRoot = Split-Path $kit
+          $ver = Split-Path -Leaf $inc
+          $env:NEVERD_TEST_SDK_LIBDIR = Join-Path $kitRoot "Lib\$ver\um\arm64"
+          $env:INCLUDE = @('um','shared','ucrt','winrt') | ForEach-Object { Join-Path $inc $_ } | Join-String -Separator ';'
+          $llvm = Join-Path $env:ProgramFiles 'LLVM\bin'
+          if (Test-Path (Join-Path $llvm 'clang.exe')) { $env:Path = "$llvm;$env:Path" }
+          python native-arm64-source-records/check.py native-record-output
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: windows-arm64-record-execution
+          path: native-record-output/run.json
