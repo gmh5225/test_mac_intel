@@ -51,17 +51,37 @@ try:
             baseline=rows['base'][linkage]['snapshots']
             assert result['snapshots']==baseline,(name,linkage,profile)
         assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
-        if platform.system()=='Darwin' and profile in ('full','noatt'):
+        mac = platform.system()=='Darwin' and profile in ('full','noatt')
+        linux = platform.system()=='Linux' and profile=='clang'
+        if mac or linux:
             solo=t/'static-only'
             run(name+'-static-config','cmake','-G','Ninja','-S',s,'-B',solo,*flags,'-DCAPSTONE_BUILD_SHARED_LIBS=OFF')
             run(name+'-static-build','cmake','--build',solo,'--parallel','4','--target','capstone_static',*units)
             run(name+'-static-units','ctest','--test-dir',solo,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
-            for folder,active in ((solo,name=='public'),(b,False)):
+            for folder,active in ((solo,mac or name=='selector'),(b,False)):
                 cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
                 assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
+                assert ('-DCAPSTONE_X86_ITERATOR_READERS' in cs['command'])==(active and linux)
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows['base']['static']['snapshots']
             rows[name]['static_only']=result
+        if linux:
+            obj=t/'make'
+            flags_make=['make','-C',s,'-j4','V=1','CC=clang','AR=ar','BUILDDIR='+str(obj),'CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CAPSTONE_STATIC=yes','CAPSTONE_SHARED=no']
+            run(name+'-make-build',*flags_make)
+            commands=(e/(name+'-make-build.log')).read_text()
+            for flag in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'):
+                assert ('-D'+flag in commands)==(name=='selector'),(name,flag)
+            lib,=[f for f in obj.rglob('libcapstone.a') if not f.is_symlink()]
+            result=snapshots(s,p,lib.parent,t,profile,name+'-make',run,'static')
+            assert result['snapshots']==rows['base']['static']['snapshots']
+            rows[name]['make_only']=result
+            for unit in ('x86_simple_output','x86_buffer_bounds'):
+                exe=t/unit
+                run(name+'-make-link-'+unit,'clang','-O2','-I',s/'include',s/('tests/unit/'+unit+'.c'),lib,'-o',exe)
+                run(name+'-make-'+unit,exe)
+            shutil.rmtree(obj)
+
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
