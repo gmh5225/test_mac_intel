@@ -1,7 +1,7 @@
-name: Compare mixed Linux public iterator and full decoder placement on identical real records
+name: Measure a verified Intel mnemonic boundary stored in the existing recipe lookup
 on:
   push:
-    branches: [codex/linux-mixed-public-record-caller]
+    branches: [codex/intel-recipe-mnemonic-boundary]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: linux-mixed-public-caller-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: intel-recipe-mnemonic-boundary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

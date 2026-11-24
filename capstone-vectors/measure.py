@@ -56,6 +56,7 @@ try:
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+        run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
@@ -66,7 +67,7 @@ try:
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert ('CAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and ('CAPSTONE_X86_ITERATOR_READERS' in entry)==(label=='candidate')
+        assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
