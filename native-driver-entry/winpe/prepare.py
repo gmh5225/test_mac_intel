@@ -25,6 +25,9 @@ fixtures = {
     "disk": ("27164FA1-B67C-C951-5379-7606FBF9CD5B",
              "652d34863f9671761350141b4a4b6638dbaf27faa1fb8e2ac270535fc0e5c870",
              "2a248c71bb933603fdcde1c0414a98f438ee6ee14d91e7fe9ad7c6304f3b6b88"),
+    "partmgr": ("D2BC1105-C2DA-02A6-5C3E-5AC623415372",
+                "b826790c0f25c2efbf66828b73df18cd8c2762e9dedf6edcee5628d9c50aacdb",
+                "dff4ea646e059cbf714cffc722fda293b0ece3470e1d50eeadbc30bb3183b61a"),
 }
 guid, driver_hash, pdb_hash = fixtures[driver_name]
 
