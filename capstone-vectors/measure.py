@@ -54,12 +54,17 @@ try:
         else:assert uid_dump==reference
         save('access-'+label,dict(uids=count,queries=2*(count+4),sha256=hashlib.sha256(uid_dump).hexdigest()))
 
+        run('clang++','-std=c++17','-O2','-I',base/'include',r/'sample.cpp',lib,'-o',w/'offset-sample')
+        log=get(w/'offset-sample').strip().splitlines();assert len(log)==48
+        if label=='candidate':
+            assert '0x80001234' in log[0] and '0x8234' in log[6] and '0x80001234' in log[12]
+        save('operand-offsets-'+label,log)
         objects[label]={f.name:sha(f)for f in build.rglob('*.c.o')}
         run('clang++',w/'foreign.o',lib,'-o',w/('foreign-'+label))
         args=(['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm'])
         run('clang',*args,'-o',w/(label+'.library'))
         if label=='candidate':
-            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert bool(affected) and set(affected)<={'X86DisassemblerDecoder.c.o','X86Disassembler.c.o'},affected
+            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert bool(affected) and all(k.startswith('X86')for k in affected) and 'X86IntelInstPrinter.c.o' in affected,affected
             save('affected',dict(count=len(objects[label]),changed=affected))
     shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')
