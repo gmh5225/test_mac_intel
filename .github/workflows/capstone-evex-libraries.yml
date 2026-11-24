@@ -1,7 +1,7 @@
-name: Separate callback order from branch grouping on fixed Linux executable mappings
+name: Compare table-driven prefix validation and PE32 register text on fixed ELF images
 on:
   push:
-    branches: [codex/format-callback-order-controls]
+    branches: [codex/fixed-elf-prefix-fragments]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-callback-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-prefix-fragments-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
