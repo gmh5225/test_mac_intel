@@ -25,6 +25,9 @@ try:
  assert hashlib.sha256(patch.read_bytes()).hexdigest()==q['sha256']
  git('apply','--index',patch);assert git('write-tree')==q['tree']
  run('generator','python','-B',s/'suite/synctools/x86_mapping_counts.py','--check')
+ if platform.system()=='Linux' and profile=='clang':
+    for script in ('x86_operand_specializations.py','x86_disassembler_tables.py'):
+        run(script[:-3],'python','-B',s/'suite/synctools'/script,'--check')
  arches=['X86','ARM','AARCH64','MIPS']if platform.system()=='Linux' else ['X86']
  flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arches]]
  flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
@@ -41,11 +44,11 @@ try:
     git('reset','--hard',q['parent'])
     run('base-build','cmake','--build',b,'--parallel','4','--target','capstone_static')
     original=measure_probe('base')
-    assert original==candidate,(original,candidate)
     cases=1632 if profile=='noatt' else 3264
     wrong=24 if profile=='noatt' else 48
-    assert candidate==(1,[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(1 if profile=='noatt' else 2)],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, {wrong} incorrect shapes']),candidate
-    save('known-16-bit-rejections',dict(reference=q['parent'],candidate=q['commit'],records=cases,original=original,updated=candidate))
+    assert original==(1,[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(1 if profile=='noatt' else 2)],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, {wrong} incorrect shapes']),original
+    assert candidate==(0,[],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes']),candidate
+    save('corrected-16-bit-forms',dict(reference=q['parent'],candidate=q['commit'],records=cases,original=original,updated=candidate))
  save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units,case_count=cases))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
