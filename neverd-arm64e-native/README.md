@@ -150,8 +150,8 @@ writes its CPU and qualification result in the job summary. The artifact contain
 the compiler, original PAC call, cursor, scalar arithmetic, checked writeback
 and ordered-memory probe reports. The summary verifies component report hashes
 and revisions. It reports 128-bit LRCPC3, explicit PAuth_LR, PC-sensitive PACM,
-PACM HINT, scalar CPTA and checked writeback separately, including capabilities
-that ran on a host with an unavailable aggregate x1 result. The artifact also
+PACM HINT, scalar CPTA, signed-product overflow (CPTM) and checked writeback
+separately, including capabilities that ran on a host with an unavailable aggregate x1 result. The artifact also
 contains the native scalar, explicit-signer and Q-lane regression log. These
 tests exercise the probes with baseline instructions, wrong results and
 misplaced faults. They have no effect on hardware qualification.
