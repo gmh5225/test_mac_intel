@@ -8,6 +8,17 @@ def run(label,*args):
     with (e/(label+'.log')).open('wb')as f:ret=sp.run(args,stdout=f,stderr=sp.STDOUT)
     if ret.returncode:
         print((e/(label+'.log')).read_text(errors='replace')[-2200:]);ret.check_returncode()
+def measure_probe(label):
+    if os.name=='nt':
+        names=[b/'capstone_static.lib',b/'capstone.lib']
+        target=next(k for k in names if k.is_file())
+    else:target=b/'libcapstone.a'
+    exe=t/('probe.exe' if os.name=='nt' else 'probe')
+    if os.name=='nt':run(label+'-probe-build','cl','/nologo','/O2','/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (b/'CMakeCache.txt').read_text() else '/MD','/std:c11','/I'+str(s/'include'),p/'probe.c',target,'/Fo:'+str(t/'probe.obj'),'/Fe:'+str(exe))
+    else:run(label+'-probe-build',profile if profile in ('gcc','clang') else 'clang','-O2','-I',s/'include',p/'probe.c',target,'-o',exe)
+    check=sp.run([exe],text=True,capture_output=True)
+    (e/(label+'-probe.log')).write_text(check.stderr+check.stdout)
+    return check.returncode,check.stderr.splitlines(),check.stdout.splitlines()
 try:
  profile=os.environ['SCAN_PROFILE'];assert git('rev-parse','HEAD')==q['parent']
  patch=t/'candidate.patch';patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']))
@@ -26,15 +37,15 @@ try:
  text=(e/'units.log').read_text(errors='replace');assert '100% tests passed' in text and all('unit_'+n in text for n in units)
  cases=0
  if profile not in ('diet','reduced'):
-    if os.name=='nt':
-        names=[b/'capstone_static.lib',b/'capstone.lib']
-        target=next(k for k in names if k.is_file())
-    else:target=b/'libcapstone.a'
-    exe=t/('probe.exe' if os.name=='nt' else 'probe')
-    if os.name=='nt':run('probe-build','cl','/nologo','/O2','/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (b/'CMakeCache.txt').read_text() else '/MD','/std:c11','/I'+str(s/'include'),p/'probe.c',target,'/Fo:'+str(t/'probe.obj'),'/Fe:'+str(exe))
-    else:run('probe-build',profile if profile in ('gcc','clang') else 'clang','-O2','-I',s/'include',p/'probe.c',target,'-o',exe)
-    run('probe',exe);cases=1632 if profile=='noatt' else 3264
-    assert (e/'probe.log').read_text().strip()==str(cases)+' encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
+    candidate=measure_probe('candidate')
+    git('reset','--hard',q['parent'])
+    run('base-build','cmake','--build',b,'--parallel','4','--target','capstone_static')
+    original=measure_probe('base')
+    assert original==candidate,(original,candidate)
+    cases=1632 if profile=='noatt' else 3264
+    wrong=24 if profile=='noatt' else 48
+    assert candidate==(1,[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(1 if profile=='noatt' else 2)],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, {wrong} incorrect shapes']),candidate
+    save('known-16-bit-rejections',dict(reference=q['parent'],candidate=q['commit'],records=cases,original=original,updated=candidate))
  save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units,case_count=cases))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))

@@ -1,7 +1,7 @@
-name: Validate MMX scan table regeneration across native ABIs
+name: Verify MMX scan IDs and compare all independent legacy move checks with the released parent
 on:
   push:
-    branches: [codex/compact-mmx-scan-configurations]
+    branches: [codex/scan-abi-parent-comparison]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: regenerated-mmx-scans-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: baseline-compared-scans-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
