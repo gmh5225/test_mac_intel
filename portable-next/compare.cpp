@@ -14,6 +14,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <chrono>
+#include <utility>
 #include <fstream>
 #include <iterator>
 #include <random>
@@ -197,7 +199,95 @@ static void verify_iter(Session &a,Session &b,const std::vector<uint8_t> &bytes,
 }
 
 static void configure(Session &s,int m) {s.set(CS_OPT_TEXT,m?CS_OPT_ON:CS_OPT_OFF);s.set(CS_OPT_DETAIL,m==2?CS_OPT_ON:CS_OPT_OFF);}
+static uint64_t cpu_ticks() {
+#ifdef _WIN32
+  ULONG64 ticks;
+  check(QueryThreadCycleTime(GetCurrentThread(), &ticks), "thread cycles");
+  return ticks;
+#else
+  struct timespec ts{};
+  check(clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts)==0,"thread CPU");
+  return uint64_t(ts.tv_sec)*1000000000+ts.tv_nsec;
+#endif
+}
+static uint64_t visit_record(Session &s, const cs_insn &i, unsigned m) {
+  uint64_t sum=i.id+i.size+i.address+i.bytes[0];
+  if(m) sum+=std::strlen(i.mnemonic)+std::strlen(i.op_str);
+  if(m==2 && i.detail) {
+    cs_regs rr,ww;uint8_t nr=0,nw=0;
+    if(s.api.regs(s.h,&i,rr,&nr,ww,&nw)==CS_ERR_OK) {
+      for(unsigned j=0;j<nr;++j)sum+=rr[j];
+      for(unsigned j=0;j<nw;++j)sum+=ww[j];
+    }
+    auto &x=i.detail->x86;
+    sum+=x.eflags+x.op_count;
+    for(unsigned j=0;j<x.op_count;++j)sum+=x.operands[j].type+x.operands[j].size+x.operands[j].access;
+  }
+  return sum;
+}
+static std::pair<size_t,uint64_t> sweep(Session &s,const std::vector<uint8_t>& bytes,
+                                        uint64_t ip,unsigned mode,bool iter) {
+  uint64_t sum=0;size_t records=0;
+  if(iter) {
+    cs_insn *record=s.api.alloc(s.h);check(record!=nullptr,"record");
+    const uint8_t *p=bytes.data();size_t remaining=bytes.size();
+    while(remaining) {
+      if(s.api.next(s.h,&p,&remaining,&ip,record)) {
+        sum+=visit_record(s,*record,mode);++records;
+      } else {
+        ++p;--remaining;++ip;
+      }
+    }
+    s.api.free(record,1);
+  } else {
+    for(size_t off=0;off<bytes.size();) {
+      Result batch(s,bytes.data()+off,bytes.size()-off,ip+off,64);
+      if(!batch.n) { ++off; continue; }
+      for(size_t i=0;i<batch.n;++i) {
+        sum+=visit_record(s,batch.a[i],mode);
+        off+=batch.a[i].size;
+      }
+      records+=batch.n;
+    }
+  }
+  return {records,sum};
+}
+static int timing(int argc,char**argv) {
+  check(argc==7,"timing arguments");
+#ifdef _WIN32
+  DWORD_PTR available,system;
+  check(GetProcessAffinityMask(GetCurrentProcess(),&available,&system)&&available&&
+        SetThreadAffinityMask(GetCurrentThread(),available&(~available+1)),"affinity");
+#endif
+  const unsigned seed=static_cast<unsigned>(std::strtoul(argv[6],nullptr,10));
+  int slot=seed%2;
+  Api first(argv[1+slot]), second(argv[2-slot]);
+  Api *base=slot?&second:&first, *candidate=slot?&first:&second;
+  check(base->disasm!=candidate->disasm,"loaded images");
+  std::ifstream input(argv[3],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(input),{}};
+  const int bits=std::atoi(argv[4]);const uint64_t ip=std::strtoull(argv[5],nullptr,10);
+  const auto width=bits==32?CS_MODE_32:CS_MODE_64;std::mt19937 rng(seed);
+  for(unsigned mode=0;mode<3;++mode) for(bool iter:{false,true}) {
+    std::pair<size_t,uint64_t> want{};
+    std::array<unsigned,3> order{0,1,2};std::shuffle(order.begin(),order.end(),rng);
+    for(unsigned which:order) {
+      Session session(which==2?*candidate:*base,CS_ARCH_X86,width);
+      configure(session,mode);
+      const auto warm=sweep(session,bytes,ip,mode,iter);
+      if(!want.first)want=warm;check(want==warm,"native digest");
+      auto start=std::chrono::steady_clock::now();uint64_t cpu=cpu_ticks();
+      auto result=sweep(session,bytes,ip,mode,iter);
+      uint64_t ticks=cpu_ticks()-cpu;
+      auto elapsed=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-start).count();
+      check(result==want && ticks>0 && elapsed>0,"timed digest");
+      std::printf("%u %u %u %" PRIu64 " %" PRIu64 " %zu %" PRIu64 "\n",mode,iter?1:0,which,ticks,static_cast<uint64_t>(elapsed),result.first,result.second);
+    }
+  }
+  return 0;
+}
+
 int main(int argc,char **argv) {
+  if (argc==7) return timing(argc,argv);
   if(argc!=6)return 2;
   Api a(argv[1]),b(argv[2]);check(a.disasm!=b.disasm,"distinct libraries");
   std::ifstream f(argv[3],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(f),{}};check(!bytes.empty(),"input");
