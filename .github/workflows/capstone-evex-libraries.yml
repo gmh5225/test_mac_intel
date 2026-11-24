@@ -1,7 +1,7 @@
-name: Compare mixed Linux public iterator and full decoder placement on identical real records
+name: Compare two placements of bare near memory output with native x86 and six-architecture records
 on:
   push:
-    branches: [codex/linux-mixed-public-record-caller]
+    branches: [codex/native-amd64-bare-near-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: linux-mixed-public-caller-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: bare-amd64-near-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

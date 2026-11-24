@@ -41,7 +41,7 @@ try:
     assert maps['prefix']==q and maps['base']['commit']==q['parent']
     layout={}
     from elftools.elf.elffile import ELFFile
-    for stem in ('real','states','guard'):
+    for stem in ('real','states','guard','near'):
         run('clang++','-O2','-std=c++17','-I',base/'include',r/('trial-'+stem+'.cpp'),'-ldl','-o',w/('trial-'+stem))
     from training import fetch
     from foreign_time import measure as time_foreign
@@ -66,7 +66,7 @@ try:
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert ('CAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and ('CAPSTONE_X86_ITERATOR_READERS' in entry)==(label=='candidate')
+        assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -101,13 +101,14 @@ try:
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     guards={};records={}
     for lbl in ('candidate','outlined'):
+        guard=get(w/'trial-near',w/'base.so',w/(lbl+'.so')).split();assert guard==['15064704','10543552'],guard
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
         guards[lbl]=dict(states=parts.stderr.count('case arch='),status=parts.returncode,stderr=parts.stderr.splitlines()[-8:])
-        save('extra-states',guards)
+        guards[lbl]['near']=guard;save('extra-states',guards)
         assert parts.returncode==0 and guards[lbl]['states']==464
         z=get(w/'trial-guard',w/'base.so',w/(lbl+'.so')).split()
         assert z==['2162688','999139'];guards[lbl]['scan']=[int(x)for x in z]
-        save('extra-states',guards)
+        guards[lbl]['near']=guard;save('extra-states',guards)
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
