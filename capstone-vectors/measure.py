@@ -32,11 +32,26 @@ try:
     images={};objects={}
     run('clang++','-std=c++17','-O3','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
 
+    original = r/'original.patch'
+    def capture_init(label):
+        core,=build.rglob('cs.c.o')
+        functions=get('nm','-t','x','--defined-only',core)
+        choices=['cs_decode_full_insn_body','cs_decode_full_insn']
+        symbol=next(k for k in choices if any(line.endswith(' '+k) for line in functions.splitlines()))
+        asm=get('objdump','-dr','--no-show-raw-insn','--disassemble='+symbol,core)
+        assert '<'+symbol+'>:' in asm
+        (e/(label+'-caller.asm')).write_text(asm)
+        return sha(core)
+    run('git','-C',base,'apply','--index',original)
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    old_hash=capture_init('ordinary-call')
+    run('git','-C',base,'restore','--staged','--worktree','--source=HEAD','--','.')
     for label in ('base','candidate'):
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        save(label+'-caller',dict(sha256=capture_init(label),ordinary_call=old_hash))
         objects[label]={f.name:sha(f)for f in build.rglob('*.c.o')}
         run('clang++','-no-pie',w/'foreign.o',lib,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))

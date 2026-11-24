@@ -55,10 +55,10 @@ index bd513f27..9aaa065c 100644
      # Use normal capstone name. Otherwise we get libcapstone_static.a
 diff --git a/MCInstStorage.c b/MCInstStorage.c
 new file mode 100644
-index 00000000..f03bed8f
+index 00000000..26a6f488
 --- /dev/null
 +++ b/MCInstStorage.c
-@@ -0,0 +1,18 @@
+@@ -0,0 +1,19 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -72,7 +72,8 @@ index 00000000..f03bed8f
 +#elif defined(__APPLE__)
 +__attribute__((section("__TEXT,__cs_mcinst,regular,pure_instructions")))
 +#endif
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
++CAPSTONE_INTERNAL CS_PRESERVE_MOST void
++MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
 +{
 +	MCInst_InitStorage(inst, arch, false);
 +}
@@ -116,16 +117,17 @@ index 0af815c7..ad07e6c8 100644
  	MCInst_Init(&mci, handle->arch);
  #endif
 diff --git a/cs_priv.h b/cs_priv.h
-index 84e1c748..19ecedba 100644
+index 84e1c748..1b520b77 100644
 --- a/cs_priv.h
 +++ b/cs_priv.h
-@@ -30,6 +30,10 @@
+@@ -30,6 +30,11 @@
  
  #include "MCInst.h"
  #include "SStream.h"
 +
 +#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST void
++MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
 +#endif
  #ifdef CAPSTONE_X86_SCAN_ADAPTER
  #include "arch/X86/X86ScanAdapter.h"

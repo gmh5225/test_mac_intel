@@ -1,7 +1,7 @@
-name: Measure ARM AArch64 MIPS PowerPC and RISC-V on a common executable inode
+name: Inspect MIPS caller code and test preserved register initialization on three x86-64 hosts
 on:
   push:
-    branches: [codex/mixed-operand-foreign-fixed-image]
+    branches: [codex/mixed-init-call-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,8 +12,8 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, replica: 3 }
+          - { host: ubuntu-24.04, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 28189d5b4cde48d62181b6ce98dcb3c422ccc749
+          ref: fb55d5f8c8595cb18bb67d84adf6dc9c3880d311
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-mixed-foreign-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: preserved-init-caller-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
