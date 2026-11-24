@@ -102,6 +102,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install --yes clang lld ninja-build
           git -C NeverD submodule update --init --depth 1 third_party/capstone third_party/unicorn
+      - name: Grant the native KVM oracle access when present
+        run: |
+          if test -c /dev/kvm && ! test -w /dev/kvm; then
+            sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          fi
       - name: Configure current NeverC for the portable x64 host ISA
         working-directory: NeverC
         run: |
