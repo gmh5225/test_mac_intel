@@ -68,6 +68,17 @@ jobs:
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
           @{generator_revision='3af182377a5f5ff075af5001844561e7eaf711ac'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+      - name: Execute the SDK and generated declarations on Windows ARM64
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $types = "$env:RUNNER_TEMP/sdk-types"
+          $selected = "$env:RUNNER_TEMP/workqueue-winrm-abi"
+          $runtime = "$env:RUNNER_TEMP/workqueue-winrm-runtime"
+          python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected --provider RealtimeWorkQueue --provider WindowsRemoteManagement
+          New-Item -Type Directory $runtime | Out-Null
+          python -c "import json,sys; from pathlib import Path; sys.path.insert(0, 'native-driver-entry'); from check_native_process_profile import execute_work_queue_and_winrm; p,s,o=map(Path,sys.argv[1:]); rows=execute_work_queue_and_winrm(json.loads((p/'arm64'/'manifest.json').read_text(encoding='utf-8-sig')),s,o); Path('native-api-execution.json').write_text(json.dumps(rows,indent=2),encoding='utf-8')" $types $selected $runtime
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
@@ -85,6 +96,8 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-catalog-evidence
-          path: native-catalog-evidence.json
+          path: |
+            native-catalog-evidence.json
+            native-api-execution.json
           if-no-files-found: error
           retention-days: 14
