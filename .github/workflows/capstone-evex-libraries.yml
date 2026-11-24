@@ -1,7 +1,7 @@
-name: Measure isolated public iterator dispatch on real public, private and foreign routes
+name: Compare direct non-x86 public continuation with published public iteration and iced
 on:
   push:
-    branches: [codex/isolated-public-static-text]
+    branches: [codex/known-arch-public-iterator]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-public-text-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: known-foreign-public-core-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

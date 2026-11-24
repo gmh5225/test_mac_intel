@@ -92,10 +92,10 @@ index 8c6444ab..d834a1fc 100644
  #endif
 diff --git a/arch/X86/X86PublicIterator.c b/arch/X86/X86PublicIterator.c
 new file mode 100644
-index 00000000..7d00b9fe
+index 00000000..0d9eb873
 --- /dev/null
 +++ b/arch/X86/X86PublicIterator.c
-@@ -0,0 +1,31 @@
+@@ -0,0 +1,37 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -104,6 +104,10 @@ index 00000000..7d00b9fe
 +#include "X86ScanAdapter.h"
 +
 +#ifdef CAPSTONE_X86_STATIC_ITERATOR
++#define CS_DECODE_ARCH_EXCLUDES_X86
++#include "../../cs_disasm_internal.h"
++#undef CS_DECODE_ARCH_EXCLUDES_X86
++
 +/* In a mixed static library the two private text readers already implement
 + * the entire public iterator contract for their respective address sizes. */
 +#if defined(__ELF__) && defined(__clang__)
@@ -118,7 +122,9 @@ index 00000000..7d00b9fe
 +	if (!*size || !ud)
 +		return false;
 +	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
-+	if (handle->arch == CS_ARCH_X86 && !handle->no_text) {
++	if (handle->arch != CS_ARCH_X86)
++		return cs_disasm_iter_core(ud, code, size, address, insn);
++	if (!handle->no_text) {
 +		if (handle->mode == CS_MODE_32)
 +			return X86_disasmIter32(ud, code, size, address, insn);
 +		if (handle->mode == CS_MODE_64)
@@ -127,6 +133,22 @@ index 00000000..7d00b9fe
 +	return cs_disasm_iter_generic(ud, code, size, address, insn);
 +}
 +#endif
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..af45eece 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -191,7 +191,11 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
++#ifdef CS_DECODE_ARCH_EXCLUDES_X86
++	const bool scan = false;
++#else
+ 	const bool scan = use_x86_scan(handle);
++#endif
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 77c4c5e4..1d2a80c3 100644
 --- a/tests/unit/CMakeLists.txt
