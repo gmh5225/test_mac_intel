@@ -57,6 +57,12 @@ try:
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
+        symbols={fields[-1]:int(fields[0],16) for row in names if len(fields:=row.split())==3 and fields[1] in ('T','t')}
+        public=('X86_decodeFixedRecord32','X86_decodeFixedRecord64')
+        present={key:(key in symbols)for key in public}
+        assert all(value==(variant!='base') for value in present.values()),present
+        requested=('cs_decode_full_insn','cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','X86_scanNativeBatch',*public)
+        save('symbols-'+variant,{name:symbols.get(name)for name in requested})
         archive,=build.rglob('libcapstone.a')
         assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
         uid_tables={}
