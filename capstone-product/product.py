@@ -64,7 +64,7 @@ try:
             fields=line.split()
             if len(fields)==4 and fields[-1] in ('modRMTable','x86PackedUIDs'):
                 uid_tables[fields[-1]]=int(fields[1],16)
-        assert uid_tables==({'modRMTable':40064} if variant=='layout' else {'x86PackedUIDs':39968} if variant=='selector' else {'modRMTable':39968}),uid_tables
+        assert uid_tables==({'modRMTable':39968} if variant=='base' else {'x86PackedUIDs':39968}),uid_tables
         save('uid-storage-'+variant,uid_tables)
 
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
@@ -155,7 +155,7 @@ try:
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if (c['name'],mode)==('libssl3t64-amd64',3) else 13
+            pairs=35 if (c['name'],mode) in (('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:

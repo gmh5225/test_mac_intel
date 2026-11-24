@@ -1560,6 +1560,78 @@ index 515ecdcc..5d103efe 100644
  	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
  	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
  	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..1cdbbe17 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -20,11 +20,11 @@
+ #include "X86GenSimpleOutput.inc"
+ #include "../../cs_disasm_internal.h"
+ #define X86_MEMORY32_OUTPUT
+-#define X86_MEMORY_IMMEDIATE writeCompare32
++#define X86_MEMORY_IMMEDIATE writeMemoryAlu32
+ #define X86_IMMEDIATE_WIDE 0
+-#define X86_COMPARE_IMMEDIATE
++#define X86_ALU32_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
+-#undef X86_COMPARE_IMMEDIATE
++#undef X86_ALU32_IMMEDIATE
+ #undef X86_MEMORY_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
+ 
+@@ -68,12 +68,11 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++		if (size >= 2 && code[1] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+-			const unsigned row =
+-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+-				2;
+-			if (writeCompare32(code, size, insn, insn_size,
++			const unsigned opcode_reg = (code[1] & 0x38) | (opcode & 1);
++			const unsigned row = x86_simple_plans[0][0][opcode_reg] >> 2;
++			if (writeMemoryAlu32(code, size, insn, insn_size,
+ 					   &x86_simple_outputs[row],
+ 					   x86_simple_registers))
+ 				return true;
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 11582041..400b217a 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -45,7 +45,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-#ifdef X86_COMPARE_IMMEDIATE
++#ifdef X86_ALU32_IMMEDIATE
+ 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
+ #else
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
+@@ -187,13 +187,17 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-#ifdef X86_COMPARE_IMMEDIATE
+-	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
++#ifdef X86_ALU32_IMMEDIATE
++	/* Group 1 opcode 83 sign-extends its immediate. The Intel printer
++	 * spells logical masks as unsigned values of the destination width. */
+ 	int64_t value = encoded;
+-	if (opcode == 0x83)
++	if (opcode == 0x83) {
++		const unsigned operation = (modrm >> 3) & 7;
++		const bool logical = operation == 1 || operation == 4 || operation == 6;
+ 		value = (int8_t)encoded;
+-	else if (imm_size == 4 && row->ops[0].size == 8)
+-		value = (int32_t)encoded;
++		if (logical)
++			value = (uint32_t)value;
++	}
+ 	memcpy(out, ", ", 2);
+ 	out += 2;
+ 	if (value < 0)
 diff --git a/suite/synctools/x86_disassembler_tables.py b/suite/synctools/x86_disassembler_tables.py
 index 7af86dc6..fecf6b0f 100644
 --- a/suite/synctools/x86_disassembler_tables.py
@@ -1699,3 +1771,24 @@ index 85ee1b93..7727dbb7 100644
  		cs_close(&handle);
  		if (!ok)
  			return 1;
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 0c9329b4..7e3e8b69 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1021,6 +1021,16 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
+ 				    !compare(handles, b + !p,
+ 					     (mr + j) % (sizeof(b) - !p), v))
+ 					return false;
++				/* Exercise the memory forms with an imm8 and with
++				 * an imm8 sign-extended to the operand width. */
++				if (mode == CS_MODE_32 && mr < 0xc0) {
++					b[1] = 0x80;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++					b[1] = 0x83;
++					if (!compare(handles, b + 1, sizeof(b) - 1, v))
++						return false;
++				}
+ 			}
+ 		}
+ 	}

@@ -1,7 +1,7 @@
-name: Verify release-size UID tables in the current six-architecture NeverD product
+name: Measure verified i386 ALU records in current NeverD with the compact selector as an independent control
 on:
   push:
-    branches: [codex/six-arch-neutral-uid-product]
+    branches: [codex/six-arch-memory-alu-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: six-arch-extrq-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-alu-six-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
