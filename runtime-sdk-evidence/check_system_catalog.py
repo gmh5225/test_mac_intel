@@ -8,6 +8,7 @@ import re
 import struct
 import subprocess
 import sys
+import tempfile
 
 source, generated, output = map(Path, sys.argv[1:])
 def read(file):
@@ -56,5 +57,25 @@ assert samples.keys() <= rows.keys()
 result = {"architecture": "arm64", "process_machine": process.value, "machine": machine.value,
           "providers": rows, "counts": sum(len(r["names"]) for r in rows.values()),
           "headers": {lib["name"]: hashlib.sha256((generated/"arm64"/(lib["name"]+".h")).read_bytes().replace(b"\r\n",b"\n")).hexdigest() for lib in manifest["libraries"]}}
+sys.path.insert(0, str(source.resolve() / "scripts"))
+from check_microsoft_provider_abis import generated_compiler
+
+provider = providers["NtdllRuntime"]
+proof = provider["metadata"]["sdk_runtime_bridge"]
+published_args = generated_compiler(provider["commands"][0][:-2])
+address_check = "_Static_assert(sizeof(DL_EUI48) == 6 && sizeof(((DL_EUI48 *)0)->Byte) == 6, \"Ethernet address layout\");"
+frame_check = "_Static_assert(sizeof(ETHERNET_HEADER) == 14, \"Ethernet frame layout\");"
+with tempfile.TemporaryDirectory() as directory:
+    unit = Path(directory) / "address.c"
+    for cc, header, checks in (
+        (proof["arguments"], Path(proof["source"]), [address_check, frame_check]),
+        (published_args, generated / "arm64/WindowsUserARM64.h", [address_check]),
+        (published_args, generated / "arm64/WindowsKernelARM64.h", [address_check, frame_check]),
+    ):
+        unit.write_text('#include "' + header.resolve().as_posix() + '"\n' +
+                        "\n".join(checks) + "\n", encoding="utf-8")
+        subprocess.run([*cc, "-fsyntax-only", str(unit)], check=True)
+result["ethernet_layout"] = {"reference": "netiodef.h", "address_bytes": 6,
+                            "frame_bytes": 14, "user_and_kernel_compiled": True}
 output.write_text(json.dumps(result, indent=2)+"\n", encoding="utf-8")
 print(len(rows), "native providers verified,", result["counts"], "named exports")
