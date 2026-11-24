@@ -1,0 +1,2 @@
+#include "observer.h"
+__declspec(dllexport) BOOL __cdecl InspectRegisterConsoleVDM(DWORD dwRegisterFlags, HANDLE hStartHardwareEvent, HANDLE hEndHardwareEvent, HANDLE hErrorhardwareEvent, DWORD Reserved, LPDWORD lpStateLength, PVOID *lpState, COORD VDMBufferSize, PVOID *lpVDMBuffer) { return RegisterConsoleVDM(dwRegisterFlags,hStartHardwareEvent,hEndHardwareEvent,hErrorhardwareEvent,Reserved,lpStateLength,lpState,VDMBufferSize,lpVDMBuffer); }

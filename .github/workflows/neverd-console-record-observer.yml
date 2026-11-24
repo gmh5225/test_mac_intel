@@ -1,0 +1,25 @@
+name: Verify Windows console record callers
+on:
+  push:
+    branches: [codex/windows-console-record-observer-20261124]
+permissions:
+  contents: read
+jobs:
+  observe:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: x86, runner: windows-2022 }
+          - { arch: x64, runner: windows-2022 }
+          - { arch: arm64, runner: windows-11-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Compile the caller and exercise the Windows calling convention
+        run: python console-record-observer/qualify.py ${{ matrix.arch }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: console-record-${{ matrix.arch }}
+          path: console-record-observer/observed-${{ matrix.arch }}.json
