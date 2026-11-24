@@ -26,6 +26,12 @@ try:
         run('cmake','--build',b,'--parallel','3','--target','capstone_static')
         for name in ('time','firmware'):
             run('clang','-D_POSIX_C_SOURCE=200809L','-std=c11','-O3','-I',s/'include',r/(name+'.c'),b/'libcapstone.a','-o',t/(k+name))
+        if sys.platform.startswith('linux'):
+            symbols={}
+            for line in call('nm','-n','-S','--defined-only',t/(k+'time')).splitlines():
+                parts=line.split()
+                if len(parts)==4 and parts[2].lower()=='t':symbols[parts[3]]=[int(parts[0],16),int(parts[1],16)]
+            put('symbols-'+k,symbols)
         source[k]=dict(tree=call('git','-C',s,'write-tree'),lib=sha(b/'libcapstone.a'),bin=sha(t/(k+'time')))
     assert source['base']['lib']!=source['candidate']['lib']
     programs={k:(t/(k+'time')).read_bytes() for k in ('base','candidate')}; width=max(map(len,programs.values()))
