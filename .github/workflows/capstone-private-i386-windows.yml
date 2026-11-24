@@ -1,7 +1,7 @@
-name: Measure XCore thread register spelling on original XS2 and XS3 code sections
+name: Time direct XCore immediate writing and verify every official firmware record
 on:
   push:
-    branches: [codex/xcore-register-text-firmware]
+    branches: [codex/xcore-direct-integer-firmware]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xcore-register-text-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: xcore-integer-time-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
