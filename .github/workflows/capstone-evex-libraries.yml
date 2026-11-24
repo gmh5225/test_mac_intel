@@ -1,7 +1,7 @@
-name: Measure same-source IR profile training on independent x86 and five architecture programs
+name: Compare both source-trained forks using identical held-out code and latest source-built LLVM profile tools
 on:
   push:
-    branches: [codex/holdout-six-architecture-profile]
+    branches: [codex/paired-trained-iced-and-capstone]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,11 +13,10 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
+      RUSTUP_TOOLCHAIN: 1.97.1
       CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -49,6 +48,7 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          rustup toolchain install 1.97.1 --profile minimal
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: heldout-six-arch-pgo-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: trained-both-forks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

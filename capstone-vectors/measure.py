@@ -30,8 +30,10 @@ try:
     ad.mkdir()
     for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
-    run('cargo','build','--release','--locked',cwd=ad)
-    ice_lib=ad/'target/release/libiced_compare.a'
+    import rust_training
+    triple=rust_training.rust_triple()
+    run('cargo','build','--release','--locked','--target',triple,cwd=ad)
+    ice_lib=ad/'target'/triple/'release/libiced_compare.a'
     shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
@@ -47,6 +49,27 @@ try:
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
+    assert sys.platform.startswith('linux')
+    trainer=rust_training.instrument(ad,w,e,[],lib,flags)
+    samples=[x for x in rd(e/'training-corpus.json') if x['arch'] in ('i386','amd64') and x['use']=='train']
+    assert len(samples)==6
+    counts={}
+    for row in samples:
+        name=row['name'];path=w/(name+'.text');spans=w/(name+'.ranges')
+        per={};bits='32' if row['arch']=='i386' else '64'
+        for mode in range(3):
+            for engine in ('iced','fast'):
+                args=[engine,str(mode),'1',path,spans,bits]
+                raw=w/'rust-raw'/('training-'+name+'-'+engine+str(mode)+'.profraw')
+                active=list(map(int,get(trainer,*args,env=dict(os.environ,ICED_TRAINING_PROFILE=str(raw))).split()))
+                stock=list(map(int,get(w/'base',*args).split()))
+                assert active[2:]==stock[2:] and stock[2]>0 and raw.stat().st_size>0
+                per[engine+'/'+str(mode)]=stock[2:]
+        counts[name]=dict(text_sha256=row['text_sha256'],records=per)
+    trained=rust_training.optimize(ad,w,e,counts)
+    run('clang++',w/'driver.o',lib,trained,*flags,'-o',w/'trained-both')
+    save('trained-libraries',dict(stock=sha(ice_lib),trained=sha(trained),executable=sha(w/'trained-both'),rust=get('rustc','-vV')))
+    assert sha(ice_lib)!=sha(trained)
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
@@ -70,17 +93,18 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('candidate')
+        assert audit_engine('base')==audit_engine('candidate')==audit_engine('trained-both')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
-            comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
+            comparator=engine.removesuffix('-trained') if engine.startswith(('iced','fast')) else 'private'
+            exe='trained-both' if engine.endswith('-trained') else engine if engine in ('candidate','duplicate')else'base'
             return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
+            labels=['base','duplicate','candidate','iced','iced-trained']+(['fast','fast-trained']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
             assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['candidate']
+            assert expected['iced']==expected['iced-trained'] and (not mode or expected['fast']==expected['fast-trained'])
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
