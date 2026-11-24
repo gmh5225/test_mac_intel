@@ -38,7 +38,7 @@ try:
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     from training import fetch,holdouts
     heldout=fetch(r,w);save('foreign-corpus',heldout)
-    images={};objects={};text={}
+    images={};objects={}
     run('clang++','-std=c++17','-O3','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
 
     for label in ('base','candidate'):
@@ -49,21 +49,11 @@ try:
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         objects[label]={f.name:sha(f)for f in build.rglob('*.c.o')}
-        if sys.platform.startswith('linux'):
-            from elftools.elf.elffile import ELFFile
-            cs,=build.rglob('cs.c.o')
-            with cs.open('rb') as f:
-                elf=ELFFile(f);table=elf.get_section_by_name('.symtab')
-                symbols=[a for a in table.iter_symbols() if a['st_size'] and a['st_info']['type']=='STT_FUNC']
-                text[label]={a.name:hashlib.sha256(elf.get_section(a['st_shndx']).data()[a['st_value']:a['st_value']+a['st_size']]).hexdigest() for a in symbols}
-            assert 'cs_decode_full_insn' in text[label]
-            if label=='candidate':
-                save('cs-code-changes',dict(changed=[name for name,v in text['base'].items() if v!=text[label].get(name)],function_count=len(text['base']),decoder_bytes_equal=text['base']['cs_decode_full_insn']==text[label]['cs_decode_full_insn']))
         run('clang++',w/'foreign.o',lib,'-o',w/('foreign-'+label))
         args=(['-dynamiclib','-Wl,-force_load,'+str(lib)] if sys.platform=='darwin' else ['-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm'])
         run('clang',*args,'-o',w/(label+'.library'))
         if label=='candidate':
-            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert sorted(affected)==['MCInst.c.o','cs.c.o'],affected
+            affected=[k for k,h in objects[label].items()if h!=objects['base'][k]];assert affected==['X86RegisterFallback32.c.o'],affected
             save('affected',dict(count=len(objects[label]),changed=affected))
     shutil.copy2(w/'foreign-base',w/'foreign-duplicate')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp',*(['-ldl']if sys.platform!='darwin' else []),'-o',w/'states')

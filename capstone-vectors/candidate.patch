@@ -1,71 +1,153 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..6c808481 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -160,6 +160,8 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
-     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "XCORE")
-diff --git a/MCInst.c b/MCInst.c
-index cda912d1..36bbc2bd 100644
---- a/MCInst.c
-+++ b/MCInst.c
-@@ -206,3 +206,12 @@ void MCInst_setSoftFail(MCInst *MI)
- 	assert(MI && MI->flat_insn);
- 	MI->flat_insn->illegal = true;
- }
+diff --git a/arch/X86/X86GenTest32Registers.inc b/arch/X86/X86GenTest32Registers.inc
+index 7a2ad08c..6168f0bf 100644
+--- a/arch/X86/X86GenTest32Registers.inc
++++ b/arch/X86/X86GenTest32Registers.inc
+@@ -27,3 +27,15 @@ static const struct X86SimpleRegister test32_regs[2][8] = {
+ 		{ 23, 3, "edi" },
+ 	},
+ };
 +
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+/* The mixed decoder calls this for ARM, AArch64, PowerPC and RISC-V.
-+ * Each decoder constructs its active operands before reading them. */
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
++static const struct X86SimpleOutput offset32_mov_rows[2] = {
++	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 1, 2 }, { 0, 1, 1 } } },
++	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
++};
++
++static const struct X86OffsetSpelling offset32_spelling[4] = {
++	{ 14, "al, byte ptr [", "]" },
++	{ 16, "eax, dword ptr [", "]" },
++	{ 10, "byte ptr [", "], al" },
++	{ 11, "dword ptr [", "], eax" },
++};
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index ee9b645b..3b100502 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -13,9 +13,48 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+ #include "X86RegisterImmediateOutput.h"
++struct X86OffsetSpelling {
++	uint8_t length;
++	char before[17], after[8];
++};
+ #include "X86GenTest32Registers.inc"
+ #include "../../cs_disasm_internal.h"
+ 
++/* A0 through A3 encode an unsigned absolute address without a ModR/M byte.
++ * The table holds the text on either side of that address. */
++static void writeOffsetMove32(const uint8_t *code, cs_insn *insn,
++			      uint16_t *insn_size)
 +{
-+	MCInst_InitStorage(inst, arch, false);
++	const uint8_t opcode = code[0];
++	const bool store = (opcode & 2) != 0;
++	const unsigned wide = opcode & 1;
++	const uint32_t address = (uint32_t)X86_readDisp32(code + 1);
++	const struct X86SimpleOutput *row = &offset32_mov_rows[wide];
++	const struct X86OffsetSpelling *text = &offset32_spelling[opcode & 3];
++	*insn_size = insn->size = 5;
++	insn->id = row->id;
++	memcpy(insn->bytes, code, 5);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, text->before, sizeof(text->before));
++	char *end = writeUnsignedImmediate(insn->op_str + text->length, address);
++	memcpy(end, text->after, sizeof(text->after));
++	if (insn->detail) {
++		const uint16_t acc = test32_regs[wide][0].reg;
++		X86_writeSimpleDetail(insn->detail, row, opcode, 0, 0,
++				      store ? 0 : acc, store ? acc : 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->encoding.modrm_offset = 0;
++		x->encoding.disp_offset = 1;
++		x->encoding.disp_size = 4;
++		cs_x86_op *mem = &x->operands[store ? 0 : 1];
++		mem->type = X86_OP_MEM;
++		mem->mem.scale = 1;
++		mem->mem.disp = x->disp = address;
++	}
 +}
-+#endif
-diff --git a/Makefile b/Makefile
-index 2720955e..18653e18 100644
---- a/Makefile
-+++ b/Makefile
-@@ -121,6 +121,8 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
- CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
-+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
-diff --git a/cs.c b/cs.c
-index 0af815c7..ad07e6c8 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	 * performs better on some full-detail workloads with the shared
- 	 * initializer below. */
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+#elif defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+	MCInst_InitConstructedOperands(&mci, handle->arch);
- #else
- 	MCInst_Init(&mci, handle->arch);
- #endif
-diff --git a/cs_priv.h b/cs_priv.h
-index 84e1c748..19ecedba 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -30,6 +30,10 @@
- 
- #include "MCInst.h"
- #include "SStream.h"
 +
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
-+#endif
- #ifdef CAPSTONE_X86_SCAN_ADAPTER
- #include "arch/X86/X86ScanAdapter.h"
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size,
+@@ -34,6 +73,11 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 			return true;
+ 		}
+ 	}
++	if ((opcode & 0xfc) == 0xa0 && size >= 5 &&
++	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++		writeOffsetMove32(code, insn, insn_size);
++		return true;
++	}
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
  #endif
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index cce3e23d..c0636650 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -542,6 +542,30 @@ void emit_register(const X86SimpleRegister &v)
+ 		  << v.name << "\" },\n";
+ }
+ 
++void emit_offset32(Decoder &decoder, const PlanTable &plans,
++		   const std::vector<std::string> &rows)
++{
++	std::cout << "\nstatic const struct X86SimpleOutput offset32_mov_rows[2] = {\n";
++	for (unsigned opcode : { 0x88u, 0x89u })
++		std::cout << '\t' << rows.at(plans[0][0][opcode] >> 2) << ",\n";
++	std::cout << "};\n\nstatic const struct X86OffsetSpelling offset32_spelling[4] = {\n";
++	for (unsigned opcode = 0xa0; opcode <= 0xa3; ++opcode) {
++		uint8_t code[] = { static_cast<uint8_t>(opcode), 0, 0, 0, 0 };
++		decoder.decode(code, sizeof(code), sizeof(code), 0);
++		const std::string text(decoder.insn->op_str);
++		const auto address = text.find("[0]");
++		if (decoder.insn->id != X86_INS_MOV || address == std::string::npos)
++			throw std::runtime_error("unexpected i386 offset MOV");
++		const auto before = text.substr(0, address + 1);
++		const auto after = text.substr(address + 2);
++		if (before.size() > 16 || after.size() > 7)
++			throw std::runtime_error("offset MOV spelling does not fit");
++		std::cout << "\t{ " << before.size() << ", \"" << before
++			  << "\", \"" << after << "\" },\n";
++	}
++	std::cout << "};\n";
++}
++
+ void emit_test32(const PlanTable &plans, const RegisterTable &regs,
+ 		 const std::vector<std::string> &rows)
+ {
+@@ -1319,6 +1343,7 @@ int main(int argc, char **argv)
+ 	add_rex_stack(x64, regs, plans, rows, checked, admitted);
+ 	if (test32) {
+ 		emit_test32(plans, regs, rows);
++		emit_offset32(x86, plans, rows);
+ 		return 0;
+ 	}
+ 	emit_tables(plans, regs, rows);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 0c9329b4..d1954416 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1062,6 +1062,20 @@ static bool check_absolute_addresses32(csh handles[2])
+ 	};
+ 	static const uint8_t opcodes[] = { 0x00, 0x03, 0x38, 0x3b, 0x84, 0x89,
+ 					   0x8b, 0x8d, 0xc6, 0xc7, 0xff };
++	for (unsigned op = 0xa0; op < 0xa4; ++op) {
++		for (size_t i = 0; i < sizeof(addresses) / sizeof(addresses[0]);
++		     ++i) {
++			const uint32_t a = addresses[i];
++			const uint8_t bytes[] = { (uint8_t)op, (uint8_t)a,
++						  (uint8_t)(a >> 8),
++						  (uint8_t)(a >> 16),
++						  (uint8_t)(a >> 24) };
++			for (size_t n = 1; n <= sizeof(bytes); ++n)
++				if (!compare(handles, bytes, n,
++					     op + (unsigned)i))
++					return false;
++		}
++	}
+ 	for (unsigned op = 0; op < sizeof(opcodes); ++op) {
+ 		for (unsigned group = 0; group < 8; ++group) {
+ 			for (unsigned i = 0;
