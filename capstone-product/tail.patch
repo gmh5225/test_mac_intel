@@ -1,133 +1,119 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3dc297b9..ca219d06 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1076,6 +1076,9 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-     endif()
-     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
-+    if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-+        target_sources(capstone_x86_native PRIVATE arch/X86/X86Vex3Operands.c)
-+    endif()
-     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
-     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-     if(capstone_enabled_architectures STREQUAL "X86")
-diff --git a/Makefile b/Makefile
-index 0fe49035..199eda9d 100644
---- a/Makefile
-+++ b/Makefile
-@@ -291,6 +291,9 @@ endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
- 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
-+ifneq (,$(filter -DCAPSTONE_ARM_AARCH64_MIPS_X86,$(CFLAGS)))
-+	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86Vex3Operands.o
-+endif
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
- endif
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..00064dad 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -81,6 +81,16 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
- 			      const struct X86SimpleRegister regs[4][16],
- 			      bool wide);
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 8d827a97..74b482b5 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,11 +30,19 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
  
-+/* The fixed AMD64 caller has identified a three-byte VEX prefix. */
-+#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
-+CAPSTONE_INTERNAL bool
-+X86_writeVex3Operands(cs_struct *handle, const uint8_t *code, size_t size,
-+		      cs_insn *insn, uint16_t *insn_size,
-+		      const struct X86SimpleRegister regs[4][16], bool wide);
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
+-	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_RECORD
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
 +#else
-+#define X86_writeVex3Operands X86_writeVexRegisterImmediate
++#define CAPSTONE_X86_MIXED_PUBLIC_RECORD
++CAPSTONE_INTERNAL bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code,
++					   size_t size, cs_insn *insn,
++					   uint16_t *length);
 +#endif
+ #endif
+ 
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..ed00d9d8 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3755,6 +3755,10 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 
+ #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
++#elif defined(CAPSTONE_X86_MIXED_PUBLIC_RECORD)
++#define CS_DECODE_OUTPUT_MISS(handle, code, size, insn, length, batch) \
++	cs_decode_full_insn(handle, code, size, insn, length, \
++			    (batch) ? CS_RECORD_BATCH : CS_RECORD_PUBLIC_ITERATOR)
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index cec4bec6..e3a77092 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -32,4 +32,12 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
 +
- /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
- CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
- 						   const uint8_t *code,
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..76840116 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -197,7 +197,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
- 		return true;
- 	if (code[0] == 0xc4 &&
--	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
-+	    X86_writeVex3Operands(handle, code, size, insn, insn_size,
- 					  x86_simple_registers, true))
- 		return true;
- 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
-diff --git a/arch/X86/X86Vex3Operands.c b/arch/X86/X86Vex3Operands.c
-new file mode 100644
-index 00000000..9f6f46b5
---- /dev/null
-+++ b/arch/X86/X86Vex3Operands.c
-@@ -0,0 +1,29 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+#include "../../cs_priv.h"
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_vex3_operands_text" rodata = ".cs_x86_vex3_operands_rodata"
-+#endif
-+#include "X86OutputOptions.h"
-+#include "X86VexBaseMemory.h"
-+
-+bool X86_writeVex3Operands(cs_struct *handle, const uint8_t *code, size_t size,
-+			   cs_insn *insn, uint16_t *insn_size,
-+			   const struct X86SimpleRegister regs[4][16], bool wide)
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *length)
 +{
-+	if (size >= 5 && code[4] < 0xc0 && wide) {
-+		if (X86_OUTPUT_UNSUPPORTED(handle, false))
-+			return false;
-+		return writeVexBaseMemory(code, size, 3, insn, insn_size, regs[3]);
-+	}
-+	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
-+					     regs, wide);
++	return X86_trySimpleOutput(handle, code, size, insn, length);
 +}
 +#endif
+ #endif
+diff --git a/cs.c b/cs.c
+index 333e7de2..febe3351 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1104,8 +1104,13 @@ __attribute__((noinline))
+ #endif
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, cs_record_kind kind)
+ {
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
++	const bool batch = kind == CS_RECORD_BATCH;
++#else
++	const bool batch = kind;
 +#endif
-diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
-index 6723d788..19fd32e9 100644
---- a/xcode/Capstone.xcodeproj/project.pbxproj
-+++ b/xcode/Capstone.xcodeproj/project.pbxproj
-@@ -239,6 +239,7 @@
- 		5816C41E14374534B361EF32 /* X86VexRegisterImmediate.c in Sources */ = {isa = PBXBuildFile; fileRef = 029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */; };
- 		A9B7FA0C9D8900A243394458 /* X86PlainEvexOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */; };
- 		70ABBD7F903AC493B372F180 /* X86RegisterFallback32.c in Sources */ = {isa = PBXBuildFile; fileRef = 5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */; };
-+		D65B4D38F90872C01024EEFA /* X86Vex3Operands.c in Sources */ = {isa = PBXBuildFile; fileRef = 1C6DA210FC40995841E2F77F /* X86Vex3Operands.c */; };
- 		3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */ = {isa = PBXBuildFile; fileRef = BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */; };
- 		F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */; };
- 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
-@@ -536,6 +537,7 @@
- 		029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VexRegisterImmediate.c; sourceTree = "<group>"; };
- 		98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86PlainEvexOutput.c; sourceTree = "<group>"; };
- 		5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86RegisterFallback32.c; sourceTree = "<group>"; };
-+		1C6DA210FC40995841E2F77F /* X86Vex3Operands.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Vex3Operands.c; sourceTree = "<group>"; };
- 		BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryFallback32.c; sourceTree = "<group>"; };
- 		526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86ImmediateOutput.c; sourceTree = "<group>"; };
- 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
-@@ -1025,6 +1027,7 @@
- 				029632200F114D2F98A08CA9 /* X86VexRegisterImmediate.c */,
- 				98D1A958BA441848EAB1CA5B /* X86PlainEvexOutput.c */,
- 				5F8735EB17DC98F7973339F7 /* X86RegisterFallback32.c */,
-+				1C6DA210FC40995841E2F77F /* X86Vex3Operands.c */,
- 				BFEEA2C504515B50A3D06B29 /* X86MemoryFallback32.c */,
- 				526314BBC39C6A88358C1D66 /* X86ImmediateOutput.c */,
- 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
-@@ -1798,6 +1801,7 @@
- 				5816C41E14374534B361EF32 /* X86VexRegisterImmediate.c in Sources */,
- 				A9B7FA0C9D8900A243394458 /* X86PlainEvexOutput.c in Sources */,
- 				70ABBD7F903AC493B372F180 /* X86RegisterFallback32.c in Sources */,
-+				D65B4D38F90872C01024EEFA /* X86Vex3Operands.c in Sources */,
- 				3A53497911EC12DEB29E66FC /* X86MemoryFallback32.c in Sources */,
- 				F74BC2F8F26F7C2681921DB9 /* X86ImmediateOutput.c in Sources */,
- 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+@@ -1113,9 +1118,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
++		if (kind == CS_RECORD_PUBLIC_ITERATOR && !handle->no_text &&
++		    X86_tryPublicOutput(handle, code, size, insn, insn_size))
++			return true;
++#endif
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..6e64c7ad 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -23,9 +23,17 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ #endif
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
++/* Existing single/batch callers pass false/true. The public iterator can try
++ * the formatted writer before falling back to the same full decoder. */
++typedef uint8_t cs_record_kind;
++enum { CS_RECORD_BATCH = 1, CS_RECORD_PUBLIC_ITERATOR = 2 };
++#else
++typedef bool cs_record_kind;
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size, cs_record_kind kind);
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool

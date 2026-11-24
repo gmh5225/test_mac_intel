@@ -1,141 +1,52 @@
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..403a5d85 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -30,11 +30,18 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
- 					 uint16_t *insn_size);
- #endif
- 
--#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
--	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
--	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
--	!defined(_WIN32_WCE)
-+#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
-+	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CAPSTONE_X86_PUBLIC_RECORD
-+#ifdef CAPSTONE_X86_ONLY
- #define CAPSTONE_X86_PUBLIC_OUTPUT
-+#else
-+CAPSTONE_INTERNAL bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code,
-+					   size_t size, cs_insn *insn,
-+					   uint16_t *length);
-+#endif
- #endif
- 
- bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 0d9b1a76..ffc4379a 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch);
- 
--#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#ifdef CAPSTONE_X86_PUBLIC_RECORD
- #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
- #endif
- #define CS_DECODE_SCAN_IMPL decodeIteratorScan
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..e3a77092 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -32,4 +32,12 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- #endif
- 	return cs_disasm_iter(ud, code, size, address, insn);
- }
-+
-+#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
-+			 cs_insn *insn, uint16_t *length)
-+{
-+	return X86_trySimpleOutput(handle, code, size, insn, length);
-+}
-+#endif
- #endif
-diff --git a/cs.c b/cs.c
-index 333e7de2..54f5390c 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1082,7 +1082,13 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 
- /* Keep the full decoder's stack frame off generated-output hits, while
-  * retaining the public iterator's scan code and private calling convention. */
--#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
-+#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+CS_DECODE_INLINE bool decode_full_record(cs_struct *handle, const uint8_t *code,
-+					 size_t size, cs_insn *insn,
-+					 uint16_t *insn_size, bool batch,
-+					 bool public_x86_output)
-+{
-+#elif defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
- CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		    cs_insn *insn, uint16_t *insn_size, bool batch)
-@@ -1113,9 +1119,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- #endif
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
--	if (handle->arch == CS_ARCH_X86)
-+	if (handle->arch == CS_ARCH_X86) {
-+#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+		if (public_x86_output && !handle->no_text &&
-+		    X86_tryPublicOutput(handle, code, size, insn, insn_size))
-+			return true;
-+#endif
- 		MCInst_InitX86(&mci);
--	else
-+	} else
- #endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
-@@ -1228,6 +1239,34 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	return true;
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..3f6846ce 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11979,6 +11979,16 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 	return NULL;
  }
  
-+#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+CS_PRESERVE_MOST bool
-+cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
-+		    cs_insn *insn, uint16_t *insn_size, bool batch)
++/* Most explicit operands follow zero or one previously reported register. */
++static inline bool x86HasRegister(uint16_t *regs, uint8_t count, unsigned int reg)
 +{
-+	return decode_full_record(handle, code, size, insn, insn_size, batch, false);
++	if (count <= 1)
++		return count != 0 && regs[0] == reg;
++	if (count == 2)
++		return (regs[0] == reg) | (regs[1] == reg);
++	return arr_exist_inline(regs, count, reg);
 +}
 +
-+/* Only the public iterator reaches this entry. Private readers have attempted
-+ * their own writer, and batch records keep their existing output rules. */
-+#if defined(__ELF__) && defined(__GNUC__)
-+__attribute__((section(".cs_x86_public_record_text")))
-+#elif defined(__APPLE__) && defined(__clang__)
-+__attribute__((section("__TEXT,__cs_x86_record")))
-+#endif
-+CS_PRESERVE_MOST bool
-+X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
-+		       cs_insn *insn, uint16_t *insn_size, bool batch)
-+{
-+	return decode_full_record(handle, code, size, insn, insn_size, batch, true);
-+}
-+#endif
-+
- #if defined(_MSC_VER)
- __declspec(noinline)
- #elif defined(__GNUC__)
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b0f4a6ce..acb2c08b 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -18,7 +18,7 @@
-  * the compiler can combine scan and output state without an extra boundary.
-  * Otherwise cs.c instantiates the same iterator. Input validation, option
-  * selection and callbacks keep their original order. */
--#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#ifdef CAPSTONE_X86_PUBLIC_RECORD
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
- 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+@@ -12008,12 +12018,12 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		switch ((int)op->type) {
+ 		case X86_OP_REG:
+ 			if ((op->access & CS_AC_READ) &&
+-			    !arr_exist_inline(regs_read, read_count, op->reg)) {
++			    !x86HasRegister(regs_read, read_count, op->reg)) {
+ 				regs_read[read_count] = op->reg;
+ 				read_count++;
+ 			}
+ 			if ((op->access & CS_AC_WRITE) &&
+-			    !arr_exist_inline(regs_write, write_count,
++			    !x86HasRegister(regs_write, write_count,
+ 					      op->reg)) {
+ 				regs_write[write_count] = op->reg;
+ 				write_count++;
+@@ -12026,13 +12036,13 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 				read_count++;
+ 			}
+ 			if ((op->mem.base != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !x86HasRegister(regs_read, read_count,
+ 					      op->mem.base)) {
+ 				regs_read[read_count] = op->mem.base;
+ 				read_count++;
+ 			}
+ 			if ((op->mem.index != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !x86HasRegister(regs_read, read_count,
+ 					      op->mem.index)) {
+ 				regs_read[read_count] = op->mem.index;
+ 				read_count++;
