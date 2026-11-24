@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 5942008068426ed1d0b7daba6772cf013755546f
+          ref: 637476087d703f7ef034ab2dc9979e76095a14b8
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -70,7 +70,7 @@ jobs:
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='5942008068426ed1d0b7daba6772cf013755546f'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='637476087d703f7ef034ab2dc9979e76095a14b8'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Execute the SDK and generated declarations on Windows ARM64
         shell: pwsh
         run: |
@@ -96,8 +96,9 @@ jobs:
           $types = "$env:RUNNER_TEMP/sdk-types"
           $selected = "$env:RUNNER_TEMP/qualified-named-runtime"
           $catalog = Get-Content 'source/scripts/MicrosoftNamedRuntimeSDKInputs.json' -Raw | ConvertFrom-Json
+          $cpdk = Get-Content 'source/scripts/MicrosoftCPDKInputs.json' -Raw | ConvertFrom-Json
           $providerArgs = @()
-          foreach ($item in $catalog.providers.PSObject.Properties) {
+          foreach ($item in (@($catalog.providers.PSObject.Properties) + @($cpdk.providers.PSObject.Properties))) {
             if ($null -ne $item.Value.targets.arm64) {
               $providerArgs += '--provider'
               $providerArgs += $item.Name

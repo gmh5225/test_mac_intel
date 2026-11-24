@@ -8,6 +8,8 @@ import sys
 
 source, generated, validation, output = map(Path, sys.argv[1:])
 profiles = json.loads((source / "scripts/MicrosoftNamedRuntimeSDKInputs.json").read_text(encoding="utf-8"))
+cpdk = json.loads((source / "scripts/MicrosoftCPDKInputs.json").read_text(encoding="utf-8"))
+profiles["providers"].update(cpdk["providers"])
 manifest = json.loads((generated / "arm64/manifest.json").read_text(encoding="utf-8-sig"))
 report = json.loads((validation / "report.json").read_text(encoding="utf-8-sig"))
 checks = {case["provider"]: case for case in report["cases"]}
