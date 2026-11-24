@@ -1,143 +1,213 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..a7ce1337 100644
+index a7ce1337..396ab047 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -160,6 +160,14 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
-     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    # Linux x86-64 retains its inlined initialization for MIPS text throughput.
-+    if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
-+       AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
-+            (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")))
-+        add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
-+        set(capstone_storage_source MCInstStorage.c)
-+    endif()
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "XCORE")
-@@ -1056,7 +1064,7 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
- 
- ## targets
- add_library(capstone_build_settings INTERFACE)
--add_library(capstone OBJECT ${ALL_SOURCES} ${ALL_HEADERS})
-+add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${ALL_HEADERS})
- target_link_libraries(capstone PUBLIC capstone_build_settings)
- set_property(TARGET capstone PROPERTY C_STANDARD 99)
- target_include_directories(capstone_build_settings INTERFACE
-@@ -1089,23 +1097,23 @@ endif()
- 
- if(CAPSTONE_BUILD_STATIC_LIBS)
-     set(capstone_static_objects $<TARGET_OBJECTS:capstone>)
--    set(capstone_alias_patterns_tail)
-+    set(capstone_static_tail)
-     if(TARGET capstone_x86_iter32)
-         if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-            AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
-             # Backends reference the alias parser indirectly. Keep its hot code
-             # ahead of the optional native readers even when all are linked.
--            # Keep the opcode rows after the native scanner when both are linked.
--            set(capstone_alias_patterns_tail
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasPatternLookup[.]c[.]o$>")
-+            # Keep alias rows and the mixed operand initializer after the native readers.
-+            set(capstone_static_tail
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>")
-             set(capstone_static_objects
--                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup)[.]c[.]o$>"
-+                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
-                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
-         else()
-             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
-         endif()
--        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_alias_patterns_tail})
-+        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
-     endif()
-     add_library(capstone_static STATIC ${capstone_static_objects})
-     # Use normal capstone name. Otherwise we get libcapstone_static.a
-diff --git a/MCInstStorage.c b/MCInstStorage.c
-new file mode 100644
-index 00000000..f03bed8f
---- /dev/null
-+++ b/MCInstStorage.c
-@@ -0,0 +1,18 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include "cs_priv.h"
-+
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+/* The mixed decoder calls this for ARM, AArch64, PowerPC and RISC-V.
-+ * Each decoder constructs its active operands before reading them. */
-+#if defined(__ELF__)
-+__attribute__((section(".cs_mcinst_storage_text")))
-+#elif defined(__APPLE__)
-+__attribute__((section("__TEXT,__cs_mcinst,regular,pure_instructions")))
-+#endif
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
-+{
-+	MCInst_InitStorage(inst, arch, false);
-+}
-+#endif
+@@ -1086,8 +1086,16 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    if(capstone_enabled_architectures STREQUAL "X86")
+-        target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++    if(capstone_enabled_architectures STREQUAL "X86" OR
++       (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
++        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
++        AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
++        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
++        if(capstone_enabled_architectures STREQUAL "X86")
++            target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++        else()
++            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
++        endif()
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+             $<TARGET_OBJECTS:capstone_x86_native>)
 diff --git a/Makefile b/Makefile
-index 2720955e..1a644eea 100644
+index 1a644eea..fb13d941 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -121,6 +121,17 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
- CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
-+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+# Use the compiler target, including cross builds.
-+MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
-+	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
-+	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
-+	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
-+	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print "yes" }')
-+ifeq ($(MIXED_STORAGE_TARGET),yes)
-+CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
-+MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
-+endif
+@@ -127,8 +127,8 @@ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev
+ 	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+ 	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
+ 	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
+-	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print "yes" }')
+-ifeq ($(MIXED_STORAGE_TARGET),yes)
++	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print macos ? "macos" : "linux-arm64" }')
++ifneq ($(MIXED_STORAGE_TARGET),)
+ CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
+ MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
  endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
-@@ -449,8 +460,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
- LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
- LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
- LIBOBJ += $(LIBOBJ_X86_NUMBERS)
--LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o
--LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o
-+LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
-+LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
+@@ -304,6 +304,8 @@ endif
+ 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
  ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- LIBOBJ_SHARED := $(LIBOBJ)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
++else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
++	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
  endif
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 039ad47a..06cc61ae 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -45,6 +45,12 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+ #endif
+ #endif
+ 
++#if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_FIXED_RECORD
++#endif
++
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *info);
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..197453cb 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3755,6 +3755,8 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 
+ #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
++#elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
++#define CS_PUBLIC_FIXED_RECORD
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
+ #include "../../cs_disasm_internal.h"
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 96ce9f72..7afca7e4 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -260,6 +260,14 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #define CS_DECODE_TRY_OUTPUT tryOutput64
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
++
++#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
++			     cs_insn *insn, uint16_t *length)
++{
++	return decode_insn(handle, code, size, insn, length, false, false);
++}
++#endif
+ #endif
+ 
+ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index ade6f2bcf..7bbf1c0d 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -201,6 +201,14 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
++
++#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
++			     cs_insn *insn, uint16_t *length)
++{
++	return decode_insn(handle, code, size, insn, length, false, false);
++}
++#endif
+ #endif
+ 
+ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
 diff --git a/cs.c b/cs.c
-index 0af815c7..ad07e6c8 100644
+index ad07e6c8..d0b8b045 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	 * performs better on some full-detail workloads with the shared
- 	 * initializer below. */
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+#elif defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+	MCInst_InitConstructedOperands(&mci, handle->arch);
- #else
- 	MCInst_Init(&mci, handle->arch);
+@@ -1085,8 +1085,9 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
+ {
++	const bool batch = request == true;
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+ 	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
+@@ -1104,8 +1105,9 @@ __attribute__((noinline))
  #endif
-diff --git a/cs_priv.h b/cs_priv.h
-index 84e1c748..19ecedba 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -30,6 +30,10 @@
- 
- #include "MCInst.h"
- #include "SStream.h"
-+
-+#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__clang__)
-+CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
+ {
++	const bool batch = request == true;
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+@@ -1113,9 +1115,19 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86)
++	if (handle->arch == CS_ARCH_X86) {
++#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++		if (request == CS_RECORD_PUBLIC_ITER && !handle->no_text) {
++			if (handle->mode == CS_MODE_32)
++				return X86_decodeFixedRecord32(handle, code, size,
++							       insn, insn_size);
++			if (handle->mode == CS_MODE_64)
++				return X86_decodeFixedRecord64(handle, code, size,
++							       insn, insn_size);
++		}
 +#endif
- #ifdef CAPSTONE_X86_SCAN_ADAPTER
- #include "arch/X86/X86ScanAdapter.h"
+ 		MCInst_InitX86(&mci);
+-	else
++	} else
  #endif
+ #ifdef CAPSTONE_HAS_MIPS
+ 	if (handle->arch == CS_ARCH_MIPS)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..4c4c34f2 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -23,9 +23,21 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ #endif
++/* The public iterator can enter a fixed x86 reader once. Misses from that
++ * reader call the same full decoder with the ordinary iterator request. */
++#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++typedef uint8_t cs_record_request;
++enum { CS_RECORD_PUBLIC_ITER = 2 };
++CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
++		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
++CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
++		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
++#else
++typedef bool cs_record_request;
++#endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch);
++		    cs_insn *insn, uint16_t *insn_size, cs_record_request request);
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -176,6 +188,9 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ #endif
+ #ifdef CS_DECODE_OUTPUT_MISS
+ 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
++#elif defined(CS_PUBLIC_FIXED_RECORD)
++	return cs_decode_full_insn(handle, code, size, insn, insn_size,
++				   batch ? true : CS_RECORD_PUBLIC_ITER);
+ #else
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ #endif
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 77c4c5e4..1d2a80c3 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -218,7 +218,7 @@ foreach(TSRC ${UNIT_TEST_SOURCES})
+     add_test(NAME "unit_${TBIN}" COMMAND ${TBIN})
+ endforeach()
+ 
+-if(TARGET x86_simple_output AND NOT capstone_enabled_architectures STREQUAL "X86")
++if(TARGET x86_simple_output AND NOT capstone_x86_objects)
+     target_sources(x86_simple_output PRIVATE $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64> $<TARGET_OBJECTS:capstone_x86_native>)
+ endif()
+ 
