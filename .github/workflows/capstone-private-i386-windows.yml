@@ -1,7 +1,7 @@
-name: Validate dedicated MIPS register jumps across native ABIs
+name: Verify MIPS scan defaults across native toolchains
 on:
   push:
-    branches: [codex/mips-jump-abi-validation]
+    branches: [codex/mips-default-abi]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mips-jump-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mips-default-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
