@@ -15,11 +15,13 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          sparse-checkout: native-driver-entry
+          sparse-checkout: |
+            native-driver-entry
+            runtime-sdk-evidence
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: cc8b85befc76880ec626411ecef44c55706a0f1e
+          ref: fa6da36d7cbc1355815c30ca9e89c7046d373e56
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -67,7 +69,7 @@ jobs:
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='cc8b85befc76880ec626411ecef44c55706a0f1e'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='fa6da36d7cbc1355815c30ca9e89c7046d373e56'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Execute the SDK and generated declarations on Windows ARM64
         shell: pwsh
         run: |
@@ -85,6 +87,15 @@ jobs:
           python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected --provider RealtimeWorkQueue --provider WindowsRemoteManagement
           New-Item -Type Directory $runtime | Out-Null
           python -c "import json,sys; from pathlib import Path; sys.path.insert(0, 'native-driver-entry'); from check_native_process_profile import execute_work_queue_and_winrm; p,s,o=map(Path,sys.argv[1:]); rows=execute_work_queue_and_winrm(json.loads((p/'arm64'/'manifest.json').read_text(encoding='utf-8-sig')),s,o); Path('native-api-execution.json').write_text(json.dumps(rows,indent=2),encoding='utf-8')" $types $selected $runtime
+      - name: Compile and resolve documented display and lockdown-policy exports
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $types = "$env:RUNNER_TEMP/sdk-types"
+          $selected = "$env:RUNNER_TEMP/qualified-named-runtime"
+          python source/scripts/check_microsoft_provider_abis.py --architecture arm64 --generated $types --neverd "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" --output $selected --provider DisplayControl --provider DisplayDriverFunctions --provider LockdownPolicy
+          python runtime-sdk-evidence/check_named_exports.py source $types $selected native-named-exports.json
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
@@ -105,5 +116,6 @@ jobs:
           path: |
             native-catalog-evidence.json
             native-api-execution.json
+            native-named-exports.json
           if-no-files-found: error
           retention-days: 14
