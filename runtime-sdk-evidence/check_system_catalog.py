@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 
-source, generated, output = map(Path, sys.argv[1:])
+source, generated, reader, output = map(Path, sys.argv[1:])
 def read(file):
     return json.loads(file.read_text(encoding="utf-8-sig"))
 
@@ -67,11 +67,19 @@ address_check = "_Static_assert(sizeof(DL_EUI48) == 6 && sizeof(((DL_EUI48 *)0)-
 frame_check = "_Static_assert(sizeof(ETHERNET_HEADER) == 14, \"Ethernet frame layout\");"
 with tempfile.TemporaryDirectory() as directory:
     unit = Path(directory) / "address.c"
-    for cc, header, checks in (
-        (proof["arguments"], Path(proof["source"]), [address_check, frame_check]),
-        (published_args, generated / "arm64/WindowsUserARM64.h", [address_check]),
-        (published_args, generated / "arm64/WindowsKernelARM64.h", [address_check, frame_check]),
+    for domain, cc, header, checks in (
+        ("reference", proof["arguments"], Path(proof["source"]), [address_check, frame_check]),
+        ("user", published_args, generated / "arm64/WindowsUserARM64.h", [address_check]),
+        ("kernel", published_args, generated / "arm64/WindowsKernelARM64.h", [address_check, frame_check]),
     ):
+        if domain != "reference":
+            selected = Path(directory) / (domain + ".h")
+            names = ["DL_EUI48"] if domain == "user" else ["DL_EUI48", "ETHERNET_HEADER"]
+            subprocess.run([str(reader), "types", "--data-model", "LLP64", "--record-abi",
+                            "microsoft", "--declare", str(header), "--spelling", "windows",
+                            "--asserts", *[v for name in names for v in ("--type", name)],
+                            "-o", str(selected)], check=True)
+            header = selected
         unit.write_text('#include "' + header.resolve().as_posix() + '"\n' +
                         "\n".join(checks) + "\n", encoding="utf-8")
         subprocess.run([*cc, "-fsyntax-only", str(unit)], check=True)

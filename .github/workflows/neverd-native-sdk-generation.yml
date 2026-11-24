@@ -102,7 +102,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          python runtime-sdk-evidence/check_system_catalog.py source "$env:RUNNER_TEMP/sdk-types" native-system-catalog.json
+          python runtime-sdk-evidence/check_system_catalog.py source "$env:RUNNER_TEMP/sdk-types" "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" native-system-catalog.json
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
