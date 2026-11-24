@@ -1,17 +1,3 @@
-from pathlib import Path as _Path
-import hashlib as _hashlib, subprocess as _sp
-_base_dir = _Path(__file__).resolve().parent
-_source_dir = _base_dir.parent / 'source'
-def _git(*args, data=None):
-    return _sp.check_output(['git','-C',_source_dir,*args],input=data).decode().strip()
-assert _git('rev-parse','HEAD') == '8347e89a4e9a9e1618009fb8a496e335e857d00f'
-_patch = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:family-ids/corrected-parent.patch'])
-assert _hashlib.sha256(_patch).hexdigest() == 'c462aa5959d9fe71006d84e6f3f2206d72ea347c945c85b6683de69621430369'
-_git('apply','--index','-',data=_patch)
-assert _git('write-tree') == 'ca4d4512e65bdf432ea1eb3f76d69d66a07cc211'
-_commit = _sp.check_output(['git','-C',_base_dir.parent,'cat-file','blob','HEAD:family-ids/parent.commit'])
-assert _git('hash-object','-w','-t','commit','--stdin',data=_commit) == '7db5af38d02d193688bccd2b45e58627979979bb'
-_git('checkout','-q','--detach','7db5af38d02d193688bccd2b45e58627979979bb')
 from pathlib import Path
 import hashlib,json,os,platform,random,shutil,subprocess as sp,tempfile
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
@@ -23,7 +9,8 @@ def cmd(n,a,cwd=None):
 def g(*a):return sp.check_output(['git','-C',s,*a],text=True).strip()
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 cc=os.environ['CC'];meta=load(d/'tree.json');osrel='22.04'if '22.04' in Path('/etc/os-release').read_text() else '24.04'
-t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');assert orig==meta['parent']
+t=Path(tempfile.mkdtemp());b=t/'build';orig=g('rev-parse','HEAD');base=load(d/'base.json');assert orig==base['parent'] and meta['parent']==base['commit']
+assert sha(d/'base.patch')==base['sha256'];g('apply','--index',str(d/'base.patch'));assert g('write-tree')==base['tree']
 try:
     cmd('configure',['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA')]])
     imgs={};ids={}
@@ -37,7 +24,7 @@ try:
         for ln in sp.check_output(['nm','-n','-S','--defined-only',so],text=True).splitlines():
             fs=ln.split()
             if len(fs)==4 and fs[-1] in names:syms[fs[-1]]=list(map(lambda x:int(x,16),fs[:2]))
-        assert 'matchAliasPatterns' in syms and 'cs_disasm_iter' in syms and ('matchAliasPatternRange' in syms)==(k=='indexed')
+        assert 'matchAliasPatterns' in syms and 'cs_disasm_iter' in syms
         printer,=b.rglob('MCInstPrinter.c.o')
         cmd('common-code-'+k,['objcopy','--dump-section','.text='+str(t/'common.text'),printer])
         regular_code=sha(t/'common.text')
@@ -45,32 +32,22 @@ try:
         save('layout-'+k,dict(symbols=syms,common_code=regular_code,linked_sections=sections))
         ids[k]=sha(so)
         imgs[k]=so.read_bytes()
-        if cc=='clang':
-            cmd('alias-static-'+k,['cmake','--build',b,'--target','capstone_static','--parallel','4'])
-            cmd('alias-compile-'+k,[cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_HAS_AARCH64','-DCAPSTONE_HAS_MIPS','-DCAPSTONE_USE_SYS_DYN_MEM','-I',s,'-I',s/'include',d/'alias.c',b/'libcapstone.a','-o',t/'alias'])
-            cmd('alias-oracle-'+k,[t/'alias'])
-            assert int((out/('alias-oracle-'+k+'.log')).read_text())>500000
         if k=='indexed':
-            names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch']
+            names=['mcinst','aarch64_postprocess','aarch64_scan','mips_scan','mips_single','mips_msa_control','mips_reglist_offset','mips_register_names','x86_reg_access','x86_mapping_counts','x86_scan_batch','x86_evex_normalization_boundary','x86_evex_vpcmp_id','x86_evex_vpcmp_mask_size']
             cmd('units-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static',*names])
             cmd('units-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$'])
-            cmd('generator',['python3','-B',s/'suite/synctools/alias_mnemonic_trie.py','--check'])
-            cmd('index-check',['python3','-B',s/'suite/synctools/alias_pattern_rows.py','--check'])
+            cmd('compare-mappings',['python3','-B',s/'suite/synctools/x86_mapping_counts.py','--check'])
     assert ids['base']!=ids['indexed']
     imgs['copy']=imgs['base'];size=max(map(len,imgs.values()));imgs={k:v+bytes(size-len(v)) for k,v in imgs.items()}
     slot=t/'slot';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(imgs['base']);(slot/'libcapstone.so').symlink_to(target.name)
     cmd('compile-time',['c++','-std=c++17','-O3','-I',s/'include',d/'time.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'time'])
-    shutil.copy2(d/'fetch.py',t/'fetch.py');cmd('pe',['python3','-B',t/'fetch.py'])
-    for f in ('libmvec.py','libmvec.json'):shutil.copy2(d/f,t/f)
-    cmd('libmvec',['python3','-B',t/'libmvec.py'])
     import corpus
     foreign=corpus.prepare(d,t,out,lambda args,n:cmd(n,args));extra=[q for q in foreign if q['name'] in ('arm-ls', 'arm64-ls', 'mips64el-ls', 'ppc64el-ls', 'riscv64-ls', 'sparc64-ls', 's390x-ls', 'loong64-ls')]
     from xtensa import get
     xfile,xsource=get(t,load(d/'xtensa-source.json'));save('xtensa-source',xsource);extra.append(dict(name='xtensa-picolibc',path=xfile))
     assert len(extra)==9
     selectors={'arm': 101, 'arm64': 102, 'mips64el': 103, 'ppc64el': 104, 'riscv64': 105, 'sparc64': 106, 's390x': 107, 'loong64': 108, 'xtensa': 109}
-    panels=[('putty32',32,t/'putty-0.85-32.text',0x401000,(0,1,2,3)),('putty64',64,t/'putty-0.85-64.text',0x140001000,(1,2))]
-    panels.append(('libmvec-amd64',64,t/'libmvec.text',load(t/'libmvec.json')['address'],(1,2)))
+    panels=[]
     panels.extend((q['name'],selectors[q['name'].split('-')[0]],Path(q['path']),0x100000,(0,1,2))for q in extra)
     cmd('compile-records',['c++','-std=c++17','-O2','-I',s/'include',d/'raw.cpp','-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/'raw'])
     samples=[q for q in foreign if q['name'].split('-')[0] in selectors]+[extra[-1]]
