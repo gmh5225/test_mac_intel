@@ -150,7 +150,16 @@ try:
             checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
 
         sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
-        return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
+        argv=['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])]
+        proc=sp.run(argv,capture_output=True,text=True)
+        if proc.returncode:
+            save('failed-image',dict(label=k,case=case['name'],mode=mode,reps=reps,exit_code=proc.returncode,image=sha(image),stderr=proc.stderr[-2000:]))
+            if shutil.which('gdb'):
+                sp.run(['gdb','--batch','-ex','run','-ex','bt','--args',*map(str,argv)],stdout=(out/'debug-image.log').open('w'),stderr=sp.STDOUT)
+        proc.check_returncode();return list(map(int,proc.stdout.split()))
+    original=next(c for c in cases if c['name']=='putty-32-0.85')
+    smoke={k:execute(k,original,1,2)[1:] for k in imgs}
+    assert len(set(map(tuple,smoke.values())))==1;save('relocated-smoke',smoke)
     rows=[];rng=random.Random(1739)
     for c in cases:
         for mode in (range(4) if c['selector'] in (32,64) else range(3)):

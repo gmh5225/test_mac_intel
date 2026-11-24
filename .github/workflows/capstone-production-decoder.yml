@@ -1,7 +1,7 @@
-name: Separate i386 operand construction from scanner placement in the source-built NeverD product
+name: Measure i386 construction with fully relocated matched scanner addresses
 on:
   push:
-    branches: [codex/matched-product-scanner-sections]
+    branches: [codex/product-addresses-preserve-relocations]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-scanner-address-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: relocated-scanner-address-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

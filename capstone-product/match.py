@@ -32,13 +32,18 @@ def pair(build,t,products,archive,save):
         with obj.open('rb')as f:
             elf=ELFFile(f);sec=elf.get_section_by_name(SECTION);body=sec.data()
         assert len(body)==sizes[k],(len(body),sizes)
+        relocations={}
         if len(body)<size:
             fill=directory/'filled';fill.write_bytes(body+bytes(size-len(body)))
             tmp=directory/'updated.o'
             sp.run(['objcopy','--update-section',SECTION+'='+str(fill),obj,tmp],check=True)
-            tmp.replace(obj)
-            with obj.open('rb')as f:
-                sec=ELFFile(f).get_section_by_name(SECTION);assert sec.data()==fill.read_bytes()
+            from extend import extend
+            relocations['preserved']=extend(obj,SECTION,size-len(body))
+            # Compare the discarded experimental objcopy image to its input.
+            with tmp.open('rb')as f:
+                e=ELFFile(f);idx=e.get_section_index(SECTION)
+                relocations['objcopy']={z.name:z.num_relocations()for z in e.iter_sections()
+                    if z['sh_type'] in ('SHT_RELA','SHT_REL') and z['sh_info']==idx}
             sp.run(['ar','rDs',new,obj],check=True)
         assert get('ar','t',new).splitlines()==names
         assert all(sp.check_output(['ar','p',original,n])==sp.check_output(['ar','p',new,n]) for n in names if n!=MEMBER)
@@ -48,7 +53,7 @@ def pair(build,t,products,archive,save):
             sp.run(argv,check=True,cwd=build)
         assert sha(raw)==sha(products[k]),('link replay changed executable',k)
         products['matched-'+k]=directory/'matched';before=read_sections(raw);after=read_sections(products['matched-'+k])
-        log[k]=dict(before=before,after=after,pad=size-len(body),unchanged_executable=sha(raw)==sha(products['matched-'+k]),input_sha256=sha(original),output_sha256=sha(new))
+        log[k]=dict(relocations=relocations,before=before,after=after,pad=size-len(body),unchanged_executable=sha(raw)==sha(products['matched-'+k]),input_sha256=sha(original),output_sha256=sha(new))
     base=log['base']['after'];new=log['selector']['after']
     scan=['.cs_x86_native_batch_text','.cs_x86_batch32_text','.cs_x86_batch64_text']
     check=dict(allocated_extent_differences=[k for k,v in base.items()if new.get(k,(None,None))[:2]!=v[:2]],
