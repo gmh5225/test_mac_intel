@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 95c94b6a4deba11a7c64aa01d38335d347955e21
+          ref: 3c10a215b039b6f627b2d8922ae6d1d6668da3a3
           path: source
           sparse-checkout: scripts
           persist-credentials: false
@@ -70,7 +70,7 @@ jobs:
           foreach ($name in $expected.Keys) {
             if ($selected[$name] -ne $expected[$name]) { throw "Incomplete native ABI evidence for $name" }
           }
-          @{generator_revision='95c94b6a4deba11a7c64aa01d38335d347955e21'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
+          @{generator_revision='3c10a215b039b6f627b2d8922ae6d1d6668da3a3'; reader_revision='180f23d24352f2dfb2b23cd234dd7028ded45ff1'; reader_sha256=(Get-FileHash $exe).Hash.ToLower(); reader_core_sha256=(Get-FileHash "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll").Hash.ToLower(); machine=43620; manifest_sha256=(Get-FileHash "$out/manifest.json").Hash.ToLower(); libraries=$libraries; independently_compiled_providers=$selected; ordinal_provider_abis=$ordinalExpected} | ConvertTo-Json -Depth 6 | Set-Content native-catalog-evidence.json
       - name: Execute the SDK and generated declarations on Windows ARM64
         shell: pwsh
         run: |
@@ -112,7 +112,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $PSNativeCommandUseErrorActionPreference = $true
-          python runtime-sdk-evidence/check_system_catalog.py source "$env:RUNNER_TEMP/sdk-types" "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" native-system-catalog.json
+          python runtime-sdk-evidence/check_recent_system_catalog.py source "$env:RUNNER_TEMP/sdk-types" "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" native-system-catalog.json
       - name: Record the first failing official interface or compiler
         if: failure()
         shell: pwsh
