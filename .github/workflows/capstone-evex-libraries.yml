@@ -1,7 +1,7 @@
-name: Measure the table-only EXTRQ fix against iced Intel and FastFormatter
+name: Time scan, formatting and detail with independent predicate ID checks on real applications
 on:
   push:
-    branches: [codex/extrq-selector-iced-score]
+    branches: [codex/canonical-public-predicates-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-extrq-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: predicate-record-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
