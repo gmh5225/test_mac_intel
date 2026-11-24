@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','prefix'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','prefix','stable'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -36,7 +36,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','prefix'):
+    for variant in ('base','prefix','stable'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -72,7 +72,7 @@ try:
         counts=[row.split() for row in p.stdout.splitlines()]
         assert len(counts)==15
         wrong=[sum(int(row[col]) for row in counts) for col in (4,5,6)]
-        if variant=='prefix':assert not any(wrong),wrong
+        if variant!='base':assert not any(wrong),wrong
         else:assert wrong[2]>0,wrong
         save('scan-'+variant,dict(counts=counts,total=sum(int(row[2]) for row in counts),mismatches=wrong))
         test=out/('tests-'+variant+'.log')
@@ -97,16 +97,32 @@ try:
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
         save('executable-sections-'+variant,code_sections)
+        with binary.open('rb') as file:
+            elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+            save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert len({z['archive']for z in identities.values()})==2 and len({z['binary']for z in identities.values()})==2
+    assert len({z['archive']for z in identities.values()})==3 and len({z['binary']for z in identities.values()})==3
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
     shutil.copy2(products['base'],t/'selected')
     imgs={k:v.read_bytes()for k,v in products.items()};imgs['copy']=imgs['base']
     length=max(map(len,imgs.values()));imgs={k:v+bytes(length-len(v))for k,v in imgs.items()}
+    image=t/'selected';image.write_bytes(imgs['base'])
+    inode=image.stat().st_ino;block=4096
+    offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
+    checked={};assert offsets
     def execute(k,case,mode,reps):
-        image=products[k if k!='copy' else 'base']
+        # Touch exactly the same file pages, in the same order, before every exec.
+        with image.open('r+b',buffering=0) as dest:
+            for at in offsets:
+                dest.seek(at)
+                part=imgs[k][at:at+block]
+                assert dest.write(part)==len(part)
+        assert image.stat().st_ino==inode and image.stat().st_size==length
+        if k not in checked:
+            checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
+
         sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
         return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
     rows=[];rng=random.Random(1739)
@@ -126,6 +142,8 @@ try:
                 cycles.append(ticks)
             rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],reps=n,cycles=cycles))
             save('timings',rows)
+    assert set(checked)==set(imgs) and checked['copy']==checked['base']
+    save('fixed-image',dict(inode=inode,verified=checked,bytes=length,block=block,blocks=len(offsets)))
     save('complete',dict(done=True,pairs=13,panels=len(rows),source=llvm))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())

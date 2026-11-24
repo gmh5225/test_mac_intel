@@ -1,7 +1,7 @@
-name: Measure the regenerated scan data in source-built NeverD
+name: Compare two MMX scan projections through one verified NeverD executable inode
 on:
   push:
-    branches: [codex/mmx-scan-tables-product]
+    branches: [codex/same-image-mmx-scan-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: d435a992844193f968dcb21e96bb9a0d3ecd487d
+          ref: c9e9df34dbe4527bc2dcc6da328844f1df5af42a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "d435a992844193f968dcb21e96bb9a0d3ecd487d"
+          test "$(git rev-parse HEAD)" = "c9e9df34dbe4527bc2dcc6da328844f1df5af42a"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "1a1075b8bff460c3bd4da0b93f8e0a091c09039a"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 1a1075b8bff460c3bd4da0b93f8e0a091c09039a
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: regenerated-mmx-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: same-image-scan-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
