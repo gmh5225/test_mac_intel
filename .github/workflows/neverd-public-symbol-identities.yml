@@ -1,0 +1,26 @@
+name: Identify symbol files for four original ARM64 export contracts
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - '.github/workflows/neverd-public-symbol-identities.yml'
+      - 'runtime-sdk-evidence/image_identity.py'
+permissions:
+  contents: read
+jobs:
+  identities:
+    runs-on: windows-11-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: runtime-sdk-evidence
+          persist-credentials: false
+      - name: Read the CodeView identities and exact export addresses in the PE files
+        shell: pwsh
+        run: python runtime-sdk-evidence/image_identity.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: installed-export-identities
+          path: installed-image-identities.json
+          if-no-files-found: error
