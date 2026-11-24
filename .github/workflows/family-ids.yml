@@ -1,7 +1,7 @@
-name: Measure unconditional RISC-V operand-reader projections and verify DIET
+name: Test projected RISC-V scan IDs in release and DIET builds
 on:
   push:
-    branches: [codex/derived-riscv-scan-ids]
+    branches: [codex/checked-riscv-projected-ids]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: derived-riscv-ids-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: checked-riscv-projection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
