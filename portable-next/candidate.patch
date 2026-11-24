@@ -1,70 +1,155 @@
-diff --git a/arch/X86/X86UnsignedImmediate.h b/arch/X86/X86UnsignedImmediate.h
-index 6f3953cc..c78150e3 100644
---- a/arch/X86/X86UnsignedImmediate.h
-+++ b/arch/X86/X86UnsignedImmediate.h
-@@ -4,23 +4,54 @@
- #ifndef CS_X86_UNSIGNED_IMMEDIATE_H
- #define CS_X86_UNSIGNED_IMMEDIATE_H
+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
+index b774119d..a137144b 100644
+--- a/arch/X86/X86MappingInsnOp.inc
++++ b/arch/X86/X86MappingInsnOp.inc
+@@ -5105,7 +5105,7 @@
  
-+#include "../../MathExtras.h"
-+
- static char *writeUnsignedImmediate(char *out, uint64_t value)
- {
- 	if (value <= HEX_THRESHOLD) {
- 		*out = (char)('0' + value);
- 		return out + 1;
--	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
--		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
--		return out + 2 + (end - start);
- 	}
-+
-+	static const char byte_digits[] =
-+		"000102030405060708090a0b0c0d0e0f"
-+		"101112131415161718191a1b1c1d1e1f"
-+		"202122232425262728292a2b2c2d2e2f"
-+		"303132333435363738393a3b3c3d3e3f"
-+		"404142434445464748494a4b4c4d4e4f"
-+		"505152535455565758595a5b5c5d5e5f"
-+		"606162636465666768696a6b6c6d6e6f"
-+		"707172737475767778797a7b7c7d7e7f"
-+		"808182838485868788898a8b8c8d8e8f"
-+		"909192939495969798999a9b9c9d9e9f"
-+		"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
-+		"b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
-+		"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
-+		"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
-+		"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
-+		"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
-+	memcpy(out, "0x", 2);
-+	out += 2;
-+	if (value < 256) {
-+		const char *pair = byte_digits + 2 * (unsigned)value;
-+		if (value >= 16)
-+			*out++ = pair[0];
-+		*out++ = pair[1];
-+		return out;
-+	}
-+
-+	/* Write the significant digits directly into the operand string. */
-+	unsigned bits = (67 - CountLeadingZeros_64(value)) & ~3u;
-+	if (bits & 4) {
-+		bits -= 4;
-+		*out++ = byte_digits[2 * (unsigned)(value >> bits) + 1];
-+	}
-+	while (bits) {
-+		bits -= 8;
-+		memcpy(out, byte_digits + 2 * (uint8_t)(value >> bits), 2);
-+		out += 2;
-+	}
-+	return out;
+ {	/* X86_KMOVBmk, X86_INS_KMOVB: kmovb */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVBrk, X86_INS_KMOVB: kmovb */
+@@ -5130,7 +5130,7 @@
+ 
+ {	/* X86_KMOVDmk, X86_INS_KMOVD: kmovd */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVDrk, X86_INS_KMOVD: kmovd */
+@@ -5155,7 +5155,7 @@
+ 
+ {	/* X86_KMOVQmk, X86_INS_KMOVQ: kmovq */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVQrk, X86_INS_KMOVQ: kmovq */
+@@ -5180,7 +5180,7 @@
+ 
+ {	/* X86_KMOVWmk, X86_INS_KMOVW: kmovw */
+ 	0,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_KMOVWrk, X86_INS_KMOVW: kmovw */
+diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
+index c414d6d3..9cf2eb66 100644
+--- a/suite/auto-sync/README.md
++++ b/suite/auto-sync/README.md
+@@ -149,6 +149,9 @@ If regenerated `VMOVSS` or `VMOVSD` metadata loses operand accesses or AVX512
+ group membership, apply `suite/auto-sync/inc_patches/X86/04_scalar_vector_access.patch`,
+ regenerate the mapping counts with `python3 suite/synctools/x86_mapping_counts.py`,
+ and run `unit_x86_scalar_vector_access`.
++The VEX `KMOVB/W/D/Q` memory-store rows are maintained by
++`suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch` and covered by
++`unit_x86_kmask_access`.
+ 
+ After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
+ `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
+diff --git a/suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch b/suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch
+new file mode 100644
+index 00000000..1c119e58
+--- /dev/null
++++ b/suite/auto-sync/inc_patches/X86/05_kmov_store_access.patch
+@@ -0,0 +1,31 @@
++diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
++--- a/arch/X86/X86MappingInsnOp.inc
+++++ b/arch/X86/X86MappingInsnOp.inc
++@@ -5106,4 +5106,4 @@
++ {	/* X86_KMOVBmk, X86_INS_KMOVB: kmovb */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
++@@ -5131,4 +5131,4 @@
++ {	/* X86_KMOVDmk, X86_INS_KMOVD: kmovd */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
++@@ -5156,4 +5156,4 @@
++ {	/* X86_KMOVQmk, X86_INS_KMOVQ: kmovq */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
++@@ -5181,4 +5181,4 @@
++ {	/* X86_KMOVWmk, X86_INS_KMOVW: kmovw */
++-	0,
+++	0,
++-	{ CS_AC_READ, CS_AC_READ, 0 }
+++	{ CS_AC_WRITE, CS_AC_READ, 0 }
++ },
+diff --git a/tests/unit/x86_kmask_access.c b/tests/unit/x86_kmask_access.c
+index 13eeb649..43745a79 100644
+--- a/tests/unit/x86_kmask_access.c
++++ b/tests/unit/x86_kmask_access.c
+@@ -148,6 +148,51 @@ static bool test_case(csh handle, const kmask_case *test, size_t case_index,
+ 	return success;
  }
  
- #endif
++static bool test_memory_moves(csh handle, cs_opt_value syntax)
++{
++	static const struct {
++		uint8_t vex;
++		uint8_t size;
++		x86_insn id;
++	} forms[] = { { 0x79, 1, X86_INS_KMOVB },
++		      { 0x78, 2, X86_INS_KMOVW },
++		      { 0xf9, 4, X86_INS_KMOVD },
++		      { 0xf8, 8, X86_INS_KMOVQ } };
++	for (size_t i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i) {
++		for (unsigned store = 0; store < 2; ++store) {
++			/* Move between k2 and memory at [rbx]. */
++			const uint8_t code[] = { 0xc4, 0xe1, forms[i].vex,
++						 (uint8_t)(0x90 + store),
++						 0x13 };
++			cs_insn *insn = NULL;
++			if (!check(cs_disasm(handle, code, sizeof(code), 0, 1,
++					     &insn) == 1,
++				   "decode mask memory move", i, syntax))
++				return false;
++			const cs_x86 *x = &insn->detail->x86;
++			const unsigned mem_index =
++				syntax == CS_OPT_SYNTAX_ATT ? store : !store;
++			const cs_x86_op *mem = &x->operands[mem_index];
++			const cs_x86_op *reg = &x->operands[1 - mem_index];
++			bool ok = check(
++				insn->id == forms[i].id && x->op_count == 2 &&
++					mem->type == X86_OP_MEM &&
++					mem->size == forms[i].size &&
++					mem->access == (store ? CS_AC_WRITE :
++								CS_AC_READ) &&
++					reg->type == X86_OP_REG &&
++					reg->reg == X86_REG_K2 &&
++					reg->access == (store ? CS_AC_READ :
++								CS_AC_WRITE),
++				"mask memory move access", i, syntax);
++			cs_free(insn, 1);
++			if (!ok)
++				return false;
++		}
++	}
++	return true;
++}
++
+ int main(void)
+ {
+ 	static const kmask_case test_cases[] = {
+@@ -267,6 +312,7 @@ int main(void)
+ 		for (size_t i = 0;
+ 		     i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
+ 			success &= test_case(handle, &test_cases[i], i, syntax);
++		success &= test_memory_moves(handle, syntax);
+ 	}
+ 
+ 	cs_close(&handle);

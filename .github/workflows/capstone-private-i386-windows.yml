@@ -1,7 +1,7 @@
-name: Verify unsigned immediate formatting and operand access across native ABIs
+name: Verify VEX mask store details on Windows macOS Linux in both x86 widths
 on:
   push:
-    branches: [codex/immediate-pairs-native-abis]
+    branches: [codex/kmov-memory-access-runtime]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: immediate-pairs-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mask-memory-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
