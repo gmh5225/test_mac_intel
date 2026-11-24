@@ -15,6 +15,13 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
+    assert get('git','-C',base,'rev-parse','HEAD').strip()=='1a1075b8bff460c3bd4da0b93f8e0a091c09039a'
+    assert sha(r/'parent.patch')=='bbfc45ef957e4359551601ce848386b41816c48a56e8ea3578907670bbcb0a43'
+    run('git','-C',base,'apply','--index',r/'parent.patch')
+    assert get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    original=sp.check_output(['git','-C',base,'hash-object','-w','-t','commit','--stdin'],input=(r/'parent-commit').read_bytes()).decode().strip()
+    assert original==q['parent']
+    run('git','-C',base,'checkout','--detach',original)
     assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
