@@ -1,3 +1,31 @@
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index ee9b645b..1f9d372c 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -14,6 +14,7 @@
+ #include "X86OutputOptions.h"
+ #include "X86RegisterImmediateOutput.h"
+ #include "X86GenTest32Registers.inc"
++#include "X86GenIndirectMemory.inc"
+ #include "../../cs_disasm_internal.h"
+ 
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -34,6 +35,15 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 			return true;
+ 		}
+ 	}
++	if (opcode == 0xff && size >= 2 && code[1] >= 0xc0) {
++		const uint8_t modrm = code[1], group = modrm & 0x38;
++		if ((group == 0x10 || group == 0x20) &&
++		    !X86_OUTPUT_UNSUPPORTED(handle, false))
++			return X86_writeIndirectRegister(
++				code, insn, insn_size, 0, modrm,
++				&x86_indirect_memory[group == 0x20],
++				&test32_regs[1][modrm & 7]);
++	}
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
+ #endif
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
 index 450dc468..24ae1504 100644
 --- a/arch/X86/X86SimpleOutput.h
@@ -25,26 +53,6 @@ index 450dc468..24ae1504 100644
 +}
 +
  #endif
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..4f65c1bb 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -108,6 +108,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 				return false;
- 			base_memory = true;
- 		} else if (opcode == 0x8d || opcode == 0xff) {
-+#ifdef X86_MEMORY32_OUTPUT
-+			const unsigned group = modrm & 0x38;
-+			if (opcode == 0xff && (group == 0x10 || group == 0x20) &&
-+			    !X86_OUTPUT_UNSUPPORTED(handle, handle->mode != CS_MODE_32))
-+				return X86_writeIndirectRegister(
-+					code, insn, insn_size, 0, modrm,
-+					&x86_indirect_memory[group == 0x20],
-+					&x86_simple_registers[2][modrm & 7]);
-+#endif
- 			return false;
- 		}
- 	}
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
 index 7afca7e4..4bb77b85 100644
 --- a/arch/X86/X86Sse64Output.c
