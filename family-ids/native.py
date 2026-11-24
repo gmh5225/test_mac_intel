@@ -14,21 +14,19 @@ def apply(k):
         assert sha(r/(k+'.patch'))==q[k]['sha256'];get('git','-C',s,'apply','--index',r/(k+'.patch'));assert get('git','-C',s,'write-tree')==q[k]['tree']
 try:
     assert get('git','-C',s,'rev-parse','HEAD')==m['checkout'] and all(v['parent']==m['checkout']for v in q.values())
-    arch=['X86','ARM','AARCH64','MIPS']
+    arch=['MIPS']
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
     libs={};images={}
     for k in ('base',*q):
         apply(k);b=t/'build'
         run('cmake-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
-        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option','mips_scan','mips_register_names','mips16_memory_calls']
-        units+=['mips16_frames','mips16_word_order','mips16_shifts_hilo','mips16_immediates','mips_msa_control','mips_reglist_offset']
-        if k in ('cold','combined'):units.append('batch_detail_alloc')
+        units=['mips_scan','mips_register_names','mips16_memory_calls','mips16_frames','mips16_word_order','mips16_shifts_hilo','mips16_immediates','mips_msa_control','mips_reglist_offset','mips16e2']
         run('build-'+k,'cmake','--build',b,'--parallel','4','--target','capstone_shared',*units)
         run('unit-'+k,'ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$')
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=(b/'libcapstone.a').is_file(),bytes=path.stat().st_size,
-                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','MipsInstPrinter.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','MipsMapping.c.o','AArch64Disassembler.c.o')})
+                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','MipsInstPrinter.c.o','MipsDisassembler.c.o','MipsMapping.c.o')})
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
@@ -36,14 +34,9 @@ try:
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
-    for f in ('fetch.py','libmvec.py','libmvec.json'):shutil.copy2(r/f,t/f)
-    for f in ('fetch.py','libmvec.py'):run(f,'python3','-B',t/f)
     cases={}
-    for n,v in m['inputs'].items():
-        f=t/('libmvec.text'if n.startswith('libmvec')else'putty-0.85-'+str(v['bits'])+'.text');assert sha(f)==v['sha256']
-        cases[n]=(f,str(v['bits']),v['address'])
     manifest=rd(r/'corpus-manifest.json')
-    for n,arch in [(arch+'-'+cmd,arch)for arch in ('mips64el','arm64')for cmd in ('ls','cp','sort')]:
+    for n,arch in [(arch+'-'+cmd,arch)for arch in ('mips64el',)for cmd in ('ls','cp','sort')]:
         v,=[e for e in manifest['inputs']if e['name']==n];deb=t/(n+'.deb');run('download-'+n,'curl','-fsSL','--retry','3','--max-time','100',v['url'],'-o',deb);assert sha(deb)==v['package_sha256']
         raw=corpus.deb_binary(deb,v['command'],v.get('member'));body=corpus.elf_text(raw);f=t/(n+'.text');f.write_bytes(body);assert sha(f)==v['text_sha256'];deb.unlink()
         hdr=struct.unpack_from('<16sHHIQQQIHHHHHH',raw);secs=[struct.unpack_from('<IIQQQQIIQQ',raw,hdr[6]+i*hdr[11])for i in range(hdr[12])];sect,=[v for v in secs if v[5]==len(body)and raw[v[4]:v[4]+v[5]]==body]
@@ -52,16 +45,6 @@ try:
     verify={}
     for k in q:
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
-        snapshot['options']=json.loads(get(*args,'options'))
-        dest=t/(k+'-foreign.json')
-        with (t/'foreign-output').open('wb')as log:sp.run([*args,'foreign',dest],check=True,stdout=log)
-        messages=(t/'foreign-output').read_bytes().splitlines()
-        from collections import Counter
-        observed=Counter(a.decode()for a in messages)
-        snapshot['foreign']=rd(dest)
-        snapshot['foreign']['diagnostics']=dict(observed)
-        assert snapshot['foreign']['records']==917504 and snapshot['foreign']['accepted']>0
-        if k!=next(iter(q)):assert snapshot['foreign']==verify[next(iter(q))]['foreign']
         for n,(f,arch,ip) in cases.items():snapshot[n]=json.loads(get(*args,'verify',f,arch,str(ip)))
         put('verified',verify)
     if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

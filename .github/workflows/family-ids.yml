@@ -1,7 +1,7 @@
-name: Check the closed MIPS real-detail pass on classic, microMIPS, MIPS16 and real multi-architecture workloads
+name: Measure dedicated MIPS text and complete records on three real ELF programs
 on:
   push:
-    branches: [codex/mips-skip-unused-canonical-render]
+    branches: [codex/dedicated-mips-paired-real-corpus]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
+          ref: 17d578259c044cad6ade810870f2aa1e7d33724a
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-canonical-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-mips-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
