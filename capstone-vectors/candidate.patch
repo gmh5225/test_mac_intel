@@ -1,60 +1,58 @@
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..ea2af3ed 100644
+index 457485ab..6893f921 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -44,6 +44,9 @@
- #include "../../MCRegisterInfo.h"
- 
- #include "X86InstPrinter.h"
-+#ifdef CAPSTONE_SSTREAM_PRECHECKED
-+#include "X86SimpleOutput.h"
-+#endif
- #include "X86FeatureExtension.h"
- #include "X86Mapping.h"
- #include "X86InstPrinterCommon.h"
-@@ -1186,6 +1189,35 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- #endif
+@@ -1144,6 +1144,30 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  	}
+ }
  
 +#ifdef CAPSTONE_SSTREAM_PRECHECKED
-+	/* The caller has reserved space for the complete printed instruction.
-+	 * Write this base and displacement with one update to the stream. */
-+	const unsigned base = MCOperand_getReg(BaseReg);
-+	const unsigned index = MCOperand_getReg(IndexReg);
-+	if (base && base < X86_FEATURE_MC_GPR_BASE && MCOperand_isReg(BaseReg) &&
-+	    !MCOperand_getReg(SegReg) && (!index || index == X86_EIZ) &&
-+	    MCOperand_isImm(DispSpec) && MI->csh->syntax != CS_OPT_SYNTAX_MASM) {
-+		const int64_t disp = MCOperand_getImm(DispSpec);
-+		const unsigned len = getRegisterNameLength(base);
-+		if (disp == (int32_t)disp && len >= 2 && len <= 4) {
-+			const char *name = getRegisterName(base);
-+			char *out = O->buffer + O->index;
-+			*out++ = '[';
-+			memcpy(out, name, 2);
-+			memcpy(out + len - 2, name + len - 2, 2);
-+			out = X86_writeDisplacement(out + len, (int32_t)disp);
-+			*out++ = ']';
-+			*out = 0;
-+			O->index = (size_t)(out - O->buffer);
-+			if (MI->csh->detail_opt) {
-+				cs_x86 *x = &MI->flat_insn->detail->x86;
-+				x->operands[x->op_count].mem.disp = disp;
-+			}
-+			goto finish_memory;
-+		}
-+	}
++/* Emit the opening bracket and an ordinary base-register name into the
++ * already bounded stream. The two copies stay within the name's extent. */
++static bool printBaseRegister(SStream *stream, const MCOperand *operand)
++{
++	if (!MCOperand_isReg(operand))
++		return false;
++	const unsigned reg = MCOperand_getReg(operand);
++	if (!reg || reg >= X86_FEATURE_MC_GPR_BASE)
++		return false;
++	const unsigned length = getRegisterNameLength(reg);
++	if (length < 2 || length > 4)
++		return false;
++	const char *name = getRegisterName(reg);
++	char *out = stream->buffer + stream->index;
++	out[0] = '[';
++	memcpy(out + 1, name, 2);
++	memcpy(out + length - 1, name + length - 2, 2);
++	out[length + 1] = 0;
++	stream->index += length + 1;
++	return true;
++}
 +#endif
 +
- 	// If this has a segment register, print it.
- 	reg = MCOperand_getReg(SegReg);
- 	if (reg) {
-@@ -1254,6 +1286,9 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ {
+ 	bool NeedPlus = false;
+@@ -1198,11 +1222,18 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 		SStream_concat0(O, ":");
+ 	}
  
- 	SStream_concat0(O, "]");
- 
+-	SStream_concat0(O, "[");
+-
+-	if (MCOperand_getReg(BaseReg)) {
+-		_printOperand(MI, Op + X86_AddrBaseReg, O);
 +#ifdef CAPSTONE_SSTREAM_PRECHECKED
-+finish_memory:
++	if (printBaseRegister(O, BaseReg))
+ 		NeedPlus = true;
++	else
 +#endif
- 	if (MI->csh->detail_opt)
- 		MI->flat_insn->detail->x86.op_count++;
++	{
++		SStream_concat0(O, "[");
++
++		if (MCOperand_getReg(BaseReg)) {
++			_printOperand(MI, Op + X86_AddrBaseReg, O);
++			NeedPlus = true;
++		}
+ 	}
  
+ 	if (MCOperand_getReg(IndexReg) &&
