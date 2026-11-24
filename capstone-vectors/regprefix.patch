@@ -1,0 +1,58 @@
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..6893f921 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -1144,6 +1144,30 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 	}
+ }
+ 
++#ifdef CAPSTONE_SSTREAM_PRECHECKED
++/* Emit the opening bracket and an ordinary base-register name into the
++ * already bounded stream. The two copies stay within the name's extent. */
++static bool printBaseRegister(SStream *stream, const MCOperand *operand)
++{
++	if (!MCOperand_isReg(operand))
++		return false;
++	const unsigned reg = MCOperand_getReg(operand);
++	if (!reg || reg >= X86_FEATURE_MC_GPR_BASE)
++		return false;
++	const unsigned length = getRegisterNameLength(reg);
++	if (length < 2 || length > 4)
++		return false;
++	const char *name = getRegisterName(reg);
++	char *out = stream->buffer + stream->index;
++	out[0] = '[';
++	memcpy(out + 1, name, 2);
++	memcpy(out + length - 1, name + length - 2, 2);
++	out[length + 1] = 0;
++	stream->index += length + 1;
++	return true;
++}
++#endif
++
+ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ {
+ 	bool NeedPlus = false;
+@@ -1198,11 +1222,18 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 		SStream_concat0(O, ":");
+ 	}
+ 
+-	SStream_concat0(O, "[");
+-
+-	if (MCOperand_getReg(BaseReg)) {
+-		_printOperand(MI, Op + X86_AddrBaseReg, O);
++#ifdef CAPSTONE_SSTREAM_PRECHECKED
++	if (printBaseRegister(O, BaseReg))
+ 		NeedPlus = true;
++	else
++#endif
++	{
++		SStream_concat0(O, "[");
++
++		if (MCOperand_getReg(BaseReg)) {
++			_printOperand(MI, Op + X86_AddrBaseReg, O);
++			NeedPlus = true;
++		}
+ 	}
+ 
+ 	if (MCOperand_getReg(IndexReg) &&

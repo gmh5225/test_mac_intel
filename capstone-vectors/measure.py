@@ -37,22 +37,22 @@ try:
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     import shlex
-    original=sha(lib);db=rd(build/'compile_commands.json');row,=[x for x in db if Path(x['file']).name=='X86ImmediateOutput.c']
+    original=sha(lib);db=rd(build/'compile_commands.json');row,=[x for x in db if Path(x['file']).name=='X86IntelInstPrinterPrechecked.c']
     argv=shlex.split(row['command']);f=Path(row['file']);src_index=argv.index(str(f));obj_index=argv.index('-o')+1
     def compile(source,output,extra):
         args=argv.copy();args[src_index]=str(source);args[obj_index]=str(output);run(*args,*extra,cwd=row['directory'])
-    for name in ('digits','details'):
+    for name in ('address','regprefix'):
         patch=r/(name+'.patch');spec=m['variants'][name];assert sha(patch)==spec['sha256']
         run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==spec['tree']
-        compile(f,w/(name+'.o'),['-DX86_writeImmediateOutput=measure_'+name])
+        compile(f,w/(name+'.o'),['-DX86_Intel_printInstructionPrechecked=measure_'+name])
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','arch/X86')
     compile(r/'select.c',w/'select.o',['-I',str(base)])
-    run('clang++',w/'driver.o',w/'select.o',w/'digits.o',w/'details.o','-Wl,--wrap=X86_writeImmediateOutput',lib,ice_lib,*flags,'-o',w/'image')
+    run('clang++',w/'driver.o',w/'select.o',w/'address.o',w/'regprefix.o','-Wl,--wrap=X86_Intel_printInstructionPrechecked',lib,ice_lib,*flags,'-o',w/'image')
     images={'all':dict(exe=sha(w/'image'),archive=sha(lib))};assert sha(lib)==original
     symbols={}
     for line in get('nm','-S','-n',w/'image').splitlines():
         col=line.split()
-        if len(col)==4 and col[3]in ('X86_writeImmediateOutput','measure_digits','measure_details','__wrap_X86_writeImmediateOutput','X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32'):symbols[col[3]]=[int(col[0],16),int(col[1],16)]
+        if len(col)==4 and col[3]in ('X86_Intel_printInstructionPrechecked','measure_address','measure_regprefix','__wrap_X86_Intel_printInstructionPrechecked','X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32'):symbols[col[3]]=[int(col[0],16),int(col[1],16)]
     assert len(symbols)==7;save('workers',dict(symbols=symbols,object_options=argv,images=images))
     run('setarch',platform.machine(),'-R','/bin/true')
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
@@ -75,24 +75,24 @@ try:
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
         def audit_engine(exe):
-            rows=[list(map(int,z.split())) for z in get('setarch',platform.machine(),'-R',w/'image','audit','0','1',f,path,str(bits),env=dict(os.environ,CS_IMMEDIATE_VARIANT={'digits':'1','details':'2'}.get(exe,'0'))).splitlines()]
+            rows=[list(map(int,z.split())) for z in get('setarch',platform.machine(),'-R',w/'image','audit','0','1',f,path,str(bits),env=dict(os.environ,CS_IMMEDIATE_VARIANT={'address':'1','regprefix':'2'}.get(exe,'0'))).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('digits')==audit_engine('details')
+        assert audit_engine('base')==audit_engine('address')==audit_engine('regprefix')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
             exe=engine if engine in ('candidate','duplicate')else'base'
-            return list(map(int,get('setarch',platform.machine(),'-R',w/'image',comparator,str(mode),str(n),f,path,str(bits),env=dict(os.environ,CS_IMMEDIATE_VARIANT={'digits':'1','details':'2','trap':'3'}.get(engine,'0'))).split()))
+            return list(map(int,get('setarch',platform.machine(),'-R',w/'image',comparator,str(mode),str(n),f,path,str(bits),env=dict(os.environ,CS_IMMEDIATE_VARIANT={'address':'1','regprefix':'2','trap':'3'}.get(engine,'0'))).split()))
         assert take('trap',0,1)[2:]==take('base',0,1)[2:]
         proc=sp.run(['setarch',platform.machine(),'-R',w/'image','private','1','1',f,path,str(bits)],env=dict(os.environ,CS_IMMEDIATE_VARIANT='3'))
         assert proc.returncode==73,(name,proc.returncode)
 
         for mode in (0,1,2):
-            labels=['base','duplicate','digits','details','iced']+(['fast']if mode else[])
+            labels=['base','duplicate','address','regprefix','iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['digits']==expected['details']
+            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']==expected['address']==expected['regprefix']
             rows=[];rng=random.Random(name+'/same-image-immediate/'+str(mode))
             for _ in range(17):
                 rng.shuffle(labels);sample={k:[] for k in labels}
@@ -101,10 +101,10 @@ try:
                     sample[k].append(row[:2])
                 rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
             key=name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-            summary[key]={label:{k:interval([x[k][i]/x['digits'][i]for x in rows])for k in labels if k!='digits'}for i,label in enumerate(('cpu','wall'))}
+            summary[key]={label:{k:interval([x[k][i]/x['address'][i]for x in rows])for k in labels if k!='address'}for i,label in enumerate(('cpu','wall'))}
             save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==18
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Both algorithms use one fixed-address executable linked with the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
+    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and regprefix. Both algorithms use one fixed-address executable linked with the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and Capstone output checksums agree exactly.'))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

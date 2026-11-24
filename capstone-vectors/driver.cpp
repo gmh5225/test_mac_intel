@@ -174,10 +174,10 @@ static void add_result(Result &total,const Result &span,const Span &range) {
   total.values += span.values;
 }
 
-extern "C" void measure_select_scalar(int);
+extern "C" void measure_select_printer(int);
 int main(int argc,char **argv) {
   const char *setting = std::getenv("CS_IMMEDIATE_VARIANT");
-  measure_select_scalar(setting ? std::atoi(setting) : 0);
+  measure_select_printer(setting ? std::atoi(setting) : 0);
   if(argc!=7) return 2;
   std::string engine=argv[1];
   unsigned mode=std::stoul(argv[2]), reps=std::stoul(argv[3]);

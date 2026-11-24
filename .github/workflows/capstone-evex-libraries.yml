@@ -1,7 +1,7 @@
-name: Isolate scalar formatting and operand construction inside one fixed executable
+name: Separate decoded memory formatting from executable layout on native Intel and Arm
 on:
   push:
-    branches: [codex/scalar-workers-same-loaded-image]
+    branches: [codex/fixed-bounded-address-printers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: cc78c284267e68b5d778023d1f8393352aa44f96
+          ref: 8f7493e97555c1bb764c8d31f41feb9c35d8f403
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -55,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: worker-immediate-single-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: address-worker-immediate-single-image-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
