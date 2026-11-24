@@ -1,7 +1,7 @@
-name: Compare public and native Mac Intel and Arm iterators and verify Linux library identity
+name: Compare scalar16 SQLite and PE32 scan clocks on two native Macs
 on:
   push:
-    branches: [codex/macos-static-iterator-source-products]
+    branches: [codex/two-mac-public-scan-controls]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,8 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
           - { host: macos-15, cc: clang, replica: 1 }
           - { host: macos-15-intel, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
@@ -57,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: macos-static-public-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: macos-scan-controls-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
