@@ -1,7 +1,7 @@
-name: Verify regenerated integer vector stores in all x86 output routes
+name: Verify normal i386 SIB output across the x86 ABI and configuration matrix
 on:
   push:
-    branches: [codex/projected-vector-access-abis]
+    branches: [codex/ordinary-i386-sib-abis]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: projected-vector-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: ordinary-i386-sib-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
