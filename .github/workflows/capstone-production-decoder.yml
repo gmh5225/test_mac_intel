@@ -1,7 +1,7 @@
-name: Measure independent VEX3 and public writers in the integrated NeverD decoder
+name: Measure the same NeverD machine objects with the public record section before and after the native readers
 on:
   push:
-    branches: [codex/current-vex3-public-readers-product]
+    branches: [codex/public-record-section-order]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-vex3-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: public-record-section-order-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
