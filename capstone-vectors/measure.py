@@ -45,6 +45,13 @@ try:
     from foreign_time import measure as time_foreign
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    reference=maps['reference']
+    assert sha(r/'reference.patch')==reference['sha256']
+    run('git','-C',base,'apply','--index',r/'reference.patch')
+    assert get('git','-C',base,'write-tree').strip()==reference['tree']
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'reference')
+    save('offset-reference',dict(source=reference,archive=sha(lib),exe=sha(w/'reference')))
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
@@ -61,6 +68,10 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/'sample.cpp',lib,'-o',w/'offset-unit')
+        actual=get(w/'offset-unit');target=rd(r/'offset-expected.json')['base' if label=='base'else 'fixed']
+        assert actual==target and len(actual.splitlines())==48,label
+        save('offsets-'+label,actual.splitlines())
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -126,8 +137,9 @@ try:
                 repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
                 expected={k:take(k,mode,repeats)[2:]for k in labels}
                 assert all(v[:3]==expected['base'][:3] for v in expected.values())
-                assert expected['base']==expected['duplicate']==expected['candidate']
-                assert expected['outlined']==expected['base']
+                oracle=list(map(int,get(w/'reference',route,str(mode),str(repeats),f,path,str(bits)).split()))[2:]
+                assert expected['base']==expected['duplicate'] and expected['outlined']==expected['candidate']==oracle
+                if mode==0:assert expected['base']==oracle
                 rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
                 for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
                     rng.shuffle(labels);sample={k:[] for k in labels}
@@ -135,7 +147,7 @@ try:
                         row=take(k,mode,repeats);assert row[2:]==expected[k]
                         sample[k].append(row[:2])
                     rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
+                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,oracle=oracle,cycles=rows)
                 summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
                 save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
     assert len(summary)==36

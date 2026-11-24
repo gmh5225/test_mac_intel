@@ -61,7 +61,9 @@ def compare(image,path,images,invoke,select):
         expected={k:take(k,mode,reps)[2:] for k in keys}
         assert len({tuple(row[:3])for row in expected.values()})==1,expected
         for route in ('capstone','private'):
-            assert len({tuple(expected[route+'/'+k])for k in images})==1,expected
+            oracle=list(map(int,sp.check_output([Path(invoke[-1]).parent/'reference',route,str(mode),str(reps),image,path,'16'],text=True).split()))[2:]
+            assert expected[route+'/base']==expected[route+'/duplicate'] and expected[route+'/outlined']==expected[route+'/candidate']==oracle
+            if not mode:assert expected[route+'/base']==oracle
         rng=random.Random(9917+mode);pairs=[]
         for _ in range(17):
             rng.shuffle(keys);v={k:[]for k in keys}

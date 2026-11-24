@@ -1,7 +1,7 @@
-name: Test late i386 indirect registers against the same fast-path semantics and measure zero-hit JPEG with symbol placement
+name: Verify two effective-address printers against an independent formatting build and measure all six architectures
 on:
   push:
-    branches: [codex/i386-indirect-register-placement]
+    branches: [codex/compare-native-absolute-offset-printers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-indirect-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: absolute-memory-writers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
