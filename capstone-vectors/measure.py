@@ -167,7 +167,7 @@ def main(w):
         changed=sorted(n for n,v in objects[key].items()if v!=objects[orig].get(n))
         save('object-diff-'+key+'.json',changed)
         if kind=='bare':
-            assert ({'X86EvexScan.c.o'} if not darwin else set()) == set(changed),(key,changed)
+            assert ({'X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'} if mixed else set()) == set(changed),(key,changed)
         save('objects-'+key+'.json',dict(all=objects[key],changed=changed,order=members))
         exe=w/('runner-'+key)
         flags=[('-Wl,-u,_' if darwin else '-Wl,--undefined=')+n for n in ('X86_scanNativeBatch','X86_disasmIterText','X86_disasmIter32')]
@@ -180,7 +180,7 @@ def main(w):
             if len(cols)!=3 or cols[1] not in ('t','T'):continue
             name=cols[2][1:] if darwin and cols[2].startswith('_') else cols[2]
             if name in names:linked[name]=int(cols[0],16)
-        assert ('X86_decodePublicRecord' in linked)==(not mixed)
+        assert ('X86_decodePublicRecord' in linked)==(not mixed or kind=='bare')
         assert {'cs_disasm_iter','X86_disasmIter32','X86_disasmIterText','X86_scanNativeBatch'}<=linked.keys()
         assert ('X86_tryBulkOutput' in linked)==active_tail,(key,linked)
         assert ('X86_tryRecord32' in linked)==active_tail,(key,linked)
@@ -192,8 +192,8 @@ def main(w):
     import random
     images={k:v.read_bytes() for k,v in bins.items()}
     hashes={k:hashlib.sha256(v).hexdigest() for k,v in images.items()}
-    assert (hashes['bare']!=hashes['base'])==(not darwin)
-    assert (hashes['mixed_bare']!=hashes['mixed_base'])==(not darwin)
+    assert hashes['bare']==hashes['base']
+    assert hashes['mixed_bare']!=hashes['mixed_base']
     image=w/'timed-runner'
     n=max(map(len,images.values()))
     padded={k:v+bytes(n-len(v)) for k,v in images.items()}
