@@ -17,6 +17,43 @@ def digest(file):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def execute_work_queue_and_winrm(manifest, selected, output):
+    """Run the same two local API lifecycles against SDK and published declarations."""
+    bodies = {
+        "RealtimeWorkQueue": "if (RtwqStartup() < 0) return 1; return RtwqShutdown() < 0;",
+        "WindowsRemoteManagement": (
+            "WSMAN_API_HANDLE h = 0; if (WSManInitialize(1, &h) || !h) return 1; "
+            "return WSManDeinitialize(h, 0) != 0;"),
+    }
+    results = []
+    providers = next(lib["providers"] for lib in manifest["libraries"]
+                     if lib["name"].startswith("WindowsUser"))
+    for name, body in bodies.items():
+        proof = next(p["metadata"]["sdk_import_bridge"] for p in providers if p["name"] == name)
+        for view in ("original", "published"):
+            source = output / (name + "-" + view + ".c")
+            if view == "original":
+                header = Path(proof["source"])
+                flags = proof["arguments"]
+            else:
+                header = selected / "arm64" / name / "selected.h"
+                flags = ["clang", "--target=aarch64-pc-windows-msvc"]
+            source.write_text('#include "' + header.resolve().as_posix() + '"\nint main(void) { ' +
+                              body + ' }\n', encoding="utf-8")
+            obj = source.with_suffix(".obj")
+            exe = source.with_suffix(".exe")
+            subprocess.run([*flags, "-O1", "-c", source, "-o", obj], check=True)
+            subprocess.run(["lld-link", "/subsystem:console", "/entry:main", "/nodefaultlib",
+                            "/out:" + str(exe), obj, proof["import_library"]["file"]], check=True)
+            pe = exe.read_bytes()
+            machine, = struct.unpack_from("<H", pe, struct.unpack_from("<I", pe, 60)[0] + 4)
+            assert machine == 0xaa64
+            subprocess.run([exe], check=True, timeout=30)
+            results.append(dict(provider=name, view=view, machine=machine,
+                                sha256=digest(exe), exit_code=0))
+    return results
+
+
 def execute_system_calls(directory):
     objects = [directory / "calls.obj"]
     compiler = ["clang-cl", "--target=aarch64-pc-windows-msvc", "/nologo", "/O2", "/MD"]
@@ -81,7 +118,8 @@ def main():
                         "DeviceManagementRegistration": 15, "NetworkTrafficControl": 20,
                         "ComputeStorage": 14, "WebSockets": 13, "RestartManager": 11,
                         "FontEmbedding": 14, "PerformanceCounters": 12, "QoSTraffic": 11,
-                        "OverlayFiles": 11, "SetupAdministration": 50}
+                        "OverlayFiles": 11, "SetupAdministration": 50,
+                        "RealtimeWorkQueue": 34, "WindowsRemoteManagement": 33}
     system_abi = args.output / "system-abis"
     system_calls = args.output / "system-calls"
     provider_options = [arg for name in system_providers for arg in ("--provider", name)]
@@ -100,6 +138,7 @@ def main():
         (api, route) for api in system_apis for route in ("highc", "llvmc")}
     assert all(r["architecture"] == "arm64" and r["passed"] and r["retains_call"]
                and r["object_exit"] == 0 and r["link_exit"] == 0 for r in system_rows)
+    work_queue_and_winrm = execute_work_queue_and_winrm(manifest, system_abi, args.output)
     data = args.engine.read_bytes()
     nt, = struct.unpack_from("<I", data, 60)
     machine, = struct.unpack_from("<H", data, nt + 4)
@@ -115,6 +154,7 @@ def main():
                   linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "input_sha256")}
                                        for r in rows])
     report["ordinal_exports"] = verify_ordinal_sdk(args.source, args.output, args.cache, invoke, digest)
+    report["work_queue_and_winrm"] = work_queue_and_winrm
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print("Native ARM64 engine compiled HighC and LLVMC for sixteen linked Microsoft SDK callers")
 
