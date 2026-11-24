@@ -1,7 +1,7 @@
-name: Compare batch detail ownership, bounded growth and empty-detail releases on real x86, AArch64 and MIPS programs
+name: Measure shared public iteration and batch formatting on PE32, PE32+, SIMD, MIPS and AArch64
 on:
   push:
-    branches: [codex/real-batch-allocation-controls]
+    branches: [codex/shared-public-batch-and-iterator]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: batch-storage-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: shared-batch-format-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

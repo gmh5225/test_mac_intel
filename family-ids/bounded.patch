@@ -1,8 +1,36 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 3dc297b9..e43189c4 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -160,6 +160,9 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
+     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
++    if(CAPSTONE_BUILD_SHARED_LIBS AND NOT CAPSTONE_BUILD_STATIC_LIBS)
++        add_compile_definitions(CAPSTONE_X86_SHARED_PUBLIC_RECORD)
++    endif()
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "XCORE")
+diff --git a/Makefile b/Makefile
+index 0fe49035..7e4ac2ab 100644
+--- a/Makefile
++++ b/Makefile
+@@ -121,6 +121,9 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
+ CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
+ else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
+ CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
++ifeq ($(CAPSTONE_SHARED):$(CAPSTONE_STATIC),yes:no)
++CFLAGS += -DCAPSTONE_X86_SHARED_PUBLIC_RECORD
++endif
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 8d827a97..5f7682dd 100644
+index 8d827a97..594947ee 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -30,12 +30,21 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+@@ -30,11 +30,18 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
  					 uint16_t *insn_size);
  #endif
  
@@ -10,132 +38,79 @@ index 8d827a97..5f7682dd 100644
 -	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 -	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 -	!defined(_WIN32_WCE)
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_X86_SHARED_PUBLIC_RECORD)) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_PUBLIC_RECORD
 +#ifdef CAPSTONE_X86_ONLY
  #define CAPSTONE_X86_PUBLIC_OUTPUT
++#else
++CAPSTONE_INTERNAL bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code,
++					   size_t size, cs_insn *insn,
++					   uint16_t *length);
++#endif
  #endif
-+#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
-+#include "../../cs_priv.h"
-+/* Dedicated Linux builds already try this writer in the common decoder. */
-+#define CAPSTONE_X86_BULK_OUTPUT
-+CAPSTONE_INTERNAL bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code,
-+					size_t size, cs_insn *insn,
-+					uint16_t *insn_size);
-+#endif
-+#endif
  
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			MCInst *instr, uint16_t *size, uint64_t address,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..ffc4379a 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifdef CAPSTONE_X86_PUBLIC_RECORD
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+ #endif
+ #define CS_DECODE_SCAN_IMPL decodeIteratorScan
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index cec4bec6..07fa8e88 100644
+index cec4bec6..e3a77092 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -15,6 +15,16 @@
- 
- #include "X86SimpleOutputImpl.h"
- 
-+#ifdef CAPSTONE_X86_BULK_OUTPUT
-+bool X86_tryBulkOutput(cs_struct *handle, const uint8_t *code, size_t size,
-+		       cs_insn *insn, uint16_t *insn_size)
+@@ -32,4 +32,12 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
++
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++bool X86_tryPublicOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *length)
 +{
-+	/* A custom detail allocator may change the option mid-record. */
-+	return (!insn->detail || handle->detail_opt) &&
-+	       X86_trySimpleOutput(handle, code, size, insn, insn_size);
++	return X86_trySimpleOutput(handle, code, size, insn, length);
 +}
 +#endif
-+
- #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
- #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
  #endif
 diff --git a/cs.c b/cs.c
-index ede7c2aa..c22b168f 100644
+index 333e7de2..55022b20 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1010,40 +1010,41 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
- 		off++;
- 	const char *operands = OS->buffer + off;
--	if (stream_length_valid) {
-+	size_t extent;
- #ifdef CS_MIPS_VISIBLE_OPERANDS
--		/* MIPS can remove the MIPS16 comment or a '$' after printing.
--		 * Both edits shorten the visible string without moving the cursor. */
--		const size_t extent = strlen(operands);
-+	if (stream_length_valid)
-+		extent = strlen(operands);
- #else
--		const size_t extent = OS->index - off;
--#endif
--		const size_t length = MIN(extent, sizeof(insn->op_str) - 1);
--		if (length > 32) {
--			memcpy(insn->op_str, operands, length);
--		} else if (length >= 16) {
--			memcpy(insn->op_str, operands, 16);
--			memcpy(insn->op_str + length - 16,
--			       operands + length - 16, 16);
--		} else if (length >= 8) {
--			memcpy(insn->op_str, operands, 8);
--			memcpy(insn->op_str + length - 8, operands + length - 8,
--			       8);
--		} else if (length >= 4) {
--			memcpy(insn->op_str, operands, 4);
--			memcpy(insn->op_str + length - 4, operands + length - 4,
--			       4);
--		} else if (length >= 2) {
--			memcpy(insn->op_str, operands, 2);
--			memcpy(insn->op_str + length - 2, operands + length - 2,
--			       2);
--		} else if (length) {
--			insn->op_str[0] = operands[0];
--		}
--	} else {
--		for (off = 0; operands[off] && off < sizeof(insn->op_str) - 1;
--		     off++)
--			insn->op_str[off] = operands[off];
-+	if (stream_length_valid)
-+		extent = OS->index - off;
-+#endif
-+	else {
-+		/* A printer can shorten the visible string before its stream index. */
-+		size_t limit = MIN(sizeof(OS->buffer) - off, sizeof(insn->op_str) - 1);
-+		const char *end = memchr(operands, '\0', limit);
-+		extent = end ? (size_t)(end - operands) : limit;
-+	}
-+	const size_t length = MIN(extent, sizeof(insn->op_str) - 1);
-+	if (length > 32) {
-+		memcpy(insn->op_str, operands, length);
-+	} else if (length >= 16) {
-+		memcpy(insn->op_str, operands, 16);
-+		memcpy(insn->op_str + length - 16,
-+		       operands + length - 16, 16);
-+	} else if (length >= 8) {
-+		memcpy(insn->op_str, operands, 8);
-+		memcpy(insn->op_str + length - 8, operands + length - 8,
-+		       8);
-+	} else if (length >= 4) {
-+		memcpy(insn->op_str, operands, 4);
-+		memcpy(insn->op_str + length - 4, operands + length - 4,
-+		       4);
-+	} else if (length >= 2) {
-+		memcpy(insn->op_str, operands, 2);
-+		memcpy(insn->op_str + length - 2, operands + length - 2,
-+		       2);
-+	} else if (length) {
-+		insn->op_str[0] = operands[0];
- 	}
+@@ -1082,7 +1082,13 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  
- 	// we might have customized mnemonic
-@@ -1107,9 +1108,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+-#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++CS_DECODE_INLINE bool decode_full_record(cs_struct *handle, const uint8_t *code,
++					 size_t size, cs_insn *insn,
++					 uint16_t *insn_size, bool batch,
++					 bool public_x86_output)
++{
++#elif defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+@@ -1113,9 +1119,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  #endif
  	MCInst mci;
  #ifdef CAPSTONE_HAS_X86
 -	if (handle->arch == CS_ARCH_X86)
 +	if (handle->arch == CS_ARCH_X86) {
-+#ifdef CAPSTONE_X86_BULK_OUTPUT
-+		if (size && !handle->no_text &&
-+		    X86_tryBulkOutput(handle, code, size, insn, insn_size))
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++		if (public_x86_output && !handle->no_text &&
++		    X86_tryPublicOutput(handle, code, size, insn, insn_size))
 +			return true;
 +#endif
  		MCInst_InitX86(&mci);
@@ -144,3 +119,275 @@ index ede7c2aa..c22b168f 100644
  #endif
  #ifdef CAPSTONE_HAS_MIPS
  	if (handle->arch == CS_ARCH_MIPS)
+@@ -1228,6 +1239,34 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	return true;
+ }
+ 
++#if defined(CAPSTONE_X86_PUBLIC_RECORD) && !defined(CAPSTONE_X86_ONLY)
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++CS_PRESERVE_MOST bool
++cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
++		    cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_full_record(handle, code, size, insn, insn_size, batch, false);
++}
++
++/* Only the public iterator reaches this entry. Private readers have attempted
++ * their own writer, and batch records keep their existing output rules. */
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_public_record_text")))
++#elif defined(__APPLE__) && defined(__clang__)
++__attribute__((section("__TEXT,__cs_x86_record,regular,pure_instructions")))
++#endif
++CS_PRESERVE_MOST bool
++X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	return decode_full_record(handle, code, size, insn, insn_size, batch, true);
++}
++#endif
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+@@ -1560,6 +1599,18 @@ void cs_skipdata_opstr(char *opstr, const uint8_t *buffer, size_t size)
+ }
+ #endif
+ 
++/* Allocator callbacks may change CS_OPT_DETAIL after a record acquires its
++ * detail. Release what each record owns. Preserve calls to custom free(NULL)
++ * on paths that previously visited every slot. */
++static void free_insn_cache(cs_insn *cache, size_t count, bool free_empty)
++{
++	for (size_t i = 0; i < count; i++) {
++		if (free_empty || cache[i].detail)
++			cs_mem_free(cache[i].detail);
++	}
++	cs_mem_free(cache);
++}
++
+ // dynamically allocate memory to contain disasm insn
+ // NOTE: caller must free() the allocated memory itself to avoid memory leaking
+ CAPSTONE_EXPORT
+@@ -1568,7 +1619,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+ {
+ 	struct cs_struct *handle;
+ 	uint16_t insn_size;
+-	size_t c = 0, i;
++	size_t c = 0;
+ 	unsigned int f = 0; // index of the next instruction in the cache
+ 	cs_insn *insn_cache; // cache contains disassembled instructions
+ 	void *total = NULL;
+@@ -1621,11 +1672,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+ 			insn_cache->detail =
+ 				cs_mem_calloc(1, sizeof(cs_detail));
+ 			if (!insn_cache->detail) {
+-				insn_cache = (cs_insn *)total;
+-				for (i = 0; i < c; i++, insn_cache++)
+-					cs_mem_free(insn_cache->detail);
+-
+-				cs_mem_free(total);
++				free_insn_cache(total, c, true);
+ 				*insn = NULL;
+ 
+ 				handle->errnum = CS_ERR_MEM;
+@@ -1650,8 +1697,8 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+ 		} else {
+ 			// encounter a broken instruction
+ 
+-			// free memory of @detail pointer
+-			if (handle->detail_opt) {
++			// Release detail acquired before a callback changed the option.
++			if (insn_cache->detail || handle->detail_opt) {
+ 				cs_mem_free(insn_cache->detail);
+ 			}
+ 
+@@ -1709,18 +1756,27 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+ 
+ 		if (f == cache_size) {
+ 			// full cache, so expand the cache to contain incoming insns
++#if defined(CAPSTONE_X86_SHARED_PUBLIC_RECORD) && defined(CAPSTONE_X86_PUBLIC_RECORD)
++			unsigned int next_cache_size = cache_size * 8 / 5;
++			/* Each remaining instruction consumes at least one byte. */
++			const size_t bytes_left = size - next_offset;
++			const size_t limit = count ? MIN(bytes_left, count - c) : bytes_left;
++			if (limit < next_cache_size && cs_mem_realloc == realloc &&
++			    cs_mem_calloc == calloc && cs_mem_free == free &&
++			    cs_mem_malloc == malloc) {
++				if (!limit)
++					break;
++				next_cache_size = (unsigned int)limit;
++			}
++			cache_size = next_cache_size;
++#else
+ 			cache_size = cache_size * 8 / 5; // * 1.6 ~ golden ratio
++#endif
+ 			size_t old_total_size = total_size;
+ 			total_size += (sizeof(cs_insn) * cache_size);
+ 			tmp = cs_mem_realloc(total, total_size);
+ 			if (tmp == NULL) { // insufficient memory
+-				if (handle->detail_opt) {
+-					insn_cache = (cs_insn *)total;
+-					for (i = 0; i < c; i++, insn_cache++)
+-						cs_mem_free(insn_cache->detail);
+-				}
+-
+-				cs_mem_free(total);
++				free_insn_cache(total, c, handle->detail_opt);
+ 				*insn = NULL;
+ 				handle->errnum = CS_ERR_MEM;
+ 				return 0;
+@@ -1756,13 +1812,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+ 							  sizeof(*insn_cache));
+ 		if (tmp == NULL) { // insufficient memory
+ 			// free all detail pointers
+-			if (handle->detail_opt) {
+-				insn_cache = (cs_insn *)total;
+-				for (i = 0; i < c; i++, insn_cache++)
+-					cs_mem_free(insn_cache->detail);
+-			}
+-
+-			cs_mem_free(total);
++			free_insn_cache(total, c, handle->detail_opt);
+ 			*insn = NULL;
+ 
+ 			handle->errnum = CS_ERR_MEM;
+@@ -1780,14 +1830,7 @@ size_t CAPSTONE_API cs_disasm(csh ud, const uint8_t *buffer, size_t size,
+ CAPSTONE_EXPORT
+ void CAPSTONE_API cs_free(cs_insn *insn, size_t count)
+ {
+-	size_t i;
+-
+-	// free all detail pointers
+-	for (i = 0; i < count; i++)
+-		cs_mem_free(insn[i].detail);
+-
+-	// then free pointer to cs_insn array
+-	cs_mem_free(insn);
++	free_insn_cache(insn, count, true);
+ }
+ 
+ CAPSTONE_EXPORT
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b0f4a6ce..acb2c08b 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,7 +18,7 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#ifdef CAPSTONE_X86_PUBLIC_RECORD
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 735eaf83..f97cec2c 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -186,7 +186,7 @@ if(CAPSTONE_X86_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES x86_apx_rex2_generated.c)
+     list(APPEND UNIT_TEST_SOURCES x86_avx512_4fmaps_scalar_llig.c)
+     list(APPEND UNIT_TEST_SOURCES text_option.c x86_printer_prechecked.c)
+-    list(APPEND UNIT_TEST_SOURCES detail_option.c)
++    list(APPEND UNIT_TEST_SOURCES detail_option.c batch_detail_alloc.c)
+ endif()
+ if(CAPSTONE_RISCV_SUPPORT AND Python3_Interpreter_FOUND)
+     add_test(NAME unit_alias_pattern_rows_generator
+diff --git a/tests/unit/batch_detail_alloc.c b/tests/unit/batch_detail_alloc.c
+new file mode 100644
+index 00000000..82943142
+--- /dev/null
++++ b/tests/unit/batch_detail_alloc.c
+@@ -0,0 +1,87 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++static csh active_handle;
++static void *detail;
++static bool fail_resize;
++static unsigned int detail_allocations, detail_frees, resize_failures;
++
++static void *CAPSTONE_API disable_detail_on_allocation(size_t count, size_t size)
++{
++	void *p = calloc(count, size);
++	if (active_handle && p && count == 1 && size == sizeof(cs_detail)) {
++		detail = p;
++		++detail_allocations;
++		cs_option(active_handle, CS_OPT_DETAIL, CS_OPT_OFF);
++	}
++	return p;
++}
++
++static void *CAPSTONE_API resize_batch(void *p, size_t size)
++{
++	if (active_handle && fail_resize) {
++		++resize_failures;
++		return NULL;
++	}
++	return realloc(p, size);
++}
++
++static void CAPSTONE_API release(void *p)
++{
++	if (p && p == detail) {
++		detail = NULL;
++		++detail_frees;
++	}
++	free(p);
++}
++
++static bool check_batch(const uint8_t *code, size_t length, bool resize)
++{
++	csh handle = 0;
++	cs_insn *out = NULL;
++	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
++		return false;
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK) {
++		cs_close(&handle);
++		return false;
++	}
++	detail_allocations = detail_frees = resize_failures = 0;
++	fail_resize = resize;
++	active_handle = handle;
++	const size_t n = cs_disasm(handle, code, length, 0x1000, 0, &out);
++	active_handle = 0;
++	const bool ok = n == 0 && out == NULL &&
++			cs_errno(handle) == (resize ? CS_ERR_MEM : CS_ERR_OK) &&
++			detail_allocations == 1 && detail_frees == 1 &&
++			resize_failures == (resize ? 1U : 0U);
++	if (!ok)
++		fprintf(stderr, "batch of %zu bytes: %u detail allocations, "
++				"%u frees, %u failed resizes\n",
++			length, detail_allocations, detail_frees, resize_failures);
++	if (out)
++		cs_free(out, n);
++	cs_close(&handle);
++	free(detail);
++	detail = NULL;
++	return ok;
++}
++
++int main(void)
++{
++	cs_opt_mem hooks = { malloc, disable_detail_on_allocation, resize_batch,
++			     release, vsnprintf };
++	if (cs_option(0, CS_OPT_MEM, (size_t)&hooks) != CS_ERR_OK)
++		return 1;
++	const uint8_t truncated[] = { 0x0f };
++	uint8_t nops[128];
++	memset(nops, 0x90, sizeof(nops));
++	bool ok = check_batch(truncated, sizeof(truncated), false);
++	ok &= check_batch(nops, 1, true); /* shrink */
++	ok &= check_batch(nops, sizeof(nops), true); /* grow */
++	return ok ? 0 : 1;
++}

@@ -31,7 +31,7 @@ try:
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
-        expected={'cs.c.o'}
+        expected={'cs.c.o'} if k=='ownership' else {'cs.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o'}
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
@@ -48,6 +48,8 @@ try:
         hdr=struct.unpack_from('<16sHHIQQQIHHHHHH',raw);secs=[struct.unpack_from('<IIQQQQIIQQ',raw,hdr[6]+i*hdr[11])for i in range(hdr[12])];sect,=[v for v in secs if v[5]==len(body)and raw[v[4]:v[4]+v[5]]==body]
         cases[n]=(f,arch,sect[3])
     put('inputs',{n:dict(hash=sha(f),arch=arch,ip=ip,bytes=f.stat().st_size)for n,(f,arch,ip) in cases.items()})
+    pred=t/'predicates';run('compile-predicates','clang++','-O3','-std=c++17','-I',s/'include',r/'predicates.cpp','-ldl','-o',pred)
+    predicate_results={k:json.loads(get(pred,libs['base'],libs[k])) for k in q};assert all(v=={'attempts':73728,'records':61440} for v in predicate_results.values());put('vector-predicates',predicate_results)
     verify={}
     for k in q:
         args=[driver,libs['base'],libs[k]];snapshot=verify[k]={}
