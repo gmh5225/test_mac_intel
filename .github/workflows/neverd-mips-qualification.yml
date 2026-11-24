@@ -168,6 +168,12 @@ jobs:
           build-check/bin/NeverDMIPSFlowTests --gtest_output=xml:evidence/flow.xml
           python qualification-driver/neverd-mips-qualification/native-benchmark.py build-check/bin/neverd-mips-bench evidence/performance.json
           cp build-check/neverd-dependency-inputs.json build-check/neverd-build-receipt.json evidence/
+      - name: Time both R3000 word serializations on the native runner
+        if: env.REQUIRED_TEST == 'MIPSHistoricalScheduling.R3000SyscallsEnterTheRecordedGeneralVector'
+        run: |
+          suffix=
+          if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
+          python qualification-driver/neverd-mips-qualification/classic-release-timing.py "build-check/bin/neverd-mips-bench$suffix" evidence/r3000-word-timing.json --r3000-syscall
       - name: Measure baseline and candidate on this native host
         if: needs.source.outputs.paired_base != ''
         run: |

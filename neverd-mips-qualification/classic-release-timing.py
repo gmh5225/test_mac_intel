@@ -13,28 +13,38 @@ import sys
 import tempfile
 
 
-def measure(binary, output):
+def profile_inputs(syscall):
+    if syscall:
+        yield 32, 0, "mips1", (0x0000000C, 0x3C1AA000) * 64
+        return
     common = (
         0x24840007, 0x00851021, 0x00851026, 0x8CA20000,
         0xACA20004, 0x10850001, 0x00000000, 0x03E00008,
     )
+    for width in (32, 64):
+        words = (common + ((0x0085102D, 0x64840007) if width == 64 else ())) * 16
+        for rev in (1, 2, 3, 5):
+            name = ("mips" if width == 32 else "mips64") if rev == 2 else f"mips{width}r{rev}"
+            yield width, rev, name, words
+
+
+def measure(binary, output, syscall=False):
     stages = ("decode", "capstone")
     profiles = {}
     rng = random.Random(20261124)
     with tempfile.TemporaryDirectory() as temp:
         root = Path(temp)
-        for width in (32, 64):
-            words = (common + ((0x0085102D, 0x64840007) if width == 64 else ())) * 16
-            for rev in (1, 2, 3, 5):
-                name = ("mips" if width == 32 else "mips64") if rev == 2 else f"mips{width}r{rev}"
-                for order in ("big", "little"):
-                    profile = name + ("el" if order == "little" else "")
-                    raw = b"".join(word.to_bytes(4, order) for word in words)
-                    (root / profile).write_bytes(raw)
-                    profiles[profile] = {
-                        "width": width, "revision": rev, "endian": order,
-                        "sha256": hashlib.sha256(raw).hexdigest(), "count": len(words), "pairs": [],
-                    }
+        for width, revision, name, words in profile_inputs(syscall):
+            for order in ("big", "little"):
+                profile = name + ("el" if order == "little" else "")
+                raw = b"".join(word.to_bytes(4, order) for word in words)
+                (root / profile).write_bytes(raw)
+                profiles[profile] = {
+                    "width": width, "revision": revision, "endian": order,
+                    "sha256": hashlib.sha256(raw).hexdigest(), "count": len(words), "pairs": [],
+                }
+                if syscall:
+                    profiles[profile]["historical_isa"] = 1
 
         def run(name, stage, reps):
             row = json.loads(subprocess.check_output(
@@ -81,4 +91,4 @@ def measure(binary, output):
 
 
 if __name__ == "__main__":
-    measure(Path(sys.argv[1]).resolve(), Path(sys.argv[2]))
+    measure(Path(sys.argv[1]).resolve(), Path(sys.argv[2]), sys.argv[3:] == ["--r3000-syscall"])
