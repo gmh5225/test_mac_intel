@@ -1,7 +1,7 @@
-name: Time six physical input images with the new six-architecture NeverD link and fork iced
+name: Time the GCC six-architecture build with original and restored writer code generation
 on:
   push:
-    branches: [codex/six-arch-iced-fork-score]
+    branches: [codex/gcc-six-architecture-writer-stores]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: macos-15, cc: clang, replica: 1 }
-          - { host: macos-15-intel, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-24.04, cc: gcc, replica: 2 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: six-arch-selector-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: gcc-six-output-stores-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

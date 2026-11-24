@@ -36,7 +36,10 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    images={}
+    images={};objects={}
+    cases={'X86VectorOutput.c','X86ImmediateOutput.c','X86EvexMemoryOutput.c','X86MemoryOutput.c','X86OutputIterator.c'}
+    assert os.environ['CC']=='gcc' and sys.platform.startswith('linux')
+
     for label in ('base','candidate'):
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
@@ -44,6 +47,25 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
+        cc=rd(build/'compile_commands.json');active={Path(v['file']).name for v in cc if '-mstringop-strategy=libcall' in v['command']}
+        assert active==(cases if label=='candidate' else set()),active
+        obj={f.name:f for f in build.rglob('*.c.o')}
+        objects[label]={k:sha(v)for k,v in obj.items()}
+        stores={}
+        for k in cases:
+            asm=get('objdump','-d',obj[k+'.o'])
+            import re
+            stores[k]=len(re.findall(r'\brep(?:z)?\s+stos',asm))
+        save('stores-'+label,stores)
+        # Use the exact real target from Make's dry run as a second build-system check.
+        recipe=get('make','-s','-n','V=1','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CC=gcc','CAPSTONE_BUILD_CORE_ONLY=yes','OBJDIR='+str(w/'make-objects'),str(w/'make-objects/arch/X86/X86ImmediateOutput.o'),cwd=base)
+        assert ('-mstringop-strategy=libcall' in recipe)==(label=='candidate'),recipe
+        if label=='candidate':
+            delta=[n for n in obj if objects['base'][n]!=objects[label][n]]
+            assert delta and set(delta)<={k+'.o'for k in cases},delta
+            save('affected-objects',dict(changed=delta,total=len(obj),active_flags=sorted(active)))
+            unit=w/'x86-records';run('gcc','-O2','-I',base/'include',base/'tests/unit/x86_simple_output.c',lib,'-lm','-o',unit);run(unit)
+
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
@@ -51,7 +73,7 @@ try:
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
+    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('gcc','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
