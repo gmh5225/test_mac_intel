@@ -44,11 +44,9 @@ try:
     git('reset','--hard',q['parent'])
     run('base-build','cmake','--build',b,'--parallel','4','--target','capstone_static')
     original=measure_probe('base')
-    cases=1632 if profile=='noatt' else 3264
-    wrong=24 if profile=='noatt' else 48
-    assert original==(1,[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(1 if profile=='noatt' else 2)],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, {wrong} incorrect shapes']),original
-    assert candidate==(0,[],[f'{cases} encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes']),candidate
-    save('corrected-16-bit-forms',dict(reference=q['parent'],candidate=q['commit'],records=cases,original=original,updated=candidate))
+    cases=9088
+    assert original==(0,[],['9088 144 1008']) and candidate==(0,[],['9088 144 0']),(original,candidate)
+    save('extrq-register-selectors',dict(reference=q['parent'],candidate=q['commit'],records=cases,original=original,updated=candidate))
  save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,units=units,case_count=cases))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))

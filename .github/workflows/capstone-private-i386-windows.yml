@@ -1,7 +1,7 @@
-name: Validate mandatory XMM operand forms and EXTRQ selector across native ABIs
+name: Check EXTRQ selector legality, truncation and cursors across native Capstone configurations
 on:
   push:
-    branches: [codex/mandatory-xmm-native-forms]
+    branches: [codex/verify-independent-extrq-abis]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: xmm-prefix-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: extrq-selector-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
