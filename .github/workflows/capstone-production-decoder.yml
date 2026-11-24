@@ -1,7 +1,7 @@
-name: Measure single opcode-group dispatch alone and with operand storage on current NeverD
+name: Verify real-mode fixes and layout impact in the source-built NeverD product
 on:
   push:
-    branches: [codex/checked-group1-memory-neverd]
+    branches: [codex/real-mode-source-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: f96ca7d5ae203fda295d143fa89583685fe28861
+          ref: 7dc4a154b93afdafd1026e13e96e60ea7e25a846
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "f96ca7d5ae203fda295d143fa89583685fe28861"
+          test "$(git rev-parse HEAD)" = "7dc4a154b93afdafd1026e13e96e60ea7e25a846"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "fa11ca3d930b9e66a919ed4de20affdbc75bd125"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin fa11ca3d930b9e66a919ed4de20affdbc75bd125
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-group-current-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: real-mode-context-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

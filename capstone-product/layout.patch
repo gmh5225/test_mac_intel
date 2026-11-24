@@ -1,135 +1,777 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..fb4079bf 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -68,14 +68,19 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 	case 0x80:
- 	case 0x81:
- 	case 0x83:
--		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
-+		if (size >= 2 && code[1] < 0xc0 &&
- 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			const unsigned group = code[1] & 0x38;
- 			const unsigned row =
--				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
--				2;
--			if (writeCompare32(code, size, insn, insn_size,
--					   &x86_simple_outputs[row],
--					   x86_simple_registers))
-+				x86_simple_plans[0][0][group | (opcode & 1)] >> 2;
-+			if (group == 0x38) {
-+				if (writeCompare32(code, size, insn, insn_size,
-+						   &x86_simple_outputs[row],
-+						   x86_simple_registers))
-+					return true;
-+			} else if (X86_writeAluImmediate32(
-+					   code, size, insn, insn_size,
-+					   &x86_simple_outputs[row], x86_simple_registers))
- 				return true;
- 		}
- 		break;
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..6ac0d7ca 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -6,7 +6,11 @@
- /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
- #ifdef X86_MEMORY_IMMEDIATE
- #include "X86UnsignedImmediate.h"
-+#ifdef X86_ALU32_IMMEDIATE
-+CAPSTONE_INTERNAL bool X86_MEMORY_IMMEDIATE(
-+#else
- static bool X86_MEMORY_IMMEDIATE(
-+#endif
- #elif defined(X86_SEGMENT_LEA32)
- static bool X86_SEGMENT_LEA32(
- #elif defined(X86_EXTEND64_MEMORY)
-@@ -45,7 +49,7 @@ bool X86_writeMemoryOutput(
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
- #ifdef X86_MEMORY_IMMEDIATE
--#ifdef X86_COMPARE_IMMEDIATE
-+#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
- 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
- #else
- 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
-@@ -187,12 +191,18 @@ bool X86_writeMemoryOutput(
- 	const uint32_t encoded =
- 		imm_size == 1 ? code[imm_offset] :
- 				(uint32_t)X86_readDisp32(code + imm_offset);
--#ifdef X86_COMPARE_IMMEDIATE
--	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
-+#if defined(X86_COMPARE_IMMEDIATE) || defined(X86_ALU32_IMMEDIATE)
-+	/* Opcode 83 sign-extends its imm8. Logical operations print it as a
-+	 * mask of the destination width. */
- 	int64_t value = encoded;
--	if (opcode == 0x83)
-+	if (opcode == 0x83) {
- 		value = (int8_t)encoded;
--	else if (imm_size == 4 && row->ops[0].size == 8)
-+#ifdef X86_ALU32_IMMEDIATE
-+		const unsigned operation = (modrm >> 3) & 7;
-+		if (operation == 1 || operation == 4 || operation == 6)
-+			value = (uint32_t)value;
-+#endif
-+	} else if (imm_size == 4 && row->ops[0].size == 8)
- 		value = (int32_t)encoded;
- 	memcpy(out, ", ", 2);
- 	out += 2;
-diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index ee9b645b..7d9db022 100644
---- a/arch/X86/X86RegisterFallback32.c
-+++ b/arch/X86/X86RegisterFallback32.c
-@@ -36,5 +36,15 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..4a9d134e 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1230,6 +1230,9 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
  	}
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
-+
-+#define X86_MEMORY32_OUTPUT
-+#define X86_MEMORY_IMMEDIATE X86_writeAluImmediate32
-+#define X86_IMMEDIATE_WIDE 0
-+#define X86_ALU32_IMMEDIATE
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_ALU32_IMMEDIATE
-+#undef X86_IMMEDIATE_WIDE
-+#undef X86_MEMORY_IMMEDIATE
-+#undef X86_MEMORY32_OUTPUT
- #endif
- #endif
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..2d757368 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -60,6 +60,11 @@ enum X86SimpleForm {
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
  
-+CAPSTONE_INTERNAL bool
-+X86_writeAluImmediate32(const uint8_t *code, size_t size, cs_insn *insn,
-+		      uint16_t *insn_size, const struct X86SimpleOutput *row,
-+		      const struct X86SimpleRegister regs[4][16]);
++X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode);
++X86_DECODE_INLINE bool hasMandatoryVector66(OpcodeType map, uint8_t opcode);
 +
- CAPSTONE_INTERNAL bool
- X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 0c9329b4..7e3e8b69 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1021,6 +1021,16 @@ static bool check_alu_immediates(csh handles[2], cs_mode mode)
- 				    !compare(handles, b + !p,
- 					     (mr + j) % (sizeof(b) - !p), v))
- 					return false;
-+				/* Exercise the memory forms with an imm8 and with
-+				 * an imm8 sign-extended to the operand width. */
-+				if (mode == CS_MODE_32 && mr < 0xc0) {
-+					b[1] = 0x80;
-+					if (!compare(handles, b + 1, sizeof(b) - 1, v))
-+						return false;
-+					b[1] = 0x83;
-+					if (!compare(handles, b + 1, sizeof(b) - 1, v))
-+						return false;
-+				}
- 			}
+ X86_DECODE_INLINE uint16_t mandatoryPrefixAttributes(uint8_t pp)
+ {
+ 	switch (pp) {
+@@ -1323,6 +1326,12 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 		    !rexWOverridesOpSize) {
+ 			attrMask |= ATTR_OPSIZE;
  		}
++		/* Mandatory 66 selects a vector opcode in every operand-size mode.
++		 * Effective address size still comes from the prefix reader. */
++		if (decoderMode == MODE_16BIT && insn->hasOpSize &&
++		    !insn->repeatPrefix &&
++		    hasMandatoryVector66(insn->opcodeType, insn->opcode))
++			attrMask |= ATTR_OPSIZE;
+ 		if (insn->hasAdSize)
+ 			attrMask |= ATTR_ADSIZE;
+ 		if (insn->opcodeType == ONEBYTE) {
+@@ -1501,11 +1510,19 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 
+ 		return 0;
  	}
++	/* A proved one-byte context needs only the primary table read. */
++	uint8_t context16 = 0;
++	if (decoderMode == MODE_16BIT && insn->opcodeType == ONEBYTE &&
++	    !insn->repeatPrefix && insn->vectorExtensionType == TYPE_NO_VEX_XOP) {
++		context16 = oneByteContext16(insn->opcode);
++		if (context16 == 2 && !insn->hasOpSize)
++			attrMask |= ATTR_OPSIZE;
++	}
+ 	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
+ 		return -1;
+ 	}
+ 
+-	if ((decoderMode == MODE_16BIT ||
++	if (!context16 && (decoderMode == MODE_16BIT ||
+ 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
+ 	    !(attrMask & ATTR_OPSIZE)) {
+ 		/*
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index 5d103efe..376235af 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -2726,6 +2726,35 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
++X86_DECODE_INLINE bool hasMandatoryVector66(OpcodeType map, uint8_t opcode)
++{
++	(void)map;
++	(void)opcode;
++	return false;
++}
++X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode)
++{
++	/* 0 needs both contexts, 1 uses the primary, 2 selects operand size. */
++	static const uint8_t plans[256] = {
++		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 1,
++		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2,
++		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
++		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
++		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
++		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
++		2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 2, 1, 2,
++		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++		1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2,
++		1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 2, 2, 1, 1,
++		0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
++		1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
++		1, 2, 2, 2, 2, 2, 1, 2, 1, 1, 2, 2, 1, 1, 1, 2,
++		1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++		1, 1, 1, 0, 1, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2,
++		1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2,
++	};
++	return plans[opcode];
++}
+ /* 2205 raw terminals, 81 raw handlers; selected opcodes [220, 111, 182, 111, 182, 111, 220, 109, 220, 111, 220, 111, 182, 109, 181, 111, 181, 111, 182, 111, 215, 107, 215, 107, 215, 109, 215, 109]. */
+ /* 2217 public terminals, 14 public handlers; selected opcodes [222, 111, 184, 111, 184, 111, 222, 109, 222, 111, 222, 111, 184, 109, 183, 111, 183, 111, 184, 111, 217, 107, 217, 107, 217, 109, 217, 109]. */
+ #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
+@@ -9887,7 +9916,43 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+-/* 2764 raw terminals, 81 raw handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 111, 215, 111, 215, 112, 215, 112]. */
++X86_DECODE_INLINE bool hasMandatoryVector66(OpcodeType map, uint8_t opcode)
++{
++	static const uint32_t opcodes[3][8] = {
++		/* x86DisassemblerTwoByteOpcodes */
++		{ 0x00ff0000u, 0x0000ff00u, 0xfff30000u, 0xf37fffffu, 0x00000000u, 0x00000000u, 0xffff0074u, 0x7ffeffffu },
++		/* x86DisassemblerThreeByte38Opcodes */
++		{ 0x70b10fffu, 0xffbf0f3fu, 0x00000003u, 0x00000000u, 0x00000000u, 0x00000000u, 0xf8008000u, 0x00000000u },
++		/* x86DisassemblerThreeByte3AOpcodes */
++		{ 0x00f0ff00u, 0x00000007u, 0x00000017u, 0x0000000fu, 0x00000000u, 0x00000000u, 0x8000c000u, 0x00000000u },
++	};
++	const unsigned row = (unsigned)map - TWOBYTE;
++	return row < 3 && ((opcodes[row][opcode >> 5] >> (opcode & 31)) & 1);
++}
++X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode)
++{
++	/* 0 needs both contexts, 1 uses the primary, 2 selects operand size. */
++	static const uint8_t plans[256] = {
++		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 1,
++		1, 2, 1, 2, 1, 2, 2, 2, 1, 2, 1, 2, 1, 2, 2, 2,
++		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
++		1, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1,
++		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
++		2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
++		2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 1, 2, 1, 2,
++		1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++		1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 2, 2, 2, 2,
++		1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 2, 2, 1, 1,
++		0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2,
++		1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2,
++		1, 2, 2, 2, 2, 2, 1, 0, 1, 1, 2, 2, 1, 1, 1, 2,
++		1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
++		1, 1, 1, 0, 1, 2, 1, 2, 2, 1, 2, 1, 1, 2, 1, 2,
++		1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2,
++	};
++	return plans[opcode];
++}
++/* 2764 raw terminals, 81 raw handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 111, 215, 110, 215, 112, 215, 111]. */
+ /* 3296 public terminals, 14 public handlers; selected opcodes [222, 216, 184, 216, 184, 216, 222, 218, 222, 216, 222, 222, 184, 218, 183, 216, 183, 222, 184, 222, 217, 210, 217, 210, 217, 213, 217, 213]. */
+ #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
+ #define X86_TERMINAL_SPLIT UINT64_C(0x4000000000000000)
+@@ -11835,7 +11900,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
+ 	0, 0, 0, 0,
+ 	0, 0, 0, 0,
+ 	0, 0, 0, UINT64_C(0x000000000b000558),
+-	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
++	0, 0, 0, 0,
+ 	0, 0, 0, 0,
+ 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+ 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+@@ -12103,7 +12168,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
+ 	0, 0, 0, 0,
+ 	0, 0, 0, 0,
+ 	0, 0, 0, UINT64_C(0x000000000b000558),
+-	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
++	0, 0, 0, 0,
+ 	0, 0, 0, 0,
+ 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
+ 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
+@@ -14102,14 +14167,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	0, UINT64_C(0x00000000040002d7), UINT64_C(0x000000000400004c), UINT64_C(0x00000000040002db),
+ 	UINT64_C(0x00000000040000f2), UINT64_C(0x00000000040005c7), 0, UINT64_C(0x00000000040002ec),
+ 	0, UINT64_C(0x80000000000302ad), UINT64_C(0x00000000040000b2), 0,
+-	UINT64_C(0x408020f7810041ef), UINT64_C(0x408020f7810041ef), UINT64_C(0x408020eb010041db), UINT64_C(0x40000000010041db),
+-	UINT64_C(0x40802179010042f2), UINT64_C(0x40802178010042f0), UINT64_C(0x408020ec810041d8), UINT64_C(0x40000000010041d8),
++	UINT64_C(0x408020f7010041ee), UINT64_C(0x408020f7010041ee), UINT64_C(0x40000000010041da), UINT64_C(0x40000000010041da),
++	UINT64_C(0x40802178810042f1), UINT64_C(0x40802177810042ef), UINT64_C(0x40000000010041d7), UINT64_C(0x40000000010041d7),
+ 	UINT64_C(0x80000000000302ce), UINT64_C(0x408020ff010041fe), 0, 0,
+ 	0, UINT64_C(0x40000000010041fe), UINT64_C(0x40000000010041fe), UINT64_C(0x408020ff010041fe),
+ 	0, 0, 0, 0,
+ 	0, 0, 0, 0,
+-	UINT64_C(0x408020e7810041cf), UINT64_C(0x408020e7810041cf), UINT64_C(0x408020b981004173), UINT64_C(0x40000000010041e2),
+-	UINT64_C(0x408020bb01004176), UINT64_C(0x408020ba01004174), UINT64_C(0x40802172010042e4), UINT64_C(0x4080203a81004075),
++	UINT64_C(0x408020e7010041ce), UINT64_C(0x408020e7010041ce), UINT64_C(0x408020b901004172), UINT64_C(0x40000000010041e1),
++	UINT64_C(0x408020ba81004175), UINT64_C(0x408020b881004171), UINT64_C(0x40802171810042e3), UINT64_C(0x4080203a01004074),
+ 	UINT64_C(0x00000000040005cb), UINT64_C(0x0000000004000275), UINT64_C(0x000000000400026d), UINT64_C(0x0000000004000270),
+ 	UINT64_C(0x00000000040002d8), UINT64_C(0x00000000040002d9), 0, UINT64_C(0x00000000040000d9),
+ 	0, 0, 0, 0,
+@@ -14118,18 +14183,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	UINT64_C(0x4080202b01004056), UINT64_C(0x4080202f0100405e), UINT64_C(0x4080202981004053), UINT64_C(0x4080202801004050),
+ 	UINT64_C(0x4080203401004068), UINT64_C(0x4080203201004064), UINT64_C(0x4080203301004066), UINT64_C(0x4080203081004061),
+ 	UINT64_C(0x4080202d0100405a), UINT64_C(0x4080202c81004059), UINT64_C(0x4080202d8100405b), UINT64_C(0x4080202c01004058),
+-	UINT64_C(0x408020ee80000000), UINT64_C(0x4080215d010042ba), 0, 0,
+-	UINT64_C(0x4080200e8100401d), UINT64_C(0x4080200d8100401b), UINT64_C(0x4080210101004202), UINT64_C(0x408022f0810045e1),
+-	UINT64_C(0x408020050100400a), UINT64_C(0x408020fa010041f4), UINT64_C(0x4080204181004083), UINT64_C(0x4080203f8100407f),
+-	UINT64_C(0x40802166810042cd), UINT64_C(0x408020b70100416e), UINT64_C(0x4080204b01004096), UINT64_C(0x408020b481004169),
++	UINT64_C(0x408020ee00000000), UINT64_C(0x4080215c810042b9), 0, 0,
++	UINT64_C(0x4080200e0100401c), UINT64_C(0x4080200d0100401a), UINT64_C(0x4080210081004201), UINT64_C(0x408022f0010045e0),
++	UINT64_C(0x4080200481004009), UINT64_C(0x408020f9810041f3), UINT64_C(0x4080204081004081), UINT64_C(0x4080204101004082),
++	UINT64_C(0x40802166010042cc), UINT64_C(0x408020b68100416d), UINT64_C(0x4080204a81004095), UINT64_C(0x408020b401004168),
+ 	UINT64_C(0x408020e2810041c5), UINT64_C(0x408020e3810041c7), UINT64_C(0x408020e3010041c6), UINT64_C(0x408020c101004182),
+ 	UINT64_C(0x408020ca01004194), UINT64_C(0x408020cb01004196), UINT64_C(0x408020ca81004195), UINT64_C(0x408020c181004183),
+ 	UINT64_C(0x408020e1010041c2), UINT64_C(0x408020e2010041c4), UINT64_C(0x408020e1810041c3), UINT64_C(0x408020c081004181),
+-	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
+-	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
++	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
++	UINT64_C(0x4300612b8600c257), UINT64_C(0x8000000000030a06), UINT64_C(0x8000000000030a16), UINT64_C(0x8000000000030a26),
+ 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
+-	0, UINT64_C(0x4080221381004427), 0, 0,
+-	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
++	0, UINT64_C(0x4080205400000000), 0, 0,
++	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
+ 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
+ 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
+ 	UINT64_C(0x0000000003010110), UINT64_C(0x000000000301010c), UINT64_C(0x000000000301010e), UINT64_C(0x000000000301010b),
+@@ -14147,7 +14212,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	0, 0, UINT64_C(0x80000000000304d2), UINT64_C(0x4080201d0100403a),
+ 	UINT64_C(0x4080201b01004036), UINT64_C(0x4080201b81004037), UINT64_C(0x408020f6010041ec), UINT64_C(0x408020f6010041ec),
+ 	0, 0, 0, 0,
+-	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061590600c2b2), UINT64_C(0x80000000000304f4),
++	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061588600c2b1), UINT64_C(0x80000000000304f4),
+ 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
+ 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
+ 	0, UINT64_C(0x408020dc810041b9), UINT64_C(0x408020db810041b7), UINT64_C(0x408020dc010041b8),
+@@ -14155,11 +14220,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	UINT64_C(0x408020df810041bf), UINT64_C(0x408020e0010041c0), UINT64_C(0x408020d2010041a4), UINT64_C(0x408020c70100418e),
+ 	UINT64_C(0x408020c481004189), UINT64_C(0x408020c50100418a), UINT64_C(0x408020d1010041a2), UINT64_C(0x408020c68100418d),
+ 	UINT64_C(0x408020c78100418f), UINT64_C(0x408020db010041b6), UINT64_C(0x408020da810041b5), UINT64_C(0x408020c801004190),
+-	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x400000000100417c),
++	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x40000000010041df),
+ 	UINT64_C(0x408020de810041bd), UINT64_C(0x408020df010041be), UINT64_C(0x408020d1810041a3), UINT64_C(0x408020d5810041ab),
+ 	UINT64_C(0x408020c381004187), UINT64_C(0x408020c401004188), UINT64_C(0x408020d0810041a1), UINT64_C(0x408020e4010041c8),
+ 	0, UINT64_C(0x408020da010041b4), UINT64_C(0x408020d9010041b2), UINT64_C(0x408020d9810041b3),
+-	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020bc00000000),
++	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020b380000000),
+ 	UINT64_C(0x408020dd010041ba), UINT64_C(0x408020e0810041c1), UINT64_C(0x408020dd810041bb), UINT64_C(0x408020de010041bc),
+ 	UINT64_C(0x408020c201004184), UINT64_C(0x408020c58100418b), UINT64_C(0x408020c281004185), UINT64_C(0x00000000040002ea),
+ },
+@@ -14370,14 +14435,14 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	0, UINT64_C(0x00000000040002d7), UINT64_C(0x000000000400004c), UINT64_C(0x00000000040002db),
+ 	UINT64_C(0x00000000040000f2), UINT64_C(0x00000000040005c7), 0, UINT64_C(0x00000000040002ec),
+ 	0, UINT64_C(0x80000000000302ad), UINT64_C(0x00000000040000b2), 0,
+-	UINT64_C(0x408020f7810041ef), UINT64_C(0x408020f7810041ef), UINT64_C(0x408020eb010041db), UINT64_C(0x40000000010041db),
+-	UINT64_C(0x40802179010042f2), UINT64_C(0x40802178010042f0), UINT64_C(0x408020ec810041d8), UINT64_C(0x40000000010041d8),
++	UINT64_C(0x408020f7010041ee), UINT64_C(0x408020f7010041ee), UINT64_C(0x408020eb010041da), UINT64_C(0x40000000010041da),
++	UINT64_C(0x40802178810042f1), UINT64_C(0x40802177810042ef), UINT64_C(0x408020ec810041d7), UINT64_C(0x40000000010041d7),
+ 	UINT64_C(0x80000000000302ce), UINT64_C(0x408020ff010041fe), 0, 0,
+ 	0, UINT64_C(0x40000000010041fe), UINT64_C(0x40000000010041fe), UINT64_C(0x408020ff010041fe),
+ 	0, 0, 0, 0,
+ 	0, 0, 0, 0,
+-	UINT64_C(0x408020e7810041cf), UINT64_C(0x408020e7810041cf), UINT64_C(0x408020b981004173), UINT64_C(0x40000000010041e2),
+-	UINT64_C(0x408020bb01004176), UINT64_C(0x408020ba01004174), UINT64_C(0x40802172010042e4), UINT64_C(0x4080203a81004075),
++	UINT64_C(0x408020e7010041ce), UINT64_C(0x408020e7010041ce), UINT64_C(0x408020b901004172), UINT64_C(0x40000000010041e1),
++	UINT64_C(0x408020ba81004175), UINT64_C(0x408020b881004171), UINT64_C(0x40802171810042e3), UINT64_C(0x4080203a01004074),
+ 	UINT64_C(0x00000000040005cb), UINT64_C(0x0000000004000275), UINT64_C(0x000000000400026d), UINT64_C(0x0000000004000270),
+ 	UINT64_C(0x00000000040002d8), UINT64_C(0x00000000040002d9), 0, UINT64_C(0x00000000040000d9),
+ 	0, 0, 0, 0,
+@@ -14386,18 +14451,18 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	UINT64_C(0x4080202b01004056), UINT64_C(0x4080202f0100405e), UINT64_C(0x4080202981004053), UINT64_C(0x4080202801004050),
+ 	UINT64_C(0x4080203401004068), UINT64_C(0x4080203201004064), UINT64_C(0x4080203301004066), UINT64_C(0x4080203081004061),
+ 	UINT64_C(0x4080202d0100405a), UINT64_C(0x4080202c81004059), UINT64_C(0x4080202d8100405b), UINT64_C(0x4080202c01004058),
+-	UINT64_C(0x408020ee80000000), UINT64_C(0x4080215d010042ba), UINT64_C(0x4080214181004283), UINT64_C(0x4080213401004268),
+-	UINT64_C(0x4080200e8100401d), UINT64_C(0x4080200d8100401b), UINT64_C(0x4080210101004202), UINT64_C(0x408022f0810045e1),
+-	UINT64_C(0x408020050100400a), UINT64_C(0x408020fa010041f4), UINT64_C(0x4080204181004083), UINT64_C(0x4080203f8100407f),
+-	UINT64_C(0x40802166810042cd), UINT64_C(0x408020b70100416e), UINT64_C(0x4080204b01004096), UINT64_C(0x408020b481004169),
++	UINT64_C(0x408020ee00000000), UINT64_C(0x4080215c810042b9), UINT64_C(0x4080214181004283), UINT64_C(0x4080213401004268),
++	UINT64_C(0x4080200e0100401c), UINT64_C(0x4080200d0100401a), UINT64_C(0x4080210081004201), UINT64_C(0x408022f0010045e0),
++	UINT64_C(0x4080200481004009), UINT64_C(0x408020f9810041f3), UINT64_C(0x4080204081004081), UINT64_C(0x4080204101004082),
++	UINT64_C(0x40802166010042cc), UINT64_C(0x408020b68100416d), UINT64_C(0x4080204a81004095), UINT64_C(0x408020b401004168),
+ 	UINT64_C(0x408020e2810041c5), UINT64_C(0x408020e3810041c7), UINT64_C(0x408020e3010041c6), UINT64_C(0x408020c101004182),
+ 	UINT64_C(0x408020ca01004194), UINT64_C(0x408020cb01004196), UINT64_C(0x408020ca81004195), UINT64_C(0x408020c181004183),
+ 	UINT64_C(0x408020e1010041c2), UINT64_C(0x408020e2010041c4), UINT64_C(0x408020e1810041c3), UINT64_C(0x408020c081004181),
+-	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
+-	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
++	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
++	UINT64_C(0x4300612b8600c257), UINT64_C(0x8000000000030a06), UINT64_C(0x8000000000030a16), UINT64_C(0x8000000000030a26),
+ 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
+-	0, UINT64_C(0x4080221381004427), 0, 0,
+-	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
++	0, UINT64_C(0x4080205401004427), 0, 0,
++	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020ea010041d4),
+ 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
+ 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
+ 	UINT64_C(0x0000000003010110), UINT64_C(0x000000000301010c), UINT64_C(0x000000000301010e), UINT64_C(0x000000000301010b),
+@@ -14415,7 +14480,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	0, 0, UINT64_C(0x80000000000304d2), UINT64_C(0x4080201d0100403a),
+ 	UINT64_C(0x4080201b01004036), UINT64_C(0x4080201b81004037), UINT64_C(0x408020f6010041ec), UINT64_C(0x408020f6010041ec),
+ 	0, 0, 0, UINT64_C(0x40000000010041e0),
+-	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061590600c2b2), UINT64_C(0x80000000000304f4),
++	UINT64_C(0x430060cf0600c19e), UINT64_C(0x430060cb80000000), UINT64_C(0x430061588600c2b1), UINT64_C(0x80000000000304f4),
+ 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
+ 	UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038), UINT64_C(0x0000000004000038),
+ 	0, UINT64_C(0x408020dc810041b9), UINT64_C(0x408020db810041b7), UINT64_C(0x408020dc010041b8),
+@@ -14423,11 +14488,11 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ 	UINT64_C(0x408020df810041bf), UINT64_C(0x408020e0010041c0), UINT64_C(0x408020d2010041a4), UINT64_C(0x408020c70100418e),
+ 	UINT64_C(0x408020c481004189), UINT64_C(0x408020c50100418a), UINT64_C(0x408020d1010041a2), UINT64_C(0x408020c68100418d),
+ 	UINT64_C(0x408020c78100418f), UINT64_C(0x408020db010041b6), UINT64_C(0x408020da810041b5), UINT64_C(0x408020c801004190),
+-	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x400000000100417c),
++	UINT64_C(0x408020d3810041a7), UINT64_C(0x408020d4010041a8), 0, UINT64_C(0x40000000010041df),
+ 	UINT64_C(0x408020de810041bd), UINT64_C(0x408020df010041be), UINT64_C(0x408020d1810041a3), UINT64_C(0x408020d5810041ab),
+ 	UINT64_C(0x408020c381004187), UINT64_C(0x408020c401004188), UINT64_C(0x408020d0810041a1), UINT64_C(0x408020e4010041c8),
+ 	0, UINT64_C(0x408020da010041b4), UINT64_C(0x408020d9010041b2), UINT64_C(0x408020d9810041b3),
+-	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020bc00000000),
++	UINT64_C(0x408020d5010041aa), UINT64_C(0x408020d0010041a0), UINT64_C(0x408020d6010041ac), UINT64_C(0x408020b380000000),
+ 	UINT64_C(0x408020dd010041ba), UINT64_C(0x408020e0810041c1), UINT64_C(0x408020dd810041bb), UINT64_C(0x408020de010041bc),
+ 	UINT64_C(0x408020c201004184), UINT64_C(0x408020c58100418b), UINT64_C(0x408020c281004185), UINT64_C(0x00000000040002ea),
+ },
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index f1ebc59f..914d62b3 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -5,6 +5,7 @@
+ 
+ import argparse
+ from collections import defaultdict
++from functools import lru_cache
+ from pathlib import Path
+ import re
+ 
+@@ -563,6 +564,116 @@ def scalar_terminal_form(operands, modrm):
+     return True
+ 
+ 
++@lru_cache(maxsize=None)
++def legacy_vector66_maps(suffix):
++    """Identify legacy vector opcode groups whose 66 byte selects an instruction."""
++    common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
++    contexts, _, names = tables.parse_common(common)
++    source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
++    ids = tables.parse_ids(source, contexts)
++    maps = tables.parse_maps(
++        (X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
++        names[:4] if suffix else names,
++        len(contexts),
++    )
++    specifiers = instruction_specifiers(source)
++    vector = {
++        i for i, operands in enumerate(read_sets(X86 / f"X86GenDisassemblerTables{suffix}.inc"))
++        if any(kind == "TYPE_XMM" for _, kind in operands)
++    }
++    equivalent = equivalents16(suffix)
++    groups = {}
++    invalid = (("MODRM_ONEENTRY", 0),) * 256
++    for name, indices, rows in maps[1:4]:
++        selected = groups[name] = set()
++        for first, second in (("IC", "IC_OPSIZE"), ("IC_ADSIZE", "IC_OPSIZE_ADSIZE")):
++            a = indices[contexts.index(first)]
++            b = indices[contexts.index(second)]
++            ordinary = rows[a - 1] if a else invalid
++            prefixed = rows[b - 1] if b else invalid
++            for opcode, (left, right) in enumerate(zip(ordinary, prefixed)):
++                if left == right or opcode in selected:
++                    continue
++                for modrm in range(256):
++                    unprefixed = tables.source_id(ids, *left, modrm)
++                    with_66 = tables.source_id(ids, *right, modrm)
++                    if (unprefixed != with_66 and specifiers[with_66] in vector
++                            and (unprefixed, with_66) not in equivalent):
++                        selected.add(opcode)
++                        break
++    return groups
++
++
++def emit_real_mode_onebyte_context(suffix):
++    """Select one table only when it consumes exactly the ordinary ModR/M bytes."""
++    common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
++    contexts, _, names = tables.parse_common(common)
++    source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
++    ids = tables.parse_ids(source, contexts)
++    maps = tables.parse_maps(
++        (X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
++        names[:4] if suffix else names, len(contexts),
++    )
++    _, indices, rows = maps[0]
++    equivalent = equivalents16(suffix)
++    def decision(context, opcode):
++        row = indices[contexts.index(context)]
++        return rows[row - 1][opcode] if row else ("MODRM_ONEENTRY", 0)
++
++    plans = []
++    for opcode in range(256):
++        use = {1, 2}
++        # Moffs and JCXZ perform their own address-size inversion.
++        if opcode in (0xa0, 0xa1, 0xa2, 0xa3, 0xe3):
++            use.clear()
++        for normal, sized in (("IC", "IC_OPSIZE"), ("IC_ADSIZE", "IC_OPSIZE_ADSIZE")):
++            a = decision(normal, opcode)
++            b = decision(sized, opcode)
++            if (a[0] == "MODRM_ONEENTRY") != (b[0] == "MODRM_ONEENTRY"):
++                use.clear()
++                break
++            for modrm in range(256):
++                orig = tables.source_id(ids, *a, modrm)
++                alt = tables.source_id(ids, *b, modrm)
++                selected = alt if (orig, alt) in equivalent else orig
++                if selected != orig:
++                    use.discard(1)
++                if selected != alt:
++                    use.discard(2)
++        plans.append(min(use) if use else 0)
++    lines = ["X86_DECODE_INLINE uint8_t oneByteContext16(uint8_t opcode)", "{",
++             "\t/* 0 needs both contexts, 1 uses the primary, 2 selects operand size. */",
++             "\tstatic const uint8_t plans[256] = {"]
++    for offset in range(0, 256, 16):
++        lines.append("\t\t" + ", ".join(map(str, plans[offset:offset + 16])) + ",")
++    return lines + ["\t};", "\treturn plans[opcode];", "}"]
++
++
++def emit_legacy_vector66(suffix):
++    groups = legacy_vector66_maps(suffix)
++    lines = [
++        "X86_DECODE_INLINE bool hasMandatoryVector66(OpcodeType map, uint8_t opcode)",
++        "{",
++    ]
++    if any(groups.values()):
++        lines += ["\tstatic const uint32_t opcodes[3][8] = {"]
++        for name, selected in groups.items():
++            words = [
++                sum(1 << (op & 31) for op in selected if op >> 5 == i)
++                for i in range(8)
++            ]
++            lines.append(f"\t\t/* {name} */")
++            lines.append("\t\t{ " + ", ".join(f"0x{w:08x}u" for w in words) + " },")
++        lines += [
++            "\t};",
++            "\tconst unsigned row = (unsigned)map - TWOBYTE;",
++            "\treturn row < 3 && ((opcodes[row][opcode >> 5] >> (opcode & 31)) & 1);",
++        ]
++    else:
++        lines += ["\t(void)map;", "\t(void)opcode;", "\treturn false;"]
++    return lines + ["}"]
++
++
+ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_ROWS):
+ 
+     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+@@ -651,6 +762,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
+             "Mandatory SSE attribute contexts changed",
+         )
+     equivalent = equivalents16(suffix)
++    vector66 = legacy_vector66_maps(suffix)
+     for _, attr_mask, mode16, has_op_size in contexts_to_project:
+         context_name = context_values[attr_mask]
+         row_maps = []
+@@ -698,8 +810,9 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
+                         len(other_uids) == count,
+                         "Incomplete secondary terminal sequence",
+                     )
++                    mandatory_66 = has_op_size and opcode in vector66.get(name, ())
+                     uids = tuple(
+-                        b if not has_op_size and (a, b) in equivalent else a
++                        b if mandatory_66 or (not has_op_size and (a, b) in equivalent) else a
+                         for a, b in zip(uids, other_uids)
+                     )
+                 if (
+@@ -752,7 +865,7 @@ def legacy_terminal_model(suffix, *, public=False, contexts_to_project=TERMINAL_
+                         second = tables.source_id(
+                             ids, second_kind, second_offset, modrm
+                         )
+-                        if not has_op_size and (expected, second) in equivalent:
++                        if mandatory_66 or (not has_op_size and (expected, second) in equivalent):
+                             expected = second
+                     tables.require(
+                         terminals[first + delta][0] == expected,
+@@ -1044,6 +1157,8 @@ def emit_terminal(suffix):
+         legacy_terminal_model(suffix, public=True)
+     )
+     lines = [
++        *emit_legacy_vector66(suffix),
++        *emit_real_mode_onebyte_context(suffix),
+         f"/* {len(terminals)} raw terminals, {len(groups)} raw handlers; selected opcodes {selected_counts}. */",
+         f"/* {len(public_terminals)} public terminals, {len(public_groups)} public handlers; selected opcodes {public_counts}. */",
+         f"#define X86_TERMINAL_INDEXED UINT64_C(0x{TERMINAL_INDEXED:x})",
+diff --git a/tests/unit/x86_integer_vector_access.c b/tests/unit/x86_integer_vector_access.c
+index 7727dbb7..b35bd8b2 100644
+--- a/tests/unit/x86_integer_vector_access.c
++++ b/tests/unit/x86_integer_vector_access.c
+@@ -8,67 +8,210 @@ struct move {
+ 	uint8_t bytes[6], length, width;
+ 	x86_insn id;
+ 	bool store, wide_only;
++	x86_reg vector_reg;
+ };
+ 
+ static const struct move moves[] = {
+-	{ { 0x0f, 0x6e, 0x0b }, 3, 4, X86_INS_MOVD, false, false },
+-	{ { 0x0f, 0x7e, 0x0b }, 3, 4, X86_INS_MOVD, true, false },
+-	{ { 0x0f, 0x6f, 0x0b }, 3, 8, X86_INS_MOVQ, false, false },
+-	{ { 0x0f, 0x7f, 0x0b }, 3, 8, X86_INS_MOVQ, true, false },
+-	{ { 0x48, 0x0f, 0x6e, 0x0b }, 4, 8, X86_INS_MOVQ, false, true },
+-	{ { 0x48, 0x0f, 0x7e, 0x0b }, 4, 8, X86_INS_MOVQ, true, true },
+-	{ { 0x66, 0x0f, 0x6e, 0x0b }, 4, 4, X86_INS_MOVD, false, false },
+-	{ { 0x66, 0x0f, 0x7e, 0x0b }, 4, 4, X86_INS_MOVD, true, false },
+-	{ { 0x66, 0x48, 0x0f, 0x6e, 0x0b }, 5, 8, X86_INS_MOVQ, false, true },
+-	{ { 0x66, 0x48, 0x0f, 0x7e, 0x0b }, 5, 8, X86_INS_MOVQ, true, true },
+-	{ { 0xf3, 0x0f, 0x7e, 0x0b }, 4, 8, X86_INS_MOVQ, false, false },
+-	{ { 0x66, 0x0f, 0xd6, 0x0b }, 4, 8, X86_INS_MOVQ, true, false },
+-	{ { 0xc5, 0xf9, 0x6e, 0x0b }, 4, 4, X86_INS_VMOVD, false, false },
+-	{ { 0xc5, 0xf9, 0x7e, 0x0b }, 4, 4, X86_INS_VMOVD, true, false },
+-	{ { 0xc5, 0xfa, 0x7e, 0x0b }, 4, 8, X86_INS_VMOVQ, false, false },
+-	{ { 0xc5, 0xf9, 0xd6, 0x0b }, 4, 8, X86_INS_VMOVQ, true, false },
+-	{ { 0xc4, 0xe1, 0x79, 0x6e, 0x0b }, 5, 4, X86_INS_VMOVD, false, false },
+-	{ { 0xc4, 0xe1, 0x79, 0x7e, 0x0b }, 5, 4, X86_INS_VMOVD, true, false },
+-	{ { 0xc4, 0xe1, 0xf9, 0x6e, 0x0b }, 5, 8, X86_INS_VMOVQ, false, true },
+-	{ { 0xc4, 0xe1, 0xf9, 0x7e, 0x0b }, 5, 8, X86_INS_VMOVQ, true, true },
+-	{ { 0xc4, 0xe1, 0x7a, 0x7e, 0x0b }, 5, 8, X86_INS_VMOVQ, false, false },
+-	{ { 0xc4, 0xe1, 0x79, 0xd6, 0x0b }, 5, 8, X86_INS_VMOVQ, true, false },
++	{ { 0x0f, 0x6e, 0x0b }, 3, 4, X86_INS_MOVD, false, false, X86_REG_MM1 },
++	{ { 0x0f, 0x7e, 0x0b }, 3, 4, X86_INS_MOVD, true, false, X86_REG_MM1 },
++	{ { 0x0f, 0x6f, 0x0b }, 3, 8, X86_INS_MOVQ, false, false, X86_REG_MM1 },
++	{ { 0x0f, 0x7f, 0x0b }, 3, 8, X86_INS_MOVQ, true, false, X86_REG_MM1 },
++	{ { 0x48, 0x0f, 0x6e, 0x0b },
++	  4,
++	  8,
++	  X86_INS_MOVQ,
++	  false,
++	  true,
++	  X86_REG_MM1 },
++	{ { 0x48, 0x0f, 0x7e, 0x0b },
++	  4,
++	  8,
++	  X86_INS_MOVQ,
++	  true,
++	  true,
++	  X86_REG_MM1 },
++	{ { 0x66, 0x0f, 0x6e, 0x0b },
++	  4,
++	  4,
++	  X86_INS_MOVD,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0x66, 0x0f, 0x7e, 0x0b },
++	  4,
++	  4,
++	  X86_INS_MOVD,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0x66, 0x48, 0x0f, 0x6e, 0x0b },
++	  5,
++	  8,
++	  X86_INS_MOVQ,
++	  false,
++	  true,
++	  X86_REG_XMM1 },
++	{ { 0x66, 0x48, 0x0f, 0x7e, 0x0b },
++	  5,
++	  8,
++	  X86_INS_MOVQ,
++	  true,
++	  true,
++	  X86_REG_XMM1 },
++	{ { 0xf3, 0x0f, 0x7e, 0x0b },
++	  4,
++	  8,
++	  X86_INS_MOVQ,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0x66, 0x0f, 0xd6, 0x0b },
++	  4,
++	  8,
++	  X86_INS_MOVQ,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc5, 0xf9, 0x6e, 0x0b },
++	  4,
++	  4,
++	  X86_INS_VMOVD,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc5, 0xf9, 0x7e, 0x0b },
++	  4,
++	  4,
++	  X86_INS_VMOVD,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc5, 0xfa, 0x7e, 0x0b },
++	  4,
++	  8,
++	  X86_INS_VMOVQ,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc5, 0xf9, 0xd6, 0x0b },
++	  4,
++	  8,
++	  X86_INS_VMOVQ,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc4, 0xe1, 0x79, 0x6e, 0x0b },
++	  5,
++	  4,
++	  X86_INS_VMOVD,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc4, 0xe1, 0x79, 0x7e, 0x0b },
++	  5,
++	  4,
++	  X86_INS_VMOVD,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc4, 0xe1, 0xf9, 0x6e, 0x0b },
++	  5,
++	  8,
++	  X86_INS_VMOVQ,
++	  false,
++	  true,
++	  X86_REG_XMM1 },
++	{ { 0xc4, 0xe1, 0xf9, 0x7e, 0x0b },
++	  5,
++	  8,
++	  X86_INS_VMOVQ,
++	  true,
++	  true,
++	  X86_REG_XMM1 },
++	{ { 0xc4, 0xe1, 0x7a, 0x7e, 0x0b },
++	  5,
++	  8,
++	  X86_INS_VMOVQ,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xc4, 0xe1, 0x79, 0xd6, 0x0b },
++	  5,
++	  8,
++	  X86_INS_VMOVQ,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
+ 	{ { 0x62, 0xf1, 0x7d, 0x08, 0x6e, 0x0b },
+ 	  6,
+ 	  4,
+ 	  X86_INS_VMOVD,
+ 	  false,
+-	  false },
++	  false,
++	  X86_REG_XMM1 },
+ 	{ { 0x62, 0xf1, 0x7d, 0x08, 0x7e, 0x0b },
+ 	  6,
+ 	  4,
+ 	  X86_INS_VMOVD,
+ 	  true,
+-	  false },
++	  false,
++	  X86_REG_XMM1 },
+ 	{ { 0x62, 0xf1, 0xfd, 0x08, 0x6e, 0x0b },
+ 	  6,
+ 	  8,
+ 	  X86_INS_VMOVQ,
+ 	  false,
+-	  true },
++	  true,
++	  X86_REG_XMM1 },
+ 	{ { 0x62, 0xf1, 0xfd, 0x08, 0x7e, 0x0b },
+ 	  6,
+ 	  8,
+ 	  X86_INS_VMOVQ,
+ 	  true,
+-	  true },
++	  true,
++	  X86_REG_XMM1 },
+ 	{ { 0x62, 0xf1, 0xfe, 0x08, 0x7e, 0x0b },
+ 	  6,
+ 	  8,
+ 	  X86_INS_VMOVQ,
+ 	  false,
+-	  false },
++	  false,
++	  X86_REG_XMM1 },
+ 	{ { 0x62, 0xf1, 0xfd, 0x08, 0xd6, 0x0b },
+ 	  6,
+ 	  8,
+ 	  X86_INS_VMOVQ,
+ 	  true,
+-	  false },
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0x66, 0x0f, 0x6f, 0x0b },
++	  4,
++	  16,
++	  X86_INS_MOVDQA,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0x66, 0x0f, 0x7f, 0x0b },
++	  4,
++	  16,
++	  X86_INS_MOVDQA,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xf3, 0x0f, 0x6f, 0x0b },
++	  4,
++	  16,
++	  X86_INS_MOVDQU,
++	  false,
++	  false,
++	  X86_REG_XMM1 },
++	{ { 0xf3, 0x0f, 0x7f, 0x0b },
++	  4,
++	  16,
++	  X86_INS_MOVDQU,
++	  true,
++	  false,
++	  X86_REG_XMM1 },
+ };
+ 
+ static bool check_moves(csh handle, bool wide, bool att)
+@@ -89,6 +232,7 @@ static bool check_moves(csh handle, bool wide, bool att)
+ 			  x86->op_count == 2 && memory->type == X86_OP_MEM &&
+ 			  memory->size == move->width &&
+ 			  reg->type == X86_OP_REG &&
++			  reg->reg == move->vector_reg &&
+ 			  memory->access ==
+ 				  (move->store ? CS_AC_WRITE : CS_AC_READ) &&
+ 			  reg->access ==
+@@ -131,6 +275,38 @@ static bool check_scan(csh handle, bool wide)
+ 	return ok;
+ }
+ 
++static bool check_legacy_vector_prefix(csh handle)
++{
++	static const struct {
++		uint8_t raw[6];
++		uint8_t size;
++		unsigned id;
++		x86_reg first, second;
++	} cases[] = {
++		{ { 0x0f, 0x60, 0xcd }, 3, X86_INS_PUNPCKLBW, X86_REG_MM1, X86_REG_MM5 },
++		{ { 0x66, 0x0f, 0x60, 0xcd }, 4, X86_INS_PUNPCKLBW, X86_REG_XMM1, X86_REG_XMM5 },
++		{ { 0x66, 0x0f, 0x38, 0x00, 0xcd }, 5, X86_INS_PSHUFB, X86_REG_XMM1, X86_REG_XMM5 },
++		{ { 0x66, 0x0f, 0x3a, 0x0f, 0xcd, 0xa5 }, 6, X86_INS_PALIGNR, X86_REG_XMM1, X86_REG_XMM5 },
++	};
++	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
++		cs_insn *insn;
++		size_t count = cs_disasm(handle, cases[i].raw, cases[i].size,
++					 0x1000, 1, &insn);
++		if (!count)
++			return false;
++		cs_x86 *x = &insn->detail->x86;
++		bool ok = insn->size == cases[i].size && insn->id == cases[i].id &&
++			  x->op_count >= 2 && x->operands[0].type == X86_OP_REG &&
++			  x->operands[1].type == X86_OP_REG &&
++			  x->operands[0].reg == cases[i].first &&
++			  x->operands[1].reg == cases[i].second;
++		cs_free(insn, count);
++		if (!ok)
++			return false;
++	}
++	return true;
++}
++
+ static bool check_extrq_selector(csh handle)
+ {
+ 	uint8_t code[] = { 0x66, 0x0f, 0x78, 0xc0, 0x04, 0x02 };
+@@ -154,13 +330,15 @@ static bool check_extrq_selector(csh handle)
+ 
+ int main(void)
+ {
+-	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
+-	for (unsigned i = 0; i < 2; ++i) {
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
++	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i) {
+ 		csh handle;
+ 		if (cs_open(CS_ARCH_X86, modes[i], &handle))
+ 			return 1;
+ 		bool ok = cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ==
+ 			  CS_ERR_OK;
++		ok = ok && check_legacy_vector_prefix(handle) &&
++		     check_extrq_selector(handle);
+ 		for (unsigned att = 0; att < 2 && ok; ++att) {
+ 			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
+ 					       att ? CS_OPT_SYNTAX_ATT :
+@@ -168,11 +346,10 @@ int main(void)
+ 			if (att && err == CS_ERR_X86_ATT)
+ 				continue;
+ 			ok = err == CS_ERR_OK &&
+-			     check_moves(handle, i != 0, att != 0);
++			     check_moves(handle, modes[i] == CS_MODE_64,
++					 att != 0);
+ 		}
+ 		ok = ok && check_scan(handle, modes[i] == CS_MODE_64);
+-		if (modes[i] != CS_MODE_16)
+-			ok = ok && check_extrq_selector(handle);
+ 		cs_close(&handle);
+ 		if (!ok)
+ 			return 1;

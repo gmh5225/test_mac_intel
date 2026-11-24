@@ -59,11 +59,11 @@ try:
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
         assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
-        if variant in ('base','selector'):
+        if variant in ('layout','selector'):
             command(['clang','-fPIC','-shared','-O2','-I',cs/'include',r/'export.c','-Wl,--whole-archive',archive,'-Wl,--no-whole-archive','-lm','-o',t/(variant+'.so')],'grid-lib-'+variant)
         if variant=='selector':
             command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'grid.cpp','-ldl','-o',t/'grid'],'grid-link')
-            command([t/'grid',t/'base.so',t/'selector.so'],'grid-result')
+            command([t/'grid',t/'layout.so',t/'selector.so'],'grid-result')
             grid=json.loads((out/'grid-result.log').read_text())
             save('grid',grid)
             command(['clang++','-std=c++17','-O2','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-lm','-o',t/'emit-alu'],'generate-link')
@@ -93,7 +93,7 @@ try:
         command([t/'mask-access'],'verify-memory-'+variant)
         assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
         command(['clang','-O2','-I',cs/'include',r/'forms.c',archive,'-o',t/'forms'],'compile-forms-'+variant)
-        v=sp.run([t/'forms'],text=True,capture_output=True);failure=True
+        v=sp.run([t/'forms'],text=True,capture_output=True);failure=variant=='base'
         expected_errors=[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(2)] if failure else []
         expected_stdout=f'3264 encodings and syntax cases, 0 incorrect memory accesses, {48 if failure else 0} incorrect shapes'
         assert (v.returncode,v.stderr.splitlines(),v.stdout.splitlines())==(int(failure),expected_errors,[expected_stdout]),(v.returncode,v.stdout,v.stderr)
