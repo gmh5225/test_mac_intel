@@ -1,0 +1,46 @@
+name: MIPS III direct decoder comparison
+on:
+  push:
+    branches: [codex/mips-macos-direct-decode]
+    paths: ['.github/workflows/mips-macos-direct-decode.yml', 'neverd-mips-qualification/**']
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: macos-15
+    timeout-minutes: 80
+    env:
+      QUALIFIED_REVISION: cbfb57d534df6bea7ceb2cd023c5505b72477759
+      NEVERD_THREADS: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: driver
+          persist-credentials: false
+          sparse-checkout: neverd-mips-qualification
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.QUALIFIED_REVISION }}
+          persist-credentials: false
+          path: source
+      - name: Build the same Release benchmark at the qualified revision
+        working-directory: source
+        run: |
+          test "$(git rev-parse HEAD)" = "$QUALIFIED_REVISION"
+          git submodule update --init --depth 1 third_party/capstone signatures third_party/unicorn
+          brew install cmake ninja lld
+          cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DBUILD_TESTING=ON \
+            -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON
+          python3 scripts/build.py build-check --config Release --parallel 4 --target neverd-mips-bench
+          test "$(git -C third_party/capstone rev-parse HEAD)" = "$(git rev-parse HEAD:third_party/capstone)"
+      - name: Alternate the two decoders on identical bytes in both orders
+        working-directory: source
+        run: python3 ../driver/neverd-mips-qualification/direct-decode.py build-check/bin/neverd-mips-bench ../measurements.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: mips-direct-${{ env.QUALIFIED_REVISION }}
+          path: measurements.json
+          retention-days: 7
