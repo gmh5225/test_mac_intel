@@ -22,8 +22,10 @@ def main(w):
     meta=json.loads((r/'experiment.json').read_text())
     assert sp.check_output(['git','-C',base,'write-tree'],text=True).strip()==meta['checkout_tree']
     iced=json.loads((r/'experiment.json').read_text())['iced_revision']
-    checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
-    run(['git','init','--bare',w/'iced-git'],'iced-repo');run(['git','-C',w/'iced-git','fetch','--depth','1','https://github.com/NeverSight/iced.git',iced],'iced-fetch');run(['git','-C',w/'iced-git','archive','--format=tar','-o',tar,iced,'src/rust/iced-x86'],'iced-archive');run(['tar','-xf',tar,'-C',checkout],'iced-extract');tar.unlink()
+    checkout=p/'iced-source'
+    def tree(*args):return sp.check_output(['git','-C',checkout,*args],text=True).strip()
+    assert tree('rev-parse','HEAD')==iced and tree('rev-parse','HEAD:src/rust/iced-x86')=='cafc6f3c3591113c54ce5dca4d70fbf4a042c88f' and not tree('status','--porcelain','--','src/rust/iced-x86')
+    (w/'iced').symlink_to(checkout,target_is_directory=True)
     ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
     src=src.replace('InstructionInfoFactory, IntelFormatter,','InstructionInfoFactory, IntelFormatter, FastFormatter,').replace('    formatter: IntelFormatter,','    formatter: IntelFormatter,\n    fast: FastFormatter,\n    fast_enabled: bool,').replace('        mode,','        mode: mode & 3,\n        fast_enabled: mode & 8 != 0,\n        fast: FastFormatter::new(),')
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')

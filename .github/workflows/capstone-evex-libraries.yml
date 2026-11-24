@@ -1,7 +1,7 @@
-name: Measure wrapped i386 target digits in standalone and NeverD builds on native macOS and Linux Arm64
+name: Retest the macOS Arm64 branch writer with verified fork source checkout
 on:
   push:
-    branches: [codex/arm64-wrapped-i386-targets]
+    branches: [codex/arm64-targets-verified-iced-source]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,9 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
           - { host: macos-15, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
@@ -40,16 +37,23 @@ jobs:
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
           persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/iced
+          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
+          path: iced-source
+          sparse-checkout: src/rust/iced-x86
+          persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
       - if: always()
-        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config"
+        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wrapped-i386-targets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: verified-fork-targets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
