@@ -1,7 +1,7 @@
-name: Check the late EVEX transfer reader against the full decoder on native Linux compilers
+name: Validate opcode-selected EVEX packed moves against the full decoder and real scans
 on:
   push:
-    branches: [codex/evex-packed-miss-oracle]
+    branches: [codex/classify-evex-before-packed-reader]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: outlined-packed-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: classified-packed-move-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

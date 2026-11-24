@@ -61,10 +61,10 @@ index 0fe49035..7771bc5f 100644
  endif
 diff --git a/arch/X86/X86EvexPackedScan.c b/arch/X86/X86EvexPackedScan.c
 new file mode 100644
-index 00000000..5e2ed8e6
+index 00000000..15e3120a
 --- /dev/null
 +++ b/arch/X86/X86EvexPackedScan.c
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,22 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -77,46 +77,31 @@ index 00000000..5e2ed8e6
 +#define X86_EVEX_TRANSFER_RODATA ".cs_x86_evex_packed_rodata"
 +#include "X86EvexScanPlan.h"
 +
-+/* Entry after the ordinary register plan declines a complete EVEX prefix.
-+ * Keep the native batch reader's IDs, reserved fields and SIB lengths. */
++/* The ordinary reader selects these transfer opcodes from its existing
++ * opcode table. Invalid encodings retain its feature and decoder fallback. */
 +__attribute__((section(".cs_x86_evex_packed_text")))
-+x86_feature_decode_result
-+X86_decodePackedScanFeature(csh ud, const uint8_t *code, size_t code_len,
-+			    MCInst *instr, uint16_t *size, uint8_t opcode)
++bool X86_readPackedEvexPlan(const uint8_t *code, size_t code_len,
++			    unsigned *id, unsigned *length)
 +{
-+	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
-+	unsigned id, length;
-+	if (handle->mode == CS_MODE_64 &&
-+#ifdef CAPSTONE_X86_SCAN_ADAPTER
-+	    !handle->x86_scan_adapter &&
-+#endif
-+	    X86_readEvexScanPlan(code, code_len, &id, &length)) {
-+		instr->Opcode = 0;
-+		instr->OpcodePub = id;
-+		instr->popcode_adjust = 0;
-+		*size = (uint16_t)length;
-+		return X86_FEATURE_DECODED;
-+	}
-+	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
-+					  opcode);
++	return X86_readEvexScanPlan(code, code_len, id, length);
 +}
 +#endif
 +#endif
 diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
-index 7b8535ac..efcdfea6 100644
+index 7b8535ac..1d1227a4 100644
 --- a/arch/X86/X86EvexScan.c
 +++ b/arch/X86/X86EvexScan.c
-@@ -27,7 +27,7 @@ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
- 		*size = (uint16_t)length;
- 		return X86_FEATURE_DECODED;
- 	}
--	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
-+	return X86_decodePackedScanFeature(ud, code, code_len, instr, size,
- 					  opcode);
- }
+@@ -4,6 +4,8 @@
+ #ifdef CAPSTONE_HAS_X86
+ #include "X86FeatureExtension.h"
+ #ifdef X86_EVEX_REGISTER_SCAN
++#define X86_EVEX_BATCH_PACKED
++#define X86_EVEX_OUTLINED_PACKED
+ #include "X86EvexScanPlan.h"
  
+ /* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
 diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
-index a60fc089..fa0cd470 100644
+index a60fc089..91f0d48f 100644
 --- a/arch/X86/X86EvexScanPlan.h
 +++ b/arch/X86/X86EvexScanPlan.h
 @@ -33,6 +33,10 @@ static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
@@ -130,17 +115,32 @@ index a60fc089..fa0cd470 100644
  	unsigned id, length;
  	if (index & 128) {
  		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+@@ -45,9 +49,14 @@ static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
+ 
+ #ifdef X86_EVEX_BATCH_PACKED
+ 		} else if (index >= EVEX_SCAN_PACKED) {
++#ifdef X86_EVEX_OUTLINED_PACKED
++			return X86_readPackedEvexPlan(code, code_len, instruction_id,
++						      instruction_length);
++#else
+ 			if (map != 1 || pp > 1)
+ 				return false;
+ 			kind = 4 + (index - EVEX_SCAN_PACKED) * 2 + pp;
++#endif
+ #endif
+ 		} else {
+ 			if (map != 2 || pp != 1 || code[5] >= 0xc0)
 diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 15ac5a2d..b8652713 100644
+index 15ac5a2d..ea22ef1d 100644
 --- a/arch/X86/X86FeatureExtension.h
 +++ b/arch/X86/X86FeatureExtension.h
-@@ -320,6 +320,9 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
+@@ -319,6 +319,9 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
  	!defined(_WIN32_WCE)
  #define X86_EVEX_REGISTER_SCAN
++CAPSTONE_INTERNAL bool X86_readPackedEvexPlan(const uint8_t *code,
++					      size_t code_len, unsigned *id,
++					      unsigned *length);
  CAPSTONE_INTERNAL x86_feature_decode_result
-+X86_decodePackedScanFeature(csh handle, const uint8_t *code, size_t code_len,
-+			    MCInst *instr, uint16_t *size, uint8_t opcode);
-+CAPSTONE_INTERNAL x86_feature_decode_result
  X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
  			       MCInst *instr, uint16_t *size, uint8_t opcode);
- #endif
