@@ -1,7 +1,7 @@
-name: Verify mixed Capstone consumers for the dedicated MIPS scan
+name: Check unaffected mixed consumers with a cold MIPS opcode switch
 on:
   push:
-    branches: [codex/mips-jump-mixed-images]
+    branches: [codex/mips-default-control]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mips-jump-control-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mips-default-control-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
