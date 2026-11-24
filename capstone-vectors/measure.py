@@ -38,14 +38,14 @@ try:
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
     maps=rd(r/'source.json')
-    assert maps['ordered']==q and maps['base']['commit']==q['parent']
+    assert maps['amd64']==q and maps['base']['commit']==q['parent']
     layout={}
     from elftools.elf.elffile import ELFFile
-    for label in ('base','grouped','candidate'):
+    for label in ('base','i386','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        if label=='grouped':
-            assert sha(r/'grouped.patch')==maps['grouped']['sha256']
-            run('git','-C',base,'apply','--index',r/'grouped.patch');assert get('git','-C',base,'write-tree').strip()==maps['grouped']['tree']
+        if label=='i386':
+            assert sha(r/'i386.patch')==maps['i386']['sha256']
+            run('git','-C',base,'apply','--index',r/'i386.patch');assert get('git','-C',base,'write-tree').strip()==maps['i386']['tree']
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
@@ -95,7 +95,7 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('grouped')==audit_engine('candidate')
+        assert audit_engine('base')==audit_engine('i386')==audit_engine('candidate')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             select(engine)
