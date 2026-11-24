@@ -1,7 +1,7 @@
-name: Check all prefix and writemask records and scan cursors against fork iced and released Capstone
+name: Check Capstone issue 2244, batch and iterator comparator IDs against iced and the published API
 on:
   push:
-    branches: [codex/native-decoded-selector-corpus]
+    branches: [codex/verified-floating-and-integer-predicates]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: bbfc6da691392ba8b369812c59624d3769d03676
+          ref: 53ac2a9d6d2ad99dff0dbadff424fa00607ec84c
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: independent-decoded-corpus-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: consistent-public-compare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
