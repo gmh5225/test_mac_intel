@@ -1,14 +1,12 @@
-name: NeverD classic MIPS releases
+name: NeverD microMIPS64 HI/LO
 on:
   push:
-    branches: [codex/mips-classic-release-qualification]
+    branches: [codex/micromips64-neverd-lift]
     paths: ['.github/workflows/neverd-mips-native-elf.yml']
-  workflow_dispatch:
 permissions:
   contents: read
-  actions: read
 env:
-  REVISION: 9e46317bed64bf8f33416f803c3eac8cef60e9c9
+  REVISION: f784de0ce3d2c12ad1af5ab31cdec388cd9cda59
   LLVM_REVISION: e03b3a2cd27615bd9a8d193b37f36da80d56355b
   HOMEBREW_NO_AUTO_UPDATE: '1'
 jobs:
@@ -42,9 +40,7 @@ jobs:
       - if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14 qemu-user \
-            binutils-mips-linux-gnu binutils-mipsel-linux-gnu \
-            binutils-mips64-linux-gnuabi64 binutils-mips64el-linux-gnuabi64
+          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14
       - if: runner.os == 'macOS'
         run: brew install cmake ninja lld
       - if: runner.os == 'Windows'
@@ -66,14 +62,12 @@ jobs:
             -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
             -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON "${args[@]}"
           python scripts/build.py build-check --config Release --parallel 4 --target \
-            NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDMIPSPipelineTests \
-            NeverDLLVMTargetInitializationTests NeverDCodegenDiagnosticTests \
-            NeverDMIPSTests NeverDMIPSFlowTests NeverDMIPSIntegerTests neverd-mips-bench
-      - name: Run the registered MIPS, SDK, pipeline and codegen suites
+            NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests
+      - name: Run the MIPS flow, pipeline and integer suites
         run: |
           mkdir -p evidence
           ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error \
-            -L '^(NeverDMIPSObjectTests|NeverDMIPSSDKTests|NeverDMIPSPipelineTests|NeverDLLVMTargetInitializationTests|NeverDCodegenDiagnosticTests|NeverDMIPSTests|NeverDMIPSIntegerTests|NeverDMIPSFlowTests)$' \
+            -L '^(NeverDMIPSFlowTests|NeverDMIPSPipelineTests|NeverDMIPSIntegerTests)$' \
             --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/results.xml"
           python - <<'PY'
           import os, re, subprocess
@@ -82,15 +76,8 @@ jobs:
           cases = ET.parse('evidence/results.xml').findall('.//testcase')
           assert cases and all(c.find('failure') is None and c.find('error') is None and c.find('skipped') is None for c in cases)
           names = [t.get('name', '') for t in cases]
-          for name in ('FixedAddressEmissionKeepsEntryPointersAndFunctionRanges',
-                       'InvalidFunctionFeaturesReturnDiagnosticsToTheCaller',
-                       'FileInstallationRequiresAnArchitectureSpecificWriter',
-                       'LiftToObjectRetainsABIAndReportsTheEntryBody',
-                       'RegistersExactlyTheLinkedCodegenBackends',
-                       'AllocationErrorsCannotPublishAnIncompleteObject',
-                       'ScalarClassicReleasesPreserveISAAndABIRecords',
-                       'ClassicReleaseIsEstablishedByHeaderAndABIRecord',
-                       'ReleaseOneWordsKeepTheirOwnMeaningAcrossEntryPoints'):
+          for name in ('DoublewordProductsWriteBothAccumulatorHalves',
+                       'DoublewordProductsRequirePreR6WideGPRs'):
               assert any(name in n for n in names), name
           assert subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip() == os.environ['REVISION']
           cache = Path('build-check/CMakeCache.txt').read_text()
@@ -102,73 +89,10 @@ jobs:
           Path('evidence/neverd.txt').write_text(os.environ['REVISION'] + '\n')
           print(len(names), 'registered cases on', os.environ['RUNNER_OS'])
           PY
-      - name: Execute GNU originals and SDK objects in QEMU
-        if: runner.os == 'Linux'
-        run: |
-          qemu-mips --version
-          mips-linux-gnu-as --version
-          python unittests/lift/mips/native-object-roundtrip.py \
-            --sdk build-check/bin/libneverd.so --clang clang-18 --output evidence/mips-native-execution.json
-          python - <<'PYTHON'
-          import json
-          rows = json.load(open('evidence/mips-native-execution.json'))
-          assert len(rows) == len({(r['abi'], r['endian'], r['mode']) for r in rows}) == 50
-          assert all(r['original'] == 37 for r in rows)
-          assert sum(r.get('rebuilt') == 37 for r in rows) == 42
-          projected = [r for r in rows if r['mode'] in ('classic', 'r1', 'r3', 'r5')]
-          assert len(projected) == 24 and all(r['high_c'] == r['llvm_c'] == 37 for r in projected)
-          assert sum('authenticated execution context' in r.get('diagnostic', '') for r in rows) == 8
-          PYTHON
-      - name: Verify the public LLVM release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/audit_prebuilt_llvm_release.py
-      - name: Measure the same integer words with NeverD and Capstone
-        run: |
-          python - <<'PYTHON'
-          import hashlib, json, os, platform, random, statistics, subprocess, tempfile
-          from pathlib import Path
-          exe=Path('build-check/bin/neverd-mips-bench'+('.exe' if os.name=='nt' else '')).resolve()
-          # All four shapes use common integer instructions. Different widths also
-          # exercise wide additions, preserving the published order and raw words.
-          common=(0x24840007,0x00851021,0x00851026,0x8ca20000,0xaca20004,0x10850001,0x00000000,0x03e00008)
-          profiles={}; samples=8
-          rng=random.Random(20261124)
-          with tempfile.TemporaryDirectory() as t:
-              for width in (32,64):
-                  words=(common+((0x0085102d,0x64840007) if width==64 else ()))*16
-                  for rev in (1,3,5):
-                      for endian in ('big','little'):
-                          raw=b''.join(w.to_bytes(4,endian) for w in words)
-                          name=f'mips{width}r{rev}'+('el' if endian=='little' else '')
-                          path=Path(t)/name; path.write_bytes(raw)
-                          profiles[name]={'input_sha256':hashlib.sha256(raw).hexdigest(),'count':len(words),'pairs':[]}
-              def run(name,stage,reps):
-                  row=json.loads(subprocess.check_output([str(exe),name,stage,str(Path(t)/name),str(reps)]))
-                  assert row['instructions_per_repeat']==profiles[name]['count']
-                  return row
-              for name,p in profiles.items():
-                  a,b=[run(name,m,10) for m in ('decode','capstone')]
-                  assert a['digest']==b['digest']
-                  p['digest']=a['digest']
-              for block in range(samples):
-                  names=list(profiles);rng.shuffle(names)
-                  for n,name in enumerate(names):
-                      stages=('decode','capstone') if (block+list(profiles).index(name))%2==0 else ('capstone','decode')
-                      p=profiles[name]; reps=(600000+p['count']-1)//p['count']; legs={}
-                      for stage in stages:
-                          row=run(name,stage,reps)
-                          assert row['digest']==p['digest']
-                          legs[stage]=[row['cpu_seconds']*1e9/(p['count']*reps),row['wall_seconds']*1e9/(p['count']*reps)]
-                      p['pairs'].append({'order':stages,'ns_per_instruction_cpu_wall':legs})
-              for p in profiles.values():
-                  p['median_cpu_ratio']=statistics.median(pair['ns_per_instruction_cpu_wall']['decode'][0]/pair['ns_per_instruction_cpu_wall']['capstone'][0] for pair in p['pairs'])
-          Path('evidence/classic-release-decode.json').write_text(json.dumps({'revision':os.environ['REVISION'],'host':platform.platform(),'profiles':profiles},indent=2)+'\n')
-          PYTHON
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: classic-release-${{ runner.os }}
+          name: micromips64-hilo-${{ runner.os }}
           path: |
             evidence/
             build-check/Testing/Temporary/LastTest.log
