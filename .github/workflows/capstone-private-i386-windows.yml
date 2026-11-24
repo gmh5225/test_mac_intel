@@ -1,7 +1,7 @@
-name: Check EXTRQ selector legality, truncation and cursors across native Capstone configurations
+name: Validate reserved selector storage across DIET, reduced, native and Windows builds
 on:
   push:
-    branches: [codex/verify-independent-extrq-abis]
+    branches: [codex/reused-uid-storage-platforms]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
+          ref: 396483e58bf0bb8f4dd6e36daff8b0458bad2315
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: extrq-selector-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: neutral-extrq-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
