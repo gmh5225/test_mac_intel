@@ -38,7 +38,7 @@ try:
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
     for variant in ('base','prefix'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
-        command(['git','apply','--index',r/'base.patch'],'apply-correction-'+variant,cs)
+        assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         caller='lib/decode/Decoder.cpp'
         entry='X86_disasmIterText'
@@ -91,6 +91,12 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
+        code_sections={}
+        for name in ('X86BatchScan.c.o','X86DisassemblerDecoder.c.o'):
+            obj,=build.rglob(name)
+            with obj.open('rb') as file:
+                elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
+        save('executable-sections-'+variant,code_sections)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
     assert len({z['archive']for z in identities.values()})==2 and len({z['binary']for z in identities.values()})==2
     save('products',identities)
