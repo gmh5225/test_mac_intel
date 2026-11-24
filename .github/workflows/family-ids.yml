@@ -1,7 +1,7 @@
-name: Time classic MIPS register jump and zero-shift scans on eight native hosts
+name: Measure a single classic MIPS SPECIAL dispatch and compare ELF code layout
 on:
   push:
-    branches: [codex/mips-register-jump-scans]
+    branches: [codex/mips-single-switch-native]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -42,5 +42,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-register-transfer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: single-switch-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

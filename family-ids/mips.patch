@@ -1,50 +1,51 @@
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 7df6e761..fe55f053 100644
+index 7df6e761..df7e53b0 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
-@@ -987,6 +987,28 @@ void Mips_set_mem_access(MCInst *MI, bool status)
+@@ -419,7 +419,8 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  }
  
- #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
-+/* The classic scan only needs the public opcode. Register jumps reserve
-+ * rt, and JR also reserves rd. A zero shift leaves all hint encodings
-+ * (SSNOP, EHB and PAUSE) to the ordinary decoder. */
-+static inline unsigned classicScanOpcode(MCInst *instr, uint32_t word,
-+					 cs_mode mode)
-+{
-+	const unsigned major = word >> 26;
-+	if (major)
-+		return major == 8 ? Mips_ADDi : standardScanOpcode(major, mode);
-+
-+	switch (word & 0x7ff) {
+ /* The classic three-register ALU forms reserve bits 10..6 as zero. */
+-static inline unsigned classicMappedOpcode(MCInst *instr, uint32_t word)
++static inline unsigned classicMappedOpcode(MCInst *instr, uint32_t word,
++					  bool opcode_only)
+ {
+ 	const unsigned major = word >> 26;
+ 	/* The DSP table precedes the base table for these two full primary
+@@ -430,6 +431,14 @@ static inline unsigned classicMappedOpcode(MCInst *instr, uint32_t word)
+ 	if (major)
+ 		return major == 8 ? Mips_ADDi : classicScalarOpcode(major);
+ 	switch (word & 0x7ff) {
++	/* The zero shift excludes the SSNOP, EHB and PAUSE encodings.
++	 * JR reserves both rt and rd, while JALR only reserves rt. */
 +	case 0x00:
-+		return (word >> 21) == 0 ? Mips_SLL : 0;
++		return opcode_only && (word >> 21) == 0 ? Mips_SLL : 0;
 +	case 0x08:
-+		return (word & 0x001ff800) == 0 ? Mips_JR : 0;
++		return opcode_only && (word & 0x001ff800) == 0 ? Mips_JR : 0;
 +	case 0x09:
-+		return (word & 0x001f0000) == 0 ? Mips_JALR : 0;
-+	default:
-+		return classicMappedOpcode(instr, word);
-+	}
-+}
-+
- static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
- 			       MCInst *instr, uint16_t *size, uint64_t address,
- 			       void *info)
-@@ -997,12 +1019,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
- 	    h->disasm == getScanInstruction && h->insn_id == Mips_get_insn_id &&
- 	    h->no_text && !instr->flat_insn->detail) {
- 		const uint32_t word = readBytes32(instr, code);
--		const unsigned major = word >> 26;
--		/* SPECIAL needs the function and reserved shift bits. ADDI
--		 * and the register forms share the classic detail mapping. */
--		const unsigned opcode = major == 0 || major == 8 ?
++		return opcode_only && (word & 0x001f0000) == 0 ? Mips_JALR : 0;
+ 	case 0x20:
+ 		return Mips_ADD;
+ 	case 0x21:
+@@ -469,7 +478,8 @@ bool Mips_disasmClassicNoText(cs_struct *handle, const uint8_t *code,
+ 		Mips_init_cs_detail(&instr);
+ 		return false;
+ 	}
+-	const unsigned opcode = classicMappedOpcode(&instr, readBytes32(&instr, code));
++	const unsigned opcode = classicMappedOpcode(&instr, readBytes32(&instr, code),
++						 false);
+ 	if (opcode) {
+ 		Mips_init_cs_detail(&instr);
+ 		MCInst_setOpcode(&instr, opcode);
+@@ -1001,7 +1011,7 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+ 		/* SPECIAL needs the function and reserved shift bits. ADDI
+ 		 * and the register forms share the classic detail mapping. */
+ 		const unsigned opcode = major == 0 || major == 8 ?
 -						classicMappedOpcode(instr, word) :
--						standardScanOpcode(major, mode);
-+		const unsigned opcode = classicScanOpcode(instr, word, mode);
++						classicMappedOpcode(instr, word, true) :
+ 						standardScanOpcode(major, mode);
  		if (opcode) {
  			Mips_init_cs_detail(instr);
- 			MCInst_setOpcode(instr, opcode);
 diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
 index d4a344e7..7a7c6658 100644
 --- a/tests/unit/mips_scan.c
