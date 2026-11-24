@@ -1,7 +1,7 @@
-name: Check public record fields and option callbacks on 16 native build configurations
+name: Compare shared full-decoder choices across Windows and macOS ABIs
 on:
   push:
-    branches: [codex/public-record-current-abi]
+    branches: [codex/shared-record-native-abi]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: public-record-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: shared-record-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
