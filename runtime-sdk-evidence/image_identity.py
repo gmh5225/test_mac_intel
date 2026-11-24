@@ -8,9 +8,7 @@ import struct
 from pathlib import Path
 
 SYSTEM = Path(os.environ["SystemRoot"]).resolve()
-MODULES = {"rtm.dll": ["CreateTable"], "ole32.dll": ["StgConvertPropertyToVariant"],
-           "gdiplus.dll": ["GdipEnumerateMetafileDestPoint", "GdipEnumerateMetafileDestRectI"],
-           "bcryptprimitives.dll": ["ProcessPrng"]}
+MODULES = {"coml2.dll":["#5"]}
 def scan(name, wanted):
     dll = ctypes.WinDLL(name)
     get = ctypes.windll.kernel32.GetModuleFileNameW
@@ -47,6 +45,13 @@ def scan(name, wanted):
         val=string(num("I",offset(names+i*4,4))[0])
         if val not in wanted:continue
         index=num("H",offset(ordinals+i*2,2))[0];assert index<nfunc
+        entries[val] = index
+    for key in wanted:
+        if key.startswith("#"):
+            index=int(key[1:])-ordinal
+            assert 0<=index<nfunc
+            entries[key]=index
+    for val,index in list(entries.items()):
         address=num("I",offset(functions+index*4,4))[0]
         seg=next((k+1, address-row[0]) for k,row in enumerate(sections) if row[0]<=address<row[0]+max(row[1:3]))
         entries[val]=dict(ordinal=ordinal+index,rva=address,section=seg[0],offset=seg[1],
