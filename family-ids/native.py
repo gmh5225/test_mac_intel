@@ -16,14 +16,14 @@ cc=os.environ['CC'];flavor=os.environ['FLAVOR'];ccflags='-Wno-error=discarded-qu
 t=Path(tempfile.mkdtemp());manifest=json.loads((r/'manifest.json').read_text())['inputs']
 try:
  panels={};all_images={};raw={};inputs={};fixed={}
- for arch,sel,prefix in [('MIPS',103,'mips64el'),('PPC',104,'ppc64el')]:
+ for arch,sel,prefix in [('PPC',104,'ppc64el'),('MIPS',103,'mips64el'),('RISCV',105,'riscv64')]:
     info=next(v for v in manifest if v['name']==prefix+'-ls');pkg=t/(arch+'.deb')
     run('curl','--retry','3','-fsSL',info['url'],'-o',pkg);assert sha(pkg)==info['package_sha256']
     for name in ('ls','sort','cp','cat'):
         image=corpus.deb_binary(pkg,name);f=t/(prefix+'-'+name+'.text');f.write_bytes(corpus.elf_text(image));inputs[f.stem]=dict(sha256=sha(f),bytes=f.stat().st_size,package=sha(pkg))
         if name=='ls':assert sha(f)==info['text_sha256']
     pkg.unlink()
- profiles=[('mips',['MIPS'],False),('ppc',['PPC'],False)] if flavor=='first' else [('neverd',['ARM','AARCH64','MIPS','X86'],False),('mixed',['MIPS','PPC','RISCV'],False),('mips-diet',['MIPS'],True),('ppc-diet',['PPC'],True)]
+ profiles=[('ppc',['PPC'],False)] if flavor=='first' else [('neverd',['ARM','AARCH64','MIPS','X86'],False),('mixed',['MIPS','PPC','RISCV'],False),('ppc-diet',['PPC'],True)]
  for key,arches,diet in profiles:
     b=t/key;variants={};libraries={}
     for label in ('base','candidate'):
@@ -38,8 +38,16 @@ try:
     all_images[key]=variants
     before,after=variants['base'],variants['candidate'];assert set(before['objects'])==set(after['objects'])
     changed=[Path(f).name for f,a in before['objects'].items()if after['objects'][f]!=a]
-    if flavor=='second':assert before==after;shutil.rmtree(b);continue
-    assert changed==['MCInstPrinter.c.o'] and before['shared']!=after['shared']
+    if arches!=['PPC']:
+        assert before==after;shutil.rmtree(b);continue
+    if before==after:
+        assert diet, key
+    else:
+        assert changed==['PPCMapping.c.o'] and before['shared']!=after['shared'],(key,changed)
+    run('c++','-std=c++17','-O2','-I',src/'include',r/'ppc-states.cpp','-ldl','-o',t/'ppc-states')
+    state_check=get(t/'ppc-states',libraries['base'],libraries['candidate'],'4096')
+    save('state-'+key,dict(result=state_check))
+    if before==after:shutil.rmtree(b);continue
     run('ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_alias_mnemonic')
     sel,prefix=(103,'mips64el') if key=='mips' else (104,'ppc64el');lib=t/'libcapstone.so';lib.write_bytes(libraries['base'].read_bytes())
     import re
@@ -55,13 +63,15 @@ try:
             for i in offsets:f.seek(i);assert f.write(images[k][i:i+4096])==len(images[k][i:i+4096])
         assert lib.stat().st_size==n and lib.stat().st_ino==inode
         if k not in verified:verified[k]=sha(lib);assert verified[k]==hashlib.sha256(images[k]).hexdigest()
-    for name in ('ls','cat','sort','cp'):
+    fixtures=[(104,'ppc64el',n)for n in ('ls','cat','sort','cp')]
+    if key=='mixed':fixtures.extend([(103,'mips64el','ls'),(105,'riscv64','ls')])
+    for sel,prefix,name in fixtures:
         f=t/(prefix+'-'+name+'.text')
         for opt in range(5):
             values=[]
             for label in libraries:
                 select(label);values.append(get(*cmd,t/'raw',str(sel),f,str(opt)))
-            assert values[0]==values[1] and int(values[0].split()[0])>0;raw[f.stem+'/'+str(opt)]=values[0]
+            assert values[0]==values[1] and int(values[0].split()[0])>0;raw[key+'/'+f.stem+'/'+str(opt)]=values[0]
         def sample(k,mode,reps):
             select(k);return list(map(int,get(*cmd,t/'time',str(sel),str(mode),f,'1048576',str(reps)).split()))
         for mode in (0,1,2):
@@ -73,7 +83,7 @@ try:
                     if not i and k==labels[0]:expected=z[2:]
                     assert z[2:]==expected
                 cycles.append({k:[sum(v[x]for v in obs)/2 for x in (0,1)]for k,obs in times.items()})
-            panels[f.stem+'/'+str(mode)]=dict(reps=reps,checksum=expected,cycles=cycles)
+            panels[key+'/'+f.stem+'/'+str(mode)]=dict(reps=reps,checksum=expected,cycles=cycles)
     fixed[key]=dict(inode=inode,verified=verified,blocks=len(offsets));shutil.rmtree(b)
  save('raw',raw);save('timings',panels);save('images',all_images);save('fixed',fixed);save('complete',dict(source=q,host=platform.platform(),profiles=list(all_images),inputs=inputs,cpu=get('lscpu')))
 finally:
