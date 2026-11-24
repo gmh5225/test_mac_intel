@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 env:
-  UNICORN_REVISION: 5707f08444319743a30965bc3433343afff4c7eb
+  UNICORN_REVISION: 2c86611ba590f6e7cb90feeb2a4e3abd0dc8407b
 jobs:
   mips:
     strategy:
@@ -40,11 +40,14 @@ jobs:
       - name: Execute the MIPS suites
         shell: bash
         run: |
+          git rev-parse HEAD > build/source.txt
           ctest --test-dir build --build-config Release -R '^test_mips' \
             --no-tests=error --output-on-failure --output-junit mips-result.xml
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
           name: unicorn-mips-${{ runner.os }}
-          path: build/mips-result.xml
+          path: |
+            build/mips-result.xml
+            build/source.txt
           if-no-files-found: warn
