@@ -1,8 +1,17 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index bd513f27..37e3b956 100644
+index bd513f27..5a5f2130 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -513,7 +513,8 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -160,6 +160,8 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
+     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
++elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
++    add_compile_definitions(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "XCORE")
+@@ -513,7 +515,8 @@ if(CAPSTONE_X86_SUPPORT)
      # Use scalar/vector stores or libc for the fixed public output buffers.
      # Generic x64 GCC otherwise emits REP STOS even for the short clears.
      if((capstone_enabled_architectures STREQUAL "X86" OR capstone_enabled_architectures STREQUAL "MIPS;X86"
@@ -12,11 +21,37 @@ index bd513f27..37e3b956 100644
         AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
         AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
         AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+diff --git a/MCInst.c b/MCInst.c
+index cda912d1..d62bd580 100644
+--- a/MCInst.c
++++ b/MCInst.c
+@@ -206,3 +206,12 @@ void MCInst_setSoftFail(MCInst *MI)
+ 	assert(MI && MI->flat_insn);
+ 	MI->flat_insn->illegal = true;
+ }
++
++#ifdef CS_MIXED_CONSTRUCTED_STORAGE
++/* The mixed decoder calls this for ARM, AArch64, PowerPC and RISC-V.
++ * Each decoder constructs its active operands before reading them. */
++CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch)
++{
++	MCInst_InitStorage(inst, arch, false);
++}
++#endif
 diff --git a/Makefile b/Makefile
-index 2720955e..da9772cd 100644
+index 2720955e..c4ca97ff 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -698,7 +698,11 @@ $(OBJDIR)/arch/TriCore/TriCoreDisassembler.o: CFLAGS += -DCAPSTONE_TRICORE_DIREC
+@@ -121,6 +121,8 @@ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
+ CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
+ else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
+ CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
++else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
++CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
+@@ -698,7 +700,11 @@ $(OBJDIR)/arch/TriCore/TriCoreDisassembler.o: CFLAGS += -DCAPSTONE_TRICORE_DIREC
  endif
  
  # Match the Release x86 formatter tuning for the compiler's target.
@@ -29,3 +64,34 @@ index 2720955e..da9772cd 100644
  ifneq (,$(filter -O2 -O3,$(CFLAGS)))
  X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
      awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
+diff --git a/cs.c b/cs.c
+index 0af815c7..3007fb0f 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1159,6 +1159,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	 * performs better on some full-detail workloads with the shared
+ 	 * initializer below. */
+ 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
++#elif defined(CS_MIXED_CONSTRUCTED_STORAGE)
++	MCInst_InitConstructedOperands(&mci, handle->arch);
+ #else
+ 	MCInst_Init(&mci, handle->arch);
+ #endif
+diff --git a/cs_priv.h b/cs_priv.h
+index 84e1c748..7f98f52b 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -30,6 +30,13 @@
+ 
+ #include "MCInst.h"
+ #include "SStream.h"
++
++#if defined(CAPSTONE_MIXED_CONSTRUCTED_OPERANDS) && defined(__GNUC__) && \
++	!defined(__clang__) && defined(__linux__) && defined(__x86_64__) && \
++	defined(__LP64__)
++#define CS_MIXED_CONSTRUCTED_STORAGE
++CAPSTONE_INTERNAL void MCInst_InitConstructedOperands(MCInst *inst, cs_arch arch);
++#endif
+ #ifdef CAPSTONE_X86_SCAN_ADAPTER
+ #include "arch/X86/X86ScanAdapter.h"
+ #endif

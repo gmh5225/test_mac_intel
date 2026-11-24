@@ -50,7 +50,7 @@ try:
     foreign=(r/'foreign.cpp').read_text().rstrip();assert foreign.endswith('cs_close(&handle);\n}')
     (w/'combined-foreign.cpp').write_text(foreign[:-1]+'  return 0;\n}\n')
     run('clang++','-O3','-std=c++17','-Dmain=run_foreign','-I',base/'include','-c',w/'combined-foreign.cpp','-o',w/'foreign.o')
-    for label in ('base','candidate','foreigninit','combined'):
+    for label in ('base','candidate','scan','combined'):
         if label!='base':
             run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
             source=m['variants'][label];patch=r/(label+'.patch')
@@ -67,11 +67,11 @@ try:
         obj={f.name:f for f in build.rglob('*.c.o')}
         objects[label]={k:sha(v)for k,v in obj.items()}
         run('gcc','-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',w/(label+'.library'))
-        if label in ('foreigninit','combined'):
+        if label in ('scan','combined'):
             ref='candidate' if label=='combined' else 'base'
             changed=sorted(k for k,v in objects[label].items()if v!=objects[ref][k])
-            assert changed==['MCInst.c.o','cs.c.o'],changed
-            save('changed-storage-'+label,changed)
+            assert changed==['X86BatchScan.c.o'],changed
+            save('changed-scan-'+label,changed)
 
         stores={}
         for k in cases:
@@ -83,23 +83,23 @@ try:
         recipe=get('make','-s','-n','V=1','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CC=gcc','CAPSTONE_BUILD_CORE_ONLY=yes','OBJDIR='+str(w/'make-objects'),str(w/'make-objects/arch/X86/X86ImmediateOutput.o'),cwd=base)
         assert ('-mstringop-strategy=libcall' in recipe)==tuned,recipe
         if tuned:
-            other='base' if label=='candidate' else 'foreigninit'
+            other='base' if label=='candidate' else 'scan'
             delta=[n for n in obj if objects[other][n]!=objects[label][n]]
-            assert delta and set(delta)<={k+'.o'for k in cases},delta
+            assert {'cs.c.o','MCInst.c.o'} <= set(delta) <= {k+'.o'for k in cases}|{'cs.c.o','MCInst.c.o'},delta
             save('affected-'+label,dict(changed=delta,total=len(obj),active_flags=sorted(active)))
             unit=w/'x86-records';run('gcc','-O2','-I',base/'include',base/'tests/unit/x86_simple_output.c',lib,'-lm','-o',unit);run(unit)
 
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'states.cpp','-ldl','-o',w/'states')
-    for label in ('foreigninit','combined'):
+    for label in ('scan','combined'):
         test=sp.run([w/'states',w/'base.library',w/(label+'.library'),'2048'],capture_output=True,text=True)
         if test.returncode:print(test.stderr[-1800:],flush=True)
         test.check_returncode()
         save('states-'+label,dict(stdout=test.stdout,settings=test.stderr.count('case arch='),iterations=2048))
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
-    labels_native=('base','duplicate','candidate','foreigninit','foreigncopy','combined')
+    labels_native=('base','duplicate','candidate','scan','scancopy','combined')
     def paths(prefix):
-        return {label:w/(prefix+{'foreigncopy':'foreigninit','duplicate':'base'}.get(label,label)) for label in labels_native}
+        return {label:w/(prefix+{'scancopy':'scan','duplicate':'base'}.get(label,label)) for label in labels_native}
     bench=FixedImage(w/'selected',paths(''));foreign_image=bench
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
@@ -125,7 +125,7 @@ try:
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
         original_rows=audit_engine('base')
-        assert all(audit_engine(k)==original_rows for k in ('candidate','foreigninit','combined'))
+        assert all(audit_engine(k)==original_rows for k in ('candidate','scan','combined'))
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
             comparator=engine if engine in ('iced','fast') else 'private'
