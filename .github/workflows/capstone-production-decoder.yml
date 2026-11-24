@@ -1,7 +1,7 @@
-name: Test the late i386 memory writer with current NeverD and public iteration
+name: Test final operand storage alone and with late i386 output against current NeverD
 on:
   push:
-    branches: [codex/current-dev-late-i386-alu-output]
+    branches: [codex/latest-dev-isolated-writers-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 62a2625e54e1925318eacd492e8365ff48cee3cc
+          ref: 4e0ff7ecf35083a51d414bc736be6ab9132c4cf7
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "62a2625e54e1925318eacd492e8365ff48cee3cc"
+          test "$(git rev-parse HEAD)" = "4e0ff7ecf35083a51d414bc736be6ab9132c4cf7"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "fa11ca3d930b9e66a919ed4de20affdbc75bd125"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin fa11ca3d930b9e66a919ed4de20affdbc75bd125
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-i386-alu-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: final-operand-writers-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
