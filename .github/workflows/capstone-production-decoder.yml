@@ -1,7 +1,7 @@
-name: Measure single opcode-group dispatch alone and with operand storage on current NeverD
+name: Compare verified address construction and the standalone vector prefix fix in source-built NeverD
 on:
   push:
-    branches: [codex/checked-group1-memory-neverd]
+    branches: [codex/current-operand-range-full-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: f96ca7d5ae203fda295d143fa89583685fe28861
+          ref: a59058c3305d3aa6a19c84dbc90be0049234892e
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,11 +51,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "f96ca7d5ae203fda295d143fa89583685fe28861"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "fa11ca3d930b9e66a919ed4de20affdbc75bd125"
+          test "$(git rev-parse HEAD)" = "a59058c3305d3aa6a19c84dbc90be0049234892e"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "e55d0c4b18bbe676431aa1fbd12d9013da69c315"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin fa11ca3d930b9e66a919ed4de20affdbc75bd125
-          git -C third_party/capstone checkout --detach fa11ca3d930b9e66a919ed4de20affdbc75bd125
+          git -C third_party/capstone fetch --depth=1 origin e55d0c4b18bbe676431aa1fbd12d9013da69c315
+          git -C third_party/capstone checkout --detach e55d0c4b18bbe676431aa1fbd12d9013da69c315
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-group-current-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: current-address-prefix-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
