@@ -1,7 +1,7 @@
-name: Verify dedicated MIPS and PowerPC alias rows with portable binary hashing
+name: Measure PowerPC mapping across six Mach-O image orders and both public decode APIs
 on:
   push:
-    branches: [codex/mips-powerpc-alias-portable-measurement]
+    branches: [codex/measure-dedicated-ppc-darwin]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: clang, flavor: first }
-          - { host: ubuntu-24.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
+          - { host: macos-15-intel, cc: clang, flavor: first }
+          - { host: macos-15, cc: clang, flavor: first }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: portable-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: ppc-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
