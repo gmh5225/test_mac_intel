@@ -59,25 +59,11 @@ try:
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')
         assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
-        if variant in ('base','selector'):
-            command(['clang','-fPIC','-shared','-O2','-I',cs/'include',r/'export.c','-Wl,--whole-archive',archive,'-Wl,--no-whole-archive','-lm','-o',t/(variant+'.so')],'grid-lib-'+variant)
-        if variant=='selector':
-            command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'grid.cpp','-ldl','-o',t/'grid'],'grid-link')
-            command([t/'grid',t/'base.so',t/'selector.so'],'grid-result')
-            grid=json.loads((out/'grid-result.log').read_text())
-            save('grid',grid)
-            command(['clang++','-std=c++17','-O2','-I',cs/'include',cs/'suite/synctools/x86_simple_output.cpp',archive,'-lm','-o',t/'emit-alu'],'generate-link')
-            generated=sp.check_output([t/'emit-alu','--test32-registers'])
-            assert generated==(cs/'arch/X86/X86GenTest32Registers.inc').read_bytes()
-            save('regenerated',dict(sha256=hashlib.sha256(generated).hexdigest(),bytes=len(generated)))
-        uid_tables={}
-        for line in sp.check_output(['nm','-S','--defined-only',archive],text=True).splitlines():
-            fields=line.split()
-            if len(fields)==4 and fields[-1] in ('modRMTable','x86PackedUIDs'):
-                uid_tables[fields[-1]]=int(fields[1],16)
-        assert uid_tables==({'modRMTable':39968}),uid_tables
-        save('uid-storage-'+variant,uid_tables)
-
+        command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'offset.cpp',archive,'-o',t/'offset'],'link-offset-'+variant)
+        vals=sp.check_output([t/'offset'],text=True).strip().splitlines();assert len(vals)==48
+        if variant=='base':assert '0x1234' in vals[0] and '0xffff8234' in vals[6] and '0xffffffff80001234' in vals[12]
+        else:assert '0x80001234' in vals[0] and '0x8234' in vals[6] and '0x80001234' in vals[12]
+        save('absolute-offsets-'+variant,vals)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
         for z in foreign:
@@ -92,23 +78,6 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'probe.c',archive,'-o',t/'mask-access'],'verify-build-'+variant)
         command([t/'mask-access'],'verify-memory-'+variant)
         assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
-        command(['clang','-O2','-I',cs/'include',r/'forms.c',archive,'-o',t/'forms'],'compile-forms-'+variant)
-        v=sp.run([t/'forms'],text=True,capture_output=True);failure=variant!='layout'
-        expected_errors=[f'decode 11 bits 16 att {att}: 24 rejected' for att in range(2)] if failure else []
-        expected_stdout=f'3264 encodings and syntax cases, 0 incorrect memory accesses, {48 if failure else 0} incorrect shapes'
-        assert (v.returncode,v.stderr.splitlines(),v.stdout.splitlines())==(int(failure),expected_errors,[expected_stdout]),(v.returncode,v.stdout,v.stderr)
-        save('forms-'+variant,dict(records=3264,wrong=48 if failure else 0,stdout=v.stdout,stderr=v.stderr))
-        command(['clang','-O2','-I',cs/'include',r/'selector.c',archive,'-o',t/'selector-guard'],'link-selector-'+variant)
-        command([t/'selector-guard'],'selector-'+variant)
-        assert (out/('selector-'+variant+'.log')).read_text().strip()=='9088 144 0'
-        check=t/'verify-move-scans'
-        command(['clang++','-O2','-std=c++17','-I',cs/'include','-I',cs,r/'check.cpp',archive,'-o',check],'build-scan-'+variant)
-        p=sp.run([check],capture_output=True,text=True,check=True)
-        counts=[row.split() for row in p.stdout.splitlines()]
-        assert len(counts)==15
-        wrong=[sum(int(row[col]) for row in counts) for col in (4,5,6)]
-        assert not any(wrong),wrong
-        save('scan-'+variant,dict(counts=counts,total=sum(int(row[2]) for row in counts),mismatches=wrong))
         test=out/('tests-'+variant+'.log')
         assert '100% tests passed' in test.read_text()
         if variant=='base':
@@ -126,7 +95,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Vex32Output.c.o'):
+        for name in ('X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','PPCMapping.c.o','ARMMapping.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
