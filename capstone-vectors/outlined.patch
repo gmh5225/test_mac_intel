@@ -1,0 +1,29 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 0d9b1a76..3fb327fb 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1598,11 +1598,23 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	return 0;
+ }
+ 
++/* The 16-bit compatibility path performs its own operand-size and mandatory
++ * prefix selection. Keep one copy outside the scan and full decode loops. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static int getID16(struct InternalInstruction *insn, cs_mode mode)
++{
++	return getIDForMode(insn, mode, MODE_16BIT);
++}
++
+ X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+ {
+ 	switch (insn->mode) {
+ 	case MODE_16BIT:
+-		return getIDForMode(insn, mode, MODE_16BIT);
++		return getID16(insn, mode);
+ 	case MODE_32BIT:
+ 		return getIDForMode(insn, mode, MODE_32BIT);
+ 	default:
