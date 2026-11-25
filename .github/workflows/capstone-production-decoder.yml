@@ -1,7 +1,7 @@
-name: Time complete NeverD with 16-bit register and relative branch writers
+name: Check x86 and other ISA production workloads with the qualified ARM output configurations
 on:
   push:
-    branches: [codex/real-mode-branch-neverd-product]
+    branches: [codex/arm-literal-complete-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: branch-registers-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: arm-literal-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

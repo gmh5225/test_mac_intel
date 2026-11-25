@@ -1,238 +1,245 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..4200594a 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -12,13 +12,117 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
-+#include "X86ScanAdapter.h"
- #include "X86SimpleOutput.h"
- #include "X86VectorRegisterOutput.h"
- #define X86_VEX32_REGISTER_MOVES
- #include "X86GenVex32MemoryOutput.inc"
- #undef X86_VEX32_REGISTER_MOVES
- #include "X86GenSimpleOutput.inc"
-+#include "X86RegisterImmediateOutput.h"
-+#include "X86ExtendRegisterOutput.h"
-+
-+/* A single operand-size prefix selects 32-bit registers in real mode.
-+ * Register-only operations keep their generated i386 effects. The address
-+ * size and encoded offsets belong to the original prefixed instruction. */
-+static bool writeOperandOverride16(cs_struct *handle, const uint8_t *code,
-+				   size_t size, cs_insn *insn, uint16_t *length)
-+{
-+	if (size < 3 || code[0] != X86_PREFIX_OPSIZE)
-+		return false;
-+	const unsigned opcode = code[1];
-+	const bool mov = (opcode & 0xf8) == 0xb8;
-+	const bool pair = (opcode < 0x40 && (opcode & 7) <= 3) ||
-+			  (opcode >= 0x84 && opcode <= 0x8b);
-+	if (mov ? size < 6 : (!pair || code[2] < 0xc0))
-+		return false;
-+	if (X86_OUTPUT_UNSUPPORTED(handle, handle->mode != CS_MODE_16))
-+		return false;
-+	const unsigned plan = x86_simple_plans[0][0][mov ? 0x8b : opcode];
-+	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
-+	if (mov) {
-+		writeUnsignedRegisterImmediate(insn, row,
-+					       &x86_simple_registers[2][opcode & 7],
-+					       code, 0, 0, 2, 4, length);
-+	} else {
-+		const unsigned mr = code[2], reg = (mr >> 3) & 7, rm = mr & 7;
-+		const bool reg_first = (plan & 3) == X86_SIMPLE_REG_RM;
-+		const struct X86SimpleRegister *regs =
-+			x86_simple_registers[(opcode & 1) ? 2 : 0];
-+		writeExtendRegisters(code, 3, insn, length, row,
-+				     &regs[reg_first ? reg : rm],
-+				     &regs[reg_first ? rm : reg], 0, opcode,
-+				     mr, false);
-+	}
-+	if (insn->detail) {
-+		cs_x86 *x = &insn->detail->x86;
-+		x->addr_size = 2;
-+		x->prefix[2] = X86_PREFIX_OPSIZE;
-+		if (mov)
-+			x->opcode[0] = opcode;
-+		else
-+			x->encoding.modrm_offset = 2;
-+	}
-+	return true;
-+}
-+
-+/* Relative jumps use the existing mnemonic and flag records. The operand
-+ * width of a real-mode target and the encoded displacement are distinct. */
-+static bool writeLegacyOutput16(cs_struct *handle, const uint8_t *code,
-+				size_t size, cs_insn *insn, uint16_t *length)
-+{
-+	if (code[0] == X86_PREFIX_OPSIZE)
-+		return writeOperandOverride16(handle, code, size, insn, length);
-+	if (size < 2)
-+		return false;
-+	const bool escaped = code[0] == 0x0f;
-+	const unsigned opcode = code[escaped];
-+	const bool short_jump = !escaped &&
-+				((opcode & 0xf0) == 0x70 || opcode == 0xeb);
-+	if (!short_jump && (escaped ? (opcode & 0xf0) != 0x80 : opcode != 0xe9))
-+		return false;
-+	const unsigned offset = 1 + escaped;
-+	const unsigned disp_size = short_jump ? 1 : 2;
-+	const unsigned len = offset + disp_size;
-+	if (size < len || X86_OUTPUT_UNSUPPORTED(handle, false))
-+		return false;
-+	const int32_t disp = short_jump ? (int8_t)code[offset] :
-+			     (int16_t)((unsigned)code[offset] |
-+				       ((unsigned)code[offset + 1] << 8));
-+	const uint64_t target = X86_relativeBranchTarget(handle->mode,
-+				insn->address, len, (uint64_t)disp, disp_size);
-+	const unsigned plan = x86_simple_plans[0][escaped ? 3 : 0][opcode];
-+	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
-+	*length = insn->size = len;
-+	insn->id = row->id;
-+	memcpy(insn->bytes, code, len);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	writeUnsignedImmediate(insn->op_str, target);
-+	if (insn->detail) {
-+		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
-+		/* A jump reads its instruction pointer after any flags and
-+		 * writes it first. The i386 records name the 32-bit view. */
-+		assert(row->read_count && row->reads[row->read_count - 1] == X86_REG_EIP);
-+		assert(row->write_count && row->writes[0] == X86_REG_EIP);
-+		insn->detail->regs_read[row->read_count - 1] = X86_REG_IP;
-+		insn->detail->regs_write[0] = X86_REG_IP;
-+		cs_x86 *x = &insn->detail->x86;
-+		x->addr_size = 2;
-+		if (escaped)
-+			x->opcode[1] = opcode;
-+		x->encoding.imm_size = disp_size;
-+		x->operands[0].type = X86_OP_IMM;
-+		x->operands[0].size = 2;
-+		x->operands[0].imm = (int64_t)target;
-+	}
-+	return true;
-+}
-+
-+#define CS_DECODE_TRY_OUTPUT writeLegacyOutput16
- #include "../../cs_disasm_internal.h"
-+#undef CS_DECODE_TRY_OUTPUT
- #define X86_MEMORY32_OUTPUT
- #define X86_MEMORY_IMMEDIATE writeCompare32
- #define X86_IMMEDIATE_WIDE 0
-@@ -97,5 +201,10 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 	}
- 	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
- }
-+CAPSTONE_INTERNAL bool X86_disasmIter16(csh ud, const uint8_t **code, size_t *size,
-+			 uint64_t *address, cs_insn *insn)
-+{
-+	return cs_disasm_iter_core(ud, code, size, address, insn);
-+}
- #endif
- #endif
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..35b9fc64 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -9,6 +9,7 @@
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
-+#define X86_LEGACY_OUTPUT
- #include "X86OutputOptions.h"
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-@@ -34,10 +35,15 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- 				      size_t *size, uint64_t *address,
- 				      cs_insn *insn)
- {
--#ifdef CS_DECODE_TRY_OUTPUT
-+#ifdef X86_LEGACY_OUTPUT
- 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
--	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
-+	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
-+		if (handle->mode == CS_MODE_16)
-+			return X86_disasmIter16(ud, code, size, address, insn);
-+#ifdef CS_DECODE_TRY_OUTPUT
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
-+#endif
-+	}
- #endif
- 	return cs_disasm_iter(ud, code, size, address, insn);
- }
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..3ea69caa 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -11,6 +11,10 @@
- #include "X86InstPrinterCommon.h"
- #include "X86Mapping.h"
- 
-+/* Called by the generic x86 iterator with a 16-bit text handle. */
-+CAPSTONE_INTERNAL bool X86_disasmIter16(csh ud, const uint8_t **code, size_t *size,
-+			 uint64_t *address, cs_insn *insn);
-+
- /* Called by the static i386 iterator with at least one input byte. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index e6eec867..b0fb08f0 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1618,6 +1618,25 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
- 	return true;
+diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
+index 37012242..26a96fff 100644
+--- a/arch/ARM/ARMInstPrinter.c
++++ b/arch/ARM/ARMInstPrinter.c
+@@ -219,7 +219,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
+ 	ARM_printMarkup(O, "<imm:");
+ 	printInt32Bang(O, OffImm);
+ 	SStream_concat0(O, markup(">"));
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
  }
  
-+static bool check_register_overrides16(csh handles[2])
-+{
-+	for (unsigned opcode = 0; opcode < 256; ++opcode) {
-+		bool pair = (opcode < 0x40 && (opcode & 7) <= 3) ||
-+			    (opcode >= 0x84 && opcode <= 0x8b);
-+		if (!pair && (opcode & 0xf8) != 0xb8)
-+			continue;
-+		for (unsigned reg = 0; reg < 8; ++reg) {
-+			uint8_t bytes[] = { 0x66, (uint8_t)opcode,
-+				(uint8_t)(0xc0 | (reg << 3) | (7 - reg)),
-+				0x80, 0xff, 0xa5 };
-+			for (size_t len = 1; len <= sizeof(bytes); ++len)
-+				if (!compare(handles, bytes, len, reg))
-+					return false;
-+		}
-+	}
-+	return true;
-+}
-+
- static bool check_mode(cs_mode mode)
- {
- 	csh handles[2] = { 0 };
-@@ -1633,6 +1652,11 @@ static bool check_mode(cs_mode mode)
- 			if (cs_option(handles[side], CS_OPT_DETAIL,
- 				      detail ? CS_OPT_ON : CS_OPT_OFF))
- 				goto done;
-+		if (mode == CS_MODE_16) {
-+			if (!check_branches(handles) || !check_register_overrides16(handles))
-+				goto done;
-+			continue;
-+		}
- 		if (!check_branches(handles) || !check_memory(handles, mode) ||
- 		    !check_lea(handles, mode) ||
- 		    !check_mov_disp32(handles, mode) ||
-@@ -1708,7 +1732,7 @@ static bool check_mode(cs_mode mode)
- 			}
+@@ -288,7 +288,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
+ 				ARM_AM_getAM2Offset(MCOperand_getImm(MO3)));
+ 			SStream_concat0(O, markup(">"));
  		}
+-		SStream_concat(O, "%s", "]");
++		ARM_printFormattedChar(O, "]");
+ 		SStream_concat0(O, markup(">"));
+ 		return;
  	}
--	ok = check_callbacks(handles) && check_primary_batches(handles[0]);
-+	ok = mode == CS_MODE_16 || (check_callbacks(handles) && check_primary_batches(handles[0]));
- done:
- 	for (unsigned i = 0; i < 2; ++i)
- 		if (handles[i])
-@@ -1722,7 +1746,7 @@ int main(void)
- 	if (!check_mode(CS_MODE_32))
- 		return 1;
- 	private_iter = X86_disasmIterText;
--	if (!check_mode(CS_MODE_32) || !check_mode(CS_MODE_64))
-+	if (!check_mode(CS_MODE_16) || !check_mode(CS_MODE_32) || !check_mode(CS_MODE_64))
- 		return 1;
- 	private_iter = X86_disasmIter;
- 	return check_mode(CS_MODE_32) && check_mode(CS_MODE_64) ? 0 : 1;
+@@ -301,7 +301,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
+ 	printRegImmShift(MI, O, ARM_AM_getAM2ShiftOpc(MCOperand_getImm(MO3)),
+ 			 ARM_AM_getAM2Offset(MCOperand_getImm(MO3)),
+ 			 getUseMarkup());
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -315,7 +315,7 @@ static inline void printAddrModeTBB(MCInst *MI, unsigned Op, SStream *O)
+ 	printRegName(O, MCOperand_getReg(MO1));
+ 	SStream_concat0(O, ", ");
+ 	printRegName(O, MCOperand_getReg(MO2));
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -516,7 +516,7 @@ static inline void printPostIdxImm8s4Operand(MCInst *MI, unsigned OpNum,
+ 			printRegImmShift(MI, O, ARM_AM_uxtw, shift, \
+ 					 getUseMarkup()); \
+ \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printMveAddrModeRQOperand(0);
+@@ -547,7 +547,7 @@ DEFINE_printMveAddrModeRQOperand(2);
+ 			printUInt32(O, ImmOffs * 4); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printAddrMode5Operand(false);
+@@ -584,7 +584,7 @@ DEFINE_printAddrMode5Operand(true);
+ 			printUInt32(O, ImmOffs * 2); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printAddrMode5FP16Operand(false);
+@@ -599,10 +599,10 @@ static inline void printAddrMode6Operand(MCInst *MI, unsigned OpNum, SStream *O)
+ 	SStream_concat0(O, "[");
+ 	printRegName(O, MCOperand_getReg(MO1));
+ 	if (MCOperand_getImm(MO2)) {
+-		SStream_concat(O, "%s", ":");
++		ARM_printFormattedChar(O, ":");
+ 		printInt64(O, ((uint32_t)MCOperand_getImm(MO2)) << 3);
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -613,7 +613,7 @@ static inline void printAddrMode7Operand(MCInst *MI, unsigned OpNum, SStream *O)
+ 	ARM_printMarkup(O, "<mem:");
+ 	SStream_concat0(O, "[");
+ 	printRegName(O, MCOperand_getReg(MO1));
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -918,7 +918,7 @@ static inline void printCImmediate(MCInst *MI, unsigned OpNum, SStream *O)
+ static inline void printCoprocOptionImm(MCInst *MI, unsigned OpNum, SStream *O)
+ {
+ 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_CoprocOptionImm, OpNum);
+-	SStream_concat(O, "%s", "{");
++	ARM_printFormattedChar(O, "{");
+ 	printInt64(O, MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
+ 	SStream_concat0(O, "}");
+ }
+@@ -1014,7 +1014,7 @@ static inline void printThumbAddrModeRROperand(MCInst *MI, unsigned Op,
+ 		SStream_concat0(O, ", ");
+ 		printRegName(O, RegNum);
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -1039,7 +1039,7 @@ static inline void printThumbAddrModeImm5SOperand(MCInst *MI, unsigned Op,
+ 		printUInt32Bang(O, ImmOffs * Scale);
+ 		SStream_concat0(O, markup(">"));
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -1125,7 +1125,7 @@ static inline void printT2SOOperand(MCInst *MI, unsigned OpNum, SStream *O)
+ 			printInt32Bang(O, OffImm); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printAddrModeImm12Operand(false);
+@@ -1161,7 +1161,7 @@ DEFINE_printAddrModeImm12Operand(true);
+ 			printInt32Bang(O, OffImm); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printT2AddrModeImm8Operand(true);
+@@ -1203,7 +1203,7 @@ DEFINE_printT2AddrModeImm8Operand(false);
+ 			printInt32Bang(O, OffImm); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ 
+@@ -1226,7 +1226,7 @@ static inline void printT2AddrModeImm0_1020s4Operand(MCInst *MI, unsigned OpNum,
+ 		printInt64Bang(O, (int32_t)(MCOperand_getImm(MO2) * 4));
+ 		SStream_concat0(O, markup(">"));
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -1290,7 +1290,7 @@ static inline void printT2AddrModeSoRegOperand(MCInst *MI, unsigned OpNum,
+ 		printUInt32(O, ShAmt);
+ 		SStream_concat0(O, markup(">"));
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -1367,7 +1367,7 @@ static inline void printModImmOperand(MCInst *MI, unsigned OpNum, SStream *O)
+ 	int32_t Rotated = ARM_AM_rotr32(Bits, Rot);
+ 	if (ARM_AM_getSOImmVal(Rotated) == MCOperand_getImm(Op)) {
+ 		// #rot has the least possible value
+-		SStream_concat(O, "%s", "#");
++		ARM_printFormattedChar(O, "#");
+ 		SStream_concat0(O, markup("<imm:"));
+ 		if (PrintUnsigned)
+ 			printUInt32(O, (uint32_t)(Rotated));
+@@ -1404,7 +1404,7 @@ static inline void printFBits32(MCInst *MI, unsigned OpNum, SStream *O)
+ static inline void printVectorIndex(MCInst *MI, unsigned OpNum, SStream *O)
+ {
+ 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_VectorIndex, OpNum);
+-	SStream_concat(O, "%s", "[");
++	ARM_printFormattedChar(O, "[");
+ 	printInt64(O,
+ 		   (int32_t)MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
+ 	SStream_concat0(O, "]");
+diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
+index 98805f06..8567e6f4 100644
+--- a/arch/ARM/ARMMapping.h
++++ b/arch/ARM/ARMMapping.h
+@@ -22,6 +22,21 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
+ // return name of register in friendly string
+ const char *ARM_reg_name(csh handle, unsigned int reg);
+ 
++/* Formatted single-character literals preserve the original %s call for
++ * applications that install a formatter through CS_OPT_MEM. */
++static inline void ARM_printFormattedChar(SStream *O, const char *literal)
++{
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	if (cs_vsnprintf == cs_default_vsnprintf) {
++		SStream_concat1(O, literal[0]);
++		return;
++	}
++#endif
++	SStream_concat(O, "%s", literal);
++}
++
+ /* A disabled markup tag contributes no text. A callback can observe
+  * even an empty argument, and a markup stream can close a pending tag. */
+ #if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+index 5eb4f77d..74b6dc6e 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+@@ -633,6 +633,20 @@ public:
+         syntax = b"{ int y = 1; int x = 1; OS << x; }"
+         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
+ 
++    def test_arm_formatted_literal(self):
++        suffix = b'SStream_concat0(O, markup(">"));'
++        self.check_patching_result(
++            StreamOperations(0, "ARM"),
++            b'{ O << "]" << markup(">"); }',
++            b'ARM_printFormattedChar(O, "]");\n' + suffix,
++        )
++        for arch, literal in (("AArch64", b'"]"'), ("ARM", b'", "'), ("ARM", b'""')):
++            self.check_patching_result(
++                StreamOperations(0, arch),
++                b'{ O << ' + literal + b' << markup(">"); }',
++                b'SStream_concat(O, "%s", ' + literal + b');\n' + suffix,
++            )
++
+     def test_arm_single_markup_before_operand(self):
+         source = b"""{ O << markup("<imm:") << '#' << amount; }"""
+         suffix = b"SStream_concat1(O, '#');\nSStream_concat0(O, amount);"
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+index 6068ef0f..113e716d 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+@@ -32,6 +32,10 @@ class StreamOperations(Patch):
+         return "stream"
+ 
+     def _concat_strings(self, s_name: bytes, ops: list[Node], src: bytes) -> bytes:
++        if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "string_literal":
++            literal = get_text_from_node(src, ops[0])
++            if len(literal) == 3 and literal[:1] == b'"' and 0x20 <= literal[1] < 0x7F:
++                return b"ARM_printFormattedChar(" + s_name + b", " + literal + b");\n"
+         if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "call_expression":
+             function = ops[0].child_by_field_name("function")
+             arguments = ops[0].child_by_field_name("arguments")
