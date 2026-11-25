@@ -67,7 +67,7 @@ try:
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
-        hot=['cs_disasm_iter','cs_regs_access','cs_decode_full_insn','X86_scanNativeBatch','X86_disasmIterText','X86_getInstruction','X86_Vex','AArch64_getInstruction','ARM_getInstruction','Mips_getInstruction','PPC_getInstruction','RISCV_getInstruction','ARM_formatChar']
+        hot=['cs_disasm_iter','cs_regs_access','cs_decode_full_insn','X86_scanNativeBatch','X86_disasmIterText','X86_getInstruction','X86_Vex','AArch64_getInstruction','ARM_getInstruction','Mips_getInstruction','PPC_getInstruction','RISCV_getInstruction','RISCV_selectScanDecoder','getScanInstruction']
         positions={x.split()[-1]:int(x.split()[0],16) for x in names if len(x.split())==3 and x.split()[-1] in hot}
         assert {'cs_disasm_iter','cs_regs_access','X86_scanNativeBatch','X86_disasmIterText'}<=positions.keys()
         save('hot-symbols-'+variant,positions)
@@ -110,15 +110,10 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
+        for name in ('AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o','RISCVInstPrinter.c.o','RISCVModule.c.o','RISCVDisassembler.c.o','cs.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
-        if variant=='selector' and os.uname().machine=='x86_64':
-            obj,=build.rglob('ARMFormattedChar.c.o')
-            with obj.open('rb')as file:
-                helper=ELFFile(file).get_section_by_name('.cs_arm_formatted_char');assert helper is not None
-                code_sections[obj.name]={'.cs_arm_formatted_char':hashlib.sha256(helper.data()).hexdigest()}
         save('executable-sections-'+variant,code_sections)
         with binary.open('rb') as file:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
