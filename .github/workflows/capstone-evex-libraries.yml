@@ -1,7 +1,7 @@
-name: Compare current Capstone and three numeric register fixes on RISC-V ELF, PuTTY x86 and four other architectures
+name: Measure two generation-time RISC-V register name lookups on ordinary ELF, PE32 and other architecture paths
 on:
   push:
-    branches: [codex/riscv-resolve-numeric-names-normal-links]
+    branches: [codex/riscv-resolved-dialect-offset-banks]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rv-numeric-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rv-two-name-offsets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
