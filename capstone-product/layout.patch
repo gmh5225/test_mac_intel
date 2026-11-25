@@ -1,45 +1,170 @@
-diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 5c23890c..306fd1ba 100644
---- a/arch/Mips/MipsInstPrinter.c
-+++ b/arch/Mips/MipsInstPrinter.c
-@@ -510,15 +510,38 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
- 			MipsFCCToString((Mips_CondCode)MCOperand_getImm(MO)));
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 1cc3d3a9..cb65d0a4 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				// only immediate as address of memory
+ 				if (DispVal < 0) {
+ 					SStream_concat(O, "0x%" PRIx64,
+-						       x86_get_address_mask(
+-							       MI->csh->mode) &
+-							       DispVal);
++						       X86_absoluteAddress(MI, DispVal));
+ 				} else {
+ 					if (DispVal > HEX_THRESHOLD)
+ 						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
+index 2ee82ef7..575bd418 100644
+--- a/arch/X86/X86InstPrinterCommon.c
++++ b/arch/X86/X86InstPrinterCommon.c
+@@ -290,3 +290,15 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
+ 	}
+ }
+ #endif
++
++/* An absolute displacement is an offset of the effective address width. */
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp)
++{
++	const cs_mode mode = mi->csh->mode;
++	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
++	if (x86_has_feature(mode, CS_MODE_16))
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
++	if (x86_has_feature(mode, CS_MODE_32))
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
++}
+diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
+index 37b02959..bb4919aa 100644
+--- a/arch/X86/X86InstPrinterCommon.h
++++ b/arch/X86/X86InstPrinterCommon.h
+@@ -22,6 +22,8 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
+ 	return target;
  }
  
--static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
--		       unsigned OpNo, SStream *OS, bool IsBranch)
-+static void printAliasMnemonic(SStream *OS, const char *Str)
- {
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+	/* Ordinary output writes the tab, alias and operand separator together.
-+	 * Markup and user formatters observe their original append boundaries. */
-+	if (cs_vsnprintf == cs_default_vsnprintf && !OS->is_closed &&
-+	    !OS->markup_stream && OS->index < SSTREAM_BUF_LEN - 2) {
-+		const size_t NameLen = strlen(Str);
-+		if (NameLen < SSTREAM_BUF_LEN - 2 - OS->index) {
-+			char *out = OS->buffer + OS->index;
-+			*out++ = '\t';
-+			memcpy(out, Str, NameLen);
-+			memcpy(out + NameLen, "\t", 2);
-+			OS->index += NameLen + 2;
-+			return;
-+		}
-+	}
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp);
++
+ void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
+ 
+ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..9272465d 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -326,6 +326,22 @@ static bool need_zero_prefix(uint64_t imm)
+ 		return true;
+ }
+ 
++/* A negative displacement with no base or index denotes an unsigned
++ * address. Its encoded width is at least 16 bits, so it always prints
++ * in hexadecimal even when the data operand is only one byte wide. */
++#if defined(__GNUC__)
++__attribute__((cold, noinline))
 +#endif
- #if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
- 	SStream_concat2(OS, "\t", Str);
- #else
- 	SStream_concat(OS, "%s%s", "\t", Str);
- #endif
- 	SStream_concat0(OS, "\t");
++static void printNegativeAbsolute(MCInst *MI, SStream *O, int64_t displacement)
++{
++	const uint64_t address = X86_absoluteAddress(MI, displacement);
++	if (MI->csh->syntax == CS_OPT_SYNTAX_MASM)
++		SStream_concat(O, need_zero_prefix(address) ? "0%" PRIx64 "h" : "%" PRIx64 "h",
++			       address);
++	else
++		SStream_concat_hex64(O, address, false);
 +}
 +
-+static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
-+		       unsigned OpNo, SStream *OS, bool IsBranch)
+ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ {
+ 	if (positive) {
+@@ -1235,11 +1251,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
+ 					MI->op1_size = 8;
+ 				if (DispVal < 0) {
+-					printImm(MI, O,
+-						 x86_get_address_mask(
+-							 MI->csh->mode) &
+-							 DispVal,
+-						 true);
++					printNegativeAbsolute(MI, O, DispVal);
+ 				} else {
+ 					printImm(MI, O, DispVal, true);
+ 				}
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index 380faa79..97d6bb42 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -154,13 +154,4 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+ 	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
+ }
+ 
+-static inline uint64_t x86_get_address_mask(cs_mode mode)
+-{
+-	if (x86_has_feature(mode, CS_MODE_16))
+-		return UINT16_MAX;
+-	if (x86_has_feature(mode, CS_MODE_32))
+-		return UINT32_MAX;
+-	return UINT64_MAX;
+-}
+-
+ #endif
+diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
+index cfd13cba..fe231be4 100644
+--- a/tests/unit/x86_legacy_address_size.c
++++ b/tests/unit/x86_legacy_address_size.c
+@@ -279,9 +279,59 @@ static bool check_other_opcodes(void)
+ 	return ok;
+ }
+ 
++static bool check_absolute_offsets(void)
 +{
-+	printAliasMnemonic(OS, Str);
- 	if (IsBranch)
- 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
- 	else
++	static const struct {
++		cs_mode mode;
++		uint8_t code[8];
++		uint8_t size;
++		const char *intel, *att;
++	} cases[] = {
++		{ CS_MODE_16, { 0x67, 0x8b, 0x05, 0x34, 0x12, 0x00, 0x80 },
++		  7, "ax, word ptr [0x80001234]", "0x80001234, %ax" },
++		{ CS_MODE_32, { 0x67, 0x8b, 0x06, 0x34, 0x82 },
++		  5, "eax, dword ptr [0x8234]", "0x8234, %eax" },
++		{ CS_MODE_64, { 0x67, 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  8, "eax, dword ptr [0x80001234]", "0x80001234, %eax" },
++		/* With no bitness flag the decoder selects 64-bit addressing. */
++		{ (cs_mode)0, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
++		{ CS_MODE_64, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
++	};
++	bool ok = true;
++	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
++		csh handle;
++		if (cs_open(CS_ARCH_X86, cases[i].mode, &handle) != CS_ERR_OK)
++			return false;
++		for (unsigned att = 0; att < 2; ++att) {
++			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
++					       att ? CS_OPT_SYNTAX_ATT : CS_OPT_SYNTAX_INTEL);
++			if (att && err == CS_ERR_X86_ATT)
++				continue;
++			cs_insn *insn = NULL;
++			size_t count = cs_disasm(handle, cases[i].code, cases[i].size,
++						 0x1000, 1, &insn);
++			const char *expected = att ? cases[i].att : cases[i].intel;
++			if (err != CS_ERR_OK || count != 1 ||
++			    insn->size != cases[i].size ||
++			    strcmp(insn->op_str, expected) != 0) {
++				fprintf(stderr, "absolute offset mode %u: expected %s, got %s\n",
++					(unsigned)cases[i].mode, expected,
++					count == 1 ? insn->op_str : "(invalid)");
++				ok = false;
++			}
++			cs_free(insn, count);
++		}
++		cs_close(&handle);
++	}
++	return ok;
++}
++
+ int main(void)
+ {
+ 	bool ok = check_conversions();
+ 	ok &= check_other_opcodes();
++	ok &= check_absolute_offsets();
+ 	return ok ? 0 : 1;
+ }

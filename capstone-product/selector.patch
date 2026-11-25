@@ -1,208 +1,238 @@
-diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 5c23890c..0c2ff671 100644
---- a/arch/Mips/MipsInstPrinter.c
-+++ b/arch/Mips/MipsInstPrinter.c
-@@ -510,15 +510,41 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
- 			MipsFCCToString((Mips_CondCode)MCOperand_getImm(MO)));
- }
- 
--static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
--		       unsigned OpNo, SStream *OS, bool IsBranch)
-+static void printAliasMnemonic(SStream *OS, const char *Str, size_t NameLen)
- {
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+	/* Ordinary output writes the tab, alias and operand separator together.
-+	 * Markup and user formatters observe their original append boundaries. */
-+	if (cs_vsnprintf == cs_default_vsnprintf && !OS->is_closed &&
-+	    !OS->markup_stream && OS->index < SSTREAM_BUF_LEN - 2) {
-+		if (NameLen < SSTREAM_BUF_LEN - 2 - OS->index) {
-+			char *out = OS->buffer + OS->index;
-+			*out++ = '\t';
-+			memcpy(out, Str, NameLen);
-+			memcpy(out + NameLen, "\t", 2);
-+			OS->index += NameLen + 2;
-+			return;
-+		}
-+	}
-+#else
-+	(void)NameLen;
-+#endif
- #if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
- 	SStream_concat2(OS, "\t", Str);
- #else
- 	SStream_concat(OS, "%s%s", "\t", Str);
- #endif
- 	SStream_concat0(OS, "\t");
-+}
-+
-+#define MIPS_ALIAS_NAME(name) name, (sizeof(name) - 1)
-+
-+static bool printAlias(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
-+		       unsigned OpNo, SStream *OS, bool IsBranch)
-+{
-+	printAliasMnemonic(OS, Str, NameLen);
- 	if (IsBranch)
- 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
- 	else
-@@ -526,11 +552,11 @@ static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
- 	return true;
- }
- 
--static bool printAlias2(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias2(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, SStream *OS,
- 			bool IsBranch)
- {
--	printAlias(Str, MI, Address, OpNo0, OS, IsBranch);
-+	printAlias(Str, NameLen, MI, Address, OpNo0, OS, IsBranch);
- 	SStream_concat0(OS, ", ");
- 	if (IsBranch)
- 		printBranchOperand((MCInst *)MI, Address, OpNo1, OS);
-@@ -539,11 +565,11 @@ static bool printAlias2(const char *Str, const MCInst *MI, uint64_t Address,
- 	return true;
- }
- 
--static bool printAlias3(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias3(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, unsigned OpNo2,
- 			SStream *OS)
- {
--	printAlias(Str, MI, Address, OpNo0, OS, false);
-+	printAlias(Str, NameLen, MI, Address, OpNo0, OS, false);
- 	SStream_concat0(OS, ", ");
- 	printOperand((MCInst *)MI, OpNo1, OS);
- 	SStream_concat0(OS, ", ");
-@@ -559,89 +585,91 @@ static bool printAlias4(const MCInst *MI, uint64_t Address, SStream *OS)
- 		// beq $zero, $zero, $L2 => b $L2
- 		// beq $r0, $zero, $L2 => beqz $r0, $L2
- 		return (isReg(MI, 0, Mips_ZERO) && isReg(MI, 1, Mips_ZERO) &&
--			printAlias("b", MI, Address, 2, OS, true)) ||
-+			printAlias(MIPS_ALIAS_NAME("b"), MI, Address, 2, OS, true)) ||
- 		       (isReg(MI, 1, Mips_ZERO) &&
--			printAlias2("beqz", MI, Address, 0, 2, OS, true));
-+			printAlias2(MIPS_ALIAS_NAME("beqz"), MI, Address, 0, 2, OS, true));
- 	case Mips_BEQ64:
- 		// beq $r0, $zero, $L2 => beqz $r0, $L2
- 		return isReg(MI, 1, Mips_ZERO_64) &&
--		       printAlias2("beqz", MI, Address, 0, 2, OS, true);
-+		       printAlias2(MIPS_ALIAS_NAME("beqz"), MI, Address, 0, 2, OS, true);
- 	case Mips_BNE:
- 	case Mips_BNE_MM:
- 		// bne $r0, $zero, $L2 => bnez $r0, $L2
- 		return isReg(MI, 1, Mips_ZERO) &&
--		       printAlias2("bnez", MI, Address, 0, 2, OS, true);
-+		       printAlias2(MIPS_ALIAS_NAME("bnez"), MI, Address, 0, 2, OS, true);
- 	case Mips_BNE64:
- 		// bne $r0, $zero, $L2 => bnez $r0, $L2
- 		return isReg(MI, 1, Mips_ZERO_64) &&
--		       printAlias2("bnez", MI, Address, 0, 2, OS, true);
-+		       printAlias2(MIPS_ALIAS_NAME("bnez"), MI, Address, 0, 2, OS, true);
- 	case Mips_BGEZAL:
- 		// bgezal $zero, $L1 => bal $L1
- 		return isReg(MI, 0, Mips_ZERO) &&
--		       printAlias("bal", MI, Address, 1, OS, true);
-+		       printAlias(MIPS_ALIAS_NAME("bal"), MI, Address, 1, OS, true);
- 	case Mips_BC1T:
- 		// bc1t $fcc0, $L1 => bc1t $L1
- 		return isReg(MI, 0, Mips_FCC0) &&
--		       printAlias("bc1t", MI, Address, 1, OS, true);
-+		       printAlias(MIPS_ALIAS_NAME("bc1t"), MI, Address, 1, OS, true);
- 	case Mips_BC1F:
- 		// bc1f $fcc0, $L1 => bc1f $L1
- 		return isReg(MI, 0, Mips_FCC0) &&
--		       printAlias("bc1f", MI, Address, 1, OS, true);
-+		       printAlias(MIPS_ALIAS_NAME("bc1f"), MI, Address, 1, OS, true);
- 	case Mips_JALR:
- 		// jalr $zero, $r1 => jr $r1
- 		// jalr $ra, $r1 => jalr $r1
- 		return (isReg(MI, 0, Mips_ZERO) &&
--			printAlias("jr", MI, Address, 1, OS, false)) ||
-+			printAlias(MIPS_ALIAS_NAME("jr"), MI, Address, 1, OS, false)) ||
- 		       (isReg(MI, 0, Mips_RA) &&
--			printAlias("jalr", MI, Address, 1, OS, false));
-+			printAlias(MIPS_ALIAS_NAME("jalr"), MI, Address, 1, OS, false));
- 	case Mips_JALR64:
- 		// jalr $zero, $r1 => jr $r1
- 		// jalr $ra, $r1 => jalr $r1
- 		return (isReg(MI, 0, Mips_ZERO_64) &&
--			printAlias("jr", MI, Address, 1, OS, false)) ||
-+			printAlias(MIPS_ALIAS_NAME("jr"), MI, Address, 1, OS, false)) ||
- 		       (isReg(MI, 0, Mips_RA_64) &&
--			printAlias("jalr", MI, Address, 1, OS, false));
-+			printAlias(MIPS_ALIAS_NAME("jalr"), MI, Address, 1, OS, false));
- 	case Mips_NOR:
- 	case Mips_NOR_MM:
- 	case Mips_NOR_MMR6:
- 		// nor $r0, $r1, $zero => not $r0, $r1
- 		return isReg(MI, 2, Mips_ZERO) &&
--		       printAlias2("not", MI, Address, 0, 1, OS, false);
-+		       printAlias2(MIPS_ALIAS_NAME("not"), MI, Address, 0, 1, OS, false);
- 	case Mips_NOR64:
- 		// nor $r0, $r1, $zero => not $r0, $r1
- 		return isReg(MI, 2, Mips_ZERO_64) &&
--		       printAlias2("not", MI, Address, 0, 1, OS, false);
-+		       printAlias2(MIPS_ALIAS_NAME("not"), MI, Address, 0, 1, OS, false);
- 	case Mips_OR:
- 	case Mips_ADDu:
- 		// or $r0, $r1, $zero => move $r0, $r1
- 		// addu $r0, $r1, $zero => move $r0, $r1
- 		return isReg(MI, 2, Mips_ZERO) &&
--		       printAlias2("move", MI, Address, 0, 1, OS, false);
-+		       printAlias2(MIPS_ALIAS_NAME("move"), MI, Address, 0, 1, OS, false);
- 	case Mips_LI48_NM:
- 	case Mips_LI16_NM:
- 		// li[16/48] $r0, imm => li $r0, imm
--		return printAlias2("li", MI, Address, 0, 1, OS, false);
-+		return printAlias2(MIPS_ALIAS_NAME("li"), MI, Address, 0, 1, OS, false);
- 	case Mips_ADDIU_NM:
- 	case Mips_ADDIUNEG_NM:
- 		if (isReg(MI, 1, Mips_ZERO_NM))
--			return printAlias2("li", MI, Address, 0, 2, OS, false);
-+			return printAlias2(MIPS_ALIAS_NAME("li"), MI, Address, 0, 2, OS, false);
- 		else
--			return printAlias3("addiu", MI, Address, 0, 1, 2, OS);
-+			return printAlias3(MIPS_ALIAS_NAME("addiu"), MI, Address, 0, 1, 2, OS);
- 	case Mips_ADDIU48_NM:
- 	case Mips_ADDIURS5_NM:
- 	case Mips_ADDIUR1SP_NM:
- 	case Mips_ADDIUR2_NM:
- 	case Mips_ADDIUGPB_NM:
- 	case Mips_ADDIUGPW_NM:
--		return printAlias3("addiu", MI, Address, 0, 1, 2, OS);
-+		return printAlias3(MIPS_ALIAS_NAME("addiu"), MI, Address, 0, 1, 2, OS);
- 	case Mips_ANDI16_NM:
- 	case Mips_ANDI_NM:
- 		// andi[16/32] $r0, $r1, imm => andi $r0, $r1, imm
--		return printAlias3("andi", MI, Address, 0, 1, 2, OS);
-+		return printAlias3(MIPS_ALIAS_NAME("andi"), MI, Address, 0, 1, 2, OS);
- 	default:
- 		return false;
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 1cc3d3a9..fd122362 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -936,10 +936,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 			} else {
+ 				// only immediate as address of memory
+ 				if (DispVal < 0) {
+-					SStream_concat(O, "0x%" PRIx64,
+-						       x86_get_address_mask(
+-							       MI->csh->mode) &
+-							       DispVal);
++					X86_printNegativeAbsolute(MI, O, DispVal, true);
+ 				} else {
+ 					if (DispVal > HEX_THRESHOLD)
+ 						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
+index 2ee82ef7..558b95ea 100644
+--- a/arch/X86/X86InstPrinterCommon.c
++++ b/arch/X86/X86InstPrinterCommon.c
+@@ -290,3 +290,32 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
  	}
  }
-+#undef MIPS_ALIAS_NAME
+ #endif
 +
++/* An absolute displacement is an offset of the effective address width. */
++static uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp)
++{
++	const cs_mode mode = mi->csh->mode;
++	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
++	if (x86_has_feature(mode, CS_MODE_16))
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
++	if (x86_has_feature(mode, CS_MODE_32))
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
++}
++
++/* An absolute offset has no base or index. Use its address width while
++ * leaving the signed displacement and the following operand unchanged. */
++void X86_printNegativeAbsolute(const MCInst *mi, SStream *out,
++			      int64_t displacement, bool att)
++{
++	const uint64_t address = X86_absoluteAddress(mi, displacement);
++	if (att) {
++		SStream_concat(out, "0x%" PRIx64, address);
++	} else if (mi->csh->syntax == CS_OPT_SYNTAX_MASM) {
++		const char *format = X86_masmNeedsLeadingZero(address) ?
++					     "0%" PRIx64 "h" : "%" PRIx64 "h";
++		SStream_concat(out, format, address);
++	} else {
++		SStream_concat_hex64(out, address, false);
++	}
++}
+diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
+index 37b02959..689d446d 100644
+--- a/arch/X86/X86InstPrinterCommon.h
++++ b/arch/X86/X86InstPrinterCommon.h
+@@ -22,6 +22,26 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
+ 	return target;
+ }
  
- static void printRegisterList(MCInst *MI, int opNum, SStream *O)
++// for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h
++// this function tell us if we need to have prefix 0 in front of a number
++static inline bool X86_masmNeedsLeadingZero(uint64_t imm)
++{
++	// find the first hex letter representing imm
++	while (imm >= 0x10)
++		imm >>= 4;
++
++	if (imm < 0xa)
++		return false;
++	else // this need 0 prefix
++		return true;
++}
++
++#if defined(__GNUC__)
++__attribute__((cold, noinline))
++#endif
++void X86_printNegativeAbsolute(const MCInst *mi, SStream *out,
++			       int64_t displacement, bool att);
++
+ void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
+ 
+ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..ccf218d9 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -312,20 +312,6 @@ static void printRegName(SStream *OS, unsigned RegNo)
+ 				      getRegisterNameLength(RegNo));
+ }
+ 
+-// for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h
+-// this function tell us if we need to have prefix 0 in front of a number
+-static bool need_zero_prefix(uint64_t imm)
+-{
+-	// find the first hex letter representing imm
+-	while (imm >= 0x10)
+-		imm >>= 4;
+-
+-	if (imm < 0xa)
+-		return false;
+-	else // this need 0 prefix
+-		return true;
+-}
+-
+ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
  {
-diff --git a/arch/Mips/MipsInstPrinter.h b/arch/Mips/MipsInstPrinter.h
-index f082c91d..fd1f5123 100644
---- a/arch/Mips/MipsInstPrinter.h
-+++ b/arch/Mips/MipsInstPrinter.h
-@@ -144,12 +144,12 @@ DECLARE_printUImm_2(6, 2);
- static void printMemOperand(MCInst *MI, int opNum, SStream *O);
- static void printMemOperandEA(MCInst *MI, int opNum, SStream *O);
- static void printFCCOperand(MCInst *MI, int opNum, SStream *O);
--static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 		       unsigned OpNo, SStream *OS, bool IsBranch);
--static bool printAlias2(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias2(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, SStream *OS,
- 			bool IsBranch);
--static bool printAlias3(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias3(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, unsigned OpNo2,
- 			SStream *OS);
- static bool printAlias4(const MCInst *MI, uint64_t Address, SStream *OS);
+ 	if (positive) {
+@@ -350,13 +336,13 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 
+ 				if (imm == 0x8000000000000000LL) // imm == -imm
+ 					SStream_concat0(O, "8000000000000000h");
+-				else if (need_zero_prefix(imm))
++				else if (X86_masmNeedsLeadingZero(imm))
+ 					SStream_concat(O, "0%" PRIx64 "h", imm);
+ 				else
+ 					SStream_concat(O, "%" PRIx64 "h", imm);
+ 			} else {
+ 				if (imm > HEX_THRESHOLD) {
+-					if (need_zero_prefix(imm))
++					if (X86_masmNeedsLeadingZero(imm))
+ 						SStream_concat(O,
+ 							       "0%" PRIx64 "h",
+ 							       imm);
+@@ -398,7 +384,7 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 				if (imm == 0x8000000000000000LL) // imm == -imm
+ 					SStream_concat0(O, "8000000000000000h");
+ 				else if (imm < -HEX_THRESHOLD) {
+-					if (need_zero_prefix(imm))
++					if (X86_masmNeedsLeadingZero(imm))
+ 						SStream_concat(O,
+ 							       "-0%" PRIx64 "h",
+ 							       -imm);
+@@ -411,7 +397,7 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 							     true);
+ 			} else {
+ 				if (imm > HEX_THRESHOLD) {
+-					if (need_zero_prefix(imm))
++					if (X86_masmNeedsLeadingZero(imm))
+ 						SStream_concat(O,
+ 							       "0%" PRIx64 "h",
+ 							       imm);
+@@ -1235,11 +1221,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
+ 					MI->op1_size = 8;
+ 				if (DispVal < 0) {
+-					printImm(MI, O,
+-						 x86_get_address_mask(
+-							 MI->csh->mode) &
+-							 DispVal,
+-						 true);
++					X86_printNegativeAbsolute(MI, O, DispVal, false);
+ 				} else {
+ 					printImm(MI, O, DispVal, true);
+ 				}
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index 380faa79..97d6bb42 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -154,13 +154,4 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+ 	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
+ }
+ 
+-static inline uint64_t x86_get_address_mask(cs_mode mode)
+-{
+-	if (x86_has_feature(mode, CS_MODE_16))
+-		return UINT16_MAX;
+-	if (x86_has_feature(mode, CS_MODE_32))
+-		return UINT32_MAX;
+-	return UINT64_MAX;
+-}
+-
+ #endif
+diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
+index cfd13cba..fe231be4 100644
+--- a/tests/unit/x86_legacy_address_size.c
++++ b/tests/unit/x86_legacy_address_size.c
+@@ -279,9 +279,59 @@ static bool check_other_opcodes(void)
+ 	return ok;
+ }
+ 
++static bool check_absolute_offsets(void)
++{
++	static const struct {
++		cs_mode mode;
++		uint8_t code[8];
++		uint8_t size;
++		const char *intel, *att;
++	} cases[] = {
++		{ CS_MODE_16, { 0x67, 0x8b, 0x05, 0x34, 0x12, 0x00, 0x80 },
++		  7, "ax, word ptr [0x80001234]", "0x80001234, %ax" },
++		{ CS_MODE_32, { 0x67, 0x8b, 0x06, 0x34, 0x82 },
++		  5, "eax, dword ptr [0x8234]", "0x8234, %eax" },
++		{ CS_MODE_64, { 0x67, 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  8, "eax, dword ptr [0x80001234]", "0x80001234, %eax" },
++		/* With no bitness flag the decoder selects 64-bit addressing. */
++		{ (cs_mode)0, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
++		{ CS_MODE_64, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
++	};
++	bool ok = true;
++	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
++		csh handle;
++		if (cs_open(CS_ARCH_X86, cases[i].mode, &handle) != CS_ERR_OK)
++			return false;
++		for (unsigned att = 0; att < 2; ++att) {
++			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
++					       att ? CS_OPT_SYNTAX_ATT : CS_OPT_SYNTAX_INTEL);
++			if (att && err == CS_ERR_X86_ATT)
++				continue;
++			cs_insn *insn = NULL;
++			size_t count = cs_disasm(handle, cases[i].code, cases[i].size,
++						 0x1000, 1, &insn);
++			const char *expected = att ? cases[i].att : cases[i].intel;
++			if (err != CS_ERR_OK || count != 1 ||
++			    insn->size != cases[i].size ||
++			    strcmp(insn->op_str, expected) != 0) {
++				fprintf(stderr, "absolute offset mode %u: expected %s, got %s\n",
++					(unsigned)cases[i].mode, expected,
++					count == 1 ? insn->op_str : "(invalid)");
++				ok = false;
++			}
++			cs_free(insn, count);
++		}
++		cs_close(&handle);
++	}
++	return ok;
++}
++
+ int main(void)
+ {
+ 	bool ok = check_conversions();
+ 	ok &= check_other_opcodes();
++	ok &= check_absolute_offsets();
+ 	return ok ? 0 : 1;
+ }

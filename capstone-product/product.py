@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','layout','selector'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+for k in ('base','layout','selector','oracle'):assert sha(r/(k+'.patch'))==m[k]['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -53,7 +53,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','layout','selector'):
+    for variant in ('base','layout','selector','oracle'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -72,8 +72,7 @@ try:
         assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
         command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'offset.cpp',archive,'-o',t/'offset'],'link-offset-'+variant)
         vals=sp.check_output([t/'offset'],text=True).strip().splitlines();assert len(vals)==48
-        if variant=='base':original_offsets=vals
-        else:assert vals==original_offsets
+        assert vals==json.loads((r/'offset-expected.json').read_text())['base' if variant=='base' else 'fixed'].splitlines()
         save('absolute-offsets-'+variant,vals)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
@@ -115,13 +114,13 @@ try:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    expected=3
+    expected=4
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
     shutil.copy2(products['base'],t/'selected')
-    imgs={k:v.read_bytes()for k,v in products.items()};imgs['copy']=imgs['base']
+    imgs={k:v.read_bytes()for k,v in products.items() if k!='oracle'};imgs['copy']=imgs['base']
     length=max(map(len,imgs.values()));imgs={k:v+bytes(length-len(v))for k,v in imgs.items()}
     image=t/'selected';image.write_bytes(imgs['base'])
     inode=image.stat().st_ino;block=4096
@@ -129,34 +128,37 @@ try:
     checked={};assert offsets
     def execute(k,case,mode,reps):
         # Touch exactly the same file pages, in the same order, before every exec.
-        with image.open('r+b',buffering=0) as dest:
-            for at in offsets:
-                dest.seek(at)
-                part=imgs[k][at:at+block]
-                assert dest.write(part)==len(part)
-        assert image.stat().st_ino==inode and image.stat().st_size==length
-        if k not in checked:
-            checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
+        if k!='oracle':
+            with image.open('r+b',buffering=0) as dest:
+                for at in offsets:
+                    dest.seek(at)
+                    part=imgs[k][at:at+block]
+                    assert dest.write(part)==len(part)
+            assert image.stat().st_ino==inode and image.stat().st_size==length
+            if k not in checked:
+                checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
 
         sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
-        return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
+        return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',products['oracle'] if k=='oracle' else image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
     rows=[];rng=random.Random(1739)
     for c in cases:
         for mode in (range(4) if c['selector'] in (32,64) else range(3)):
             single=execute('base',c,mode,1)
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
+            corrected=execute('oracle',c,mode,n)[1:];assert corrected[:3]==expected[:3]
+            if mode==0 or c['selector'] not in (32,64):assert corrected==expected
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             pairs=35 if c['selector']==4 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
                     sample=execute(k,c,mode,n)
-                    wanted=expected.copy()
+                    wanted=expected if k in ('base','copy') else corrected
                     assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
                     ticks[k].append(sample[0])
                 cycles.append(ticks)
-            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],reps=n,cycles=cycles))
+            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],corrected_score=corrected[3],reps=n,cycles=cycles))
             save('timings',rows)
     assert set(checked)==set(imgs) and checked['copy']==checked['base']
     save('fixed-image',dict(inode=inode,verified=checked,bytes=length,block=block,blocks=len(offsets)))
