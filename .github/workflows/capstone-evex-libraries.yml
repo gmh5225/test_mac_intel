@@ -1,7 +1,7 @@
-name: Time verified packed AMD64 VEX2 memory and i386 or AMD64 vector clears on the frozen real ELF and PE corpus
+name: Measure PE32 stack memory and AT&T scalar memory detail in final order with the same frozen inputs and four counterbalanced hosts
 on:
   push:
-    branches: [codex/x86-packed-vex64-att-and-vex-clear]
+    branches: [codex/x86-att-stack-and-final-memory-details]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-vex64-att-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-scalar-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
