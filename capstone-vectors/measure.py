@@ -21,7 +21,7 @@ try:
     singlecmd=next(z['command'] for z in rd(one/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
     mixcmd=next(z['command'] for z in rd(mix/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
     assert '-DCAPSTONE_MIPS_ONLY' in singlecmd and '-DCAPSTONE_MIPS_ONLY' not in mixcmd
-    mixed={};dedicated={};products={};domain={};streams={};real={}
+    mixed={};products={};domain={};streams={};real={}
     shutil.copyfile(r/'public-compare.cpp',w/'trial-compare.cpp');shutil.copyfile(r/'mips-domain.cpp',w/'mips-domain.cpp')
     run('clang++','-O2','-std=c++17','-I',src/'include',w/'mips-domain.cpp','-ldl','-o',w/'domain')
     run('clang++','-O2','-std=c++17','-I',w,'-I',src/'include',r/'real.cpp','-ldl','-o',w/'real')
@@ -34,12 +34,9 @@ try:
         assert out('git','-C',src,'write-tree')==q[v]['tree']
         run('cmake','--build',mix,'--target','capstone_static','--parallel','4')
         archive,=mix.rglob('libcapstone.a');objects={str(obj.relative_to(mix)):sha(obj)for obj in mix.rglob('*.c.o')}
-        assert len(objects)>40;mixed[v]=dict(objects=objects,archive=sha(archive));save('mixed',mixed)
+        assert len(objects)>40;mixed[v]=dict(objects=objects,archive=sha(archive));assert mixed[v]==mixed['base'];save('mixed',mixed)
         run('cmake','--build',one,'--target','capstone_static','capstone_shared','--parallel','4')
-        static,=one.rglob('libcapstone.a');shared,=one.rglob('libcapstone.so')
-        dedicated[v]=[sha(static),sha(shared)];assert dedicated[v]==dedicated['base'];save('standalone',dedicated)
-        lib=archive;output=w/(v+'.so')
-        run('clang','-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',output)
+        lib,=one.rglob('libcapstone.a');shared,=one.rglob('libcapstone.so');output=w/(v+'.so');shutil.copy2(shared,output)
         run('clang++','-O3','-std=c++17','-no-pie','-I',src/'include',r/'foreign.cpp',lib,'-o',w/('foreign-'+v))
         products[v]=dict(archive=sha(lib),shared=sha(output),program=sha(w/('foreign-'+v)));save('products',products)
         run('python3','-B',src/'suite/synctools/mips_register_names.py','--check')
@@ -49,19 +46,17 @@ try:
         assert '100% tests passed' in report
         (e/(v+'-units.log')).write_text(report+'\n')
 
-        current=next(z['command']for z in rd(mix/'compile_commands.json') if z['file'].endswith('/MipsInstPrinter.c'))
-        assert ('CAPSTONE_MIPS_MIXED_REGISTER_NAMES' in current)==(v!='base' and os.uname().machine=='aarch64')
-        args=shlex.split(current);slot=args.index('-o')
+        args=shlex.split(singlecmd);slot=args.index('-o')
         run(*args[:slot],'-I',src,r/'stream.c',lib,'-o',w/'guard')
         streams[v]=list(map(int,out(w/'guard').split()))
         assert streams[v]==[1136128,0]
         if v!='base':
             domain[v]=json.loads(out(w/'domain',w/'base.so',output));assert domain[v]['trials']==20971520 and domain[v]['accepted']==15190912
             real[v]={row['name']:list(map(int,out(w/'real',w/'base.so',output,w/(row['name']+'.text')).split())) for row in corpus}
-    for tag in ('candidate','outlined'):
-        changed=[Path(k).name for k,v in mixed['base']['objects'].items() if v!=mixed[tag]['objects'][k]]
-        assert changed==(['MipsInstPrinter.c.o'] if os.uname().machine=='aarch64' else []),changed
-        if os.uname().machine!='aarch64':assert products[tag]==products['base']
+    if os.uname().machine=='aarch64':
+        assert products['base']==products['candidate']==products['outlined']
+    else:
+        assert all(products[tag]['shared']!=products['base']['shared'] for tag in ('candidate','outlined'))
     assert domain['candidate']==domain['outlined'] and real['candidate']==real['outlined']
     save('guards',dict(domain=domain,streams=streams,real=real))
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});save('host',dict(cpu=out('lscpu'),compiler=out('clang','--version')))

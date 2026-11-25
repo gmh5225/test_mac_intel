@@ -1,7 +1,7 @@
-name: Measure the verified MIPS register tables in the actual six-architecture NeverD Capstone configuration
+name: Compare adjacent byte and packed MIPS register name indices on dedicated x86-64 Clang
 on:
   push:
-    branches: [codex/mixed-mips-register-name-banks]
+    branches: [codex/mips-abi-numeric-pair-index]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-mixed-bank-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-pair-index-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
