@@ -105,7 +105,7 @@ try:
     proof={}
     for label in ('outlined','candidate'):
         proof[label]=list(map(int,get(w/'access-replay',w/'base.so',w/(label+'.so')).split()))
-        assert proof[label][0]==1920000
+        assert proof[label][0]==1920000 and proof[label][3]==2048
     assert proof['outlined']==proof['candidate'];save('register-query',proof)
     guards={};records={}
     for lbl in ('candidate','outlined'):

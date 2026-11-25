@@ -1,29 +1,28 @@
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..d75bc35a 100644
+index 79adee8d..e410a076 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -12003,7 +12003,23 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
- 		       write_count * sizeof(insn->detail->regs_write[0]));
+@@ -11990,6 +11990,23 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	read_count = insn->detail->regs_read_count;
+ 	write_count = insn->detail->regs_write_count;
  
- 	// explicit registers
--	for (i = 0; i < x86->op_count; i++) {
-+	i = 0;
-+	if (read_count == 0 && write_count == 0 && x86->op_count != 0 &&
-+	    x86->operands[0].type == X86_OP_REG &&
-+	    x86->operands[0].access == CS_AC_WRITE) {
-+		regs_write[write_count++] = x86->operands[0].reg;
-+		i = 1;
-+		/* A plain memory source can contribute only its base register. */
-+		if (x86->op_count == 2 && x86->operands[1].type == X86_OP_MEM) {
-+			const x86_op_mem *mem = &x86->operands[1].mem;
-+			if (mem->segment == X86_REG_INVALID && mem->index == X86_REG_INVALID) {
-+				if (mem->base != X86_REG_INVALID)
-+					regs_read[read_count++] = mem->base;
-+				i = 2;
-+			}
-+		}
++	/* Register transfers and arithmetic have one writable destination
++	 * followed by read-only sources. With no implicit operands, append
++	 * their unique registers in operand order. */
++	const cs_x86_op *ops = x86->operands;
++	if (read_count == 0 && write_count == 0 && x86->op_count == 2 &&
++	    ops[0].type == X86_OP_REG && (ops[0].access & CS_AC_WRITE) &&
++	    ops[1].type == X86_OP_REG && ops[1].access == CS_AC_READ) {
++		if (ops[0].access & CS_AC_READ)
++			regs_read[read_count++] = ops[0].reg;
++		regs_write[0] = ops[0].reg;
++		if (read_count == 0 || regs_read[0] != (unsigned)ops[1].reg)
++			regs_read[read_count++] = ops[1].reg;
++		*regs_read_count = read_count;
++		*regs_write_count = 1;
++		return;
 +	}
-+	for (; i < x86->op_count; i++) {
- 		cs_x86_op *op = &(x86->operands[i]);
- 		switch ((int)op->type) {
- 		case X86_OP_REG:
++
+ 	// implicit registers
+ 	if (read_count == 1)
+ 		regs_read[0] = insn->detail->regs_read[0];

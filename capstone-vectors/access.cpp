@@ -52,5 +52,21 @@ int main(int argc,char **argv) {
             ++queries;
         }
     }
-    std::cout<<queries<<" "<<first<<" "<<load<<"\n";
+
+    uint64_t packed=0;
+    const x86_reg ids[]={X86_REG_INVALID,X86_REG_EAX,X86_REG_XMM8,X86_REG_ZMM31};
+    for(unsigned n:{2u,3u}) for(auto a:ids)for(auto b:ids)for(auto c:ids)for(auto rw:{false,true}){
+        cs_insn x{};cs_detail d{};x.id=X86_INS_MOV;x.detail=&d;auto &xp=d.x86;
+        xp.op_count=n;const x86_reg regs[]={a,b,c};
+        for(unsigned k=0;k<n;++k){
+            xp.operands[k].type=X86_OP_REG;xp.operands[k].reg=regs[k];
+            xp.operands[k].access=(cs_ac_type)(k?CS_AC_READ:rw?CS_AC_READ|CS_AC_WRITE:CS_AC_WRITE);
+        }
+        for(unsigned offset:{0u,1u,2u,64u})for(bool same:{false,true}){
+            Query left=query(base,x,offset,same),right=query(trial,x,offset,same);
+            if(std::memcmp(left.regs,right.regs,sizeof left.regs)||left.nr!=right.nr||left.nw!=right.nw)return 3;
+            ++packed;
+        }
+    }
+    std::cout<<queries<<" "<<first<<" "<<load<<" "<<packed<<"\n";
 }
