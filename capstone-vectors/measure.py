@@ -35,6 +35,10 @@ try:
     shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
+    masm=(w/'driver.cpp').read_text()
+    anchor='  cs_insn *insn=cs_malloc(handle);';assert masm.count(anchor)==1
+    (w/'masm.cpp').write_text(masm.replace(anchor,'  if(cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_MASM)!=CS_ERR_OK)return 9;'+chr(10)+anchor))
+    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'masm.cpp','-o',w/'masm.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
     maps=rd(r/'source.json')
@@ -59,6 +63,7 @@ try:
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
+        run('clang++',w/'masm.o',lib,ice_lib,*flags,'-o',w/('masm-'+label))
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
@@ -107,14 +112,15 @@ try:
         proof[label]=list(map(int,get(w/'cmov-guard',w/'base.so',w/(label+'.so')).split()))
         assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
     assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
-    run('clang++','-O2','-std=c++17','-I',base/'include',r/'rip.cpp','-ldl','-o',w/'rip')
-    outcomes={}
-    for label in ('candidate','outlined'):
-        z=sp.run([w/'rip',w/'base.so',w/(label+'.so')],capture_output=True,text=True)
-        assert z.returncode==0,(label,z.stderr[-1000:])
-        outcomes[label]=json.loads(z.stdout)
-    assert outcomes['candidate']==outcomes['outlined'] and outcomes['candidate']['cases']==820176
-    save('rip-record',outcomes)
+    moffs={}
+    for label in ('base','candidate','outlined'):
+        library=w/(label+'.so');exe=w/(label+'-moffs')
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/'moffs.cpp',library,'-o',exe)
+        p=sp.run([exe],capture_output=True,text=True)
+        assert p.returncode==0,(label,p.stderr[-400:])
+        counts=list(map(int,p.stdout.split()));assert counts==[11520,864 if label=='base' else 0,0],(label,counts)
+        moffs[label]=counts
+    save('moffs',moffs)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
@@ -132,6 +138,8 @@ try:
     save('host',host);observations={};summary={};audits={}
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
+    from masm_pairs import paired_masm
+    take_masm=paired_masm(w,save);masm_results={}
     for name,bits,f,spans,_ in fixtures:
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
@@ -144,6 +152,10 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        for mode in (1,2):
+            masm_results[name+'/'+str(mode)]=take_masm(name,mode,f,path,bits)
+            save('masm-cost',masm_results)
+
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
