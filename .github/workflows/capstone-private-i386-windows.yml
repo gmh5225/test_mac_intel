@@ -1,7 +1,7 @@
-name: Measure plain RISC-V register output and mixed-library scan with markup and cursor controls
+name: Verify the RISC-V register and scanner changes on released mixed ARM with four native throughput controls
 on:
   push:
-    branches: [codex/riscv-plain-register-stream-controls]
+    branches: [codex/riscv-release-configuration-controls]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 571a1592ff48d148257b7ae1146d2fb593470783
+          ref: 994ce74539381ccfe41411455924c8933825d004
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -46,7 +46,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.profile == 'full'
         with:
           repository: NeverSight/NeverD
-          ref: f6f945d903b0a8a96ba8c4cea4c8221be9da3941
+          ref: 7c158ca1c194c0a2b56d830eaeee9fa901732618
           path: neverd-config
           sparse-checkout: |
             cmake
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-plain-register-stream-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: released-mixed-riscv-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7
