@@ -44,7 +44,7 @@ try:
     changed=[]
     if objects:
         assert objects['base'].keys()==objects['release'].keys();changed=[Path(k).name for k in objects['base']if objects['base'][k]!=objects['release'][k]]
-        enabled=platform.machine()=='aarch64' and cc=='clang' and profile=='full'
+        enabled=platform.machine()=='x86_64' and cc=='clang' and profile=='full'
         assert changed==(['MipsInstPrinter.c.o'] if enabled else []),(changed,enabled)
     save('complete',dict(complete=True,source=q,trees=tree,records=results,units=units,changed_objects=changed,arch=platform.machine(),platform=platform.system(),compiler=cc,profile=profile))
 finally:
