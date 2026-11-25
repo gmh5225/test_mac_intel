@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
+import hashlib,json,math,re,os,platform,random,shutil,subprocess as sp,tempfile
 from elf_slots import plan,symbols
 from elftools.elf.elffile import ELFFile
 import training,pe_panels
@@ -54,7 +54,33 @@ try:
     ch=[Path(k).name for k in objects['base'] if objects['base'][k]!=objects['candidate'][k]]
     required={'cs.c.o','X86ATTInstPrinter.c.o','X86OutputIterator.c.o','X86VectorOutput.c.o','X86ImmediateOutput.c.o'}
     assert required <= set(ch) <= local_names,ch
-    other,script=plan(versions,archives,w,ar,objcopy,sorted(ch));(e/'diagnostic.ld').write_bytes(script.read_bytes())
+    other,script=plan(versions,archives,w,ar,objcopy,sorted(ch))
+    def link(bin,lib,controlled):
+        mapfile=bin.with_suffix('.map')
+        args=['clang++',w/'driver.o','-no-pie','-fuse-ld=bfd','-Wl,-Map,'+str(mapfile)]
+        if controlled:
+            args+=['-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-Wl,-T,'+str(script)]
+        else:args.append(lib)
+        run(*args,'-o',bin)
+        members=sorted(set(re.findall(re.escape(str(lib))+r'\(([^()\n]+\.o)\)',mapfile.read_text())))
+        assert members,(lib,mapfile)
+        return members
+    original=script.read_text()
+    anchors={}
+    for group in ('exec','const','write','zero'):
+        section='.csprobe_'+group
+        if section+' : ALIGN' not in original:continue
+        positions=[]
+        for tag,lib in other.items():
+            exe=w/('bounds-'+tag);link(exe,lib,True)
+            with exe.open('rb')as stream:positions.append(ELFFile(stream).get_section_by_name(section)['sh_addr'])
+        anchor=(max(positions)+4095)&~4095
+        spec=script.read_text();mark=section+' : ALIGN(64)';assert spec.count(mark)==1
+        script.write_text(spec.replace(mark,section+' '+hex(anchor)+' : ALIGN(64)'))
+        anchors[section]=anchor
+    (e/'diagnostic.ld').write_bytes(script.read_bytes())
+    closure={}
+
     cases=training.fetch(r,w)
     for name,bits,f,spans,meta in pe_panels.prepare(w):
         assert bits in (32,64) and spans
@@ -66,9 +92,7 @@ try:
     for kind,libs in [('regular',archives),('controlled',other)]:
         for v,lib in libs.items():
             tag=kind+'-'+v;exe=w/tag
-            args=['clang++',w/'driver.o',lib,'-no-pie','-fuse-ld=bfd']
-            if kind=='controlled':args+=['-Wl,-T,'+str(script)]
-            run(*args,'-o',exe)
+            closure[tag]=link(exe,lib,kind=='controlled')
             sy,sec=symbols(exe);assert set(hot)<=sy.keys(),sy.keys()
             stamps[tag]=dict(hot={n:sy[n]for n in hot},sections=sec,sha256=sig(exe))
             if kind=='controlled':
@@ -84,6 +108,11 @@ try:
     controlled=stamps['controlled-base']['sections']
     slots=[s for s in controlled if s.startswith('.csprobe_')]
     assert {'.csprobe_exec','.csprobe_const'}<=set(slots) and all(controlled[s][1]==stamps['controlled-candidate']['sections'][s][1]for s in slots)
+    assert closure['controlled-base']==closure['controlled-candidate']==sorted(get(ar,'t',archives['base']).splitlines()),closure
+    ends=stamps['controlled-base']['slots'];diff={k:v-stamps['controlled-candidate']['slots'][k]for k,v in ends.items()if v!=stamps['controlled-candidate']['slots'][k]}
+    assert not diff,diff
+    for k,p in anchors.items():assert controlled[k][0]==stamps['controlled-candidate']['sections'][k][0]==p
+    save('archive-closure',dict(members=closure,anchors=anchors,script=sig(script),new=sorted(set(closure['regular-candidate'])-set(closure['regular-base'])),removed=sorted(set(closure['regular-base'])-set(closure['regular-candidate']))))
     save('layout',dict(objects=ch,syms=stamps,driver_sha=sig(w/'driver.cpp'),script=sig(script),source=m))
     length=max(map(len,bins.values()));bins={k:v.ljust(length,b'\0')for k,v in bins.items()}
     for kind in ['regular','controlled']:bins[kind+'-duplicate']=bins[kind+'-base']
