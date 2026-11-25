@@ -1,7 +1,7 @@
-name: Time the Linux mixed public decoder call target against iced and verify complete records
+name: Benchmark direct architecture selection and a handle-selected record reader against conventional and fast iced formatters
 on:
   push:
-    branches: [codex/public-fixed-reader-relocation]
+    branches: [codex/public-caller-and-handle-record-reader]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-terminal-call-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-caller-handle-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

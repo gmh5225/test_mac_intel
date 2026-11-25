@@ -86,20 +86,22 @@ index 06cc61ae..6e690fbe 100644
  
  #if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..3574575d 100644
+index 197453cb..19bc5f63 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3753,7 +3753,9 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  					  cs_insn *insn, uint16_t *insn_size,
  					  bool batch);
  
 -#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_PUBLIC_OUTPUT)
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_OUTPUT
++#define CS_DECODE_MIXED_PUBLIC
++#elif defined(CAPSTONE_X86_PUBLIC_OUTPUT)
  #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
  #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
  #define CS_PUBLIC_FIXED_RECORD
 diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
-index 732c4004..c5a4c0f9 100644
+index 732c4004..7b38a3d7 100644
 --- a/arch/X86/X86PublicOutput.c
 +++ b/arch/X86/X86PublicOutput.c
 @@ -4,7 +4,7 @@
@@ -111,20 +113,8 @@ index 732c4004..c5a4c0f9 100644
  #if defined(__ELF__) && defined(__clang__)
  #pragma clang section text = ".cs_x86_public_output_text"
  #endif
-@@ -13,6 +13,11 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
- 					    cs_insn *insn, uint16_t *length,
- 					    bool batch)
- {
-+#ifdef CAPSTONE_X86_MIXED_PUBLIC_OUTPUT
-+	if (handle->arch != CS_ARCH_X86)
-+		return cs_decode_full_insn(handle, code, size, insn, length,
-+					   batch);
-+#endif
- 	/* The caller owns skipdata callbacks, bulk boundaries and the public
- 	 * cursors. A fixed iterator can fill this one record using local cursors. */
- 	if (!batch && !handle->skipdata && !handle->no_text &&
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 4c4c34f2..b3027d0d 100644
+index 4c4c34f2..4b3b7a3e 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -18,7 +18,7 @@
@@ -136,3 +126,19 @@ index 4c4c34f2..b3027d0d 100644
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
  		       cs_insn *insn, uint16_t *insn_size, bool batch);
+@@ -186,7 +186,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
+-#ifdef CS_DECODE_OUTPUT_MISS
++#ifdef CS_DECODE_MIXED_PUBLIC
++	/* The scan predicate already selects this architecture in the public
++	 * iterator. Foreign records can enter their existing decoder directly. */
++	if (handle->arch == CS_ARCH_X86)
++		return X86_decodePublicRecord(handle, code, size, insn, insn_size,
++					     batch);
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++#elif defined(CS_DECODE_OUTPUT_MISS)
+ 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
+ #elif defined(CS_PUBLIC_FIXED_RECORD)
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size,
