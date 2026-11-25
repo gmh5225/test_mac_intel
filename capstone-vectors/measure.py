@@ -79,7 +79,7 @@ try:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             import struct
-            maps=[]
+            alias_maps=[]
             for sym in elf.get_section_by_name('.symtab').iter_symbols():
                 if 'insn_alias_mnem_map' not in sym.name or sym['st_info']['type']!='STT_OBJECT' or sym['st_size']<16:continue
                 sec=elf.get_section(sym['st_shndx']);offset=sym['st_value']-sec['sh_addr'];raw=sec.data()[offset:offset+sym['st_size']]
@@ -87,9 +87,9 @@ try:
                 pointers=[struct.unpack_from('<Q',raw,off)[0] for off in range(8,len(raw),16)]
                 if not pointers or not start<=pointers[0]<start+len(const) or not const.startswith(b'rfebb\0',pointers[0]-start):continue
                 assert len(raw)%16==0
-                maps.append(dict(address=sym['st_value'],size=sym['st_size'],pointer_sha=hashlib.sha256(b''.join(struct.pack('<Q',x)for x in pointers)).hexdigest(),ids=[struct.unpack_from('<I',raw,off)[0] for off in range(0,len(raw),16)]))
-            assert len(maps)==1,(label,len(maps))
-            save('name-map-'+label,maps[0])
+                alias_maps.append(dict(address=sym['st_value'],size=sym['st_size'],pointer_sha=hashlib.sha256(b''.join(struct.pack('<Q',x)for x in pointers)).hexdigest(),ids=[struct.unpack_from('<I',raw,off)[0] for off in range(0,len(raw),16)]))
+            assert len(alias_maps)==1,(label,len(alias_maps))
+            save('name-map-'+label,alias_maps[0])
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
