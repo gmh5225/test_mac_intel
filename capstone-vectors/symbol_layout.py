@@ -8,6 +8,8 @@ def symbols(path):
         'X86_decodeRegisterFallback32', 'X86_decodeOutputMiss32',
         'X86_scanNativeBatch', 'X86_reg_access', 'X86_writeSimpleDetail',
         'X86_writeVectorOutput',
+        'map_set_alias_id_trie', 'map_set_alias_id_trie_impl', 'PPC_printer',
+        'PPC_getInstruction', 'map_set_mips_alias_id', 'map_set_aarch64_alias_id',
     )
     result = {}
     with path.open('rb') as source:
