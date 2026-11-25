@@ -1,7 +1,7 @@
-name: Check PowerPC aliases and Intel register spellings across Windows, Linux and macOS
+name: Validate ordered PowerPC lookup and bounded register copies across build configurations
 on:
   push:
-    branches: [codex/ppc-and-register-spelling-profiles]
+    branches: [codex/ordered-powerpc-and-terminated-register-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: ppc-x86-spellings-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: ordered-ppc-x86-bounds-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
