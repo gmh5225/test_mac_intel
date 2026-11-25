@@ -1,7 +1,7 @@
-name: Validate 16-bit register and branch writers across Capstone build profiles
+name: Qualify the fixed-iterator 16-bit writer in standalone, shared, and mixed Capstone configurations
 on:
   push:
-    branches: [codex/real-mode-branch-register-build-profiles]
+    branches: [codex/real-mode-fixed-fallback-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: real-branch-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: fixed-branch-profile-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
