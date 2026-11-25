@@ -29,6 +29,13 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
         step=max(1,(len(cases)+31)//32)
         source.extend(b''.join(cases[::step]))
     assert len(source)>1000
+    # Also visit source/destination reversals, the three AT&T-only mnemonic suffixes,
+    # upper vector registers, RIP-relative and stack addresses, and VEX forms without ModR/M.
+    source.extend(bytes.fromhex('c5 f8 77 c5 fc 77 c5 f9 5a 00 c5 f9 e6 04 24 c5 fb e6 4d 80'))
+    for flags in (0x78,0x79,0x7a,0x7b,0x7c,0x7d,0xf8,0xf9,0xfa,0xfb,0xfc,0xfd):
+        for opcode in (0x10,0x11,0x28,0x29,0x51,0x5a,0x5b,0x6f,0x7f,0xe6):
+            source.extend(bytes([0xc5,flags,opcode,0x44,0x24,0x80,0xc5,flags,opcode,0x05,0x12,0x34,0x56,0x80]))
+
     sample=temp/'curated-x86.bin';sample.write_bytes(source)
     modes=[(0,0,0),(0,1,0)]
     if profile!='diet':modes.append((0,1,1))

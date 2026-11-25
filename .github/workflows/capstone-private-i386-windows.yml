@@ -1,7 +1,7 @@
-name: Check decoded operand kinds and effective-address output across nineteen build configurations
+name: Verify VEX and SSE formatter records, conversions and vector clears across nineteen x86 and PowerPC configurations
 on:
   push:
-    branches: [codex/x86-operand-kinds-configurations]
+    branches: [codex/x86-vex-dialect-cross-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 571a1592ff48d148257b7ae1146d2fb593470783
+          ref: 994ce74539381ccfe41411455924c8933825d004
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: canonical-operand-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: vex-dialect-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
