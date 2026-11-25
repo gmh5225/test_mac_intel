@@ -1,7 +1,7 @@
-name: Attribute scan formatting and detail costs in five Capstone architecture backends
+name: Count live formatter calls and literal tokens in five architecture backends without changing the output
 on:
   push:
-    branches: [codex/other-isa-formatter-costs]
+    branches: [codex/architecture-printf-callers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c6df2f25c9189936a7b57ee8a01d123be11aba68
+          ref: 8a2ccbbe12cab2cf86f117285387d8cf976cc30f
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: other-isa-formatter-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: architecture-format-owners-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
