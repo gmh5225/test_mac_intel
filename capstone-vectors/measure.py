@@ -52,6 +52,15 @@ try:
         if tag=='base':base_objects=objects
         changed=sorted(obj for obj in objects if objects[obj]!=base_objects[obj])
         assert objects.keys()==base_objects.keys() and all(obj.startswith('RISCV') for obj in changed),(tag,changed)
+        section='.cs_riscv_printer_text'
+        if tag in ('printer','fields'):
+            addr,len_=sections[section]
+            sym=symbols_['RISCV_LLVM_printInstruction']
+            assert addr<=sym[0] and sym[0]+sym[1]<=addr+len_,(tag,section,sym)
+            settings['riscv_printer_functions']=sorted(n for n,(start,size,digest)in symbols_.items() if addr<=start<addr+len_)
+            assert settings['riscv_printer_functions']
+        else:
+            assert section not in sections,(tag,section)
         settings['changed_objects']=changed
         hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_ATT_printInst','X86_Intel_printInst','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction']
         layout[tag]=dict(members=members,settings=settings,hot={n:symbols_[n]for n in hot},sections=sections,sha256=sig(binary))

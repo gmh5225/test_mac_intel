@@ -1,7 +1,7 @@
-name: Measure reuse of the canonical RISC-V register string pool on real ELF and PE programs with ordinary static linking
+name: Measure normal ELF static links with RISC-V printer code grouped at its source on PE32, PE64 and five architectures
 on:
   push:
-    branches: [codex/riscv-canonical-register-pool]
+    branches: [codex/riscv-ordinary-printer-code-placement]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rv-canonical-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rv-code-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
