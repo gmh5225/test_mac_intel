@@ -4,7 +4,9 @@ from pathlib import Path
 def snapshots(src, bench, build, temp, profile, label, run, linkage):
     shared=linkage=='shared'
     if os.name=='nt':
-        library=build/('capstone.lib' if shared else 'capstone_static.lib')
+        cache=(build/'CMakeCache.txt').read_text()
+        dual='CAPSTONE_BUILD_SHARED_LIBS:BOOL=ON' in cache
+        library=build/('capstone_static.lib' if not shared and dual else 'capstone.lib')
         exe=(build if shared else temp)/'snapshot.exe'
     else:
         import sys

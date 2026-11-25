@@ -33,6 +33,7 @@ try:
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
     for name,tree in [('base',None),*q['variants'].items()]:
+        if name not in ('base','request','mode') and not (platform.system()=='Windows' and profile in ('full','noatt')):continue
         if tree:
             git('restore','--staged','--worktree','--source=HEAD','--','.')
             patch=t/(name+'.patch')
@@ -71,7 +72,7 @@ try:
                 cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
                 assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
                 assert ('-DCAPSTONE_X86_ITERATOR_READERS' in cs['command'])==False
-                assert ('CAPSTONE_MIXED_X86_MODE_READERS' in cs['command'])==False,(name,profile,folder)
+                assert ('CAPSTONE_MIXED_X86_MODE_READERS' in cs['command'])==(name in ('fixed','request','mode') and folder==solo and not mac),(name,profile,folder)
 
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
@@ -83,7 +84,7 @@ try:
             commands=(e/(name+'-make-build.log')).read_text()
             for flag in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'):
                 assert ('-D'+flag in commands)==False,(name,flag)
-            assert ('-DCAPSTONE_MIXED_X86_MODE_READERS' in commands)==(name=='fixed')
+            assert ('-DCAPSTONE_MIXED_X86_MODE_READERS' in commands)==(name in ('fixed','request','mode'))
             lib,=[f for f in obj.rglob('libcapstone.a') if not f.is_symlink()]
             result=snapshots(s,p,lib.parent,t,profile,name+'-make',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']

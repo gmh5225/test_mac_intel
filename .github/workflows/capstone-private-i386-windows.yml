@@ -1,7 +1,7 @@
-name: Verify high moffs addresses across Windows Linux macOS static shared and reduced configurations
+name: Validate mixed mode record dispatch and finish MSVC static-only checks for the unsigned MOV address and both reader designs
 on:
   push:
-    branches: [codex/moffs-address-width-static-shared-ports]
+    branches: [codex/verify-existing-arch-request-and-msvc-archive]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: moffs-address-width-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: mixed-record-and-archive-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
