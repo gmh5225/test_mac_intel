@@ -1,67 +1,78 @@
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..bf248e97 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -27,6 +27,12 @@
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..549cf0f0 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -95,7 +95,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const bool alu = opcode < 0x40;
+ 			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
+ 						 (opcode & 0xfc) == 0x88;
+-#ifdef X86_MEMORY32_OUTPUT
++#if defined(X86_MEMORY32_OUTPUT) || defined(X86_FIXED_INDIRECT_MEMORY64)
+ 			const unsigned group = (modrm >> 3) & 7;
+ 			const bool single =
+ 				opcode == 0xff &&
+@@ -169,6 +169,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return X86_MEMORY32_OUTPUT(code, size, insn, insn_size, row,
+ 					   x86_simple_registers);
+ #else
++#ifdef X86_FIXED_INDIRECT_MEMORY64
++		if (opcode == 0xff && (modrm & 0x38) != 0x30)
++			row = &x86_indirect64[has_rex][(modrm & 0x20) != 0];
++#endif
+ 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+ 					     x86_simple_registers);
  #endif
- 
- #include "X86GenSimpleOutput.inc"
-+#include "X86GenIndirect64Output.inc"
-+#define X86_MEMORY_IMMEDIATE writeGroupByteImmediate64
-+#define X86_IMMEDIATE_WIDE 1
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_IMMEDIATE_WIDE
-+#undef X86_MEMORY_IMMEDIATE
- #ifdef CAPSTONE_X86_ONLY
- #include "X86VexBaseMemory.h"
- #endif
-@@ -152,6 +158,40 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 7afca7e4..9c030a99 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -62,8 +62,8 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
  }
+ 
+-#ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
+ #include "X86GenIndirect64Output.inc"
++#ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
+ 
+ /* FF /2 and /4 have one explicit 64-bit target. The register and memory
+  * forms share their generated access, implicit register and group records. */
+@@ -91,6 +91,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
+ }
+ 
+ #define X86_FIXED_INDIRECT writeIndirect64
++#else
++#define X86_FIXED_INDIRECT_MEMORY64
  #endif
  
-+/* CMP and TEST with imm8, and near indirect CALL/JMP, share the address
-+ * reader. The opcode extension selects a generated operand and effects row. */
-+static bool writeGroupMemory64(cs_struct *handle, const uint8_t *code,
-+			       size_t size, cs_insn *insn, uint16_t *length)
-+{
-+	/* A set bit identifies an opcode extension with a single memory
-+	 * address that the shared writers can consume. */
-+	static const uint8_t groups[256] = {
-+		[0x80] = 1u << 7, [0xf6] = 1u, [0xff] = (1u << 2) | (1u << 4),
-+	};
-+	const unsigned lead = (code[0] & 0xf0) == 0x40;
-+	if (size <= lead)
-+		return false;
-+	const uint8_t opcode = code[lead];
-+	const unsigned allowed = groups[opcode];
-+	if (!allowed || size < lead + 2)
-+		return false;
-+	const uint8_t mr = code[lead + 1];
-+	const unsigned group = (mr >> 3) & 7;
-+	if (mr >= 0xc0 || !(allowed & (1u << group)))
-+		return false;
-+	if (X86_OUTPUT_UNSUPPORTED(handle, false))
-+		return false;
-+	if (opcode == 0xff)
-+		return X86_writeMemoryOutput(code, size, insn, length,
-+					     &x86_indirect64[lead][group == 4],
-+					     x86_simple_registers);
-+	const unsigned bank = lead ? 1 + ((code[0] >> 3) & 1) : 0;
-+	const unsigned form = opcode == 0xf6 ? 0x84 : 0x38;
-+	const unsigned row = x86_simple_plans[1][bank][form] >> 2;
-+	return writeGroupByteImmediate64(code, size, insn, length,
-+					 &x86_simple_outputs[row], x86_simple_registers);
-+}
-+
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -241,6 +281,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ /* Only the bare VEX2 opcode plan enters here. Packed base-relative
+@@ -159,15 +161,22 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
  	}
- #endif
- fallback:
-+	if (writeGroupMemory64(handle, code, size, insn, insn_size))
-+		return true;
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
- 	defined(__x86_64__)
- 	/* The fixed AMD64 decoder has just tried the shared output plans.
+ 	if (primary != 0x0f) {
+ 		const uint8_t mr = code[has_rex + 1];
+-		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+-		    X86_OUTPUT_UNSUPPORTED(handle, false))
++		if (mr >= 0xc0)
++			return false;
++		const unsigned extension = mr & 0x38;
++		unsigned form;
++		if ((primary & 0xfe) == 0xc6 && extension == 0)
++			form = 0x88 | (primary & 1); /* MOV */
++		else if (primary == 0x80 && extension == 0x38)
++			form = 0x38; /* CMP r/m8, imm8 */
++		else if (primary == 0xf6 && extension == 0)
++			form = 0x84; /* TEST r/m8, imm8 */
++		else
++			return false;
++		if (X86_OUTPUT_UNSUPPORTED(handle, false))
+ 			return false;
+-		const unsigned prefix_class =
+-			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
+-		/* The MOV store row carries its operand width and access. */
+-		const unsigned row = x86_simple_plans[1][prefix_class]
+-						     [0x88 | (primary & 1)] >>
+-				     2;
++		const unsigned bank = has_rex ? 1 + ((rex_byte >> 3) & 1) : 0;
++		const unsigned row = x86_simple_plans[1][bank][form] >> 2;
+ 		return writeMemoryImmediate64(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
+ 					      x86_simple_registers);

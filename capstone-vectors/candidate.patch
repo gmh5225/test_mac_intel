@@ -1,64 +1,35 @@
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..138738a6 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -27,6 +27,12 @@
- #endif
- 
- #include "X86GenSimpleOutput.inc"
-+#include "X86GenIndirect64Output.inc"
-+#define X86_MEMORY_IMMEDIATE writeGroupByteImmediate64
-+#define X86_IMMEDIATE_WIDE 1
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_IMMEDIATE_WIDE
-+#undef X86_MEMORY_IMMEDIATE
- #ifdef CAPSTONE_X86_ONLY
- #include "X86VexBaseMemory.h"
- #endif
-@@ -152,6 +158,37 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
- }
- #endif
- 
-+/* CMP and TEST with imm8, and near indirect CALL/JMP, share the address
-+ * reader. The opcode extension selects a generated operand and effects row. */
-+static bool writeGroupMemory64(cs_struct *handle, const uint8_t *code,
-+			       size_t size, cs_insn *insn, uint16_t *length)
-+{
-+	const unsigned lead = (code[0] & 0xf0) == 0x40;
-+	if (size <= lead)
-+		return false;
-+	const uint8_t opcode = code[lead];
-+	if ((opcode != 0x80 && opcode != 0xf6 && opcode != 0xff) ||
-+	    size < lead + 2)
-+		return false;
-+	const uint8_t mr = code[lead + 1];
-+	const unsigned group = (mr >> 3) & 7;
-+	if (mr >= 0xc0 || (opcode == 0x80 && group != 7) ||
-+	    (opcode == 0xf6 && group != 0) ||
-+	    (opcode == 0xff && group != 2 && group != 4))
-+		return false;
-+	if (X86_OUTPUT_UNSUPPORTED(handle, false))
-+		return false;
-+	if (opcode == 0xff)
-+		return X86_writeMemoryOutput(code, size, insn, length,
-+					     &x86_indirect64[lead][group == 4],
-+					     x86_simple_registers);
-+	const unsigned bank = lead ? 1 + ((code[0] >> 3) & 1) : 0;
-+	const unsigned form = opcode == 0xf6 ? 0x84 : 0x38;
-+	const unsigned row = x86_simple_plans[1][bank][form] >> 2;
-+	return writeGroupByteImmediate64(code, size, insn, length,
-+					 &x86_simple_outputs[row], x86_simple_registers);
-+}
-+
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -241,6 +278,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 7afca7e4..3a4a8ffa 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -159,15 +159,22 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
  	}
- #endif
- fallback:
-+	if (writeGroupMemory64(handle, code, size, insn, insn_size))
-+		return true;
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
- 	defined(__x86_64__)
- 	/* The fixed AMD64 decoder has just tried the shared output plans.
+ 	if (primary != 0x0f) {
+ 		const uint8_t mr = code[has_rex + 1];
+-		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+-		    X86_OUTPUT_UNSUPPORTED(handle, false))
++		if (mr >= 0xc0)
+ 			return false;
+-		const unsigned prefix_class =
+-			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
+-		/* The MOV store row carries its operand width and access. */
+-		const unsigned row = x86_simple_plans[1][prefix_class]
+-						     [0x88 | (primary & 1)] >>
+-				     2;
++		const unsigned extension = mr & 0x38;
++		unsigned form;
++		if ((primary & 0xfe) == 0xc6 && extension == 0)
++			form = 0x88 | (primary & 1); /* MOV */
++		else if (primary == 0x80 && extension == 0x38)
++			form = 0x38; /* CMP r/m8, imm8 */
++		else if (primary == 0xf6 && extension == 0)
++			form = 0x84; /* TEST r/m8, imm8 */
++		else
++			return false;
++		if (X86_OUTPUT_UNSUPPORTED(handle, false))
++			return false;
++		const unsigned bank = has_rex ? 1 + ((rex_byte >> 3) & 1) : 0;
++		const unsigned row = x86_simple_plans[1][bank][form] >> 2;
+ 		return writeMemoryImmediate64(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
+ 					      x86_simple_registers);
