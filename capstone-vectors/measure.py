@@ -7,6 +7,7 @@ def save(name,value):
     f=e/(name+'.json');temp=f.with_suffix('.tmp');temp.write_text(json.dumps(value,indent=2)+'\n');temp.replace(f)
 def get(*args,**kwargs):return sp.check_output(args,text=True,**kwargs)
 def run(*args,**kwargs):sp.run(args,check=True,**kwargs)
+def once(s,a,b):assert s.count(a)==1,(a,s.count(a));return s.replace(a,b)
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 def interval(values):
     x=sorted(values);n=len(x)
@@ -30,12 +31,25 @@ try:
     ad.mkdir()
     for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
+    f=ad/'iced.rs';v=f.read_text()
+    start=v.index('                result.values = result.values.wrapping_add(\n                    state.text.len()')
+    end=v.index('                );',start)+len('                );')
+    original=v[start:end]
+    v=v[:start]+'''                if state.mode & 7 == 5 {
+                    std::hint::black_box(state.text.as_bytes());
+                } else {
+'''+original+'''
+                }'''+v[end:]
+    v=once(v,'if (state.mode & 7) >= 2 {','if (state.mode & 7) >= 2 && (state.mode & 7) != 5 {')
+    f.write_text(v)
+    f=w/'driver.cpp';v=once((r/'driver.cpp').read_text(),'if (mode>4 || !reps)','if (mode>5 || !reps)')
+    v=once(v,'mode>=2 ? CS_OPT_ON','mode>=2 && mode!=5 ? CS_OPT_ON')
+    v=once(v,'      if (mode) {','''      if (mode == 5) {
+        asm volatile("" : : "r"(insn->mnemonic), "r"(insn->op_str) : "memory");
+      } else if (mode) {''')
+    f.write_text(v)
     run('cargo','build','--release','--locked',cwd=ad)
     ice_lib=ad/'target/release/libiced_compare.a'
-    driver=(r/'driver.cpp').read_text();marker='Result timed=run(reps);'
-    assert driver.count(marker)==1
-    wrapped='#include <valgrind/callgrind.h>\n'+driver.replace(marker,'CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT; '+marker+' CALLGRIND_TOGGLE_COLLECT;')
-    (w/'driver.cpp').write_text(wrapped)
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
@@ -43,9 +57,9 @@ try:
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'base')
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     audits={}; wanted={'putty-32-0.85','libmvec-amd64','jpeg-avx2-i386'}
-    results=[]
-    from costs import profile
-    save('build',dict(capstone=q,neverd=dev,iced=m['iced_revision'],lib=sha(lib),exe=sha(w/'base'),host=platform.machine(),driver=sha(w/'driver.cpp'),inputs=m['drivers']))
+    report={}
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    save('build',dict(capstone=q,neverd=dev,iced=m['iced_revision'],lib=sha(lib),exe=sha(w/'base'),host=platform.machine(),driver=sha(w/'driver.cpp'),adapter=sha(ad/'iced.rs'),inputs=m['drivers']))
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
@@ -66,18 +80,26 @@ try:
         assert len(traces)==len(selected) and all(x[3]==x[4] and x[1]==x[5]for x in traces)
         audits[name]=dict(extents=len(selected),boundaries=sum(x[3]for x in traces),extent_sha256=sha(path),text_sha256=sha(f))
         save('audit',audits)
-        for mode in (1,2,4):
-            engines=('capstone','private','fast') if mode!=4 else ('private',)
-            same=None
-            for engine in engines:
-                row=profile(w/'base',engine,mode,bits,f,path,w,e,name)
-                signature=row['raw_signature'][:3];assert same is None or signature==same
-                same=signature
-                reference=list(map(int,get(w/'base',engine,str(mode),'1',f,path,str(bits)).split()))[2:]
-                assert reference==row['raw_signature'] and reference[0]+reference[1]==audits[name]['boundaries']
-                results.append(row)
-            save('profile',results)
-    assert set(audits)==wanted and len(results)==21
-    save('complete',dict(complete=True,cases=len(results),inputs=audits,dev=dev,capstone=q,iced=m['iced_revision']))
+        labels=('private/1','private/5','fast/1','fast/5')
+        def read(label,reps):return list(map(int,get('setarch',os.uname().machine,'-R',w/'base',*label.split('/'),str(reps),f,path,str(bits)).split()))
+        calibration={label:read(label,1)for label in labels}
+        assert len({tuple(z[2:5])for z in calibration.values()})==1 and calibration['private/1'][2]>0
+        reps=max(1,min(math.ceil(40e6/z[0])for z in calibration.values()))
+        expected={label:read(label,reps)[2:] for label in labels}
+        assert len({tuple(z[:3])for z in expected.values()})==1
+        assert all(expected[e+'/5'][3]<expected[e+'/1'][3]for e in ('private','fast'))
+        order=list(labels);rng=random.Random('consumer-'+name);cycles=[]
+        for block in range(17):
+            rng.shuffle(order);data={label:[] for label in labels}
+            for label in order+order[::-1]:
+                z=read(label,reps);assert z[2:]==expected[label];data[label].append(z[:2])
+            cycles.append({k:[x+y for x,y in zip(*v)] for k,v in data.items()})
+        def compare(a,b):
+            values=[sorted(row[a][i]/row[b][i]for row in cycles) for i in (0,1)]
+            return {clock:[statistics.median(v),v[4],v[-5]] for clock,v in zip(('cpu','wall'),values)}
+        report[name]=dict(reps=reps,extent_sha256=sha(path),text_sha256=sha(f),expected=expected,ordinary_ratio=compare('fast/1','private/1'),materialized_ratio=compare('fast/5','private/5'),private_consumption=compare('private/1','private/5'),iced_consumption=compare('fast/1','fast/5'),cycles=cycles)
+        save('results',report);print(name,report[name]['ordinary_ratio'],report[name]['materialized_ratio'],flush=True)
+    assert len(report)==3
+    save('complete',dict(complete=True,dev=dev,source=q,iced=m['iced_revision'],inputs=list(report),pairs=17,method='The same executable processes each span twice in a randomized forward/reverse list with both checksum policies and both engines. Mode 5 still invokes the formatter and passes full output to a compiler barrier. This is a consumer-cost diagnostic only.'))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
