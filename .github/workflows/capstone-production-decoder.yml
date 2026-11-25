@@ -1,7 +1,7 @@
-name: Compare ARM formatter helper ownership in full NeverD with current source-built LLVM
+name: Measure ARM literal call targets and linked symbol addresses in NeverD with source-built LLVM
 on:
   push:
-    branches: [codex/shared-arm-literals-complete-product]
+    branches: [codex/arm-character-target-layout-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: ce00fc089a123d4149a1a39e458a6a81b9778a5b
+          ref: b20891634f83e245f43ab87e15cdf47800d5d4bb
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "ce00fc089a123d4149a1a39e458a6a81b9778a5b"
+          test "$(git rev-parse HEAD)" = "b20891634f83e245f43ab87e15cdf47800d5d4bb"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "571a1592ff48d148257b7ae1146d2fb593470783"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 571a1592ff48d148257b7ae1146d2fb593470783
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-arm-literal-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: arm-call-layout-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

@@ -22,20 +22,46 @@ index 99eb30fe..48239585 100644
  # Use the compiler target, including cross builds.
  MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
  	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index af2bc19c..ecff7b09 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -2406,4 +2406,20 @@ void ARM_set_detail_op_float(MCInst *MI, unsigned OpNum, uint64_t Imm)
+ 	ARM_inc_op_count(MI);
+ }
+ 
++#ifdef ARM_FORMATTED_CHAR_CALL
++/* The printer supplies "%s" and one NUL-terminated, single-character
++ * string at every call. A custom formatter receives these same arguments. */
++void ARM_formatChar(SStream *O, const char *fmt, ...)
++{
++	va_list args;
++	va_start(args, fmt);
++	const char *literal = va_arg(args, const char *);
++	va_end(args);
++	if (cs_vsnprintf == cs_default_vsnprintf)
++		SStream_concat1(O, literal[0]);
++	else
++		SStream_concat(O, fmt, literal);
++}
++#endif
++
+ #endif
 diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
-index d6833e63..c00c3b59 100644
+index d6833e63..66d2fa9c 100644
 --- a/arch/ARM/ARMMapping.h
 +++ b/arch/ARM/ARMMapping.h
-@@ -27,7 +27,11 @@ const char *ARM_reg_name(csh handle, unsigned int reg);
- #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE) && defined(__linux__) && defined(__clang__) && \
--	(defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__)))
-+	((defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__))) || \
-+	 (defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && defined(__x86_64__)))
-+#if defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
-+__attribute__((noinline))
-+#endif
- static inline void ARM_printFormattedChar(SStream *O, const char *literal)
- {
- 	if (cs_vsnprintf == cs_default_vsnprintf) {
+@@ -36,6 +36,13 @@ static inline void ARM_printFormattedChar(SStream *O, const char *literal)
+ 	}
+ 	SStream_concat(O, "%s", literal);
+ }
++#elif defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && !defined(CAPSTONE_DIET) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE) && defined(__linux__) && \
++	defined(__clang__) && defined(__x86_64__)
++#define ARM_FORMATTED_CHAR_CALL
++CAPSTONE_INTERNAL void ARM_formatChar(SStream *O, const char *fmt, ...);
++#define ARM_printFormattedChar(O, literal) ARM_formatChar((O), "%s", (const char *)(literal))
+ #else
+ #define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
+ #endif
