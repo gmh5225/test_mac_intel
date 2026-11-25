@@ -42,7 +42,7 @@ try:
     assert q['commit']==m['checkout_commit'] and q['tree']==m['checkout_tree']
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'base')
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    audits={}; wanted={'putty-32-0.85','libmvec-amd64','jpeg-avx2-i386'}
+    audits={}; wanted={'libmvec-amd64'}
     from costs import profile
     from stage import recipe_values,variants
     source=rd(r/'merged.json');assert q['commit']==source['parent'] and sha(r/'candidate.patch')==source['sha256']
@@ -87,11 +87,13 @@ try:
                     v=visit(tag,reps);assert v[2:]==expected;times[tag].append(v[:2])
                 cycles.append({t:[sum(v[i] for v in pairs)for i in (0,1)]for t,pairs in times.items()})
             rows[name+'/'+str(mode)]=dict(cycles=cycles,signature=expected,repeats=reps);save('observations',rows)
-            for tag in ('base','on','off'):
-                z=profile(w/tag,'private',mode,bits,f,path,w,e,name+'-'+tag)
-                assert z['raw_signature']==visit(tag,1)[2:]
-                profiles.append(z);save('profiles',profiles)
-    assert len(rows)==6 and len(profiles)==18 and set(audits)==wanted
-    save('complete',dict(complete=True,source=q,merged=source,cases=len(rows),profiles=len(profiles),neverd=dev,inputs=audits))
+            from probe import hardware,record
+            with hardware(r,w,save) as (groups,measure):
+                if 'work' in groups:
+                    summary=record(groups,measure,w,path_used,select,visit,f,path,bits,mode,reps,save)
+                    assert set(summary)==set(groups)
+    assert len(rows)==2 and set(audits)==wanted
+    save('complete',dict(complete=True,source=q,merged=source,cases=len(rows),neverd=dev,inputs=audits))
+
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

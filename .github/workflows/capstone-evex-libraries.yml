@@ -1,7 +1,7 @@
-name: Isolate mnemonic boundary data in identical printer machine code
+name: Measure libmvec printer table integration with gated hardware counters on identical code
 on:
   push:
-    branches: [codex/isolate-printer-record-hints]
+    branches: [codex/combined-printer-core-counters]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, replica: 3 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -48,7 +50,7 @@ jobs:
       - name: Build from source and time only verified common function boundaries
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y valgrind
+          sudo apt-get install -y valgrind linux-tools-generic
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -57,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: merged-table-data-only-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: merged-table-hardware-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
