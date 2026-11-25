@@ -63,9 +63,10 @@ try:
         table=base/'arch/X86/X86GenSse64RegisterOutput.inc'
         assert generated==table.read_bytes()
         if label=='base':projections={}
-        projections[label]=dict(sha256=sha(table),rows=sum(row.startswith(b'\t{')for row in generated.splitlines()),cmov=generated.count(b'"cmov'))
-        assert projections[label]['rows']==80 and projections[label]['cmov']==(0 if label=='base' else 16),projections
-        save('generated-register-rows',projections)
+        run('clang++','-std=c++17','-I',base,'-I',base/'include',r/'layout.cpp','-o',w/'layout')
+        projections[label]=dict(fields=list(map(int,get(w/'layout').split())),sha256=sha(table),rows=generated.count(b'UINT64_C('))
+        assert projections[label]==rd(r/'expected-layout.json')[label],projections
+        save('generated-record-layout',projections)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
@@ -130,7 +131,9 @@ try:
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
     host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
-    for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
+    fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
+    assert {row[0]for row in fixtures}==set(m["samples"])
+    for name,bits,f,spans,_ in fixtures:
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]

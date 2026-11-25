@@ -1,7 +1,7 @@
-name: Measure scalar conditional moves in the existing AMD64 register map on PE and ELF
+name: Measure the actual 88, 72 and 64 byte register and memory row layouts against iced on identical ELF and PE ranges
 on:
   push:
-    branches: [codex/shared-register-map-cmov]
+    branches: [codex/x86-compact-scalar-record-layout]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
+          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c6df2f25c9189936a7b57ee8a01d123be11aba68
+          ref: b2bd96f85c2af066d091d5b5042f1ca031daa265
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-cmov-map-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: compact-scalar-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
