@@ -45,7 +45,11 @@ try:
         run('clang++','-O2','-std=c++17','-I',base/'include',r/('trial-'+stem+'.cpp'),'-ldl','-o',w/('trial-'+stem))
     from training import fetch
     from foreign_time import measure as time_foreign
-    foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
+    all_rows=fetch(r,w);foreign_rows=[x for x in all_rows if x['use']!='extra-mips']
+    mips_rows=[x for x in all_rows if x['arch']=='mips64el']
+    assert len(mips_rows)==4
+    save('foreign-corpus',foreign_rows);save('mips-corpus',mips_rows)
+    streams={}
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -65,6 +69,13 @@ try:
         projections[label]=sha(table)
         assert len(set(projections.values()))==1
         save('generated-plans',projections)
+        if label!='base':
+            code=(base/'arch/Mips/MipsInstPrinter.c').read_text();a=code.index('static void printAliasMnemonic(');b=code.index('static bool printAlias(',a)
+            add=', strlen(s)' if label=='outlined' else ''
+            (w/'alias-writer.inc').write_text(code[a:b].split('#define MIPS_ALIAS_NAME(')[0]+'#define MEASURE_WRITE(ss,s) printAliasMnemonic((ss),(s)'+add+')'+chr(10))
+            run('clang','-O2','-std=gnu99','-DCAPSTONE_USE_SYS_DYN_MEM','-I',w,'-I',base,'-I',base/'include',r/'stream-guard.c',lib,'-o',w/'stream-guard')
+            streams[label]=int(get(w/'stream-guard'));assert streams[label]==458752
+            save('stream-domain',streams)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
@@ -114,6 +125,10 @@ try:
         proof[label]=list(map(int,get(w/'prefix-guard',w/'base.so',w/(label+'.so')).split()))
         assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
     assert proof['outlined']==proof['candidate'];save('prefix-guard',proof)
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'mips-domain.cpp','-ldl','-o',w/'mips-domain')
+    domain={k:json.loads(get(w/'mips-domain',w/'base.so',w/(k+'.so'))) for k in ('candidate','outlined')}
+    assert domain['candidate']==domain['outlined'] and domain['candidate']['trials']==5242880 and 0<domain['candidate']['accepted']<5242880
+    save('mips-domain',domain)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
@@ -192,6 +207,8 @@ try:
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
     time_foreign(foreign_rows,w,save)
+    from extra_mips_time import measure as time_mips
+    time_mips(mips_rows,w,lambda name,data:save('extra-mips-'+name,data))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
