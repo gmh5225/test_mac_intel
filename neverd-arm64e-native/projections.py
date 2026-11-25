@@ -28,6 +28,31 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def host_profiles(policy):
+    x1 = CONFIG["x1_runner"]
+    catalog = Path(__file__).with_name(CONFIG["host_catalog"])
+    runners = json.loads(catalog.read_bytes())["runners"] if "ordered" in policy else [x1]
+    return [{"runner": runner, "artifact": CONFIG["x1_artifact"] if runner == x1 else
+             CONFIG["ordered_artifact"].format(runner=runner)} for runner in runners]
+
+
+def confirm_unavailable_compiler(native, control_dir, controls, report):
+    mode = native["x1_cursor_probe"]["mode"]
+    receipt = controls["probes"][mode]
+    cursor_path = control_dir / mode / native["report_name"]
+    cursor = json.loads(cursor_path.read_bytes())
+    policy = native["cursor_probe"]
+    labels = {policy["profile_label"].format(optimization=opt, recipe=recipe)
+              for opt in policy["optimizations"] for recipe in policy["recipes"]}
+    rows = cursor["profiles"]
+    unavailable = native["cpta_probe"]["slice_unavailable"]
+    if (cursor["source_revision"] != controls["source_revision"] or receipt["sha256"] != digest(cursor_path) or
+            report["cursor_sha256"] != receipt["sha256"] or cursor["status"] != native["unavailable"] or
+            set(rows) != labels or any(row.get("outcome") != unavailable or row["status"] != native["unavailable"] or
+                                       "sha256" in row for row in rows.values())):
+        raise ValueError(CONFIG["link_error"])
+
+
 def check_ordered(inputs, output, policy, model, report, original_q):
     ordered = policy["ordered"]
     routes = model["ordered"]
@@ -77,7 +102,12 @@ def check_acceptance(source, inputs, output, policy, report, fields, revision, c
     model = json.loads((source / CONFIG["model_policy"]).read_text())
     labels = {"-".join((family, route, opt)) for family in model["cases"]
               for route in (*model["routes"], *model["backend_objects"]) for opt in model["optimizations"]}
-    if set(report["images"]) != labels or report["all_executed"] != (fields["executed"] == len(labels)):
+    if not report["all_linked"]:
+        if ("ordered" not in policy or qualified or report["images"] or report["all_executed"] or
+                os.environ.get(CONFIG["runner_env"], CONFIG["x1_runner"]) == CONFIG["x1_runner"]):
+            raise ValueError(CONFIG["link_error"])
+        confirm_unavailable_compiler(native, control_path.parent, controls, report)
+    elif set(report["images"]) != labels or report["all_executed"] != (fields["executed"] == len(labels)):
         raise ValueError(CONFIG["link_error"])
     ordered = {}
     passed = qualified and report["all_executed"]
@@ -134,7 +164,7 @@ def run(stage, source, work):
     report = json.loads(path.read_text())
     if report["source_revision"] != revision:
         raise ValueError(CONFIG["revision_error"])
-    if not report["all_linked"]:
+    if not strict and not report["all_linked"]:
         raise ValueError(CONFIG["link_error"])
     hardware = subprocess.check_output(CONFIG["cpu"], text=True).strip()
     images = list(report["images"].values())
@@ -155,5 +185,9 @@ def run(stage, source, work):
 if __name__ == "__main__":
     if sys.argv[1:] == [CONFIG["resolve"]]:
         resolve()
+    elif sys.argv[1] == CONFIG["host_mode"]:
+        path = (Path(sys.argv[2]) / CONFIG["verifier"]).with_suffix(".def")
+        with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
+            print(f"profiles={json.dumps(host_profiles(json.loads(path.read_bytes())))}", file=output)
     else:
         run(sys.argv[1], Path(sys.argv[2]).resolve(), Path(sys.argv[3]).resolve())

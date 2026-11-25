@@ -168,14 +168,14 @@ pushes to the repository and can also be tested with a manual run.
 ## Generated arm64e.x1 projections
 
 **Verify generated NeverD arm64e.x1 images** resolves a branch in
-NeverSight/NeverD to one revision for both jobs. The macOS producer builds
+NeverSight/NeverD to one revision for all jobs. The macOS producer builds
 the Release tests with the checksum-pinned r6 package and exports the signing
-and ordered-memory inputs. Xcode 27 downloads that job's artifact by ID. With a NeverD
-revision supporting `check --require-native`, the same Mac runs the five
-original native controls and measures all 20 linked and signed images. An
-available instruction family can execute its own comparisons independently.
-Revisions that export ordered memory also link and run six ordinary arm64
-programs on this host. HighC and LLVM C run at O0 and O2, alongside both
+and ordered-memory inputs. Each measuring Mac downloads that artifact by ID
+and runs the five original native controls. Xcode 27 must link all 20 signed
+images. Revisions that export ordered memory also run on the macOS 15 and
+26 profiles. A system compiler that rejects the x1 target records this
+outcome for both recipes at O0 and O2. Every profile still links and runs six
+ordinary arm64 programs. HighC and LLVM C run at O0 and O2, alongside both
 direct backend objects. The workflow checks the exported input and guest
 manifests, the six process outcomes and the compiler-original 128-bit probe.
 Full acceptance requires all six routes to execute their Q comparisons.

@@ -169,3 +169,39 @@ class ProjectionWorkflowTests(unittest.TestCase):
                 else:
                     self.assertEqual(projections.check_ordered(work, work, policy, model, report, original_q),
                                      {p["ordered_count"]: len(labels), **flags})
+
+    def test_only_ordered_exports_use_all_hosted_profiles(self):
+        p = projections.CONFIG
+        base = CASES["projection_policy"]
+        self.assertEqual(projections.host_profiles(base), [{"runner": p["x1_runner"], "artifact": p["x1_artifact"]}])
+        profiles = projections.host_profiles({**base, "ordered": CASES["ordered_export"]})
+        catalog = json.loads(Path(projections.__file__).with_name(p["host_catalog"]).read_bytes())
+        self.assertEqual([profile["runner"] for profile in profiles], catalog["runners"])
+        self.assertEqual(len({profile["artifact"] for profile in profiles}), len(profiles))
+
+    def test_unlinked_images_require_every_cursor_profile_to_reject_the_x1_slice(self):
+        native = {**CASES["hosted_report_policy"], **CASES["slice_control"]}
+        cursor = native["cursor_probe"]
+        labels = [cursor["profile_label"].format(optimization=o, recipe=r) for o in cursor["optimizations"] for r in cursor["recipes"]]
+        mode = native["x1_cursor_probe"]["mode"]
+        for damage in (None, "source_revision", "profiles", "sha256", "outcome", "cursor_sha256"):
+            with self.subTest(damage=damage), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                path = root / mode / native["report_name"]
+                path.parent.mkdir()
+                row = {"status": native["unavailable"], "outcome": native["cpta_probe"]["slice_unavailable"]}
+                rows = {label: dict(row) for label in labels}
+                if damage == "profiles":
+                    del rows[labels[0]]
+                elif damage in ("sha256", "outcome"):
+                    rows[labels[0]][damage] = CASES["wrong_revision"]
+                path.write_text(json.dumps({"source_revision": CASES["wrong_revision"] if damage == "source_revision" else CASES["revision"],
+                                            "status": native["unavailable"], "profiles": rows}))
+                sha = projections.digest(path)
+                controls = {"source_revision": CASES["revision"], "probes": {mode: {"sha256": sha}}}
+                report = {"cursor_sha256": CASES["wrong_revision"] if damage == "cursor_sha256" else sha}
+                if damage:
+                    with self.assertRaisesRegex(ValueError, projections.CONFIG["link_error"]):
+                        projections.confirm_unavailable_compiler(native, root, controls, report)
+                else:
+                    projections.confirm_unavailable_compiler(native, root, controls, report)
