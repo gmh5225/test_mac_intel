@@ -62,8 +62,10 @@ for route in ("original", "highc", "llvmc"):
     actual = contracts(source)
     assert actual == ref, (route, actual, ref)
     exe = out / (route + ".exe")
-    run(["clang-cl", "/nologo", "/std:c17", "/O2", "/DTEST_RECOVERED_PRNG_CALLER",
-         harness, object_file(source), library, "/Fe:" + str(exe), "/Fo:" + str(out / "guard.obj")])
+    guard = out / "guard.obj"
+    run(["clang-cl", "/nologo", "/std:c17", "/O2", "/c", "/DTEST_RECOVERED_PRNG_CALLER",
+         harness, "/Fo" + str(guard)])
+    run(["clang-cl", "/nologo", guard, object_file(source), library, "/Fe" + str(exe)])
     pe = run(["llvm-readobj", "--coff-imports", exe])
     assert any(re.search(r"Name: bcryptprimitives\.dll\b", block, re.I) and
                re.search(r"Symbol: ProcessPrng \(", block) for block in pe.split("Import {"))
