@@ -1,7 +1,7 @@
-name: Measure AT&T fixed branch and scalar register records against iced GasFormatter and Intel and foreign controls
+name: Measure isolated AT&T register formatting against iced and check other architectures in the same images
 on:
   push:
-    branches: [codex/att-fixed-branch-and-register-records]
+    branches: [codex/att-register-writer-link-targets]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-fixed-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-register-call-targets-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

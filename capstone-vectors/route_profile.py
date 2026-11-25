@@ -36,6 +36,9 @@ def run(r,w,source,build,paths,patch=None,tree=None):
             at=s.index('const char *extension_name',s.index('static void printRegName(SStream *OS, unsigned RegNo)\n{'))
             s=s[:at]+'++profile_names[16];\n\t'+s[at:]
 
+            if patch:
+                assert s.count('X86_ATT_formatRegister(OS,')==1
+                s=s.replace('X86_ATT_formatRegister(OS,','++profile_names[17];\n\tX86_ATT_formatRegister(OS,')
         f.write_text(s)
     call('cmake','--build',build,'--target','capstone_static','--parallel','4')
     lib,=build.rglob('libcapstone.a')
