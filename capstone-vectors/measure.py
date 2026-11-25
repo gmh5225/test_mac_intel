@@ -32,10 +32,7 @@ try:
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
     run('cargo','build','--release','--locked',cwd=ad)
     ice_lib=ad/'target/release/libiced_compare.a'
-    driver=(r/'driver.cpp').read_text();marker='Result timed=run(reps);'
-    assert driver.count(marker)==1
-    wrapped='#include <valgrind/callgrind.h>\n'+driver.replace(marker,'CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT; '+marker+' CALLGRIND_TOGGLE_COLLECT;')
-    (w/'driver.cpp').write_text(wrapped)
+    shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
@@ -44,32 +41,31 @@ try:
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     audits={}; wanted={'libmvec-amd64','putty-32-0.85','jpeg-avx2-i386'}
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    from phases import case
-    from probe import hardware
+    from symbols import case
+    run("clang","-O2","-fPIC","-shared",r/"sample.c","-ldl","-o",w/"sample.so")
     stage_groups={}
-    save('build',dict(capstone=q,neverd=dev,iced=m['iced_revision'],lib=sha(lib),exe=sha(w/'base'),host=platform.machine(),driver=sha(w/'driver.cpp'),inputs=m['drivers']))
+    save('build',dict(capstone=q,neverd=dev,iced=m['iced_revision'],lib=sha(lib),exe=sha(w/'base'),cpu=get('lscpu'),host=platform.machine(),driver=sha(w/'driver.cpp'),inputs=m['drivers']))
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    with hardware(r,w,save) as (groups,measure):
-        for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
-            if name not in wanted:continue
-            spec=m['provenance'][name]
-            assert sha(f)==spec['text_sha256']
-            selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
-            path=w/(name+'.tsv')
-            def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-            emit(selected)
-            if m['samples'][name]=='simd-functions':
-                view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-                assert len(view)==len(selected)
-                selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-            assert sha(path)==spec['extent_sha256']
-            traces=[list(map(int,line.split()))for line in get(w/'base','audit','0','1',f,path,str(bits)).splitlines()]
-            assert len(traces)==len(selected) and all(x[3]==x[4] and x[1]==x[5]for x in traces)
-            audits[name]=dict(extents=len(selected),boundaries=sum(x[3]for x in traces),extent_sha256=sha(path),text_sha256=sha(f))
-            save('audit',audits)
-            stage_groups[name]=case(name,bits,w/'base',f,path,groups,measure,save)
+    for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
+        if name not in wanted:continue
+        spec=m['provenance'][name]
+        assert sha(f)==spec['text_sha256']
+        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
+        path=w/(name+'.tsv')
+        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
+        emit(selected)
+        if m['samples'][name]=='simd-functions':
+            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
+            assert len(view)==len(selected)
+            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
+        assert sha(path)==spec['extent_sha256']
+        traces=[list(map(int,line.split()))for line in get(w/'base','audit','0','1',f,path,str(bits)).splitlines()]
+        assert len(traces)==len(selected) and all(x[3]==x[4] and x[1]==x[5]for x in traces)
+        audits[name]=dict(extents=len(selected),boundaries=sum(x[3]for x in traces),extent_sha256=sha(path),text_sha256=sha(f))
+        save('audit',audits)
+        stage_groups[name]=case(name,bits,w,w/'base',f,path,save)
     assert set(audits)==set(stage_groups)==wanted
     save('complete',dict(complete=True,source=q,iced=m['iced_revision'],neverd=dev,inputs=audits,groups=stage_groups))
 finally:

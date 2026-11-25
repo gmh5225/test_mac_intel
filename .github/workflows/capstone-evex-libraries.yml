@@ -1,7 +1,7 @@
-name: Compare shipping Capstone and iced by decoder, formatted record, detail and register query
+name: Sample actual instructions in the warmed scalar and SIMD formatting loops of Capstone and fork iced
 on:
   push:
-    branches: [codex/shipping-iced-per-stage-counters]
+    branches: [codex/shipping-formatter-per-symbol-cpu]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c6df2f25c9189936a7b57ee8a01d123be11aba68
+          ref: 8a2ccbbe12cab2cf86f117285387d8cf976cc30f
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,8 +49,6 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y valgrind linux-tools-generic
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -59,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: per-stage-hardware-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-formatter-symbols-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
