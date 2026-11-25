@@ -1,7 +1,7 @@
-name: Measure AT&T VEX and SSE register records with EVEX moves and broadcasts on real ELF and PE binaries against iced GAS
+name: Measure canonical i386 AT&T VEX memory forms and checked register moves on JPEG, OpenSSL and PuTTY against iced GAS
 on:
   push:
-    branches: [codex/x86-att-simd-moves-and-registers]
+    branches: [codex/x86-i386-att-checked-vector-moves]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-vector-and-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-vex-memory-and-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
