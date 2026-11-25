@@ -1,5 +1,5 @@
 #define main unused_comparison_main
-#include "trial-compare.cpp"
+#include "public-compare.cpp"
 #undef main
 
 int main(int argc, char **argv) {
