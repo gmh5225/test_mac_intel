@@ -1,161 +1,147 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6050d7c2..6503b5d4 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1093,14 +1093,16 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
-     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-     if(capstone_enabled_architectures STREQUAL "X86" OR
--       (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
--        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
--        AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
-+       (CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
-         AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
-         if(capstone_enabled_architectures STREQUAL "X86")
-             target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
--        else()
-+        elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
-+               AND CMAKE_SYSTEM_NAME STREQUAL "Darwin"
-+               AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
-             target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
-+        else()
-+            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_MIXED_X86_MODE_READERS)
-         endif()
-         set(capstone_x86_objects
-             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-diff --git a/Makefile b/Makefile
-index 06b05013..4c21bf66 100644
---- a/Makefile
-+++ b/Makefile
-@@ -311,6 +311,8 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
- else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
- 	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
-+else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
-+	CFLAGS += -DCAPSTONE_MIXED_X86_MODE_READERS
- endif
- 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
- endif
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 06cc61ae..6d3aa2c2 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -51,6 +51,13 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
- #define CAPSTONE_X86_PUBLIC_FIXED_RECORD
- #endif
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 1cc3d3a9..7d6a66f3 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -557,22 +557,15 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 	}
  
-+#if !defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) && \
-+	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CAPSTONE_X86_MIXED_PUBLIC_OUTPUT
-+#endif
-+
- bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			MCInst *instr, uint16_t *size, uint64_t address,
- 			void *info);
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..ce512dca 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3757,6 +3757,8 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
- #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
- #define CS_PUBLIC_FIXED_RECORD
-+#elif defined(CAPSTONE_X86_MIXED_PUBLIC_OUTPUT)
-+#define CS_DECODE_OUTPUT_MISS X86_decodeMixedPublicRecord
- #endif
- #define CS_DECODE_SCAN_IMPL decodeIteratorScan
- #include "../../cs_disasm_internal.h"
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..35a07c2c 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -30,6 +30,30 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
- #endif
- #include "../../cs_disasm_internal.h"
+ 	if (MCOperand_isImm(DispSpec)) {
+-		int64_t imm = MCOperand_getImm(DispSpec);
++		const uint64_t offset = (uint64_t)MCOperand_getImm(DispSpec);
+ 		if (MI->csh->detail_opt)
+ 			MI->flat_insn->detail->x86
+ 				.operands[MI->flat_insn->detail->x86.op_count]
+-				.mem.disp = imm;
+-		if (imm < 0) {
+-			SStream_concat(
+-				O, "0x%" PRIx64,
+-				arch_masks[x86_get_bit_mode(MI->csh->mode)] &
+-					imm);
+-		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "%" PRIu64, imm);
+-		}
++				.mem.disp = (int64_t)offset;
++		if (offset > HEX_THRESHOLD)
++			SStream_concat(O, "0x%" PRIx64, offset);
++		else
++			SStream_concat(O, "%" PRIu64, offset);
+ 	}
  
-+#ifdef CAPSTONE_X86_MIXED_PUBLIC_OUTPUT
-+/* The public iterator has already tried the text-free scan and validated size.
-+ * Its cursor and skipdata handling also own failed record attempts. */
-+CS_PRESERVE_MOST bool X86_decodeMixedPublicRecord(
-+	cs_struct *handle, const uint8_t *code, size_t size, cs_insn *insn,
-+	uint16_t *length, bool batch)
+ 	if (MI->csh->detail_opt)
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..88986c5b 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -326,6 +326,16 @@ static bool need_zero_prefix(uint64_t imm)
+ 		return true;
+ }
+ 
++static void printMasmHex(SStream *O, uint64_t value)
 +{
-+	if (handle->arch == CS_ARCH_X86 && !batch && !handle->no_text) {
-+#ifdef CAPSTONE_MIXED_X86_MODE_READERS
-+		if (handle->mode == CS_MODE_32)
-+			return X86_decodeFixedRecord32(handle, code, size, insn,
-+						       length);
-+		if (handle->mode == CS_MODE_64)
-+			return X86_decodeFixedRecord64(handle, code, size, insn,
-+						       length);
-+#else
-+		if (X86_trySimpleOutput(handle, code, size, insn, length))
-+			return true;
-+#endif
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, length, batch);
++	if (value == (UINT64_C(1) << 63))
++		SStream_concat0(O, "8000000000000000h");
++	else if (need_zero_prefix(value))
++		SStream_concat(O, "0%" PRIx64 "h", value);
++	else
++		SStream_concat(O, "%" PRIx64 "h", value);
 +}
-+#endif
 +
- CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- 				      size_t *size, uint64_t *address,
- 				      cs_insn *insn)
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..71a8fd44 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -261,7 +261,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
- 
--#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_MIXED_X86_MODE_READERS)
- bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
- 			     cs_insn *insn, uint16_t *length)
+ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
  {
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 7bbf1c0d..526dc4de 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -202,7 +202,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
+ 	if (positive) {
+@@ -348,21 +358,10 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 					}
+ 				}
  
--#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_MIXED_X86_MODE_READERS)
- bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
- 			     cs_insn *insn, uint16_t *length)
+-				if (imm == 0x8000000000000000LL) // imm == -imm
+-					SStream_concat0(O, "8000000000000000h");
+-				else if (need_zero_prefix(imm))
+-					SStream_concat(O, "0%" PRIx64 "h", imm);
+-				else
+-					SStream_concat(O, "%" PRIx64 "h", imm);
++				printMasmHex(O, (uint64_t)imm);
+ 			} else {
+ 				if (imm > HEX_THRESHOLD) {
+-					if (need_zero_prefix(imm))
+-						SStream_concat(O,
+-							       "0%" PRIx64 "h",
+-							       imm);
+-					else
+-						SStream_concat(
+-							O, "%" PRIx64 "h", imm);
++					printMasmHex(O, (uint64_t)imm);
+ 				} else
+ 					SStream_concat_dec64(O, imm, false);
+ 			}
+@@ -721,13 +720,14 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 				.operands[MI->flat_insn->detail->x86.op_count]
+ 				.mem.disp = imm;
+ 
+-		if (imm < 0)
+-			printImm(MI, O,
+-				 arch_masks[x86_get_bit_mode(MI->csh->mode)] &
+-					 imm,
+-				 true);
+-		else
++		/* The decoder already zero-extends narrower moffs values.
++		 * The accumulator width does not narrow a 64-bit offset. */
++		if (imm >= 0)
+ 			printImm(MI, O, imm, true);
++		else if (MI->csh->syntax == CS_OPT_SYNTAX_MASM)
++			printMasmHex(O, (uint64_t)imm);
++		else
++			SStream_concat_hex64(O, (uint64_t)imm, false);
+ 	}
+ 
+ 	SStream_concat0(O, "]");
+diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
+index cfd13cba..17401f22 100644
+--- a/tests/unit/x86_legacy_address_size.c
++++ b/tests/unit/x86_legacy_address_size.c
+@@ -279,9 +279,43 @@ static bool check_other_opcodes(void)
+ 	return ok;
+ }
+ 
++static bool check_moffs_address(cs_mode mode, cs_opt_value syntax,
++				const char *expected)
++{
++	const uint8_t code[] = { 0xa0, 0x34, 0x82, 0x00, 0x80,
++				 0xec, 0xcd, 0xbc, 0xbc };
++	csh handle;
++	cs_insn *insn = NULL;
++	bool ok = false;
++	if (cs_open(CS_ARCH_X86, mode, &handle) != CS_ERR_OK)
++		return false;
++	cs_err err = cs_option(handle, CS_OPT_SYNTAX, syntax);
++	if (err == CS_ERR_X86_ATT && syntax == CS_OPT_SYNTAX_ATT) {
++		cs_close(&handle);
++		return true;
++	}
++	if (err == CS_ERR_OK) {
++		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
++		ok = count == 1 && insn->size == sizeof(code) &&
++		     strcmp(insn->op_str, expected) == 0;
++		if (!ok)
++			fprintf(stderr, "expected %s, got %s\n", expected,
++				count ? insn->op_str : "(decode failed)");
++		cs_free(insn, count);
++	}
++	cs_close(&handle);
++	return ok;
++}
++
+ int main(void)
  {
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 4c4c34f2..08c5fa85 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -22,18 +22,24 @@
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
- 		       cs_insn *insn, uint16_t *insn_size, bool batch);
-+#elif defined(CAPSTONE_X86_MIXED_PUBLIC_OUTPUT)
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeMixedPublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
-+			    cs_insn *insn, uint16_t *length, bool batch);
- #endif
- /* The public iterator can enter a fixed x86 reader once. Misses from that
-  * reader call the same full decoder with the ordinary iterator request. */
- #ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
- typedef uint8_t cs_record_request;
- enum { CS_RECORD_PUBLIC_ITER = 2 };
-+#else
-+typedef bool cs_record_request;
-+#endif
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_MIXED_X86_MODE_READERS)
- CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
- 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
- CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
- 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
--#else
--typedef bool cs_record_request;
- #endif
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	bool ok = check_conversions();
+ 	ok &= check_other_opcodes();
++	ok &= check_moffs_address(CS_MODE_64, CS_OPT_SYNTAX_INTEL,
++				  "al, byte ptr [0xbcbccdec80008234]");
++	ok &= check_moffs_address(CS_MODE_64, CS_OPT_SYNTAX_MASM,
++				  "al, byte ptr [0bcbccdec80008234h]");
++	ok &= check_moffs_address((cs_mode)0, CS_OPT_SYNTAX_ATT,
++				  "0xbcbccdec80008234, %al");
+ 	return ok ? 0 : 1;
+ }
