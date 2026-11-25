@@ -23,16 +23,17 @@ index 99eb30fe..48239585 100644
  MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
  	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index af2bc19c..ecff7b09 100644
+index af2bc19c..e03a2202 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -2406,4 +2406,20 @@ void ARM_set_detail_op_float(MCInst *MI, unsigned OpNum, uint64_t Imm)
+@@ -2406,4 +2406,21 @@ void ARM_set_detail_op_float(MCInst *MI, unsigned OpNum, uint64_t Imm)
  	ARM_inc_op_count(MI);
  }
  
 +#ifdef ARM_FORMATTED_CHAR_CALL
 +/* The printer supplies "%s" and one NUL-terminated, single-character
 + * string at every call. A custom formatter receives these same arguments. */
++__attribute__((section(".cs_arm_formatted_char")))
 +void ARM_formatChar(SStream *O, const char *fmt, ...)
 +{
 +	va_list args;

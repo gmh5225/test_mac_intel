@@ -114,6 +114,11 @@ try:
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
+        if variant=='selector' and os.uname().machine=='x86_64':
+            obj,=build.rglob('ARMFormattedChar.c.o')
+            with obj.open('rb')as file:
+                helper=ELFFile(file).get_section_by_name('.cs_arm_formatted_char');assert helper is not None
+                code_sections[obj.name]={'.cs_arm_formatted_char':hashlib.sha256(helper.data()).hexdigest()}
         save('executable-sections-'+variant,code_sections)
         with binary.open('rb') as file:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
