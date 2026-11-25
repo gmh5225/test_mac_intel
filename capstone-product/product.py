@@ -53,7 +53,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','layout','selector','oracle'):
+    for variant in ('base','layout','selector'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -76,8 +76,12 @@ try:
         assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
         command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'offset.cpp',archive,'-o',t/'offset'],'link-offset-'+variant)
         vals=sp.check_output([t/'offset'],text=True).strip().splitlines();assert len(vals)==48
-        assert vals==json.loads((r/'offset-expected.json').read_text())['base' if variant=='base' else 'fixed'].splitlines()
+        assert vals==json.loads((r/'offset-expected.json').read_text())['base'].splitlines()
         save('absolute-offsets-'+variant,vals)
+        command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'moffs.cpp',archive,'-o',t/'moffs'],'link-moffs-'+variant)
+        counts=list(map(int,sp.check_output([t/'moffs'],text=True,stderr=sp.DEVNULL).split()))
+        assert counts==[11520,864 if variant=='base' else 0,0],(variant,counts)
+        save('moffs-'+variant,counts)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
         for z in foreign:
@@ -118,7 +122,10 @@ try:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    expected=4
+    assert m['oracle']==m['layout']
+    products['oracle']=products['layout'];identities['oracle']=identities['layout']
+    save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-layout.json').read_text()))
+    expected=3
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
