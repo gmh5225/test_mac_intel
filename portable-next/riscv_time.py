@@ -31,7 +31,7 @@ def measure(rows, w, save):
     data={}
     for row in rows:
         assert row['arch']=='riscv64'
-        for mode in range(6):
+        for mode in range(8):
             n=max(1,math.ceil(25e6/run('base',row,mode,1)[0]))
             expected=run('base',row,mode,n)[2:]
             assert expected[0]>0
@@ -44,5 +44,5 @@ def measure(rows, w, save):
                 cycles.append({k:[sum(x[i]for x in xs)for i in (0,1)]for k,xs in pairs.items()})
             data[row['name']+'/'+str(mode)]=dict(reps=n,checks=expected,cycles=cycles)
             save('riscv-option-observations',data)
-    assert len(data)==24 and len(verified)==3
+    assert len(data)==32 and len(verified)==3
     save('riscv-option-fixed',dict(inode=inode,original=image_shas,verified=verified,bytes=length,blocks=len(offsets)))

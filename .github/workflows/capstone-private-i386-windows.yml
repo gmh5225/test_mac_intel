@@ -1,7 +1,7 @@
-name: Check backend-local mixed RISC-V scanning, compressed printing and numeric syntax on both ABIs and four timing controls
+name: Verify RISC-V operand mapping and real syntax across mixed and dedicated configurations
 on:
   push:
-    branches: [codex/riscv-backend-local-scanner]
+    branches: [codex/riscv-type-permission-row-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: backend-owned-riscv-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: rv-demanded-views-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7

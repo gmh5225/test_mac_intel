@@ -26,16 +26,20 @@ int main(int argc, char **argv) {
   std::ifstream input(argv[2], std::ios::binary);
   std::vector<uint8_t> text(std::istreambuf_iterator<char>(input), {});
   csh handle = 0;
-  if (!input || text.empty() || output > 5 || repeats == 0 ||
+  if (!input || text.empty() || output > 7 || repeats == 0 ||
       cs_open(arch, mode, &handle) != CS_ERR_OK ||
-      cs_option(handle, CS_OPT_DETAIL, output >= 2 ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK ||
+      cs_option(handle, CS_OPT_DETAIL, (output >= 2 && output != 6) ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK ||
       cs_option(handle, CS_OPT_TEXT, output ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK) return 3;
-  if (output >= 3) {
+  if (output >= 3 && output <= 5) {
     if (arch != CS_ARCH_RISCV) return 6;
     const unsigned detail = output == 4 ? CS_OPT_DETAIL_UNCOMPRESSED_REAL : CS_OPT_DETAIL_REAL;
     if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON | detail) != CS_ERR_OK) return 7;
     if (output == 4 && cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_REAL) != CS_ERR_OK) return 8;
     if (output == 5 && cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_UNCOMPRESSED_REAL) != CS_ERR_OK) return 9;
+  }
+  if (output >= 6) {
+    if (cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_REAL)!=CS_ERR_OK) return 10;
+    if (output==7 && cs_option(handle,CS_OPT_DETAIL,CS_OPT_ON|CS_OPT_DETAIL_REAL)!=CS_ERR_OK) return 11;
   }
   cs_insn *insn = cs_malloc(handle);
   if (!insn) return 4;
@@ -60,7 +64,7 @@ int main(int argc, char **argv) {
       boundaries = (boundaries ^ (ip + insn->size)) * 1099511628211ull;
       value += insn->id;
       if (output) value += std::strlen(insn->mnemonic) + std::strlen(insn->op_str);
-      if (output >= 2) {
+      if ((output >= 2 && output != 6)) {
         cs_regs reads{}, writes{};
         uint8_t nr = 0, nw = 0;
         const cs_err err = cs_regs_access(handle, insn, reads, &nr, writes, &nw);
