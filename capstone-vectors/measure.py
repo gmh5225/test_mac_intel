@@ -189,6 +189,7 @@ try:
     time_foreign(foreign_rows,w,save)
     from route_profile import run as profile_routes
     save('route-profile',profile_routes(r,w,base,build,replay_paths))
+    save('full-core-profile',profile_routes(r,w,base,build,replay_paths,r/'candidate.patch',maps['prefix']['tree']))
     save('candidate-profile',profile_routes(r,w,base,build,replay_paths,r/'outlined.patch',maps['outlined']['tree']))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
