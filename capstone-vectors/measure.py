@@ -45,7 +45,22 @@ try:
     roots=get('git','-C',root,'show',dev+':lib/decode/CMakeLists.txt')
     options=['--undefined=X86_disasmIter','--undefined=X86_disasmIter32']
     assert all('"LINKER:'+text+'"' in roots for text in options)
-    extra=['--undefined=X86_decodeOutputMiss32','--undefined=X86_decodeRegisterFallback32']
+    sections={'.cs_x86_amd64_text':'ax','.cs_x86_amd64_rodata':'a'}
+    def link(tag,label,padding):
+        path=w/tag;extra=[]
+        directives=[]
+        for section,flag in sections.items():
+            count=padding.get(section,0)
+            if count:directives.append('.section '+section+',"'+flag+'"\\n.space '+str(count)+',0')
+        if directives:
+            f=w/'tail.s';f.write_text('\\n'.join(directives)+'\\n.section .note.GNU-stack,""\\n')
+            run('clang','-c',f,'-o',w/'tail.o');extra=[w/'tail.o']
+        ld=['-Wl,'+k for k in options]
+        run('clang++',w/'driver.o',*ld,w/(label+'.a'),*extra,ice_lib,*flags,'-o',path)
+        with path.open('rb') as f:
+            elf=ELFFile(f)
+            layout[tag]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()]for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+        images[tag]=dict(exe=sha(path),symbols=symbols(path),archive=archive[label],padding=padding)
     archive={};objects={}
     for label in ('base','outlined'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -56,24 +71,40 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         archive[label]=sha(lib)
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
-        for style in ('shipping','fallbacks'):
-            tag=style+'-'+label;path=w/tag
-            ld=['-Wl,'+k for k in options+(extra if style=='fallbacks' else [])]
-            run('clang++',w/'driver.o',*ld,lib,ice_lib,*flags,'-o',path)
-            with path.open('rb') as f:
-                elf=ELFFile(f)
-                layout[tag]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()]for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-            images[tag]=dict(exe=sha(path),symbols=symbols(path),archive=archive[label])
+        shutil.copyfile(lib,w/(label+'.a'));link('natural-'+label,label,{})
+    natural={k:layout['natural-'+k]for k in ('base','outlined')}
+    sizes={k:{sec:v[sec][1]for sec in sections}for k,v in natural.items()}
+    delta={sec:max(v[sec] for v in sizes.values())-min(v[sec] for v in sizes.values())for sec in sections}
+    assert 0<delta[".cs_x86_amd64_text"]<8192 and 0<=delta[".cs_x86_amd64_rodata"]<8192,delta
+    assert (delta[".cs_x86_amd64_rodata"]>0)==(os.uname().machine=="aarch64"),delta
+    geometry={}
+    for style in ('text_only','both'):
+        for label in ('base','outlined'):
+            use=[*sections]if style=='both' else ['.cs_x86_amd64_text']
+            padding={name:max(v[name]for v in sizes.values())-sizes[label][name] for name in use}
+            tag=style+'-'+label;link(tag,label,padding)
+            if not any(padding.values()):assert images[tag]['exe']==images['natural-'+label]['exe']
+        a,b=(layout[style+'-'+k]for k in ('base','outlined'))
+        assert a.keys()==b.keys()
+        geometry[style]={n:[a[n][:2],b[n][:2],a[n][2]==b[n][2]]for n in a}
+        for sec in ('.text','.cs_x86_i386_text','.cs_x86_memory_fallback32_text','.cs_x86_register_fallback32_text','.cs_x86_amd64_text'):
+            assert a[sec][:2]==b[sec][:2],(style,sec,a[sec],b[sec])
+        if style=='both':
+            for sec in ('.rodata','.cs_x86_i386_rodata','.cs_x86_register_fallback32_rodata','.cs_x86_memory_fallback32_rodata','.cs_x86_amd64_rodata'):
+                assert a[sec][:2]==b[sec][:2],(sec,a[sec],b[sec])
+    save('geometry',dict(natural=natural,matched=geometry,sizes=sizes,delta=delta))
+    for label in ('base','outlined'):
+        del images['natural-'+label];del layout['natural-'+label]
     assert set(objects['base'])==set(objects['outlined'])
     assert [Path(f).name for f in objects['base']if objects['base'][f]!=objects['outlined'][f]]==['X86Sse64Output.c.o']
-    save('sources',dict(capstone=maps,neverd=dev,ice=m['iced_revision'],archives=archive,images=images,options=dict(shipping=options,fallbacks=options+extra),host=platform.platform(),cpu=get('lscpu')))
+    save('sources',dict(capstone=maps,neverd=dev,ice=m['iced_revision'],archives=archive,images=images,options=dict(linker=options,matched=delta),host=platform.platform(),cpu=get('lscpu')))
     save('linked-sections',layout)
     stages={tag:(w/tag).read_bytes() for tag in images}
     lengths={k:len(v)for k,v in stages.items()};length=max(lengths.values())
     stages={k:v+bytes(length-len(v)) for k,v in stages.items()}
-    for style in ('shipping','fallbacks'):
+    for style in ('text_only','both'):
         stages[style+'-copy']=stages[style+'-base']
-    current=w/'selected';shutil.copy2(w/'shipping-base',current);current.write_bytes(stages['shipping-base'])
+    current=w/'selected';shutil.copy2(w/'text_only-base',current);current.write_bytes(stages['text_only-base'])
     inode=current.stat().st_ino;verified={};offsets=[i for i in range(0,length,4096)if len({v[i:i+4096]for v in stages.values()})>1]
     def select(k):
         with current.open('r+b',buffering=0)as f:
@@ -106,13 +137,13 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('shipping-base')==audit_engine('fallbacks-base')==audit_engine('shipping-outlined')==audit_engine('fallbacks-outlined')
+        assert audit_engine('text_only-base')==audit_engine('both-base')==audit_engine('text_only-outlined')==audit_engine('both-outlined')
         audits[name]=dict(extents=len(selected),sha=sha(path),bytes=spec['bytes']);save('audit',audits)
         for mode in (1,2):
             def take(k,n):
                 select(k)
                 return list(map(int,get(*invoke,'private',str(mode),str(n),f,path,str(bits)).split()))
-            reps=max(1,math.ceil(25e6/take('shipping-base',1)[0]))
+            reps=max(1,math.ceil(25e6/take('text_only-base',1)[0]))
             labels=list(stages);expected={k:take(k,reps)[2:]for k in labels}
             assert len({tuple(z)for z in expected.values()})==1
             pairs=[];rng=random.Random(name+str(mode))
