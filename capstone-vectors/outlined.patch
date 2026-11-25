@@ -13,6 +13,31 @@ index 1cc3d3a9..34666027 100644
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86BaseInfo.h b/arch/X86/X86BaseInfo.h
+index f5485a3b..5d135946 100644
+--- a/arch/X86/X86BaseInfo.h
++++ b/arch/X86/X86BaseInfo.h
+@@ -48,4 +48,7 @@ enum IPREFIXES {
+ 	X86_IP_HAS_NOTRACK = 64
+ };
+ 
++/* Bits above the printer prefix flags carry the shift of the absolute address mask. */
++#define X86_IP_ADDRESS_MASK_SHIFT 8
++
+ #endif
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..21dece32 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -715,7 +715,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			}
+ #endif
+ 
+-			instr->flags = Flags;
++			instr->flags = Flags | ((64u - 8u * insn.addressSize) << X86_IP_ADDRESS_MASK_SHIFT);
+ 		}
+ 
+ 		return result;
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
 index 457485ab..78ba0cf5 100644
 --- a/arch/X86/X86IntelInstPrinter.c
@@ -29,27 +54,31 @@ index 457485ab..78ba0cf5 100644
  				} else {
  					printImm(MI, O, DispVal, true);
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..22142c46 100644
+index 380faa79..27bd76d5 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,16 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -6,6 +6,7 @@
+ 
+ #include "capstone/capstone.h"
+ #include "../../cs_priv.h"
++#include "X86BaseInfo.h"
+ 
+ // map instruction to its characteristics
+ typedef struct insn_map_x86 {
+@@ -154,13 +155,10 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* An absolute displacement is an offset of the effective address width. */
++/* Truncate an absolute offset to the address width chosen by the decoder. */
 +static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
  {
-+	const cs_mode mode = mi->csh->mode;
-+	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
- 	if (x86_has_feature(mode, CS_MODE_16))
+-	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
-+		return address_override ? (uint32_t)disp : (uint16_t)disp;
- 	if (x86_has_feature(mode, CS_MODE_32))
+-	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+		return address_override ? (uint16_t)disp : (uint32_t)disp;
-+	return address_override ? (uint32_t)disp : (uint64_t)disp;
++	return (uint64_t)disp & (UINT64_MAX >> (mi->flags >> X86_IP_ADDRESS_MASK_SHIFT));
  }
  
  #endif

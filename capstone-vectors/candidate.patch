@@ -1,15 +1,3 @@
-diff --git a/MCInst.h b/MCInst.h
-index e0409109..59e1a593 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -154,6 +154,7 @@ struct MCInst {
- 	uint64_t address; // address of this insn
- 	cs_struct *csh; // save the main csh
- 	uint8_t x86opsize; // opsize for [mem] operand
-+	uint8_t x86_addr_mask_shift; // 64 minus the effective address width in bits
- 
- 	// These flags could be used to pass some info from one target subcomponent
- 	// to another, for example, from disassembler to asm printer. The values of
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
 index 1cc3d3a9..34666027 100644
 --- a/arch/X86/X86ATTInstPrinter.c
@@ -25,18 +13,31 @@ index 1cc3d3a9..34666027 100644
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86BaseInfo.h b/arch/X86/X86BaseInfo.h
+index f5485a3b..fa801847 100644
+--- a/arch/X86/X86BaseInfo.h
++++ b/arch/X86/X86BaseInfo.h
+@@ -48,4 +48,7 @@ enum IPREFIXES {
+ 	X86_IP_HAS_NOTRACK = 64
+ };
+ 
++/* Bits above the printer prefix flags carry the effective address size in bytes. */
++#define X86_IP_ADDRESS_SIZE_SHIFT 8
++
+ #endif
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..e2accc28 100644
+index b88dfbc7..a12bd17f 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
-@@ -674,6 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 				insn.vectorExtensionPrefix[3] =
- 					original_scalar_compare_p2;
- 			instr->imm_size = insn.immSize;
-+			instr->x86_addr_mask_shift = (uint8_t)(64 - 8 * insn.addressSize);
+@@ -715,7 +715,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			}
+ #endif
  
- 			// copy all prefixes
- 			instr->x86_prefix[0] = insn.prefix0;
+-			instr->flags = Flags;
++			instr->flags = Flags | ((unsigned)insn.addressSize << X86_IP_ADDRESS_SIZE_SHIFT);
+ 		}
+ 
+ 		return result;
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
 index 457485ab..78ba0cf5 100644
 --- a/arch/X86/X86IntelInstPrinter.c
@@ -53,10 +54,18 @@ index 457485ab..78ba0cf5 100644
  				} else {
  					printImm(MI, O, DispVal, true);
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..6383abdf 100644
+index 380faa79..1a3ed5ef 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,10 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -6,6 +6,7 @@
+ 
+ #include "capstone/capstone.h"
+ #include "../../cs_priv.h"
++#include "X86BaseInfo.h"
+ 
+ // map instruction to its characteristics
+ typedef struct insn_map_x86 {
+@@ -154,13 +155,15 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
@@ -69,7 +78,12 @@ index 380faa79..6383abdf 100644
 -	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+	return (uint64_t)disp & (UINT64_MAX >> mi->x86_addr_mask_shift);
++	const unsigned address_size = mi->flags >> X86_IP_ADDRESS_SIZE_SHIFT;
++	if (address_size == 2)
++		return (uint16_t)disp;
++	if (address_size == 4)
++		return (uint32_t)disp;
++	return (uint64_t)disp;
  }
  
  #endif
