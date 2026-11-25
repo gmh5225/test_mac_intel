@@ -1,7 +1,7 @@
-name: Check indexed PowerPC names and high-byte x86 recipe records on Windows macOS Linux and Make
+name: Verify bounded PowerPC name equality and scalar conditional-move output across compiler profiles
 on:
   push:
-    branches: [codex/indexed-names-and-merged-printer-configs]
+    branches: [codex/portable-name-equality-and-cmov]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: name-index-merged-recipes-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: local-name-cmov-map-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
