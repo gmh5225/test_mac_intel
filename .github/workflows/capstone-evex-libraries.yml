@@ -1,7 +1,7 @@
-name: Sample actual instructions in the warmed scalar and SIMD formatting loops of Capstone and fork iced
+name: Resolve libc leaf routines in the warmed Capstone and iced formatters on PE and ELF
 on:
   push:
-    branches: [codex/shipping-formatter-per-symbol-cpu]
+    branches: [codex/formatter-libc-symbols-by-build-id]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,8 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y libc6-dbg
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -57,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-formatter-symbols-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: exact-libc-symbols-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

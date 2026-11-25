@@ -58,9 +58,10 @@ __attribute__((destructor)) static void finish(void)
     for (sig_atomic_t i = 0; i < samples; ++i) {
         Dl_info loc = {0};
         int found = dladdr((const void *)points[i], &loc);
-        fprintf(out, "%" PRIxPTR "\t%s\t%s\n", points[i],
+        fprintf(out, "%" PRIxPTR "\t%s\t%s\t%" PRIxPTR "\n", points[i],
                 found && loc.dli_fname ? loc.dli_fname : "?",
-                found && loc.dli_sname ? loc.dli_sname : "?");
+                found && loc.dli_sname ? loc.dli_sname : "?",
+                (uintptr_t)points[i] - (uintptr_t)loc.dli_fbase);
     }
     if (fclose(out)) _exit(88);
 }

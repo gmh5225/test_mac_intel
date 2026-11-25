@@ -2,6 +2,7 @@ from bisect import bisect_right
 from collections import Counter,defaultdict
 from functools import lru_cache
 from pathlib import Path
+from debug_names import resolve as shared_symbol
 import math,os,random,subprocess as sp
 
 ROUTES={'capstone-text':('private',1),'iced-text':('fast',1),
@@ -33,6 +34,7 @@ def case(name,bits,work,image,fixture,extents,save):
         args=['setarch',os.uname().machine,'-R']
         if env:args+=['env',*env]
         return list(map(int,sp.check_output([*args,image,engine,str(mode),str(reps),fixture,extents,str(bits)],text=True).split()))
+    libc_ids=set()
     path=work/'saved-pcs.tsv'
     meta={};seen={}
     for tag in ROUTES:
@@ -49,9 +51,12 @@ def case(name,bits,work,image,fixture,extents,save):
             assert r[2:]==v['expected'][2:]
             freq=Counter();pcs=Counter()
             for line in path.read_text().splitlines():
-                pc,lib,sym=line.split('\t');pc=int(pc,16)
+                pc,lib,sym,relative=line.split('\t');pc=int(pc,16)
                 if Path(lib).name==image.name:
                     name_at,offset=resolve(pc);freq[name_at]+=1;pcs[pc]+=1
+                elif Path(lib).name=='libc.so.6':
+                    exact,build_id=shared_symbol(lib,int(relative,16));libc_ids.add(build_id)
+                    freq['libc.so.6!'+exact]+=1
                 else:freq[Path(lib).name+': '+sym]+=1
             samples=sum(freq.values());assert samples>=160,(name,tag,epoch,r,samples)
             hist[tag].update(freq);insns[tag].update(pcs)
@@ -64,5 +69,7 @@ def case(name,bits,work,image,fixture,extents,save):
             steps=[line.strip()for line in assembly.splitlines()if ':' in line and line.lstrip()[:1] in '0123456789abcdef' and '<' not in line.split(':')[0]]
             top.append(dict(pc=hex(addr),samples=n,function=name_at,offset=offset,instructions=steps[:3]))
         meta[tag].update(samples=sum(hist[tag].values()),epochs=seen[tag],symbols=hist[tag].most_common(),top_instructions=top)
+    assert len(libc_ids)==1
+    save('libc-build-id',dict(build_id=next(iter(libc_ids))))
     save('symbols-'+name,meta)
     return {tag:v['samples']for tag,v in meta.items()}
