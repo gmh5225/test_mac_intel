@@ -1,7 +1,7 @@
-name: Measure canonical 16-bit short and near jump output with the fixed and general iterator fallback
+name: Measure single-construction legacy vector opcode details and shared register formatting
 on:
   push:
-    branches: [codex/real-mode-relative-final-record]
+    branches: [codex/construct-legacy-vector-opcodes]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-mode-branches-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-opcode-owners-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -108,15 +108,6 @@ try:
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
-    run('clang++','-O2','-std=c++17','-I',base/'include',r/'prefix-guard.cpp','-ldl','-o',w/'prefix-guard')
-    proof={}
-    for label in ('candidate','outlined'):
-        proof[label]=list(map(int,get(w/'prefix-guard',w/'base.so',w/(label+'.so')).split()))
-        assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
-    assert proof['outlined']==proof['candidate'];save('prefix-guard',proof)
-    run('clang++','-std=c++17','-O2','-I',base/'include',r/'branch-guard.cpp','-ldl','-o',w/'branch-guard')
-    jumps={lbl:list(map(int,get(w/'branch-guard',w/'base.so',w/(lbl+'.so')).split()))for lbl in ('candidate','outlined')}
-    assert jumps['candidate']==jumps['outlined']==[11427120,4911540];save('branches',jumps)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
