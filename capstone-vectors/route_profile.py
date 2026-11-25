@@ -33,7 +33,7 @@ def run(r,w,source,build,paths,patch=None,tree=None):
         at=s.index(pat,entry)
         s=s[:at]+'++profile_names[15];\n\t\t'+s[at:]
         if spelling=='ATT':
-            at=s.index('const char *extension_name',s.index('static void printRegName(SStream *OS, unsigned RegNo)\n{'))
+            at=s.index('const char *extension_name',s.index('printRegName(SStream *OS, unsigned RegNo)\n{'))
             s=s[:at]+'++profile_names[16];\n\t'+s[at:]
             if patch:
                 at=s.index('if (!extension_name) {',at);s=s[:at]+'++profile_names[17];\n\t\t'+s[at:]
