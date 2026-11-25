@@ -1,52 +1,54 @@
-#define main original_compare_main
+#define main prior_driver
 #include "trial-compare.cpp"
 #undef main
 
 int main(int argc, char **argv) {
-    if(argc!=3)return 2;
-    Api ref(argv[1]),next(argv[2]);
-    size_t pg=sysconf(_SC_PAGESIZE);
-    auto *p=static_cast<uint8_t *>(mmap(nullptr,2*pg,PROT_READ|PROT_WRITE,MAP_ANON|MAP_PRIVATE,-1,0));
-    check(p!=MAP_FAILED&&!mprotect(p+pg,pg,PROT_NONE),"guard");
-    uint64_t trials=0,accepted=0;
-    for (auto mode:{CS_MODE_16,CS_MODE_32,CS_MODE_64}) {
-        Session a(ref,CS_ARCH_X86,mode),b(next,CS_ARCH_X86,mode);
-        cs_opt_mnem neutral{X86_INS_UD2,"ud2"};a.set(CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&neutral));
-        for (unsigned config=0;config<8;++config) {
-            for(auto *s:{&a,&b}) {
-                s->set(CS_OPT_DETAIL,config&1?CS_OPT_ON:CS_OPT_OFF);
-                s->set(CS_OPT_UNSIGNED,config&2?CS_OPT_ON:CS_OPT_OFF);
-                s->set(CS_OPT_TEXT,config&4?CS_OPT_OFF:CS_OPT_ON);
-            }
-            for (unsigned pre:{0,0x26,0x2e,0x36,0x3e,0x64,0x65,0x66,0x67,0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f}) {
-                for(unsigned op:{0x80,0x81,0xf6,0xf7,0xfe,0xff})
-                for(unsigned mr=0;mr<256;++mr)for(unsigned v=0;v<((mr&7)==4?256u:1u);++v) {
-                    const unsigned ext=(mr>>3)&7;
-                    const bool selected=(op==0x80&&ext==7)||(op==0xf6&&ext==0)||(op==0xff&&(ext==2||ext==4));
-                    if (!selected && v>1 && v!=0x24 && v!=255)continue;
-                    if (mode!=CS_MODE_64 && v>1 && v!=0x24 && v!=255)continue;
-                    uint8_t bytes[12]={};unsigned len=0;
-                    if(pre)bytes[len++]=pre;
-                    bytes[len++]=op;bytes[len++]=mr;if((mr&7)==4)bytes[len++]=v;
-                    for(unsigned i=0;i<5;++i)bytes[len++]=uint8_t(73*(i+1)+mr+v);
-                    for(unsigned avail=0;avail<=len;++avail){
-                        if(!selected && avail!=len)continue;
-                        const uint8_t *pos=p+pg-avail;std::memcpy(p+pg-avail,bytes,avail);
-                        const uint8_t *in[2]={pos,pos};size_t sz[2]={avail,avail};uint64_t ip[2]={0xfffffffffffffffeULL,0xfffffffffffffffeULL};
-                        cs_insn entries[2];cs_detail dt[2];bool ok[2];
-                        for(unsigned i=0;i<2;++i){auto &s=i?b:a;auto &z=entries[i];std::memset(&z,0xa5,sizeof(z));std::memset(&dt[i],0xa5,sizeof(dt[i]));
-                            z.detail=config&1?dt+i:nullptr;z.illegal=z.is_alias=z.usesAliasDetails=false;
-                            ok[i]=s.api.next(s.h,in+i,sz+i,ip+i,&z);check(z.detail==((config&1)?dt+i:nullptr),"record owner");z.detail=nullptr;}
-                        if(ok[0]!=ok[1]||in[0]!=in[1]||sz[0]!=sz[1]||ip[0]!=ip[1]||ref.error(a.h)!=next.error(b.h)||std::memcmp(entries,entries+1,sizeof(cs_insn))||std::memcmp(dt,dt+1,sizeof(cs_detail))){
-                            std::fprintf(stderr,"mismatch mode=%u options=%u prefix=%u op=%x imm=%x avail=%u text=(%s %s)/(%s %s)\n",mode,config,pre,op,v,avail,entries[0].mnemonic,entries[0].op_str,entries[1].mnemonic,entries[1].op_str);
-                            const auto *l=reinterpret_cast<const uint8_t *>(dt),*r=reinterpret_cast<const uint8_t *>(dt+1);
-                            for(size_t k=0;k<sizeof(cs_detail);++k)if(l[k]!=r[k])std::fprintf(stderr," detail[%zu]=%02x/%02x\n",k,l[k],r[k]);
-                            return 1;
-                        }++trials;accepted+=ok[0];
-                    }
-                }
-            }
+  if (argc != 3) return 2;
+  Api base(argv[1]), candidate(argv[2]);
+  uint64_t inputs=0, accepted=0, declined=0;
+  for (cs_mode mode : {CS_MODE_16, CS_MODE_32, CS_MODE_64}) {
+    Session a(base,CS_ARCH_X86,mode), b(candidate,CS_ARCH_X86,mode);
+    for (unsigned option=0;option<6;++option) {
+      const bool details=option!=0;
+      for (Session *s : {&a,&b}) {
+        s->set(CS_OPT_DETAIL,details?CS_OPT_ON:CS_OPT_OFF);
+        s->set(CS_OPT_SYNTAX,option==2?CS_OPT_SYNTAX_ATT:option==3?CS_OPT_SYNTAX_MASM:CS_OPT_SYNTAX_INTEL);
+        s->set(CS_OPT_UNSIGNED,option==4?CS_OPT_ON:CS_OPT_OFF);
+        cs_opt_mnem mnemonic{X86_INS_MOV,option==5?"custom_mask":nullptr};
+        s->set(CS_OPT_MNEMONIC,(size_t)&mnemonic);
+      }
+      auto check_record=[&](const std::vector<uint8_t>&bytes,size_t length,uint64_t address) {
+        const uint8_t *u=bytes.data(),*v=u; size_t left=length,right=length;uint64_t ip=address,pc=ip;
+        cs_insn l,r;cs_detail d,e;
+        memset(&l,0x55,sizeof l);l.illegal=l.is_alias=l.usesAliasDetails=false;r=l;
+        memset(&d,0x5a,sizeof d);memcpy(&e,&d,sizeof d);
+        l.detail=details?&d:nullptr;r.detail=details?&e:nullptr;
+        bool l_ok=base.next(a.h,&u,&left,&ip,&l),r_ok=candidate.next(b.h,&v,&right,&pc,&r);
+        l.detail=r.detail=nullptr;
+        if (l_ok!=r_ok || u!=v || left!=right || ip!=pc || base.error(a.h)!=candidate.error(b.h) || memcmp(&l,&r,sizeof l) || memcmp(&d,&e,sizeof d)) {
+          fprintf(stderr,"relative encoding differs mode=%u option=%u len=%zu bytes=",(unsigned)mode,option,length);
+          for(unsigned char byte:bytes)fprintf(stderr,"%02x",byte);
+          fprintf(stderr," base='%s %s' candidate='%s %s'\n",l.mnemonic,l.op_str,r.mnemonic,r.op_str);exit(3);
         }
+        ++inputs;accepted+=l_ok;declined+=!l_ok;
+      };
+      for (unsigned op=0;op<256;++op) {
+        const bool pair=(op<0x40 && (op&7)<=3)||(op>=0x84&&op<=0x8b);
+        const bool eligible=pair||(op&0xf0)==0x50||(op&0xf8)==0xb8;
+        const std::vector<unsigned> others={0u,4u,0x85u,0xc0u,0xffu};
+        std::vector<unsigned> vals;
+        if(pair)for(unsigned i=0;i<256;++i)vals.push_back(i);else vals=others;
+        for(unsigned mr:vals)for(unsigned pre: {0u,0x66u,0x6766u,0x6666u,0xf366u}) {
+          if(!eligible && pre!=0x66)continue;
+          std::vector<uint8_t> bytes;
+          if(pre>>8)bytes.push_back(pre>>8);
+          if(pre)bytes.push_back(pre&255);
+          bytes.insert(bytes.end(),{uint8_t(op),uint8_t(mr),0xff,0x84,0x97,0xff,0x80});
+          for(size_t n=0;n<=bytes.size();++n)check_record(bytes,n,UINT64_MAX-2);
+        }
+      }
     }
-    std::printf("%llu %llu\n",(unsigned long long)trials,(unsigned long long)accepted);return munmap(p,2*pg)!=0;
+  }
+  if (!declined || !accepted) return 4;
+  printf("%" PRIu64 " %" PRIu64 "\n",inputs,accepted);
 }
