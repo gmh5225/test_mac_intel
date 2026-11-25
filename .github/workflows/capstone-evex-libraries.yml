@@ -1,7 +1,7 @@
-name: Compare archive membership and normal public Intel and AT&T iteration after assigning records to the syntax printer
+name: Compare normal public library links on RISC-V and other real ELF and PE workloads with the original scan decoder
 on:
   push:
-    branches: [codex/x86-att-owner-native-public-dialect]
+    branches: [codex/riscv-printer-public-link]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: syntax-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rv-printer-link-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

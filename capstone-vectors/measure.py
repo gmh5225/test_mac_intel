@@ -12,8 +12,8 @@ def run(*args):sp.run(args,check=True)
 def get(*args):return sp.check_output(args,text=True).strip()
 def sig(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 m=read(r/'layout-source.json');q=m['sources']['base']
-assert get('git','-C',src,'rev-parse','HEAD')==q['parent'] and get('git','-C',nd,'rev-parse','HEAD')==m['neverd']
-assert all(sig(r/(tag+'.patch'))==record['sha256']for tag,record in m['sources'].items())
+assert get('git','-C',src,'rev-parse','HEAD')==m['checkout'] and get('git','-C',nd,'rev-parse','HEAD')==m['neverd']
+assert all(sig(r/(tag+'.patch'))==record['sha256']for tag,record in m['sources'].items()if tag!='base')
 w=Path(tempfile.mkdtemp());build=w/'build'
 try:
     project=w/'project';(project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(src);(project/'cmake').mkdir()
@@ -34,8 +34,9 @@ try:
     (w/'driver.cpp').write_text(driver);run('clang++','-std=c++17','-O3','-DNDEBUG','-I',src/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     bins={};layout={};ar=shutil.which('llvm-ar') or shutil.which('ar')
     for tag,record in m['sources'].items():
-        run('git','-C',src,'reset','--hard',q['parent'])
-        run('git','-C',src,'apply','--index',r/(tag+'.patch'));assert get('git','-C',src,'write-tree')==record['tree']
+        run('git','-C',src,'reset','--hard',m['checkout'])
+        if tag!='base':run('git','-C',src,'apply','--index',r/(tag+'.patch'))
+        assert get('git','-C',src,'write-tree')==record['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         lib,=build.rglob('libcapstone.a');binary=w/tag;mapfile=w/(tag+'.map')
         run('clang++',w/'driver.o',lib,'-no-pie','-fuse-ld=bfd','-Wl,-Map,'+str(mapfile),'-o',binary)
@@ -45,7 +46,13 @@ try:
         compile=read(build/'compile_commands.json')
         settings={'fixed_readers':any('CAPSTONE_STATIC_X86_READERS' in cmd['command']for cmd in compile),
                   'fixed_functions':[name for name in ('X86_decodeFixedRecord32','X86_decodeFixedRecord64')if name in symbols_]}
-        assert settings['fixed_readers']==(tag=='fixed') and len(settings['fixed_functions'])==(2 if tag=='fixed'else 0),(tag,settings)
+        assert not settings['fixed_readers'] and not settings['fixed_functions'],(tag,settings)
+        objects={p.name:sig(p)for p in build.rglob('*.c.o')}
+        assert len(objects)>=50
+        if tag=='base':base_objects=objects
+        changed=sorted(obj for obj in objects if objects[obj]!=base_objects[obj])
+        assert objects.keys()==base_objects.keys() and all(obj.startswith('RISCV') for obj in changed),(tag,changed)
+        settings['changed_objects']=changed
         hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_ATT_printInst','X86_Intel_printInst','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction']
         layout[tag]=dict(members=members,settings=settings,hot={n:symbols_[n]for n in hot},sections=sections,sha256=sig(binary))
         bins[tag]=binary.read_bytes()
