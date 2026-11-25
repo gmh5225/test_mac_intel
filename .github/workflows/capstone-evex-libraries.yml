@@ -1,7 +1,7 @@
-name: Measure MIPS-only alias output on four ELF files with unchanged mixed Capstone archives
+name: Measure MIPS register spelling on four ELF programs in ABI and numeric syntax
 on:
   push:
-    branches: [codex/standalone-mips-alias-streams]
+    branches: [codex/mips-register-spelling-elf]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 08844cf483fb5ce17bba3681ad91ae084c191bab
+          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1263831f6cf4d59c45372480665fc1d8c898b820
+          ref: 6f748e8de6d414c64319dd4287e976568f2d4b6b
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-only-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-gpr-spellings-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

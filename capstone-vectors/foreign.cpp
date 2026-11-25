@@ -13,7 +13,7 @@
 int main(int argc, char **argv) {
   if (argc != 5) return 1;
   const std::string target = argv[1];
-  const unsigned output = std::stoul(argv[3]), repeats = std::stoul(argv[4]);
+  const unsigned request = std::stoul(argv[3]), output = request > 2 ? request - 2 : request, repeats = std::stoul(argv[4]);
   cs_arch arch;
   cs_mode mode;
   if (target == "arm64") { arch = CS_ARCH_AARCH64; mode = CS_MODE_LITTLE_ENDIAN; }
@@ -30,6 +30,7 @@ int main(int argc, char **argv) {
       cs_open(arch, mode, &handle) != CS_ERR_OK ||
       cs_option(handle, CS_OPT_DETAIL, output == 2 ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK ||
       cs_option(handle, CS_OPT_TEXT, output ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK) return 3;
+  if (request > 2 && cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_NOREGNAME) != CS_ERR_OK) return 7;
   cs_insn *insn = cs_malloc(handle);
   if (!insn) return 4;
   uint64_t accepted = 0, rejected = 0, value = 0, boundaries = 14695981039346656037ull;

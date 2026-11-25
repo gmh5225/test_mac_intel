@@ -8,10 +8,11 @@ int main(int argc, char **argv) {
   uint64_t trials=0, accepted=0;
   for (unsigned width : {unsigned(CS_MODE_MIPS32), unsigned(CS_MODE_MIPS64)})
     for (unsigned endian : {0u, unsigned(CS_MODE_BIG_ENDIAN)})
-     for (unsigned opt=0;opt<4;++opt) {
+     for(unsigned syntax=0;syntax<4;++syntax) for (unsigned opt=0;opt<4;++opt) {
       cs_mode mode=static_cast<cs_mode>(width|endian);
       Session a(reference,CS_ARCH_MIPS,mode), b(proposed,CS_ARCH_MIPS,mode);
       for (auto *session : {&a, &b}) {
+        session->set(CS_OPT_SYNTAX,(syntax&1 ? CS_OPT_SYNTAX_NOREGNAME : 0)|(syntax&2 ? CS_OPT_SYNTAX_NO_DOLLAR : 0));
         session->set(CS_OPT_TEXT,opt ? CS_OPT_ON : CS_OPT_OFF);
         session->set(CS_OPT_DETAIL,opt<2 ? CS_OPT_OFF : (opt==2 ? unsigned(CS_OPT_ON) : unsigned(CS_OPT_ON)|unsigned(CS_OPT_DETAIL_REAL)));
       }

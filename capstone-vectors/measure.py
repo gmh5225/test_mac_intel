@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,os,shutil,subprocess as sp,tempfile
+import hashlib,json,os,shlex,shutil,subprocess as sp,tempfile
 from training import fetch
 from extra_mips_time import measure
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir(exist_ok=True);src=r.parent/'source';nd=r.parent/'neverd-config'
@@ -21,9 +21,10 @@ try:
     singlecmd=next(z['command'] for z in rd(one/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
     mixcmd=next(z['command'] for z in rd(mix/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
     assert '-DCAPSTONE_MIPS_ONLY' in singlecmd and '-DCAPSTONE_MIPS_ONLY' not in mixcmd
-    mixed={};products={};domain={};streams={}
+    mixed={};products={};domain={};streams={};real={}
     shutil.copyfile(r/'public-compare.cpp',w/'trial-compare.cpp');shutil.copyfile(r/'mips-domain.cpp',w/'mips-domain.cpp')
     run('clang++','-O2','-std=c++17','-I',src/'include',w/'mips-domain.cpp','-ldl','-o',w/'domain')
+    run('clang++','-O2','-std=c++17','-I',w,'-I',src/'include',r/'real.cpp','-ldl','-o',w/'real')
     corpus=fetch(r,w);manifest=rd(r/'mips-samples.json')['fixtures'];assert len(corpus)==4
     assert all(a['binary_sha256']==manifest[a['name']]['binary_sha256'] and a['text_sha256']==manifest[a['name']]['sha256']for a in corpus);save('mips-corpus',corpus)
     for v in ('base','candidate','outlined'):
@@ -38,15 +39,16 @@ try:
         lib,=one.rglob('libcapstone.a');shared,=one.rglob('libcapstone.so');output=w/(v+'.so');shutil.copy2(shared,output)
         run('clang++','-O3','-std=c++17','-no-pie','-I',src/'include',r/'foreign.cpp',lib,'-o',w/('foreign-'+v))
         products[v]=dict(archive=sha(lib),shared=sha(output),program=sha(w/('foreign-'+v)));save('products',products)
+        run('python3','-B',src/'suite/synctools/mips_register_names.py','--check')
+        args=shlex.split(singlecmd);slot=args.index('-o')
+        run(*args[:slot],'-I',src,r/'stream.c',lib,'-o',w/'guard')
+        streams[v]=list(map(int,out(w/'guard').split()))
+        assert streams[v]==[1136128,0]
         if v!='base':
-            code=(src/'arch/Mips/MipsInstPrinter.c').read_text()
-            helper=(r/(v+'.inc')).read_text()
-            assert helper.split('#define MEASURE_WRITE')[0].strip() in code
-            (w/'alias-writer.inc').write_text(helper)
-            run('clang','-O2','-std=gnu99','-DCAPSTONE_MIPS_ONLY','-DCAPSTONE_USE_SYS_DYN_MEM','-I',w,'-I',src,'-I',src/'include',r/'stream-guard.c',lib,'-o',w/'guard')
-            streams[v]=int(out(w/'guard'));assert streams[v]==458752
-            domain[v]=json.loads(out(w/'domain',w/'base.so',output));assert domain[v]['trials']==5242880 and 0<domain[v]['accepted']<5242880
-    assert domain['candidate']==domain['outlined'];save('guards',dict(domain=domain,streams=streams))
+            domain[v]=json.loads(out(w/'domain',w/'base.so',output));assert domain[v]['trials']==20971520 and domain[v]['accepted']==15190912
+            real[v]={row['name']:list(map(int,out(w/'real',w/'base.so',output,w/(row['name']+'.text')).split())) for row in corpus}
+    assert domain['candidate']==domain['outlined'] and real['candidate']==real['outlined']
+    save('guards',dict(domain=domain,streams=streams,real=real))
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});save('host',dict(cpu=out('lscpu'),compiler=out('clang','--version')))
     measure(corpus,w,save)
     save('complete',dict(complete=True,source=q,hosts=1,pairs=35))

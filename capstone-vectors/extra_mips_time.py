@@ -31,7 +31,7 @@ def measure(rows, w, save):
     data={}
     for row in rows:
         if row['arch'] in ('i386','amd64'):continue
-        for mode in range(3):
+        for mode in range(5):
             n=max(1,math.ceil(25e6/run('base',row,mode,1)[0]))
             expected=run('base',row,mode,n)[2:]
             assert expected[0]>0
@@ -44,5 +44,5 @@ def measure(rows, w, save):
                 cycles.append({k:[sum(x[i]for x in xs)for i in (0,1)]for k,xs in pairs.items()})
             data[row['name']+'/'+str(mode)]=dict(reps=n,checks=expected,cycles=cycles)
             save('foreign-observations',data)
-    assert len(data)==12 and len(verified)==4
+    assert len(data)==20 and len(verified)==4
     save('foreign-fixed',dict(inode=inode,original=image_shas,verified=verified,bytes=length,blocks=len(offsets)))
