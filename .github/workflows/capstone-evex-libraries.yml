@@ -1,7 +1,7 @@
-name: Measure first-byte AMD64 output selection on real instructions and compare all input boundaries
+name: Compare cache-line-aligned i386 entry and AMD64 opcode selection across real PE ELF and firmware
 on:
   push:
-    branches: [codex/amd64-dual-lookup-escape-details]
+    branches: [codex/independent-x86-fetch-alignment]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
+          ref: 08844cf483fb5ce17bba3681ad91ae084c191bab
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c6df2f25c9189936a7b57ee8a01d123be11aba68
+          ref: 1263831f6cf4d59c45372480665fc1d8c898b820
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: first-byte-plans-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: independently-aligned-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

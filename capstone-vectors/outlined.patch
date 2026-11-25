@@ -1,12 +1,12 @@
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..93f2c6ca 100644
+index 21414e7a..930fa43d 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -54,6 +54,19 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -54,6 +54,20 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  #else
  	const bool wide = handle->mode == CS_MODE_64;
  #endif
-+#if defined(X86_FIXED_OUTPUT) && X86_FIXED_WIDE
++#ifdef X86_FIXED_PRIMARY_CURSOR
 +	uint8_t opcode = code[0], rex = 0;
 +	unsigned prefix_class = 0;
 +	if ((opcode & 0xf0) == 0x40 || opcode == 0x0f) {
@@ -17,12 +17,13 @@ index 21414e7a..93f2c6ca 100644
 +		opcode = code[1];
 +	}
 +	const bool has_rex = rex != 0;
++	const bool escaped = prefix_class == 3;
 +	const unsigned plan = x86_simple_plans[1][prefix_class][opcode];
 +#else
  	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
  	const uint8_t rex = has_rex ? code[0] : 0;
  	const bool escaped = code[0] == 0x0f;
-@@ -65,6 +78,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -65,6 +79,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  				      has_rex ? ((rex & 8) ? 2 : 1) :
  						0;
  	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
@@ -30,12 +31,35 @@ index 21414e7a..93f2c6ca 100644
  	if (!plan) {
  #ifdef X86_OUTPUT_MISS
  		return X86_OUTPUT_MISS(handle, code, size, insn, insn_size);
-@@ -256,7 +270,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 				      first, second);
- 		if (relative) {
- 			cs_x86 *x = &insn->detail->x86;
--			if (escaped) {
-+			if (prefix_class == 3) {
- 				x->opcode[0] = 0x0f;
- 				x->opcode[1] = opcode;
- 			}
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 7afca7e4..09cd0f71 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -252,7 +252,11 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #define X86_FIXED_OUTPUT tryOutput64
+ #define X86_FIXED_WIDE true
+ #define X86_OUTPUT_MISS writeExtraOutput64
++#if defined(__ELF__) && defined(__clang__)
++#define X86_FIXED_PRIMARY_CURSOR
++#endif
+ #include "X86SimpleOutputImpl.h"
++#undef X86_FIXED_PRIMARY_CURSOR
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 7bbf1c0d..1f093877 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -211,6 +211,11 @@ bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size
+ #endif
+ #endif
+ 
++/* Keep the i386 iterator entry on its own fetch line as the adjacent
++ * AMD64 formatter changes size. */
++#if defined(__ELF__) && defined(__clang__) && defined(CS_DECODE_TRY_OUTPUT)
++__attribute__((aligned(64)))
++#endif
+ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ 					size_t *size, uint64_t *address,
+ 					cs_insn *insn)
