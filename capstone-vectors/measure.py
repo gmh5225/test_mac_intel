@@ -60,6 +60,14 @@ try:
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'reference')
     run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/'att-reference')
     save('offset-reference',dict(source=reference,archive=sha(lib),exe=sha(w/'reference')))
+    run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+    old_names=maps['previous']
+    assert sha(r/'previous.patch')==old_names['sha256']
+    run('git','-C',base,'apply','--index',r/'previous.patch')
+    assert get('git','-C',base,'write-tree').strip()==old_names['tree']
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/'att-previous')
+    save('register-control',dict(source=old_names,exe=sha(w/'att-previous')))
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
