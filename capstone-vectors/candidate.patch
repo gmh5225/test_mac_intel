@@ -1,177 +1,126 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..f38285fb 100644
+index 1cc3d3a9..34666027 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -241,9 +241,9 @@ static void printRegName(SStream *OS, unsigned RegNo);
- static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- {
- 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
--	if (MCOperand_isReg(Op)) {
-+	if (Op->Kind == kRegister) {
- 		printRegName(O, MCOperand_getReg(Op));
--	} else if (MCOperand_isImm(Op)) {
-+	} else if (Op->Kind == kImmediate) {
- 		uint8_t encsize;
- 		uint8_t opsize =
- 			X86_immediate_size(MCInst_getOpcode(MI), &encsize);
-@@ -556,7 +556,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 		}
- 	}
- 
--	if (MCOperand_isImm(DispSpec)) {
-+	if (DispSpec->Kind == kImmediate) {
- 		int64_t imm = MCOperand_getImm(DispSpec);
- 		if (MI->csh->detail_opt)
- 			MI->flat_insn->detail->x86
-@@ -633,7 +633,7 @@ static void printMemOffs64(MCInst *MI, unsigned OpNo, SStream *O)
- static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
- {
- 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
--	if (MCOperand_isImm(Op)) {
-+	if (Op->Kind == kImmediate) {
- 		int64_t imm = X86_relativeBranchTarget(
- 			MI->csh->mode, MI->address, MI->flat_insn->size,
- 			MCOperand_getImm(Op), MI->imm_size);
-@@ -662,7 +662,7 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
- static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- {
- 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
--	if (MCOperand_isReg(Op)) {
-+	if (Op->Kind == kRegister) {
- 		unsigned int reg = MCOperand_getReg(Op);
- 		printRegName(O, reg);
- 		if (MI->csh->detail_opt) {
-@@ -702,7 +702,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 				MI->flat_insn->detail->x86.op_count++;
- 			}
- 		}
--	} else if (MCOperand_isImm(Op)) {
-+	} else if (Op->Kind == kImmediate) {
- 		// Print X86 immediates as signed values.
- 		uint8_t encsize = 0;
- 		int64_t imm = MCOperand_getImm(Op);
-@@ -923,7 +923,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 		}
- 	}
- 
--	if (MCOperand_isImm(DispSpec)) {
-+	if (DispSpec->Kind == kImmediate) {
- 		DispVal = MCOperand_getImm(DispSpec);
- 		if (MI->csh->detail_opt)
- 			MI->flat_insn->detail->x86
-@@ -937,9 +937,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				// only immediate as address of memory
  				if (DispVal < 0) {
  					SStream_concat(O, "0x%" PRIx64,
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
-+						       (uint64_t)DispVal &
-+						       (UINT64_MAX >> (64 - 8 * X86_effectiveAddressSize(MI))));
++						       x86_absolute_address(MI, DispVal));
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..bdc933f1 100644
+index 457485ab..c5ff1731 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -326,14 +326,15 @@ static bool need_zero_prefix(uint64_t imm)
+@@ -326,72 +326,40 @@ static bool need_zero_prefix(uint64_t imm)
  		return true;
  }
  
--static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
-+static void printImmWithSize(MCInst *MI, SStream *O, int64_t imm, bool positive,
-+			     unsigned operand_size)
- {
- 	if (positive) {
- 		// always print this number in positive form
- 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -368,8 +369,8 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 			}
- 		} else { // Intel syntax
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -443,13 +444,18 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 	}
- }
- 
-+static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
++static void printUnsignedHex(const MCInst *MI, SStream *O, uint64_t value)
 +{
-+	printImmWithSize(MI, O, imm, positive, MI->op1_size);
++	if (MI->csh->syntax != CS_OPT_SYNTAX_MASM)
++		SStream_concat_hex64(O, value, false);
++	else if (value == (UINT64_C(1) << 63))
++		SStream_concat0(O, "8000000000000000h");
++	else if (need_zero_prefix(value))
++		SStream_concat(O, "0%" PRIx64 "h", value);
++	else
++		SStream_concat(O, "%" PRIx64 "h", value);
 +}
 +
- // local printOperand, without updating public operands
- static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
  {
- 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
--	if (MCOperand_isReg(Op)) {
-+	if (Op->Kind == kRegister) {
- 		printRegName(O, MCOperand_getReg(Op));
--	} else if (MCOperand_isImm(Op)) {
-+	} else if (Op->Kind == kImmediate) {
- 		int64_t imm = MCOperand_getImm(Op);
- 		printImm(MI, O, imm, MI->csh->imm_unsigned);
- 	}
-@@ -714,7 +720,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 
- 	SStream_concat0(O, "[");
- 
--	if (MCOperand_isImm(DispSpec)) {
-+	if (DispSpec->Kind == kImmediate) {
- 		int64_t imm = MCOperand_getImm(DispSpec);
- 		if (MI->csh->detail_opt)
- 			MI->flat_insn->detail->x86
-@@ -929,7 +935,7 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
- static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
- {
- 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
--	if (MCOperand_isImm(Op)) {
-+	if (Op->Kind == kImmediate) {
- 		int64_t imm = X86_relativeBranchTarget(
- 			MI->csh->mode, MI->address, MI->flat_insn->size,
- 			MCOperand_getImm(Op), MI->imm_size);
-@@ -979,7 +985,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- {
- 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
- 
--	if (MCOperand_isReg(Op)) {
-+	if (Op->Kind == kRegister) {
- 		unsigned int reg = MCOperand_getReg(Op);
- 
- 		printRegName(O, reg);
-@@ -1016,7 +1022,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 		if (MI->op1_size == 0)
- 			MI->op1_size =
- 				MI->csh->regsize_map[X86_register_map(reg)];
--	} else if (MCOperand_isImm(Op)) {
-+	} else if (Op->Kind == kImmediate) {
- 		uint8_t encsize = 0;
- 		int64_t imm = MCOperand_getImm(Op);
- 		uint8_t opsize =
-@@ -1215,7 +1221,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 		NeedPlus = true;
- 	}
- 
--	if (MCOperand_isImm(DispSpec)) {
-+	if (DispSpec->Kind == kImmediate) {
- 		int64_t DispVal = MCOperand_getImm(DispSpec);
- 		if (MI->csh->detail_opt)
- 			MI->flat_insn->detail->x86
-@@ -1235,11 +1241,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 	if (positive) {
+-		// always print this number in positive form
+-		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
+-			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
+-					default:
+-						break;
+-					case 1:
+-						imm &= 0xff;
+-						break;
+-					case 2:
+-						imm &= 0xffff;
+-						break;
+-					case 4:
+-						imm &= 0xffffffff;
+-						break;
+-					}
+-				}
+-
+-				if (imm == 0x8000000000000000LL) // imm == -imm
+-					SStream_concat0(O, "8000000000000000h");
+-				else if (need_zero_prefix(imm))
+-					SStream_concat(O, "0%" PRIx64 "h", imm);
+-				else
+-					SStream_concat(O, "%" PRIx64 "h", imm);
+-			} else {
+-				if (imm > HEX_THRESHOLD) {
+-					if (need_zero_prefix(imm))
+-						SStream_concat(O,
+-							       "0%" PRIx64 "h",
+-							       imm);
+-					else
+-						SStream_concat(
+-							O, "%" PRIx64 "h", imm);
+-				} else
+-					SStream_concat_dec64(O, imm, false);
++		if (imm < 0) {
++			switch (MI->op1_size) {
++			case 1:
++				imm = (uint8_t)imm;
++				break;
++			case 2:
++				imm = (uint16_t)imm;
++				break;
++			case 4:
++				imm = (uint32_t)imm;
++				break;
++			default:
++				break;
+ 			}
+-		} else { // Intel syntax
+-			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
+-					default:
+-						break;
+-					case 1:
+-						imm &= 0xff;
+-						break;
+-					case 2:
+-						imm &= 0xffff;
+-						break;
+-					case 4:
+-						imm &= 0xffffffff;
+-						break;
+-					}
+-				}
+-
+-				SStream_concat_hex64(O, imm, false);
+-			} else {
+-				if (imm > HEX_THRESHOLD)
+-					SStream_concat_hex64(O, imm, false);
+-				else
+-					SStream_concat_dec64(O, imm, false);
+-			}
+-		}
++			printUnsignedHex(MI, O, (uint64_t)imm);
++		} else if (imm > HEX_THRESHOLD)
++			printUnsignedHex(MI, O, (uint64_t)imm);
++		else
++			SStream_concat_dec64(O, imm, false);
+ 	} else {
+ 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
+ 			if (imm < 0) {
+@@ -1235,11 +1203,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
@@ -180,42 +129,41 @@ index 457485ab..bdc933f1 100644
 -							 MI->csh->mode) &
 -							 DispVal,
 -						 true);
-+					printImmWithSize(MI, O, DispVal, true,
-+							 X86_effectiveAddressSize(MI));
++					printUnsignedHex(MI, O,
++							 x86_absolute_address(MI, DispVal));
  				} else {
  					printImm(MI, O, DispVal, true);
  				}
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..2bc4a5f2 100644
+index 380faa79..d1bd525b 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,17 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,16 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* A displacement used as an absolute address has the effective address
-+ * width even if the memory operand or a following immediate is narrower. */
-+static inline unsigned X86_effectiveAddressSize(const MCInst *mi)
++/* The absolute address wraps at the effective address width. */
++static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
  {
 +	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
 +	const cs_mode mode = mi->csh->mode;
  	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
-+		return address_override ? 4 : 2;
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
  	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+		return address_override ? 2 : 4;
-+	return address_override ? 4 : 8;
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
  }
  
  #endif
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
-index cfd13cba..3b436991 100644
+index cfd13cba..19279ad5 100644
 --- a/tests/unit/x86_legacy_address_size.c
 +++ b/tests/unit/x86_legacy_address_size.c
-@@ -279,9 +279,56 @@ static bool check_other_opcodes(void)
+@@ -279,9 +279,63 @@ static bool check_other_opcodes(void)
  	return ok;
  }
  
@@ -235,12 +183,19 @@ index cfd13cba..3b436991 100644
 +		  8, "eax, dword ptr [0x80001234]", "0x80001234, %eax" },
 +		{ CS_MODE_64, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
 +		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
++		{ 0, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
 +	};
 +	bool ok = true;
 +	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
 +		csh handle;
-+		if (cs_open(CS_ARCH_X86, cases[i].mode, &handle) != CS_ERR_OK)
++		if (cs_open(CS_ARCH_X86, cases[i].mode ? cases[i].mode : CS_MODE_64,
++			    &handle) != CS_ERR_OK)
 +			return false;
++		if (!cases[i].mode && cs_option(handle, CS_OPT_MODE, 0) != CS_ERR_OK) {
++			cs_close(&handle);
++			return false;
++		}
 +		for (unsigned att = 0; att < 2; ++att) {
 +			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
 +					       att ? CS_OPT_SYNTAX_ATT : CS_OPT_SYNTAX_INTEL);

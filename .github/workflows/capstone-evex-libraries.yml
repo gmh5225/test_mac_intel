@@ -1,7 +1,7 @@
-name: Time decoded x86 operand kinds for Intel and AT&T on real binaries and validate address widths
+name: Verify unsigned absolute addresses across mode changes with real PE ELF and foreign controls
 on:
   push:
-    branches: [codex/decoded-operand-kinds-and-address-timing]
+    branches: [codex/x86-unsigned-absolute-addresses]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-operand-kinds-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: absolute-only-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
