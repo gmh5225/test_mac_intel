@@ -1,7 +1,7 @@
-name: Measure scalar conditional moves in the existing AMD64 register map on PE and ELF
+name: Carry the AMD64 prefix into its output miss and verify real records and PE32 performance
 on:
   push:
-    branches: [codex/shared-register-map-cmov]
+    branches: [codex/amd64-reuse-primary-on-output-miss]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-cmov-map-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: known-amd64-primary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
