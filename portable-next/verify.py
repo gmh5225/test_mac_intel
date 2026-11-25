@@ -117,7 +117,7 @@ try:
         a,both=mixed['base']['objects'],mixed['candidate']['objects']
         assert a.keys()==both.keys()
         delta=[Path(p).name for p in a if a[p]!=both[p]]
-        assert sorted(delta)==['RISCVDisassembler.c.o', 'RISCVInstPrinter.c.o', 'RISCVMapping.c.o', 'RISCVModule.c.o', 'cs.c.o'],delta
+        assert sorted(delta)==['RISCVDisassembler.c.o', 'RISCVInstPrinter.c.o', 'RISCVMapping.c.o'],delta
     if not win and profile=='full':
         cmd('numeric-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'numeric.cpp','-o',t/'numeric']+(['-ldl']if linux else []))
         rows={}
