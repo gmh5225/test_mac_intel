@@ -1,156 +1,60 @@
-diff --git a/arch/X86/X86GenSse64RegisterOutput.inc b/arch/X86/X86GenSse64RegisterOutput.inc
-index 189ba45e..c2623ccf 100644
---- a/arch/X86/X86GenSse64RegisterOutput.inc
-+++ b/arch/X86/X86GenSse64RegisterOutput.inc
-@@ -49,22 +49,22 @@ static const struct X86SseRegisterOutput x86_sse_register_outputs[] = {
- 	{ { 0 }, false, false },
- 	{ { 0 }, false, false },
- 	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
--	{ { 0 }, false, false },
-+	{ { 101, "cmovo", "", UINT64_C(8589934592), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 96, "cmovno", "", UINT64_C(8589934592), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 82, "cmovb", "", UINT64_C(137438953472), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 81, "cmovae", "", UINT64_C(137438953472), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 86, "cmove", "", UINT64_C(34359738368), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 94, "cmovne", "", UINT64_C(34359738368), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 83, "cmovbe", "", UINT64_C(171798691840), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 80, "cmova", "", UINT64_C(171798691840), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 104, "cmovs", "", UINT64_C(17179869184), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 100, "cmovns", "", UINT64_C(17179869184), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 102, "cmovp", "", UINT64_C(68719476736), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 97, "cmovnp", "", UINT64_C(68719476736), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 90, "cmovl", "", UINT64_C(25769803776), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 89, "cmovge", "", UINT64_C(25769803776), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 91, "cmovle", "", UINT64_C(60129542144), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
-+	{ { 88, "cmovg", "", UINT64_C(60129542144), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 137, 0, 0, 0 }, 1, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } }, false, false },
- 	{ { 0 }, false, false },
- 	{ { 698, "sqrtps", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 148, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
- 	{ { 643, "rsqrtps", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 148, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 16, 1 } } }, false, true },
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..4fae7992 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -192,6 +192,17 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
- 	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
- 	const unsigned first = entry->reverse ? rm : reg,
- 		       second = entry->reverse ? reg : rm;
-+	/* CMOVcc occupies the previously empty 40..4f slots in this 0F table. */
-+	if ((opcode & 0xf0) == 0x40) {
-+		const struct X86SimpleRegister *bank = x86_simple_registers[rex & 8 ? 3 : 2];
-+		writeExtendRegisters(code, length, insn, insn_size, row, &bank[first],
-+				     &bank[second], rex, opcode, mr, true);
-+		if (insn->detail && (rex & 8)) {
-+			insn->detail->x86.operands[0].size = 8;
-+			insn->detail->x86.operands[1].size = 8;
-+		}
-+		return true;
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..8973ae44 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -54,6 +54,22 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ #else
+ 	const bool wide = handle->mode == CS_MODE_64;
+ #endif
++#if defined(X86_FIXED_OUTPUT) && X86_FIXED_WIDE
++	/* Start with the unprefixed row. REX and 0F occupy empty slots in
++	 * that row and need a second byte to select their opcode map. */
++	uint8_t opcode = code[0], rex = 0;
++	unsigned prefix_class = 0;
++	unsigned plan = x86_simple_plans[1][0][opcode];
++	if (!plan && ((opcode & 0xf0) == 0x40 || opcode == 0x0f)) {
++		if (size < 2)
++			return false;
++		rex = opcode == 0x0f ? 0 : opcode;
++		prefix_class = rex ? 1 + ((rex >> 3) & 1) : 3;
++		opcode = code[1];
++		plan = x86_simple_plans[1][prefix_class][opcode];
 +	}
- 	*insn_size = insn->size = (uint16_t)length;
- 	insn->id = row->id;
- 	memcpy(insn->bytes, code, length);
++	const bool has_rex = rex != 0;
++#else
+ 	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
+ 	const uint8_t rex = has_rex ? code[0] : 0;
+ 	const bool escaped = code[0] == 0x0f;
+@@ -65,6 +81,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 				      has_rex ? ((rex & 8) ? 2 : 1) :
+ 						0;
+ 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
++#endif
+ 	if (!plan) {
+ #ifdef X86_OUTPUT_MISS
+ 		return X86_OUTPUT_MISS(handle, code, size, insn, insn_size);
+@@ -256,7 +273,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 				      first, second);
+ 		if (relative) {
+ 			cs_x86 *x = &insn->detail->x86;
+-			if (escaped) {
++			if (prefix_class == 3) {
+ 				x->opcode[0] = 0x0f;
+ 				x->opcode[1] = opcode;
+ 			}
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index b202bca4..5ed71e8f 100644
+index b202bca4..385eeda8 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -905,6 +905,36 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
- 		  << " memory rows\n";
- }
- 
-+// A CMOV's condition selects its mnemonic and implicit flags. The REX.W bit
-+// selects the size of both registers. Check both sizes before sharing a row.
-+std::string describe_cmov_registers(Decoder &decoder, const RegisterTable &regs,
-+				    uint8_t opcode)
-+{
-+	CheckedRow row;
-+	for (unsigned prefix = 0; prefix <= 16; ++prefix) {
-+		const uint8_t rex = prefix ? uint8_t(0x3f + prefix) : 0;
-+		const bool wide = (rex & 8) != 0;
-+		const auto &bank = regs[wide ? 3 : 2];
-+		for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
-+			const uint8_t code[] = { rex, 0x0f, opcode, uint8_t(mr) };
-+			decoder.decode(code + !rex, 3 + !!rex, 3 + !!rex, 0);
-+			cs_insn insn = *decoder.insn;
-+			cs_detail detail = *insn.detail;
-+			auto &x = detail.x86;
-+			if (x.op_count != 2 || x.operands[0].size != (wide ? 8 : 4) ||
-+			    x.operands[1].size != x.operands[0].size)
-+				throw std::runtime_error("unexpected conditional move width");
-+			x.operands[0].size = x.operands[1].size = 4;
-+			insn.detail = &detail;
-+			const auto &dst = bank[((rex & 4) << 1) | ((mr >> 3) & 7)];
-+			const auto &src = bank[((rex & 1) << 3) | (mr & 7)];
-+			row.observe(describe(insn, opcode, rex, uint8_t(mr),
-+					     &dst, &src, false, false, true));
-+		}
-+	}
-+	return row.fields;
-+}
-+
- void emit_sse64_registers(Decoder &decoder)
- {
- 	X86SimpleRegister regs[16]{};
-@@ -952,6 +982,14 @@ void emit_sse64_registers(Decoder &decoder)
- 			++count;
+@@ -1356,6 +1356,11 @@ int main(int argc, char **argv)
  		}
  	}
-+	RegisterTable gprs{};
-+	describe_registers(decoder, gprs);
-+	for (unsigned opcode = 0x40; opcode <= 0x4f; ++opcode) {
-+		if (opcode < first || opcode > last || !table[opcode].empty())
-+			throw std::runtime_error("unexpected CMOV slot in the 0F map");
-+		table[opcode] = "{ " + describe_cmov_registers(decoder, gprs, uint8_t(opcode)) +
-+				", false, false }";
+ 	add_rex_stack(x64, regs, plans, rows, checked, admitted);
++	// The AMD64 first-byte lookup reserves the escape and REX opcodes.
++	for (unsigned first = 0; first < 256; ++first) {
++		if ((first == 0x0f || (first & 0xf0) == 0x40) && plans[1][0][first] != 0)
++			throw std::runtime_error("AMD64 prefix has an unprefixed output plan");
 +	}
- 	if (table[0x28].empty() || table[0x58].empty() || table[0x59].empty())
- 		throw std::runtime_error("missing legacy SSE register forms");
- 	std::cout
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index e6eec867..46e322cb 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1216,6 +1216,21 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
- 	return true;
- }
- 
-+static bool check_cmov_registers64(csh handles[2])
-+{
-+	for (unsigned cc = 0; cc < 16; ++cc) {
-+		for (unsigned prefix = 0; prefix <= 16; ++prefix) {
-+			for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
-+				const uint8_t bytes[] = { (uint8_t)(0x3f + prefix), 0x0f,
-+							  (uint8_t)(0x40 + cc), (uint8_t)mr };
-+				if (!compare(handles, bytes + !prefix, 3 + !!prefix, cc + mr))
-+					return false;
-+			}
-+		}
-+	}
-+	return true;
-+}
-+
- static bool check_extend64(csh handles[2])
- {
- 	static const uint8_t ops[] = { 0x63, 0xb6, 0xb7, 0xbe, 0xbf };
-@@ -1672,7 +1687,7 @@ static bool check_mode(cs_mode mode)
- 		     (!check_absolute_addresses32(handles) ||
- 		      !check_extend32(handles) || !check_group3_registers32(handles))) ||
- 		    (mode == CS_MODE_64 && private_iter != X86_disasmIter &&
--		     !check_extend64(handles)) ||
-+		     (!check_extend64(handles) || !check_cmov_registers64(handles))) ||
- 		    (private_iter != X86_disasmIter &&
- 		     !check_indirect_memory(handles, mode)) ||
- 		    !check_alu_immediates(handles, mode) ||
+ 	if (test32) {
+ 		emit_test32(plans, regs, rows);
+ 		return 0;
