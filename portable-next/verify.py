@@ -41,7 +41,7 @@ try:
     mixed_sources=d.parent/'neverd-config'
     verify_mixed=linux and profile=='full'
     if verify_mixed:
-        expected_dev='cf7070f32ef716648478d178390c742cbaec5b21'
+        expected_dev='b26e3812d16e6962f90153a677c6e1e5466d0e88'
         assert sp.check_output(['git','-C',mixed_sources,'rev-parse','HEAD'],text=True).strip()==expected_dev
         product=t/'consumer';(product/'third_party').mkdir(parents=True);(product/'third_party/capstone').symlink_to(s)
         (product/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
