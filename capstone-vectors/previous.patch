@@ -1478,7 +1478,7 @@ index cffc4e81..6f12d080 100644
  		}
  		break;
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..715897bb 100644
+index 11582041..62404426 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
 @@ -4,7 +4,14 @@
@@ -1497,14 +1497,16 @@ index 11582041..715897bb 100644
  #include "X86UnsignedImmediate.h"
  static bool X86_MEMORY_IMMEDIATE(
  #elif defined(X86_SEGMENT_LEA32)
-@@ -120,6 +127,21 @@ bool X86_writeMemoryOutput(
+@@ -120,6 +127,23 @@ bool X86_writeMemoryOutput(
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
  	char *out = insn->op_str;
 +#ifdef X86_ATT_MEMORY
++	const unsigned operand_size = push ? row->ops[0].size :
++		((opcode & 1) ? (rex & 8 ? 8 : 4) : 1);
 +	insn->mnemonic[strlen(row->mnemonic)] =
-+		(opcode & 1) ? (rex & 8 ? 'q' : 'l') : 'b';
-+	if (!load) {
++		operand_size == 8 ? 'q' : operand_size == 4 ? 'l' : 'b';
++	if (!load && !push) {
 +		out = writeATTMemoryRegister(out, reg);
 +		memcpy(out, ", ", 2);
 +		out += 2;
@@ -1519,26 +1521,36 @@ index 11582041..715897bb 100644
  	if (load) {
  		memcpy(out, reg->name, sizeof(reg->name));
  		out += reg->length;
-@@ -217,6 +239,7 @@ bool X86_writeMemoryOutput(
+@@ -217,9 +241,16 @@ bool X86_writeMemoryOutput(
  		memcpy(out + 2, reg->name, sizeof(reg->name));
  	}
  #endif
 +#endif /* X86_ATT_MEMORY */
  	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      load ? reg->reg : 0, load ? 0 : reg->reg);
-@@ -264,6 +287,11 @@ bool X86_writeMemoryOutput(
- 			x->sib_scale = (int8_t)mem->mem.scale;
- 			x->sib_index = mem->mem.index;
- 		}
+-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+-				      load ? reg->reg : 0, load ? 0 : reg->reg);
 +#ifdef X86_ATT_MEMORY
-+		cs_x86_op dest = x->operands[0];
-+		x->operands[0] = x->operands[1];
-+		x->operands[1] = dest;
++		const bool reversed = true;
++#else
++		const bool reversed = false;
 +#endif
- 	}
- 	return true;
- }
++		X86_writeSimpleDetailInOrder(insn->detail, row, opcode, rex, modrm,
++					     load ? reg->reg : 0, load ? 0 : reg->reg,
++					     reversed);
+ 		cs_x86 *x = &insn->detail->x86;
+ #ifdef X86_EXTEND64_MEMORY
+ 		if (opcode != 0x63) {
+@@ -242,7 +273,9 @@ bool X86_writeMemoryOutput(
+ 		x->encoding.imm_offset = (uint8_t)imm_offset;
+ 		x->encoding.imm_size = (uint8_t)imm_size;
+ #endif
+-		cs_x86_op *mem = &x->operands[load ? 1 : 0];
++		const unsigned memory_operand =
++			reversed ? row->operand_count - 1u - (unsigned)load : (unsigned)load;
++		cs_x86_op *mem = &x->operands[memory_operand];
+ 		mem->type = X86_OP_MEM;
+ #ifdef X86_MEMORY32_OUTPUT
+ 		mem->mem.base = disp32_only ? X86_REG_INVALID :
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 index 8c6444ab..e4bdaadd 100644
 --- a/arch/X86/X86OutputIterator.c
@@ -1841,7 +1853,7 @@ index 450dc468..8342a094 100644
 +
  #endif
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..3011e1df 100644
+index 21414e7a..f4881fa6 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
 @@ -1,8 +1,7 @@
@@ -1913,7 +1925,7 @@ index 21414e7a..3011e1df 100644
 +		((opcode < 0x40 && (opcode & 7) < 4) ||
 +		 (opcode & 0xfc) == 0x88 || (opcode & 0xfe) == 0x84);
 +	const bool memory = base_memory && !escaped &&
-+		((opcode & 0xfc) == 0x88 || opcode == 0x8d ||
++		((opcode & 0xfc) == 0x88 || opcode == 0x8d || opcode == 0xff ||
 +		 (opcode < 0x40 && (opcode & 7) < 4) || (opcode & 0xfe) == 0x84);
 +	const bool stack = !escaped && (opcode & 0xf0) == 0x50;
 +	const bool no_operands = !has_rex && !escaped &&

@@ -1478,7 +1478,7 @@ index cffc4e81..6f12d080 100644
  		}
  		break;
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..5aac82b8 100644
+index 11582041..62404426 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
 @@ -4,7 +4,14 @@
@@ -1521,28 +1521,36 @@ index 11582041..5aac82b8 100644
  	if (load) {
  		memcpy(out, reg->name, sizeof(reg->name));
  		out += reg->length;
-@@ -217,6 +241,7 @@ bool X86_writeMemoryOutput(
+@@ -217,9 +241,16 @@ bool X86_writeMemoryOutput(
  		memcpy(out + 2, reg->name, sizeof(reg->name));
  	}
  #endif
 +#endif /* X86_ATT_MEMORY */
  	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      load ? reg->reg : 0, load ? 0 : reg->reg);
-@@ -264,6 +289,13 @@ bool X86_writeMemoryOutput(
- 			x->sib_scale = (int8_t)mem->mem.scale;
- 			x->sib_index = mem->mem.index;
- 		}
+-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+-				      load ? reg->reg : 0, load ? 0 : reg->reg);
 +#ifdef X86_ATT_MEMORY
-+		if (!push) {
-+			cs_x86_op dest = x->operands[0];
-+			x->operands[0] = x->operands[1];
-+			x->operands[1] = dest;
-+		}
++		const bool reversed = true;
++#else
++		const bool reversed = false;
 +#endif
- 	}
- 	return true;
- }
++		X86_writeSimpleDetailInOrder(insn->detail, row, opcode, rex, modrm,
++					     load ? reg->reg : 0, load ? 0 : reg->reg,
++					     reversed);
+ 		cs_x86 *x = &insn->detail->x86;
+ #ifdef X86_EXTEND64_MEMORY
+ 		if (opcode != 0x63) {
+@@ -242,7 +273,9 @@ bool X86_writeMemoryOutput(
+ 		x->encoding.imm_offset = (uint8_t)imm_offset;
+ 		x->encoding.imm_size = (uint8_t)imm_size;
+ #endif
+-		cs_x86_op *mem = &x->operands[load ? 1 : 0];
++		const unsigned memory_operand =
++			reversed ? row->operand_count - 1u - (unsigned)load : (unsigned)load;
++		cs_x86_op *mem = &x->operands[memory_operand];
+ 		mem->type = X86_OP_MEM;
+ #ifdef X86_MEMORY32_OUTPUT
+ 		mem->mem.base = disp32_only ? X86_REG_INVALID :
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 index 8c6444ab..e4bdaadd 100644
 --- a/arch/X86/X86OutputIterator.c
@@ -1592,7 +1600,7 @@ index 62d4288a..524d147a 100644
 +
  #endif
 diff --git a/arch/X86/X86PackedMemoryOutput.h b/arch/X86/X86PackedMemoryOutput.h
-index 688c2b27..94e1c036 100644
+index 688c2b27..93c56d3a 100644
 --- a/arch/X86/X86PackedMemoryOutput.h
 +++ b/arch/X86/X86PackedMemoryOutput.h
 @@ -4,16 +4,19 @@
@@ -1613,11 +1621,11 @@ index 688c2b27..94e1c036 100644
  			      uint8_t rex, unsigned offset, size_t size,
 -			      bool vex)
 +			      bool vex, const struct X86SimpleRegister *base_regs,
-+			      bool att, const char *mnemonic)
++			      bool att, const char *mnemonic, bool mandatory)
  {
  	const uint8_t mr = code[offset - 1], opcode = code[offset - 2];
  	const unsigned number = ((mr >> 3) & 7) | ((rex & 4) << 1);
-@@ -29,57 +32,71 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+@@ -29,66 +32,73 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
  			     disp_size == 1 ? (int8_t)code[disp_offset] :
  					      0;
  	const struct X86SimpleRegister *base =
@@ -1645,6 +1653,19 @@ index 688c2b27..94e1c036 100644
 -		if (width == 8)
 -			*out = 'q';
 -		out += 11;
+-	} else {
+-		memcpy(out, "xmmword ptr [", 13);
+-		out += 13;
+-	}
+-#else
+-	memcpy(out, "xmmword ptr [", 13);
+-	if (ll)
+-		*out = 'y';
+-	out += 13;
+-#endif
+-	if (rip) {
+-		memcpy(out, "rip", 3);
+-		out += 3;
 +	if (att) {
 +		if (entry->reverse) {
 +			*out++ = '%';
@@ -1658,38 +1679,6 @@ index 688c2b27..94e1c036 100644
 +			writeVectorRegister(out + 3, ll, number);
 +		}
  	} else {
-+		if (!entry->reverse) {
-+			out = writeVectorRegister(out, ll, number);
-+			memcpy(out, ", ", 2);
-+			out += 2;
-+		}
-+#ifdef X86_LEGACY_PACKED_MEMORY
-+		const unsigned width = row->ops[entry->reverse ? 0 : 1].size;
-+		if (width < 16) {
-+			memcpy(out, "dword ptr [", 11);
-+			if (width == 8)
-+				*out = 'q';
-+			out += 11;
-+		} else {
-+			memcpy(out, "xmmword ptr [", 13);
-+			out += 13;
-+		}
-+#else
- 		memcpy(out, "xmmword ptr [", 13);
-+		if (ll)
-+			*out = 'y';
- 		out += 13;
--	}
--#else
--	memcpy(out, "xmmword ptr [", 13);
--	if (ll)
--		*out = 'y';
--	out += 13;
- #endif
--	if (rip) {
--		memcpy(out, "rip", 3);
--		out += 3;
--	} else {
 -		memcpy(out, base->name, base->length);
 -		out += base->length;
 -	}
@@ -1698,6 +1687,23 @@ index 688c2b27..94e1c036 100644
 -	if (entry->reverse) {
 -		memcpy(out, ", ", 2);
 -		writeVectorRegister(out + 2, ll, number);
++		if (!entry->reverse) {
++			out = writeVectorRegister(out, ll, number);
++			memcpy(out, ", ", 2);
++			out += 2;
++		}
++		const unsigned width = row->ops[entry->reverse ? 0 : 1].size;
++		if (mandatory && width < 16) {
++			memcpy(out, "dword ptr [", 11);
++			if (width == 8)
++				*out = 'q';
++			out += 11;
++		} else {
++			memcpy(out, "xmmword ptr [", 13);
++			if (ll)
++				*out = 'y';
++			out += 13;
++		}
 +		if (rip) {
 +			memcpy(out, "rip", 3);
 +			out += 3;
@@ -1723,7 +1729,17 @@ index 688c2b27..94e1c036 100644
  		cs_x86 *x = &insn->detail->x86;
  		if (vex) {
  			memcpy(x->opcode, code, 2);
-@@ -101,7 +118,7 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+ 		} else {
+ 			x->opcode[1] = opcode;
+-#ifdef X86_LEGACY_PACKED_MEMORY
+-			if (code[0] == 0x66)
++			if (mandatory && code[0] == 0x66)
+ 				x->prefix[2] = 0x66;
+-#endif
+ 		}
+ 		x->encoding.modrm_offset = (uint8_t)(offset - 1);
+ 		if (disp_size) {
+@@ -101,7 +111,7 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
  			x->sib_scale = 1;
  		}
  		x->disp = disp;
@@ -1732,7 +1748,7 @@ index 688c2b27..94e1c036 100644
  		op->type = X86_OP_MEM;
  		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
  		op->mem.scale = 1;
-@@ -110,4 +127,15 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
+@@ -110,4 +120,15 @@ static bool writePackedMemory(const uint8_t *code, cs_insn *insn,
  	return true;
  }
  
@@ -1744,15 +1760,15 @@ index 688c2b27..94e1c036 100644
 +				     bool att)
 +{
 +	return writePackedMemoryMnemonic(code, insn, insn_size, entry, rex, offset,
-+					 size, vex, base_regs, att, entry->output.mnemonic);
++					 size, vex, base_regs, att, entry->output.mnemonic, false);
 +}
 +
  #endif
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..8342a094 100644
+index 450dc468..daa0a5d3 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -68,6 +68,42 @@ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -68,6 +68,46 @@ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  CAPSTONE_INTERNAL void X86_writeImmediateOutput(
  	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
  	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
@@ -1781,6 +1797,10 @@ index 450dc468..8342a094 100644
 +CAPSTONE_INTERNAL bool X86_writePackedVex64(
 +	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
 +	const struct X86SimpleRegister *base_regs, bool att);
++CAPSTONE_INTERNAL bool X86_writeLegacyPacked64(
++	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
++	unsigned offset, uint8_t rex, const struct X86SimpleRegister *base_regs,
++	bool att);
 +/* Bare 0F plus optional REX. The caller checked the header and options. */
 +CAPSTONE_INTERNAL bool X86_writeBareSse64(
 +	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
@@ -1795,7 +1815,7 @@ index 450dc468..8342a094 100644
  
  CAPSTONE_INTERNAL bool
  X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
-@@ -95,6 +131,10 @@ CAPSTONE_INTERNAL bool X86_writeEvexRipMemory(cs_struct *handle,
+@@ -95,6 +135,10 @@ CAPSTONE_INTERNAL bool X86_writeEvexRipMemory(cs_struct *handle,
   * Other compilers retain the established static reader. */
  #if defined(__clang__)
  #define CAPSTONE_X86_EVEX_MEMORY_OUTPUT
@@ -1806,7 +1826,7 @@ index 450dc468..8342a094 100644
  CAPSTONE_INTERNAL bool
  X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			  uint16_t *insn_size,
-@@ -173,11 +213,11 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+@@ -173,11 +217,11 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
  	return out + length;
  }
  
@@ -1820,7 +1840,7 @@ index 450dc468..8342a094 100644
  {
  	memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
  	memcpy(detail->regs_read, row->reads, sizeof(row->reads));
-@@ -197,7 +237,7 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+@@ -197,7 +241,7 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
  	x86->encoding.imm_size = row->imm_size;
  	x86->op_count = row->operand_count;
  	for (unsigned i = 0; i < x86->op_count; ++i) {
@@ -1829,7 +1849,7 @@ index 450dc468..8342a094 100644
  		op->type = X86_OP_REG;
  		op->reg = (x86_reg)(i ? second : first);
  		op->size = row->ops[i].size;
-@@ -205,4 +245,14 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+@@ -205,4 +249,14 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
  	}
  }
  
@@ -1845,7 +1865,7 @@ index 450dc468..8342a094 100644
 +
  #endif
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..f4881fa6 100644
+index 21414e7a..85181a59 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
 @@ -1,8 +1,7 @@
@@ -1873,7 +1893,7 @@ index 21414e7a..f4881fa6 100644
  static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
  			     size_t size, cs_insn *insn, uint16_t *insn_size)
  #else
-@@ -53,6 +58,32 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -53,6 +58,42 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  	const bool wide = X86_FIXED_WIDE;
  #else
  	const bool wide = handle->mode == CS_MODE_64;
@@ -1885,6 +1905,16 @@ index 21414e7a..f4881fa6 100644
 +	    X86_writeBareSse64(code, size, insn, insn_size, 3u + sse_rex,
 +			       sse_rex ? code[0] : 0, x86_simple_registers[3], true))
 +		return true;
++	if (wide && size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
++		const uint8_t mandatory_rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
++		const unsigned offset = 4 + (mandatory_rex != 0);
++		if (size >= offset && code[offset - 3] == 0x0f && code[offset - 1] < 0xc0) {
++			if (X86_OUTPUT_UNSUPPORTED_FOR(handle, false, false, X86_ATT_printInst))
++				return false;
++			return X86_writeLegacyPacked64(code, size, insn, insn_size, offset,
++						       mandatory_rex, x86_simple_registers[3], true);
++		}
++	}
 +	const bool evex = wide && code[0] == 0x62;
 +	if (evex || (code[0] & 0xfe) == 0xc4 || code[0] == 0x66) {
 +		if (X86_OUTPUT_UNSUPPORTED_FOR(handle, !wide && handle->mode != CS_MODE_32,
@@ -1906,7 +1936,7 @@ index 21414e7a..f4881fa6 100644
  #endif
  	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
  	const uint8_t rex = has_rex ? code[0] : 0;
-@@ -111,8 +142,29 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -111,8 +152,29 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
  		}
  	}
@@ -1936,7 +1966,7 @@ index 21414e7a..f4881fa6 100644
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
  		if (plan == X86_PLAN_VECTOR) {
-@@ -148,6 +200,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -148,6 +210,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			if (size < (opcode == 0x81 ? 6u : 3u) + has_rex)
  				return false;
  			const unsigned group = (modrm >> 3) & 7;
@@ -1947,7 +1977,7 @@ index 21414e7a..f4881fa6 100644
  			row = plan == X86_PLAN_SHIFT_IMM8 ?
  				      x86_shift_rows[wide][prefix_class][group] :
  				      x86_simple_plans[wide][prefix_class]
-@@ -157,13 +213,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -157,13 +223,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  						   [((rex & 1) << 3) |
  						    (modrm & 7)];
  		}
@@ -1970,7 +2000,7 @@ index 21414e7a..f4881fa6 100644
  		if (opcode == 0xff && (modrm & 0x38) != 0x30)
  			row = &x86_indirect_memory[(modrm & 0x20) != 0];
  		return X86_MEMORY32_OUTPUT(code, size, insn, insn_size, row,
-@@ -190,9 +254,22 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -190,9 +264,22 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			first = row->ops[0].reg;
  			insn->bytes[1] = opcode;
  		}
@@ -1993,7 +2023,7 @@ index 21414e7a..f4881fa6 100644
  		const uint8_t *bytes = code + row->imm_offset;
  		int64_t delta;
  		if (row->imm_size == 1) {
-@@ -239,11 +316,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -239,11 +326,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
  		const struct X86SimpleRegister *b =
  			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
@@ -2015,7 +2045,7 @@ index 21414e7a..f4881fa6 100644
  		first = a->reg;
  		second = b->reg;
  		insn->bytes[1] = code[1];
-@@ -262,9 +349,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -262,9 +359,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			}
  			x->operands[0].type = X86_OP_IMM;
  			x->operands[0].imm = (int64_t)target;
@@ -2140,7 +2170,7 @@ index 7afca7e4..a5feaf58 100644
  
  #include "X86RoundedRegisterPlan.h"
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..fd3e3f2b 100644
+index 504682a4..9752a369 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
 @@ -16,7 +16,6 @@
@@ -2151,7 +2181,19 @@ index 504682a4..fd3e3f2b 100644
  #include "../../cs_disasm_internal.h"
  #ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
  #define X86_EVEX_INDEXED_SIB
-@@ -157,25 +156,11 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -30,11 +29,6 @@
+ #ifdef CAPSTONE_X86_ONLY
+ #include "X86VexBaseMemory.h"
+ #endif
+-#define X86_LEGACY_PACKED_MEMORY
+-#include "X86PackedMemoryOutput.h"
+-#undef X86_LEGACY_PACKED_MEMORY
+-#include "X86GenLegacyPackedMemory.inc"
+-
+ #include "X86GenLegacyRegisterImmediates.inc"
+ #include "X86GenLegacyMap38Registers.inc"
+ 
+@@ -157,25 +151,11 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  		       cs_insn *insn, uint16_t *insn_size, bool batch)
  {
@@ -2181,18 +2223,27 @@ index 504682a4..fd3e3f2b 100644
  	}
  #ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
  	if (size >= 7 && code[0] == 0x62 && code[5] < 0xc0 &&
-@@ -220,7 +205,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
- 				    writePackedMemory(code, insn, insn_size,
- 						      &legacy_packed_rows[row],
+@@ -212,15 +192,9 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 					    code, insn, insn_size, offset, rex))
+ 					return true;
+ 			} else if (code[offset - 1] < 0xc0) {
+-				const unsigned bank =
+-					code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
+-				const unsigned row =
+-					legacy_packed_plans[bank][opcode];
+-				if (row &&
+-				    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+-				    writePackedMemory(code, insn, insn_size,
+-						      &legacy_packed_rows[row],
 -						      rex, offset, size, false))
-+						      rex, offset, size, false,
-+						      x86_simple_registers[3], false))
++				if (!X86_OUTPUT_UNSUPPORTED(handle, false) &&
++				    X86_writeLegacyPacked64(code, size, insn, insn_size,
++							    offset, rex, x86_simple_registers[3], false))
  					return true;
  			} else if (code[0] == 0x66 && opcode >= 0x70 &&
  				   opcode <= 0x73 && size > offset &&
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..93b630ef 100644
+index dceebc42..74c7d6ab 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -9,6 +9,7 @@
@@ -2203,7 +2254,7 @@ index dceebc42..93b630ef 100644
  struct PaddingOutput {
  	unsigned id;
  	uint8_t length;
-@@ -20,8 +21,145 @@ struct PaddingOutput {
+@@ -20,8 +21,160 @@ struct PaddingOutput {
  		index, scale;
  };
  
@@ -2216,9 +2267,24 @@ index dceebc42..93b630ef 100644
 +#include "X86PackedMemoryOutput.h"
 +#include "X86GenSse64RegisterOutput.inc"
 +#include "X86GenVex64PackedMemory.inc"
++#include "X86GenLegacyPackedMemory.inc"
 +#ifndef CAPSTONE_X86_ATT_DISABLE
 +#include "X86GenVex64PackedATT.inc"
 +#endif
++
++CAPSTONE_INTERNAL bool X86_writeLegacyPacked64(
++	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
++	unsigned offset, uint8_t rex, const struct X86SimpleRegister *base_regs,
++	bool att)
++{
++	const unsigned bank = code[0] == 0x66 ? 0 : 1 + (code[0] & 1);
++	const unsigned plan = legacy_packed_plans[bank][code[offset - 2]];
++	if (!plan)
++		return false;
++	const struct X86SseRegisterOutput *entry = &legacy_packed_rows[plan];
++	return writePackedMemoryMnemonic(code, insn, insn_size, entry, rex, offset,
++					 size, false, base_regs, att, entry->output.mnemonic, true);
++}
 +
 +CAPSTONE_INTERNAL bool X86_writePackedVex64(
 +	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
@@ -2240,7 +2306,7 @@ index dceebc42..93b630ef 100644
 +#endif
 +	const uint8_t rex = (uint8_t)(0x40 | ((~(unsigned)code[1] >> 5) & 4));
 +	return writePackedMemoryMnemonic(code, insn, insn_size, entry, rex, 4, size,
-+					 true, base_regs, att, mnemonic);
++					 true, base_regs, att, mnemonic, false);
 +}
 +
 +
@@ -2349,7 +2415,7 @@ index dceebc42..93b630ef 100644
  
  #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
  static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
-@@ -29,29 +167,18 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -29,29 +182,18 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  			       const struct X86SimpleRegister *regs);
  #endif
  
@@ -2384,7 +2450,7 @@ index dceebc42..93b630ef 100644
  	if (!row || (row->immediate && size < 7))
  		return false;
  	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
-@@ -66,12 +193,46 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -66,12 +208,46 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
  			return false;
  		const unsigned pair[] = { regs[2], regs[0] };
@@ -2435,7 +2501,7 @@ index dceebc42..93b630ef 100644
  }
  
  /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
-@@ -184,7 +345,7 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+@@ -184,7 +360,7 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
  
  static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  				      cs_insn *insn, uint16_t *insn_size,
@@ -2444,7 +2510,7 @@ index dceebc42..93b630ef 100644
  {
  	if (size < 4)
  		return false;
-@@ -210,9 +371,17 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -210,9 +386,17 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
@@ -2465,7 +2531,7 @@ index dceebc42..93b630ef 100644
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
  		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -228,7 +397,7 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -228,7 +412,7 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  		x->encoding.modrm_offset = (uint8_t)(length - 1);
  		x->op_count = 2;
  		for (unsigned i = 0; i < 2; ++i) {
@@ -2474,7 +2540,7 @@ index dceebc42..93b630ef 100644
  			op->type = X86_OP_REG;
  			op->reg =
  				(x86_reg)(X86_REG_XMM0 + (i ? second : first));
-@@ -393,7 +562,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -393,7 +577,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
   * Memory forms and unsupported vector widths fall back before any output. */
  static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  				   cs_insn *insn, uint16_t *insn_size,
@@ -2483,7 +2549,7 @@ index dceebc42..93b630ef 100644
  {
  	const unsigned flags = code[prefix - 1];
  	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
-@@ -411,9 +580,9 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -411,9 +595,9 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  			return false;
  		const unsigned regs[] = { (~flags >> 3) & 15,
  					  (modrm & 7) | ((rxb & 1) << 3) };
@@ -2495,7 +2561,7 @@ index dceebc42..93b630ef 100644
  	}
  	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
  	const unsigned index = vex_register_widths[plan][w * 2 + ll];
-@@ -425,10 +594,44 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -425,9 +609,43 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
  				  (~flags >> 3) & 15,
  				  (modrm & 7) | ((rxb & 1) << 3) };
@@ -2503,8 +2569,8 @@ index dceebc42..93b630ef 100644
 -				    0x40 | (w << 3) | rxb, ll, regs, 3);
 +	return writeVectorRegistersDialect(code, insn, insn_size, row, prefix, ll,
 +				    0x40 | (w << 3) | rxb, ll, regs, 3, att);
- }
- 
++}
++
 +#ifndef CAPSTONE_X86_ATT_DISABLE
 +#define X86_VEX32_ATT_MEMORY
 +#include "X86Vex32MemoryRecord.h"
@@ -2536,13 +2602,12 @@ index dceebc42..93b630ef 100644
 +		insn->detail->x86.addr_size = 4;
 +	}
 +	return true;
-+}
+ }
 +#endif
-+
+ 
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
- 			   const struct X86SimpleRegister *regs, bool wide)
-@@ -440,7 +643,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -440,7 +658,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		return writePaddingOutput(code, size, insn, insn_size, wide);
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
@@ -2551,7 +2616,7 @@ index dceebc42..93b630ef 100644
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
-@@ -448,7 +651,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -448,7 +666,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
@@ -2560,7 +2625,7 @@ index dceebc42..93b630ef 100644
  	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
-@@ -458,15 +661,9 @@ __declspec(noinline)
+@@ -458,15 +676,9 @@ __declspec(noinline)
  #elif defined(__GNUC__)
  __attribute__((noinline))
  #endif
@@ -2579,7 +2644,7 @@ index dceebc42..93b630ef 100644
  {
  	if (
  #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
-@@ -497,24 +694,30 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -497,24 +709,30 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
@@ -2627,7 +2692,7 @@ index dceebc42..93b630ef 100644
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
  		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -536,7 +739,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -536,7 +754,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  			x->sib_base = (x86_reg)base->reg;
  		}
  		x->op_count = 2;
@@ -2636,7 +2701,7 @@ index dceebc42..93b630ef 100644
  		op->type = X86_OP_REG;
  		op->size = (uint8_t)(16u << ll);
  		static const x86_reg vector_bases[] = { X86_REG_XMM0,
-@@ -544,7 +747,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -544,7 +762,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  							X86_REG_ZMM0 };
  		op->reg = (x86_reg)(vector_bases[ll] + dst);
  		op->access = (cs_ac_type)row->access[0];
@@ -2645,7 +2710,7 @@ index dceebc42..93b630ef 100644
  		op->type = X86_OP_MEM;
  		op->size = 16;
  		op->mem.base = (x86_reg)base->reg;
-@@ -555,5 +758,36 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -555,5 +773,36 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  	return true;
  }
  
@@ -3187,7 +3252,7 @@ index d735f83c..244e45c0 100644
  
  if __name__ == "__main__":
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index b202bca4..1e570da6 100644
+index b202bca4..e8b2a44e 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
 @@ -659,11 +659,61 @@ std::string describe_sse_pair(Decoder &decoder, const X86SimpleRegister *regs,
@@ -3253,15 +3318,34 @@ index b202bca4..1e570da6 100644
  {
  	const bool vex = selector >= 0;
  	const unsigned width_bytes = vex && (selector & 4) ? 32 : 16;
-@@ -756,6 +806,7 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
+@@ -686,13 +736,12 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
+ 						  selector);
+ 			}
+ 			const unsigned start = !rex, header = 4 - start;
++			uint8_t encoded[sizeof(code) + 1] = { mandatory };
++			const uint8_t *packed = mandatory ? encoded : code + start;
+ 			auto decode_packed = [&](unsigned length) {
+-				if (!mandatory)
+-					return decode_sse(decoder, code + start,
+-							  length);
+-				uint8_t encoded[1 + sizeof(code)] = { mandatory };
+-				std::memcpy(encoded + 1, code + start, length);
+-				return decode_sse(decoder, encoded, length + 1);
++				if (mandatory)
++					std::memcpy(encoded + 1, code + start, length);
++				return decode_sse(decoder, packed, length + (mandatory != 0));
+ 			};
+ 			if (!decode_packed(header))
+ 				return false;
+@@ -756,6 +805,7 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
  						return false;
  					const std::string address(bracket);
  					if (!decode_packed(length) || insn.id != id ||
-+					    (att && !matches_att_sse(*att, insn, code + start, length, att_name)) ||
++					    (att && !matches_att_sse(*att, insn, packed, length + (mandatory != 0), att_name)) ||
  					    mnemonic != insn.mnemonic)
  						return false;
  					const auto &memory = insn.detail->x86.operands[reverse ? 0 : 1];
-@@ -848,10 +899,11 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
+@@ -848,10 +898,11 @@ bool supports_packed_memory(Decoder &decoder, unsigned opcode, bool reverse,
  	return true;
  }
  
@@ -3274,15 +3358,16 @@ index b202bca4..1e570da6 100644
  	const uint8_t prefixes[] = { 0x66, 0xf2, 0xf3 };
  	const unsigned blocks = legacy ? 3 : 8;
  	for (unsigned flags = 0; flags < blocks; ++flags) {
-@@ -862,6 +914,23 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
+@@ -862,6 +913,24 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
  					    decoder, opcode, reverse,
  					    legacy ? -1 : int(flags), &row, legacy ? prefixes[flags] : 0))
  					continue;
 +				std::string att_name;
 +				if (att) {
 +					std::string fields;
-+					if (!supports_packed_memory(decoder, opcode, reverse, int(flags),
-+												&fields, 0, att, &att_name) || fields != row) {
++					if (!supports_packed_memory(decoder, opcode, reverse,
++								    legacy ? -1 : int(flags), &fields,
++								    legacy ? prefixes[flags] : 0, att, &att_name) || fields != row) {
 +						att_name = "-";
 +					} else {
 +						const auto start = row.find('"');
@@ -3312,13 +3397,16 @@ index b202bca4..1e570da6 100644
  				break;
  			}
  		}
-@@ -879,6 +952,25 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
- 	    (legacy ? !plans[0][0x58] || !plans[0][0x6f] || !plans[2][0x6f] :
+@@ -880,6 +953,28 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
  		    !plans[0][0x10] || !plans[4][0x29] || !plans[5][0x6f]))
  		throw std::runtime_error("unexpected packed memory rows");
-+	if (att) {
-+		std::cout << "/* Generated by x86_simple_output.cpp --vex64-att-packed-memory. */\n"
-+					 "static const char *vex64PackedATTMnemonic(unsigned plan)\n{\n"
+ 	const char *name = legacy ? "legacy" : "vex64";
++	if (att && legacy && std::any_of(att_names.begin(), att_names.end(),
++			[](const std::string &spelling) { return !spelling.empty(); }))
++		throw std::runtime_error("AT&T legacy memory operands or mnemonic differ");
++	if (att && !legacy) {
++		std::cout << "/* Generated by x86_simple_output.cpp --" << name << "-att-packed-memory. */\n"
++					 << "static const char *" << name << "PackedATTMnemonic(unsigned plan)\n{\n"
 +					 "\tswitch (plan) {\n";
 +		for (unsigned i = 1; i < att_names.size(); ++i) {
 +			const auto &spelling = att_names[i];
@@ -3328,17 +3416,17 @@ index b202bca4..1e570da6 100644
 +			if (spelling == "-")
 +				std::cout << "\n\t\treturn NULL;\n";
 +			else
-+				std::cout << " {\n\t\tstatic const char name[sizeof(vex64_packed_rows[0].output.mnemonic)] = \""
++				std::cout << " {\n\t\tstatic const char name[sizeof(" << name << "_packed_rows[0].output.mnemonic)] = \""
 +						  << spelling << "\";\n\t\treturn name;\n\t}\n";
 +		}
-+		std::cout << "\tdefault:\n\t\treturn vex64_packed_rows[plan].output.mnemonic;\n\t}\n}\n";
++		std::cout << "\tdefault:\n\t\treturn " << name << "_packed_rows[plan].output.mnemonic;\n\t}\n}\n";
 +		std::cerr << rows.size() - 1 << " packed rows checked against Intel and AT&T\n";
 +		return;
 +	}
- 	const char *name = legacy ? "legacy" : "vex64";
  	std::cout << "/* Generated by x86_simple_output.cpp --" << name
  		  << "-packed-memory. */\n"
-@@ -905,7 +997,7 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
+ 		  << "static const struct X86SseRegisterOutput " << name
+@@ -905,7 +1000,7 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
  		  << " memory rows\n";
  }
  
@@ -3347,7 +3435,7 @@ index b202bca4..1e570da6 100644
  {
  	X86SimpleRegister regs[16]{};
  	for (unsigned i = 0; i < 16; ++i) {
-@@ -941,12 +1033,28 @@ void emit_sse64_registers(Decoder &decoder)
+@@ -941,12 +1036,28 @@ void emit_sse64_registers(Decoder &decoder)
  				}
  		}
  		if (uniform) {
@@ -3382,21 +3470,22 @@ index b202bca4..1e570da6 100644
  			first = std::min(first, opcode);
  			last = opcode;
  			++count;
-@@ -1191,6 +1299,13 @@ void emit_indirect64(Decoder &decoder, const RegisterTable &regs)
+@@ -1191,6 +1302,14 @@ void emit_indirect64(Decoder &decoder, const RegisterTable &regs)
  
  int main(int argc, char **argv)
  {
-+	if (argc == 2 && std::strcmp(argv[1], "--vex64-att-packed-memory") == 0) {
++	const bool att_legacy_memory = argc == 2 && std::strcmp(argv[1], "--check-legacy-att") == 0;
++	if (att_legacy_memory || (argc == 2 && std::strcmp(argv[1], "--vex64-att-packed-memory") == 0)) {
 +		Decoder intel(CS_MODE_64), att(CS_MODE_64);
 +		if (cs_option(att.handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT))
 +			throw std::runtime_error("AT&T syntax is required for packed memory records");
-+		emit_packed_memory(intel, false, &att);
++		emit_packed_memory(intel, att_legacy_memory, &att);
 +		return 0;
 +	}
  	if (argc == 2 && std::strcmp(argv[1], "--vex64-packed-memory") == 0) {
  		Decoder decoder(CS_MODE_64);
  		emit_packed_memory(decoder, false);
-@@ -1208,6 +1323,13 @@ int main(int argc, char **argv)
+@@ -1208,6 +1327,13 @@ int main(int argc, char **argv)
  		emit_packed_memory(decoder, true);
  		return 0;
  	}
@@ -3410,12 +3499,12 @@ index b202bca4..1e570da6 100644
  	if (argc == 2 && std::strcmp(argv[1], "--sse64-registers") == 0) {
  		Decoder decoder(CS_MODE_64);
  		emit_sse64_registers(decoder);
-@@ -1228,7 +1350,7 @@ int main(int argc, char **argv)
+@@ -1228,7 +1354,7 @@ int main(int argc, char **argv)
  	const bool group3 = argc == 2 && std::strcmp(argv[1], "--group3-registers32") == 0;
  	if (argc != 1 && !indirect && !extend && !test32 && !group3)
  		throw std::runtime_error(
 -			"expected no arguments, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32, --extend64, --test32-registers or --group3-registers32");
-+			"expected no arguments, --sse64-registers, --check-sse64-att, --vex64-packed-memory, --vex64-att-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32, --extend64, --test32-registers or --group3-registers32");
++			"expected no arguments, --sse64-registers, --check-sse64-att, --vex64-packed-memory, --vex64-att-packed-memory, --legacy-packed-memory, --check-legacy-att, --indirect-memory, --indirect64, --extend32, --extend64, --test32-registers or --group3-registers32");
  	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
  	RegisterTable regs{};
  	describe_registers(x64, regs);
