@@ -114,6 +114,9 @@ try:
         proof[label]=list(map(int,get(w/'prefix-guard',w/'base.so',w/(label+'.so')).split()))
         assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
     assert proof['outlined']==proof['candidate'];save('prefix-guard',proof)
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'branch-guard.cpp','-ldl','-o',w/'branch-guard')
+    jumps={lbl:list(map(int,get(w/'branch-guard',w/'base.so',w/(lbl+'.so')).split()))for lbl in ('candidate','outlined')}
+    assert jumps['candidate']==jumps['outlined']==[11427120,4911540];save('branches',jumps)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
