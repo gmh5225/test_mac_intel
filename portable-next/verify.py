@@ -71,7 +71,7 @@ try:
                 cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
                 assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
                 assert ('-DCAPSTONE_X86_ITERATOR_READERS' in cs['command'])==False
-                assert ('CAPSTONE_MIXED_X86_MODE_READERS' in cs['command'])==(name=='fixed' and folder==solo and not mac),(name,profile,folder)
+                assert ('CAPSTONE_MIXED_X86_MODE_READERS' in cs['command'])==False,(name,profile,folder)
 
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']

@@ -1,7 +1,7 @@
-name: Verify public scalar and fixed Intel readers in 19 Windows Linux and macOS configurations including static-only MSVC and GNU Make
+name: Verify high moffs addresses across Windows Linux macOS static shared and reduced configurations
 on:
   push:
-    branches: [codex/public-mixed-intel-reader-configs]
+    branches: [codex/moffs-address-width-static-shared-ports]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: public-mixed-reader-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: moffs-address-width-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
