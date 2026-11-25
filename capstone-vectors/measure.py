@@ -50,6 +50,13 @@ try:
         run(*args[:slot],'-I',src,r/'stream.c',lib,'-o',w/'guard')
         streams[v]=list(map(int,out(w/'guard').split()))
         assert streams[v]==[1136128,0]
+        run(*args[:slot],'-I',src,r/'comments.c',lib,'-o',w/'comment-guard')
+        checked=int(out(w/'comment-guard'));assert checked==512*513*4+1
+        save('comment-'+v,dict(checked=checked))
+        if os.uname().machine=='x86_64' and v=='outlined':
+            run(*args[:slot],'-O1','-g','-fsanitize=address,undefined','-fno-sanitize-recover=all','-I',src,r/'comments.c',lib,'-o',w/'comment-instrumented')
+            assert int(out(w/'comment-instrumented'))==checked
+
         if v!='base':
             domain[v]=json.loads(out(w/'domain',w/'base.so',output));assert domain[v]['trials']==20971520 and domain[v]['accepted']==15190912
             real[v]={row['name']:list(map(int,out(w/'real',w/'base.so',output,w/(row['name']+'.text')).split())) for row in corpus}

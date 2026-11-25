@@ -1,102 +1,43 @@
 diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 40bf05b4..5642b8aa 100644
+index 40bf05b4..632369f0 100644
 --- a/arch/Mips/MipsInstPrinter.c
 +++ b/arch/Mips/MipsInstPrinter.c
-@@ -117,6 +117,33 @@ static const char *MipsFCCToString(Mips_CondCode CC)
+@@ -29,6 +29,13 @@
+ #include <stdlib.h>
+ #include <capstone/platform.h>
  
- const char *Mips_LLVM_getRegisterName(unsigned RegNo, bool noRegName);
- 
-+#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
-+    defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
-+#define MIPS_DIRECT_NUMERIC_NAMES
++#if defined(__linux__) && defined(__x86_64__) && defined(__SSE2__) && \
++    defined(__clang__) && defined(CAPSTONE_MIPS_ONLY) && \
++    !defined(CAPSTONE_DIET) && !defined(_KERNEL_MODE) && \
++    !defined(CAPSTONE_HAS_OSXKERNEL)
++#define MIPS_NATIVE_COMMENT_SEARCH
++#endif
 +
-+/* The printed numeric spelling comes from the generated LLVM register table. */
-+static bool appendNumericRegister(SStream *OS, MCRegister reg, bool dollar)
+ #include "MipsMapping.h"
+ #include "MipsInstPrinter.h"
+ 
+@@ -165,10 +172,23 @@ static void printRegName(MCInst *MI, SStream *OS, MCRegister Reg)
+ 				    Reg, syntax_opt & CS_OPT_SYNTAX_NOREGNAME));
+ }
+ 
++#ifdef MIPS_NATIVE_COMMENT_SEARCH
++static void stripMipsComment(SStream *O)
 +{
-+	const char *name = Mips_LLVM_getRegisterName(reg, true);
-+	if (!name || OS->is_closed || OS->markup_stream || OS->prefixed_by_markup)
-+		return false;
-+	if (name[0] < '0' || name[0] > '9' || OS->index >= SSTREAM_BUF_LEN - 3)
-+		return false;
-+	const bool pair = name[1] != '\0';
-+	if (pair && (name[1] < '0' || name[1] > '9' || name[2] != '\0'))
-+		return false;
-+	char *out = OS->buffer + OS->index;
-+	if (dollar)
-+		*out++ = '$';
-+	*out++ = name[0];
-+	if (pair)
-+		*out++ = name[1];
-+	*out = '\0';
-+	OS->index += dollar + 1 + pair;
-+	return true;
++	char *comment = strchr(O->buffer, '#');
++	if (comment && comment != O->buffer + sizeof(O->buffer) - 1)
++		*comment = '\0';
 +}
 +#endif
 +
- /* Use the numeric and ABI register tables in the dedicated Linux arm64 printer. */
- #if defined(__linux__) && defined(__aarch64__) && defined(__clang__) && \
-     defined(CAPSTONE_MIPS_ONLY)
-@@ -157,6 +184,11 @@ static void printRegName(MCInst *MI, SStream *OS, MCRegister Reg)
- 			return;
- 		}
- 	}
+ static void patch_cs_printer(MCInst *MI, SStream *O)
+ {
+-	// replace '# 16 bit inst' to empty.
++	/* MIPS16 and nanoMIPS writers can append an assembly comment. */
++#ifdef MIPS_NATIVE_COMMENT_SEARCH
++	stripMipsComment(O);
++#else
+ 	SStream_replc(O, '#', 0);
 +#endif
-+#ifdef MIPS_DIRECT_NUMERIC_NAMES
-+	if ((syntax_opt & CS_OPT_SYNTAX_NOREGNAME) &&
-+	    appendNumericRegister(OS, Reg, !(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR)))
-+		return;
- #endif
- 	if (!(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR)) {
- 		SStream_concat1(OS, '$');
-diff --git a/suite/synctools/mips_register_names.py b/suite/synctools/mips_register_names.py
-index 2f1202e0..161f0c94 100644
---- a/suite/synctools/mips_register_names.py
-+++ b/suite/synctools/mips_register_names.py
-@@ -10,7 +10,34 @@ import re
  
- ROOT = Path(__file__).resolve().parents[2]
- ARCH = ROOT / "arch" / "Mips"
--ATTRIBUTE = r"""/* Use the numeric and ABI register tables in the dedicated Linux arm64 printer. */
-+ATTRIBUTE = r"""#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
-+    defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
-+#define MIPS_DIRECT_NUMERIC_NAMES
-+
-+/* The printed numeric spelling comes from the generated LLVM register table. */
-+static bool appendNumericRegister(SStream *OS, MCRegister reg, bool dollar)
-+{
-+	const char *name = Mips_LLVM_getRegisterName(reg, true);
-+	if (!name || OS->is_closed || OS->markup_stream || OS->prefixed_by_markup)
-+		return false;
-+	if (name[0] < '0' || name[0] > '9' || OS->index >= SSTREAM_BUF_LEN - 3)
-+		return false;
-+	const bool pair = name[1] != '\0';
-+	if (pair && (name[1] < '0' || name[1] > '9' || name[2] != '\0'))
-+		return false;
-+	char *out = OS->buffer + OS->index;
-+	if (dollar)
-+		*out++ = '$';
-+	*out++ = name[0];
-+	if (pair)
-+		*out++ = name[1];
-+	*out = '\0';
-+	OS->index += dollar + 1 + pair;
-+	return true;
-+}
-+#endif
-+
-+/* Use the numeric and ABI register tables in the dedicated Linux arm64 printer. */
- #if defined(__linux__) && defined(__aarch64__) && defined(__clang__) && \
-     defined(CAPSTONE_MIPS_ONLY)
- #define MIPS_REGISTER_NAME_BANKS
-@@ -53,6 +80,11 @@ HOOK = """#ifdef MIPS_SHORT_REGISTER_NAMES
- 		}
- 	}
- #endif
-+#ifdef MIPS_DIRECT_NUMERIC_NAMES
-+	if ((syntax_opt & CS_OPT_SYNTAX_NOREGNAME) &&
-+	    appendNumericRegister(OS, Reg, !(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR)))
-+		return;
-+#endif
- """
- BODY = """\tif (!(syntax_opt & CS_OPT_SYNTAX_NO_DOLLAR)) {
- \t\tSStream_concat1(OS, '$');
+ #ifndef CAPSTONE_MIPS_FINAL_OUTPUT_TRIM
+ 	SStream_trimls(O);

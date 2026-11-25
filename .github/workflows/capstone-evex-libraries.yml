@@ -1,7 +1,7 @@
-name: Measure direct numeric MIPS register writes with unmodified default name lookup and test every syntax
+name: Measure final MIPS comment removal on real programs, streams and unchanged mixed builds
 on:
   push:
-    branches: [codex/mips-numeric-whole-register]
+    branches: [codex/mips-rendered-comment-search]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-numeric-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-comment-search-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
