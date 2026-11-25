@@ -32,17 +32,20 @@ def measure(rows, w, save):
     for row in rows:
         if row['arch'] in ('i386','amd64'):continue
         for mode in range(3):
-            n=max(1,math.ceil(25e6/run('base',row,mode,1)[0]))
+            target=(row['name'],mode)
+            held={('mips64el-cat',1),('mips64el-cat',2),('riscv64-cat',1)}
+            if target not in held and row['arch']!='ppc64el':continue
+            n=max(1,math.ceil(50e6/run('base',row,mode,1)[0]))
             expected=run('base',row,mode,n)[2:]
             assert expected[0]>0
-            cycles=[];labels=list(images);rng=random.Random(row['name']+'/'+str(mode))
-            for _ in range(17):
+            cycles=[];labels=['base','duplicate','outlined','twin'];rng=random.Random('replicate-'+row['name']+'/'+str(mode))
+            for _ in range(101 if target in held else 35):
                 rng.shuffle(labels);pairs={k:[]for k in labels}
                 for k in labels+labels[::-1]:
-                    x=run(k,row,mode,n);assert x[2:]==expected
+                    x=run('outlined' if k=='twin' else k,row,mode,n);assert x[2:]==expected
                     pairs[k].append(x[:2])
                 cycles.append({k:[sum(x[i]for x in xs)for i in (0,1)]for k,xs in pairs.items()})
             data[row['name']+'/'+str(mode)]=dict(reps=n,checks=expected,cycles=cycles)
             save('foreign-observations',data)
-    assert len(data)==3*sum(row["arch"] not in ("amd64","i386") for row in rows) and len(verified)==4
+    assert len(data)==6 and len(verified)==3
     save('foreign-fixed',dict(inode=inode,original=image_shas,verified=verified,bytes=length,blocks=len(offsets)))

@@ -1,7 +1,7 @@
-name: Measure mixed PowerPC alias lookup while preserving existing caller and parser placement
+name: Recheck five held PowerPC control workloads with 101 paired blocks on independent hosts
 on:
   push:
-    branches: [codex/ppc-preserve-shared-parser-order]
+    branches: [codex/ppc-replicate-five-held-cases]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -14,7 +14,10 @@ jobs:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, replica: 3 }
+          - { host: ubuntu-24.04, cc: clang, replica: 4 }
+          - { host: ubuntu-24.04, cc: clang, replica: 5 }
+          - { host: ubuntu-24.04, cc: clang, replica: 6 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +60,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ordered-ppc-parser-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: repeated-powerpc-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

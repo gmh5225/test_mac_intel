@@ -160,44 +160,30 @@ try:
             assert vals[0][2]==spec['bytes']
             records[name][lbl]=vals[0]
         save('extra-real',records)
-        for route in ('private','capstone'):
+        for route in ('private',):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')
-                select('base' if other else engine)
+                select('outlined' if engine=='twin' else engine)
                 return list(map(int,get(*invoke,engine if other else route,str(mode),str(n),f,path,str(bits)).split()))
             for mode in (0,1,2):
-                labels=[*imgs,'iced'] + (['fast'] if mode else [])
-                repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
+                if (name,mode) not in {('putty-64-0.85',0),('jpeg-avx2-i386',2)}:continue
+                labels=['base','duplicate','outlined','twin']
+                repeats=max(1,math.ceil(50e6/take('base',mode,1)[0]))
                 expected={k:take(k,mode,repeats)[2:]for k in labels}
-                assert all(v[:3]==expected['base'][:3] for v in expected.values())
-                assert expected['base']==expected['duplicate']==expected['candidate']
-                assert expected['outlined']==expected['base']
-                rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-                for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
+                assert len({tuple(z)for z in expected.values()})==1
+                rows=[];rng=random.Random(name+'/replicate-ordered-lookup/'+str(mode))
+                for _ in range(101):
                     rng.shuffle(labels);sample={k:[] for k in labels}
                     for k in labels+labels[::-1]:
                         row=take(k,mode,repeats);assert row[2:]==expected[k]
                         sample[k].append(row[:2])
                     rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
                 key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-                summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
-                save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==36
-    from firmware16 import compare
-    sources=rd(r/'input-sources.json');assert sha(r/'scalar.c')==sources['c_sha']
-    run('clang',*sources['compile'],r/'scalar.c','-o',w/'scalar.o')
-    with (w/'scalar.o').open('rb')as f:
-        elf=ELFFile(f);assert elf['e_machine']=='EM_386';blob=elf.get_section_by_name('.text').data()
-    path=w/'scalar16.bin';path.write_bytes(blob);spans=w/'scalar16.tsv';spans.write_text(f'0 {len(blob)} 1048576'+chr(10))
-    scalar=compare(path,spans,imgs,invoke,select)
-    save('scalar16',dict(sha256=sha(path),bytes=len(blob),source=sources['c_sha'],results=scalar))
-    save('fixed-image',dict(inode=inode,blocks=len(offsets),verified=verified,bytes=length,original_sizes=original_sizes,staged_sha256={k:hashlib.sha256(v).hexdigest()for k,v in imgs.items()}))
-    if platform.machine()=='x86_64':
-        from firmware16 import verify
-        save('seabios16',verify(w,imgs,invoke,select))
+                save('observations',observations)
+    assert len(observations)==2
+    save('fixed-image',dict(inode=inode,verified=verified,images=images))
     time_foreign(foreign_rows,w,save)
-    time_foreign(all_rows[len(training):],w,lambda name,value:save('extra-ppc-'+name,value))
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
+    save('complete',dict(complete=True,source=maps,host=host,images=images))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
