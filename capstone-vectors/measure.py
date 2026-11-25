@@ -14,6 +14,42 @@ def sig(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 m=read(r/'layout-source.json');q=m['sources']['base']
 assert get('git','-C',src,'rev-parse','HEAD')==m['checkout'] and get('git','-C',nd,'rev-parse','HEAD')==m['neverd']
 assert all(sig(r/(tag+'.patch'))==record['sha256']for tag,record in m['sources'].items()if tag!='base')
+def benchmark_handles(images, w):
+    size=max(len(data) for data in images.values())
+    images={k:v.ljust(size,b'\0') for k,v in images.items()}
+    images['duplicate']=images['base']
+    pages=[i for i in range(0,size,4096) if len({v[i:i+4096] for v in images.values()})>1]
+    target=w/'selected-handle'
+    target.write_bytes(images['base']);target.chmod(0o755)
+    inode=target.stat().st_ino;previous=['base'];verified={}
+    def observe(label,mode,reps):
+        if previous[0]!=label:
+            with target.open('r+b',buffering=0)as stream:
+                for offset in pages:
+                    data=images[label][offset:offset+4096]
+                    stream.seek(offset);assert stream.write(data)==len(data)
+            previous[0]=label
+        assert target.stat().st_ino==inode
+        if label not in verified:
+            verified[label]=sig(target);assert verified[label]==hashlib.sha256(images[label]).hexdigest()
+        values=list(map(int,get('setarch',os.uname().machine,'-R',target,str(mode),str(reps)).split()))
+        assert len(values)==2 and all(values)
+        return values
+    panels={}
+    for mode in range(3):
+        n0=100000
+        n=max(10000,math.ceil(18e6*n0/min(observe('base',mode,n0))))
+        order=list(images);rng=random.Random(7329+mode);cycles=[]
+        for _ in range(17):
+            rng.shuffle(order);row={k:[0,0] for k in order}
+            for label in order+order[::-1]:
+                sample=observe(label,mode,n)
+                for clock,value in enumerate(sample):row[label][clock]+=value
+            cycles.append(row)
+        panels[str(mode)]=dict(repeats=n,pairs=cycles)
+    assert set(verified)==set(images) and images['base']==images['duplicate']
+    save('lifecycle',dict(inode=inode,images=verified,panels=panels,affinity=sorted(os.sched_getaffinity(0))))
+
 w=Path(tempfile.mkdtemp());build=w/'build'
 try:
     project=w/'project';(project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(src);(project/'cmake').mkdir()
@@ -32,6 +68,8 @@ try:
     driver=driver.replace('  cs_insn *insn =', '  if (setting>2 && (arch!=CS_ARCH_X86 || cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT)!=CS_ERR_OK)) return 7;\n  cs_insn *insn =')
     assert driver.count('setting')==5 and 'CS_OPT_SYNTAX_ATT' in driver
     (w/'driver.cpp').write_text(driver);run('clang++','-std=c++17','-O3','-DNDEBUG','-I',src/'include','-c',w/'driver.cpp','-o',w/'driver.o')
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    life={}
     bins={};layout={};ar=shutil.which('llvm-ar') or shutil.which('ar')
     for tag,record in m['sources'].items():
         run('git','-C',src,'reset','--hard',m['checkout'])
@@ -56,7 +94,11 @@ try:
         hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_ATT_printInst','X86_Intel_printInst','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction']
         layout[tag]=dict(members=members,settings=settings,hot={n:symbols_[n]for n in hot},sections=sections,sha256=sig(binary))
         bins[tag]=binary.read_bytes()
+        handles=w/(tag+'-handle')
+        run('clang','-O2','-I',src/'include',r/'handle.c',lib,'-no-pie','-fuse-ld=bfd','-o',handles)
+        life[tag]=handles.read_bytes()
         save('layout',dict(source=m,variants=layout))
+    benchmark_handles(life,w)
     cases=training.fetch(r,w)
     for name,bits,f,spans,meta in pe_panels.prepare(w):
         assert bits in (32,64) and spans

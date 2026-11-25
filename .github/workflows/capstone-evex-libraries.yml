@@ -1,7 +1,7 @@
-name: Measure register-bank selection at RISC-V syntax changes and verify default ELF and PE32 paths
+name: Compare RISC-V handle initialization, repeated options and real disassembly with length-bearing register names
 on:
   push:
-    branches: [codex/riscv-select-register-name-bank-per-handle]
+    branches: [codex/riscv-gpr-record-selection-and-open-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rv-selected-bank-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rv-gpr-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
