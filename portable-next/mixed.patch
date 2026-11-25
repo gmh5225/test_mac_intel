@@ -1,184 +1,291 @@
-diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
-index ea9309f4..5444947a 100644
---- a/arch/X86/X86GenMappingCounts.inc
-+++ b/arch/X86/X86GenMappingCounts.inc
-@@ -16591,8 +16591,8 @@ static const uint16_t x86_mapping_counts[] = {
- 	0, // X86_VXORPSZrrkz
- 	2048, // X86_VXORPSrm
- 	2048, // X86_VXORPSrr
--	1536, // X86_VZEROALL
--	1536, // X86_VZEROUPPER
-+	17920, // X86_VZEROALL
-+	17920, // X86_VZEROUPPER
- 	1024, // X86_WAIT
- 	1024, // X86_WBINVD
- 	0, // X86_WBNOINVD
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..263db425 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -10253,45 +10253,34 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 396ab047..4f0a7438 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -161,6 +161,7 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
++    add_compile_definitions(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
+     # Linux x86-64 retains its inlined initialization for MIPS text throughput.
+     if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
+@@ -175,7 +176,7 @@ if(capstone_enabled_architectures STREQUAL "XCORE")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "ARM")
+-    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "MIPS")
+diff --git a/Makefile b/Makefile
+index fb13d941..48239585 100644
+--- a/Makefile
++++ b/Makefile
+@@ -122,6 +122,7 @@ CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
+ else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
+ CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
+ else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
++CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
+ # Use the compiler target, including cross builds.
+ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
+ 	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+@@ -135,7 +136,7 @@ endif
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
+-CFLAGS += -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
++CFLAGS += -DCAPSTONE_ARM_ONLY -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
+diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
+index 37012242..26a96fff 100644
+--- a/arch/ARM/ARMInstPrinter.c
++++ b/arch/ARM/ARMInstPrinter.c
+@@ -219,7 +219,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
+ 	ARM_printMarkup(O, "<imm:");
+ 	printInt32Bang(O, OffImm);
+ 	SStream_concat0(O, markup(">"));
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
  }
- #endif
  
--// look for @id in @insns
--// return -1 if not found
--unsigned int find_insn(unsigned int id)
-+static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
- {
--	// binary searching since the IDs are sorted in order
--	unsigned int left, right, m;
--	unsigned int max = ARR_SIZE(insns);
--
--	right = max - 1;
--
--	if (id < insns[0].id || id > insns[right].id)
--		// not found
--		return -1;
--
--	left = 0;
-+	const unsigned int count = ARR_SIZE(insns);
-+	const unsigned int first = insns[0].id;
-+	/* The generator orders distinct IDs. If the endpoints span exactly
-+	 * count entries, subtraction indexes every opcode in the table. */
-+	if (insns[count - 1].id - first == count - 1) {
-+		const unsigned int row = id - first;
-+		return row < count ? row : (unsigned int)-1;
-+	}
- 
--	while (left <= right) {
--		m = (left + right) / 2;
--		if (id == insns[m].id) {
--			return m;
--		}
-+	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
-+		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
- 
--		if (id < insns[m].id)
--			right = m - 1;
-+	unsigned int lo = 0, hi = count;
-+	while (lo < hi) {
-+		const unsigned int mid = lo + (hi - lo) / 2;
-+		if (insns[mid].id < id)
-+			lo = mid + 1;
- 		else
--			left = m + 1;
-+			hi = mid;
+@@ -288,7 +288,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
+ 				ARM_AM_getAM2Offset(MCOperand_getImm(MO3)));
+ 			SStream_concat0(O, markup(">"));
+ 		}
+-		SStream_concat(O, "%s", "]");
++		ARM_printFormattedChar(O, "]");
+ 		SStream_concat0(O, markup(">"));
+ 		return;
  	}
--
--	// not found
--	// printf("NOT FOUNDDDDDDDDDDDDDDD id = %u\n", id);
--	return -1;
-+	return lo < count && insns[lo].id == id ? lo : (unsigned int)-1;
+@@ -301,7 +301,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
+ 	printRegImmShift(MI, O, ARM_AM_getAM2ShiftOpc(MCOperand_getImm(MO3)),
+ 			 ARM_AM_getAM2Offset(MCOperand_getImm(MO3)),
+ 			 getUseMarkup());
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
  }
  
--static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
-+unsigned int find_insn(unsigned int id)
+@@ -315,7 +315,7 @@ static inline void printAddrModeTBB(MCInst *MI, unsigned Op, SStream *O)
+ 	printRegName(O, MCOperand_getReg(MO1));
+ 	SStream_concat0(O, ", ");
+ 	printRegName(O, MCOperand_getReg(MO2));
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -516,7 +516,7 @@ static inline void printPostIdxImm8s4Operand(MCInst *MI, unsigned OpNum,
+ 			printRegImmShift(MI, O, ARM_AM_uxtw, shift, \
+ 					 getUseMarkup()); \
+ \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printMveAddrModeRQOperand(0);
+@@ -547,7 +547,7 @@ DEFINE_printMveAddrModeRQOperand(2);
+ 			printUInt32(O, ImmOffs * 4); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printAddrMode5Operand(false);
+@@ -584,7 +584,7 @@ DEFINE_printAddrMode5Operand(true);
+ 			printUInt32(O, ImmOffs * 2); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printAddrMode5FP16Operand(false);
+@@ -599,10 +599,10 @@ static inline void printAddrMode6Operand(MCInst *MI, unsigned OpNum, SStream *O)
+ 	SStream_concat0(O, "[");
+ 	printRegName(O, MCOperand_getReg(MO1));
+ 	if (MCOperand_getImm(MO2)) {
+-		SStream_concat(O, "%s", ":");
++		ARM_printFormattedChar(O, ":");
+ 		printInt64(O, ((uint32_t)MCOperand_getImm(MO2)) << 3);
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -613,7 +613,7 @@ static inline void printAddrMode7Operand(MCInst *MI, unsigned OpNum, SStream *O)
+ 	ARM_printMarkup(O, "<mem:");
+ 	SStream_concat0(O, "[");
+ 	printRegName(O, MCOperand_getReg(MO1));
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -918,7 +918,7 @@ static inline void printCImmediate(MCInst *MI, unsigned OpNum, SStream *O)
+ static inline void printCoprocOptionImm(MCInst *MI, unsigned OpNum, SStream *O)
  {
--	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
--		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
--
--	return find_insn(id);
-+	return find_insn_h(NULL, id);
+ 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_CoprocOptionImm, OpNum);
+-	SStream_concat(O, "%s", "{");
++	ARM_printFormattedChar(O, "{");
+ 	printInt64(O, MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
+ 	SStream_concat0(O, "}");
+ }
+@@ -1014,7 +1014,7 @@ static inline void printThumbAddrModeRROperand(MCInst *MI, unsigned Op,
+ 		SStream_concat0(O, ", ");
+ 		printRegName(O, RegNum);
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
  }
  
- #ifndef CAPSTONE_DIET
-@@ -10374,6 +10363,17 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 			switch (insn->id) {
- 			default:
- 				break;
-+			case X86_INS_VZEROALL:
-+			case X86_INS_VZEROUPPER:
-+				if (mode != CS_MODE_64) {
-+					/* Outside long mode only YMM0 through YMM7 exist. */
-+					cs_detail *d = insn->detail;
-+					memset(d->regs_write + 8, 0,
-+					       sizeof(insns[i].regs_mod) -
-+						       8 * sizeof(d->regs_write[0]));
-+					d->regs_write_count = 8;
-+				}
-+				break;
- 			case X86_INS_XADD:
- 				insn->detail->regs_write[0] = X86_REG_EFLAGS;
- 				insn->detail->regs_write_count = 1;
-diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
-index d9dd18e2..428aed88 100644
---- a/tests/unit/x86_reg_access.c
-+++ b/tests/unit/x86_reg_access.c
-@@ -53,6 +53,54 @@ static bool check_implicit_copies(csh handle)
- 	return true;
+@@ -1039,7 +1039,7 @@ static inline void printThumbAddrModeImm5SOperand(MCInst *MI, unsigned Op,
+ 		printUInt32Bang(O, ImmOffs * Scale);
+ 		SStream_concat0(O, markup(">"));
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
  }
  
-+static bool check_vector_clear_writes(void)
+@@ -1125,7 +1125,7 @@ static inline void printT2SOOperand(MCInst *MI, unsigned OpNum, SStream *O)
+ 			printInt32Bang(O, OffImm); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printAddrModeImm12Operand(false);
+@@ -1161,7 +1161,7 @@ DEFINE_printAddrModeImm12Operand(true);
+ 			printInt32Bang(O, OffImm); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ DEFINE_printT2AddrModeImm8Operand(true);
+@@ -1203,7 +1203,7 @@ DEFINE_printT2AddrModeImm8Operand(false);
+ 			printInt32Bang(O, OffImm); \
+ 			SStream_concat0(O, markup(">")); \
+ 		} \
+-		SStream_concat(O, "%s", "]"); \
++		ARM_printFormattedChar(O, "]"); \
+ 		SStream_concat0(O, markup(">")); \
+ 	}
+ 
+@@ -1226,7 +1226,7 @@ static inline void printT2AddrModeImm0_1020s4Operand(MCInst *MI, unsigned OpNum,
+ 		printInt64Bang(O, (int32_t)(MCOperand_getImm(MO2) * 4));
+ 		SStream_concat0(O, markup(">"));
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -1290,7 +1290,7 @@ static inline void printT2AddrModeSoRegOperand(MCInst *MI, unsigned OpNum,
+ 		printUInt32(O, ShAmt);
+ 		SStream_concat0(O, markup(">"));
+ 	}
+-	SStream_concat(O, "%s", "]");
++	ARM_printFormattedChar(O, "]");
+ 	SStream_concat0(O, markup(">"));
+ }
+ 
+@@ -1367,7 +1367,7 @@ static inline void printModImmOperand(MCInst *MI, unsigned OpNum, SStream *O)
+ 	int32_t Rotated = ARM_AM_rotr32(Bits, Rot);
+ 	if (ARM_AM_getSOImmVal(Rotated) == MCOperand_getImm(Op)) {
+ 		// #rot has the least possible value
+-		SStream_concat(O, "%s", "#");
++		ARM_printFormattedChar(O, "#");
+ 		SStream_concat0(O, markup("<imm:"));
+ 		if (PrintUnsigned)
+ 			printUInt32(O, (uint32_t)(Rotated));
+@@ -1404,7 +1404,7 @@ static inline void printFBits32(MCInst *MI, unsigned OpNum, SStream *O)
+ static inline void printVectorIndex(MCInst *MI, unsigned OpNum, SStream *O)
+ {
+ 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_VectorIndex, OpNum);
+-	SStream_concat(O, "%s", "[");
++	ARM_printFormattedChar(O, "[");
+ 	printInt64(O,
+ 		   (int32_t)MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
+ 	SStream_concat0(O, "]");
+diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
+index 98805f06..4c131ea6 100644
+--- a/arch/ARM/ARMMapping.h
++++ b/arch/ARM/ARMMapping.h
+@@ -22,6 +22,25 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
+ // return name of register in friendly string
+ const char *ARM_reg_name(csh handle, unsigned int reg);
+ 
++/* Formatted single-character literals preserve the original %s call for
++ * applications that install a formatter through CS_OPT_MEM. */
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE) && defined(__linux__) && defined(__clang__) && \
++	((defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__))) || \
++	 (defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && defined(__x86_64__)))
++static inline void ARM_printFormattedChar(SStream *O, const char *literal)
 +{
-+	if (cs_support(CS_SUPPORT_X86_REDUCE))
-+		return true;
-+
-+	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
-+	const uint8_t bytes[][4] = { { 0xc5, 0xf8, 0x77 },
-+				     { 0xc5, 0xfc, 0x77 },
-+				     { 0xc4, 0xe1, 0x78, 0x77 },
-+				     { 0xc4, 0xe1, 0x7c, 0x77 } };
-+	for (unsigned m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m) {
-+		const unsigned expected = modes[m] == CS_MODE_64 ? 16 : 8;
-+		csh h = 0;
-+		if (cs_open(CS_ARCH_X86, modes[m], &h) != CS_ERR_OK)
-+			return false;
-+		bool ok = cs_option(h, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
-+		for (unsigned n = 0; n < sizeof(bytes) / sizeof(bytes[0]) && ok;
-+		     ++n) {
-+			cs_insn *insn = NULL;
-+			size_t size = n < 2 ? 3 : 4;
-+			size_t count =
-+				cs_disasm(h, bytes[n], size, 0, 1, &insn);
-+			cs_regs reads, writes;
-+			uint8_t nr, nw;
-+			ok = count == 1 && insn->size == size &&
-+			     insn->id == (n % 2 ? X86_INS_VZEROALL :
-+						  X86_INS_VZEROUPPER) &&
-+			     insn->detail->regs_write_count == expected &&
-+			     cs_regs_access(h, insn, reads, &nr, writes, &nw) ==
-+				     CS_ERR_OK &&
-+			     nw == expected;
-+			for (unsigned i = 0; ok && i < expected; ++i)
-+				ok = insn->detail->regs_write[i] ==
-+					     X86_REG_YMM0 + i &&
-+				     writes[i] == X86_REG_YMM0 + i;
-+			cs_free(insn, count);
-+			if (!ok)
-+				fprintf(stderr,
-+					"vector clear writes: mode=%u encoding=%u\n",
-+					(unsigned)modes[m], n);
-+		}
-+		cs_close(&h);
-+		if (!ok)
-+			return false;
++	if (cs_vsnprintf == cs_default_vsnprintf) {
++		SStream_concat1(O, literal[0]);
++		return;
 +	}
-+	return true;
++	SStream_concat(O, "%s", literal);
 +}
++#else
++#define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
++#endif
 +
- static bool check_test_operands(void)
- {
- 	static const unsigned widths[] = { 1, 2, 4, 8 };
-@@ -784,6 +832,7 @@ int main(void)
- 		return 1;
- 	}
- 	bool success = check_implicit_copies(handle) && check_test_operands() &&
-+		       check_vector_clear_writes() &&
- 		       check_scalar_move_flags() &&
- 		       check_scalar_segment_reads() &&
- 		       check_vector_compare_flags();
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 19e16b16..d4d2072a 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1649,7 +1649,8 @@ static bool check_mode(cs_mode mode)
- 		    !check_evex_memory_moves(handles) ||
- 		    !check_padding(handles) ||
- 		    (mode == CS_MODE_32 &&
--		     (!check_segment_lea32(handles) ||
-+		     (!check_vex_clear(handles) ||
-+		      !check_segment_lea32(handles) ||
- 		      !check_vex32_register_moves(handles) ||
- 		      !check_memory_flag_immediates(handles, mode))) ||
- 		    !check_alu_memory(handles, mode) ||
+ /* A disabled markup tag contributes no text. A callback can observe
+  * even an empty argument, and a markup stream can close a pending tag. */
+ #if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+index 5eb4f77d..74b6dc6e 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+@@ -633,6 +633,20 @@ public:
+         syntax = b"{ int y = 1; int x = 1; OS << x; }"
+         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
+ 
++    def test_arm_formatted_literal(self):
++        suffix = b'SStream_concat0(O, markup(">"));'
++        self.check_patching_result(
++            StreamOperations(0, "ARM"),
++            b'{ O << "]" << markup(">"); }',
++            b'ARM_printFormattedChar(O, "]");\n' + suffix,
++        )
++        for arch, literal in (("AArch64", b'"]"'), ("ARM", b'", "'), ("ARM", b'""')):
++            self.check_patching_result(
++                StreamOperations(0, arch),
++                b'{ O << ' + literal + b' << markup(">"); }',
++                b'SStream_concat(O, "%s", ' + literal + b');\n' + suffix,
++            )
++
+     def test_arm_single_markup_before_operand(self):
+         source = b"""{ O << markup("<imm:") << '#' << amount; }"""
+         suffix = b"SStream_concat1(O, '#');\nSStream_concat0(O, amount);"
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+index 6068ef0f..113e716d 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+@@ -32,6 +32,10 @@ class StreamOperations(Patch):
+         return "stream"
+ 
+     def _concat_strings(self, s_name: bytes, ops: list[Node], src: bytes) -> bytes:
++        if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "string_literal":
++            literal = get_text_from_node(src, ops[0])
++            if len(literal) == 3 and literal[:1] == b'"' and 0x20 <= literal[1] < 0x7F:
++                return b"ARM_printFormattedChar(" + s_name + b", " + literal + b");\n"
+         if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "call_expression":
+             function = ops[0].child_by_field_name("function")
+             arguments = ops[0].child_by_field_name("arguments")

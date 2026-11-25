@@ -85,23 +85,27 @@ try:
                 run(name+'-make-'+unit,exe)
             shutil.rmtree(obj)
 
-        mips=t/'mips-only'
+        arm=t/'arm-only'
         if name=='base':
             opt=[v for v in flags if not v.endswith('_SUPPORT=ON')]
-            run('single-config','cmake','-G','Ninja','-S',s,'-B',mips,*opt,'-DCAPSTONE_MIPS_SUPPORT=ON')
-        run(name+'-single-build','cmake','--build',mips,'--target','capstone_static','capstone_shared','--parallel','4')
+            run('single-config','cmake','-G','Ninja','-S',s,'-B',arm,*opt,'-DCAPSTONE_ARM_SUPPORT=ON')
+        run(name+'-single-build','cmake','--build',arm,'--target','capstone_static','capstone_shared','--parallel','4')
         for kind in ('static','shared'):
-            rows[name]['mips_'+kind]=standalone(s,p,mips,t,profile,name+'-single-'+kind,run,kind)
-            assert rows[name]['mips_'+kind]['views']==rows['base']['mips_static']['views']
-        if name=='scoped':
-            config=next((mips/'CMakeFiles').glob('*/CMakeCCompiler.cmake')).read_text()
-            active=platform.system()=='Linux' and platform.machine() in ('x86_64','aarch64') and 'set(CMAKE_C_COMPILER_ID "Clang")' in config and profile!='diet'
-            rows[name]['active']=active
-            for link in ('static','shared','static_only','make_only','mips_static','mips_shared'):
+            rows[name]['arm_'+kind]=standalone(s,p,arm,t,profile,name+'-single-'+kind,run,kind)
+            assert rows[name]['arm_'+kind]['views']==rows['base']['arm_static']['views']
+        if name in ('standalone','mixed'):
+            config=next((arm/'CMakeFiles').glob('*/CMakeCCompiler.cmake')).read_text()
+            target=platform.system()=='Linux' and platform.machine() in ('x86_64','aarch64') and 'set(CMAKE_C_COMPILER_ID "Clang")' in config and profile!='diet'
+            rows[name]['active']={}
+            for link in ('static','shared','static_only','make_only','arm_static','arm_shared'):
                 if link not in rows[name]:continue
-                ref='all_hosts' if active and link.startswith('mips_') else 'base'
-                trial,want=rows[name][link],rows[ref][link]
-                if platform.system()=='Linux':assert trial['library_sha256']==want['library_sha256'],(name,link,ref)
+                active=target and (link.startswith('arm_') or name=='mixed' and len(arches)==6 and platform.machine()=='x86_64' and link in ('static','shared','static_only'))
+                # The Linux Make build below has its own recorded architecture list.
+                if link=='make_only':active=target and name=='mixed' and platform.machine()=='x86_64' and len(arches)==6
+                rows[name]['active'][link]=active
+                ref='all_hosts' if active else 'base'
+                if platform.system()=='Linux':
+                    assert rows[name][link]['library_sha256']==rows[ref][link]['library_sha256'],(name,link,ref,profile)
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
