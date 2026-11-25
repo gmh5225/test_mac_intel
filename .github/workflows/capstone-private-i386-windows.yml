@@ -1,7 +1,7 @@
-name: Check RISC-V numeric syntax across mixed and dedicated libraries and real programs
+name: Measure short RISC-V register spellings with handle-selected syntax on real programs
 on:
   push:
-    branches: [codex/riscv-handle-numeric-registers]
+    branches: [codex/riscv-handle-short-registers]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -46,7 +46,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.profile == 'full'
         with:
           repository: NeverSight/NeverD
-          ref: b20891634f83e245f43ab87e15cdf47800d5d4bb
+          ref: f6f945d903b0a8a96ba8c4cea4c8221be9da3941
           path: neverd-config
           sparse-checkout: |
             cmake
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-register-syntax-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: riscv-short-registers-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7

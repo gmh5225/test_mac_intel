@@ -41,7 +41,7 @@ try:
     mixed_sources=d.parent/'neverd-config'
     verify_mixed=linux and profile=='full'
     if verify_mixed:
-        expected_dev='b20891634f83e245f43ab87e15cdf47800d5d4bb'
+        expected_dev='f6f945d903b0a8a96ba8c4cea4c8221be9da3941'
         assert sp.check_output(['git','-C',mixed_sources,'rev-parse','HEAD'],text=True).strip()==expected_dev
         product=t/'consumer';(product/'third_party').mkdir(parents=True);(product/'third_party/capstone').symlink_to(s)
         (product/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
@@ -58,6 +58,11 @@ try:
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
+        if stage=='candidate':
+            gen=s/'suite/synctools/riscv_gpr_names.py'
+            cmd('generated-check',[os.sys.executable,'-B',gen,'--check'])
+            cmd('generated-repeat',[os.sys.executable,'-B',gen])
+            assert g('diff','--name-only')==''
         units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_scan_options', 'riscv_instruction_groups', 'riscv_op_count_iter', 'riscv_sysreg', 'riscv_reg_access', 'riscv_insn_name_segv'] if profile=='full' else ['riscv_scan_options']
         targets=['records_static','records_shared',*units]+(['rv_time'] if linux and profile=='full' else [])
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target',*targets])
