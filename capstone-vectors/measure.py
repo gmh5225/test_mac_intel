@@ -17,7 +17,6 @@ w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
-    assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
     (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(base)
     (project/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
@@ -27,57 +26,26 @@ try:
     run('cmake','-G','Ninja','-S',project,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
     files={Path(c['file']).name for c in rd(build/'compile_commands.json')};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c'}<=files and 'X86PublicOutput.c' not in files
-    ad.mkdir()
-    for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
-    (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
-    run('cargo','build','--release','--locked',cwd=ad)
-    ice_lib=ad/'target/release/libiced_compare.a'
-    driver=(r/'driver.cpp').read_text();marker='Result timed=run(reps);'
-    assert driver.count(marker)==1
-    wrapped='#include <valgrind/callgrind.h>\n'+driver.replace(marker,'CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT; '+marker+' CALLGRIND_TOGGLE_COLLECT;')
-    (w/'driver.cpp').write_text(wrapped)
-    flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
-    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
-    for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    assert q['commit']==m['checkout_commit'] and q['tree']==m['checkout_tree']
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'base')
-    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    audits={}; wanted={'putty-32-0.85','libmvec-amd64','jpeg-avx2-i386'}
-    results=[]
+
+    from training import fetch
     from costs import profile
-    save('build',dict(capstone=q,neverd=dev,iced=m['iced_revision'],lib=sha(lib),exe=sha(w/'base'),host=platform.machine(),driver=sha(w/'driver.cpp'),inputs=m['drivers']))
-    inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
-    sys.path.insert(0,str(w));import pe_panels,frozen_deb
-    run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
-        if name not in wanted:continue
-        spec=m['provenance'][name]
-        assert sha(f)==spec['text_sha256']
-        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
-        path=w/(name+'.tsv')
-        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-        emit(selected)
-        if m['samples'][name]=='simd-functions':
-            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-            assert len(view)==len(selected)
-            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-        assert sha(path)==spec['extent_sha256']
-        traces=[list(map(int,line.split()))for line in get(w/'base','audit','0','1',f,path,str(bits)).splitlines()]
-        assert len(traces)==len(selected) and all(x[3]==x[4] and x[1]==x[5]for x in traces)
-        audits[name]=dict(extents=len(selected),boundaries=sum(x[3]for x in traces),extent_sha256=sha(path),text_sha256=sha(f))
-        save('audit',audits)
-        for mode in (1,2,4):
-            engines=('capstone','private','fast') if mode!=4 else ('private',)
-            same=None
-            for engine in engines:
-                row=profile(w/'base',engine,mode,bits,f,path,w,e,name)
-                signature=row['raw_signature'][:3];assert same is None or signature==same
-                same=signature
-                reference=list(map(int,get(w/'base',engine,str(mode),'1',f,path,str(bits)).split()))[2:]
-                assert reference==row['raw_signature'] and reference[0]+reference[1]==audits[name]['boundaries']
-                results.append(row)
-            save('profile',results)
-    assert set(audits)==wanted and len(results)==21
-    save('complete',dict(complete=True,cases=len(results),inputs=audits,dev=dev,capstone=q,iced=m['iced_revision']))
+    rows=fetch(r,w);corpus={row['arch']:row for row in rows if row['arch'] not in ('amd64','i386')}
+    assert len(corpus)==5 and len([row for row in rows if row['arch'] in corpus])==5
+    save('corpus',corpus)
+    for tag in ('foreign','profile-foreign'):
+        run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',r/(tag+'.cpp'),lib,'-no-pie','-o',w/tag)
+    results=[]
+    for arch,row in corpus.items():
+        name=row['name'];path=w/(name+'.text')
+        assert sha(path)==row['text_sha256']
+        for mode in range(4):
+            z=profile(w/'profile-foreign',arch,mode,0,path,None,w,e,name)
+            native=list(map(int,get(w/'profile-foreign',arch,path,str(mode),'1').split()))[2:]
+            assert z['raw_signature']==native
+            original=list(map(int,get(w/'foreign',arch,path,str(min(mode,2)),'1').split()))[2:]
+            assert original[:3]==native[:3]
+            if mode!=3:assert original==native
+            z['original']=original;results.append(z);save('profile',results)
+    save('complete',dict(complete=True,source=q,neverd=dev,cases=len(results),lib=sha(lib),driver=sha(r/'foreign.cpp'),profile_driver=sha(r/'profile-foreign.cpp'),cpu=platform.machine()))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

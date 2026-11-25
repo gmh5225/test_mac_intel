@@ -2,7 +2,7 @@
 import collections, gzip, hashlib, json, re, subprocess as sp
 def profile(exe,engine,mode,bits,path,spans,work,out,case):
     log=work/'cost.callgrind'
-    cmd=['valgrind','--tool=callgrind','--collect-atstart=no','--cache-sim=yes','--branch-sim=yes','--compress-pos=no','--callgrind-out-file='+str(log),str(exe),engine,str(mode),'1',str(path),str(spans),str(bits)]
+    cmd=['valgrind','--tool=callgrind','--collect-atstart=no','--cache-sim=yes','--branch-sim=yes','--compress-pos=no','--callgrind-out-file='+str(log),str(exe),engine,str(path),str(mode),'1']
     p=sp.run(cmd,capture_output=True,text=True)
     (out/(case+'-'+engine+'-'+str(mode)+'.log')).write_text(p.stderr)
     p.check_returncode()
