@@ -1,7 +1,7 @@
-name: Measure direct MIPS alias formatting and cross-architecture throughput on the published source
+name: Measure MIPS-only alias output on four ELF files with unchanged mixed Capstone archives
 on:
   push:
-    branches: [codex/mips-alias-stream-ordinary]
+    branches: [codex/standalone-mips-alias-streams]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,13 +40,6 @@ jobs:
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/iced
-          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
-          path: iced-source
-          sparse-checkout: src/rust/iced-x86
-          persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
@@ -57,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-alias-stream-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-only-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

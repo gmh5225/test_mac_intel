@@ -1,45 +1,47 @@
 diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 5c23890c..306fd1ba 100644
+index 5c23890c..0e45836c 100644
 --- a/arch/Mips/MipsInstPrinter.c
 +++ b/arch/Mips/MipsInstPrinter.c
-@@ -510,15 +510,38 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
+@@ -510,15 +510,40 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
  			MipsFCCToString((Mips_CondCode)MCOperand_getImm(MO)));
  }
  
--static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
--		       unsigned OpNo, SStream *OS, bool IsBranch)
-+static void printAliasMnemonic(SStream *OS, const char *Str)
- {
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
++#if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
++static void printAliasMnemonic(SStream *OS, const char *name)
++{
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 +	/* Ordinary output writes the tab, alias and operand separator together.
 +	 * Markup and user formatters observe their original append boundaries. */
 +	if (cs_vsnprintf == cs_default_vsnprintf && !OS->is_closed &&
 +	    !OS->markup_stream && OS->index < SSTREAM_BUF_LEN - 2) {
-+		const size_t NameLen = strlen(Str);
++		const size_t NameLen = strlen(name);
 +		if (NameLen < SSTREAM_BUF_LEN - 2 - OS->index) {
 +			char *out = OS->buffer + OS->index;
 +			*out++ = '\t';
-+			memcpy(out, Str, NameLen);
++			memcpy(out, name, NameLen);
 +			memcpy(out + NameLen, "\t", 2);
 +			OS->index += NameLen + 2;
 +			return;
 +		}
 +	}
 +#endif
++	SStream_concat2(OS, "\t", name);
++	SStream_concat0(OS, "\t");
++}
++#endif
++
+ static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
+ 		       unsigned OpNo, SStream *OS, bool IsBranch)
+ {
  #if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
- 	SStream_concat2(OS, "\t", Str);
+-	SStream_concat2(OS, "\t", Str);
++	printAliasMnemonic(OS, Str);
  #else
  	SStream_concat(OS, "%s%s", "\t", Str);
- #endif
+-#endif
  	SStream_concat0(OS, "\t");
-+}
-+
-+static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
-+		       unsigned OpNo, SStream *OS, bool IsBranch)
-+{
-+	printAliasMnemonic(OS, Str);
++#endif
  	if (IsBranch)
  		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
  	else
