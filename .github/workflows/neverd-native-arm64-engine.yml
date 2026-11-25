@@ -13,6 +13,7 @@ on:
       - native-driver-entry/check_com_callbacks.py
       - native-driver-entry/process_sdk_smoke.c
       - native-driver-entry/check_process_prng.py
+      - native-driver-entry/check_declared_imports.py
       - native-driver-entry/process_prng.c
       - native-driver-entry/native_dispatcher_queue.py
       - native-driver-entry/dispatcher_queue_main.cpp
@@ -34,6 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          persist-credentials: false
           sparse-checkout: |
             /native-engine-revision.txt
             /native-driver-entry/
@@ -228,6 +230,7 @@ jobs:
             $reader = "$toolbuild/bin/llvm-readobj.exe"
           }
           python native-driver-entry/prefetch_profile.py --scripts source/scripts --cache $cache
+          "NEVERD_READOBJ=$reader" >> $env:GITHUB_ENV
           $originalInclude = $env:INCLUDE
           try {
             # The generator supplies the kit paths. Preserve the build environment
@@ -241,6 +244,9 @@ jobs:
           python source/scripts/build.py $nb --target neverd --parallel 4
           if ((Get-FileHash $core).Hash -eq $bootstrap) { throw 'The native engine did not embed the official libraries' }
           python native-driver-entry/check_native_process_profile.py --source source --types $types --cache $cache --engine $exe --output "$env:RUNNER_TEMP/sdk-qual" --report native-sdk-profile.json
+      - name: Execute declared import layouts through the official-profile native engine
+        shell: pwsh
+        run: python native-driver-entry/check_declared_imports.py "$env:RUNNER_TEMP/nb/bin/neverd.dll" "$env:RUNNER_TEMP/declared-imports" native-declared-imports.json
       - name: Report SDK tool diagnostics on failure
         if: failure()
         shell: pwsh
@@ -278,6 +284,7 @@ jobs:
             native-com-observations.json
             native-process-sdk.json
             native-sdk-profile.json
+            native-declared-imports.json
             wdk-header-search-original.json
             wdk-header-search-fixed.json
             native-dll-loader.json
