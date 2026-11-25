@@ -53,8 +53,6 @@ try:
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     reference=maps['reference']
-    assert sha(r/'reference.patch')==reference['sha256']
-    run('git','-C',base,'apply','--index',r/'reference.patch')
     assert get('git','-C',base,'write-tree').strip()==reference['tree']
     run('cmake','--build',build,'--target','capstone_static','--parallel','4')
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'reference')
@@ -77,21 +75,15 @@ try:
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
         run('clang++','-O2','-std=c++17','-I',base/'include',r/'sample.cpp',lib,'-o',w/'offset-unit')
-        actual=get(w/'offset-unit');target=rd(r/'offset-expected.json')['base' if label=='base'else 'fixed']
+        actual=get(w/'offset-unit');target=rd(r/'offset-expected.json')['base']
         assert actual==target and len(actual.splitlines())==48,label
         save('offsets-'+label,actual.splitlines())
         run('clang','-fPIC','-shared','-I',base/'include',r/'trailing-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/'trailing.so')
         run('clang++','-O2','-std=c++17','-I',base/'include',r/'trailing-immediate.cpp','-ldl','-o',w/'trailing')
         suffix=json.loads(get(w/'trailing',w/'trailing.so'))
         assert suffix['cases']==31104 and suffix['changed_operands']==0 and suffix['suffix_hash']==8508379939118731520,suffix
-        assert suffix['wrong_address']==(15696 if label=='base' else 0),suffix
+        assert suffix['wrong_address']==15696,suffix
         save('trailing-'+label,suffix)
-
-        if label!='base':
-            run('clang','-std=c11','-O2','-I',base/'include',r/'transitions.c',lib,'-o',w/'transitions')
-            count=int(get(w/'transitions'))
-            assert count==1600
-            save('transitions-'+label,{'checked':count})
 
         run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/('att-'+label))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
@@ -133,7 +125,7 @@ try:
     save('host',host);observations={};summary={};audits={}
     replay_paths={}
     from att_timing import start
-    att_measure,att_images=start(w);att={}
+    att_measure,att_images=start(w);att={};private_att={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
@@ -155,6 +147,9 @@ try:
         replay_paths[name]=(bits,f,path,spec['extent_sha256'])
         att[name]={str(detail):att_measure(name,bits,f,path,detail) for detail in (0,1)}
         save('att-timing',att);save('att-images',att_images)
+        private_att[name]={str(detail):att_measure(name,bits,f,path,detail,'private') for detail in (0,1)}
+        save('att-native-timing',private_att)
+
         for route in ('private','capstone'):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')

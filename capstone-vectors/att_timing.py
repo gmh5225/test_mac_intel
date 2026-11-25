@@ -16,17 +16,17 @@ def start(work):
         assert path.stat().st_ino==inode and path.stat().st_size==length
         if tag not in checked:
             checked[tag]=digest(path.read_bytes());assert checked[tag]==digest(images[tag])
-    def measure(name,bits,blob,ranges,detail):
+    def measure(name,bits,blob,ranges,detail,route='capstone'):
         def take(tag,n):
             if tag=='oracle':exe=work/'att-reference'
             else:select('base' if tag=='gas' else tag);exe=path
-            return list(map(int,subprocess.check_output(['setarch',os.uname().machine,'-R',exe,'iced' if tag=='gas' else 'capstone',str(detail+1),str(n),blob,ranges,str(bits)],text=True).split()))
+            return list(map(int,subprocess.check_output(['setarch',os.uname().machine,'-R',exe,'iced' if tag=='gas' else route,str(detail+1),str(n),blob,ranges,str(bits)],text=True).split()))
         n=max(1,math.ceil(25e6/take('base',1)[0]))
         labels=[*images,'gas'];expected={k:take(k,n)[2:]for k in labels}
         oracle=take('oracle',n)[2:]
         assert expected['base']==expected['duplicate'] and expected['candidate']==expected['outlined']==oracle
         assert expected['gas'][:3]==expected['base'][:3]==oracle[:3]
-        pairs=[];rng=random.Random(name+'/AT&T/public/'+str(detail))
+        pairs=[];rng=random.Random(name+'/AT&T/'+route+'/'+str(detail))
         for _ in range(17):
             rng.shuffle(labels);paired={k:[] for k in labels}
             for tag in labels+labels[::-1]:

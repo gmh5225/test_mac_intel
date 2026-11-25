@@ -1,318 +1,108 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..8ddc5cce 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -316,6 +316,21 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
- 	}
- }
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..524d147a 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -29,15 +29,19 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  
-+/* The final pass assigns all accesses after implicit operands are inserted.
-+ * A custom formatter can observe the intermediate detail while printing. */
-+static inline void set_early_operand_access(MCInst *MI)
-+{
-+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+	if (cs_vsnprintf == cs_default_vsnprintf)
-+		return;
-+#endif
-+	cs_x86 *x86 = &MI->flat_insn->detail->x86;
-+	uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+	get_op_access(MI->csh, MCInst_getOpcode(MI), access, &x86->eflags);
-+	x86->operands[x86->op_count].access = access[x86->op_count];
-+}
+ /* Keep the mode, option and callback checks in a single short-circuit chain
+  * in both instantiations of the scalar writer. */
+-#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++#define X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, syntax_mismatch, expected_printer) \
+ 	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
+ 	 (handle)->mnem_list || (handle)->doing_mem || \
+-	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
+-	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
++	 (syntax_mismatch) || \
+ 	 (handle)->disasm != X86_getInstruction || \
+ 	 (handle)->insn_id != X86_get_insn_id || \
+-	 (handle)->printer != X86_Intel_printInst || \
++	 (handle)->printer != (expected_printer) || \
+ 	 (handle)->post_printer != X86_postprinter || \
+ 	 cs_vsnprintf != cs_default_vsnprintf)
+ 
++#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++	X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, \
++		(handle)->syntax != CS_OPT_SYNTAX_INTEL && \
++		(handle)->syntax != CS_OPT_SYNTAX_DEFAULT, X86_Intel_printInst)
 +
- static void fixup_evex_opmask_access(MCInst *MI)
- {
- 	cs_x86 *x86 = &MI->flat_insn->detail->x86;
-@@ -350,7 +365,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
- 	int reg;
- 
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+
- 
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -374,11 +389,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
--		MI->flat_insn->detail->x86
--			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+		set_early_operand_access(MI);
- 	}
- 
- 	SegReg = MCInst_getOperand(MI, Op + 1);
-@@ -407,7 +418,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
- static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
- {
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+
- 
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -431,11 +442,7 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
--		MI->flat_insn->detail->x86
--			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+		set_early_operand_access(MI);
- 	}
- 
- 	// DI accesses are always ES-based on non-64bit mode
-@@ -512,7 +519,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 	int reg;
- 
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+
- 
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -536,11 +543,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
--		MI->flat_insn->detail->x86
--			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+		set_early_operand_access(MI);
- 	}
- 
- 	// If this has a segment register, print it.
-@@ -672,7 +675,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 							  .op_count]
- 					.mem.base = X86_register_map(reg);
- 			} else {
--				uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+
- 
- 				MI->flat_insn->detail->x86
- 					.operands[MI->flat_insn->detail->x86
-@@ -689,15 +692,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 					MI->csh->regsize_map[X86_register_map(
- 						reg)];
- 
--				get_op_access(
--					MI->csh, MCInst_getOpcode(MI), access,
--					&MI->flat_insn->detail->x86.eflags);
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.access =
--					access[MI->flat_insn->detail->x86
--						       .op_count];
-+				set_early_operand_access(MI);
- 
- 				MI->flat_insn->detail->x86.op_count++;
- 			}
-@@ -876,7 +871,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 	int64_t DispVal = 1;
- 
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+
- 
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -903,11 +898,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
--		MI->flat_insn->detail->x86
--			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+		set_early_operand_access(MI);
- 	}
- 
- 	// If this has a segment register, print it.
-@@ -937,9 +928,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				// only immediate as address of memory
- 				if (DispVal < 0) {
- 					SStream_concat(O, "0x%" PRIx64,
--						       x86_get_address_mask(
--							       MI->csh->mode) &
--							       DispVal);
-+						       (uint64_t)DispVal &
-+						       (UINT64_MAX >> (64 - 8 * X86_effectiveAddressSize(MI))));
- 				} else {
- 					if (DispVal > HEX_THRESHOLD)
- 						SStream_concat(O, "0x%" PRIx64,
-@@ -1034,9 +1024,15 @@ static void printRegName(SStream *OS, unsigned RegNo)
- 			X86_featureExtensionMCRegisterName(RegNo) :
- 			NULL;
- 
--	SStream_concat(OS, "%%%s",
--		       extension_name ? extension_name :
--					getRegisterName(RegNo));
-+	const char *name = extension_name ? extension_name : getRegisterName(RegNo);
-+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+	if (cs_vsnprintf == cs_default_vsnprintf) {
-+		SStream_concat2(OS, "%", name);
-+		return;
-+	}
-+#endif
-+	SStream_concat(OS, "%%%s", name);
- }
- 
- void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..bed743fe 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -326,14 +326,15 @@ static bool need_zero_prefix(uint64_t imm)
- 		return true;
- }
- 
--static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
-+static void printImmWithSize(MCInst *MI, SStream *O, int64_t imm, bool positive,
-+			     unsigned operand_size)
- {
- 	if (positive) {
- 		// always print this number in positive form
- 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -368,8 +369,8 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 			}
- 		} else { // Intel syntax
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -443,6 +444,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 	}
- }
- 
-+static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
-+{
-+	printImmWithSize(MI, O, imm, positive, MI->op1_size);
-+}
-+
- // local printOperand, without updating public operands
- static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- {
-@@ -1235,11 +1241,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
- 					MI->op1_size = 8;
- 				if (DispVal < 0) {
--					printImm(MI, O,
--						 x86_get_address_mask(
--							 MI->csh->mode) &
--							 DispVal,
--						 true);
-+					printImmWithSize(MI, O, DispVal, true,
-+							 X86_effectiveAddressSize(MI));
- 				} else {
- 					printImm(MI, O, DispVal, true);
- 				}
-diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..2bc4a5f2 100644
---- a/arch/X86/X86Mapping.h
-+++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,17 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
- 	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
- }
- 
--static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* A displacement used as an absolute address has the effective address
-+ * width even if the memory operand or a following immediate is narrower. */
-+static inline unsigned X86_effectiveAddressSize(const MCInst *mi)
- {
-+	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
-+	const cs_mode mode = mi->csh->mode;
- 	if (x86_has_feature(mode, CS_MODE_16))
--		return UINT16_MAX;
-+		return address_override ? 4 : 2;
- 	if (x86_has_feature(mode, CS_MODE_32))
--		return UINT32_MAX;
--	return UINT64_MAX;
-+		return address_override ? 2 : 4;
-+	return address_override ? 4 : 8;
- }
- 
  #endif
-diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
-index cfd13cba..3b436991 100644
---- a/tests/unit/x86_legacy_address_size.c
-+++ b/tests/unit/x86_legacy_address_size.c
-@@ -279,9 +279,56 @@ static bool check_other_opcodes(void)
- 	return ok;
- }
- 
-+static bool check_absolute_offsets(void)
-+{
-+	static const struct {
-+		cs_mode mode;
-+		uint8_t code[8];
-+		uint8_t size;
-+		const char *intel, *att;
-+	} cases[] = {
-+		{ CS_MODE_16, { 0x67, 0x8b, 0x05, 0x34, 0x12, 0x00, 0x80 },
-+		  7, "ax, word ptr [0x80001234]", "0x80001234, %ax" },
-+		{ CS_MODE_32, { 0x67, 0x8b, 0x06, 0x34, 0x82 },
-+		  5, "eax, dword ptr [0x8234]", "0x8234, %eax" },
-+		{ CS_MODE_64, { 0x67, 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
-+		  8, "eax, dword ptr [0x80001234]", "0x80001234, %eax" },
-+		{ CS_MODE_64, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
-+		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
-+	};
-+	bool ok = true;
-+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-+		csh handle;
-+		if (cs_open(CS_ARCH_X86, cases[i].mode, &handle) != CS_ERR_OK)
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..867be81f 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -111,8 +111,26 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		}
+ 	}
+-	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
++	bool att = false;
++	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32)) {
++#ifndef CAPSTONE_X86_ATT_DISABLE
++		/* Bare relative branches share targets and operand metadata across
++		 * dialects. Register-pair ALU, MOV and TEST forms reverse the operands. */
++		const bool branch = !has_rex && form == X86_SIMPLE_RELATIVE;
++		const bool pair = (form == X86_SIMPLE_RM_REG ||
++				   form == X86_SIMPLE_REG_RM) && modrm >= 0xc0 &&
++			((opcode < 0x40 && (opcode & 7) < 4) ||
++			 (opcode & 0xfc) == 0x88 || (opcode & 0xfe) == 0x84);
++		if (plan >= X86_PLAN_PUSH_IMMEDIATE || (!branch && !pair) ||
++		    X86_OUTPUT_UNSUPPORTED_FOR(handle,
++			!wide && handle->mode != CS_MODE_32,
++			handle->syntax != CS_OPT_SYNTAX_ATT, X86_ATT_printInst))
 +			return false;
-+		for (unsigned att = 0; att < 2; ++att) {
-+			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
-+					       att ? CS_OPT_SYNTAX_ATT : CS_OPT_SYNTAX_INTEL);
-+			if (att && err == CS_ERR_X86_ATT)
-+				continue;
-+			cs_insn *insn = NULL;
-+			size_t count = cs_disasm(handle, cases[i].code, cases[i].size,
-+						 0x1000, 1, &insn);
-+			const char *expected = att ? cases[i].att : cases[i].intel;
-+			if (err != CS_ERR_OK || count != 1 ||
-+			    insn->size != cases[i].size ||
-+			    strcmp(insn->op_str, expected) != 0) {
-+				fprintf(stderr, "absolute offset mode %u: expected %s, got %s\n",
-+					(unsigned)cases[i].mode, expected,
-+					count == 1 ? insn->op_str : "(invalid)");
-+				ok = false;
-+			}
-+			cs_free(insn, count);
-+		}
-+		cs_close(&handle);
++		att = true;
++#else
+ 		return false;
++#endif
 +	}
-+	return ok;
-+}
-+
- int main(void)
- {
- 	bool ok = check_conversions();
- 	ok &= check_other_opcodes();
-+	ok &= check_absolute_offsets();
- 	return ok ? 0 : 1;
- }
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR) {
+@@ -193,6 +211,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
+ 		*insn_size = insn->size = (uint16_t)(1 + has_rex);
+ 	} else if (relative) {
++		if (att && row->id == X86_INS_CALL)
++			insn->mnemonic[4] = wide ? 'q' : 'l';
+ 		const uint8_t *bytes = code + row->imm_offset;
+ 		int64_t delta;
+ 		if (row->imm_size == 1) {
+@@ -239,11 +259,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
+ 		const struct X86SimpleRegister *b =
+ 			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
+-		memcpy(insn->op_str, a->name, sizeof(a->name));
+-		char *separator = insn->op_str + a->length;
+-		separator[0] = ',';
+-		separator[1] = ' ';
+-		memcpy(separator + 2, b->name, sizeof(b->name));
++		if (att) {
++			insn->mnemonic[strlen(row->mnemonic)] =
++				(opcode & 1) ? (rex & 8 ? 'q' : 'l') : 'b';
++			insn->op_str[0] = '%';
++			memcpy(insn->op_str + 1, b->name, sizeof(b->name));
++			char *separator = insn->op_str + 1 + b->length;
++			memcpy(separator, ", %", 3);
++			memcpy(separator + 3, a->name, sizeof(a->name));
++		} else {
++			memcpy(insn->op_str, a->name, sizeof(a->name));
++			char *separator = insn->op_str + a->length;
++			separator[0] = ',';
++			separator[1] = ' ';
++			memcpy(separator + 2, b->name, sizeof(b->name));
++		}
+ 		first = a->reg;
+ 		second = b->reg;
+ 		insn->bytes[1] = code[1];
+@@ -262,6 +292,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			}
+ 			x->operands[0].type = X86_OP_IMM;
+ 			x->operands[0].imm = (int64_t)target;
++		} else if (att) {
++			cs_x86_op *ops = insn->detail->x86.operands;
++			cs_x86_op dest = ops[0];
++			ops[0] = ops[1];
++			ops[1] = dest;
+ 		}
+ 	}
+ 	return true;
