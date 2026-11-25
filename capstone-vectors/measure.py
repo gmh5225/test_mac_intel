@@ -72,6 +72,13 @@ try:
         actual=get(w/'offset-unit');target=rd(r/'offset-expected.json')['base' if label=='base'else 'fixed']
         assert actual==target and len(actual.splitlines())==48,label
         save('offsets-'+label,actual.splitlines())
+        run('clang','-fPIC','-shared','-I',base/'include',r/'trailing-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/'trailing.so')
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/'trailing-immediate.cpp','-ldl','-o',w/'trailing')
+        suffix=json.loads(get(w/'trailing',w/'trailing.so'))
+        assert suffix['cases']==31104 and suffix['changed_operands']==0 and suffix['suffix_hash']==8508379939118731520,suffix
+        assert suffix['wrong_address']==(15696 if label=='base' else 0),suffix
+        save('trailing-'+label,suffix)
+
         if label!='base':
             run('clang','-std=c11','-O2','-I',base/'include',r/'transitions.c',lib,'-o',w/'transitions')
             count=int(get(w/'transitions'))

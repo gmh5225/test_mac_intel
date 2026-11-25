@@ -1,7 +1,7 @@
-name: Verify default and changing x86 effective address sizes and measure two printer implementations
+name: Validate address and operand widths independently on real x86 formatter paths
 on:
   push:
-    branches: [codex/x86-absolute-offset-mode-transitions]
+    branches: [codex/absolute-address-and-trailing-immediate]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mode-offset-printers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: independent-address-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

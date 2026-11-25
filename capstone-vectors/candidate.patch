@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..34666027 100644
+index 1cc3d3a9..cb65d0a4 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
 @@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
@@ -9,109 +9,122 @@ index 1cc3d3a9..34666027 100644
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
-+						       x86_absolute_address(MI, DispVal));
++						       X86_absoluteAddress(MI, DispVal));
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
+index 2ee82ef7..575bd418 100644
+--- a/arch/X86/X86InstPrinterCommon.c
++++ b/arch/X86/X86InstPrinterCommon.c
+@@ -290,3 +290,15 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
+ 	}
+ }
+ #endif
++
++/* An absolute displacement is an offset of the effective address width. */
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp)
++{
++	const cs_mode mode = mi->csh->mode;
++	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
++	if (x86_has_feature(mode, CS_MODE_16))
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
++	if (x86_has_feature(mode, CS_MODE_32))
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
++}
+diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
+index 37b02959..bb4919aa 100644
+--- a/arch/X86/X86InstPrinterCommon.h
++++ b/arch/X86/X86InstPrinterCommon.h
+@@ -22,6 +22,8 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
+ 	return target;
+ }
+ 
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp);
++
+ void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
+ 
+ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..3cfb3a78 100644
+index 457485ab..957cb024 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -1232,13 +1232,12 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				}
- 			} else {
- 				// memory reference to an immediate address
--				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
-+				if (x86_has_feature(MI->csh->mode, CS_MODE_64) ||
-+				    !x86_get_bit_mode(MI->csh->mode))
+@@ -326,14 +326,15 @@ static bool need_zero_prefix(uint64_t imm)
+ 		return true;
+ }
+ 
+-static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
++static void printImmWidth(MCInst *MI, SStream *O, int64_t imm, bool positive,
++			  uint8_t operand_size)
+ {
+ 	if (positive) {
+ 		// always print this number in positive form
+ 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
+ 			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
++				if (operand_size) {
++					switch (operand_size) {
+ 					default:
+ 						break;
+ 					case 1:
+@@ -368,8 +369,8 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 			}
+ 		} else { // Intel syntax
+ 			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
++				if (operand_size) {
++					switch (operand_size) {
+ 					default:
+ 						break;
+ 					case 1:
+@@ -443,6 +444,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 	}
+ }
+ 
++static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
++{
++	printImmWidth(MI, O, imm, positive, MI->op1_size);
++}
++
+ // local printOperand, without updating public operands
+ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+@@ -1235,11 +1241,9 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
- 					printImm(MI, O,
+-					printImm(MI, O,
 -						 x86_get_address_mask(
 -							 MI->csh->mode) &
 -							 DispVal,
-+						 x86_absolute_address(MI, DispVal),
- 						 true);
+-						 true);
++					/* The absolute address already has its effective width. */
++					printImmWidth(MI, O, X86_absoluteAddress(MI, DispVal),
++						      true, 8);
  				} else {
  					printImm(MI, O, DispVal, true);
+ 				}
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..a65ef7ea 100644
+index 380faa79..97d6bb42 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,13 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,4 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* Address-size override affects rendering of a displacement used as the
-+ * entire address. Keep the signed displacement in operand detail. */
-+static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
- {
+-{
 -	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
 -	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+	const unsigned has_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
-+	return (uint64_t)disp &
-+	       (UINT64_MAX >> mi->csh->x86_address_shift[has_override]);
- }
- 
+-}
+-
  #endif
-diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
-index 6fcbe3f4..b8295a0a 100644
---- a/arch/X86/X86Module.c
-+++ b/arch/X86/X86Module.c
-@@ -10,6 +10,21 @@
- #include "X86Mapping.h"
- #include "X86Module.h"
- 
-+/* Select the same mode precedence as the instruction decoder. */
-+static void setAddressShifts(cs_struct *handle)
-+{
-+	if (x86_has_feature(handle->mode, CS_MODE_16)) {
-+		handle->x86_address_shift[0] = 64 - 16;
-+		handle->x86_address_shift[1] = 64 - 32;
-+	} else if (x86_has_feature(handle->mode, CS_MODE_32)) {
-+		handle->x86_address_shift[0] = 64 - 32;
-+		handle->x86_address_shift[1] = 64 - 16;
-+	} else {
-+		handle->x86_address_shift[0] = 0;
-+		handle->x86_address_shift[1] = 64 - 32;
-+	}
-+}
-+
- cs_err X86_global_init(cs_struct *ud)
- {
- 	MCRegisterInfo *mri;
-@@ -42,6 +57,7 @@ cs_err X86_global_init(cs_struct *ud)
- 	else
- 		ud->regsize_map = regsize_map_32;
- 
-+	setAddressShifts(ud);
- 	X86_build_lookup_tables(ud);
- 
- 	return CS_ERR_OK;
-@@ -65,6 +81,7 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
- 		handle->mode = (cs_mode)(value &
- 					 (CS_MODE_16 | CS_MODE_32 | CS_MODE_64 |
- 					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
-+		setAddressShifts(handle);
- 		break;
- 	case CS_OPT_SYNTAX:
- 		switch (value) {
-diff --git a/cs_priv.h b/cs_priv.h
-index 19ecedba..d3416bb5 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -142,6 +142,7 @@ struct cs_struct {
- 	bool no_text; // CS_OPT_TEXT is off: instructions are not printed
- 	bool skipdata; // set this to True if we skip data when disassembling
- 	uint8_t skipdata_size; // how many bytes to skip
-+	uint8_t x86_address_shift[2]; // without and with address-size override
- 	cs_opt_skipdata skipdata_setup; // user-defined skipdata setup
- 	const uint8_t *regsize_map; // map to register size (x86-only for now)
- 	GetRegisterAccess_t reg_access;
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
 index cfd13cba..fe231be4 100644
 --- a/tests/unit/x86_legacy_address_size.c
