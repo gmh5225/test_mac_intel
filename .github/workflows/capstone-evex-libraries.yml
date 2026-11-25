@@ -1,7 +1,7 @@
-name: Measure production x86 linking with AMD64 sections after the i386 paths
+name: Test separated ELF code and data segments with AMD64 sections placed after i386
 on:
   push:
-    branches: [codex/place-amd64-sections-after-i386]
+    branches: [codex/separate-linux-code-and-ordered-x86-data]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-fixed-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-separated-code-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

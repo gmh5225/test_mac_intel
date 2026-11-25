@@ -58,7 +58,7 @@ try:
         for style in ('shipping','ordered'):
             tag=style+'-'+label;path=w/tag
             ld=['-Wl,'+k for k in options]
-            if style=='ordered':ld.extend(['-Xlinker','-T','-Xlinker',str(r/'amd64-last.ld')])
+            if style=='ordered':ld.extend(['-Wl,-z,separate-code','-Xlinker','-T','-Xlinker',str(r/'amd64-last.ld')])
             run('clang++',w/'driver.o',*ld,lib,ice_lib,*flags,'-o',path)
             with path.open('rb') as f:
                 elf=ELFFile(f)
@@ -66,13 +66,19 @@ try:
             images[tag]=dict(exe=sha(path),symbols=symbols(path),archive=archive[label])
     assert set(objects['base'])==set(objects['outlined'])
     assert [Path(f).name for f in objects['base']if objects['base'][f]!=objects['outlined'][f]]==['X86Sse64Output.c.o']
-    save('sources',dict(capstone=maps,neverd=dev,ice=m['iced_revision'],archives=archive,images=images,options=dict(shipping=options,ordered_script=(r/'amd64-last.ld').read_text()),host=platform.platform(),cpu=get('lscpu')))
+    save('sources',dict(capstone=maps,neverd=dev,ice=m['iced_revision'],archives=archive,images=images,options=dict(shipping=options,ordered_options=options+['-z','separate-code'],ordered_script=(r/'amd64-last.ld').read_text()),host=platform.platform(),cpu=get('lscpu')))
     save('linked-sections',layout)
     target=('.cs_x86_i386_text','.cs_x86_memory_fallback32_text','.cs_x86_register_fallback32_text','.cs_x86_i386_rodata','.cs_x86_memory_fallback32_rodata','.cs_x86_register_fallback32_rodata')
     for tag in ('ordered-base','ordered-outlined'):
         for sec in target:
             family='.cs_x86_amd64_'+('text' if sec.endswith('_text') else 'rodata')
             assert layout[tag][sec][0]+layout[tag][sec][1]<=layout[tag][family][0],(tag,sec,layout[tag][sec],layout[tag][family])
+    segments={}
+    for tag in layout:
+        with (w/tag).open('rb') as stream:
+            elf=ELFFile(stream)
+            segments[tag]=[[p['p_vaddr'],p['p_memsz'],p['p_flags'],p['p_align']]for p in elf.iter_segments() if p['p_type']=='PT_LOAD']
+    save('load-segments',segments)
     assert all(layout['ordered-base'][sec][:2]==layout['ordered-outlined'][sec][:2] for sec in target)
     stages={tag:(w/tag).read_bytes() for tag in images}
     lengths={k:len(v)for k,v in stages.items()};length=max(lengths.values())
