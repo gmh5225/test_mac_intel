@@ -1,7 +1,7 @@
-name: Time direct EVEX immediate shift register records before or after the existing register table on OpenSSL, JPEG and PuTTY
+name: Measure bare SSE register and memory output on real AMD64 libmvec, PuTTY and OpenSSL alongside i386
 on:
   push:
-    branches: [codex/x86-amd64-att-evex-shift-lookup]
+    branches: [codex/x86-amd64-bare-sse-att-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-att-shift-lookup-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: bare-sse-att-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
