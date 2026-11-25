@@ -44,12 +44,61 @@ static void flush() {
   output.clear();
 }
 
+static int ppc_snapshot(const char *fixture, bool big, unsigned mode) {
+  std::ifstream input(fixture, std::ios::binary);
+  std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(input), {}};
+  if (bytes.size() < 128 || bytes.size() % 4)
+    throw std::runtime_error("incomplete PowerPC corpus");
+  csh h;
+  cs_mode flags = static_cast<cs_mode>(unsigned(CS_MODE_64) |
+                                      (big ? unsigned(CS_MODE_BIG_ENDIAN) : 0u));
+  if (cs_open(CS_ARCH_PPC, flags, &h) ||
+      cs_option(h, CS_OPT_TEXT, mode ? CS_OPT_ON : CS_OPT_OFF) ||
+      cs_option(h, CS_OPT_DETAIL, mode == 3 ? CS_OPT_ON | CS_OPT_DETAIL_REAL
+                                           : mode == 2 ? CS_OPT_ON : CS_OPT_OFF))
+    throw std::runtime_error("PowerPC options");
+  unsigned accepted=0, aliases=0, named=0;
+  for (size_t pos=0; pos<bytes.size(); pos+=4) {
+    if (!big) std::reverse(bytes.begin()+pos,bytes.begin()+pos+4);
+    const uint8_t *p=bytes.data()+pos; size_t remaining=4;
+    uint64_t address=0x10000+pos;
+    cs_detail d;
+    cs_insn x;
+    std::memset(&x,0x5a,sizeof x); std::memset(&d,0xa5,sizeof d);
+    x.detail=mode>=2?&d:nullptr;
+    x.is_alias=x.usesAliasDetails=x.illegal=false;
+    bool ok=cs_disasm_iter(h,&p,&remaining,&address,&x);
+    value(ok); value(address); value(remaining); value(cs_errno(h));
+    if (ok) {
+      ++accepted;
+      if (p != bytes.data()+pos+4 || remaining || x.size!=4)
+        throw std::runtime_error("PowerPC cursor");
+      if (x.is_alias) {
+        ++aliases;
+        const char *n=cs_insn_name(h,x.alias_id);
+        if (n) {++named; text(n);} else value(0);
+      }
+    }
+    if (x.detail != (mode>=2?&d:nullptr)) throw std::runtime_error("PowerPC detail pointer");
+    x.detail=nullptr;
+    const auto *insn=reinterpret_cast<const uint8_t*>(&x);
+    const auto *detail=reinterpret_cast<const uint8_t*>(&d);
+    output.insert(output.end(),insn,insn+sizeof x);
+    if (mode>=2) output.insert(output.end(),detail,detail+sizeof d);
+    if (output.size()>=65536) flush();
+  }
+  flush(); cs_close(&h);
+  std::fprintf(stderr,"{\"accepted\":%u,\"aliases\":%u,\"named\":%u}\n",accepted,aliases,named);
+  return accepted?0:1;
+}
+
 int main(int argc, char **argv) {
   try {
 #ifdef _WIN32
     if (_setmode(_fileno(stdout), _O_BINARY) == -1)
       throw std::runtime_error("binary stdout");
 #endif
+    if (argc == 4) return ppc_snapshot(argv[1],std::atoi(argv[2])!=0,std::atoi(argv[3]));
     if (argc != 7)
       throw std::runtime_error(
           "snapshot bits att text detail every_offset input");

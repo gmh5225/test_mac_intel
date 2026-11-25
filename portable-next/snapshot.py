@@ -46,4 +46,26 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
             counts=json.loads(diag)
             assert counts['accepted']>0 and len(source)==sum(counts.values())
             results['/'.join(args[:4])]=dict(sha256=digest.hexdigest(),counts=counts)
+
+    corpus = bytearray()
+    for f in sorted((src/'suite/MC/PowerPC').glob('*.s.cs')):
+        for line in f.read_text().splitlines():
+            left=line.partition('=')[0].strip()
+            if re.fullmatch(r'0x[0-9a-fA-F]{2}(?:,\s*0x[0-9a-fA-F]{2}){3}',left):
+                corpus.extend(bytes(int(v,16) for v in left.split(',')))
+    assert len(corpus)>=128 and len(corpus)%4==0
+    ppc_input=temp/'curated-ppc.bin';ppc_input.write_bytes(corpus)
+    for big in (0,1):
+        for detail in (range(2) if profile=='diet' else range(4)):
+            args=[exe,ppc_input,str(big),str(detail)]
+            with sp.Popen(args,stdout=sp.PIPE,stderr=sp.PIPE) as proc:
+                digest=hashlib.sha256()
+                for chunk in iter(lambda:proc.stdout.read(65536),b''):digest.update(chunk)
+                diag=proc.stderr.read().decode()
+                result=proc.wait()
+                assert result==0,(args,result,diag)
+            counts=json.loads(diag);assert counts['accepted']>0 and counts['accepted']<=len(corpus)//4
+            if profile!='diet' and detail:assert counts['named']>0,counts
+            results['powerpc/'+str(big)+'/'+str(detail)]=dict(counts=counts,sha256=digest.hexdigest(),corpus_sha256=hashlib.sha256(corpus).hexdigest())
+
     return dict(records=records,bytes=len(source),sha256=hashlib.sha256(source).hexdigest(),snapshots=results)

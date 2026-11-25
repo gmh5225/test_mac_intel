@@ -1,7 +1,7 @@
-name: Verify Linux iterator and host-scoped Group 3 across CMake and Make release builds
+name: Check PowerPC aliases and Intel register spellings across Windows, Linux and macOS
 on:
   push:
-    branches: [codex/linux-public-and-group3-abi-matrix]
+    branches: [codex/ppc-and-register-spelling-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b7a40bec54cdcb46fd6555b3335e3965a06a3740
+          ref: 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: linux-public-and-group3-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: ppc-x86-spellings-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

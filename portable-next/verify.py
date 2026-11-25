@@ -21,13 +21,13 @@ t=Path(tempfile.mkdtemp())
 b=t/'build'
 try:
     assert git('rev-parse','HEAD')==q['base'] and git('status','--porcelain')==''
-    arches=['X86','AARCH64','ARM','MIPS','PPC','RISCV'] if profile not in ('diet','reduced') else ['X86']
+    arches=['X86','AARCH64','ARM','MIPS','PPC','RISCV'] if profile not in ('diet','reduced') else ['X86','PPC']
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in arches]]
     flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
     units=['mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
     if profile not in ('diet','reduced'):
         units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access']
-    if len(arches)>1:
+    if len(arches)>2:
         units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
     flags.append('-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
@@ -40,6 +40,8 @@ try:
             assert hashlib.sha256(patch.read_bytes()).hexdigest()==tree['sha256']
             git('apply','--index',patch)
             assert git('write-tree')==tree['tree']
+        run(name+'-register-projection',os.sys.executable,'-B',s/'suite/synctools/x86_register_name_sizes.py','--check')
+        run(name+'-alias-projection',os.sys.executable,'-B',s/'suite/synctools/alias_mnemonic_trie.py','--check')
         run(name+'-build','cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
         run(name+'-units','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
         log=(e/(name+'-units.log')).read_text(errors='replace')
@@ -58,10 +60,10 @@ try:
             run(name+'-static-config','cmake','-G','Ninja','-S',s,'-B',solo,*flags,'-DCAPSTONE_BUILD_SHARED_LIBS=OFF')
             run(name+'-static-build','cmake','--build',solo,'--parallel','4','--target','capstone_static',*units)
             run(name+'-static-units','ctest','--test-dir',solo,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
-            for folder,active in ((solo,mac or name=='selector'),(b,False)):
+            for folder,active in ((solo,mac),(b,False)):
                 cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
                 assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
-                assert ('-DCAPSTONE_X86_ITERATOR_READERS' in cs['command'])==(active and linux)
+                assert ('-DCAPSTONE_X86_ITERATOR_READERS' in cs['command'])==False
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows['base']['static']['snapshots']
             rows[name]['static_only']=result
@@ -71,7 +73,7 @@ try:
             run(name+'-make-build',*flags_make)
             commands=(e/(name+'-make-build.log')).read_text()
             for flag in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'):
-                assert ('-D'+flag in commands)==(name=='selector'),(name,flag)
+                assert ('-D'+flag in commands)==False,(name,flag)
             lib,=[f for f in obj.rglob('libcapstone.a') if not f.is_symlink()]
             result=snapshots(s,p,lib.parent,t,profile,name+'-make',run,'static')
             assert result['snapshots']==rows['base']['static']['snapshots']
