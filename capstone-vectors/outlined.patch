@@ -1,147 +1,182 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..7d6a66f3 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -557,22 +557,15 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 	}
- 
- 	if (MCOperand_isImm(DispSpec)) {
--		int64_t imm = MCOperand_getImm(DispSpec);
-+		const uint64_t offset = (uint64_t)MCOperand_getImm(DispSpec);
- 		if (MI->csh->detail_opt)
- 			MI->flat_insn->detail->x86
- 				.operands[MI->flat_insn->detail->x86.op_count]
--				.mem.disp = imm;
--		if (imm < 0) {
--			SStream_concat(
--				O, "0x%" PRIx64,
--				arch_masks[x86_get_bit_mode(MI->csh->mode)] &
--					imm);
--		} else {
--			if (imm > HEX_THRESHOLD)
--				SStream_concat(O, "0x%" PRIx64, imm);
--			else
--				SStream_concat(O, "%" PRIu64, imm);
--		}
-+				.mem.disp = (int64_t)offset;
-+		if (offset > HEX_THRESHOLD)
-+			SStream_concat(O, "0x%" PRIx64, offset);
-+		else
-+			SStream_concat(O, "%" PRIu64, offset);
- 	}
- 
- 	if (MI->csh->detail_opt)
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..88986c5b 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -326,6 +326,16 @@ static bool need_zero_prefix(uint64_t imm)
- 		return true;
- }
- 
-+static void printMasmHex(SStream *O, uint64_t value)
-+{
-+	if (value == (UINT64_C(1) << 63))
-+		SStream_concat0(O, "8000000000000000h");
-+	else if (need_zero_prefix(value))
-+		SStream_concat(O, "0%" PRIx64 "h", value);
-+	else
-+		SStream_concat(O, "%" PRIx64 "h", value);
-+}
+diff --git a/arch/X86/X86BitTestRegisterOutput.h b/arch/X86/X86BitTestRegisterOutput.h
+new file mode 100644
+index 00000000..e8f8b784
+--- /dev/null
++++ b/arch/X86/X86BitTestRegisterOutput.h
+@@ -0,0 +1,29 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
 +
- static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- {
- 	if (positive) {
-@@ -348,21 +358,10 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 					}
- 				}
- 
--				if (imm == 0x8000000000000000LL) // imm == -imm
--					SStream_concat0(O, "8000000000000000h");
--				else if (need_zero_prefix(imm))
--					SStream_concat(O, "0%" PRIx64 "h", imm);
--				else
--					SStream_concat(O, "%" PRIx64 "h", imm);
-+				printMasmHex(O, (uint64_t)imm);
- 			} else {
- 				if (imm > HEX_THRESHOLD) {
--					if (need_zero_prefix(imm))
--						SStream_concat(O,
--							       "0%" PRIx64 "h",
--							       imm);
--					else
--						SStream_concat(
--							O, "%" PRIx64 "h", imm);
-+					printMasmHex(O, (uint64_t)imm);
- 				} else
- 					SStream_concat_dec64(O, imm, false);
- 			}
-@@ -721,13 +720,14 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 				.operands[MI->flat_insn->detail->x86.op_count]
- 				.mem.disp = imm;
- 
--		if (imm < 0)
--			printImm(MI, O,
--				 arch_masks[x86_get_bit_mode(MI->csh->mode)] &
--					 imm,
--				 true);
--		else
-+		/* The decoder already zero-extends narrower moffs values.
-+		 * The accumulator width does not narrow a 64-bit offset. */
-+		if (imm >= 0)
- 			printImm(MI, O, imm, true);
-+		else if (MI->csh->syntax == CS_OPT_SYNTAX_MASM)
-+			printMasmHex(O, (uint64_t)imm);
-+		else
-+			SStream_concat_hex64(O, (uint64_t)imm, false);
- 	}
- 
- 	SStream_concat0(O, "]");
-diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
-index cfd13cba..17401f22 100644
---- a/tests/unit/x86_legacy_address_size.c
-+++ b/tests/unit/x86_legacy_address_size.c
-@@ -279,9 +279,43 @@ static bool check_other_opcodes(void)
- 	return ok;
- }
- 
-+static bool check_moffs_address(cs_mode mode, cs_opt_value syntax,
-+				const char *expected)
++#ifndef CS_X86_BIT_TEST_REGISTER_OUTPUT_H
++#define CS_X86_BIT_TEST_REGISTER_OUTPUT_H
++
++#include "X86ExtendRegisterOutput.h"
++#include "X86GenBitTestRegisters.inc"
++
++/* 0F A3/AB/B3/BB share the two-register encoding and operand order.
++ * The generated row owns each instruction's flags and register access. */
++static inline bool writeBitTestRegisters(
++	cs_struct *handle, const uint8_t *code, unsigned length,
++	cs_insn *insn, uint16_t *insn_size, uint8_t rex, unsigned bank,
++	const struct X86SimpleRegister *regs)
 +{
-+	const uint8_t code[] = { 0xa0, 0x34, 0x82, 0x00, 0x80,
-+				 0xec, 0xcd, 0xbc, 0xbc };
-+	csh handle;
-+	cs_insn *insn = NULL;
-+	bool ok = false;
-+	if (cs_open(CS_ARCH_X86, mode, &handle) != CS_ERR_OK)
++	const uint8_t opcode = code[length - 2], mr = code[length - 1];
++	if ((opcode & 0xe7) != 0xa3 || mr < 0xc0 ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
 +		return false;
-+	cs_err err = cs_option(handle, CS_OPT_SYNTAX, syntax);
-+	if (err == CS_ERR_X86_ATT && syntax == CS_OPT_SYNTAX_ATT) {
-+		cs_close(&handle);
-+		return true;
-+	}
-+	if (err == CS_ERR_OK) {
-+		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
-+		ok = count == 1 && insn->size == sizeof(code) &&
-+		     strcmp(insn->op_str, expected) == 0;
-+		if (!ok)
-+			fprintf(stderr, "expected %s, got %s\n", expected,
-+				count ? insn->op_str : "(decode failed)");
-+		cs_free(insn, count);
-+	}
-+	cs_close(&handle);
-+	return ok;
++	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
++	const unsigned reg = ((mr >> 3) & 7) | ((rex & 4) << 1);
++	writeExtendRegisters(code, length, insn, insn_size,
++			     &x86_bit_test_registers[bank][(opcode >> 3) & 3],
++			     &regs[rm], &regs[reg], rex, opcode, mr, true);
++	return true;
 +}
 +
- int main(void)
- {
- 	bool ok = check_conversions();
- 	ok &= check_other_opcodes();
-+	ok &= check_moffs_address(CS_MODE_64, CS_OPT_SYNTAX_INTEL,
-+				  "al, byte ptr [0xbcbccdec80008234]");
-+	ok &= check_moffs_address(CS_MODE_64, CS_OPT_SYNTAX_MASM,
-+				  "al, byte ptr [0bcbccdec80008234h]");
-+	ok &= check_moffs_address((cs_mode)0, CS_OPT_SYNTAX_ATT,
-+				  "0xbcbccdec80008234, %al");
- 	return ok ? 0 : 1;
++#endif
+diff --git a/arch/X86/X86GenBitTestRegisters.inc b/arch/X86/X86GenBitTestRegisters.inc
+new file mode 100644
+index 00000000..880ddb6e
+--- /dev/null
++++ b/arch/X86/X86GenBitTestRegisters.inc
+@@ -0,0 +1,21 @@
++/* Generated by x86_simple_output.cpp --bit-test-registers. */
++static const struct X86SimpleOutput x86_bit_test_registers[3][4] = {
++	{
++		{ 57, "bt", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 2, 0, 0, { { 0, 4, 1 }, { 0, 4, 1 } } },
++		{ 60, "bts", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 2, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
++		{ 59, "btr", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 2, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
++		{ 58, "btc", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 2, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
++	},
++	{
++		{ 57, "bt", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 4, 1 }, { 0, 4, 1 } } },
++		{ 60, "bts", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
++		{ 59, "btr", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
++		{ 58, "btc", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
++	},
++	{
++		{ 57, "bt", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 1 }, { 0, 8, 1 } } },
++		{ 60, "bts", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
++		{ 59, "btr", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
++		{ 58, "btc", "", UINT64_C(29686813949954), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
++	},
++};
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index 251c6819..53c72d3a 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -14,6 +14,7 @@
+ #include "X86OutputOptions.h"
+ #include "X86RegisterImmediateOutput.h"
+ #include "X86GenTest32Registers.inc"
++#include "X86BitTestRegisterOutput.h"
+ /* The extra Group 3 forms improve the i386 reader on Linux x86-64 Clang. */
+ #if defined(__linux__) && defined(__clang__) && defined(__x86_64__)
+ #define X86_GROUP3_REGISTER_OUTPUT
+@@ -61,6 +62,10 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 		}
+ #endif
+ 	}
++	if (opcode == 0x0f && size >= 3 &&
++	    writeBitTestRegisters(handle, code, 3, insn, insn_size, 0, 0,
++				  test32_regs[1]))
++		return true;
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
+ #endif
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..19a5b7a4 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -27,6 +27,7 @@
+ #endif
+ 
+ #include "X86GenSimpleOutput.inc"
++#include "X86BitTestRegisterOutput.h"
+ #ifdef CAPSTONE_X86_ONLY
+ #include "X86VexBaseMemory.h"
+ #endif
+@@ -241,6 +242,15 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	}
+ #endif
+ fallback:
++	{
++		const uint8_t rex = (code[0] & 0xf0) == 0x40 ? code[0] : 0;
++		const unsigned length = 3 + (rex != 0);
++		if (size >= length && code[rex != 0] == 0x0f &&
++		    writeBitTestRegisters(handle, code, length, insn, insn_size,
++					  rex, 1 + !!(rex & 8),
++					  x86_simple_registers[rex & 8 ? 3 : 2]))
++			return true;
++	}
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ 	/* The fixed AMD64 decoder has just tried the shared output plans.
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index b202bca4..f1c89f85 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -260,6 +260,41 @@ struct CheckedRow {
+ 	}
+ };
+ 
++void emit_bit_test_registers(Decoder &x32, Decoder &x64, const RegisterTable &regs)
++{
++	std::cout << "/* Generated by x86_simple_output.cpp --bit-test-registers. */\n"
++		     "static const struct X86SimpleOutput x86_bit_test_registers[3][4] = {\n";
++	unsigned encodings = 0;
++	for (unsigned bank = 0; bank < 3; ++bank) {
++		std::cout << "\t{\n";
++		for (unsigned opcode : { 0xa3, 0xab, 0xb3, 0xbb }) {
++			CheckedRow row;
++			const unsigned first = bank == 2 ? 0x48 : 0;
++			const unsigned last = bank == 0 ? 0 : bank == 1 ? 0x47 : 0x4f;
++			for (unsigned rex = first; rex <= last; ++rex) {
++				if (rex && rex < 0x40)
++					continue;
++				for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
++					const uint8_t bytes[] = { uint8_t(rex), 0x0f, uint8_t(opcode), uint8_t(mr) };
++					Decoder &decoder = bank ? x64 : x32;
++					const unsigned length = 3 + (rex != 0);
++					decoder.decode(bytes + !rex, length, length, 0x4000);
++					const auto *names = regs[bank == 2 ? 3 : 2];
++					const auto &dest = names[(mr & 7) | ((rex & 1) << 3)];
++					const auto &index = names[((mr >> 3) & 7) | ((rex & 4) << 1)];
++					row.observe(describe(*decoder.insn, uint8_t(opcode), uint8_t(rex),
++							     uint8_t(mr), &dest, &index, false, false, true));
++				}
++			}
++			encodings += row.encodings;
++			std::cout << "\t\t" << row.fields << ",\n";
++		}
++		std::cout << "\t},\n";
++	}
++	std::cout << "};\n";
++	std::cerr << encodings << " canonical bit-test register encodings\n";
++}
++
+ // Group 3 register forms differ in their implicit effects. Verify each
+ // row against all eight explicit registers before sharing it.
+ void emit_group3_registers(Decoder &decoder, const RegisterTable &regs)
+@@ -1191,6 +1226,13 @@ void emit_indirect64(Decoder &decoder, const RegisterTable &regs)
+ 
+ int main(int argc, char **argv)
+ {
++	if (argc == 2 && std::strcmp(argv[1], "--bit-test-registers") == 0) {
++		Decoder x32(CS_MODE_32), x64(CS_MODE_64);
++		RegisterTable regs{};
++		describe_registers(x64, regs);
++		emit_bit_test_registers(x32, x64, regs);
++		return 0;
++	}
+ 	if (argc == 2 && std::strcmp(argv[1], "--vex64-packed-memory") == 0) {
+ 		Decoder decoder(CS_MODE_64);
+ 		emit_packed_memory(decoder, false);
+@@ -1228,7 +1270,7 @@ int main(int argc, char **argv)
+ 	const bool group3 = argc == 2 && std::strcmp(argv[1], "--group3-registers32") == 0;
+ 	if (argc != 1 && !indirect && !extend && !test32 && !group3)
+ 		throw std::runtime_error(
+-			"expected no arguments, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32, --extend64, --test32-registers or --group3-registers32");
++			"expected no arguments, --bit-test-registers, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32, --extend64, --test32-registers or --group3-registers32");
+ 	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
+ 	RegisterTable regs{};
+ 	describe_registers(x64, regs);
