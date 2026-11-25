@@ -29,13 +29,13 @@ def measure(rows, w, save):
         cmd=['setarch',os.uname().machine,'-R',path,row['arch'],w/(row['name']+'.text'),str(mode),str(n)]
         return list(map(int,sp.check_output(cmd,text=True).split()))
     data={}
-    for row in rows:
+    for row in reversed(rows):
         if row['arch'] in ('i386','amd64'):continue
         for mode in range(5):
             n=max(1,math.ceil(25e6/run('base',row,mode,1)[0]))
             expected=run('base',row,mode,n)[2:]
             assert expected[0]>0
-            cycles=[];labels=list(images);rng=random.Random(row['name']+'/'+str(mode))
+            cycles=[];labels=list(images);rng=random.Random('independent-repeat/'+row['name']+'/'+str(mode))
             for _ in range(35):
                 rng.shuffle(labels);pairs={k:[]for k in labels}
                 for k in labels+labels[::-1]:

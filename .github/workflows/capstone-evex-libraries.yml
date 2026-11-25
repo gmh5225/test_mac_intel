@@ -1,7 +1,7 @@
-name: Compare adjacent byte and packed MIPS register name indices on dedicated x86-64 Clang
+name: Repeat dedicated MIPS name lookup against independent controls using current NeverD dev
 on:
   push:
-    branches: [codex/mips-abi-numeric-pair-index]
+    branches: [codex/mips-register-index-independent-repeat]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f47e72ea35c2b8f2270ac80a20ff79915eeffdb9
+          ref: 1226b1959ec56bd8043d7ff057bf3b8d37f1937a
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-pair-index-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-index-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
