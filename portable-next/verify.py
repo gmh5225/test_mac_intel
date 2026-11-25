@@ -111,6 +111,9 @@ try:
         guard=sp.run([t/'scan-guard',t/'scan-base.so',t/'scan-candidate.so'],text=True,capture_output=True)
         save('mixed-guard',dict(code=guard.returncode,counts=guard.stdout.strip(),message=guard.stderr.strip()))
         if guard.returncode:raise RuntimeError((guard.returncode,guard.stderr))
+        cmd('printer-guard-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'printer-guard.cpp','-ldl','-o',t/'print-guard'])
+        z=sp.run([t/'print-guard',t/'scan-base.so',t/'scan-candidate.so'],text=True,capture_output=True,check=True)
+        save('printed-records',dict(counts=z.stdout.strip(),options=z.stderr.strip(),tree=q['tree']))
         a,both=mixed['base']['objects'],mixed['candidate']['objects']
         assert a.keys()==both.keys()
         delta=[Path(p).name for p in a if a[p]!=both[p]]

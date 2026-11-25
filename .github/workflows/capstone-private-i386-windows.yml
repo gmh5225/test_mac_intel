@@ -1,7 +1,7 @@
-name: Verify the RISC-V register and scanner changes on released mixed ARM with four native throughput controls
+name: Time width-selected RISC-V expansion and alias lookup with independent printed records on the released six-architecture build
 on:
   push:
-    branches: [codex/riscv-release-configuration-controls]
+    branches: [codex/riscv-expanded-instruction-ownership]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: released-mixed-riscv-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: expanded-riscv-printer-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7
