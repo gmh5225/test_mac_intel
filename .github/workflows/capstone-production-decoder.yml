@@ -1,7 +1,7 @@
-name: Measure PowerPC alias resolution in NeverD with LLVM main built from source
+name: Validate ordered PowerPC alias lookup in fully linked NeverD with current LLVM sources
 on:
   push:
-    branches: [codex/ppc-alias-neverd-product]
+    branches: [codex/ppc-ordered-full-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ppc-alias-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: ordered-ppc-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
