@@ -1,7 +1,7 @@
-name: Measure ARM literal call targets and linked symbol addresses in NeverD with source-built LLVM
+name: Test the public x86 record edge and AT&T output in NeverD with LLVM built from main
 on:
   push:
-    branches: [codex/arm-character-target-layout-product]
+    branches: [codex/mixed-record-and-att-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -20,6 +20,9 @@ jobs:
           - os: ubuntu-24.04
             cc: clang
             replica: 3
+          - os: ubuntu-24.04-arm
+            cc: clang
+            replica: 4
     runs-on: ${{ matrix.os }}
     timeout-minutes: 235
     steps:
@@ -67,6 +70,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-call-layout-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: att-and-public-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

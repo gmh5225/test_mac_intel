@@ -1,68 +1,138 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d305ef98..4f0a7438 100644
+index d305ef98..2d9eff25 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -161,6 +161,7 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    add_compile_definitions(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
-     # Linux x86-64 retains its inlined initialization for MIPS text throughput.
-     if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
-        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
+@@ -1088,13 +1088,20 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86" OR
+        (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+-        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
++        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
++             (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|aarch64|arm64)$"))
++        AND CMAKE_C_COMPILER_ID MATCHES "Clang"
+         AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
+         AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
+-        if(capstone_enabled_architectures STREQUAL "X86")
++        if(capstone_enabled_architectures STREQUAL "X86" OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+             target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
+-        else()
+-            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
++        endif()
++        if(NOT capstone_enabled_architectures STREQUAL "X86")
++            if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
++                target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_MIXED_PUBLIC_READER)
++            else()
++                target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
++            endif()
+         endif()
+         set(capstone_x86_objects
+             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
 diff --git a/Makefile b/Makefile
-index 99eb30fe..48239585 100644
+index 99eb30fe..4c4b9c81 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -122,6 +122,7 @@ CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
- # Use the compiler target, including cross builds.
- MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
+@@ -127,8 +127,9 @@ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev
  	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
-diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index af2bc19c..e03a2202 100644
---- a/arch/ARM/ARMMapping.c
-+++ b/arch/ARM/ARMMapping.c
-@@ -2406,4 +2406,21 @@ void ARM_set_detail_op_float(MCInst *MI, unsigned OpNum, uint64_t Imm)
- 	ARM_inc_op_count(MI);
- }
+ 	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
+ 	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
+-	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print macos ? "macos" : "linux-arm64" }')
+-ifneq ($(MIXED_STORAGE_TARGET),)
++	     $$2 == "__x86_64__" { amd64=1 } \
++	     END { if (clang_cc && ptr==8) { if (macos) print "macos"; else if (linux_target && arm64) print "linux-arm64"; else if (linux_target && amd64) print "linux-amd64" } }')
++ifneq ($(filter macos linux-arm64,$(MIXED_STORAGE_TARGET)),)
+ CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
+ MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
+ endif
+@@ -304,8 +305,13 @@ endif
+ 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+-else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
++else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
++ifeq ($(MIXED_STORAGE_TARGET),macos)
+ 	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
++else ifneq ($(filter linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
++	CFLAGS += -DCAPSTONE_X86_MIXED_PUBLIC_READER
++	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
++endif
+ endif
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 06cc61ae..6e690fbe 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -30,10 +30,11 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 					 uint16_t *insn_size);
+ #endif
  
-+#ifdef ARM_FORMATTED_CHAR_CALL
-+/* The printer supplies "%s" and one NUL-terminated, single-character
-+ * string at every call. A custom formatter receives these same arguments. */
-+__attribute__((section(".cs_arm_formatted_char")))
-+void ARM_formatChar(SStream *O, const char *fmt, ...)
-+{
-+	va_list args;
-+	va_start(args, fmt);
-+	const char *literal = va_arg(args, const char *);
-+	va_end(args);
-+	if (cs_vsnprintf == cs_default_vsnprintf)
-+		SStream_concat1(O, literal[0]);
-+	else
-+		SStream_concat(O, fmt, literal);
-+}
+-#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && \
++#if (defined(CAPSTONE_X86_ONLY) || defined(CAPSTONE_X86_MIXED_PUBLIC_READER)) && !defined(CAPSTONE_DIET) && \
+ 	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
++#ifdef CAPSTONE_X86_ONLY
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
+ /* Linux already selects the scalar writer in its full decode entry. */
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+@@ -43,6 +44,9 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+ 					 size_t size, cs_insn *insn,
+ 					 uint16_t *insn_size);
+ #endif
++#else
++#define CAPSTONE_X86_MIXED_PUBLIC_OUTPUT
 +#endif
-+
  #endif
-diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
-index d6833e63..66d2fa9c 100644
---- a/arch/ARM/ARMMapping.h
-+++ b/arch/ARM/ARMMapping.h
-@@ -36,6 +36,13 @@ static inline void ARM_printFormattedChar(SStream *O, const char *literal)
- 	}
- 	SStream_concat(O, "%s", literal);
- }
-+#elif defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE) && defined(__linux__) && \
-+	defined(__clang__) && defined(__x86_64__)
-+#define ARM_FORMATTED_CHAR_CALL
-+CAPSTONE_INTERNAL void ARM_formatChar(SStream *O, const char *fmt, ...);
-+#define ARM_printFormattedChar(O, literal) ARM_formatChar((O), "%s", (const char *)(literal))
- #else
- #define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
+ 
+ #if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..3574575d 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+ 
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_PUBLIC_OUTPUT)
+ #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
+ #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
+ #define CS_PUBLIC_FIXED_RECORD
+diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
+index 732c4004..c5a4c0f9 100644
+--- a/arch/X86/X86PublicOutput.c
++++ b/arch/X86/X86PublicOutput.c
+@@ -4,7 +4,7 @@
+ #include "../../cs_disasm_internal.h"
+ #include "X86ScanAdapter.h"
+ 
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_PUBLIC_OUTPUT)
+ #if defined(__ELF__) && defined(__clang__)
+ #pragma clang section text = ".cs_x86_public_output_text"
  #endif
+@@ -13,6 +13,11 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+ 					    cs_insn *insn, uint16_t *length,
+ 					    bool batch)
+ {
++#ifdef CAPSTONE_X86_MIXED_PUBLIC_OUTPUT
++	if (handle->arch != CS_ARCH_X86)
++		return cs_decode_full_insn(handle, code, size, insn, length,
++					   batch);
++#endif
+ 	/* The caller owns skipdata callbacks, bulk boundaries and the public
+ 	 * cursors. A fixed iterator can fill this one record using local cursors. */
+ 	if (!batch && !handle->skipdata && !handle->no_text &&
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 4c4c34f2..b3027d0d 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,7 +18,7 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_MIXED_PUBLIC_OUTPUT)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
