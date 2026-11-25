@@ -1,7 +1,7 @@
-name: Measure direct PowerPC trie calls and verify x86 function placement
+name: Measure mixed PowerPC alias lookup while preserving existing caller and parser placement
 on:
   push:
-    branches: [codex/ppc-existing-parser-without-wrapper]
+    branches: [codex/ppc-preserve-shared-parser-order]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: direct-ppc-parser-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ordered-ppc-parser-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

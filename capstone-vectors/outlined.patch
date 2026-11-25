@@ -1,8 +1,13 @@
 diff --git a/AliasMapping.c b/AliasMapping.c
-index 77e2395c..b2447ad0 100644
+index 77e2395c..6766791d 100644
 --- a/AliasMapping.c
 +++ b/AliasMapping.c
-@@ -6,27 +6,29 @@
+@@ -2,31 +2,33 @@
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+ #include "Mapping.h"
++#include "utils.h"
+ 
  #if defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && \
  	!defined(CAPSTONE_USE_ALIAS_TRIE) && \
  	(defined(CAPSTONE_HAS_AARCH64) || \
@@ -33,7 +38,7 @@ index 77e2395c..b2447ad0 100644
 +			   const alias_trie_node *trie,
 +			   size_t trie_size) ALIAS_LOOKUP_CODE
  	__attribute__((minsize));
- #include "MappingAlias.h"
+-#include "MappingAlias.h"
  
  #ifdef CAPSTONE_HAS_AARCH64
 -static const alias_trie_node aarch64_alias_trie[] ALIAS_LOOKUP_DATA = {
@@ -41,7 +46,7 @@ index 77e2395c..b2447ad0 100644
  #include "arch/AArch64/AArch64GenAliasTrie.inc"
  };
  
-@@ -36,13 +38,13 @@ void map_set_aarch64_alias_id(MCInst *MI, const SStream *O, const name_map *map,
+@@ -36,13 +38,15 @@ void map_set_aarch64_alias_id(MCInst *MI, const SStream *O, const name_map *map,
  {
  	(void)map;
  	(void)map_size;
@@ -51,13 +56,15 @@ index 77e2395c..b2447ad0 100644
  }
  #endif
  
++#include "MappingAlias.h"
++
  #if defined(CAPSTONE_HAS_MIPS) && !defined(CAPSTONE_DIET)
 -static const alias_trie_node mips_alias_trie[] ALIAS_LOOKUP_DATA = {
 +static const alias_trie_node mips_alias_trie[] CS_ALIAS_TRIE_DATA = {
  #include "arch/Mips/MipsGenAliasTrie.inc"
  };
  
-@@ -52,7 +54,7 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
+@@ -52,7 +56,7 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
  {
  	(void)map;
  	(void)map_size;
@@ -123,10 +130,10 @@ index d6575cb9..bfe578bc 100644
  	unsigned int id = 0;
  	if (MCInst_isAlias(MI)) {
 diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
-index 0fa421fc..01ef69e1 100644
+index 0fa421fc..e28a21dc 100644
 --- a/arch/PowerPC/PPCMapping.c
 +++ b/arch/PowerPC/PPCMapping.c
-@@ -153,8 +153,9 @@ static const name_map insn_alias_mnem_map[] = {
+@@ -153,8 +153,16 @@ static const name_map insn_alias_mnem_map[] = {
  	{ PPC_INS_ALIAS_END, NULL },
  };
  
@@ -134,11 +141,18 @@ index 0fa421fc..01ef69e1 100644
 -static const alias_trie_node alias_trie[] = {
 +#if defined(CAPSTONE_USE_ALIAS_TRIE) || defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
 +#define PPC_ALIAS_TRIE
-+static const alias_trie_node alias_trie[] CS_ALIAS_TRIE_DATA = {
++/* Keep the mixed ELF build's PowerPC lookup data with its read-only
++ * name mappings. The dedicated build uses the ordinary constant section. */
++#if defined(__ELF__) && defined(__GNUC__) && !defined(CAPSTONE_USE_ALIAS_TRIE)
++#define PPC_ALIAS_DATA __attribute__((section(".data.rel.ro.local")))
++#else
++#define PPC_ALIAS_DATA
++#endif
++static const alias_trie_node alias_trie[] PPC_ALIAS_DATA = {
  #include "PPCGenAliasTrie.inc"
  };
  #endif
-@@ -339,8 +340,11 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -339,8 +347,11 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
  	PPC_LLVM_printInst(MI, MI->address, "", O);
  #ifndef CAPSTONE_DIET
