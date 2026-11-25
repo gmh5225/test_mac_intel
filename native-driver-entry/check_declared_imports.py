@@ -40,8 +40,9 @@ def run(*args):
 
 def compile_source(path):
     obj = path.with_suffix(".obj")
-    run("clang", target, "-std=gnu17", "-fno-strict-aliasing", "-fno-builtin",
-        "-fno-optimize-sibling-calls", "-O2", "-c", path, "-o", obj)
+    run("clang-cl", target, "/nologo", "/MT", "/O2", "/clang:-std=gnu17",
+        "/clang:-fno-strict-aliasing", "/clang:-fno-builtin",
+        "/clang:-fno-optimize-sibling-calls", "/c", path, "/Fo" + str(obj))
     return obj
 
 def digest(path):
