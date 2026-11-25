@@ -58,6 +58,9 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang','-std=gnu99','-O2','-Wall','-Werror','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',r/'displacement-guard.c',lib,'-o',w/'guard-displacement')
+        traversed=int(get(w/'guard-displacement'));assert traversed==655984
+        save('span-'+label,dict(checks=traversed,tree=get('git','-C',base,'write-tree').strip()))
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
@@ -73,6 +76,30 @@ try:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
     save('linked-sections',layout)
+
+    cfile=base/'arch/X86/X86MemoryOutput.c'
+    normal=cfile.read_text()
+    begin='char *X86_writeLongDisplacement(char *out, int32_t displacement)'
+    marker='unsigned shift = (32u'
+    assert normal.count(begin)==1 and normal.count(marker)==1
+    tracer='''#include <stdio.h>
+static unsigned long long lengths[2][9];
+static void __attribute__((destructor)) dump_lengths(void)
+{
+    for(unsigned sign=0;sign<2;++sign)
+        for(unsigned width=0;width<9;++width)
+            fprintf(stderr,"%llu ",lengths[sign][width]);
+    fputc(10,stderr);
+}
+'''
+    cfile.write_text(normal.replace(begin,tracer+begin).replace(marker,'++lengths[displacement < 0][8u - CountLeadingZeros_32(magnitude) / 4u];\n\t'+marker))
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'widths')
+    cfile.write_text(normal)
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    assert sha(lib)==images['candidate']['archive'] and not get('git','-C',base,'diff','--name-only')
+    width_counts={}
+
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
     imgs={k:v+bytes(length-len(v)) for k,v in imgs.items()};imgs['duplicate']=imgs['base']
@@ -144,6 +171,18 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        for route in ('private','capstone'):
+            for mode in (1,2):
+                key=route+'/'+name+'/'+str(mode)
+                args=[route,str(mode),'1',f,path,str(bits)]
+                ref=get(w/'candidate',*args).split()[2:]
+                out=sp.run([w/'widths',*args],capture_output=True,text=True,check=True)
+                assert out.stdout.split()[2:]==ref
+                counts=list(map(int,out.stderr.split()))
+                assert len(counts)==18 and all(z%2==0 for z in counts)
+                width_counts[key]=dict(accepted=int(ref[0]),positive=[n//2 for n in counts[:9]],negative=[n//2 for n in counts[9:]])
+        save('long-displacements',width_counts)
+
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)

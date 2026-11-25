@@ -1,38 +1,82 @@
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..fa2407b3 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -72,6 +72,33 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- {
- 	const struct X86SimpleOutput *row =
- 		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
-+	/* A bare RIP-relative target is always a six-byte memory record. */
-+	if (!rex && (modrm == 0x15 || modrm == 0x25)) {
-+		if (size < 6)
-+			return false;
-+		const int32_t displacement = X86_readDisp32(code + 2);
-+		insn->id = row->id;
-+		*insn_size = insn->size = 6;
-+		memcpy(insn->bytes, code, 6);
-+		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+		memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+		memset(insn->op_str, 0, sizeof(insn->op_str));
-+		memcpy(insn->op_str, "qword ptr [rip", 14);
-+		*X86_writeDisplacement(insn->op_str + 14, displacement) = ']';
-+		if (insn->detail) {
-+			X86_writeSimpleDetail(insn->detail, row, 0xff, 0,
-+					      code[1], 0, 0);
-+			cs_x86 *x = &insn->detail->x86;
-+			cs_x86_op *mem = &x->operands[0];
-+			mem->type = X86_OP_MEM;
-+			mem->mem.base = X86_REG_RIP;
-+			mem->mem.scale = 1;
-+			mem->mem.disp = x->disp = displacement;
-+			x->encoding.disp_offset = 2;
-+			x->encoding.disp_size = 4;
-+		}
-+		return true;
+diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
+index ba0526c4..3c608c11 100644
+--- a/arch/X86/X86MemoryOutput.c
++++ b/arch/X86/X86MemoryOutput.c
+@@ -8,6 +8,46 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
++#include "../../MathExtras.h"
++
++static const char hex_pairs[] =
++	"000102030405060708090a0b0c0d0e0f"
++	"101112131415161718191a1b1c1d1e1f"
++	"202122232425262728292a2b2c2d2e2f"
++	"303132333435363738393a3b3c3d3e3f"
++	"404142434445464748494a4b4c4d4e4f"
++	"505152535455565758595a5b5c5d5e5f"
++	"606162636465666768696a6b6c6d6e6f"
++	"707172737475767778797a7b7c7d7e7f"
++	"808182838485868788898a8b8c8d8e8f"
++	"909192939495969798999a9b9c9d9e9f"
++	"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
++	"b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
++	"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
++	"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
++	"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
++	"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
++
++/* Signed-byte displacements have already used the short decimal/hex writer. */
++char *X86_writeLongDisplacement(char *out, int32_t displacement)
++{
++	const uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
++						      (uint32_t)displacement;
++
++	memcpy(out, displacement < 0 ? " - 0x" : " + 0x", 5);
++	out += 5;
++	unsigned shift = (32u - CountLeadingZeros_32(magnitude) + 3u) & ~3u;
++	if (shift & 4u) {
++		shift -= 4;
++		*out++ = "0123456789abcdef"[magnitude >> shift];
 +	}
- 	if (modrm < 0xc0)
- 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
- 					     x86_simple_registers);
++	do {
++		shift -= 8;
++		memcpy(out, hex_pairs + 2 * ((magnitude >> shift) & 0xff), 2);
++		out += 2;
++	} while (shift);
++	return out;
++}
+ 
+ #include "X86MemoryOutputImpl.h"
+ 
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..6cc313c7 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -155,22 +155,14 @@ static inline int32_t X86_readDisp32(const uint8_t *p)
+ 			 (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24);
+ }
+ 
++CAPSTONE_INTERNAL char *X86_writeLongDisplacement(char *out,
++						  int32_t displacement);
++
+ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+ {
+ 	if (displacement >= -128 && displacement <= 127)
+ 		return X86_writeDisp8(out, displacement);
+-	memcpy(out, displacement < 0 ? " - 0x" : " + 0x", 5);
+-	out += 5;
+-	uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
+-						(uint32_t)displacement;
+-	char digits[8], *start = digits + sizeof(digits);
+-	do {
+-		*--start = "0123456789abcdef"[magnitude & 15];
+-		magnitude >>= 4;
+-	} while (magnitude);
+-	const size_t length = (size_t)(digits + sizeof(digits) - start);
+-	memcpy(out, start, length);
+-	return out + length;
++	return X86_writeLongDisplacement(out, displacement);
+ }
+ 
+ static inline void X86_writeSimpleDetail(cs_detail *detail,

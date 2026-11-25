@@ -1,7 +1,7 @@
-name: Compare materializing RIP-relative memory records in the active AMD64 near-transfer writer
+name: Measure byte-pair displacement rendering on real PE and ELF and count calls by numeric width
 on:
   push:
-    branches: [codex/emit-active-rip-near-targets]
+    branches: [codex/bounded-hex-displacements]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: actual-rip-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: disp-width-rendering-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
