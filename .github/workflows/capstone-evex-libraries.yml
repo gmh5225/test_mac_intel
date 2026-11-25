@@ -1,7 +1,7 @@
-name: Measure text, detail creation, explicit operands and register access on complete libmvec and PuTTY32 with iced
+name: Compare iced and Capstone from every linked image on the same host, source, addresses and complete PE32 and libmvec sections
 on:
   push:
-    branches: [codex/x86-detail-consumption-paired-stages]
+    branches: [codex/iced-same-image-sse-and-scalar-alu]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: detail-stages-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: linked-engine-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

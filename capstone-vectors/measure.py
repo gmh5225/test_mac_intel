@@ -43,86 +43,90 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    candidate = rd(r/'source.json')['outlined']
-    assert sha(r/'outlined.patch') == candidate['sha256'] and candidate['parent'] == m['checkout_commit']
-    run('git','-C',base,'apply','--index',r/'outlined.patch')
-    assert get('git','-C',base,'write-tree').strip() == candidate['tree']
-    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'intel')
-    run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/'att')
+    from elftools.elf.elffile import ELFFile
+    sources=rd(r/'cross-source.json')
+    images={};symbols={};archives={}
+    for tag,z in sources.items():
+        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        if tag!='shipping':
+            patch=r/(tag+'.patch')
+            assert sha(patch)==z['sha256'] and z['parent']==sources['shipping']['commit']
+            run('git','-C',base,'apply','--index',patch)
+        assert get('git','-C',base,'write-tree').strip()==z['tree']
+        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        archives[tag]=sha(lib);exe=w/('att-'+tag)
+        run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',exe)
+        images[tag]=exe.read_bytes()
+        with exe.open('rb') as stream:
+            elf=ELFFile(stream);table=elf.get_section_by_name('.symtab')
+            selected={}
+            for sym in table.iter_symbols():
+                if sym['st_info']['type']!='STT_FUNC' or not sym['st_size']:continue
+                if sym.name not in ('iced_run','cs_disasm_iter','cs_regs_access','X86_tryATTOutput','X86_reg_access') and not ('iced_x86' in sym.name and 'GasFormatter' in sym.name):continue
+                section=elf.get_section(sym['st_shndx'])
+                off=sym['st_value']-section['sh_addr']
+                raw=section.data()[off:off+sym['st_size']]
+                assert len(raw)==sym['st_size']
+                selected[sym.name]=[sym['st_value'],len(raw),hashlib.sha256(raw).hexdigest()]
+            assert {'iced_run','cs_disasm_iter','cs_regs_access','X86_reg_access'}<=set(selected)
+            symbols[tag]=selected
+    save('symbols',symbols)
+    hashes={k:hashlib.sha256(v).hexdigest()for k,v in images.items()}
+    length=max(map(len,images.values()))
+    images={k:v.ljust(length,b'\0')for k,v in images.items()}
+    path=w/'selected';shutil.copy2(w/'att-shipping',path);path.write_bytes(images['shipping'])
+    inode=path.stat().st_ino;verified={};pages=[i for i in range(0,length,4096) if len({v[i:i+4096]for v in images.values()})>1]
+    assert pages and len(set(hashes.values()))==len(images)
+    def select(tag):
+        with path.open('r+b',buffering=0)as f:
+            for at in pages:
+                part=images[tag][at:at+4096];f.seek(at);assert f.write(part)==len(part)
+        assert path.stat().st_ino==inode
+        if tag not in verified:
+            verified[tag]=sha(path)
+            assert verified[tag]==hashlib.sha256(images[tag]).hexdigest()
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    cohort = rd(r/'cohort.json')
-    assert cohort['complete'] and cohort['source']==candidate
-    host = dict(cpu=get('lscpu'),affinity=sorted(os.sched_getaffinity(0)),system=platform.platform(),compiler=get('clang','--version').splitlines()[0],images={s:sha(w/s) for s in ('intel','att')},archive=sha(lib),iced=m['iced_revision'],source=candidate,neverd=dev,drivers={**m['drivers'],**rd(r/'gas-sources.json')})
-    save('host',host)
-    policies = dict(intel=('capstone','private','iced','fast'),att=('capstone','private','iced'))
-    sys.path.insert(0,str(w))
-    import pe_panels
+    prefix=['setarch',os.uname().machine,'-R',path]
+    sys.path.insert(0,str(w));import pe_panels
     run(sys.executable,'-B',w/'libmvec.py')
-    meta = rd(w/'libmvec.json')
-    pe = rd(w/'pe-images.json')
-    (w/'pe-images.json').write_text(json.dumps([row for row in pe if row['bits']==32]))
-    putty, = pe_panels.prepare(w)
-    vec = ('libmvec-amd64',64,w/'libmvec.text',[(0,meta['bytes'],meta['address'])],meta)
-    def bench_case(name,group,bits,blob,ranges,accepted,rejected):
-        policy = policies if group=='whole' else {'att':('capstone','iced')}
-        modes = (1,3,4,2)
-        def take(syntax,engine,mode,repeats):
-            value = list(map(int,get('setarch',os.uname().machine,'-R',w/syntax,engine,str(mode),str(repeats),blob,ranges,str(bits)).split()))
-            assert len(value)==6 and value[2:4]==[accepted*repeats,rejected*repeats],(name,group,engine,mode,value)
-            return value
-        def call(label,n):
-            dialect,engine,mode = label.split('/')
-            return take(dialect,engine,int(mode),n)
-        labels = [f'{dialect}/{engine}/{mode}' for dialect,engines in policy.items() for engine in engines for mode in modes]
-        def audit(dialect):
-            actual = [list(map(int,line.split())) for line in get('setarch',os.uname().machine,'-R',w/dialect,'audit','0','1',blob,ranges,str(bits)).splitlines()]
-            assert len(actual)==len(ranges.read_text().splitlines()) and all(a[3]==a[4] and a[1]==a[5] for a in actual)
-            assert sum(a[3] for a in actual)==accepted+rejected
-            return actual
-        audits = [audit(dialect) for dialect in policy]
-        assert all(a==audits[0] for a in audits)
-        n = max(1,math.ceil(15e6/min(call(label,1)[0] for label in labels)))
-        expected = {label:call(label,n)[2:] for label in labels}
-        assert len({tuple(z[:3]) for z in expected.values()})==1
-        for dialect,engines in policy.items():
-            for engine in engines:
-                assert expected[f'{dialect}/{engine}/1']==expected[f'{dialect}/{engine}/3']
-                if engine=='private':
-                    assert all(expected[f'{dialect}/{engine}/{mode}']==expected[f'{dialect}/capstone/{mode}'] for mode in modes)
-        cycles=[]
-        rng=random.Random(name+'/'+group+'/stages')
-        for j in range(17):
-            order=labels.copy()
-            rng.shuffle(order)
-            clocks={label:[0,0] for label in order}
-            for label in order+order[::-1]:
-                value=call(label,n)
-                assert value[2:]==expected[label],(name,group,label,j,value)
-                for i in (0,1):clocks[label][i]+=value[i]
-            cycles.append(clocks)
-        return dict(accepted=accepted,rejected=rejected,spans=len(audits[0]),bytes=sum(a[1] for a in audits[0]),sha256=sha(blob),extents_sha256=sha(ranges),repeats=n,visits=2,checks=expected,cycles=cycles)
-    panels={}
+    meta=rd(w/'libmvec.json')
+    putty_records=[row for row in rd(w/'pe-images.json') if row['bits']==32]
+    (w/'pe-images.json').write_text(json.dumps(putty_records))
+    putty,=pe_panels.prepare(w)
+    vec=('libmvec-amd64',64,w/'libmvec.text',[(0,meta['bytes'],meta['address'])],meta)
+    host=dict(cpu=get('lscpu'),affinity=sorted(os.sched_getaffinity(0)),source=sources,compiler=get('clang','--version').splitlines()[0],neverd=dev,iced=m['iced_revision'],rust_archive=sha(gas_lib),drivers=rd(r/'gas-sources.json'),archives=archives,images=hashes)
+    save('host',host);panels={}
     for name,bits,blob,spans,_ in (vec,putty):
-        expected=m['provenance'][name]
-        assert sha(blob)==expected['text_sha256'] and len(spans)==1
-        path=w/(name+'.tsv')
-        path.write_text(''.join('%d %d %d\n'%tuple(row) for row in spans))
-        assert sha(path)==expected['extent_sha256']
-        accepted,rejected=(25021,0) if bits==64 else (282906,3)
-        panels[name+'/whole']=bench_case(name,'whole',bits,blob,path,accepted,rejected)
-        save('observations',panels)
-        if bits==64:
-            assert cohort['section_sha256']==sha(blob) and cohort['extents_sha256']==sha(path)
-            for group,data in cohort['groups'].items():
-                path=r/(group+'.tsv')
-                assert sha(path)==data['sha256']
-                result=bench_case(name,group,bits,blob,path,data['instructions'],0)
-                assert (result['spans'],result['bytes'])==(data['spans'],data['bytes'])
-                panels[name+'/'+group]=result
-                save('observations',panels)
-    save('complete',dict(complete=True,panels=sorted(panels),host=host))
+        ranges=w/(name+'.tsv');ranges.write_text(''.join('%d %d %d\n'%tuple(row)for row in spans))
+        spec=m['provenance'][name];assert sha(blob)==spec['text_sha256'] and sha(ranges)==spec['extent_sha256'] and len(spans)==1
+        expected_counts=[25021,0] if bits==64 else [282906,3]
+        for tag in sources:
+            select(tag)
+            audit=list(map(int,get(*prefix,'audit','0','1',blob,ranges,str(bits)).split()))
+            assert audit[1]==audit[5]==blob.stat().st_size and audit[3]==audit[4]==sum(expected_counts)
+        for mode in (1,2):
+            def sample(label,n):
+                tag,engine=label.split('/');select(tag)
+                res=list(map(int,get(*prefix,engine,str(mode),str(n),blob,ranges,str(bits)).split()))
+                assert len(res)==6 and res[2:4]==[n*x for x in expected_counts]
+                return res
+            labels=[tag+'/'+engine for tag in sources for engine in ('iced','capstone')]
+            n=max(1,math.ceil(18e6/min(sample(key,1)[0]for key in labels)))
+            expected={k:sample(k,n)[2:] for k in labels}
+            assert len({tuple(v[:3])for v in expected.values()})==1
+            assert len({tuple(expected[tag+'/iced'])for tag in sources})==1
+            assert len({tuple(expected[tag+'/capstone'])for tag in sources if tag!='shipping'})==1
+            cycles=[];rng=random.Random(name+'/linked-iced/'+str(mode))
+            for i in range(17):
+                order=labels.copy();rng.shuffle(order);row={k:[0,0]for k in labels}
+                for k in order+order[::-1]:
+                    res=sample(k,n);assert res[2:]==expected[k]
+                    for clock in (0,1):row[k][clock]+=res[clock]
+                cycles.append(row)
+            panels[name+'/'+str(mode)]=dict(source_sha256=sha(blob),extents=sha(ranges),repeats=n,checks=expected,cycles=cycles)
+            save('observations',panels)
+    assert set(verified)==set(sources)
+    save('complete',dict(complete=True,source=sources,panels=sorted(panels),inode=inode,pages=len(pages),staged=verified))
 finally:
-    n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink())
-    shutil.rmtree(w)
-    save('cleanup',dict(removed=not w.exists(),bytes=n))
+    amount=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink())
+    shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=amount))
