@@ -1,7 +1,7 @@
-name: Verify scalar stack memory and mandatory-prefix SSE outputs in static, shared, reduced and DIET builds across 19 configurations
+name: Verify public scalar and fixed Intel readers in 19 Windows Linux and macOS configurations including static-only MSVC and GNU Make
 on:
   push:
-    branches: [codex/x86-scalar-legacy-sse-operand-configs]
+    branches: [codex/public-mixed-intel-reader-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 994ce74539381ccfe41411455924c8933825d004
+          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: legacy-stack-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: public-mixed-reader-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
