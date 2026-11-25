@@ -1,0 +1,38 @@
+name: Execute private import calls with the retained Windows ARM64 engine
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths:
+      - .github/workflows/neverd-declared-import-replay.yml
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    env:
+      NEVERD_REV: e9533a9f69199e408f01e3fb63d4da8f36bc43f4
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: native-driver-entry
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - uses: actions/cache/restore@0400d5f644dc74513175e3cd8d07132dd4860809
+        with:
+          path: ${{ runner.temp }}/neverd-provider-tools
+          key: neverd-arm64-provider-tools-${{ env.NEVERD_REV }}-v3
+          fail-on-cache-miss: true
+      - name: Link and execute four independent callers
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:NEVERD_READOBJ = (Get-Command llvm-readobj).Source
+          python native-driver-entry/check_declared_imports.py "$env:RUNNER_TEMP/neverd-provider-tools/neverd.dll" "$env:RUNNER_TEMP/declared-imports" native-declared-imports.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-declared-import-calls
+          path: native-declared-imports.json
+          if-no-files-found: error
