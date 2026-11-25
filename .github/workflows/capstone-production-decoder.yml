@@ -1,7 +1,7 @@
-name: Measure the active near-indirect x86 reader in source-built NeverD with PE32 controls
+name: Compare RIP writer and aligned scans in full NeverD with the fork LLVM source on three hosts
 on:
   push:
-    branches: [codex/near-indirect-source-product]
+    branches: [codex/current-neverd-aligned-rip-writer]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: f47e72ea35c2b8f2270ac80a20ff79915eeffdb9
+          ref: cad258781045b067e2c7779fc8331bcbe487d9f0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: primary-rip-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: aligned-rip-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

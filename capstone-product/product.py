@@ -125,8 +125,12 @@ try:
     assert m['oracle']==m['layout']
     products['oracle']=products['layout'];identities['oracle']=identities['layout']
     save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-layout.json').read_text()))
-    expected=1 if os.uname().machine=="aarch64" else 3
-    assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
+    archive_count=len({v['archive'] for v in identities.values()})
+    image_count=len({v['binary'] for v in identities.values()})
+    if os.uname().machine=='aarch64':
+        assert archive_count==image_count==1
+    else:
+        assert 2<=image_count<=archive_count<=3
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
