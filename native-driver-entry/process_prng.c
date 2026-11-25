@@ -4,10 +4,16 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef BOOL (WINAPI *ProcessPrngRoutine)(PBYTE, SIZE_T);
+#if defined(TEST_RECOVERED_PRNG_CALLER) && defined(TEST_CDECL_PRNG_CALLER)
+#define TEST_CALLER_ABI __cdecl
+#else
+#define TEST_CALLER_ABI WINAPI
+#endif
+
+typedef BOOL (TEST_CALLER_ABI *ProcessPrngRoutine)(PBYTE, SIZE_T);
 
 #ifdef TEST_RECOVERED_PRNG_CALLER
-extern BOOL WINAPI InspectProcessPrng(PBYTE, SIZE_T);
+extern BOOL TEST_CALLER_ABI InspectProcessPrng(PBYTE, SIZE_T);
 #endif
 
 int main(void) {
