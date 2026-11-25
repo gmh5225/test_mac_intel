@@ -1,14 +1,14 @@
-name: NeverD microMIPS64 R6 native ELF
+name: NeverD microMIPS R6 native ELF r11
 on:
   push:
-    branches: [codex/micromips64-neverd-r10]
+    branches: [codex/micromips-r6-neverd-r11]
     paths: ['.github/workflows/neverd-mips-native-elf.yml']
 permissions:
   contents: read
 env:
-  REVISION: 5f80feeafdfb216392e67da627aa8dd22a671258
-  LLVM_REVISION: 1c37d515ef3b12e8923390f95dc49052a966f00f
-  UNICORN_REVISION: 34afc42471e2aa56428ee0bc5b9687ef7729d94b
+  REVISION: f182b9ab565e13915793f4e846046c9ff52590b8
+  LLVM_REVISION: 2bc46a924391617452eeed3a6846621147eaf889
+  UNICORN_REVISION: 456fbb3b4f4b1c08ac95a562b736cd289c286ff4
   HOMEBREW_NO_AUTO_UPDATE: '1'
 jobs:
   native:
@@ -78,12 +78,12 @@ jobs:
             echo "Retrying the public LLVM release download after an HTTP failure."
           done
           python scripts/build.py build-check --config Release --parallel 4 --target \
-            NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDNativeExceptionRewriteContractTests NeverDLowScalarConstantTests NeverDFiniteScalarBranchTests
+            neverd-mips-bench NeverDMIPSTests NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDNativeExceptionRewriteContractTests NeverDLowScalarConstantTests NeverDFiniteScalarBranchTests
       - name: Run MIPS decoding, lifting, native object and public SDK suites
         run: |
           mkdir -p evidence
           ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error \
-            -L '^(NeverDMIPSFlowTests|NeverDMIPSPipelineTests|NeverDMIPSIntegerTests|NeverDMIPSObjectTests|NeverDMIPSSDKTests)$' \
+            -L '^(NeverDMIPSTests|NeverDMIPSFlowTests|NeverDMIPSPipelineTests|NeverDMIPSIntegerTests|NeverDMIPSObjectTests|NeverDMIPSSDKTests)$' \
             --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/results.xml"
           ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error -R '^(ReplacementNativeCode[.]|ELFPatchSections[.]|MachOExceptionPatch[.])' --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/layout.xml"
           ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error -L '^(NeverDLowScalarConstantTests|NeverDFiniteScalarBranchTests)$' --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/scalar.xml"
@@ -94,7 +94,10 @@ jobs:
           cases = ET.parse('evidence/results.xml').findall('.//testcase')
           assert cases and all(c.find('failure') is None and c.find('error') is None and c.find('skipped') is None for c in cases)
           names = [t.get('name', '') for t in cases]
-          assert len(names)>=1078 and len(names)==len(set(names))
+          assert len(names)>=1194 and len(names)==len(set(names))
+          assert sum('CompactRegisterCallsSampleTheCallableBeforeLink' in n for n in names)==4
+          assert sum('ScalarMicroReleaseUsesTheABIRecord' in n for n in names)==4
+          assert sum('Release6ZeroBaseAUIRetainsUpperSymbol' in n for n in names)==6
           for group,minimum in [('layout',23),('scalar',39)]:
               group_cases=ET.parse('evidence/'+group+'.xml').findall('.//testcase')
               assert len(group_cases)>=minimum and all(t.find(s) is None for t in group_cases for s in ('skipped','failure','error'))
@@ -105,6 +108,10 @@ jobs:
                        'FixedAddressMicroMIPS64LeafWithoutUnwindHasAnExactRange',
                        'LiftToObjectPreservesMicroEntryAndDelaySlot',
                        'FixedAddressMicroMIPS64R6LeafReturnsWithoutADelaySlot',
+                       'FixedAddressMicroMIPS32R6LeafEndsWithCompactReturn',
+                       'MicroR6UsesTheTaggedEntryAtRegisterWidth',
+                       'RetainedN64GPDisplacementUsesBothSymbols',
+                       'StaticGOTPageMustBeRebasedWhenItsCellIsRead',
                        'PlacedR6ImageUsesELFProfileForCodeAndFunctionPointers',
                        'N32RegisterCallUsesTheELFAddressAndCalleeMode'):
               assert any(name in n for n in names), name
@@ -122,16 +129,105 @@ jobs:
           assert path, 'missing LLVM package path'
           info = (Path(path[1].strip()).parents[2] / 'BUILDINFO.txt').read_text()
           assert ('llvm_commit: ' + os.environ['LLVM_REVISION']) in info
-          assert 'targets: X86;ARM;AArch64;Mips' in info and 'neverd-llvm-v23.0.0-r10' in path[1]
+          assert 'targets: X86;ARM;AArch64;Mips' in info and 'neverd-llvm-v23.0.0-r11' in path[1]
           Path('evidence/unicorn.txt').write_text(checked_out + '\n')
           Path('evidence/BUILDINFO.txt').write_text(info)
           Path('evidence/neverd.txt').write_text(os.environ['REVISION'] + '\n')
           print(len(names), 'registered cases on', os.environ['RUNNER_OS'])
           PY
+      - name: Compare the MIPS III and MIPS64 Release 2 decoders in both byte orders
+        run: |
+          python - <<'PY'
+          """Time the NeverD decoder and its underlying Capstone iterator on matching words."""
+
+          import hashlib
+          import json
+          import math
+          import os
+          from pathlib import Path
+          import platform
+          import random
+          import statistics
+          import subprocess
+          import sys
+          import tempfile
+
+
+          def measure(binary, output):
+              common = (
+                  0x24840007, 0x00851021, 0x00851026, 0x8CA20000,
+                  0xACA20004, 0x10850001, 0x00000000, 0x03E00008,
+              )
+              stages = ("decode", "capstone")
+              profiles = {}
+              rng = random.Random(20261124)
+              with tempfile.TemporaryDirectory() as temp:
+                  root = Path(temp)
+                  words = (common + (0x0085102D, 0x64840007)) * 16
+                  for name, isa in (("mips3", "MIPS III"), ("mips64", "MIPS64 Release 2")):
+                      for order in ("big", "little"):
+                          profile = name + ("el" if order == "little" else "")
+                          raw = b"".join(word.to_bytes(4, order) for word in words)
+                          (root / profile).write_bytes(raw)
+                          profiles[profile] = {
+                              "isa": isa, "endian": order,
+                              "sha256": hashlib.sha256(raw).hexdigest(), "count": len(words), "pairs": [],
+                          }
+
+                  def run(name, stage, reps):
+                      row = json.loads(subprocess.check_output(
+                          [str(binary), name, stage, str(root / name), str(reps)], text=True
+                      ))
+                      assert row["repeats"] == reps and row["instructions_per_repeat"] == profiles[name]["count"]
+                      assert row["cpu_seconds"] > 0 and row["wall_seconds"] > 0
+                      return row
+
+                  for name, profile in profiles.items():
+                      count = profile["count"]
+                      pilot_reps = math.ceil(8_000_000 / count)
+                      pilot = {stage: run(name, stage, pilot_reps) for stage in stages}
+                      assert pilot["decode"]["digest"] == pilot["capstone"]["digest"]
+                      profile["digest"] = pilot["decode"]["digest"]
+                      profile["pilot"] = pilot
+                      fastest = min(row["cpu_seconds"] for row in pilot.values())
+                      profile["reps"] = max(math.ceil(48_000_000 / count), math.ceil(1.2 * pilot_reps / fastest))
+
+                  for block in range(8):
+                      names = list(profiles)
+                      rng.shuffle(names)
+                      for name in names:
+                          profile = profiles[name]
+                          order = stages if (block + list(profiles).index(name)) % 2 == 0 else stages[::-1]
+                          legs = {stage: run(name, stage, profile["reps"]) for stage in order}
+                          assert all(row["digest"] == profile["digest"] for row in legs.values())
+                          profile["pairs"].append({"order": order, "legs": legs})
+                      print("finished paired block", block + 1, flush=True)
+
+              for profile in profiles.values():
+                  pairs = profile["pairs"]
+                  assert sum(pair["order"][0] == "decode" for pair in pairs) == len(pairs) // 2
+                  profile["minimum_cpu_seconds"] = min(r["cpu_seconds"] for pair in pairs for r in pair["legs"].values())
+                  profile["median_decode_over_capstone"] = {
+                      clock: statistics.median(p["legs"]["decode"][clock] / p["legs"]["capstone"][clock] for p in pairs)
+                      for clock in ("cpu_seconds", "wall_seconds")
+                  }
+                  ratios = [p["legs"]["decode"]["cpu_seconds"] / p["legs"]["capstone"]["cpu_seconds"] for p in pairs]
+                  draws = sorted(statistics.median(rng.choices(ratios, k=len(ratios))) for _ in range(10000))
+                  profile["median_cpu_ratio_interval95"] = [draws[249], draws[9749]]
+              report = {
+                  "source": os.environ["REVISION"], "host": platform.platform(), "runner_os": os.environ["RUNNER_OS"],
+                  "executable_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "profiles": profiles,
+              }
+              output.write_text(json.dumps(report, indent=2) + "\n")
+
+
+          ext = '.exe' if os.name == 'nt' else ''
+          measure(Path('build-check/bin/neverd-mips-bench' + ext).resolve(), Path('evidence/classic-decoder.json'))
+          PY
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: micromips64-r10-${{ runner.os }}
+          name: micromips64-r11-${{ runner.os }}
           path: |
             evidence/
             build-check/Testing/Temporary/LastTest.log
