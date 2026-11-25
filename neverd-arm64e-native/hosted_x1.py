@@ -97,11 +97,15 @@ def measure(source, output):
     result = subprocess.run(
         [sys.executable, CONFIG["verifier"], mode, "--output", output], cwd=source
     )
-    report = json.loads((output / policy["report_name"]).read_text())
+    raw = (output / policy["report_name"]).read_bytes()
+    report = json.loads(raw)
     hardware = subprocess.check_output(CONFIG["hardware_command"], text=True).strip()
     summary = summarize(
         policy, report, os.environ["SOURCE_REVISION"], result.returncode, hardware, output
     )
+    host = {"hardware": hardware, "source_revision": report["source_revision"], "mode": mode,
+            "report_sha256": hashlib.sha256(raw).hexdigest()}
+    (output / CONFIG["host_record"]).write_text(json.dumps(host, indent=2) + "\n")
     with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as out:
         print(summary, file=out)
     with (output / CONFIG["control_log"]).open("w") as log:
