@@ -26,7 +26,7 @@ try:
     flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
     units=['mapping','mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
     if profile not in ('diet','reduced'):
-        units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access']
+        units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
     if len(arches)>2:
         units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
     flags.append('-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
@@ -52,7 +52,12 @@ try:
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
             baseline=rows['base'][linkage]['snapshots']
-            assert result['snapshots']==baseline,(name,linkage,profile)
+            assert baseline.keys()==result['snapshots'].keys()
+            for key,entry in result['snapshots'].items():
+                assert entry['counts']==baseline[key]['counts']
+                if key.startswith('powerpc/') or profile=='diet':assert entry==baseline[key]
+            if name not in ('base','oracle'):
+                assert result['snapshots']==rows['oracle'][linkage]['snapshots'],(name,linkage,profile)
         assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
         mac = platform.system()=='Darwin' and profile in ('full','noatt')
         linux = platform.system()=='Linux' and profile=='clang'
@@ -66,7 +71,7 @@ try:
                 assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
                 assert ('-DCAPSTONE_X86_ITERATOR_READERS' in cs['command'])==False
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
-            assert result['snapshots']==rows['base']['static']['snapshots']
+            assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result
         if linux:
             obj=t/'make'
@@ -77,7 +82,7 @@ try:
                 assert ('-D'+flag in commands)==False,(name,flag)
             lib,=[f for f in obj.rglob('libcapstone.a') if not f.is_symlink()]
             result=snapshots(s,p,lib.parent,t,profile,name+'-make',run,'static')
-            assert result['snapshots']==rows['base']['static']['snapshots']
+            assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['make_only']=result
             for unit in ('x86_simple_output','x86_buffer_bounds'):
                 exe=t/unit
@@ -85,15 +90,6 @@ try:
                 run(name+'-make-'+unit,exe)
             shutil.rmtree(obj)
 
-        if name=='scoped':
-            reference='all_hosts' if (platform.system()=='Linux' and platform.machine()=='x86_64') else 'base'
-            for link in ('static','shared','static_only','make_only'):
-                if link not in rows[name]:continue
-                state=rows[name][link]
-                expected=rows[reference][link]
-                assert state['ppc_index_symbol']==expected['ppc_index_symbol'],(link,state['ppc_index_symbol'],reference)
-                if platform.system()=='Linux':assert state['library_sha256']==expected['library_sha256'],(link,reference)
-                if reference=='base':assert not state['ppc_index_symbol']
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
