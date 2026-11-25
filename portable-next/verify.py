@@ -41,7 +41,7 @@ try:
     mixed_sources=d.parent/'neverd-config'
     verify_mixed=linux and profile=='full'
     if verify_mixed:
-        expected_dev='cf7070f32ef716648478d178390c742cbaec5b21'
+        expected_dev='b20891634f83e245f43ab87e15cdf47800d5d4bb'
         assert sp.check_output(['git','-C',mixed_sources,'rev-parse','HEAD'],text=True).strip()==expected_dev
         product=t/'consumer';(product/'third_party').mkdir(parents=True);(product/'third_party/capstone').symlink_to(s)
         (product/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
@@ -50,7 +50,11 @@ try:
         opts=code[code.index('# --- Capstone (our fork'):code.index('# --- NeverD CMake helpers')]
         (product/'CMakeLists.txt').write_text(chr(10).join(('cmake_minimum_required(VERSION 3.22)','project(Mixed LANGUAGES C CXX)',opts,'add_executable(consumer reader.cpp)','target_link_libraries(consumer PRIVATE capstone_static)','')))
         shutil.copyfile(d/'riscv_options.cpp',product/'reader.cpp')
-    variants={};mixed={}
+    variants={};mixed={};libs={}
+    if verify_mixed:
+        timing=t/'mixed-timing';timing.mkdir()
+        for name,path in texts.items():shutil.copyfile(path,timing/(name+'.text'))
+
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
@@ -62,6 +66,10 @@ try:
         env=dict(os.environ)
         if win:
             dll,=[f for f in b.rglob('*.dll')if 'capstone' in f.name.lower()];env['PATH']=str(dll.parent)+os.pathsep+env['PATH']
+        if not win and profile=='full':
+            ext='dylib' if platform.system()=='Darwin' else 'so'
+            lib,=[p for p in b.rglob('libcapstone.'+ext)if p.is_file()]
+            libs[stage]=t/(stage+'.'+ext);shutil.copyfile(lib,libs[stage])
         outputs={}
         for suffix in ('static','shared'):
             exe,=[f for f in b.rglob('records_'+suffix+('.exe'if win else'')) if f.is_file()]
@@ -83,12 +91,27 @@ try:
             objects={str(p.relative_to(bmix)):sha(p.read_bytes())for p in bmix.rglob('*.o')};lib,=bmix.rglob('libcapstone.a')
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
-    if verify_mixed:assert mixed['base']==mixed['candidate']
+            shutil.copyfile(bmix/'consumer',timing/('riscv-option-'+stage))
+    if verify_mixed:
+        a,both=mixed['base']['objects'],mixed['candidate']['objects']
+        assert a.keys()==both.keys()
+        delta=[Path(p).name for p in a if a[p]!=both[p]]
+        assert sorted(delta)==['RISCVInstPrinter.c.o','RISCVMapping.c.o'],delta
+    if not win and profile=='full':
+        cmd('numeric-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'numeric.cpp','-o',t/'numeric']+(['-ldl']if linux else []))
+        rows={}
+        for name,path in texts.items():
+            z=sp.run([t/'numeric',libs['base'],libs['candidate'],path],text=True,capture_output=True)
+            if z.returncode:raise RuntimeError((z.returncode,z.stderr))
+            rows[name]=json.loads(z.stdout)
+        save('numeric',rows)
+
 
     if linux and profile=='full':
         from riscv_time import measure
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         measure([dict(arch='riscv64',name=n)for n in texts],t,save)
+        measure([dict(arch='riscv64',name=n)for n in texts],timing,lambda n,v:save('mixed-'+n,v))
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))
