@@ -70,6 +70,12 @@ try:
         assert 'CAPSTONE_STATIC_X86_READERS' not in entry and ('CAPSTONE_X86_MIXED_PUBLIC_READER' in entry)==(label!='base')
         obj,=build.rglob('X86DisassemblerDecoder.c.o')
         save('public-edges-'+label,public_edges(obj))
+        if label!='base':
+            obj,=build.rglob('X86PublicOutput.c.o')
+            dump=get('objdump','-dr','--no-show-raw-insn','--disassemble=X86_decodePublicRecord',obj)
+            body=dump[dump.index('<X86_decodePublicRecord>:'):]
+            (e/('dispatch-'+label+'.s')).write_text(body)
+
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
