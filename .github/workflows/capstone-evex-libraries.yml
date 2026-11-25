@@ -1,7 +1,7 @@
-name: Measure MASM integer tokens and removed formatter calls on real x86-32 and x86-64 code
+name: Compare shared immediate magnitude selection and an isolated MASM number writer across normal Linux links
 on:
   push:
-    branches: [codex/masm-complete-token-and-real-formatting-calls]
+    branches: [codex/outlined-masm-hex-immediates]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: masm-token-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: outlined-masm-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

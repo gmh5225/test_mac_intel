@@ -67,8 +67,7 @@ try:
         run('clang++',w/'masm.o',lib,ice_lib,*flags,'-o',w/('masm-'+label))
         run('clang++',w/'masm.o',w/'count.o','-Wl,--wrap=vsnprintf',lib,ice_lib,*flags,'-o',w/('count-'+label))
         if label!='base':
-            printer=(base/'arch/X86/X86IntelInstPrinter.c').read_text()
-            (w/'token.c').write_text(printer[printer.index('static bool need_zero_prefix'):printer.index('static void printImm(MCInst *MI')])
+            (w/'token.c').write_text('#include "arch/X86/X86InstPrinterCommon.h"\n#define printMasmHex X86_printMasmHex\n')
             run('clang','-O2','-std=c11','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',w,'-I',base,'-I',base/'include',r/'token-guard.c',lib,'-o',w/'token-guard')
             checks=int(get(w/'token-guard'));assert checks==1774432;save('stream-'+label,checks)
 
