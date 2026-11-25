@@ -152,6 +152,8 @@ and ordered-memory probe reports. The summary verifies component report hashes
 and revisions. It reports 128-bit LRCPC3, explicit PAuth_LR, PC-sensitive PACM,
 PACM HINT, scalar CPTA, signed-product overflow (CPTM) and checked writeback
 separately, including capabilities that ran on a host with an unavailable aggregate x1 result. The artifact also
-contains the native scalar, explicit-signer and Q-lane regression log. These
-tests exercise the probes with baseline instructions, wrong results and
-misplaced faults. They have no effect on hardware qualification.
+contains the scalar, signing-key, PACM-mode and Q-lane regression log.
+Baseline instructions exercise mixed IA/IB outcomes and faults at unexpected
+instruction addresses. The job reports hardware capabilities from the original
+instructions. Changes to the workflow or its probe controller are checked on
+pushes to the repository and can also be tested with a manual run.
