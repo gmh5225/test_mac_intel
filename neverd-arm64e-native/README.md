@@ -159,3 +159,14 @@ Baseline instructions exercise mixed IA/IB outcomes and faults at unexpected
 instruction addresses. The job reports hardware capabilities from the original
 instructions. Changes to the workflow or its probe controller are checked on
 pushes to the repository and can also be tested with a manual run.
+
+## Generated arm64e.x1 projections
+
+**Verify generated NeverD arm64e.x1 images** resolves a branch in
+NeverSight/NeverD to one revision for both jobs. The macOS producer builds
+the Release tests with the checksum-pinned r6 package and exports the signing
+projections. Xcode 27 compiles, links and verifies all 20 images. The
+measurement artifact contains the image hashes, link maps, signatures and
+per-image launch results. A virtual M1 can qualify the link and signature.
+Full native qualification additionally requires the comparison to complete
+in every image. The input artifact expires after one day.

@@ -1,0 +1,94 @@
+name: Verify generated NeverD arm64e.x1 images
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_branch:
+        description: Branch in NeverSight/NeverD
+        type: string
+        default: dev
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      repository: ${{ steps.pin.outputs.repository }}
+      revision: ${{ steps.pin.outputs.revision }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: neverd-arm64e-native
+      - id: pin
+        env:
+          SOURCE_BRANCH: ${{ inputs.source_branch }}
+        run: python3 neverd-arm64e-native/projections.py resolve
+
+  export:
+    needs: source
+    runs-on: macos-26
+    timeout-minutes: 210
+    env:
+      SOURCE_REVISION: ${{ needs.source.outputs.revision }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: neverd-arm64e-native
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.source.outputs.repository }}
+          ref: ${{ needs.source.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+      - name: Export current HighC, LLVM C and raw backend inputs with r6
+        run: python3 neverd-arm64e-native/projections.py build neverd "$RUNNER_TEMP"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: r6-projection-inputs
+          path: ${{ runner.temp }}/inputs
+          retention-days: 1
+          if-no-files-found: error
+
+  measure:
+    needs: [source, export]
+    runs-on: xcode-27
+    timeout-minutes: 15
+    env:
+      SOURCE_REVISION: ${{ needs.source.outputs.revision }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: neverd-arm64e-native
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.source.outputs.repository }}
+          ref: ${{ needs.source.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            unittests/lift/aarch64
+            unittests/lift/fixtures/arm64e
+            unittests/lift/format
+            include/neverd/runtime
+            include/neverd/ir/intrinsics/AArch64
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: r6-projection-inputs
+          path: ${{ runner.temp }}/inputs
+      - name: Link, sign and measure the generated x1 images
+        run: |
+          ulimit -c 0
+          python3 neverd-arm64e-native/projections.py check neverd "$RUNNER_TEMP"
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: signed-x1-projection-results
+          path: ${{ runner.temp }}/measurements
+          retention-days: 7
+          if-no-files-found: error
