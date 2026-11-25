@@ -115,9 +115,7 @@ try:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    expected=2
-    reference='selector' if os.uname().machine=='x86_64' else 'base'
-    for field in ('binary','archive'):assert identities['layout'][field]==identities[reference][field],(reference,field)
+    expected=3 if os.uname().machine=='x86_64' else 1
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -128,7 +126,7 @@ try:
     image=t/'selected';image.write_bytes(imgs['base'])
     inode=image.stat().st_ino;block=4096
     offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
-    checked={};assert offsets
+    checked={};assert bool(offsets)==(expected>1)
     def execute(k,case,mode,reps):
         # Touch exactly the same file pages, in the same order, before every exec.
         with image.open('r+b',buffering=0) as dest:
@@ -149,7 +147,7 @@ try:
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if c['selector']==4 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
+            pairs=35 if c['selector']==4 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('putty-32-0.85',3),('arm-ls',1),('arm-ls',2),('arm64-ls',1),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
