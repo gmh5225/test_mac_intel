@@ -19,7 +19,10 @@ int main(int argc, char **argv) {
   const bool arm = target == "arm64";
   const bool a32 = target == "arm", mips = target == "mips64el";
   const bool riscv = target == "riscv64", ppc = target == "ppc64el";
-  const int mode = std::stoi(argv[3]), repeats = std::stoi(argv[4]);
+  const int setting = std::stoi(argv[3]), repeats = std::stoi(argv[4]);
+  if (setting < 0 || setting > 5) return 2;
+  const bool att = setting >= 4;
+  const int mode = att ? setting - 3 : setting;
   if (bytes.empty() || (!arm && !a32 && !mips && !ppc && !riscv && target != "32" && target != "64") ||
       mode < 0 || mode > 3 || repeats < 1) return 2;
   if (mode == 3 && (arm || a32 || mips || ppc || riscv)) return 2;
@@ -35,6 +38,9 @@ int main(int argc, char **argv) {
   }
   decoder.setDetail(mode == 2);
   decoder.setText(mode == 1 || mode == 2);
+  if (att && ((target != "32" && target != "64") ||
+              cs_option(decoder.getHandle(), CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) != CS_ERR_OK))
+    return 8;
   struct Span { size_t start, size; uint64_t address; };
   std::vector<Span> spans{{0, bytes.size(), 0x100000}};
   if (argc == 6) {
