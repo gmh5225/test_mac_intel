@@ -1,7 +1,7 @@
-name: Validate mixed mode record dispatch and finish MSVC static-only checks for the unsigned MOV address and both reader designs
+name: Cross-check address rendering, the near RIP reader and MIPS names in Release DIET reduced static and shared configurations
 on:
   push:
-    branches: [codex/verify-existing-arch-request-and-msvc-archive]
+    branches: [codex/verify-near-rip-moffs-and-mips]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
+          ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mixed-record-and-archive-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: rip-offset-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

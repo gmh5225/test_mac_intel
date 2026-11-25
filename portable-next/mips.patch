@@ -1,0 +1,63 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6050d7c2..11868fba 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -167,6 +167,12 @@ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
+         add_compile_definitions(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
+         set(capstone_arm_char_source arch/ARM/ARMFormattedChar.c)
+     endif()
++    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$"
++       AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS AND NOT CAPSTONE_BUILD_DIET)
++        set_property(SOURCE arch/Mips/MipsInstPrinter.c APPEND PROPERTY
++                     COMPILE_DEFINITIONS CAPSTONE_MIPS_MIXED_REGISTER_NAMES)
++    endif()
+     # Linux x86-64 retains its inlined initialization for MIPS text throughput.
+     if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
+diff --git a/Makefile b/Makefile
+index 06b05013..e176d2ac 100644
+--- a/Makefile
++++ b/Makefile
+@@ -133,6 +133,9 @@ ifneq ($(filter macos linux-arm64,$(MIXED_STORAGE_TARGET)),)
+ CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
+ MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
+ endif
++ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET),linux-arm64:yes:no:no)
++CFLAGS += -DCAPSTONE_MIPS_MIXED_REGISTER_NAMES
++endif
+ ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_DIET),linux-amd64:no)
+ CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
+ ARM_FORMAT_CHAR_OBJ = $(OBJDIR)/arch/ARM/ARMFormattedChar.o
+diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
+index 40bf05b4..23cdec30 100644
+--- a/arch/Mips/MipsInstPrinter.c
++++ b/arch/Mips/MipsInstPrinter.c
+@@ -117,9 +117,9 @@ static const char *MipsFCCToString(Mips_CondCode CC)
+ 
+ const char *Mips_LLVM_getRegisterName(unsigned RegNo, bool noRegName);
+ 
+-/* Use the numeric and ABI register tables in the dedicated Linux arm64 printer. */
++/* Use the numeric and ABI register tables in the selected Linux arm64 printers. */
+ #if defined(__linux__) && defined(__aarch64__) && defined(__clang__) && \
+-    defined(CAPSTONE_MIPS_ONLY)
++    (defined(CAPSTONE_MIPS_ONLY) || defined(CAPSTONE_MIPS_MIXED_REGISTER_NAMES))
+ #define MIPS_REGISTER_NAME_BANKS
+ #endif
+ #if ((defined(__linux__) && defined(__x86_64__) && defined(__GNUC__)) || \
+diff --git a/suite/synctools/mips_register_names.py b/suite/synctools/mips_register_names.py
+index 2f1202e0..9af8f02b 100644
+--- a/suite/synctools/mips_register_names.py
++++ b/suite/synctools/mips_register_names.py
+@@ -10,9 +10,9 @@ import re
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ ARCH = ROOT / "arch" / "Mips"
+-ATTRIBUTE = r"""/* Use the numeric and ABI register tables in the dedicated Linux arm64 printer. */
++ATTRIBUTE = r"""/* Use the numeric and ABI register tables in the selected Linux arm64 printers. */
+ #if defined(__linux__) && defined(__aarch64__) && defined(__clang__) && \
+-    defined(CAPSTONE_MIPS_ONLY)
++    (defined(CAPSTONE_MIPS_ONLY) || defined(CAPSTONE_MIPS_MIXED_REGISTER_NAMES))
+ #define MIPS_REGISTER_NAME_BANKS
+ #endif
+ #if ((defined(__linux__) && defined(__x86_64__) && defined(__GNUC__)) || \

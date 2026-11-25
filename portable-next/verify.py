@@ -29,11 +29,11 @@ try:
         units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
     if len(arches)>2:
         units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
-    flags.append('-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+    flags+=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON']
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
     for name,tree in [('base',None),*q['variants'].items()]:
-        if name not in ('base','request','mode') and not (platform.system()=='Windows' and profile in ('full','noatt')):continue
+        if name.startswith('mips') and profile!='clang':continue
         if tree:
             git('restore','--staged','--worktree','--source=HEAD','--','.')
             patch=t/(name+'.patch')
@@ -52,6 +52,11 @@ try:
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
+            if profile not in ('diet','reduced') and name in ('base','address','digits'):
+                from spelling_link import spelling
+                rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
+            if name.startswith('mips'):run(name+'-mips-projection',os.sys.executable,'-B',s/'suite/synctools/mips_register_names.py','--check')
+
             baseline=rows['base'][linkage]['snapshots']
             assert baseline.keys()==result['snapshots'].keys()
             for key,entry in result['snapshots'].items():
@@ -63,38 +68,29 @@ try:
         mac = platform.system()=='Darwin' and profile in ('full','noatt')
         linux = platform.system()=='Linux' and profile=='clang'
         win = platform.system()=='Windows' and profile in ('full','noatt')
-        if mac or linux or win:
+        if linux:
             solo=t/'static-only'
             run(name+'-static-config','cmake','-G','Ninja','-S',s,'-B',solo,*flags,'-DCAPSTONE_BUILD_SHARED_LIBS=OFF')
             run(name+'-static-build','cmake','--build',solo,'--parallel','4','--target','capstone_static',*units)
             run(name+'-static-units','ctest','--test-dir',solo,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
-            for folder,active in ((solo,mac),(b,False)):
-                cs=next(c for c in json.loads((folder/'compile_commands.json').read_text()) if Path(c['file']).name=='cs.c')
-                assert ('-DCAPSTONE_STATIC_X86_READERS' in cs['command'])==active,(name,profile,folder)
-                assert ('-DCAPSTONE_X86_ITERATOR_READERS' in cs['command'])==False
-                assert ('CAPSTONE_MIXED_X86_MODE_READERS' in cs['command'])==(name in ('fixed','request','mode') and folder==solo and not mac),(name,profile,folder)
-
+            commands=json.loads((solo/'compile_commands.json').read_text())
+            amd=next(c['command']for c in commands if Path(c['file']).name=='X86Sse64Output.c')
+            assert 'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in amd
+            mips=next(c['command']for c in commands if Path(c['file']).name=='MipsInstPrinter.c')
+            assert ('CAPSTONE_MIPS_MIXED_REGISTER_NAMES' in mips)==(name.startswith('mips') and platform.machine()=='aarch64')
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result
-        if linux:
+        if linux and name.startswith('mips'):
             obj=t/'make'
             flags_make=['make','-C',s,'-j4','V=1','CC=clang','AR=ar','BUILDDIR='+str(obj),'CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CAPSTONE_STATIC=yes','CAPSTONE_SHARED=no']
             run(name+'-make-build',*flags_make)
             commands=(e/(name+'-make-build.log')).read_text()
-            for flag in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'):
-                assert ('-D'+flag in commands)==False,(name,flag)
-            assert ('-DCAPSTONE_MIXED_X86_MODE_READERS' in commands)==(name in ('fixed','request','mode'))
+            assert ('-DCAPSTONE_MIPS_MIXED_REGISTER_NAMES' in commands)==(platform.machine()=='aarch64')
             lib,=[f for f in obj.rglob('libcapstone.a') if not f.is_symlink()]
-            result=snapshots(s,p,lib.parent,t,profile,name+'-make',run,'static')
-            assert result['snapshots']==rows[name]['static']['snapshots']
-            rows[name]['make_only']=result
-            for unit in ('x86_simple_output','x86_buffer_bounds'):
-                exe=t/unit
-                run(name+'-make-link-'+unit,'clang','-O2','-I',s/'include',s/('tests/unit/'+unit+'.c'),lib,'-o',exe)
-                run(name+'-make-'+unit,exe)
+            rows[name]['make_only']=snapshots(s,p,lib.parent,t,profile,name+'-make',run,'static')
+            assert rows[name]['make_only']['snapshots']==rows['base']['static']['snapshots']
             shutil.rmtree(obj)
-
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
