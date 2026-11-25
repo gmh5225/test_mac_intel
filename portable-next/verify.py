@@ -86,14 +86,16 @@ try:
             shutil.rmtree(obj)
 
         if name=='scoped':
-            reference='all_hosts' if (platform.system()=='Linux' and platform.machine()=='x86_64') else 'base'
+            config=next((b/'CMakeFiles').glob('*/CMakeCCompiler.cmake')).read_text()
+            clang='set(CMAKE_C_COMPILER_ID "Clang")' in config
+            active=platform.system()=='Linux' and platform.machine()=='x86_64' and clang and profile not in ('diet','reduced')
+            rows[name]['active']=active
+            reference='all_hosts' if active else 'base'
             for link in ('static','shared','static_only','make_only'):
                 if link not in rows[name]:continue
-                state=rows[name][link]
-                expected=rows[reference][link]
-                assert state['ppc_index_symbol']==expected['ppc_index_symbol'],(link,state['ppc_index_symbol'],reference)
-                if platform.system()=='Linux':assert state['library_sha256']==expected['library_sha256'],(link,reference)
-                if reference=='base':assert not state['ppc_index_symbol']
+                state=rows[name][link];expected=rows[reference][link]
+                assert state['snapshots']==expected['snapshots']
+                if platform.system()=='Linux':assert state['library_sha256']==expected['library_sha256'],(name,link,reference,clang)
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
