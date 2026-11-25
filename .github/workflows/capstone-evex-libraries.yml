@@ -1,7 +1,7 @@
-name: Repeat dedicated MIPS name lookup against independent controls using current NeverD dev
+name: Measure the cost of the dependent MIPS spelling lookup against two direct register layouts
 on:
   push:
-    branches: [codex/mips-register-index-independent-repeat]
+    branches: [codex/mips-direct-register-name-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-index-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: direct-mips-name-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
