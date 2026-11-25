@@ -1,7 +1,7 @@
-name: Compare final immediate spelling and corrected absolute offsets against the decoded address-size oracle
+name: Measure explicit numeric operand widths and independently decoded absolute address output
 on:
   push:
-    branches: [codex/normalized-immediates-and-effective-addresses]
+    branches: [codex/operand-width-and-effective-address-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: numeric-operand-format-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: explicit-address-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
