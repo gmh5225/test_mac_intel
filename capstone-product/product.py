@@ -42,7 +42,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','layout','selector'):
+    for variant in ('base','layout'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
         if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
@@ -103,15 +103,27 @@ try:
         with binary.open('rb') as file:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
+        with binary.open('rb') as file:
+            elf=ELFFile(file);table=elf.get_section_by_name('.symtab')
+            sections={};symbols={}
+            for sym in table.iter_symbols():
+                name=sym.name;index=sym['st_shndx'];size=sym['st_size']
+                if not isinstance(index,int) or not size or sym['st_info']['type']!='STT_FUNC':continue
+                if not any(token in name for token in ('PPC','PowerPC','Decoder','AliasPattern','cs_disasm_iter','cs_decode_full_insn','aliasPattern','matchAlias')):continue
+                sec=elf.get_section(index)
+                if index not in sections:sections[index]=sec.data()
+                off=sym['st_value']-sec['sh_addr'];data=sections[index][off:off+size]
+                assert len(data)==size
+                symbols.setdefault(name,[]).append([sym['st_value'],size,hashlib.sha256(data).hexdigest()])
+            assert len([k for k in symbols if 'PPC' in k])>=10
+            save('linked-symbols-'+variant, symbols)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    expected=3 if os.uname().machine=='x86_64' else 2
-    assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
-    if expected==2:assert all(identities['base'][k]==identities['layout'][k]for k in ('archive','binary'))
+    assert os.uname().machine=='x86_64' and all(identities['base'][k]!=identities['layout'][k] for k in ('archive','binary'))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
     shutil.copy2(products['base'],t/'selected')
-    imgs={k:v.read_bytes()for k,v in products.items()};imgs['copy']=imgs['base']
+    imgs={k:v.read_bytes()for k,v in products.items()};imgs['copy']=imgs['base'];imgs['candcopy']=imgs['layout']
     length=max(map(len,imgs.values()));imgs={k:v+bytes(length-len(v))for k,v in imgs.items()}
     image=t/'selected';image.write_bytes(imgs['base'])
     inode=image.stat().st_ino;block=4096
@@ -130,14 +142,16 @@ try:
 
         sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
         return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
-    rows=[];rng=random.Random(1739)
+    targets_to_time={('ppc64el-ls',i)for i in range(3)} | {(name,i)for name in ('putty-32-0.85','libssl3t64-i386')for i in (1,2)}
+    rows=[];rng=random.Random(31831)
     for c in cases:
         for mode in (range(4) if c['selector'] in (32,64) else range(3)):
+            if (c['name'],mode) not in targets_to_time:continue
             single=execute('base',c,mode,1)
-            n=max(1,round(25000/single[0]))
+            n=max(1,round(70000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
+            pairs=101 if (c['name'],mode)==('ppc64el-ls',0) else 35
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
@@ -150,7 +164,8 @@ try:
             save('timings',rows)
     assert set(checked)==set(imgs) and checked['copy']==checked['base']
     save('fixed-image',dict(inode=inode,verified=checked,bytes=length,block=block,blocks=len(offsets)))
-    save('complete',dict(done=True,pairs=13,ssl_pairs=35,panels=len(rows),source=llvm))
+    assert len(rows)==len(targets_to_time) and checked['layout']==checked['candcopy']
+    save('complete',dict(done=True,pairs=35,primary_pairs=101,panels=len(rows),source=llvm))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())
     shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))

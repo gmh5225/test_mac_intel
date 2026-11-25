@@ -1,7 +1,7 @@
-name: Build NeverD and LLVM from source for i386 register and mixed public record paths
+name: Retest the isolated PowerPC scan result alongside i386 gains on two full NeverD builds
 on:
   push:
-    branches: [codex/linux-public-and-group3-neverd-product]
+    branches: [codex/group3-powerpc-neverd-repeat]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -11,9 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04-arm
-            cc: clang
-            replica: 1
           - os: ubuntu-24.04
             cc: clang
             replica: 2
@@ -31,7 +28,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 961146191161cfb1dc1584a1e9c8946d2166ad45
+          ref: 4ee3ceaccb6f2eb5cb8e82bb90f50f50251b9e08
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +48,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "961146191161cfb1dc1584a1e9c8946d2166ad45"
+          test "$(git rev-parse HEAD)" = "4ee3ceaccb6f2eb5cb8e82bb90f50f50251b9e08"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "b7a40bec54cdcb46fd6555b3335e3965a06a3740"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin b7a40bec54cdcb46fd6555b3335e3965a06a3740
@@ -67,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scoped-group3-public-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: group3-powerpc-product-repeat-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
