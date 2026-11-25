@@ -58,15 +58,6 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        run('clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator')
-        generated=sp.check_output([w/'generator','--sse64-registers'])
-        table=base/'arch/X86/X86GenSse64RegisterOutput.inc'
-        assert generated==table.read_bytes()
-        if label=='base':projections={}
-        run('clang++','-std=c++17','-I',base,'-I',base/'include',r/'layout.cpp','-o',w/'layout')
-        projections[label]=dict(fields=list(map(int,get(w/'layout').split())),sha256=sha(table),rows=generated.count(b'UINT64_C('))
-        assert projections[label]==rd(r/'expected-layout.json')[label],projections
-        save('generated-record-layout',projections)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
@@ -116,6 +107,10 @@ try:
         proof[label]=list(map(int,get(w/'cmov-guard',w/'base.so',w/(label+'.so')).split()))
         assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
     assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
+    run('clang','-O2','-I',base/'include',r/'overlap.c','-ldl','-o',w/'access-overlap')
+    checked={label:get(w/'access-overlap',w/'base.so',w/(label+'.so')).strip() for label in ('candidate','outlined')}
+    assert checked['candidate']==checked['outlined'] and '750000 overlapping' in checked['candidate']
+    save('register-access-overlap',checked)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)

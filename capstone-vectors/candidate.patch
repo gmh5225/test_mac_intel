@@ -1,29 +1,542 @@
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..f4176a75 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -19,9 +19,9 @@ struct X86SimpleOperand {
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index de60a62a..af12208b 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -1179,7 +1179,7 @@ static const map_insn_ops insn_operands[] = {
+ #include "AArch64GenCSMappingInsnOp.inc"
  };
  
- struct X86SimpleOutput {
--	unsigned int id;
-+	uint16_t id;
- 	char mnemonic[12];
--	char operands[20];
-+	char operands[9];
- 	uint64_t flags;
- 	uint16_t reads[4];
- 	uint16_t writes[4];
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index b202bca4..6efeafb0 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -127,7 +127,7 @@ std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
- 	const auto &d = *insn.detail;
- 	const auto &x = d.x86;
- 	X86SimpleOutput row{};
--	if (strlen(insn.mnemonic) >= sizeof(row.mnemonic) ||
-+	if (insn.id > UINT16_MAX || strlen(insn.mnemonic) >= sizeof(row.mnemonic) ||
- 	    (!first && !branch && !lea &&
- 	     strlen(insn.op_str) >= sizeof(row.operands)) ||
- 	    strpbrk(insn.mnemonic, "\n\r\t\\\"") ||
+-void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			uint8_t *regs_read_count, cs_regs regs_write,
+ 			uint8_t *regs_write_count)
+ {
+@@ -1308,6 +1308,7 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ #endif
+ 
+diff --git a/arch/AArch64/AArch64Mapping.h b/arch/AArch64/AArch64Mapping.h
+index 041f3418..5b2292e6 100644
+--- a/arch/AArch64/AArch64Mapping.h
++++ b/arch/AArch64/AArch64Mapping.h
+@@ -37,7 +37,7 @@ const char *AArch64_insn_name(csh handle, unsigned int id);
+ 
+ const char *AArch64_group_name(csh handle, unsigned int id);
+ 
+-void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			uint8_t *regs_read_count, cs_regs regs_write,
+ 			uint8_t *regs_write_count);
+ 
+diff --git a/arch/ARC/ARCMapping.c b/arch/ARC/ARCMapping.c
+index b791c161..88cbf2dd 100644
+--- a/arch/ARC/ARCMapping.c
++++ b/arch/ARC/ARCMapping.c
+@@ -86,7 +86,7 @@ const char *ARC_group_name(csh handle, unsigned int id)
+ #endif
+ }
+ 
+-void ARC_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err ARC_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+ {
+@@ -127,6 +127,7 @@ void ARC_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ 
+ const insn_map arc_insns[] = {
+diff --git a/arch/ARC/ARCMapping.h b/arch/ARC/ARCMapping.h
+index cf207ae7..ad511b09 100644
+--- a/arch/ARC/ARCMapping.h
++++ b/arch/ARC/ARCMapping.h
+@@ -26,7 +26,7 @@ const char *ARC_insn_name(csh handle, unsigned int id);
+ 
+ const char *ARC_group_name(csh handle, unsigned int id);
+ 
+-void ARC_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err ARC_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count);
+ 
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index af2bc19c..068dfd9c 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -927,7 +927,7 @@ static const map_insn_ops insn_operands[] = {
+ #include "ARMGenCSMappingInsnOp.inc"
+ };
+ 
+-void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+ {
+@@ -995,6 +995,7 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ #endif
+ 
+diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
+index 66d2fa9c..36fef046 100644
+--- a/arch/ARM/ARMMapping.h
++++ b/arch/ARM/ARMMapping.h
+@@ -84,7 +84,7 @@ bool ARM_rel_branch(cs_struct *h, unsigned int insn_id);
+ 
+ bool ARM_blx_to_arm_mode(cs_struct *h, unsigned int insn_id);
+ 
+-void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count);
+ 
+diff --git a/arch/Alpha/AlphaMapping.c b/arch/Alpha/AlphaMapping.c
+index a2d5d133..73be7d46 100644
+--- a/arch/Alpha/AlphaMapping.c
++++ b/arch/Alpha/AlphaMapping.c
+@@ -192,7 +192,7 @@ bool Alpha_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ }
+ 
+ #ifndef CAPSTONE_DIET
+-void Alpha_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err Alpha_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		      uint8_t *regs_read_count, cs_regs regs_write,
+ 		      uint8_t *regs_write_count)
+ {
+@@ -233,6 +233,7 @@ void Alpha_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ #endif
+ 
+diff --git a/arch/Alpha/AlphaMapping.h b/arch/Alpha/AlphaMapping.h
+index 34919435..d0e7a59d 100644
+--- a/arch/Alpha/AlphaMapping.h
++++ b/arch/Alpha/AlphaMapping.h
+@@ -35,7 +35,7 @@ void Alpha_set_detail_op_imm(MCInst *MI, unsigned OpNum, alpha_op_type ImmType,
+ 			     int64_t Imm);
+ void Alpha_set_detail_op_reg(MCInst *MI, unsigned OpNum, alpha_op_type Reg);
+ 
+-void Alpha_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err Alpha_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		      uint8_t *regs_read_count, cs_regs regs_write,
+ 		      uint8_t *regs_write_count);
+ 
+diff --git a/arch/BPF/BPFMapping.c b/arch/BPF/BPFMapping.c
+index 72901f78..8866d882 100644
+--- a/arch/BPF/BPFMapping.c
++++ b/arch/BPF/BPFMapping.c
+@@ -192,7 +192,7 @@ static void sort_and_uniq(cs_regs arr, uint8_t n, uint8_t *new_n)
+ 
+ 	*new_n = n;
+ }
+-void BPF_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err BPF_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+ {
+@@ -235,4 +235,5 @@ void BPF_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	sort_and_uniq(regs_read, read_count, regs_read_count);
+ 	sort_and_uniq(regs_write, write_count, regs_write_count);
++	return CS_ERR_OK;
+ }
+diff --git a/arch/BPF/BPFMapping.h b/arch/BPF/BPFMapping.h
+index 9e9aa367..60b9d640 100644
+--- a/arch/BPF/BPFMapping.h
++++ b/arch/BPF/BPFMapping.h
+@@ -16,7 +16,7 @@ const char *BPF_group_name(csh handle, unsigned int id);
+ const char *BPF_insn_name(csh handle, unsigned int id);
+ const char *BPF_reg_name(csh handle, unsigned int reg);
+ void BPF_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id);
+-void BPF_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err BPF_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count);
+ 
+diff --git a/arch/HPPA/HPPAMapping.c b/arch/HPPA/HPPAMapping.c
+index af1a52a6..af8a7f28 100644
+--- a/arch/HPPA/HPPAMapping.c
++++ b/arch/HPPA/HPPAMapping.c
+@@ -400,7 +400,7 @@ static void sort_and_uniq(cs_regs arr, uint8_t n, uint8_t *new_n)
+ 	*new_n = n;
+ }
+ 
+-void HPPA_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err HPPA_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		     uint8_t *regs_read_count, cs_regs regs_write,
+ 		     uint8_t *regs_write_count)
+ {
+@@ -437,6 +437,7 @@ void HPPA_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	sort_and_uniq(regs_read, read_count, regs_read_count);
+ 	sort_and_uniq(regs_write, write_count, regs_write_count);
++	return CS_ERR_OK;
+ }
+ 
+ #endif
+diff --git a/arch/HPPA/HPPAMapping.h b/arch/HPPA/HPPAMapping.h
+index 6b62fe3a..2575c628 100644
+--- a/arch/HPPA/HPPAMapping.h
++++ b/arch/HPPA/HPPAMapping.h
+@@ -12,7 +12,7 @@ const char *HPPA_group_name(csh handle, unsigned int id);
+ const char *HPPA_insn_name(csh handle, unsigned int id);
+ const char *HPPA_reg_name(csh handle, unsigned int reg);
+ void HPPA_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id);
+-void HPPA_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err HPPA_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		     uint8_t *regs_read_count, cs_regs regs_write,
+ 		     uint8_t *regs_write_count);
+ 
+diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
+index 7c135b3f..c949717f 100644
+--- a/arch/LoongArch/LoongArchMapping.c
++++ b/arch/LoongArch/LoongArchMapping.c
+@@ -116,7 +116,7 @@ const char *LoongArch_group_name(csh handle, unsigned int id)
+ #endif
+ }
+ 
+-void LoongArch_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err LoongArch_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			  uint8_t *regs_read_count, cs_regs regs_write,
+ 			  uint8_t *regs_write_count)
+ {
+@@ -173,6 +173,7 @@ void LoongArch_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ 
+ const insn_map loongarch_insns[] = {
+diff --git a/arch/LoongArch/LoongArchMapping.h b/arch/LoongArch/LoongArchMapping.h
+index 9c6169ff..96a48a2e 100644
+--- a/arch/LoongArch/LoongArchMapping.h
++++ b/arch/LoongArch/LoongArchMapping.h
+@@ -28,7 +28,7 @@ const char *LoongArch_insn_name(csh handle, unsigned int id);
+ 
+ const char *LoongArch_group_name(csh handle, unsigned int id);
+ 
+-void LoongArch_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err LoongArch_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			  uint8_t *regs_read_count, cs_regs regs_write,
+ 			  uint8_t *regs_write_count);
+ 
+diff --git a/arch/M680X/M680XDisassembler.c b/arch/M680X/M680XDisassembler.c
+index 311c7335..080c2b69 100644
+--- a/arch/M680X/M680XDisassembler.c
++++ b/arch/M680X/M680XDisassembler.c
+@@ -2345,7 +2345,7 @@ cs_err M680X_disassembler_init(cs_struct *ud)
+ }
+ 
+ #ifndef CAPSTONE_DIET
+-void M680X_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err M680X_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		      uint8_t *regs_read_count, cs_regs regs_write,
+ 		      uint8_t *regs_write_count)
+ {
+@@ -2361,6 +2361,7 @@ void M680X_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		memcpy(regs_write, insn->detail->regs_write,
+ 		       *regs_write_count * sizeof(insn->detail->regs_write[0]));
+ 	}
++	return CS_ERR_OK;
+ }
+ #endif
+ 
+diff --git a/arch/M680X/M680XDisassembler.h b/arch/M680X/M680XDisassembler.h
+index 150262a3..7b28fa05 100644
+--- a/arch/M680X/M680XDisassembler.h
++++ b/arch/M680X/M680XDisassembler.h
+@@ -10,7 +10,7 @@ bool M680X_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 			  MCInst *instr, uint16_t *size, uint64_t address,
+ 			  void *info);
+ void M680X_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id);
+-void M680X_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err M680X_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		      uint8_t *regs_read_count, cs_regs regs_write,
+ 		      uint8_t *regs_write_count);
+ 
+diff --git a/arch/M68K/M68KInstPrinter.c b/arch/M68K/M68KInstPrinter.c
+index ed10a3d3..c274addd 100644
+--- a/arch/M68K/M68KInstPrinter.c
++++ b/arch/M68K/M68KInstPrinter.c
+@@ -785,7 +785,7 @@ const char *M68K_group_name(csh handle, unsigned int id)
+ }
+ 
+ #ifndef CAPSTONE_DIET
+-void M68K_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err M68K_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		     uint8_t *regs_read_count, cs_regs regs_write,
+ 		     uint8_t *regs_write_count)
+ {
+@@ -802,5 +802,6 @@ void M68K_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ #endif
+diff --git a/arch/M68K/M68KInstPrinter.h b/arch/M68K/M68KInstPrinter.h
+index cf730a3c..fa4d1ca0 100644
+--- a/arch/M68K/M68KInstPrinter.h
++++ b/arch/M68K/M68KInstPrinter.h
+@@ -19,7 +19,7 @@ const char *M68K_group_name(csh handle, unsigned int id);
+ void M68K_post_printer(csh handle, cs_insn *flat_insn, char *insn_asm,
+ 		       MCInst *mci);
+ #ifndef CAPSTONE_DIET
+-void M68K_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err M68K_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		     uint8_t *regs_read_count, cs_regs regs_write,
+ 		     uint8_t *regs_write_count);
+ #endif
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 7df6e761..7f4f1844 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -148,7 +148,7 @@ const insn_map mips_insns[] = {
+ #include "MipsGenCSMappingInsn.inc"
+ };
+ 
+-void Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		     uint8_t *regs_read_count, cs_regs regs_write,
+ 		     uint8_t *regs_write_count)
+ {
+@@ -205,6 +205,7 @@ void Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ 
+ static unsigned Mips_frame_id(const MCInst *MI)
+diff --git a/arch/Mips/MipsMapping.h b/arch/Mips/MipsMapping.h
+index b745afb2..88e8007e 100644
+--- a/arch/Mips/MipsMapping.h
++++ b/arch/Mips/MipsMapping.h
+@@ -40,7 +40,7 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			 MCInst *instr, uint16_t *size, uint64_t address,
+ 			 void *info);
+ 
+-void Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		     uint8_t *regs_read_count, cs_regs regs_write,
+ 		     uint8_t *regs_write_count);
+ 
+diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
+index a3e2892f..1ee52440 100644
+--- a/arch/RISCV/RISCVMapping.c
++++ b/arch/RISCV/RISCVMapping.c
+@@ -515,7 +515,7 @@ riscv_insn RISCV_map_insn(const char *name)
+ 	return RISCV_INS_INVALID;
+ }
+ 
+-void RISCV_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err RISCV_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		      uint8_t *regs_read_count, cs_regs regs_write,
+ 		      uint8_t *regs_write_count)
+ {
+@@ -548,6 +548,7 @@ void RISCV_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ 
+ void RISCV_init(MCRegisterInfo *MRI)
+diff --git a/arch/RISCV/RISCVMapping.h b/arch/RISCV/RISCVMapping.h
+index 2b77a303..41932bc8 100644
+--- a/arch/RISCV/RISCVMapping.h
++++ b/arch/RISCV/RISCVMapping.h
+@@ -36,7 +36,7 @@ riscv_insn RISCV_map_insn(const char *name);
+ 
+ void RISCV_init(MCRegisterInfo *MRI);
+ 
+-void RISCV_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err RISCV_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		      uint8_t *regs_read_count, cs_regs regs_write,
+ 		      uint8_t *regs_write_count);
+ 
+diff --git a/arch/SH/SHDisassembler.c b/arch/SH/SHDisassembler.c
+index e01205e1..6625f246 100644
+--- a/arch/SH/SHDisassembler.c
++++ b/arch/SH/SHDisassembler.c
+@@ -2259,7 +2259,7 @@ bool SH_getInstruction(csh ud, const uint8_t *code, size_t code_len, MCInst *MI,
+ }
+ 
+ #ifndef CAPSTONE_DIET
+-void SH_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err SH_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		   uint8_t *regs_read_count, cs_regs regs_write,
+ 		   uint8_t *regs_write_count)
+ {
+@@ -2275,5 +2275,6 @@ void SH_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		memcpy(regs_write, insn->detail->regs_write,
+ 		       *regs_write_count * sizeof(insn->detail->regs_write[0]));
+ 	}
++	return CS_ERR_OK;
+ }
+ #endif
+diff --git a/arch/SH/SHDisassembler.h b/arch/SH/SHDisassembler.h
+index d58bd710..3961379f 100644
+--- a/arch/SH/SHDisassembler.h
++++ b/arch/SH/SHDisassembler.h
+@@ -14,7 +14,7 @@ bool SH_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 		       MCInst *instr, uint16_t *size, uint64_t address,
+ 		       void *info);
+ 
+-void SH_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err SH_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		   uint8_t *regs_read_count, cs_regs regs_write,
+ 		   uint8_t *regs_write_count);
+ #endif
+diff --git a/arch/TriCore/TriCoreMapping.c b/arch/TriCore/TriCoreMapping.c
+index 223b44d7..06cfaff7 100644
+--- a/arch/TriCore/TriCoreMapping.c
++++ b/arch/TriCore/TriCoreMapping.c
+@@ -135,7 +135,7 @@ void TriCore_set_access(MCInst *MI)
+ #endif
+ }
+ 
+-void TriCore_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err TriCore_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			uint8_t *regs_read_count, cs_regs regs_write,
+ 			uint8_t *regs_write_count)
+ {
+@@ -185,6 +185,7 @@ void TriCore_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
+ #endif
++	return CS_ERR_OK;
+ }
+ 
+ bool TriCore_disasm(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/TriCore/TriCoreMapping.h b/arch/TriCore/TriCoreMapping.h
+index e6da6280..ff1afb86 100644
+--- a/arch/TriCore/TriCoreMapping.h
++++ b/arch/TriCore/TriCoreMapping.h
+@@ -13,7 +13,7 @@ const char *TriCore_insn_name(csh handle, unsigned int id);
+ 
+ const char *TriCore_group_name(csh handle, unsigned int id);
+ 
+-void TriCore_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err TriCore_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			uint8_t *regs_read_count, cs_regs regs_write,
+ 			uint8_t *regs_write_count);
+ 
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..dc24b663 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11979,7 +11979,7 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 	return NULL;
+ }
+ 
+-void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+ {
+@@ -12044,6 +12044,7 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ #endif
+ 
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index 380faa79..48437329 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -107,7 +107,7 @@ void op_addAvxRoundingMode(MCInst *MI, int v);
+ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 				 uint64_t *eflags);
+ 
+-void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count);
+ 
+diff --git a/arch/Xtensa/XtensaMapping.c b/arch/Xtensa/XtensaMapping.c
+index 8a0055ff..097fb354 100644
+--- a/arch/Xtensa/XtensaMapping.c
++++ b/arch/Xtensa/XtensaMapping.c
+@@ -125,7 +125,7 @@ const char *Xtensa_group_name(csh handle, unsigned int id)
+ }
+ 
+ #ifndef CAPSTONE_DIET
+-void Xtensa_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err Xtensa_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		       uint8_t *regs_read_count, cs_regs regs_write,
+ 		       uint8_t *regs_write_count)
+ {
+@@ -182,6 +182,7 @@ void Xtensa_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 
+ 	*regs_read_count = read_count;
+ 	*regs_write_count = write_count;
++	return CS_ERR_OK;
+ }
+ #endif
+ 
+diff --git a/arch/Xtensa/XtensaMapping.h b/arch/Xtensa/XtensaMapping.h
+index 2f73e58b..585c22e4 100644
+--- a/arch/Xtensa/XtensaMapping.h
++++ b/arch/Xtensa/XtensaMapping.h
+@@ -21,7 +21,7 @@ void Xtensa_insn_id(cs_struct *h, cs_insn *insn, unsigned int id);
+ const char *Xtensa_insn_name(csh handle, unsigned int id);
+ const char *Xtensa_group_name(csh handle, unsigned int id);
+ #ifndef CAPSTONE_DIET
+-void Xtensa_reg_access(const cs_insn *insn, cs_regs regs_read,
++cs_err Xtensa_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		       uint8_t *regs_read_count, cs_regs regs_write,
+ 		       uint8_t *regs_write_count);
+ #endif
+diff --git a/cs.c b/cs.c
+index d0b8b045..e3a1e739 100644
+--- a/cs.c
++++ b/cs.c
+@@ -2458,15 +2458,12 @@ cs_err CAPSTONE_API cs_regs_access(csh ud, const cs_insn *insn,
+ 		return CS_ERR_DETAIL;
+ 	}
+ 
+-	if (handle->reg_access) {
+-		handle->reg_access(insn, regs_read, regs_read_count, regs_write,
+-				   regs_write_count);
+-	} else {
+-		// this arch is unsupported yet
++	if (!handle->reg_access) {
+ 		handle->errnum = CS_ERR_ARCH;
+ 		return CS_ERR_ARCH;
+ 	}
+ 
+-	return CS_ERR_OK;
++	return handle->reg_access(insn, regs_read, regs_read_count, regs_write,
++				  regs_write_count);
+ #endif
+ }
+diff --git a/cs_priv.h b/cs_priv.h
+index 19ecedba..f0d9be1e 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -54,7 +54,7 @@ typedef const char *(*GetName_t)(csh handle, unsigned int id);
+ typedef void (*GetID_t)(cs_struct *h, cs_insn *insn, unsigned int id);
+ 
+ // return registers accessed by instruction
+-typedef void (*GetRegisterAccess_t)(const cs_insn *insn, cs_regs regs_read,
++typedef cs_err (*GetRegisterAccess_t)(const cs_insn *insn, cs_regs regs_read,
+ 				    uint8_t *regs_read_count,
+ 				    cs_regs regs_write,
+ 				    uint8_t *regs_write_count);
