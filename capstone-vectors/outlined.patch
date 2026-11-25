@@ -1,8 +1,18 @@
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..3abcd0fd 100644
+index 504682a4..745f3525 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -44,7 +44,6 @@ static void setLegacyRegisterOpcode(cs_insn *insn, const uint8_t *opcode,
+@@ -15,7 +15,9 @@
+ #include "X86OutputOptions.h"
+ #include "X86EvexAdmission.h"
+ #include "X86SimpleOutput.h"
++#define X86_VECTOR_REGISTER_CALLER_OPCODE
+ #include "X86VectorRegisterOutput.h"
++#undef X86_VECTOR_REGISTER_CALLER_OPCODE
+ #include "X86GenEvexShiftOutput.inc"
+ #include "../../cs_disasm_internal.h"
+ #ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+@@ -44,7 +46,6 @@ static void setLegacyRegisterOpcode(cs_insn *insn, const uint8_t *opcode,
  	if (insn->detail) {
  		cs_x86 *x = &insn->detail->x86;
  		x->prefix[2] = 0x66;
@@ -10,62 +20,31 @@ index 504682a4..3abcd0fd 100644
  		memcpy(x->opcode, opcode, count);
  	}
  }
-@@ -62,7 +61,7 @@ static bool writeLegacyMap38Registers(const uint8_t *code, cs_insn *insn,
- 	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
- 	const unsigned regs[] = { plan & 128 ? rm : reg,
- 				  plan & 128 ? reg : rm };
--	writeVectorRegisters(code, insn, insn_size,
-+	writeVectorRegisterOperands(code, insn, insn_size,
- 			     &legacy_map38_rows[plan & 127], offset - 1, 0, rex,
- 			     0, regs, 2);
- 	setLegacyRegisterOpcode(insn, code + offset - 3, 3);
-@@ -82,7 +81,7 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
- 	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
- 	const bool shuffle = opcode == 0x70;
- 	const unsigned regs[] = { shuffle ? field | ((rex & 4) << 1) : rm, rm };
--	writeVectorRegisters(code, insn, insn_size,
-+	writeVectorRegisterOperands(code, insn, insn_size,
- 			     &legacy_immediate_rows[plan - 1], offset - 2, 0,
- 			     rex, 0, regs, shuffle ? 2 : 1);
- 	setLegacyRegisterOpcode(insn, code + offset - 3, 2);
+@@ -173,9 +174,12 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 						  ((~(unsigned)code[3] & 8)
+ 						   << 1),
+ 					  (code[5] & 7) | ((rxb & 3) << 3) };
+-		return writeVectorRegisters(code, insn, insn_size,
++		writeVectorRegisters(code, insn, insn_size,
+ 					    &evex_shift_rows[plan - 1], 4, ll,
+ 					    0x40 | (w << 3) | rxb, ll, regs, 2);
++		if (insn->detail)
++			memcpy(insn->detail->x86.opcode, code, 4);
++		return true;
+ 	}
+ #ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+ 	if (size >= 7 && code[0] == 0x62 && code[5] < 0xc0 &&
 diff --git a/arch/X86/X86VectorRegisterOutput.h b/arch/X86/X86VectorRegisterOutput.h
-index 1f238c20..f425d33f 100644
+index 1f238c20..21078ac5 100644
 --- a/arch/X86/X86VectorRegisterOutput.h
 +++ b/arch/X86/X86VectorRegisterOutput.h
-@@ -6,7 +6,7 @@
- 
- #include "X86VectorRegisterWriter.h"
- 
--static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
-+static void writeVectorRegisterOperands(const uint8_t *code, cs_insn *insn,
- 				 uint16_t *insn_size,
- 				 const struct VectorOutputRow *row,
- 				 unsigned prefix, unsigned ll, unsigned rex,
-@@ -46,7 +46,6 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -46,7 +46,9 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  		memcpy(d->groups, row->groups, sizeof(row->groups));
  		d->groups_count = row->group_count;
  		cs_x86 *x = &d->x86;
--		memcpy(x->opcode, code, prefix);
++#ifndef X86_VECTOR_REGISTER_CALLER_OPCODE
+ 		memcpy(x->opcode, code, prefix);
++#endif
  		x->addr_size = 8;
  		x->rex = (uint8_t)rex;
  		x->modrm = code[prefix + 1];
-@@ -72,6 +71,19 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 			x->encoding.imm_size = 1;
- 		}
- 	}
-+}
-+
-+static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
-+				 uint16_t *insn_size,
-+				 const struct VectorOutputRow *row,
-+				 unsigned prefix, unsigned ll, unsigned rex,
-+				 unsigned first_ll, const unsigned *regs,
-+				 unsigned reg_count)
-+{
-+	writeVectorRegisterOperands(code, insn, insn_size, row, prefix, ll, rex,
-+				 first_ll, regs, reg_count);
-+	if (insn->detail)
-+		memcpy(insn->detail->x86.opcode, code, prefix);
- 	return true;
- }
- 

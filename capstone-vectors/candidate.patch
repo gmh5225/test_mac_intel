@@ -1,8 +1,18 @@
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..7ee8f276 100644
+index 504682a4..edec7788 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -38,17 +38,6 @@
+@@ -15,7 +15,9 @@
+ #include "X86OutputOptions.h"
+ #include "X86EvexAdmission.h"
+ #include "X86SimpleOutput.h"
++#define X86_LEGACY_REGISTER_OPCODES
+ #include "X86VectorRegisterOutput.h"
++#undef X86_LEGACY_REGISTER_OPCODES
+ #include "X86GenEvexShiftOutput.inc"
+ #include "../../cs_disasm_internal.h"
+ #ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+@@ -38,17 +40,6 @@
  #include "X86GenLegacyRegisterImmediates.inc"
  #include "X86GenLegacyMap38Registers.inc"
  
@@ -20,82 +30,53 @@ index 504682a4..7ee8f276 100644
  /* The caller has checked the escape and the entire register encoding. */
  static bool writeLegacyMap38Registers(const uint8_t *code, cs_insn *insn,
  				      uint16_t *insn_size, unsigned offset,
-@@ -62,11 +51,9 @@ static bool writeLegacyMap38Registers(const uint8_t *code, cs_insn *insn,
+@@ -62,11 +53,9 @@ static bool writeLegacyMap38Registers(const uint8_t *code, cs_insn *insn,
  	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
  	const unsigned regs[] = { plan & 128 ? rm : reg,
  				  plan & 128 ? reg : rm };
 -	writeVectorRegisters(code, insn, insn_size,
-+	return writeVectorRegisterRecord(code, insn, insn_size,
++	return writeVectorRegisters(code, insn, insn_size,
  			     &legacy_map38_rows[plan & 127], offset - 1, 0, rex,
--			     0, regs, 2);
+ 			     0, regs, 2);
 -	setLegacyRegisterOpcode(insn, code + offset - 3, 3);
 -	return true;
-+			     0, regs, 2, 3);
  }
  
  /* The caller checked a complete 66 [REX] 0F 70..73 /r ib register form. */
-@@ -82,11 +69,9 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
+@@ -82,11 +71,9 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
  	const unsigned rm = (mr & 7) | ((rex & 1) << 3);
  	const bool shuffle = opcode == 0x70;
  	const unsigned regs[] = { shuffle ? field | ((rex & 4) << 1) : rm, rm };
 -	writeVectorRegisters(code, insn, insn_size,
-+	return writeVectorRegisterRecord(code, insn, insn_size,
++	return writeVectorRegisters(code, insn, insn_size,
  			     &legacy_immediate_rows[plan - 1], offset - 2, 0,
--			     rex, 0, regs, shuffle ? 2 : 1);
+ 			     rex, 0, regs, shuffle ? 2 : 1);
 -	setLegacyRegisterOpcode(insn, code + offset - 3, 2);
 -	return true;
-+			     rex, 0, regs, shuffle ? 2 : 1, 2);
  }
  
  /* This writer belongs to the private mixed-library reader. In dedicated
 diff --git a/arch/X86/X86VectorRegisterOutput.h b/arch/X86/X86VectorRegisterOutput.h
-index 1f238c20..7e66a371 100644
+index 1f238c20..3a5fa583 100644
 --- a/arch/X86/X86VectorRegisterOutput.h
 +++ b/arch/X86/X86VectorRegisterOutput.h
-@@ -6,12 +6,12 @@
- 
- #include "X86VectorRegisterWriter.h"
- 
--static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
-+static bool writeVectorRegisterRecord(const uint8_t *code, cs_insn *insn,
- 				 uint16_t *insn_size,
- 				 const struct VectorOutputRow *row,
- 				 unsigned prefix, unsigned ll, unsigned rex,
- 				 unsigned first_ll, const unsigned *regs,
--				 unsigned reg_count)
-+				 unsigned reg_count, unsigned legacy_opcode_size)
- {
- 	const unsigned len = prefix + 2 + row->immediate;
- 	*insn_size = insn->size = (uint16_t)len;
-@@ -46,7 +46,14 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -46,7 +46,18 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  		memcpy(d->groups, row->groups, sizeof(row->groups));
  		d->groups_count = row->group_count;
  		cs_x86 *x = &d->x86;
 -		memcpy(x->opcode, code, prefix);
-+		/* Legacy records expose the actual opcode after 66 [REX]. */
-+		if (legacy_opcode_size) {
-+			x->prefix[2] = 0x66;
-+			memcpy(x->opcode, code + prefix + 1 - legacy_opcode_size,
-+			       legacy_opcode_size);
-+		} else {
++#ifdef X86_LEGACY_REGISTER_OPCODES
++		/* The register fallback also accepts 66 [REX] 0F 38 /r and
++		 * 66 [REX] 0F 70..73 /r ib. Their public opcode starts at 0F. */
++		if (code[0] == X86_PREFIX_OPSIZE) {
++			const uint8_t *opcode = code + 1 + (code[1] != 0x0f);
++			x->prefix[2] = X86_PREFIX_OPSIZE;
++			memcpy(x->opcode, opcode, 2);
++			if (opcode[1] == 0x38)
++				x->opcode[2] = opcode[2];
++		} else
++#endif
 +			memcpy(x->opcode, code, prefix);
-+		}
  		x->addr_size = 8;
  		x->rex = (uint8_t)rex;
  		x->modrm = code[prefix + 1];
-@@ -75,4 +82,15 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 	return true;
- }
- 
-+static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
-+				 uint16_t *insn_size,
-+				 const struct VectorOutputRow *row,
-+				 unsigned prefix, unsigned ll, unsigned rex,
-+				 unsigned first_ll, const unsigned *regs,
-+				 unsigned reg_count)
-+{
-+	return writeVectorRegisterRecord(code, insn, insn_size, row, prefix, ll, rex,
-+				 first_ll, regs, reg_count, 0);
-+}
-+
- #endif

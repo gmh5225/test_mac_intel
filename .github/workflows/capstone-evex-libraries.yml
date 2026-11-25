@@ -1,7 +1,7 @@
-name: Measure single-construction legacy vector opcode details and shared register formatting
+name: Measure SIMD opcode construction confined to the AMD64 fallback at current Capstone next
 on:
   push:
-    branches: [codex/construct-legacy-vector-opcodes]
+    branches: [codex/one-object-legacy-vector-opcodes]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 76d16380eb2a736a5039c7b3b9c4a72c37aacfd2
+          ref: 571a1592ff48d148257b7ae1146d2fb593470783
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 61687bbb579da03cb1f9e47ed5133d75ea027ad3
+          ref: 909177c3b7819868e6fef03579e20f77531c51b7
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-opcode-owners-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: one-vector-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
