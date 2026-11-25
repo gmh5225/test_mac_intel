@@ -1,7 +1,7 @@
-name: Benchmark indirect calls and jumps and absolute addressing in AT&T on unchanged PE32, PE64 and four ELF programs
+name: Compare x86 mode and AT&T record dispatch against iced Fast Intel and GAS on six real programs and five other architectures
 on:
   push:
-    branches: [codex/x86-att-indirect-absolute-records]
+    branches: [codex/compare-joint-intel-att-records-and-fast]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 994ce74539381ccfe41411455924c8933825d004
+          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 7c158ca1c194c0a2b56d830eaeee9fa901732618
+          ref: 963db8c6b5b74c876535ce335cd82fff394a66da
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-indirect-address-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-combined-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
