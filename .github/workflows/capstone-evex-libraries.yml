@@ -1,7 +1,7 @@
-name: Resolve libc leaf routines in the warmed Capstone and iced formatters on PE and ELF
+name: Attribute warmed formatter libc costs to verified return sites in the unchanged linked executable
 on:
   push:
-    branches: [codex/formatter-libc-symbols-by-build-id]
+    branches: [codex/libc-leaf-callsites-formatter]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: exact-libc-symbols-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: formatter-libc-callsites-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
