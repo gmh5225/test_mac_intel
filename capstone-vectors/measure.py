@@ -58,6 +58,12 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        if label!='base':
+            stream=(base/'SStream.c').read_text()
+            a=stream.index('void SStream_concat_hex64(');b=stream.index('void SStream_concat_dec64(',a)
+            (w/'hex.c').write_text(stream[a:b].replace('void SStream_concat_hex64(','static void tested_hex('))
+            run('clang','-std=c11','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-I',w,r/'stream-guard.c',lib,'-o',w/'check-stream')
+            checks=int(get(w/'check-stream'));assert checks==1780064;save('stream-'+label,checks)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
@@ -73,6 +79,47 @@ try:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
     save('linked-sections',layout)
+
+    paths=[base/'SStream.c',base/'arch/X86/X86IntelInstPrinterNumbers.c']
+    bodies=[p.read_text() for p in paths]
+    emit="""static unsigned long long hex_widths[2][2][17];
+__attribute__((visibility("hidden"))) void record_hex_width(unsigned writer, uint64_t value, bool negative)
+{
+    const unsigned digits = value ? 16 - __builtin_clzll(value) / 4 : 1;
+    ++hex_widths[writer][negative][digits];
+}
+static void __attribute__((destructor)) dump_counts(void)
+{
+    for (unsigned a=0;a<2;a++) for (unsigned b=0;b<2;b++) for(unsigned i=0;i<17;i++)
+        fprintf(stderr,"%llu ",hex_widths[a][b][i]);
+    fputc(10,stderr);
+}
+"""
+    decl='extern void record_hex_width(unsigned, uint64_t, bool);\n'
+    for index,(p,body) in enumerate(zip(paths,bodies)):
+        key='void '+('SStream_concat_hex64' if index==0 else 'X86_Intel_printHexPrechecked')+'('
+        i=body.index(key);j=body.index('\n{',i)+2
+        p.write_text(body[:i]+(emit if index==0 else decl)+body[i:j]+'\n\trecord_hex_width('+str(index)+',value,negative);'+body[j:])
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'count-hex')
+    run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/'count-foreign')
+    for p,body in zip(paths,bodies):p.write_text(body)
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    assert sha(lib)==images['candidate']['archive'] and not get('git','-C',base,'diff','--name-only')
+    hex_counts={}
+    def tally(key,exe,normal,args,passes):
+        expected=get(normal,*args).split()[2:]
+        result=sp.run([exe,*args],capture_output=True,text=True,check=True)
+        assert result.stdout.split()[2:]==expected
+        bins=list(map(int,result.stderr.split()))
+        assert len(bins)==68 and all(x%passes==0 for x in bins)
+        hex_counts[key]=dict(accepted=int(expected[0]),bins=[x//passes for x in bins])
+    for row in foreign_rows:
+        if row['arch'] in ('i386','amd64'):continue
+        for m0 in (1,2):
+            tally('foreign/'+row['name']+'/'+str(m0),w/'count-foreign',w/'foreign-candidate',[row['arch'],w/(row['name']+'.text'),str(m0),'1'],1)
+    save('hex-call-widths',hex_counts)
+
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
     imgs={k:v+bytes(length-len(v)) for k,v in imgs.items()};imgs['duplicate']=imgs['base']
@@ -144,6 +191,11 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        for route in ('private','capstone'):
+            for m0 in (1,2):
+                tally(route+'/'+name+'/'+str(m0),w/'count-hex',w/'candidate',[route,str(m0),'1',f,path,str(bits)],2)
+        save('hex-call-widths',hex_counts)
+
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
