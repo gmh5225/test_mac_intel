@@ -45,7 +45,6 @@ try:
     roots=get('git','-C',root,'show',dev+':lib/decode/CMakeLists.txt')
     options=['--undefined=X86_disasmIter','--undefined=X86_disasmIter32']
     assert all('"LINKER:'+text+'"' in roots for text in options)
-    extra=['--undefined=X86_decodeOutputMiss32','--undefined=X86_decodeRegisterFallback32']
     archive={};objects={}
     for label in ('base','outlined'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -56,9 +55,10 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         archive[label]=sha(lib)
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
-        for style in ('shipping','fallbacks'):
+        for style in ('shipping','ordered'):
             tag=style+'-'+label;path=w/tag
-            ld=['-Wl,'+k for k in options+(extra if style=='fallbacks' else [])]
+            ld=['-Wl,'+k for k in options]
+            if style=='ordered':ld.extend(['-Xlinker','-T','-Xlinker',str(r/'amd64-last.ld')])
             run('clang++',w/'driver.o',*ld,lib,ice_lib,*flags,'-o',path)
             with path.open('rb') as f:
                 elf=ELFFile(f)
@@ -66,12 +66,18 @@ try:
             images[tag]=dict(exe=sha(path),symbols=symbols(path),archive=archive[label])
     assert set(objects['base'])==set(objects['outlined'])
     assert [Path(f).name for f in objects['base']if objects['base'][f]!=objects['outlined'][f]]==['X86Sse64Output.c.o']
-    save('sources',dict(capstone=maps,neverd=dev,ice=m['iced_revision'],archives=archive,images=images,options=dict(shipping=options,fallbacks=options+extra),host=platform.platform(),cpu=get('lscpu')))
+    save('sources',dict(capstone=maps,neverd=dev,ice=m['iced_revision'],archives=archive,images=images,options=dict(shipping=options,ordered_script=(r/'amd64-last.ld').read_text()),host=platform.platform(),cpu=get('lscpu')))
     save('linked-sections',layout)
+    target=('.cs_x86_i386_text','.cs_x86_memory_fallback32_text','.cs_x86_register_fallback32_text','.cs_x86_i386_rodata','.cs_x86_memory_fallback32_rodata','.cs_x86_register_fallback32_rodata')
+    for tag in ('ordered-base','ordered-outlined'):
+        for sec in target:
+            family='.cs_x86_amd64_'+('text' if sec.endswith('_text') else 'rodata')
+            assert layout[tag][sec][0]+layout[tag][sec][1]<=layout[tag][family][0],(tag,sec,layout[tag][sec],layout[tag][family])
+    assert all(layout['ordered-base'][sec][:2]==layout['ordered-outlined'][sec][:2] for sec in target)
     stages={tag:(w/tag).read_bytes() for tag in images}
     lengths={k:len(v)for k,v in stages.items()};length=max(lengths.values())
     stages={k:v+bytes(length-len(v)) for k,v in stages.items()}
-    for style in ('shipping','fallbacks'):
+    for style in ('shipping','ordered'):
         stages[style+'-copy']=stages[style+'-base']
     current=w/'selected';shutil.copy2(w/'shipping-base',current);current.write_bytes(stages['shipping-base'])
     inode=current.stat().st_ino;verified={};offsets=[i for i in range(0,length,4096)if len({v[i:i+4096]for v in stages.values()})>1]
@@ -106,7 +112,7 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('shipping-base')==audit_engine('fallbacks-base')==audit_engine('shipping-outlined')==audit_engine('fallbacks-outlined')
+        assert audit_engine('shipping-base')==audit_engine('ordered-base')==audit_engine('shipping-outlined')==audit_engine('ordered-outlined')
         audits[name]=dict(extents=len(selected),sha=sha(path),bytes=spec['bytes']);save('audit',audits)
         for mode in (1,2):
             def take(k,n):

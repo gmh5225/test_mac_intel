@@ -1,7 +1,7 @@
-name: Measure i386 memory and register fallback placement and replicate residual OpenSSL32 detail on fixed archives
+name: Measure production x86 linking with AMD64 sections after the i386 paths
 on:
   push:
-    branches: [codex/preserve-i386-fallback-placement]
+    branches: [codex/place-amd64-sections-after-i386]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-fallback-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-fixed-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
