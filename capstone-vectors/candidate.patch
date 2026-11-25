@@ -1,19 +1,24 @@
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..dd7de787 100644
+index 504682a4..d4c8ce4a 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -27,6 +27,7 @@
+@@ -27,6 +27,11 @@
  #endif
  
  #include "X86GenSimpleOutput.inc"
++#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
++    !defined(CAPSTONE_X86_ONLY)
++#define X86_RIP_INDIRECT_RECORD
 +#include "X86GenIndirect64Output.inc"
++#endif
  #ifdef CAPSTONE_X86_ONLY
  #include "X86VexBaseMemory.h"
  #endif
-@@ -241,6 +242,14 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -241,6 +246,16 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	}
  #endif
  fallback:
++#ifdef X86_RIP_INDIRECT_RECORD
 +	if (size >= 6 && code[0] == 0xff &&
 +	    (code[1] == 0x15 || code[1] == 0x25) &&
 +	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
@@ -22,6 +27,7 @@ index 504682a4..dd7de787 100644
 +		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
 +					     x86_simple_registers);
 +	}
++#endif
  #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
  	defined(__x86_64__)
  	/* The fixed AMD64 decoder has just tried the shared output plans.

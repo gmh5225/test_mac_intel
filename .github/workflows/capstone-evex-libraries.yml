@@ -1,7 +1,7 @@
-name: Time RIP-relative indirect control transfers with final memory details on PE32 PE64 SIMD and other backends
+name: Compare fixed AMD64 RIP transfer admission and fallback in the measured Linux host configuration
 on:
   push:
-    branches: [codex/near-rip-control-transfer-output]
+    branches: [codex/host-verified-rip-transfers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-rip-indirect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mixed-rip-transfers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
