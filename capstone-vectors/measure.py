@@ -109,12 +109,11 @@ try:
     assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
     readers={}
     for label in ('base','candidate','outlined'):
+        names=('cs_disasm_iter','cs_decode_full_insn','X86_disasmIterText','X86_decodeFixedRecord32','X86_decodeFixedRecord64')
         nm=get('nm','-S','--defined-only',w/(label+'.so'))
-        selected={parts[-1]:[int(parts[0],16),int(parts[1],16)] for parts in (line.split() for line in nm.splitlines()) if len(parts)==4 and parts[-1] in ('cs_disasm_iter','X86_decodeMixedPublicRecord','X86_decodeFixedRecord32','X86_decodeFixedRecord64','X86_disasmIterText')}
-        assert 'cs_disasm_iter' in selected and 'X86_disasmIterText' in selected
-        assert ('X86_decodeMixedPublicRecord' in selected)==(label!='base')
-        assert all((key in selected)==(label=='outlined') for key in ('X86_decodeFixedRecord32','X86_decodeFixedRecord64'))
-        readers[label]=selected
+        rows={p[-1]:[int(p[0],16),int(p[1],16)]for p in (l.split()for l in nm.splitlines())if len(p)==4 and p[-1] in names}
+        assert set(rows)==set(names[:3] if label=='base' else names),(label,rows)
+        readers[label]=rows
     save('text-readers',readers)
     guards={};records={}
     for lbl in ('candidate','outlined'):
