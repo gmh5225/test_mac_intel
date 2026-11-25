@@ -1,3 +1,29 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 396ab047..d305ef98 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -175,7 +175,7 @@ if(capstone_enabled_architectures STREQUAL "XCORE")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "ARM")
+-    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "MIPS")
+diff --git a/Makefile b/Makefile
+index fb13d941..99eb30fe 100644
+--- a/Makefile
++++ b/Makefile
+@@ -135,7 +135,7 @@ endif
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
+-CFLAGS += -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
++CFLAGS += -DCAPSTONE_ARM_ONLY -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
 index 37012242..26a96fff 100644
 --- a/arch/ARM/ARMInstPrinter.c
@@ -178,27 +204,30 @@ index 37012242..26a96fff 100644
  		   (int32_t)MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
  	SStream_concat0(O, "]");
 diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
-index 98805f06..8567e6f4 100644
+index 98805f06..d6833e63 100644
 --- a/arch/ARM/ARMMapping.h
 +++ b/arch/ARM/ARMMapping.h
-@@ -22,6 +22,21 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
+@@ -22,6 +22,24 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
  // return name of register in friendly string
  const char *ARM_reg_name(csh handle, unsigned int reg);
  
 +/* Formatted single-character literals preserve the original %s call for
 + * applications that install a formatter through CS_OPT_MEM. */
-+static inline void ARM_printFormattedChar(SStream *O, const char *literal)
-+{
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
++	!defined(_WIN32_WCE) && defined(__linux__) && defined(__clang__) && \
++	(defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__)))
++static inline void ARM_printFormattedChar(SStream *O, const char *literal)
++{
 +	if (cs_vsnprintf == cs_default_vsnprintf) {
 +		SStream_concat1(O, literal[0]);
 +		return;
 +	}
-+#endif
 +	SStream_concat(O, "%s", literal);
 +}
++#else
++#define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
++#endif
 +
  /* A disabled markup tag contributes no text. A callback can observe
   * even an empty argument, and a markup stream can close a pending tag. */

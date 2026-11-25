@@ -39,10 +39,17 @@ try:
                 if v!='base':
                     guard=json.loads(out(w/'domain',w/'base.so',output,w))
                     assert guard==rd(r/'local-expectations.json')['domain']
-                    run('clang','-std=gnu99','-O2','-DCAPSTONE_HAS_ARM','-DCAPSTONE_USE_SYS_DYN_MEM','-DTEST_PAIR='+str(int(v=='outlined')),'-I',src,'-I',src/'include',r/'stream.c',lib,'-o',w/'stream')
+                    run('clang','-std=gnu99','-O2','-DCAPSTONE_HAS_ARM','-DCAPSTONE_USE_SYS_DYN_MEM','-DCAPSTONE_ARM_ONLY','-DTEST_PAIR=0','-I',src,'-I',src/'include',r/'stream.c',lib,'-o',w/'stream')
                     stream=list(map(int,out(w/'stream').split()))
                     assert stream==rd(r/'local-expectations.json')['stream'];guards[v]=dict(stream=stream,domain=guard)
         save('products',products)
+    arch='arm64' if os.uname().machine=='aarch64' else 'amd64'
+    prior=rd(r/'reproducible-products.json')[arch]
+    for name,items in products.items():
+        for v,row in items.items():
+            direct=name=='standalone' and v!='base' or v=='outlined' and arch=='amd64'
+            want='candidate' if direct else 'base'
+            assert prior[name][want]=={key:row[key]for key in ('archive','driver')},(name,v,want,prior[name][want],row['archive'],row['driver'])
     save('guards',guards)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});save('host',dict(cpu=out('lscpu'),compiler=out('clang','--version')))
     for name,(_,stage) in stages.items():

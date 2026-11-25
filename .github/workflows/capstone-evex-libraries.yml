@@ -1,7 +1,7 @@
-name: Measure ARM formatting in verified executable extents from four Debian binaries
+name: Verify measured ARM-only and mixed formatter output, binary identities, and genuine executable instructions
 on:
   push:
-    branches: [codex/arm-native-punctuation-and-memory-markup]
+    branches: [codex/arm-printf-punctuation-profile-selection]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-punctuation-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm-literal-release-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -1,5 +1,47 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 396ab047..4f0a7438 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -161,6 +161,7 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
++    add_compile_definitions(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
+     # Linux x86-64 retains its inlined initialization for MIPS text throughput.
+     if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
+@@ -175,7 +176,7 @@ if(capstone_enabled_architectures STREQUAL "XCORE")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "ARM")
+-    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "MIPS")
+diff --git a/Makefile b/Makefile
+index fb13d941..48239585 100644
+--- a/Makefile
++++ b/Makefile
+@@ -122,6 +122,7 @@ CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
+ else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
+ CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
+ else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
++CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
+ # Use the compiler target, including cross builds.
+ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
+ 	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+@@ -135,7 +136,7 @@ endif
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
+-CFLAGS += -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
++CFLAGS += -DCAPSTONE_ARM_ONLY -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index 37012242..9bd0a1df 100644
+index 37012242..26a96fff 100644
 --- a/arch/ARM/ARMInstPrinter.c
 +++ b/arch/ARM/ARMInstPrinter.c
 @@ -219,7 +219,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
@@ -105,12 +147,7 @@ index 37012242..9bd0a1df 100644
  	SStream_concat0(O, markup(">"));
  }
  
-@@ -1035,11 +1035,11 @@ static inline void printThumbAddrModeImm5SOperand(MCInst *MI, unsigned Op,
- 	printRegName(O, MCOperand_getReg(MO1));
- 	unsigned ImmOffs = MCOperand_getImm(MO2);
- 	if (ImmOffs) {
--		SStream_concat(O, "%s%s", ", ", markup("<imm:"));
-+		SStream_concat2(O, ", ", markup("<imm:"));
+@@ -1039,7 +1039,7 @@ static inline void printThumbAddrModeImm5SOperand(MCInst *MI, unsigned Op,
  		printUInt32Bang(O, ImmOffs * Scale);
  		SStream_concat0(O, markup(">"));
  	}
@@ -119,17 +156,7 @@ index 37012242..9bd0a1df 100644
  	SStream_concat0(O, markup(">"));
  }
  
-@@ -1117,15 +1117,15 @@ static inline void printT2SOOperand(MCInst *MI, unsigned OpNum, SStream *O)
- 		if (OffImm == INT32_MIN) \
- 			OffImm = 0; \
- 		if (isSub) { \
--			SStream_concat(O, "%s%s", ", ", markup("<imm:")); \
-+			SStream_concat2(O, ", ", markup("<imm:")); \
- 			printInt32Bang(O, OffImm); \
- 			SStream_concat0(O, markup(">")); \
- 		} else if (AlwaysPrintImm0 || OffImm > 0) { \
--			SStream_concat(O, "%s%s", ", ", markup("<imm:")); \
-+			SStream_concat2(O, ", ", markup("<imm:")); \
+@@ -1125,7 +1125,7 @@ static inline void printT2SOOperand(MCInst *MI, unsigned OpNum, SStream *O)
  			printInt32Bang(O, OffImm); \
  			SStream_concat0(O, markup(">")); \
  		} \
@@ -138,17 +165,7 @@ index 37012242..9bd0a1df 100644
  		SStream_concat0(O, markup(">")); \
  	}
  DEFINE_printAddrModeImm12Operand(false);
-@@ -1153,15 +1153,15 @@ DEFINE_printAddrModeImm12Operand(true);
- 		if (OffImm == INT32_MIN) \
- 			OffImm = 0; \
- 		if (isSub) { \
--			SStream_concat(O, "%s%s", ", ", markup("<imm:")); \
-+			SStream_concat2(O, ", ", markup("<imm:")); \
- 			printInt32Bang(O, OffImm); \
- 			SStream_concat0(O, markup(">")); \
- 		} else if (AlwaysPrintImm0 || OffImm > 0) { \
--			SStream_concat(O, "%s%s", ", ", markup("<imm:")); \
-+			SStream_concat2(O, ", ", markup("<imm:")); \
+@@ -1161,7 +1161,7 @@ DEFINE_printAddrModeImm12Operand(true);
  			printInt32Bang(O, OffImm); \
  			SStream_concat0(O, markup(">")); \
  		} \
@@ -157,17 +174,7 @@ index 37012242..9bd0a1df 100644
  		SStream_concat0(O, markup(">")); \
  	}
  DEFINE_printT2AddrModeImm8Operand(true);
-@@ -1195,15 +1195,15 @@ DEFINE_printT2AddrModeImm8Operand(false);
- 		if (OffImm == INT32_MIN) \
- 			OffImm = 0; \
- 		if (isSub) { \
--			SStream_concat(O, "%s%s", ", ", markup("<imm:")); \
-+			SStream_concat2(O, ", ", markup("<imm:")); \
- 			printInt32Bang(O, OffImm); \
- 			SStream_concat0(O, markup(">")); \
- 		} else if (AlwaysPrintImm0 || OffImm > 0) { \
--			SStream_concat(O, "%s%s", ", ", markup("<imm:")); \
-+			SStream_concat2(O, ", ", markup("<imm:")); \
+@@ -1203,7 +1203,7 @@ DEFINE_printT2AddrModeImm8Operand(false);
  			printInt32Bang(O, OffImm); \
  			SStream_concat0(O, markup(">")); \
  		} \
@@ -176,12 +183,7 @@ index 37012242..9bd0a1df 100644
  		SStream_concat0(O, markup(">")); \
  	}
  
-@@ -1222,11 +1222,11 @@ static inline void printT2AddrModeImm0_1020s4Operand(MCInst *MI, unsigned OpNum,
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	if (MCOperand_getImm(MO2)) {
--		SStream_concat(O, "%s%s", ", ", markup("<imm:"));
-+		SStream_concat2(O, ", ", markup("<imm:"));
+@@ -1226,7 +1226,7 @@ static inline void printT2AddrModeImm0_1020s4Operand(MCInst *MI, unsigned OpNum,
  		printInt64Bang(O, (int32_t)(MCOperand_getImm(MO2) * 4));
  		SStream_concat0(O, markup(">"));
  	}
@@ -218,43 +220,35 @@ index 37012242..9bd0a1df 100644
  		   (int32_t)MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
  	SStream_concat0(O, "]");
 diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
-index 98805f06..2c43780a 100644
+index 98805f06..4c131ea6 100644
 --- a/arch/ARM/ARMMapping.h
 +++ b/arch/ARM/ARMMapping.h
-@@ -22,15 +22,26 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
+@@ -22,6 +22,25 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
  // return name of register in friendly string
  const char *ARM_reg_name(csh handle, unsigned int reg);
  
 +/* Formatted single-character literals preserve the original %s call for
 + * applications that install a formatter through CS_OPT_MEM. */
-+static inline void ARM_printFormattedChar(SStream *O, const char *literal)
-+{
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
++	!defined(_WIN32_WCE) && defined(__linux__) && defined(__clang__) && \
++	((defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__))) || \
++	 (defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && defined(__x86_64__)))
++static inline void ARM_printFormattedChar(SStream *O, const char *literal)
++{
 +	if (cs_vsnprintf == cs_default_vsnprintf) {
 +		SStream_concat1(O, literal[0]);
 +		return;
 +	}
-+#endif
 +	SStream_concat(O, "%s", literal);
 +}
++#else
++#define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
++#endif
 +
  /* A disabled markup tag contributes no text. A callback can observe
   * even an empty argument, and a markup stream can close a pending tag. */
--#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
--	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
--#define CAPSTONE_ARM_FORMAT_MARKUP
--#endif
--#if defined(CAPSTONE_ARM_FORMAT_MARKUP) && !defined(CAPSTONE_DIET) && \
--	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
--	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
- static inline void ARM_printMarkup(SStream *O, const char *tag)
- {
- 	const char *text = markup(tag);
+ #if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
 index 5eb4f77d..74b6dc6e 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
