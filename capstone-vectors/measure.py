@@ -72,6 +72,12 @@ try:
         actual=get(w/'offset-unit');target=rd(r/'offset-expected.json')['base' if label=='base'else 'fixed']
         assert actual==target and len(actual.splitlines())==48,label
         save('offsets-'+label,actual.splitlines())
+        if label!='base':
+            run('clang','-std=c11','-O2','-I',base/'include',r/'transitions.c',lib,'-o',w/'transitions')
+            count=int(get(w/'transitions'))
+            assert count==1600
+            save('transitions-'+label,{'checked':count})
+
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)

@@ -1,7 +1,7 @@
-name: Measure the decoded absolute address width carried in existing x86 printer flags
+name: Verify default and changing x86 effective address sizes and measure two printer implementations
 on:
   push:
-    branches: [codex/x86-decoded-flags-absolute-address]
+    branches: [codex/x86-absolute-offset-mode-transitions]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: decoded-offset-flags-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mode-offset-printers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

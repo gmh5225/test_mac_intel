@@ -13,36 +13,17 @@ index 1cc3d3a9..34666027 100644
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
-diff --git a/arch/X86/X86BaseInfo.h b/arch/X86/X86BaseInfo.h
-index f5485a3b..fa801847 100644
---- a/arch/X86/X86BaseInfo.h
-+++ b/arch/X86/X86BaseInfo.h
-@@ -48,4 +48,7 @@ enum IPREFIXES {
- 	X86_IP_HAS_NOTRACK = 64
- };
- 
-+/* Bits above the printer prefix flags carry the effective address size in bytes. */
-+#define X86_IP_ADDRESS_SIZE_SHIFT 8
-+
- #endif
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..a12bd17f 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -715,7 +715,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			}
- #endif
- 
--			instr->flags = Flags;
-+			instr->flags = Flags | ((unsigned)insn.addressSize << X86_IP_ADDRESS_SIZE_SHIFT);
- 		}
- 
- 		return result;
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..78ba0cf5 100644
+index 457485ab..3cfb3a78 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -1236,9 +1236,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -1232,13 +1232,12 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				}
+ 			} else {
+ 				// memory reference to an immediate address
+-				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
++				if (x86_has_feature(MI->csh->mode, CS_MODE_64) ||
++				    !x86_get_bit_mode(MI->csh->mode))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
  					printImm(MI, O,
@@ -54,23 +35,16 @@ index 457485ab..78ba0cf5 100644
  				} else {
  					printImm(MI, O, DispVal, true);
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..1a3ed5ef 100644
+index 380faa79..a65ef7ea 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -6,6 +6,7 @@
- 
- #include "capstone/capstone.h"
- #include "../../cs_priv.h"
-+#include "X86BaseInfo.h"
- 
- // map instruction to its characteristics
- typedef struct insn_map_x86 {
-@@ -154,13 +155,15 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,13 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* Truncate an absolute offset to the address width chosen by the decoder. */
++/* Address-size override affects rendering of a displacement used as the
++ * entire address. Keep the signed displacement in operand detail. */
 +static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
  {
 -	if (x86_has_feature(mode, CS_MODE_16))
@@ -78,20 +52,71 @@ index 380faa79..1a3ed5ef 100644
 -	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+	const unsigned address_size = mi->flags >> X86_IP_ADDRESS_SIZE_SHIFT;
-+	if (address_size == 2)
-+		return (uint16_t)disp;
-+	if (address_size == 4)
-+		return (uint32_t)disp;
-+	return (uint64_t)disp;
++	const unsigned has_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
++	return (uint64_t)disp &
++	       (UINT64_MAX >> mi->csh->x86_address_shift[has_override]);
  }
  
  #endif
+diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
+index 6fcbe3f4..b8295a0a 100644
+--- a/arch/X86/X86Module.c
++++ b/arch/X86/X86Module.c
+@@ -10,6 +10,21 @@
+ #include "X86Mapping.h"
+ #include "X86Module.h"
+ 
++/* Select the same mode precedence as the instruction decoder. */
++static void setAddressShifts(cs_struct *handle)
++{
++	if (x86_has_feature(handle->mode, CS_MODE_16)) {
++		handle->x86_address_shift[0] = 64 - 16;
++		handle->x86_address_shift[1] = 64 - 32;
++	} else if (x86_has_feature(handle->mode, CS_MODE_32)) {
++		handle->x86_address_shift[0] = 64 - 32;
++		handle->x86_address_shift[1] = 64 - 16;
++	} else {
++		handle->x86_address_shift[0] = 0;
++		handle->x86_address_shift[1] = 64 - 32;
++	}
++}
++
+ cs_err X86_global_init(cs_struct *ud)
+ {
+ 	MCRegisterInfo *mri;
+@@ -42,6 +57,7 @@ cs_err X86_global_init(cs_struct *ud)
+ 	else
+ 		ud->regsize_map = regsize_map_32;
+ 
++	setAddressShifts(ud);
+ 	X86_build_lookup_tables(ud);
+ 
+ 	return CS_ERR_OK;
+@@ -65,6 +81,7 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		handle->mode = (cs_mode)(value &
+ 					 (CS_MODE_16 | CS_MODE_32 | CS_MODE_64 |
+ 					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
++		setAddressShifts(handle);
+ 		break;
+ 	case CS_OPT_SYNTAX:
+ 		switch (value) {
+diff --git a/cs_priv.h b/cs_priv.h
+index 19ecedba..d3416bb5 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -142,6 +142,7 @@ struct cs_struct {
+ 	bool no_text; // CS_OPT_TEXT is off: instructions are not printed
+ 	bool skipdata; // set this to True if we skip data when disassembling
+ 	uint8_t skipdata_size; // how many bytes to skip
++	uint8_t x86_address_shift[2]; // without and with address-size override
+ 	cs_opt_skipdata skipdata_setup; // user-defined skipdata setup
+ 	const uint8_t *regsize_map; // map to register size (x86-only for now)
+ 	GetRegisterAccess_t reg_access;
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
-index cfd13cba..3b436991 100644
+index cfd13cba..fe231be4 100644
 --- a/tests/unit/x86_legacy_address_size.c
 +++ b/tests/unit/x86_legacy_address_size.c
-@@ -279,9 +279,56 @@ static bool check_other_opcodes(void)
+@@ -279,9 +279,59 @@ static bool check_other_opcodes(void)
  	return ok;
  }
  
@@ -109,6 +134,9 @@ index cfd13cba..3b436991 100644
 +		  5, "eax, dword ptr [0x8234]", "0x8234, %eax" },
 +		{ CS_MODE_64, { 0x67, 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
 +		  8, "eax, dword ptr [0x80001234]", "0x80001234, %eax" },
++		/* With no bitness flag the decoder selects 64-bit addressing. */
++		{ (cs_mode)0, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
 +		{ CS_MODE_64, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
 +		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
 +	};
