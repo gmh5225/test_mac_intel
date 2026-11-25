@@ -1,7 +1,7 @@
-name: Measure the cost of the dependent MIPS spelling lookup against two direct register layouts
+name: Measure direct numeric MIPS register writes with unmodified default name lookup and test every syntax
 on:
   push:
-    branches: [codex/mips-direct-register-name-records]
+    branches: [codex/mips-numeric-whole-register]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: direct-mips-name-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-numeric-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
