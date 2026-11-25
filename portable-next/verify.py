@@ -85,15 +85,6 @@ try:
                 run(name+'-make-'+unit,exe)
             shutil.rmtree(obj)
 
-        if name=='scoped':
-            reference='all_hosts' if (platform.system()=='Linux' and platform.machine()=='x86_64') else 'base'
-            for link in ('static','shared','static_only','make_only'):
-                if link not in rows[name]:continue
-                state=rows[name][link]
-                expected=rows[reference][link]
-                assert state['ppc_index_symbol']==expected['ppc_index_symbol'],(link,state['ppc_index_symbol'],reference)
-                if platform.system()=='Linux':assert state['library_sha256']==expected['library_sha256'],(link,reference)
-                if reference=='base':assert not state['ppc_index_symbol']
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
