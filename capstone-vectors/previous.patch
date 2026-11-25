@@ -1,75 +1,3 @@
-diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
-index e1790f39..edbdccb0 100644
---- a/arch/RISCV/RISCVDisassembler.c
-+++ b/arch/RISCV/RISCVDisassembler.c
-@@ -40,6 +40,7 @@
- #include "RISCVDisassemblerExtension.h"
- #include "RISCVBaseInfo.h"
- #include "RISCVMapping.h"
-+#include "RISCVLinkage.h"
- 
- #define GET_REGINFO_ENUM
- #include "RISCVGenRegisterInfo.inc"
-@@ -788,10 +789,17 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
- 	return MCDisassembler_Fail;
- }
- 
-+#include "RISCVScan.h"
-+
- bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
- 			       MCInst *MI, uint16_t *Size, uint64_t Address,
- 			       void *Info)
- {
-+#ifndef CAPSTONE_RISCV_ONLY
-+	/* A mixed build keeps the choice inside the RISC-V backend. */
-+	if (canScan(MI->csh) && tryScanInstruction(Bytes, ByteLen, MI, Size))
-+		return true;
-+#endif
- 	RISCV_init_cs_detail(MI);
- 	MI->MRI = (MCRegisterInfo *)Info;
- 	DecodeStatus ret =
-@@ -803,7 +811,3 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
- 
- 	return ret != MCDisassembler_Fail;
- }
--
--#ifdef CAPSTONE_RISCV_ONLY
--#include "RISCVScan.h"
--#endif
-diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
-index b10db879..75ea6703 100644
---- a/arch/RISCV/RISCVGenDirectDecoder.inc
-+++ b/arch/RISCV/RISCVGenDirectDecoder.inc
-@@ -17240,17 +17240,16 @@ Decode:
- 	return decodeToMCInst_2(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
- }
- 
--#ifdef CAPSTONE_RISCV_ONLY
--static const uint16_t RISCVScanOpcodes[32][8] = {
--	{ 12094, 12097, 12108, 0, 12095, 12098, 0, 0 },
-+static const int16_t RISCVScanOpcodes[32][8] = {
-+	{ 12094, 12097, 12108, -12096, 12095, 12098, -12109, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 11276, 0, 12225, 12226, 13084, 0, 0, 11380 },
- 	{ 11382, 11382, 11382, 11382, 11382, 11382, 11382, 11382 },
-+	{ -11277, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
--	{ 0, 0, 0, 0, 0, 0, 0, 0 },
--	{ 12182, 12197, 12254, 0, 0, 0, 0, 0 },
-+	{ 12182, 12197, 12254, -12191, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
-@@ -17275,7 +17274,6 @@ static const uint16_t RISCVScanOpcodes[32][8] = {
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
- };
--#endif
- 
- #define RISCV_EXTENSION_MAJORS UINT32_C(0x405f0c04)
- 
 diff --git a/arch/RISCV/RISCVGenGPRNames.inc b/arch/RISCV/RISCVGenGPRNames.inc
 new file mode 100644
 index 00000000..301944f7
@@ -152,7 +80,7 @@ index 00000000..301944f7
 +	},
 +};
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index f778e3b7..a16fa11c 100644
+index f778e3b7..ea726367 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
 @@ -57,7 +57,7 @@ static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
@@ -164,7 +92,7 @@ index f778e3b7..a16fa11c 100644
  static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
  // Include the auto-generated portion of the assembly writer.
  #define PRINT_ALIAS_INSTR
-@@ -68,11 +68,10 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
+@@ -68,12 +68,6 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
  #include "RISCVGenAsmWriter.inc"
  #undef matchAliasPatterns
  
@@ -173,55 +101,42 @@ index f778e3b7..a16fa11c 100644
 -// TODO: Make RISCVInstPrinter_doGetRegisterName non-static so that this can a
 -// member.
 -static bool ArchRegNames;
-+static inline bool useArchRegNames(const cs_struct *handle)
-+{
-+	return handle->syntax & CS_OPT_SYNTAX_NOREGNAME;
-+}
- 
+-
  static bool isRealSyntax(const MCInst *MI)
  {
-@@ -107,15 +106,35 @@ static bool isAliasDetail(const MCInst *MI)
+ 	return MI->csh->syntax & CS_OPT_SYNTAX_REAL;
+@@ -107,15 +101,23 @@ static bool isAliasDetail(const MCInst *MI)
  		 (CS_OPT_DETAIL_REAL | CS_OPT_DETAIL_UNCOMPRESSED_REAL));
  }
  
 -const char *doGetRegisterName(MCRegister Reg)
+-{
+-	return getRegisterName(Reg, ArchRegNames ? RISCV_NoRegAltName :
+-						   RISCV_ABIRegAltName);
+-}
 +#ifndef CAPSTONE_DIET
 +#include "RISCVGenGPRNames.inc"
 +#endif
-+
-+static inline const char *regName(const cs_struct *handle, unsigned int reg)
- {
--	return getRegisterName(Reg, ArchRegNames ? RISCV_NoRegAltName :
--						   RISCV_ABIRegAltName);
-+	return getRegisterName(reg, useArchRegNames(handle) ?
-+					    RISCV_NoRegAltName :
-+					    RISCV_ABIRegAltName);
- }
  
 -static inline void printRegName(SStream *O, MCRegister Reg)
-+const char *RISCV_reg_name(csh handle, unsigned int reg)
++static inline void printRegName(const MCInst *MI, SStream *O, MCRegister Reg)
  {
 -	SStream_concat0(markup_OS(O, Markup_Register), doGetRegisterName(Reg));
-+	return regName((const cs_struct *)(uintptr_t)handle, reg);
-+}
-+
-+static inline void printRegName(const MCInst *MI, SStream *O, MCRegister Reg)
-+{
 +	SStream *out = O->markup_stream ? markup_OS(O, Markup_Register) : O;
 +#ifndef CAPSTONE_DIET
 +	unsigned index = (unsigned)Reg - RISCV_X0;
 +	if (index < ARR_SIZE(riscv_gpr_names[0])) {
 +		const struct RISCVGPRName *name =
-+			&riscv_gpr_names[useArchRegNames(MI->csh)][index];
++			&riscv_gpr_names[RISCV_useNumericRegisterNames(MI->csh)][index];
 +		SStream_concat0_small(out, name->text, name->length);
 +		return;
 +	}
 +#endif
-+	SStream_concat0(out, regName(MI->csh, Reg));
++	SStream_concat0(out, RISCV_reg_name((csh)(uintptr_t)MI->csh, Reg));
  }
  
  bool haveRequiredFeatures(const RISCV_SysReg *Reg, MCInst *MI)
-@@ -135,7 +154,7 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -135,7 +137,7 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  	MCOperand *MO = MCInst_getOperand(MI, (OpNo));
  
  	if (MCOperand_isReg(MO)) {
@@ -230,7 +145,7 @@ index f778e3b7..a16fa11c 100644
  		return;
  	}
  
-@@ -258,7 +277,7 @@ void printZeroOffsetMemOp(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -258,7 +260,7 @@ void printZeroOffsetMemOp(MCInst *MI, unsigned OpNo, SStream *O)
  	CS_ASSERT(MCOperand_isReg(MO) &&
  		  "printZeroOffsetMemOp can only print register operands");
  	SStream_concat0(O, "(");
@@ -239,11 +154,11 @@ index f778e3b7..a16fa11c 100644
  	SStream_concat0(O, ")");
  }
  
-@@ -281,41 +300,42 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -281,41 +283,42 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
  {
  	RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Rlist, OpNo);
  	unsigned Imm = MCOperand_getImm(MCInst_getOperand(MI, (OpNo)));
-+	const bool numeric = useArchRegNames(MI->csh);
++	const bool numeric = RISCV_useNumericRegisterNames(MI->csh);
  	SStream_concat0(O, "{");
  	switch (Imm) {
  	case RISCVZC_RLISTENCODE_RA:
@@ -292,7 +207,7 @@ index f778e3b7..a16fa11c 100644
  			SStream_concat0(O, ", ");
  			SStream_concat0(markup_OS(O, Markup_Register), "x18");
  		}
-@@ -329,13 +349,13 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -329,13 +332,13 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
  	case RISCVZC_RLISTENCODE_RA_S0_S9:
  	case RISCVZC_RLISTENCODE_RA_S0_S11:
  		SStream_concat0(markup_OS(O, Markup_Register),
@@ -309,16 +224,16 @@ index f778e3b7..a16fa11c 100644
  			SStream_concat0(markup_OS(O, Markup_Register), "x9");
  			SStream_concat0(O, ", ");
  			SStream_concat0(markup_OS(O, Markup_Register), "x18");
-@@ -343,7 +363,7 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -343,7 +346,7 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
  		}
  		SStream_concat0(
  			markup_OS(O, Markup_Register),
 -			doGetRegisterName(
-+			regName(MI->csh,
++			RISCV_reg_name((csh)(uintptr_t)MI->csh,
  				RISCV_X19 +
  				(Imm == RISCVZC_RLISTENCODE_RA_S0_S11 ?
  					 8 :
-@@ -364,13 +384,13 @@ void printRegReg(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -364,13 +367,13 @@ void printRegReg(MCInst *MI, unsigned OpNo, SStream *O)
  		  "printRegReg can only print register operands");
  	if (MCOperand_getReg(MO) == RISCV_NoRegister)
  		return;
@@ -334,7 +249,7 @@ index f778e3b7..a16fa11c 100644
  	SStream_concat0(O, ")");
  }
  
-@@ -403,23 +423,17 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -403,23 +406,17 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
  	if (MCOperand_getReg(MO) == RISCV_NoRegister)
  		return;
  	SStream_concat0(O, ", ");
@@ -359,7 +274,7 @@ index f778e3b7..a16fa11c 100644
  	return printAliasInstr(MI, MI->address, O);
  }
  
-@@ -434,14 +448,8 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+@@ -434,14 +431,8 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
  	MI->flat_insn->usesAliasDetails = usesAliasDetails;
  
  	MCInst Uncompressed;
@@ -374,7 +289,7 @@ index f778e3b7..a16fa11c 100644
  	MCInst *MIUncompressed = MI;
  	bool is_uncompressed = false;
  
-@@ -453,6 +461,7 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+@@ -453,6 +444,7 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
  		// uncompressed instruction in case of returning true
  		// False means no side effect happened
  		// (LLVM doesn't have an API for doing a pure check)
@@ -382,7 +297,7 @@ index f778e3b7..a16fa11c 100644
  		if (uncompressInst(&Uncompressed, MI)) {
  			MIUncompressed = &Uncompressed;
  			Uncompressed.address = MI->address;
-@@ -491,13 +500,11 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+@@ -491,13 +483,11 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
  		}
  	}
  
@@ -397,189 +312,36 @@ index f778e3b7..a16fa11c 100644
  	bool textAndDetailModesMatch = (isRealSyntax(MI) && isRealDetail(MI)) ||
  				       (isUncompressedRealSyntax(MI) &&
 diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
-index a3e2892f..00075117 100644
+index a3e2892f..d07232c9 100644
 --- a/arch/RISCV/RISCVMapping.c
 +++ b/arch/RISCV/RISCVMapping.c
-@@ -30,16 +30,6 @@
+@@ -32,9 +32,7 @@
  
- #include "RISCVInstPrinter.h"
- 
--const char *RISCV_reg_name(csh handle, unsigned int reg)
--{
+ const char *RISCV_reg_name(csh handle, unsigned int reg)
+ {
 -	int syntax_opt = ((cs_struct *)(uintptr_t)handle)->syntax;
 -
 -	if (syntax_opt & CS_OPT_SYNTAX_NOREGNAME) {
--		return RISCV_LLVM_getRegisterName(reg, RISCV_NoRegAltName);
--	}
--	return RISCV_LLVM_getRegisterName(reg, RISCV_ABIRegAltName);
--}
--
- static const insn_map insns[] = {
- #include "RISCVGenCSMappingInsn.inc"
- };
-@@ -141,7 +131,7 @@ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
- 		return;
++	if (RISCV_useNumericRegisterNames((const cs_struct *)(uintptr_t)handle)) {
+ 		return RISCV_LLVM_getRegisterName(reg, RISCV_NoRegAltName);
  	}
- 	cs_riscv_op *op = RISCV_get_detail_op_at(MI, OpNum);
--#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
-+#ifndef CAPSTONE_DIET
- 	/* Type and access come from one generated operand. Only a tied
- 	 * operand can change the access recorded in that entry. */
- 	assert(MI->Opcode < ARR_SIZE(insn_operands));
-diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
-index 14362d77..6d999f96 100644
---- a/arch/RISCV/RISCVScan.h
-+++ b/arch/RISCV/RISCVScan.h
-@@ -62,15 +62,13 @@ static unsigned scanCompressedOpcode(uint16_t word, cs_mode mode)
+ 	return RISCV_LLVM_getRegisterName(reg, RISCV_ABIRegAltName);
+diff --git a/arch/RISCV/RISCVMapping.h b/arch/RISCV/RISCVMapping.h
+index 2b77a303..34f65b90 100644
+--- a/arch/RISCV/RISCVMapping.h
++++ b/arch/RISCV/RISCVMapping.h
+@@ -21,6 +21,11 @@ const char *RISCV_insn_name(csh handle, unsigned int id);
  
- #endif
+ const char *RISCV_group_name(csh handle, unsigned int id);
  
--/* The scanner is selected for little-endian, non-E modes without output.
-- * Its generated rows contain only instructions unaffected by the unread bits. */
--static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
--			       MCInst *inst, uint16_t *size, uint64_t address,
--			       void *info)
-+/* The caller has selected a little-endian, non-E scan without text. */
-+static inline bool tryScanInstruction(const uint8_t *code, size_t length,
-+				      MCInst *inst, uint16_t *size)
- {
- #ifndef CAPSTONE_DIET
- 	if (length < 2 || inst->flat_insn->detail)
--		goto full;
-+		return false;
- 	if ((code[0] & 3) != 3) {
- 		const uint16_t word = code[0] | ((uint16_t)code[1] << 8);
- 		const unsigned opcode = scanCompressedOpcode(word, inst->csh->mode);
-@@ -81,24 +79,43 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
- 			*size = 2;
- 			return true;
- 		}
--		goto full;
-+		return false;
- 	}
- 	if (length >= 4) {
- #else
- 	if (length >= 4 && (code[0] & 3) == 3 && !inst->flat_insn->detail) {
- #endif
--		/* Only base encodings with unconditional GPR and immediate
--		 * operands reach this row. Feature predicates, reserved fields
--		 * and overlapping extension tables keep the full decoder. */
--		const unsigned opcode =
-+		/* The table proves the operand readers cannot fail. Negative rows
-+		 * additionally require a 64-bit hart. */
-+		int opcode =
- 			RISCVScanOpcodes[(code[0] & 0x7f) >> 2][(code[1] >> 4) & 7];
--		if (!opcode)
--			goto full;
--		MCInst_setOpcode(inst, opcode);
-+		if (opcode <= 0) {
-+			if (!opcode || !RISCV_getFeatureBits(inst->csh->mode,
-+							     RISCV_Feature64Bit))
-+				return false;
-+			opcode = -opcode;
-+		}
-+		MCInst_setOpcode(inst, (unsigned)opcode);
- 		*size = 4;
- 		return true;
- 	}
--full:
-+	return false;
++static inline bool RISCV_useNumericRegisterNames(const cs_struct *handle)
++{
++	return handle->syntax & CS_OPT_SYNTAX_NOREGNAME;
 +}
 +
-+static inline bool canScan(const cs_struct *handle)
-+{
-+	return handle->no_text && !handle->detail_opt &&
-+	       !(handle->mode & CS_MODE_BIG_ENDIAN) &&
-+	       !RISCV_getFeatureBits(handle->mode, RISCV_FeatureRVE);
-+}
-+
-+#ifdef CAPSTONE_RISCV_ONLY
-+static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
-+			       MCInst *inst, uint16_t *size, uint64_t address,
-+			       void *info)
-+{
-+	if (tryScanInstruction(code, length, inst, size))
-+		return true;
- 	return RISCV_LLVM_getInstruction(handle, code, length, inst, size,
- 					 address, info);
- }
-@@ -107,13 +124,11 @@ void RISCV_selectScanDecoder(cs_struct *handle)
- {
- 	if (handle->disasm == RISCV_LLVM_getInstruction ||
- 	    handle->disasm == getScanInstruction) {
--		const bool scan = handle->no_text && !handle->detail_opt &&
--				  !(handle->mode & CS_MODE_BIG_ENDIAN) &&
--				  !RISCV_getFeatureBits(handle->mode,
--							RISCV_FeatureRVE);
--		handle->disasm = scan ? getScanInstruction :
--					RISCV_LLVM_getInstruction;
-+		handle->disasm = canScan(handle) ? getScanInstruction :
-+						  RISCV_LLVM_getInstruction;
- 	}
- }
+ const char *RISCV_reg_name(csh handle, unsigned int reg);
  
-+#endif /* CAPSTONE_RISCV_ONLY */
-+
- #endif
-diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
-index 09bd1aa7..a42cf3dd 100644
---- a/suite/synctools/fixed_len_decoder.py
-+++ b/suite/synctools/fixed_len_decoder.py
-@@ -380,10 +380,10 @@ def riscv_scan_decoders(text):
-     return result
- 
- 
--def riscv_scan_opcodes(nodes, decoders, extension_majors):
-+def riscv_scan_opcodes(nodes, decoders, extension_majors, rv64_predicate):
-     """Resolve the base row only if opcode and funct3 determine every decision."""
-     known = 0x707f
--    def resolve(major, funct3):
-+    def resolve(major, funct3, rv64):
-         if extension_majors & (1 << major):
-             return 0
-         word = (major << 2) | 3 | (funct3 << 12)
-@@ -402,17 +402,21 @@ def riscv_scan_opcodes(nodes, decoders, extension_majors):
-                     pos = n.end if value == n.args[2] else n.target
-                 else:
-                     field, pos = value, n.end
-+            elif n.op == "CheckPredicate" and rv64 and n.args[0] == rv64_predicate:
-+                pos = n.end
-             elif n.op == "FilterValue":
-                 pos = n.end if field == n.args[0] else n.target
-             else:
-                 return 0
- 
--    rows = [[resolve(major, f) for f in range(8)] for major in range(32)]
--    require(max(max(row) for row in rows) <= 0xffff, "RISC-V scan opcode exceeds table width")
--    return "\n".join(["#ifdef CAPSTONE_RISCV_ONLY",
--                      "static const uint16_t RISCVScanOpcodes[32][8] = {",
-+    # A negative row can bypass the full decoder only when XLEN is 64.
-+    rows = [[resolve(major, f, False) or -resolve(major, f, True)
-+             for f in range(8)] for major in range(32)]
-+    require(all(abs(opcode) <= 0x7fff for row in rows for opcode in row),
-+            "RISC-V scan opcode exceeds the signed table width")
-+    return "\n".join(["static const int16_t RISCVScanOpcodes[32][8] = {",
-                       *["\t{ " + ", ".join(map(str, row)) + " }," for row in rows],
--                      "};", "#endif"])
-+                      "};"])
- 
- 
- def main():
-@@ -472,7 +476,13 @@ def main():
-             output.append(emit(name, nodes, width, w, arch == "RISCV" and name == "DecoderTable16"))
-             counts.append((name, len(nodes)))
-         if arch == "RISCV":
--            output.append(riscv_scan_opcodes(riscv_base, riscv_scan_decoders(text), extension_majors))
-+            predicates = re.findall(
-+                r"case (\d+):\s*return \(RISCV_getFeatureBits\(Inst->csh->mode, RISCV_Feature64Bit\)\);",
-+                text,
-+            )
-+            require(len(predicates) == 1, "Expected one RISC-V XLEN64 predicate")
-+            output.append(riscv_scan_opcodes(riscv_base, riscv_scan_decoders(text),
-+                                             extension_majors, int(predicates[0])))
-             output.append(
-                 f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
-             )
+ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum);
 diff --git a/suite/synctools/riscv_gpr_names.py b/suite/synctools/riscv_gpr_names.py
 new file mode 100644
 index 00000000..1ecd3d23
