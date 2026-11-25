@@ -1,7 +1,7 @@
-name: Build NeverD and LLVM from source for i386 register and mixed public record paths
+name: Measure PowerPC alias resolution in NeverD with LLVM main built from source
 on:
   push:
-    branches: [codex/linux-public-and-group3-neverd-product]
+    branches: [codex/ppc-alias-neverd-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 961146191161cfb1dc1584a1e9c8946d2166ad45
+          ref: b26e3812d16e6962f90153a677c6e1e5466d0e88
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,11 +51,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "961146191161cfb1dc1584a1e9c8946d2166ad45"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "b7a40bec54cdcb46fd6555b3335e3965a06a3740"
+          test "$(git rev-parse HEAD)" = "b26e3812d16e6962f90153a677c6e1e5466d0e88"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin b7a40bec54cdcb46fd6555b3335e3965a06a3740
-          git -C third_party/capstone checkout --detach b7a40bec54cdcb46fd6555b3335e3965a06a3740
+          git -C third_party/capstone fetch --depth=1 origin 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
+          git -C third_party/capstone checkout --detach 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scoped-group3-public-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: ppc-alias-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

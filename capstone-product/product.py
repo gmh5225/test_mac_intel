@@ -21,8 +21,17 @@ try:
     build=t/'build';cases=corpus.prepare(r,t,out,command)
     foreign=[z for z in cases if z['name'].startswith(('arm64-','mips64el-'))]
     selected={'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','arm-ls','ppc64el-ls','riscv64-ls'}
+    selected.update(('ppc64el-cp','ppc64el-sort'))
     cases=[c for c in cases if c['name'] in selected]
     assert {c['name']for c in cases}==selected
+    specs=json.loads((r/'ppc-samples.json').read_text())['fixtures']
+    ls=next(c for c in cases if c['name']=='ppc64el-ls')
+    cat=specs['ppc64el-cat'];pkg=t/'corpus'/ls['package_sha256']
+    assert sha(pkg)==cat['package']
+    cat_text=t/'ppc64el-cat.text';cat_text.write_bytes(corpus.elf_text(corpus.deb_binary(pkg,'cat')))
+    cases.append(dict(name='ppc64el-cat',path=str(cat_text),selector=3,text_sha256=sha(cat_text)))
+    assert all(next(c['text_sha256'] for c in cases if c['name']==n)==v['sha256'] for n,v in specs.items())
+    save('ppc-inputs',specs)
     rv=next(c for c in cases if c['name']=='riscv64-ls')
     elf=corpus.deb_binary(t/'corpus'/rv['package_sha256'],'ls')
     assert corpus.digest(elf)==rv['binary_sha256'] and corpus.digest(corpus.elf_text(elf))==rv['text_sha256']
@@ -95,7 +104,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('X86RegisterFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','PPCMapping.c.o','ARMMapping.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
+        for name in ('AliasMapping.c.o','X86RegisterFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','PPCMapping.c.o','ARMMapping.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
@@ -104,9 +113,8 @@ try:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    expected=3 if os.uname().machine=='x86_64' else 2
+    expected=3
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
-    if expected==2:assert all(identities['base'][k]==identities['layout'][k]for k in ('archive','binary'))
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
@@ -137,7 +145,7 @@ try:
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
+            pairs=35 if c['selector']==3 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):
                 keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
                 for k in keys+keys[::-1]:
