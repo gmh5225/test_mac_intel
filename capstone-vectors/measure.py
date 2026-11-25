@@ -110,7 +110,7 @@ try:
         spec=m['provenance'][name]
         spans=[s for s in spans if tuple(s) not in {tuple(a[:3])for a in spec['excluded_incompatible_extents']}]
         ranges=w/(name+'.tsv')
-        def emit():ranges.write_text(''.join('%d %d %d\\n'%tuple(row)for row in spans))
+        def emit():ranges.write_text(''.join('%d %d %d\n'%tuple(row)for row in spans))
         emit()
         if m['samples'][name]=='simd-functions':
             views=[list(map(int,z.split()))for z in get(w/'vectors',str(bits),blob,ranges).splitlines()]

@@ -1,7 +1,7 @@
-name: Pair both SIMD output syntaxes with each iced formatter in the same executable on PuTTY PE32, libmvec and OpenSSL
+name: Measure independent SIMD syntax writers versus iced on verified PE32, OpenSSL and libmvec ranges
 on:
   push:
-    branches: [codex/paired-intel-and-att-specialized-vector-writers]
+    branches: [codex/verified-ranges-simd-syntax-writers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: simd-syntax-pair-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: simd-syntax-extents-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
