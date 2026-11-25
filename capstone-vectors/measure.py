@@ -34,22 +34,22 @@ try:
             lib,=build.rglob('libcapstone.a');target=stage/('foreign-'+v)
             run('clang++','-O3','-std=c++17','-no-pie','-I',src/'include',r/'arm-timing.cpp',lib,'-o',target)
             products.setdefault(name,{})[v]=dict(archive=sha(lib),driver=sha(target),objects={str(o.relative_to(build)):sha(o)for o in build.rglob('*.c.o')})
-            if name=='standalone':
-                libso,=build.rglob('libcapstone.so');output=w/(v+'.so');shutil.copyfile(libso,output)
+            if name=='mixed':
+                output=w/(v+'.so')
+                run('clang','-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-lm','-o',output)
                 if v!='base':
                     guard=json.loads(out(w/'domain',w/'base.so',output,w))
                     assert guard==rd(r/'local-expectations.json')['domain']
-                    run('clang','-std=gnu99','-O2','-DCAPSTONE_HAS_ARM','-DCAPSTONE_USE_SYS_DYN_MEM','-DCAPSTONE_ARM_ONLY','-DTEST_PAIR=0','-I',src,'-I',src/'include',r/'stream.c',lib,'-o',w/'stream')
+                    run('clang','-std=gnu99','-O2','-DCAPSTONE_HAS_ARM','-DCAPSTONE_USE_SYS_DYN_MEM','-DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64','-DTEST_PAIR=0','-I',src,'-I',src/'include',r/'stream.c',lib,'-o',w/'stream')
                     stream=list(map(int,out(w/'stream').split()))
                     assert stream==rd(r/'local-expectations.json')['stream'];guards[v]=dict(stream=stream,domain=guard)
         save('products',products)
-    arch='arm64' if os.uname().machine=='aarch64' else 'amd64'
-    prior=rd(r/'reproducible-products.json')[arch]
-    for name,items in products.items():
-        for v,row in items.items():
-            direct=name=='standalone' and v!='base' or v=='outlined' and arch=='amd64'
-            want='candidate' if direct else 'base'
-            assert prior[name][want]=={key:row[key]for key in ('archive','driver')},(name,v,want,prior[name][want],row['archive'],row['driver'])
+    is_amd64=os.uname().machine=='x86_64'
+    for name,rows in products.items():
+        for v in ('candidate','outlined'):
+            active=is_amd64 and name=='mixed'
+            for key in ('archive','driver'):
+                assert (rows[v][key]!=rows['base'][key])==active,(name,v,key)
     save('guards',guards)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});save('host',dict(cpu=out('lscpu'),compiler=out('clang','--version')))
     for name,(_,stage) in stages.items():

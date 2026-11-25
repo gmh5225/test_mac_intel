@@ -1,7 +1,7 @@
-name: Verify measured ARM-only and mixed formatter output, binary identities, and genuine executable instructions
+name: Measure shared ARM punctuation helpers on mapped code and check callback behavior
 on:
   push:
-    branches: [codex/arm-printf-punctuation-profile-selection]
+    branches: [codex/arm-mixed-shared-character-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 76d16380eb2a736a5039c7b3b9c4a72c37aacfd2
+          ref: 571a1592ff48d148257b7ae1146d2fb593470783
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 61687bbb579da03cb1f9e47ed5133d75ea027ad3
+          ref: 909177c3b7819868e6fef03579e20f77531c51b7
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-literal-release-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm-shared-character-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
