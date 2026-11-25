@@ -35,9 +35,12 @@ for route in ("original", "highc", "llvmc"):
     obj = out / (route+".obj")
     exe = out / (route+".exe")
     command([*cc, "-c", src, "-o", obj])
-    command(["clang-cl", "--target="+target, "/nologo", "/O2", "/std:c17", "/DTEST_RECOVERED_PRNG_CALLER",
-             "/DTEST_CDECL_PRNG_CALLER", "native-driver-entry/process_prng.c", obj, library,
-             "/Fe:"+str(exe), "/Fo:"+str(out/"harness.obj"), "/link", *aliases])
+    harness = out / "harness.obj"
+    command(["clang-cl", "--target="+target, "/nologo", "/O2", "/std:c17", "/c",
+             "/DTEST_RECOVERED_PRNG_CALLER", "/DTEST_CDECL_PRNG_CALLER",
+             "native-driver-entry/process_prng.c", "/Fo"+str(harness)])
+    command(["clang-cl", "--target="+target, "/nologo", harness, obj, library,
+             "/Fe"+str(exe), "/link", *aliases])
     imports = command(["llvm-readobj", "--coff-imports", exe])
     assert any(re.search(r"Name: bcryptprimitives\.dll\b", block, re.I) and
                re.search(r"Symbol: ProcessPrng \(", block) for block in imports.split("Import {"))
