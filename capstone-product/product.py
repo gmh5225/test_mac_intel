@@ -80,7 +80,7 @@ try:
         save('absolute-offsets-'+variant,vals)
         command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'moffs.cpp',archive,'-o',t/'moffs'],'link-moffs-'+variant)
         counts=list(map(int,sp.check_output([t/'moffs'],text=True,stderr=sp.DEVNULL).split()))
-        assert counts==[11520,864 if variant=='base' else 0,0],(variant,counts)
+        assert counts==[11520,864,0],(variant,counts)
         save('moffs-'+variant,counts)
         command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
         records={}
@@ -113,7 +113,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
+        for name in ('X86VectorFallback64.c.o','X86Sse64Output.c.o','AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
@@ -125,7 +125,7 @@ try:
     assert m['oracle']==m['layout']
     products['oracle']=products['layout'];identities['oracle']=identities['layout']
     save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-layout.json').read_text()))
-    expected=3
+    expected=1 if os.uname().machine=="aarch64" else 3
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -136,7 +136,8 @@ try:
     image=t/'selected';image.write_bytes(imgs['base'])
     inode=image.stat().st_ino;block=4096
     offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
-    checked={};assert offsets
+    assert bool(offsets)==(os.uname().machine!="aarch64")
+    checked={}
     def execute(k,case,mode,reps):
         # Touch exactly the same file pages, in the same order, before every exec.
         if k!='oracle':

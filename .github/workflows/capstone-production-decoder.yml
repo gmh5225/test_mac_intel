@@ -1,7 +1,7 @@
-name: Verify MOV moffs unsigned addresses and time unchanged decode paths in the LLVM-source NeverD product
+name: Verify fixed RIP transfer output in the source-built NeverD product and unchanged Arm binaries
 on:
   push:
-    branches: [codex/moffs-unsigned-address-neverd-product]
+    branches: [codex/mixed-rip-neverd-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 963db8c6b5b74c876535ce335cd82fff394a66da
+          ref: 6f748e8de6d414c64319dd4287e976568f2d4b6b
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "963db8c6b5b74c876535ce335cd82fff394a66da"
+          test "$(git rev-parse HEAD)" = "6f748e8de6d414c64319dd4287e976568f2d4b6b"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "acb6a6298e4642828981a72acc6022ee36fcd0be"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin acb6a6298e4642828981a72acc6022ee36fcd0be
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: moffs-neverd-source-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: mixed-rip-neverd-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
