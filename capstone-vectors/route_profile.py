@@ -36,6 +36,12 @@ def run(r,w,source,build,paths,patch=None,tree=None):
             at=s.index('const char *extension_name',s.index('static void printRegName(SStream *OS, unsigned RegNo)\n{'))
             s=s[:at]+'++profile_names[16];\n\t'+s[at:]
 
+            if patch:
+                key='char *out = O->buffer + O->index;'
+                assert s.count(key)==1;s=s.replace(key,'++profile_names[17];\\n\\t\\t'+key)
+            else:
+                key='uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;'
+                assert s.count(key)==1;s=s.replace(key,key+'\\n\\t++profile_names[17];')
         f.write_text(s)
     call('cmake','--build',build,'--target','capstone_static','--parallel','4')
     lib,=build.rglob('libcapstone.a')

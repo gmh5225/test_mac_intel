@@ -1,65 +1,36 @@
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..524d147a 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -29,15 +29,19 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 1cc3d3a9..8762ccda 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -579,14 +579,28 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 		MI->flat_insn->detail->x86.op_count++;
+ }
  
- /* Keep the mode, option and callback checks in a single short-circuit chain
-  * in both instantiations of the scalar writer. */
--#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
-+#define X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, syntax_mismatch, expected_printer) \
- 	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
- 	 (handle)->mnem_list || (handle)->doing_mem || \
--	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
--	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
-+	 (syntax_mismatch) || \
- 	 (handle)->disasm != X86_getInstruction || \
- 	 (handle)->insn_id != X86_get_insn_id || \
--	 (handle)->printer != X86_Intel_printInst || \
-+	 (handle)->printer != (expected_printer) || \
- 	 (handle)->post_printer != X86_postprinter || \
- 	 cs_vsnprintf != cs_default_vsnprintf)
- 
-+#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
-+	X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, \
-+		(handle)->syntax != CS_OPT_SYNTAX_INTEL && \
-+		(handle)->syntax != CS_OPT_SYNTAX_DEFAULT, X86_Intel_printInst)
-+
- #endif
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..cae0b65c 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -111,8 +111,22 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			return false;
- 		}
- 	}
--	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
-+	bool att = false;
-+	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32)) {
-+#ifndef CAPSTONE_X86_ATT_DISABLE
-+		/* Bare relative branches share targets and operand metadata across
-+		 * dialects. Only a near call needs an AT&T mnemonic suffix. */
-+		if (plan >= X86_PLAN_PUSH_IMMEDIATE || has_rex ||
-+		    form != X86_SIMPLE_RELATIVE ||
-+		    X86_OUTPUT_UNSUPPORTED_FOR(handle,
-+			!wide && handle->mode != CS_MODE_32,
-+			handle->syntax != CS_OPT_SYNTAX_ATT, X86_ATT_printInst))
-+			return false;
-+		att = true;
-+#else
- 		return false;
-+#endif
+-static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
++static void printUnsignedByte(SStream *O, uint8_t val)
+ {
+-	uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;
+-
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++	if (cs_vsnprintf == cs_default_vsnprintf && !O->is_closed &&
++	    O->index < SSTREAM_BUF_LEN - 2) {
++		O->buffer[O->index++] = '$';
++		printUInt64(O, val);
++		return;
 +	}
++#endif
+ 	if (val > HEX_THRESHOLD)
+ 		SStream_concat(O, "$0x%x", val);
+ 	else
+ 		SStream_concat(O, "$%" PRIu8, val);
++}
++
++static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
++{
++	uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;
++
++	printUnsignedByte(O, val);
  
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
- 		if (plan == X86_PLAN_VECTOR) {
-@@ -193,6 +207,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
- 		*insn_size = insn->size = (uint16_t)(1 + has_rex);
- 	} else if (relative) {
-+		if (att && row->id == X86_INS_CALL)
-+			insn->mnemonic[4] = wide ? 'q' : 'l';
- 		const uint8_t *bytes = code + row->imm_offset;
- 		int64_t delta;
- 		if (row->imm_size == 1) {
+ 	if (MI->csh->detail_opt) {
+ 		MI->flat_insn->detail->x86
