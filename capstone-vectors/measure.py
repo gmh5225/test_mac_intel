@@ -58,6 +58,14 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator')
+        generated=sp.check_output([w/'generator','--sse64-registers'])
+        table=base/'arch/X86/X86GenSse64RegisterOutput.inc'
+        assert generated==table.read_bytes()
+        if label=='base':projections={}
+        projections[label]=dict(sha256=sha(table),rows=sum(row.startswith(b'\t{')for row in generated.splitlines()),cmov=generated.count(b'"cmov'))
+        assert projections[label]['rows']==80 and projections[label]['cmov']==(0 if label=='base' else 16),projections
+        save('generated-register-rows',projections)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
@@ -101,12 +109,12 @@ try:
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
-    run('clang++','-O2','-std=c++17','-I',base/'include',r/'access.cpp','-ldl','-o',w/'access-replay')
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'cmov-guard.cpp','-ldl','-o',w/'cmov-guard')
     proof={}
-    for label in ('outlined','candidate'):
-        proof[label]=list(map(int,get(w/'access-replay',w/'base.so',w/(label+'.so')).split()))
-        assert proof[label][0]==1920000 and proof[label][3]==2048
-    assert proof['outlined']==proof['candidate'];save('register-query',proof)
+    for label in ('candidate','outlined'):
+        proof[label]=list(map(int,get(w/'cmov-guard',w/'base.so',w/(label+'.so')).split()))
+        assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
+    assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
