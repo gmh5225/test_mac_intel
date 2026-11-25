@@ -1,7 +1,7 @@
-name: Measure generated NOP records and extended alignment prefixes on whole SIMD and PE32 text against iced
+name: Time AT&T embedded rounding on whole SIMD PE32 and scalar code with Intel and iced controls
 on:
   push:
-    branches: [codex/paired-alignment-spelling-and-operand-details]
+    branches: [codex/paired-att-avx512-embedded-rounding]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-att-padding-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-rounded-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
