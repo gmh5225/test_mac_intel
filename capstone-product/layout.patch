@@ -125,7 +125,7 @@ index 00000000..301944f7
 +	},
 +};
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index f778e3b7..7d1a49ef 100644
+index f778e3b7..577bec4e 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
 @@ -57,7 +57,7 @@ static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
@@ -163,24 +163,24 @@ index f778e3b7..7d1a49ef 100644
 +#endif
 +
 +static inline const char *regName(const cs_struct *handle, unsigned int reg)
-+{
-+	return getRegisterName(reg, useArchRegNames(handle) ?
-+					    RISCV_NoRegAltName :
-+					    RISCV_ABIRegAltName);
-+}
-+
-+const char *RISCV_reg_name(csh handle, unsigned int reg)
  {
 -	return getRegisterName(Reg, ArchRegNames ? RISCV_NoRegAltName :
 -						   RISCV_ABIRegAltName);
-+	return regName((const cs_struct *)(uintptr_t)handle, reg);
++	return getRegisterName(reg, useArchRegNames(handle) ?
++					    RISCV_NoRegAltName :
++					    RISCV_ABIRegAltName);
  }
  
 -static inline void printRegName(SStream *O, MCRegister Reg)
-+static inline void printRegName(const MCInst *MI, SStream *O, MCRegister Reg)
++const char *RISCV_reg_name(csh handle, unsigned int reg)
  {
 -	SStream_concat0(markup_OS(O, Markup_Register), doGetRegisterName(Reg));
-+	SStream *out = markup_OS(O, Markup_Register);
++	return regName((const cs_struct *)(uintptr_t)handle, reg);
++}
++
++static inline void printRegName(const MCInst *MI, SStream *O, MCRegister Reg)
++{
++	SStream *out = O->markup_stream ? markup_OS(O, Markup_Register) : O;
 +#ifndef CAPSTONE_DIET
 +	unsigned index = (unsigned)Reg - RISCV_X0;
 +	if (index < ARR_SIZE(riscv_gpr_names[0])) {
@@ -307,7 +307,7 @@ index f778e3b7..7d1a49ef 100644
  	SStream_concat0(O, ")");
  }
  
-@@ -403,7 +423,7 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -403,23 +423,17 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
  	if (MCOperand_getReg(MO) == RISCV_NoRegister)
  		return;
  	SStream_concat0(O, ", ");
@@ -316,6 +316,35 @@ index f778e3b7..7d1a49ef 100644
  	SStream_concat0(O, ".t");
  }
  
+-#ifdef CAPSTONE_RISCV_ONLY
+ #include "RISCVGenExpandedAlias.inc"
+-#endif
+ 
+ static inline bool printOriginalAlias(MCInst *MI, bool expanded, SStream *O)
+ {
+-#ifdef CAPSTONE_RISCV_ONLY
+ 	/* An expanded instruction can still have its own higher-priority alias. */
+ 	if (expanded && !expandedOpcodeHasOwnAlias(MCInst_getOpcode(MI)))
+ 		return false;
+-#else
+-	(void)expanded;
+-#endif
+ 	return printAliasInstr(MI, MI->address, O);
+ }
+ 
+@@ -434,12 +448,8 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+ 	MI->flat_insn->usesAliasDetails = usesAliasDetails;
+ 
+ 	MCInst Uncompressed;
+-#ifdef CAPSTONE_RISCV_ONLY
+ 	/* Only the 16-bit decoder can produce an opcode with an expansion. */
+ 	const bool can_expand = MI->flat_insn->size == 2;
+-#else
+-	const bool can_expand = true;
+-#endif
+ 	if (can_expand)
+ 		MCInst_InitStorage(&Uncompressed, MI->csh->arch, false);
+ 	MCInst *MIUncompressed = MI;
 diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
 index a3e2892f..b3de54a6 100644
 --- a/arch/RISCV/RISCVMapping.c

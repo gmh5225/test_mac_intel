@@ -1,7 +1,7 @@
-name: Verify active RISC-V images on both host architectures and time released NeverD with source-built LLVM
+name: Verify RISC-V compressed print ownership and backend-local scan selection in the full NeverD binary built with current LLVM source
 on:
   push:
-    branches: [codex/riscv-product-images-on-both-hosts]
+    branches: [codex/riscv-source-width-and-decoder-owner]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: active-riscv-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: encoded-width-riscv-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
