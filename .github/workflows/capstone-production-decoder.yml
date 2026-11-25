@@ -1,7 +1,7 @@
-name: Measure MIPS alias construction on the full NeverD decode product and existing PE and ELF workloads
+name: Time complete NeverD with 16-bit register and relative branch writers
 on:
   push:
-    branches: [codex/mips-stream-full-neverd-controls]
+    branches: [codex/real-mode-branch-neverd-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 1263831f6cf4d59c45372480665fc1d8c898b820
+          ref: cd20138f020dae39e9a296fccc7e6d60c054c591
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,11 +51,11 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "1263831f6cf4d59c45372480665fc1d8c898b820"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "08844cf483fb5ce17bba3681ad91ae084c191bab"
+          test "$(git rev-parse HEAD)" = "cd20138f020dae39e9a296fccc7e6d60c054c591"
+          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "76d16380eb2a736a5039c7b3b9c4a72c37aacfd2"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin 08844cf483fb5ce17bba3681ad91ae084c191bab
-          git -C third_party/capstone checkout --detach 08844cf483fb5ce17bba3681ad91ae084c191bab
+          git -C third_party/capstone fetch --depth=1 origin 76d16380eb2a736a5039c7b3b9c4a72c37aacfd2
+          git -C third_party/capstone checkout --detach 76d16380eb2a736a5039c7b3b9c4a72c37aacfd2
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-stream-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: branch-registers-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
