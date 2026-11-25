@@ -1,11 +1,16 @@
 diff --git a/arch/RISCV/RISCVGenAsmWriter.inc b/arch/RISCV/RISCVGenAsmWriter.inc
-index 85f2c177..f1e4581c 100644
+index 85f2c177..66d6921c 100644
 --- a/arch/RISCV/RISCVGenAsmWriter.inc
 +++ b/arch/RISCV/RISCVGenAsmWriter.inc
-@@ -28239,82 +28239,12 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
+@@ -28235,86 +28235,15 @@ static void printInstruction(MCInst *MI, uint64_t Address, SStream *O) {
+ /// from the register set description.  This returns the assembler name
+ /// for the specified register.
+ static const char *
+-getRegisterName(unsigned RegNo, unsigned AltIdx) {
++getRegisterNameFromBank(unsigned RegNo, unsigned bank) {
  #ifndef CAPSTONE_DIET
    CS_ASSERT_RET_VAL(RegNo && RegNo < 459 && "Invalid register number!", NULL);
- 
+-
 -  static const char AsmStrsABIRegAltName[] = {
 -  /* 0 */ "fs10\0"
 -  /* 5 */ "ft10\0"
@@ -91,7 +96,7 @@ index 85f2c177..f1e4581c 100644
    /* 0 */ "V3_V4_V5_V6_V7_V8_V9_V10\0"
    /* 25 */ "f10\0"
    /* 29 */ "v10\0"
-@@ -28472,54 +28402,56 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
+@@ -28472,58 +28401,75 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
    /* 1609 */ "ssp\0"
    /* 1613 */ "fflags\0"
    /* 1620 */ "vxsat\0"
@@ -184,17 +189,36 @@ index 85f2c177..f1e4581c 100644
 -           "Invalid alt name index for register!", NULL);
 -    return AsmStrsNoRegAltName+RegAsmOffsetNoRegAltName[RegNo-1];
 -  }
-+  static const uint16_t offsets[][2] = {
-+#define RISCV_NAME(a, n) { (((a) == 4) ? (n) : offsetof(struct RegisterNames, abi) + (a)), (n) },
++  static const uint16_t offsets[] = {
++#define RISCV_NAME(a, n) (((a) == 4) ? (n) : offsetof(struct RegisterNames, abi) + (a)),
++#include "RISCVGenRegisterNameOffsets.inc"
++#undef RISCV_NAME
++#define RISCV_NAME(a, n) (n),
 +#include "RISCVGenRegisterNameOffsets.inc"
 +#undef RISCV_NAME
 +  };
-+  CS_ASSERT_RET_VAL((AltIdx == RISCV_NoRegAltName || AltIdx == RISCV_ABIRegAltName) &&
-+                    "Invalid register alt name index!", NULL);
-+  return (const char *)&names + offsets[RegNo - 1][AltIdx == RISCV_NoRegAltName];
++  return (const char *)&names + offsets[bank + RegNo - 1];
  #else
    return NULL;
  #endif // CAPSTONE_DIET
+ }
++
++static inline unsigned registerNameBank(bool numeric) {
++  return numeric ? 458U : 0;
++}
++
++static const char *
++getRegisterName(unsigned RegNo, unsigned AltIdx) {
++#ifndef CAPSTONE_DIET
++  CS_ASSERT_RET_VAL((AltIdx == RISCV_NoRegAltName || AltIdx == RISCV_ABIRegAltName) &&
++                    "Invalid register alt name index!", NULL);
++#endif
++  return getRegisterNameFromBank(RegNo, registerNameBank(AltIdx == RISCV_NoRegAltName));
++}
++
+ #ifdef PRINT_ALIAS_INSTR
+ #undef PRINT_ALIAS_INSTR
+ 
 diff --git a/arch/RISCV/RISCVGenRegisterNameOffsets.inc b/arch/RISCV/RISCVGenRegisterNameOffsets.inc
 new file mode 100644
 index 00000000..36fe5c0b
@@ -661,7 +685,7 @@ index 00000000..36fe5c0b
 +RISCV_NAME(4, 216)
 +RISCV_NAME(4, 1310)
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index a60d3d24..fb5f9e4a 100644
+index a60d3d24..5e4db32e 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
 @@ -57,7 +57,7 @@ static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
@@ -686,17 +710,30 @@ index a60d3d24..fb5f9e4a 100644
  static bool isRealSyntax(const MCInst *MI)
  {
  	return MI->csh->syntax & CS_OPT_SYNTAX_REAL;
-@@ -107,18 +101,18 @@ static bool isAliasDetail(const MCInst *MI)
+@@ -107,18 +101,31 @@ static bool isAliasDetail(const MCInst *MI)
  		 (CS_OPT_DETAIL_REAL | CS_OPT_DETAIL_UNCOMPRESSED_REAL));
  }
  
 -const char *doGetRegisterName(MCRegister Reg)
++void RISCV_selectRegisterNames(cs_struct *handle)
++{
++	RISCVPrinterInfo *info = (RISCVPrinterInfo *)handle->printer_info;
++	info->name_bank = registerNameBank(RISCV_usesNumericRegisters(handle));
++}
++
++const char *RISCV_reg_name(csh handle, unsigned int reg)
++{
++	const cs_struct *cs = (const cs_struct *)(uintptr_t)handle;
++	const RISCVPrinterInfo *info = (const RISCVPrinterInfo *)cs->printer_info;
++	return getRegisterNameFromBank(reg, info->name_bank);
++}
++
 +static inline const char *regName(const MCInst *MI, MCRegister reg)
  {
 -	return getRegisterName(Reg, ArchRegNames ? RISCV_NoRegAltName :
 -						   RISCV_ABIRegAltName);
-+	return getRegisterName(reg, RISCV_usesNumericRegisters(MI->csh) ?
-+				    RISCV_NoRegAltName : RISCV_ABIRegAltName);
++	const RISCVPrinterInfo *info = (const RISCVPrinterInfo *)MI->MRI;
++	return getRegisterNameFromBank(reg, info->name_bank);
  }
  
 -static inline void printRegName(SStream *O, MCRegister Reg)
@@ -710,7 +747,7 @@ index a60d3d24..fb5f9e4a 100644
  	if ((unsigned)Reg - RISCV_X0 <= (unsigned)(RISCV_X31 - RISCV_X0) &&
  	    name[2] == '\0') {
  		SStream_concat0_small(O, name, 2);
-@@ -126,7 +120,7 @@ static inline void printRegName(SStream *O, MCRegister Reg)
+@@ -126,7 +133,7 @@ static inline void printRegName(SStream *O, MCRegister Reg)
  	}
  	SStream_concat0(O, name);
  #else
@@ -719,7 +756,7 @@ index a60d3d24..fb5f9e4a 100644
  #endif
  }
  
-@@ -147,7 +141,7 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -147,7 +154,7 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  	MCOperand *MO = MCInst_getOperand(MI, (OpNo));
  
  	if (MCOperand_isReg(MO)) {
@@ -728,7 +765,7 @@ index a60d3d24..fb5f9e4a 100644
  		return;
  	}
  
-@@ -270,7 +264,7 @@ void printZeroOffsetMemOp(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -270,7 +277,7 @@ void printZeroOffsetMemOp(MCInst *MI, unsigned OpNo, SStream *O)
  	CS_ASSERT(MCOperand_isReg(MO) &&
  		  "printZeroOffsetMemOp can only print register operands");
  	SStream_concat0(O, "(");
@@ -737,7 +774,7 @@ index a60d3d24..fb5f9e4a 100644
  	SStream_concat0(O, ")");
  }
  
-@@ -293,41 +287,42 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -293,41 +300,42 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
  {
  	RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Rlist, OpNo);
  	unsigned Imm = MCOperand_getImm(MCInst_getOperand(MI, (OpNo)));
@@ -790,7 +827,7 @@ index a60d3d24..fb5f9e4a 100644
  			SStream_concat0(O, ", ");
  			SStream_concat0(markup_OS(O, Markup_Register), "x18");
  		}
-@@ -341,13 +336,13 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -341,13 +349,13 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
  	case RISCVZC_RLISTENCODE_RA_S0_S9:
  	case RISCVZC_RLISTENCODE_RA_S0_S11:
  		SStream_concat0(markup_OS(O, Markup_Register),
@@ -807,7 +844,7 @@ index a60d3d24..fb5f9e4a 100644
  			SStream_concat0(markup_OS(O, Markup_Register), "x9");
  			SStream_concat0(O, ", ");
  			SStream_concat0(markup_OS(O, Markup_Register), "x18");
-@@ -355,7 +350,7 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -355,7 +363,7 @@ void printRlist(MCInst *MI, unsigned OpNo, SStream *O)
  		}
  		SStream_concat0(
  			markup_OS(O, Markup_Register),
@@ -816,7 +853,7 @@ index a60d3d24..fb5f9e4a 100644
  				RISCV_X19 +
  				(Imm == RISCVZC_RLISTENCODE_RA_S0_S11 ?
  					 8 :
-@@ -376,13 +371,13 @@ void printRegReg(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -376,13 +384,13 @@ void printRegReg(MCInst *MI, unsigned OpNo, SStream *O)
  		  "printRegReg can only print register operands");
  	if (MCOperand_getReg(MO) == RISCV_NoRegister)
  		return;
@@ -832,7 +869,7 @@ index a60d3d24..fb5f9e4a 100644
  	SStream_concat0(O, ")");
  }
  
-@@ -415,7 +410,7 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -415,7 +423,7 @@ void printVMaskReg(MCInst *MI, unsigned OpNo, SStream *O)
  	if (MCOperand_getReg(MO) == RISCV_NoRegister)
  		return;
  	SStream_concat0(O, ", ");
@@ -841,14 +878,39 @@ index a60d3d24..fb5f9e4a 100644
  	SStream_concat0(O, ".t");
  }
  
+@@ -436,9 +444,9 @@ static inline bool printOriginalAlias(MCInst *MI, bool expanded, SStream *O)
+ }
+ 
+ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
+-				 void * /* MCRegisterInfo* */ info)
++				 void *info)
+ {
+-	MI->MRI = (MCRegisterInfo *)info;
++	MI->MRI = &((RISCVPrinterInfo *)info)->registers;
+ 
+ 	MCInst_setIsAlias(MI, false);
+ 	bool usesAliasDetails = detail_is_set(MI) && isAliasDetail(MI) &&
 diff --git a/arch/RISCV/RISCVInstPrinter.h b/arch/RISCV/RISCVInstPrinter.h
-index 95651fa6..764d1ae0 100644
+index 95651fa6..f87372aa 100644
 --- a/arch/RISCV/RISCVInstPrinter.h
 +++ b/arch/RISCV/RISCVInstPrinter.h
-@@ -38,6 +38,11 @@
+@@ -33,11 +33,24 @@
+ #include <capstone/platform.h>
+ 
+ #include "../../MCInstPrinter.h"
++#include "../../MCRegisterInfo.h"
+ #include "../../cs_priv.h"
+ #include "../../SStream.h"
  #include "RISCVBaseInfo.h"
  #include "RISCVDisassemblerExtension.h"
  
++typedef struct RISCVPrinterInfo {
++	MCRegisterInfo registers;
++	unsigned name_bank;
++} RISCVPrinterInfo;
++
++void RISCV_selectRegisterNames(cs_struct *handle);
++
 +static inline bool RISCV_usesNumericRegisters(const cs_struct *handle)
 +{
 +	return handle->syntax & CS_OPT_SYNTAX_NOREGNAME;
@@ -858,20 +920,60 @@ index 95651fa6..764d1ae0 100644
  #define CONCAT_(a, b) a##_##b
  
 diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
-index a3e2892f..6a56ecac 100644
+index a3e2892f..b3de54a6 100644
 --- a/arch/RISCV/RISCVMapping.c
 +++ b/arch/RISCV/RISCVMapping.c
-@@ -32,9 +32,7 @@
+@@ -30,16 +30,6 @@
  
- const char *RISCV_reg_name(csh handle, unsigned int reg)
- {
+ #include "RISCVInstPrinter.h"
+ 
+-const char *RISCV_reg_name(csh handle, unsigned int reg)
+-{
 -	int syntax_opt = ((cs_struct *)(uintptr_t)handle)->syntax;
 -
 -	if (syntax_opt & CS_OPT_SYNTAX_NOREGNAME) {
-+	if (RISCV_usesNumericRegisters((const cs_struct *)(uintptr_t)handle)) {
- 		return RISCV_LLVM_getRegisterName(reg, RISCV_NoRegAltName);
- 	}
- 	return RISCV_LLVM_getRegisterName(reg, RISCV_ABIRegAltName);
+-		return RISCV_LLVM_getRegisterName(reg, RISCV_NoRegAltName);
+-	}
+-	return RISCV_LLVM_getRegisterName(reg, RISCV_ABIRegAltName);
+-}
+-
+ static const insn_map insns[] = {
+ #include "RISCVGenCSMappingInsn.inc"
+ };
+diff --git a/arch/RISCV/RISCVModule.c b/arch/RISCV/RISCVModule.c
+index 4105553b..104d5123 100644
+--- a/arch/RISCV/RISCVModule.c
++++ b/arch/RISCV/RISCVModule.c
+@@ -13,15 +13,15 @@
+ 
+ cs_err RISCV_global_init(cs_struct *ud)
+ {
+-	MCRegisterInfo *mri;
+-	mri = cs_mem_malloc(sizeof(*mri));
+-	if (!mri)
++	RISCVPrinterInfo *info = cs_mem_malloc(sizeof(*info));
++	if (!info)
+ 		return CS_ERR_MEM;
+ 
+-	RISCV_init(mri);
++	RISCV_init(&info->registers);
+ 	ud->printer = RISCV_LLVM_printInstruction;
+-	ud->printer_info = mri;
+-	ud->getinsn_info = mri;
++	ud->printer_info = info;
++	ud->getinsn_info = &info->registers;
++	RISCV_selectRegisterNames(ud);
+ 	ud->disasm = RISCV_LLVM_getInstruction;
+ 	ud->post_printer = NULL;
+ 
+@@ -40,6 +40,7 @@ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value)
+ {
+ 	if (type == CS_OPT_SYNTAX) {
+ 		handle->syntax |= (int)value;
++		RISCV_selectRegisterNames(handle);
+ 	} else if (type == CS_OPT_MODE) {
+ 		handle->mode = (cs_mode)value;
+ #ifdef CAPSTONE_RISCV_ONLY
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
 index c04d3abd..00cf6eed 100644
 --- a/suite/auto-sync/README.md
@@ -886,10 +988,10 @@ index c04d3abd..00cf6eed 100644
 +Use `--check` to verify the generated files.
 diff --git a/suite/synctools/riscv_register_names.py b/suite/synctools/riscv_register_names.py
 new file mode 100644
-index 00000000..77bfa705
+index 00000000..ad7d31f5
 --- /dev/null
 +++ b/suite/synctools/riscv_register_names.py
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,118 @@
 +#!/usr/bin/env python3
 +# SPDX-License-Identifier: BSD-3-Clause
 +"""Resolve RISC-V ABI fallbacks when synchronizing the TableGen assembly writer."""
@@ -931,36 +1033,68 @@ index 00000000..77bfa705
 +    return numeric, abi, list(zip(a, n))
 +
 +def generate(writer, existing):
-+    begin = writer.index("getRegisterName(unsigned RegNo, unsigned AltIdx) {")
-+    start = writer.index("\n\n",writer.index("Invalid register number!",begin)) + 2
-+    end = writer.index("#else\n  return NULL;\n#endif // CAPSTONE_DIET",start)
-+    section=writer[start:end]
++    first = re.search(r"static const char \*\ngetRegisterName(?:FromBank)?\(unsigned RegNo,", writer)
++    if first is None:
++        raise ValueError("Missing RISC-V register name lookup")
++    end = writer.index("\n#ifdef PRINT_ALIAS_INSTR", first.end())
++    section = writer[first.start():end]
 +    numeric, abi, rows = sources(section, existing)
 +    raw, aliases = pool_bytes(numeric), pool_bytes(abi)
-+    limit = int(re.search(r"RegNo < (\d+)",writer[begin:start])[1])
-+    if len(rows) + 1 != limit or len(raw)+len(aliases)>65535:
++    limit = int(re.search(r"RegNo < (\d+)", section)[1])
++    if len(rows) + 1 != limit or len(raw) + len(aliases) > 65535:
 +        raise ValueError("Invalid register name table dimensions")
-+    for a,n in rows:
-+        if not (0<=a<len(aliases) and 0<=n<len(raw) and raw[n]):
++    for a, n in rows:
++        if not (0 <= a < len(aliases) and 0 <= n < len(raw) and raw[n]):
 +            raise ValueError("Invalid register name offset")
-+    empty = sorted({a for a,_ in rows if aliases[a]==0})
++    empty = sorted({a for a, _ in rows if aliases[a] == 0})
 +    condition = " || ".join(f"(a) == {x}" for x in empty) or "0"
 +    resolved = f"(({condition}) ? (n) : offsetof(struct RegisterNames, abi) + (a))"
-+    includes='#include "RISCVGenRegisterNameOffsets.inc"\n#undef RISCV_NAME\n'
-+    data = ("  static const uint16_t offsets[][2] = {\n#define RISCV_NAME(a, n) { " +
-+            resolved + ", (n) },\n" + includes + "  };\n")
-+    lookup="offsets[RegNo - 1][AltIdx == RISCV_NoRegAltName]"
-+    code = (START + "\n  static const struct RegisterNames {\n"
-+            f"    char numeric[{len(raw)}];\n    char abi[{len(aliases)}];\n"
-+            "  } names = {\n  /* numeric spellings */\n" + numeric +
-+            "\n  /* end spellings */\n  ,\n  /* ABI spellings */\n" + abi +
-+            "\n  /* end spellings */\n  };\n" + data +
-+            "  CS_ASSERT_RET_VAL((AltIdx == RISCV_NoRegAltName || AltIdx == RISCV_ABIRegAltName) &&\n"
-+            '                    "Invalid register alt name index!", NULL);\n'
-+            f"  return (const char *)&names + {lookup};\n")
-+    original = ("/* Generated from the TableGen ABI and numeric register name offsets. */\n" +
-+                "".join(f"RISCV_NAME({a}, {n})\n" for a,n in rows))
-+    return writer[:start] + code + writer[end:], original
++    include = '#include "RISCVGenRegisterNameOffsets.inc"\n#undef RISCV_NAME'
++    code = f'''static const char *
++getRegisterNameFromBank(unsigned RegNo, unsigned bank) {{
++#ifndef CAPSTONE_DIET
++  CS_ASSERT_RET_VAL(RegNo && RegNo < {limit} && "Invalid register number!", NULL);
++{START}
++  static const struct RegisterNames {{
++    char numeric[{len(raw)}];
++    char abi[{len(aliases)}];
++  }} names = {{
++  /* numeric spellings */
++{numeric}
++  /* end spellings */
++  ,
++  /* ABI spellings */
++{abi}
++  /* end spellings */
++  }};
++  static const uint16_t offsets[] = {{
++#define RISCV_NAME(a, n) {resolved},
++{include}
++#define RISCV_NAME(a, n) (n),
++{include}
++  }};
++  return (const char *)&names + offsets[bank + RegNo - 1];
++#else
++  return NULL;
++#endif // CAPSTONE_DIET
++}}
++
++static inline unsigned registerNameBank(bool numeric) {{
++  return numeric ? {len(rows)}U : 0;
++}}
++
++static const char *
++getRegisterName(unsigned RegNo, unsigned AltIdx) {{
++#ifndef CAPSTONE_DIET
++  CS_ASSERT_RET_VAL((AltIdx == RISCV_NoRegAltName || AltIdx == RISCV_ABIRegAltName) &&
++                    "Invalid register alt name index!", NULL);
++#endif
++  return getRegisterNameFromBank(RegNo, registerNameBank(AltIdx == RISCV_NoRegAltName));
++}}
++'''
++    original = ("/* Generated from the TableGen ABI and numeric register name offsets. */\n"
++                + "".join(f"RISCV_NAME({a}, {n})\n" for a, n in rows))
++    return writer[:first.start()] + code + writer[end:], original
 +
 +def main():
 +    parser = argparse.ArgumentParser(description=__doc__)
