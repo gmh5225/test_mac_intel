@@ -43,6 +43,7 @@ try:
     from elftools.elf.elffile import ELFFile
     for stem in ('real','states','guard'):
         run('clang++','-O2','-std=c++17','-I',base/'include',r/('trial-'+stem+'.cpp'),'-ldl','-o',w/('trial-'+stem))
+    from public_edges import read as public_edges
     from training import fetch
     from foreign_time import measure as time_foreign
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
@@ -66,7 +67,9 @@ try:
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert ('CAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and ('CAPSTONE_X86_ITERATOR_READERS' in entry)==(label=='candidate')
+        assert 'CAPSTONE_STATIC_X86_READERS' not in entry and ('CAPSTONE_X86_MIXED_PUBLIC_READER' in entry)==(label!='base')
+        obj,=build.rglob('X86DisassemblerDecoder.c.o')
+        save('public-edges-'+label,public_edges(obj))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -100,7 +103,11 @@ try:
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     guards={};records={}
+    skip_results={}
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'skip.cpp','-ldl','-o',w/'skip')
     for lbl in ('candidate','outlined'):
+        skip_results[lbl]=json.loads(get(w/'skip',w/'base.so',w/(lbl+'.so')));save('skipdata-callbacks',skip_results)
+        assert skip_results[lbl]['cases']==1152 and skip_results[lbl]['callbacks']>0
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
         guards[lbl]=dict(states=parts.stderr.count('case arch='),status=parts.returncode,stderr=parts.stderr.splitlines()[-8:])
         save('extra-states',guards)
@@ -113,6 +120,7 @@ try:
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
     host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
+    replay_paths={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
@@ -131,6 +139,7 @@ try:
             return rows
         assert audit_engine('base')==audit_engine('outlined')==audit_engine('candidate')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
+        replay_paths[name]=(bits,f,path,spec['extent_sha256'])
         records[name]={}
         for lbl in ('candidate','outlined'):
             vals=[]
@@ -176,6 +185,9 @@ try:
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
     time_foreign(foreign_rows,w,save)
+    from route_profile import run as profile_routes
+    for tag,meta in [('base','base'),('candidate','prefix'),('outlined','outlined')]:
+        save('route-profile-'+tag,profile_routes(r,w,base,build,replay_paths,maps[meta]['tree'],None if tag=='base' else r/(tag+'.patch')))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
