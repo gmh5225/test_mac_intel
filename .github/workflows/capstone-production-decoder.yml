@@ -1,7 +1,7 @@
-name: Build NeverD dev from LLVM main source and test PowerPC name lookup with bounded equality
+name: Qualify scoped PowerPC name lookups and matching linked program bytes on full NeverD with LLVM main
 on:
   push:
-    branches: [codex/ppc-name-without-import-in-product]
+    branches: [codex/scoped-name-lookup-full-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bounded-name-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: ppc-restricted-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

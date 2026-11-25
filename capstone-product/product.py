@@ -113,7 +113,9 @@ try:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    expected=3
+    expected=2
+    reference='selector' if os.uname().machine=='x86_64' else 'base'
+    assert all(identities['layout'][k]==identities[reference][k] for k in ('archive','binary','decoder')),identities
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

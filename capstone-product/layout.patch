@@ -1,9 +1,9 @@
 diff --git a/arch/PowerPC/PPCAliasNameLookup.h b/arch/PowerPC/PPCAliasNameLookup.h
 new file mode 100644
-index 00000000..1649b1dc
+index 00000000..31734b53
 --- /dev/null
 +++ b/arch/PowerPC/PPCAliasNameLookup.h
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,43 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -14,11 +14,7 @@ index 00000000..1649b1dc
 +#include "../../MappingAlias.h"
 +/* This lookup uses the PowerPC name map only. Keep its loop out of the
 + * shared ELF instruction decoder and alias lookup sections. */
-+#if defined(__ELF__)
 +__attribute__((noinline, minsize, section(".cs_ppc_alias_text")))
-+#else
-+__attribute__((noinline, minsize))
-+#endif
 +void PPC_setAliasId(MCInst *MI, const SStream *O,
 +		    const ppc_alias_name *names, unsigned mask)
 +{
@@ -798,14 +794,15 @@ index 0fa421fc..b5cd4a41 100644
  
  bool PPC_getInstruction(csh handle, const uint8_t *bytes, size_t bytes_len,
 diff --git a/arch/PowerPC/PPCMapping.h b/arch/PowerPC/PPCMapping.h
-index ba25f358..bb68e90e 100644
+index ba25f358..4174b889 100644
 --- a/arch/PowerPC/PPCMapping.h
 +++ b/arch/PowerPC/PPCMapping.h
-@@ -12,6 +12,22 @@ typedef enum {
+@@ -12,6 +12,23 @@ typedef enum {
  #include "PPCGenCSOpGroup.inc"
  } ppc_op_group;
  
-+#if defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && !defined(CAPSTONE_USE_ALIAS_TRIE) && \
++#if defined(__linux__) && defined(__x86_64__) && \
++	defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && !defined(CAPSTONE_USE_ALIAS_TRIE) && \
 +	!defined(CAPSTONE_DIET) && UINTPTR_MAX == UINT64_MAX && \
 +	(defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_MIPS))
 +#define PPC_INDEXED_ALIAS_NAMES
@@ -898,3 +895,74 @@ index 09dcdaf8..d7ea0d4f 100644
 +                    raise SystemExit(f"Regenerate {target.name}")
 +            else:
 +                target.write_text(content)
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 7f588c14..65ba666e 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -2,6 +2,9 @@
+ 
+ #include "../../Mapping.h"
+ #include "../../utils.h"
++#ifdef CAPSTONE_HAS_POWERPC
++#include "../../arch/PowerPC/PPCMapping.h"
++#endif
+ #include <limits.h>
+ #include <stdio.h>
+ #include <string.h>
+@@ -226,6 +229,45 @@ static bool test_generated_alias_lookup(void)
+ }
+ #endif
+ 
++#ifdef PPC_INDEXED_ALIAS_NAMES
++static bool test_powerpc_alias_names(void)
++{
++	static const name_map original[] = {
++#include "../../arch/PowerPC/PPCGenCSAliasMnemMap.inc"
++		{ PPC_INS_ALIAS_SLWI, "slwi" },
++		{ PPC_INS_ALIAS_SRWI, "srwi" },
++		{ PPC_INS_ALIAS_SLDI, "sldi" },
++		{ PPC_INS_ALIAS_END, NULL },
++	};
++	static const ppc_alias_name indexed[] = {
++#include "../../arch/PowerPC/PPCGenAliasNameIndex.inc"
++	};
++	cs_struct handle = { 0 };
++	cs_insn insn = { 0 };
++	MCInst mi = { 0 };
++	SStream stream = { 0 };
++	handle.arch = CS_ARCH_PPC;
++	mi.csh = &handle;
++	mi.flat_insn = &insn;
++	mi.isAliasInstr = true;
++	if (ARR_SIZE(original) != ARR_SIZE(indexed))
++		return false;
++	for (size_t i = 0; original[i].name; ++i) {
++		if (indexed[i].id != original[i].id ||
++		    strcmp(indexed[i].name, original[i].name) != 0)
++			return false;
++		snprintf(stream.buffer, sizeof(stream.buffer), "\t%s r3", original[i].name);
++		map_set_alias_id(&mi, &stream, original, ARR_SIZE(original));
++		uint64_t expected = insn.alias_id;
++		insn.alias_id = UINT64_MAX;
++		PPC_setAliasId(&mi, &stream, indexed, PPC_ALIAS_BUCKET_MASK);
++		if (insn.alias_id != expected)
++			return false;
++	}
++	return true;
++}
++#endif
++
+ static bool test_full_group_map(void)
+ {
+ #ifndef CAPSTONE_DIET
+@@ -257,6 +299,10 @@ static bool test_full_group_map(void)
+ 
+ int main(void)
+ {
++#ifdef PPC_INDEXED_ALIAS_NAMES
++	if (!test_powerpc_alias_names())
++		return 1;
++#endif
+ #ifdef CAPSTONE_USE_ALIAS_TRIE
+ 	if (!test_generated_alias_lookup())
+ 		return 1;
