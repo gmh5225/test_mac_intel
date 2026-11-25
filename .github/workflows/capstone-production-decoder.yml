@@ -1,7 +1,7 @@
-name: Measure MIPS alias construction on the full NeverD decode product and existing PE and ELF workloads
+name: Qualify AMD64 grouped memory output in actual NeverD with the LLVM fork built from source
 on:
   push:
-    branches: [codex/mips-stream-full-neverd-controls]
+    branches: [codex/amd64-memory-groups-full-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-stream-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: amd64-grouped-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

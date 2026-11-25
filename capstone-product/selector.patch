@@ -1,208 +1,64 @@
-diff --git a/arch/Mips/MipsInstPrinter.c b/arch/Mips/MipsInstPrinter.c
-index 5c23890c..0c2ff671 100644
---- a/arch/Mips/MipsInstPrinter.c
-+++ b/arch/Mips/MipsInstPrinter.c
-@@ -510,15 +510,41 @@ static void printFCCOperand(MCInst *MI, int opNum, SStream *O)
- 			MipsFCCToString((Mips_CondCode)MCOperand_getImm(MO)));
- }
- 
--static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
--		       unsigned OpNo, SStream *OS, bool IsBranch)
-+static void printAliasMnemonic(SStream *OS, const char *Str, size_t NameLen)
- {
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+	/* Ordinary output writes the tab, alias and operand separator together.
-+	 * Markup and user formatters observe their original append boundaries. */
-+	if (cs_vsnprintf == cs_default_vsnprintf && !OS->is_closed &&
-+	    !OS->markup_stream && OS->index < SSTREAM_BUF_LEN - 2) {
-+		if (NameLen < SSTREAM_BUF_LEN - 2 - OS->index) {
-+			char *out = OS->buffer + OS->index;
-+			*out++ = '\t';
-+			memcpy(out, Str, NameLen);
-+			memcpy(out + NameLen, "\t", 2);
-+			OS->index += NameLen + 2;
-+			return;
-+		}
-+	}
-+#else
-+	(void)NameLen;
-+#endif
- #if defined(CAPSTONE_MIPS_ONLY) && !defined(CAPSTONE_DIET)
- 	SStream_concat2(OS, "\t", Str);
- #else
- 	SStream_concat(OS, "%s%s", "\t", Str);
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..138738a6 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -27,6 +27,12 @@
  #endif
- 	SStream_concat0(OS, "\t");
+ 
+ #include "X86GenSimpleOutput.inc"
++#include "X86GenIndirect64Output.inc"
++#define X86_MEMORY_IMMEDIATE writeGroupByteImmediate64
++#define X86_IMMEDIATE_WIDE 1
++#include "X86MemoryOutputImpl.h"
++#undef X86_IMMEDIATE_WIDE
++#undef X86_MEMORY_IMMEDIATE
+ #ifdef CAPSTONE_X86_ONLY
+ #include "X86VexBaseMemory.h"
+ #endif
+@@ -152,6 +158,37 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+ }
+ #endif
+ 
++/* CMP and TEST with imm8, and near indirect CALL/JMP, share the address
++ * reader. The opcode extension selects a generated operand and effects row. */
++static bool writeGroupMemory64(cs_struct *handle, const uint8_t *code,
++			       size_t size, cs_insn *insn, uint16_t *length)
++{
++	const unsigned lead = (code[0] & 0xf0) == 0x40;
++	if (size <= lead)
++		return false;
++	const uint8_t opcode = code[lead];
++	if ((opcode != 0x80 && opcode != 0xf6 && opcode != 0xff) ||
++	    size < lead + 2)
++		return false;
++	const uint8_t mr = code[lead + 1];
++	const unsigned group = (mr >> 3) & 7;
++	if (mr >= 0xc0 || (opcode == 0x80 && group != 7) ||
++	    (opcode == 0xf6 && group != 0) ||
++	    (opcode == 0xff && group != 2 && group != 4))
++		return false;
++	if (X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	if (opcode == 0xff)
++		return X86_writeMemoryOutput(code, size, insn, length,
++					     &x86_indirect64[lead][group == 4],
++					     x86_simple_registers);
++	const unsigned bank = lead ? 1 + ((code[0] >> 3) & 1) : 0;
++	const unsigned form = opcode == 0xf6 ? 0x84 : 0x38;
++	const unsigned row = x86_simple_plans[1][bank][form] >> 2;
++	return writeGroupByteImmediate64(code, size, insn, length,
++					 &x86_simple_outputs[row], x86_simple_registers);
 +}
 +
-+#define MIPS_ALIAS_NAME(name) name, (sizeof(name) - 1)
-+
-+static bool printAlias(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
-+		       unsigned OpNo, SStream *OS, bool IsBranch)
-+{
-+	printAliasMnemonic(OS, Str, NameLen);
- 	if (IsBranch)
- 		printBranchOperand((MCInst *)MI, Address, OpNo, OS);
- 	else
-@@ -526,11 +552,11 @@ static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
- 	return true;
- }
- 
--static bool printAlias2(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias2(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, SStream *OS,
- 			bool IsBranch)
- {
--	printAlias(Str, MI, Address, OpNo0, OS, IsBranch);
-+	printAlias(Str, NameLen, MI, Address, OpNo0, OS, IsBranch);
- 	SStream_concat0(OS, ", ");
- 	if (IsBranch)
- 		printBranchOperand((MCInst *)MI, Address, OpNo1, OS);
-@@ -539,11 +565,11 @@ static bool printAlias2(const char *Str, const MCInst *MI, uint64_t Address,
- 	return true;
- }
- 
--static bool printAlias3(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias3(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, unsigned OpNo2,
- 			SStream *OS)
- {
--	printAlias(Str, MI, Address, OpNo0, OS, false);
-+	printAlias(Str, NameLen, MI, Address, OpNo0, OS, false);
- 	SStream_concat0(OS, ", ");
- 	printOperand((MCInst *)MI, OpNo1, OS);
- 	SStream_concat0(OS, ", ");
-@@ -559,89 +585,91 @@ static bool printAlias4(const MCInst *MI, uint64_t Address, SStream *OS)
- 		// beq $zero, $zero, $L2 => b $L2
- 		// beq $r0, $zero, $L2 => beqz $r0, $L2
- 		return (isReg(MI, 0, Mips_ZERO) && isReg(MI, 1, Mips_ZERO) &&
--			printAlias("b", MI, Address, 2, OS, true)) ||
-+			printAlias(MIPS_ALIAS_NAME("b"), MI, Address, 2, OS, true)) ||
- 		       (isReg(MI, 1, Mips_ZERO) &&
--			printAlias2("beqz", MI, Address, 0, 2, OS, true));
-+			printAlias2(MIPS_ALIAS_NAME("beqz"), MI, Address, 0, 2, OS, true));
- 	case Mips_BEQ64:
- 		// beq $r0, $zero, $L2 => beqz $r0, $L2
- 		return isReg(MI, 1, Mips_ZERO_64) &&
--		       printAlias2("beqz", MI, Address, 0, 2, OS, true);
-+		       printAlias2(MIPS_ALIAS_NAME("beqz"), MI, Address, 0, 2, OS, true);
- 	case Mips_BNE:
- 	case Mips_BNE_MM:
- 		// bne $r0, $zero, $L2 => bnez $r0, $L2
- 		return isReg(MI, 1, Mips_ZERO) &&
--		       printAlias2("bnez", MI, Address, 0, 2, OS, true);
-+		       printAlias2(MIPS_ALIAS_NAME("bnez"), MI, Address, 0, 2, OS, true);
- 	case Mips_BNE64:
- 		// bne $r0, $zero, $L2 => bnez $r0, $L2
- 		return isReg(MI, 1, Mips_ZERO_64) &&
--		       printAlias2("bnez", MI, Address, 0, 2, OS, true);
-+		       printAlias2(MIPS_ALIAS_NAME("bnez"), MI, Address, 0, 2, OS, true);
- 	case Mips_BGEZAL:
- 		// bgezal $zero, $L1 => bal $L1
- 		return isReg(MI, 0, Mips_ZERO) &&
--		       printAlias("bal", MI, Address, 1, OS, true);
-+		       printAlias(MIPS_ALIAS_NAME("bal"), MI, Address, 1, OS, true);
- 	case Mips_BC1T:
- 		// bc1t $fcc0, $L1 => bc1t $L1
- 		return isReg(MI, 0, Mips_FCC0) &&
--		       printAlias("bc1t", MI, Address, 1, OS, true);
-+		       printAlias(MIPS_ALIAS_NAME("bc1t"), MI, Address, 1, OS, true);
- 	case Mips_BC1F:
- 		// bc1f $fcc0, $L1 => bc1f $L1
- 		return isReg(MI, 0, Mips_FCC0) &&
--		       printAlias("bc1f", MI, Address, 1, OS, true);
-+		       printAlias(MIPS_ALIAS_NAME("bc1f"), MI, Address, 1, OS, true);
- 	case Mips_JALR:
- 		// jalr $zero, $r1 => jr $r1
- 		// jalr $ra, $r1 => jalr $r1
- 		return (isReg(MI, 0, Mips_ZERO) &&
--			printAlias("jr", MI, Address, 1, OS, false)) ||
-+			printAlias(MIPS_ALIAS_NAME("jr"), MI, Address, 1, OS, false)) ||
- 		       (isReg(MI, 0, Mips_RA) &&
--			printAlias("jalr", MI, Address, 1, OS, false));
-+			printAlias(MIPS_ALIAS_NAME("jalr"), MI, Address, 1, OS, false));
- 	case Mips_JALR64:
- 		// jalr $zero, $r1 => jr $r1
- 		// jalr $ra, $r1 => jalr $r1
- 		return (isReg(MI, 0, Mips_ZERO_64) &&
--			printAlias("jr", MI, Address, 1, OS, false)) ||
-+			printAlias(MIPS_ALIAS_NAME("jr"), MI, Address, 1, OS, false)) ||
- 		       (isReg(MI, 0, Mips_RA_64) &&
--			printAlias("jalr", MI, Address, 1, OS, false));
-+			printAlias(MIPS_ALIAS_NAME("jalr"), MI, Address, 1, OS, false));
- 	case Mips_NOR:
- 	case Mips_NOR_MM:
- 	case Mips_NOR_MMR6:
- 		// nor $r0, $r1, $zero => not $r0, $r1
- 		return isReg(MI, 2, Mips_ZERO) &&
--		       printAlias2("not", MI, Address, 0, 1, OS, false);
-+		       printAlias2(MIPS_ALIAS_NAME("not"), MI, Address, 0, 1, OS, false);
- 	case Mips_NOR64:
- 		// nor $r0, $r1, $zero => not $r0, $r1
- 		return isReg(MI, 2, Mips_ZERO_64) &&
--		       printAlias2("not", MI, Address, 0, 1, OS, false);
-+		       printAlias2(MIPS_ALIAS_NAME("not"), MI, Address, 0, 1, OS, false);
- 	case Mips_OR:
- 	case Mips_ADDu:
- 		// or $r0, $r1, $zero => move $r0, $r1
- 		// addu $r0, $r1, $zero => move $r0, $r1
- 		return isReg(MI, 2, Mips_ZERO) &&
--		       printAlias2("move", MI, Address, 0, 1, OS, false);
-+		       printAlias2(MIPS_ALIAS_NAME("move"), MI, Address, 0, 1, OS, false);
- 	case Mips_LI48_NM:
- 	case Mips_LI16_NM:
- 		// li[16/48] $r0, imm => li $r0, imm
--		return printAlias2("li", MI, Address, 0, 1, OS, false);
-+		return printAlias2(MIPS_ALIAS_NAME("li"), MI, Address, 0, 1, OS, false);
- 	case Mips_ADDIU_NM:
- 	case Mips_ADDIUNEG_NM:
- 		if (isReg(MI, 1, Mips_ZERO_NM))
--			return printAlias2("li", MI, Address, 0, 2, OS, false);
-+			return printAlias2(MIPS_ALIAS_NAME("li"), MI, Address, 0, 2, OS, false);
- 		else
--			return printAlias3("addiu", MI, Address, 0, 1, 2, OS);
-+			return printAlias3(MIPS_ALIAS_NAME("addiu"), MI, Address, 0, 1, 2, OS);
- 	case Mips_ADDIU48_NM:
- 	case Mips_ADDIURS5_NM:
- 	case Mips_ADDIUR1SP_NM:
- 	case Mips_ADDIUR2_NM:
- 	case Mips_ADDIUGPB_NM:
- 	case Mips_ADDIUGPW_NM:
--		return printAlias3("addiu", MI, Address, 0, 1, 2, OS);
-+		return printAlias3(MIPS_ALIAS_NAME("addiu"), MI, Address, 0, 1, 2, OS);
- 	case Mips_ANDI16_NM:
- 	case Mips_ANDI_NM:
- 		// andi[16/32] $r0, $r1, imm => andi $r0, $r1, imm
--		return printAlias3("andi", MI, Address, 0, 1, 2, OS);
-+		return printAlias3(MIPS_ALIAS_NAME("andi"), MI, Address, 0, 1, 2, OS);
- 	default:
- 		return false;
+ /* The fixed-width AMD64 iterator has already tried its common records. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -241,6 +278,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	}
- }
-+#undef MIPS_ALIAS_NAME
-+
- 
- static void printRegisterList(MCInst *MI, int opNum, SStream *O)
- {
-diff --git a/arch/Mips/MipsInstPrinter.h b/arch/Mips/MipsInstPrinter.h
-index f082c91d..fd1f5123 100644
---- a/arch/Mips/MipsInstPrinter.h
-+++ b/arch/Mips/MipsInstPrinter.h
-@@ -144,12 +144,12 @@ DECLARE_printUImm_2(6, 2);
- static void printMemOperand(MCInst *MI, int opNum, SStream *O);
- static void printMemOperandEA(MCInst *MI, int opNum, SStream *O);
- static void printFCCOperand(MCInst *MI, int opNum, SStream *O);
--static bool printAlias(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 		       unsigned OpNo, SStream *OS, bool IsBranch);
--static bool printAlias2(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias2(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, SStream *OS,
- 			bool IsBranch);
--static bool printAlias3(const char *Str, const MCInst *MI, uint64_t Address,
-+static bool printAlias3(const char *Str, size_t NameLen, const MCInst *MI, uint64_t Address,
- 			unsigned OpNo0, unsigned OpNo1, unsigned OpNo2,
- 			SStream *OS);
- static bool printAlias4(const MCInst *MI, uint64_t Address, SStream *OS);
+ #endif
+ fallback:
++	if (writeGroupMemory64(handle, code, size, insn, insn_size))
++		return true;
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+ 	/* The fixed AMD64 decoder has just tried the shared output plans.
