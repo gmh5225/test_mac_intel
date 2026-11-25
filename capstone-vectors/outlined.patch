@@ -1,44 +1,46 @@
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..bf248e97 100644
+index 504682a4..98ac14a9 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -27,6 +27,12 @@
+@@ -27,6 +27,16 @@
  #endif
  
  #include "X86GenSimpleOutput.inc"
++#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
++	!defined(CAPSTONE_X86_ONLY)
++#define X86_GROUP_MEMORY_OUTPUT
 +#include "X86GenIndirect64Output.inc"
 +#define X86_MEMORY_IMMEDIATE writeGroupByteImmediate64
 +#define X86_IMMEDIATE_WIDE 1
 +#include "X86MemoryOutputImpl.h"
 +#undef X86_IMMEDIATE_WIDE
 +#undef X86_MEMORY_IMMEDIATE
++#endif
  #ifdef CAPSTONE_X86_ONLY
  #include "X86VexBaseMemory.h"
  #endif
-@@ -152,6 +158,40 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+@@ -152,6 +162,39 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
  }
  #endif
  
++#ifdef X86_GROUP_MEMORY_OUTPUT
 +/* CMP and TEST with imm8, and near indirect CALL/JMP, share the address
 + * reader. The opcode extension selects a generated operand and effects row. */
 +static bool writeGroupMemory64(cs_struct *handle, const uint8_t *code,
 +			       size_t size, cs_insn *insn, uint16_t *length)
 +{
-+	/* A set bit identifies an opcode extension with a single memory
-+	 * address that the shared writers can consume. */
-+	static const uint8_t groups[256] = {
-+		[0x80] = 1u << 7, [0xf6] = 1u, [0xff] = (1u << 2) | (1u << 4),
-+	};
 +	const unsigned lead = (code[0] & 0xf0) == 0x40;
 +	if (size <= lead)
 +		return false;
 +	const uint8_t opcode = code[lead];
-+	const unsigned allowed = groups[opcode];
-+	if (!allowed || size < lead + 2)
++	if ((opcode != 0x80 && opcode != 0xf6 && opcode != 0xff) ||
++	    size < lead + 2)
 +		return false;
 +	const uint8_t mr = code[lead + 1];
 +	const unsigned group = (mr >> 3) & 7;
-+	if (mr >= 0xc0 || !(allowed & (1u << group)))
++	if (mr >= 0xc0 || (opcode == 0x80 && group != 7) ||
++	    (opcode == 0xf6 && group != 0) ||
++	    (opcode == 0xff && group != 2 && group != 4))
 +		return false;
 +	if (X86_OUTPUT_UNSUPPORTED(handle, false))
 +		return false;
@@ -52,16 +54,19 @@ index 504682a4..bf248e97 100644
 +	return writeGroupByteImmediate64(code, size, insn, length,
 +					 &x86_simple_outputs[row], x86_simple_registers);
 +}
++#endif
 +
  /* The fixed-width AMD64 iterator has already tried its common records. */
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -241,6 +281,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -241,6 +284,10 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	}
  #endif
  fallback:
++#ifdef X86_GROUP_MEMORY_OUTPUT
 +	if (writeGroupMemory64(handle, code, size, insn, insn_size))
 +		return true;
++#endif
  #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
  	defined(__x86_64__)
  	/* The fixed AMD64 decoder has just tried the shared output plans.
