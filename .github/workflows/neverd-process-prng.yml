@@ -1,0 +1,42 @@
+name: Check the documented ProcessPrng ABI on installed Windows
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths: [.github/workflows/neverd-process-prng.yml, native-driver-entry/process_prng.c]
+permissions:
+  contents: read
+jobs:
+  sdk-caller:
+    strategy:
+      matrix:
+        include:
+          - {runner: windows-2025, target: x86, bits: 32, system: SysWOW64}
+          - {runner: windows-2025, target: x64, bits: 64, system: System32}
+          - {runner: windows-11-arm, target: arm64, bits: 64, system: System32}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: native-driver-entry
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.target }}
+      - name: Compile with the Windows SDK and call the signed system export
+        shell: pwsh
+        run: |
+          cl /nologo /std:c17 /W4 /WX /O2 native-driver-entry/process_prng.c /Fe:check-prng.exe
+          if ($LASTEXITCODE) { throw "C build returned $LASTEXITCODE" }
+          $json = & .\check-prng.exe
+          if ($LASTEXITCODE) { throw "Runtime returned $LASTEXITCODE" }
+          $observed = $json | ConvertFrom-Json
+          if ($observed.pointer_bits -ne ${{ matrix.bits }} -or $observed.result_bits -ne 32 -or $observed.calls -ne 5) { throw 'Unexpected SDK ABI' }
+          $file = Join-Path $env:SystemRoot '${{ matrix.system }}/bcryptprimitives.dll'
+          $sign = Get-AuthenticodeSignature $file
+          if ($sign.Status -ne 'Valid' -or $sign.SignerCertificate.Subject -notmatch 'Microsoft') { throw "Signature for $file is $($sign.Status)" }
+          [ordered]@{ target='${{ matrix.target }}'; dll_sha256=(Get-FileHash $file).Hash.ToLowerInvariant(); signer=$sign.SignerCertificate.Subject; observed=$observed } | ConvertTo-Json | Set-Content process-prng.json -Encoding utf8
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: process-prng-${{ matrix.target }}
+          path: process-prng.json
+          if-no-files-found: error
