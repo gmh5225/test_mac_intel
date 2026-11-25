@@ -58,13 +58,19 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        if label=='base':regenerated={}
+        tbl=(base/'arch/X86/X86GenPrinterQuick.inc').read_text().split('static const uint32_t X86RecipeRecords[] = {',1)[1].split('};',1)[0]
+        import re
+        values=[int(x) for x in re.findall(r'(\d+)U, //',tbl)]
+        assert len(values)==15289
+        if label=='base':
+            orig=[(x&524287,x>>19)for x in values]
+            generated={}
         else:
-            run(sys.executable,'-B',base/'suite/synctools/x86_register_name_sizes.py','--check')
-            run('clang','-std=c11','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',r/'register-check.c',lib,'-o',w/'register-check')
-            counts=list(map(int,get(w/'register-check').split()))
-            assert counts[0]==276 and counts[1]>250000
-            regenerated[label]=counts;save('regeneration',regenerated)
+            assert [(x&524287,x>>24)for x in values]==orig
+            lengths=[(v>>19)&31 for v in values];assert sum(1 for x in lengths if x)==6870 and max(lengths)==16
+            generated[label]=dict(records=len(values),hints=sum(map(bool,lengths)),max_length=max(lengths));save('regeneration',generated)
+        run('clang','-std=c11','-O2','-I',base,'-I',base/'include',r/'callback.c',lib,'-o',w/'callback')
+        callback=int(get(w/'callback'));assert callback==288;save('callback-'+label,dict(cases=callback))
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
