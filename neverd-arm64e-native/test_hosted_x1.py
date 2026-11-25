@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 import hosted_x1 as hosted
 
@@ -66,6 +67,62 @@ class HostedFeatureTests(unittest.TestCase):
             if name == section:
                 row = hosted.CONFIG["feature_row"].format(feature=label, result=hosted.CONFIG["unmeasured"])
                 self.assertIn(row, summary)
+
+    def test_complete_result_requires_the_environment_and_q_on_the_same_host(self):
+        gate = self.policy["x1_qualification"]
+        gate.update(CASES["full_hosted_gate"])
+        ordered = self.policy["ordered_probe"]
+        q_key = ordered["qualified_key"]
+        for environment in (False, True):
+            for q in (False, True):
+                with self.subTest(environment=environment, q=q):
+                    complete = environment and q
+                    status = self.policy["passed" if complete else "unavailable"]
+                    self.features[ordered["mode"]][q_key] = q
+                    self.save(ordered["mode"], self.policy["passed" if q else "unavailable"])
+                    self.report.update({
+                        "status": status,
+                        "missing": [] if q else [{"feature": q_key}],
+                        gate["qualified_key"]: environment,
+                        gate["complete_key"]: complete,
+                        q_key: q,
+                    })
+                    args = (self.policy, self.report, self.report["source_revision"],
+                            self.policy["exit_codes"][status], ordered["mode"], self.output)
+                    summary = hosted.summarize(*args)
+                    self.assertIn(hosted.CONFIG["complete_summary"].format(
+                        environment=json.dumps(environment), complete=status), summary)
+                    self.report[gate["complete_key"]] = not complete
+                    with self.assertRaises(ValueError):
+                        hosted.summarize(*args)
+
+    def test_measure_records_the_selected_mode_cpu_and_report_digest(self):
+        source = self.output / CASES["source_directory"]
+        policy_path = source / hosted.CONFIG["policy"]
+        policy_path.parent.mkdir(parents=True)
+        gate = self.policy["x1_qualification"]
+        report_path = self.output / self.policy["report_name"]
+        revision = self.report["source_revision"]
+        env = {"SOURCE_REVISION": revision, "GITHUB_STEP_SUMMARY": str(source / hosted.CONFIG["host_record"])}
+        for full in (False, True):
+            if full:
+                gate.update(CASES["full_hosted_gate"])
+                self.report[gate["complete_key"]] = False
+                self.report[self.policy["ordered_probe"]["qualified_key"]] = False
+            policy_path.write_text(json.dumps(self.policy))
+            report_path.write_text(json.dumps(self.report))
+            mode = gate["complete_mode" if full else "mode"]
+            with self.subTest(mode=mode), mock.patch.dict(hosted.os.environ, env), \
+                    mock.patch.object(hosted.subprocess, "check_output", return_value=CASES["host_cpu"]), \
+                    mock.patch.object(hosted.subprocess, "run") as run:
+                run.return_value.returncode = self.policy["exit_codes"][self.report["status"]]
+                hosted.measure(source, self.output)
+                self.assertIn(mode, run.call_args_list[0].args[0])
+                identity = json.loads((self.output / hosted.CONFIG["host_record"]).read_text())
+                self.assertEqual(identity, {
+                    "hardware": CASES["host_cpu"], "source_revision": revision, "mode": mode,
+                    "report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
+                })
 
     def test_failed_measurement_and_invalid_receipts(self):
         section, key, label = hosted.CONFIG["feature_rows"][0]
