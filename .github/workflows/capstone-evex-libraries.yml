@@ -1,7 +1,7 @@
-name: Compare iced and Capstone from every linked image on the same host, source, addresses and complete PE32 and libmvec sections
+name: Pair both SIMD output syntaxes with each iced formatter in the same executable on PuTTY PE32, libmvec and OpenSSL
 on:
   push:
-    branches: [codex/iced-same-image-sse-and-scalar-alu]
+    branches: [codex/paired-intel-and-att-specialized-vector-writers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: linked-engine-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: simd-syntax-pair-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

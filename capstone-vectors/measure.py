@@ -54,27 +54,33 @@ try:
             run('git','-C',base,'apply','--index',patch)
         assert get('git','-C',base,'write-tree').strip()==z['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        archives[tag]=sha(lib);exe=w/('att-'+tag)
-        run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',exe)
-        images[tag]=exe.read_bytes()
-        with exe.open('rb') as stream:
-            elf=ELFFile(stream);table=elf.get_section_by_name('.symtab')
-            selected={}
-            for sym in table.iter_symbols():
-                if sym['st_info']['type']!='STT_FUNC' or not sym['st_size']:continue
-                if sym.name not in ('iced_run','cs_disasm_iter','cs_regs_access','X86_tryATTOutput','X86_reg_access') and not ('iced_x86' in sym.name and 'GasFormatter' in sym.name):continue
-                section=elf.get_section(sym['st_shndx'])
-                off=sym['st_value']-section['sh_addr']
-                raw=section.data()[off:off+sym['st_size']]
-                assert len(raw)==sym['st_size']
-                selected[sym.name]=[sym['st_value'],len(raw),hashlib.sha256(raw).hexdigest()]
+        archives[tag]=sha(lib)
+        for syntax,driver,formatter in [('att','att-bench.o',gas_lib),('intel','driver.o',ice_lib)]:
+            key=syntax+'/'+tag;exe=w/(syntax+'-'+tag)
+            run('clang++',w/driver,lib,formatter,*flags,'-o',exe)
+            images[key]=exe.read_bytes();selected={};sections={}
+            with exe.open('rb')as stream:
+                elf=ELFFile(stream);table=elf.get_section_by_name('.symtab')
+                for sym in table.iter_symbols():
+                    if sym['st_info']['type']!='STT_FUNC' or not sym['st_size']:continue
+                    if not any(t in sym.name for t in ('iced_run','cs_disasm_iter','cs_regs_access','X86_reg_access','PackedMemory','PackedVex64','LegacyPacked64','BareSse64','EvexShiftRegisters')):continue
+                    idx=sym['st_shndx'];sec=elf.get_section(idx)
+                    if idx not in sections:sections[idx]=sec.data()
+                    off=sym['st_value']-sec['sh_addr']
+                    raw=sections[idx][off:off+sym['st_size']]
+                    assert len(raw)==sym['st_size']
+                    selected[sym.name]=[sym['st_value'],len(raw),hashlib.sha256(raw).hexdigest()]
             assert {'iced_run','cs_disasm_iter','cs_regs_access','X86_reg_access'}<=set(selected)
-            symbols[tag]=selected
+            if tag in ('entries','memory'):
+                assert all('X86_writeATT'+n in selected for n in ('PackedVex64','LegacyPacked64','BareSse64','EvexShiftRegisters'))
+            if tag=='memory':
+                assert 'writePackedMemoryMnemonic' not in selected
+            symbols[key]=selected
     save('symbols',symbols)
     hashes={k:hashlib.sha256(v).hexdigest()for k,v in images.items()}
     length=max(map(len,images.values()))
     images={k:v.ljust(length,b'\0')for k,v in images.items()}
-    path=w/'selected';shutil.copy2(w/'att-shipping',path);path.write_bytes(images['shipping'])
+    path=w/'selected';shutil.copy2(w/'att-shipping',path);path.write_bytes(images['att/shipping'])
     inode=path.stat().st_ino;verified={};pages=[i for i in range(0,length,4096) if len({v[i:i+4096]for v in images.values()})>1]
     assert pages and len(set(hashes.values()))==len(images)
     def select(tag):
@@ -94,38 +100,55 @@ try:
     (w/'pe-images.json').write_text(json.dumps(putty_records))
     putty,=pe_panels.prepare(w)
     vec=('libmvec-amd64',64,w/'libmvec.text',[(0,meta['bytes'],meta['address'])],meta)
-    host=dict(cpu=get('lscpu'),affinity=sorted(os.sched_getaffinity(0)),source=sources,compiler=get('clang','--version').splitlines()[0],neverd=dev,iced=m['iced_revision'],rust_archive=sha(gas_lib),drivers=rd(r/'gas-sources.json'),archives=archives,images=hashes)
+    host=dict(cpu=get('lscpu'),affinity=sorted(os.sched_getaffinity(0)),source=sources,compiler=get('clang','--version').splitlines()[0],neverd=dev,iced=m['iced_revision'],rust_archives=dict(att=sha(gas_lib),intel=sha(ice_lib)),drivers=rd(r/'gas-sources.json'),archives=archives,images=hashes)
     save('host',host);panels={}
-    for name,bits,blob,spans,_ in (vec,putty):
-        ranges=w/(name+'.tsv');ranges.write_text(''.join('%d %d %d\n'%tuple(row)for row in spans))
-        spec=m['provenance'][name];assert sha(blob)==spec['text_sha256'] and sha(ranges)==spec['extent_sha256'] and len(spans)==1
-        expected_counts=[25021,0] if bits==64 else [282906,3]
-        for tag in sources:
-            select(tag)
-            audit=list(map(int,get(*prefix,'audit','0','1',blob,ranges,str(bits)).split()))
-            assert audit[1]==audit[5]==blob.stat().st_size and audit[3]==audit[4]==sum(expected_counts)
-        for mode in (1,2):
-            def sample(label,n):
-                tag,engine=label.split('/');select(tag)
-                res=list(map(int,get(*prefix,engine,str(mode),str(n),blob,ranges,str(bits)).split()))
-                assert len(res)==6 and res[2:4]==[n*x for x in expected_counts]
-                return res
-            labels=[tag+'/'+engine for tag in sources for engine in ('iced','capstone')]
-            n=max(1,math.ceil(18e6/min(sample(key,1)[0]for key in labels)))
-            expected={k:sample(k,n)[2:] for k in labels}
-            assert len({tuple(v[:3])for v in expected.values()})==1
-            assert len({tuple(expected[tag+'/iced'])for tag in sources})==1
-            assert len({tuple(expected[tag+'/capstone'])for tag in sources if tag!='shipping'})==1
-            cycles=[];rng=random.Random(name+'/linked-iced/'+str(mode))
-            for i in range(17):
-                order=labels.copy();rng.shuffle(order);row={k:[0,0]for k in labels}
-                for k in order+order[::-1]:
-                    res=sample(k,n);assert res[2:]==expected[k]
-                    for clock in (0,1):row[k][clock]+=res[clock]
-                cycles.append(row)
-            panels[name+'/'+str(mode)]=dict(source_sha256=sha(blob),extents=sha(ranges),repeats=n,checks=expected,cycles=cycles)
-            save('observations',panels)
-    assert set(verified)==set(sources)
+    import frozen_deb
+    bits_inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in bits_inputs.items()if n=='libssl3t64-amd64'}))
+    ssl,=frozen_deb.prepare(w)
+    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
+    for name,bits,blob,spans,_ in (vec,putty,ssl):
+        spec=m['provenance'][name]
+        spans=[s for s in spans if tuple(s) not in {tuple(a[:3])for a in spec['excluded_incompatible_extents']}]
+        ranges=w/(name+'.tsv')
+        def emit():ranges.write_text(''.join('%d %d %d\\n'%tuple(row)for row in spans))
+        emit()
+        if m['samples'][name]=='simd-functions':
+            views=[list(map(int,z.split()))for z in get(w/'vectors',str(bits),blob,ranges).splitlines()]
+            assert len(views)==len(spans)
+            spans=[s for s,v in zip(spans,views)if v[1]>=8 and v[1]>=.15*v[0]]
+            emit()
+        assert sha(blob)==spec['text_sha256'] and sha(ranges)==spec['extent_sha256'] and len(spans)==spec['timed_functions']
+        counts=[]
+        for key in images:
+            select(key)
+            aud=[list(map(int,row.split()))for row in get(*prefix,'audit','0','1',blob,ranges,str(bits)).splitlines()]
+            assert len(aud)==len(spans) and all(a[1]==a[5] and a[3]==a[4] for a in aud)
+            samples=tuple(sum(z[i]for z in aud)for i in (1,3,4,5))
+            if counts:assert counts[0]==samples
+            counts.append(samples)
+        for syntax,engines in [('att',('capstone','iced')),('intel',('private','iced','fast'))]:
+            for mode in (1,2):
+                def sample(label,n):
+                    tag,engine=label.split('/');select(syntax+'/'+tag)
+                    res=list(map(int,get(*prefix,engine,str(mode),str(n),blob,ranges,str(bits)).split()))
+                    assert len(res)==6 and sum(res[2:4])==n*counts[0][1]
+                    return res
+                labels=[tag+'/'+engine for tag in sources for engine in engines]
+                n=max(1,math.ceil(18e6/min(sample(key,1)[0]for key in labels)))
+                expected={k:sample(k,n)[2:]for k in labels}
+                assert len({tuple(v[:3])for v in expected.values()})==1
+                for engine in engines:
+                    assert len({tuple(expected[t+'/'+engine])for t in sources if engine in ('iced','fast')or t!='shipping'})==1
+                cycles=[];rng=random.Random(name+'/'+syntax+'/syntax-entry/'+str(mode))
+                for _ in range(17):
+                    order=labels.copy();rng.shuffle(order);row={k:[0,0]for k in labels}
+                    for k in order+order[::-1]:
+                        res=sample(k,n);assert res[2:]==expected[k]
+                        for clock in (0,1):row[k][clock]+=res[clock]
+                    cycles.append(row)
+                panels[name+'/'+syntax+'/'+str(mode)]=dict(source_sha256=sha(blob),extents=sha(ranges),repeats=n,checks=expected,cycles=cycles)
+                save('observations',panels)
+    assert set(verified)==set(images) and len(panels)==12
     save('complete',dict(complete=True,source=sources,panels=sorted(panels),inode=inode,pages=len(pages),staged=verified))
 finally:
     amount=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink())
