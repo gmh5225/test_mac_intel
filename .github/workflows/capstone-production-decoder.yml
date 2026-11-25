@@ -1,7 +1,7 @@
-name: Validate ordered PowerPC alias lookup in fully linked NeverD with current LLVM sources
+name: Build full NeverD and current source LLVM to qualify indexed PowerPC names on real files
 on:
   push:
-    branches: [codex/ppc-ordered-full-product]
+    branches: [codex/ppc-indexed-names-neverd-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: b26e3812d16e6962f90153a677c6e1e5466d0e88
+          ref: a054f3bf5f207c8fbc701f5e29a384e0b308acf1
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "b26e3812d16e6962f90153a677c6e1e5466d0e88"
+          test "$(git rev-parse HEAD)" = "a054f3bf5f207c8fbc701f5e29a384e0b308acf1"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ordered-ppc-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: indexed-ppc-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
