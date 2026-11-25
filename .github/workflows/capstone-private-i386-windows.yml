@@ -1,7 +1,7 @@
-name: Verify dedicated RISC-V register printing across compilers, linkages, real ELF programs and identical mixed products
+name: Verify dedicated MIPS register output and DIET across Windows Linux and macOS
 on:
   push:
-    branches: [codex/riscv-dedicated-canonical-short-register]
+    branches: [codex/mips-spelling-portable-builds]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 994ce74539381ccfe41411455924c8933825d004
+          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-dedicated-register-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: mips-name-linkages-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7
