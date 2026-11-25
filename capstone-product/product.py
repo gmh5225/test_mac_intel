@@ -125,7 +125,7 @@ try:
     assert m['oracle']==m['layout']
     products['oracle']=products['layout'];identities['oracle']=identities['layout']
     save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-layout.json').read_text()))
-    expected=1 if os.uname().machine=="aarch64" else 3
+    expected=3 if os.uname().machine=="aarch64" else 1
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -136,7 +136,7 @@ try:
     image=t/'selected';image.write_bytes(imgs['base'])
     inode=image.stat().st_ino;block=4096
     offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
-    assert bool(offsets)==(os.uname().machine!="aarch64")
+    assert bool(offsets)==(os.uname().machine=="aarch64")
     checked={}
     def execute(k,case,mode,reps):
         # Touch exactly the same file pages, in the same order, before every exec.
