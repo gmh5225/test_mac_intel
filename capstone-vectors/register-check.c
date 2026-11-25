@@ -1,7 +1,6 @@
 /* Compare the compiled bounded printer with the canonical generated spellings. */
 #define X86_Intel_printInstructionPrechecked test_print_instruction
 #include "arch/X86/X86IntelInstPrinterPrechecked.c"
-#include "arch/X86/X86GenRegisterName1.inc"
 #include <stdio.h>
 
 int main(void)
