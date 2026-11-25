@@ -1,35 +1,25 @@
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..3a4a8ffa 100644
+index 7afca7e4..8f27e8d9 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -159,15 +159,22 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+@@ -159,6 +159,20 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
  	}
  	if (primary != 0x0f) {
  		const uint8_t mr = code[has_rex + 1];
--		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
--		    X86_OUTPUT_UNSUPPORTED(handle, false))
-+		if (mr >= 0xc0)
++#ifdef CAPSTONE_X86_ONLY
++		if ((primary == 0x80 && (mr & 0x38) == 0x38) ||
++		    (primary == 0xf6 && !(mr & 0x38))) {
++			if (mr >= 0xc0 || X86_OUTPUT_UNSUPPORTED(handle, false))
++				return false;
++			/* Byte CMP and TEST ignore REX.W. Any REX shifts the
++			 * ModRM offset by one, as in the register/memory row. */
++			const unsigned form = primary == 0x80 ? 0x38 : 0x84;
++			const unsigned row = x86_simple_plans[1][has_rex][form] >> 2;
++			return writeMemoryImmediate64(code, size, insn, insn_size,
++						      &x86_simple_outputs[row],
++						      x86_simple_registers);
++		}
++#endif
+ 		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+ 		    X86_OUTPUT_UNSUPPORTED(handle, false))
  			return false;
--		const unsigned prefix_class =
--			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
--		/* The MOV store row carries its operand width and access. */
--		const unsigned row = x86_simple_plans[1][prefix_class]
--						     [0x88 | (primary & 1)] >>
--				     2;
-+		const unsigned extension = mr & 0x38;
-+		unsigned form;
-+		if ((primary & 0xfe) == 0xc6 && extension == 0)
-+			form = 0x88 | (primary & 1); /* MOV */
-+		else if (primary == 0x80 && extension == 0x38)
-+			form = 0x38; /* CMP r/m8, imm8 */
-+		else if (primary == 0xf6 && extension == 0)
-+			form = 0x84; /* TEST r/m8, imm8 */
-+		else
-+			return false;
-+		if (X86_OUTPUT_UNSUPPORTED(handle, false))
-+			return false;
-+		const unsigned bank = has_rex ? 1 + ((rex_byte >> 3) & 1) : 0;
-+		const unsigned row = x86_simple_plans[1][bank][form] >> 2;
- 		return writeMemoryImmediate64(code, size, insn, insn_size,
- 					      &x86_simple_outputs[row],
- 					      x86_simple_registers);

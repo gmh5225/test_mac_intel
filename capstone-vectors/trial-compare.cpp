@@ -293,4 +293,5 @@ int main(int argc,char **argv) {
     std::printf("%s[[%" PRIu64 ",%" PRIu64 "],[%" PRIu64 ",%" PRIu64 "],[%" PRIu64 ",%" PRIu64 "]]",i?",":"",cp[0],wall[0],cp[1],wall[1],cp[2],wall[2]);
   }
   std::puts("]}");
+    return 0;
 }

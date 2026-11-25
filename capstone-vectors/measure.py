@@ -24,9 +24,13 @@ try:
     (project/cm).write_bytes(sp.check_output(['git','-C',root,'show',dev+':'+cm]))
     v=get('git','-C',root,'show',dev+':CMakeLists.txt')
     (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Layers LANGUAGES C CXX)\n'+v[v.index('# --- Capstone (our fork'):v.index('# --- NeverD CMake helpers')])
-    run('cmake','-G','Ninja','-S',project,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+    mixed=w/'mixed'
+    run('cmake','-G','Ninja','-S',project,'-B',mixed,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+    options=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    run('cmake','-G','Ninja','-S',base,'-B',build,*options)
     run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
-    files={Path(c['file']).name for c in rd(build/'compile_commands.json')};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c'}<=files and 'X86PublicOutput.c' not in files
+    files={Path(c['file']).name for c in rd(build/'compile_commands.json')};assert {'X86PublicOutput.c','X86Sse64Output.c'}<=files and not {'MipsMapping.c','ARMMapping.c'}&files
+    mixed_hashes={}
     ad.mkdir()
     for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
@@ -66,15 +70,20 @@ try:
         assert len(set(projections.values()))==1
         save('generated-plans',projections)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        run('cmake','--build',mixed,'--target','capstone_static','--parallel','4')
+        archive,=mixed.rglob('libcapstone.a');objs={str(f.relative_to(mixed)):sha(f) for f in mixed.rglob('*.c.o')}
+        assert len(objs)>45 and any('ARMMapping.c.o' in name for name in objs)
+        run('clang++',w/'foreign.o',archive,'-no-pie','-o',w/('foreign-'+label))
+        mixed_hashes[label]=dict(objects=objs,archive=sha(archive),exe=sha(w/('foreign-'+label)))
+        save('mixed-identities',mixed_hashes);assert mixed_hashes[label]==mixed_hashes['base'],label
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
-        assert len(section_data)>=45
+        assert 20<=len(section_data)<len(objs)
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        assert 'CAPSTONE_X86_ONLY' in entry
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -119,7 +128,7 @@ try:
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
         guards[lbl]=dict(states=parts.stderr.count('case arch='),status=parts.returncode,stderr=parts.stderr.splitlines()[-8:])
         save('extra-states',guards)
-        assert parts.returncode==0 and guards[lbl]['states']==464
+        assert parts.returncode==0 and guards[lbl]['states']==48
         z=get(w/'trial-guard',w/'base.so',w/(lbl+'.so')).split()
         assert z==['2162688','999139'];guards[lbl]['scan']=[int(x)for x in z]
         guards[lbl]['vector_guard']=json.loads(get(w/'trial-vector-guard',w/'base.so',w/(lbl+'.so')))

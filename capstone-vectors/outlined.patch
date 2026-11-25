@@ -23,56 +23,48 @@ index 21414e7a..549cf0f0 100644
  					     x86_simple_registers);
  #endif
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..9c030a99 100644
+index 7afca7e4..368c1786 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -62,8 +62,8 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -62,8 +62,10 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
  	return true;
  }
  
 -#ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
++#if defined(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT) || defined(CAPSTONE_X86_ONLY)
  #include "X86GenIndirect64Output.inc"
++#endif
 +#ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
  
  /* FF /2 and /4 have one explicit 64-bit target. The register and memory
   * forms share their generated access, implicit register and group records. */
-@@ -91,6 +91,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -91,6 +93,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
  }
  
  #define X86_FIXED_INDIRECT writeIndirect64
-+#else
++#elif defined(CAPSTONE_X86_ONLY)
 +#define X86_FIXED_INDIRECT_MEMORY64
  #endif
  
  /* Only the bare VEX2 opcode plan enters here. Packed base-relative
-@@ -159,15 +161,22 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+@@ -159,6 +163,20 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
  	}
  	if (primary != 0x0f) {
  		const uint8_t mr = code[has_rex + 1];
--		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
--		    X86_OUTPUT_UNSUPPORTED(handle, false))
-+		if (mr >= 0xc0)
-+			return false;
-+		const unsigned extension = mr & 0x38;
-+		unsigned form;
-+		if ((primary & 0xfe) == 0xc6 && extension == 0)
-+			form = 0x88 | (primary & 1); /* MOV */
-+		else if (primary == 0x80 && extension == 0x38)
-+			form = 0x38; /* CMP r/m8, imm8 */
-+		else if (primary == 0xf6 && extension == 0)
-+			form = 0x84; /* TEST r/m8, imm8 */
-+		else
-+			return false;
-+		if (X86_OUTPUT_UNSUPPORTED(handle, false))
++#ifdef CAPSTONE_X86_ONLY
++		if ((primary == 0x80 && (mr & 0x38) == 0x38) ||
++		    (primary == 0xf6 && !(mr & 0x38))) {
++			if (mr >= 0xc0 || X86_OUTPUT_UNSUPPORTED(handle, false))
++				return false;
++			/* Byte CMP and TEST ignore REX.W. Any REX shifts the
++			 * ModRM offset by one, as in the register/memory row. */
++			const unsigned form = primary == 0x80 ? 0x38 : 0x84;
++			const unsigned row = x86_simple_plans[1][has_rex][form] >> 2;
++			return writeMemoryImmediate64(code, size, insn, insn_size,
++						      &x86_simple_outputs[row],
++						      x86_simple_registers);
++		}
++#endif
+ 		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
+ 		    X86_OUTPUT_UNSUPPORTED(handle, false))
  			return false;
--		const unsigned prefix_class =
--			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
--		/* The MOV store row carries its operand width and access. */
--		const unsigned row = x86_simple_plans[1][prefix_class]
--						     [0x88 | (primary & 1)] >>
--				     2;
-+		const unsigned bank = has_rex ? 1 + ((rex_byte >> 3) & 1) : 0;
-+		const unsigned row = x86_simple_plans[1][bank][form] >> 2;
- 		return writeMemoryImmediate64(code, size, insn, insn_size,
- 					      &x86_simple_outputs[row],
- 					      x86_simple_registers);
