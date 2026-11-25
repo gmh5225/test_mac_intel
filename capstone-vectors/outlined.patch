@@ -1,41 +1,42 @@
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..93f2c6ca 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -54,6 +54,19 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- #else
- 	const bool wide = handle->mode == CS_MODE_64;
- #endif
-+#if defined(X86_FIXED_OUTPUT) && X86_FIXED_WIDE
-+	uint8_t opcode = code[0], rex = 0;
-+	unsigned prefix_class = 0;
-+	if ((opcode & 0xf0) == 0x40 || opcode == 0x0f) {
-+		if (size < 2)
-+			return false;
-+		rex = opcode == 0x0f ? 0 : opcode;
-+		prefix_class = rex ? 1 + ((rex >> 3) & 1) : 3;
-+		opcode = code[1];
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..d89d7284 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -8,6 +8,7 @@
+ #include <string.h>
+ #include <capstone/capstone.h>
+ #include "../../utils.h"
++#include "../../MathExtras.h"
+ 
+ /* The generated records describe the same register operands and implicit
+  * effects as the ordinary Intel printer. Only the public x86 prefix of the
+@@ -163,14 +164,21 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+ 	out += 5;
+ 	uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
+ 						(uint32_t)displacement;
+-	char digits[8], *start = digits + sizeof(digits);
+-	do {
+-		*--start = "0123456789abcdef"[magnitude & 15];
+-		magnitude >>= 4;
+-	} while (magnitude);
+-	const size_t length = (size_t)(digits + sizeof(digits) - start);
+-	memcpy(out, start, length);
+-	return out + length;
++	static const char digits[] = "0123456789abcdef";
++	/* The magnitude is nonzero. Write exactly its significant nibbles so
++	 * the caller can append the next part at the returned position. */
++	char *const end = out + (8 - CountLeadingZeros_32(magnitude) / 4);
++	char *p = end;
++	while (magnitude >= 256) {
++		p -= 2;
++		p[0] = digits[(magnitude >> 4) & 15];
++		p[1] = digits[magnitude & 15];
++		magnitude >>= 8;
 +	}
-+	const bool has_rex = rex != 0;
-+	const unsigned plan = x86_simple_plans[1][prefix_class][opcode];
-+#else
- 	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
- 	const uint8_t rex = has_rex ? code[0] : 0;
- 	const bool escaped = code[0] == 0x0f;
-@@ -65,6 +78,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 				      has_rex ? ((rex & 8) ? 2 : 1) :
- 						0;
- 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
-+#endif
- 	if (!plan) {
- #ifdef X86_OUTPUT_MISS
- 		return X86_OUTPUT_MISS(handle, code, size, insn, insn_size);
-@@ -256,7 +270,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 				      first, second);
- 		if (relative) {
- 			cs_x86 *x = &insn->detail->x86;
--			if (escaped) {
-+			if (prefix_class == 3) {
- 				x->opcode[0] = 0x0f;
- 				x->opcode[1] = opcode;
- 			}
++	if (magnitude >= 16)
++		*out++ = digits[magnitude >> 4];
++	*out = digits[magnitude & 15];
++	return end;
+ }
+ 
+ static inline void X86_writeSimpleDetail(cs_detail *detail,

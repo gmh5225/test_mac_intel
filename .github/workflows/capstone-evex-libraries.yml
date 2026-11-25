@@ -1,7 +1,7 @@
-name: Measure first-byte AMD64 output selection on real instructions and compare all input boundaries
+name: Render hexadecimal displacements directly into bounded operand buffers on real PE and ELF
 on:
   push:
-    branches: [codex/amd64-dual-lookup-escape-details]
+    branches: [codex/write-displacement-in-place]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: first-byte-plans-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: direct-x86-displacement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

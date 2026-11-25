@@ -59,6 +59,11 @@ try:
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generator')
+        run('clang','-std=gnu99','-O2','-Wall','-Werror','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',r/'displacement-guard.c','-o',w/'displacement-guard')
+        if label=='base':guards_disp={}
+        guards_disp[label]=int(sp.check_output([w/'displacement-guard']))
+        assert guards_disp[label]==655984
+        save('displacement-guards',guards_disp)
         table=base/'arch/X86/X86GenSimpleOutput.inc'
         assert sp.check_output([w/'generator'])==table.read_bytes()
         if label=='base':projections={}
