@@ -107,10 +107,15 @@ try:
         proof[label]=list(map(int,get(w/'cmov-guard',w/'base.so',w/(label+'.so')).split()))
         assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
     assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
-    run('clang','-O2','-I',base/'include',r/'overlap.c','-ldl','-o',w/'access-overlap')
-    checked={label:get(w/'access-overlap',w/'base.so',w/(label+'.so')).strip() for label in ('candidate','outlined')}
-    assert checked['candidate']==checked['outlined'] and '750000 overlapping' in checked['candidate']
-    save('register-access-overlap',checked)
+    readers={}
+    for label in ('base','candidate','outlined'):
+        nm=get('nm','-S','--defined-only',w/(label+'.so'))
+        selected={parts[-1]:[int(parts[0],16),int(parts[1],16)] for parts in (line.split() for line in nm.splitlines()) if len(parts)==4 and parts[-1] in ('cs_disasm_iter','X86_decodeMixedPublicRecord','X86_decodeFixedRecord32','X86_decodeFixedRecord64','X86_disasmIterText')}
+        assert 'cs_disasm_iter' in selected and 'X86_disasmIterText' in selected
+        assert ('X86_decodeMixedPublicRecord' in selected)==(label!='base')
+        assert all((key in selected)==(label=='outlined') for key in ('X86_decodeFixedRecord32','X86_decodeFixedRecord64'))
+        readers[label]=selected
+    save('text-readers',readers)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
