@@ -1,7 +1,7 @@
-name: Verify RISC-V compressed print ownership and backend-local scan selection in the full NeverD binary built with current LLVM source
+name: Time mixed RISC-V text and detail paths in the full NeverD product using current LLVM source
 on:
   push:
-    branches: [codex/riscv-source-width-and-decoder-owner]
+    branches: [codex/riscv-real-operands-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 7c158ca1c194c0a2b56d830eaeee9fa901732618
+          ref: 122e6bf7be8c5f95a5a5776f2bb7cc38a40c533d
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "7c158ca1c194c0a2b56d830eaeee9fa901732618"
+          test "$(git rev-parse HEAD)" = "122e6bf7be8c5f95a5a5776f2bb7cc38a40c533d"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "994ce74539381ccfe41411455924c8933825d004"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin 994ce74539381ccfe41411455924c8933825d004
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: encoded-width-riscv-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: rv-demanded-views-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
