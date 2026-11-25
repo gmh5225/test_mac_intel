@@ -68,6 +68,7 @@ try:
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        assert ('CAPSTONE_X86_MIXED_PUBLIC_READER' in entry)==(label=='candidate')
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -100,6 +101,7 @@ try:
     save('mode-probe',mode_probe)
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-callback.cpp','-ldl','-o',w/'trial-callback')
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
@@ -108,6 +110,7 @@ try:
         assert parts.returncode==0 and guards[lbl]['states']==464
         z=get(w/'trial-guard',w/'base.so',w/(lbl+'.so')).split()
         assert z==['2162688','999139'];guards[lbl]['scan']=[int(x)for x in z]
+        guards[lbl]['callback']=json.loads(get(w/'trial-callback',w/'base.so',w/(lbl+'.so')))
         save('extra-states',guards)
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
