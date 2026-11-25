@@ -63,7 +63,7 @@ try:
                 elf=ELFFile(stream);table=elf.get_section_by_name('.symtab')
                 for sym in table.iter_symbols():
                     if sym['st_info']['type']!='STT_FUNC' or not sym['st_size']:continue
-                    if not any(t in sym.name for t in ('iced_run','cs_disasm_iter','cs_regs_access','X86_reg_access','PackedMemory','PackedVex64','LegacyPacked64','BareSse64','EvexShiftRegisters','X86_writeATTPadding','X86_writeATTEvexRegisters','writeRoundedRegisters','writeVectorRegistersWithRounding')):continue
+                    if not any(t in sym.name for t in ('iced_run','cs_disasm_iter','cs_regs_access','X86_reg_access','PackedMemory','PackedVex64','LegacyPacked64','BareSse64','EvexShiftRegisters','X86_writeATTPadding','X86_writeATTEvexRegisters','writeRoundedRegisters','writeVectorRegistersWithRounding','X86_writeATTMemoryImmediate','X86_tryATTOutput')):continue
                     idx=sym['st_shndx'];sec=elf.get_section(idx)
                     if idx not in sections:sections[idx]=sec.data()
                     off=sym['st_value']-sec['sh_addr']

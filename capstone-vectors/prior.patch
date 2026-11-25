@@ -1856,6 +1856,57 @@ index 688c2b27..93c56d3a 100644
 +}
 +
  #endif
+diff --git a/arch/X86/X86RoundedRegisterOutput.h b/arch/X86/X86RoundedRegisterOutput.h
+new file mode 100644
+index 00000000..60476ca6
+--- /dev/null
++++ b/arch/X86/X86RoundedRegisterOutput.h
+@@ -0,0 +1,45 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_ROUNDED_REGISTER_OUTPUT_H
++#define CS_X86_ROUNDED_REGISTER_OUTPUT_H
++
++#include "X86RoundedRegisterPlan.h"
++
++/* EVEX.b selects embedded rounding for these register-only packed operations.
++ * The caller has checked six bytes, register addressing and the EVEX.b bit. */
++static inline bool writeRoundedRegistersDialect(const uint8_t *code, cs_insn *insn,
++				  uint16_t *insn_size, bool att)
++{
++	const unsigned index = X86_roundedRegisterRow(code);
++	if (!index)
++		return false;
++	const unsigned flags = code[2], w = flags >> 7;
++	const unsigned rc = code[3] >> 5, rxb = (~(unsigned)code[1] >> 5) & 7;
++	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
++					  (~(unsigned)code[1] & 16),
++				  ((~flags >> 3) & 15) |
++					  ((~(unsigned)code[3] & 8) << 1),
++				  (code[5] & 7) | ((rxb & 3) << 3) };
++	static const char suffix[][11] = { ", {rn-sae}", ", {rd-sae}",
++					   ", {ru-sae}", ", {rz-sae}" };
++	writeVectorRegistersWithRounding(code, insn, insn_size, &evex_rounded_rows[index],
++				    4, 2, 0x40 | (w << 3) | rxb, 2, regs, 3, att,
++				     att ? suffix[rc] + 2 : NULL);
++	if (!att) {
++		const unsigned end = 16 + (regs[0] >= 10) + (regs[1] >= 10) +
++				     (regs[2] >= 10);
++		memcpy(insn->op_str + end, suffix[rc], sizeof(suffix[rc]));
++	}
++	if (insn->detail) {
++		static const x86_avx_rm modes[] = { X86_AVX_RM_RN,
++						    X86_AVX_RM_RD,
++						    X86_AVX_RM_RU,
++						    X86_AVX_RM_RZ };
++		insn->detail->x86.avx_sae = true;
++		insn->detail->x86.avx_rm = modes[rc];
++	}
++	return true;
++}
++
++#endif
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
 index 450dc468..471bb3a2 100644
 --- a/arch/X86/X86SimpleOutput.h
@@ -2211,7 +2262,7 @@ index 21414e7a..9f136987 100644
 -
 -#endif
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..a5feaf58 100644
+index 7afca7e4..9afbc0d3 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
 @@ -26,9 +26,6 @@
@@ -2270,7 +2321,7 @@ index 7afca7e4..a5feaf58 100644
  	return X86_writeVectorOutput(code, size, insn, insn_size,
  				     x86_simple_registers[3], true);
  }
-@@ -172,43 +139,10 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
+@@ -172,82 +139,19 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
  					      &x86_simple_outputs[row],
  					      x86_simple_registers);
  	}
@@ -2316,7 +2367,50 @@ index 7afca7e4..a5feaf58 100644
 +				  x86_simple_registers[3], false);
  }
  
- #include "X86RoundedRegisterPlan.h"
+-#include "X86RoundedRegisterPlan.h"
++#include "X86RoundedRegisterOutput.h"
+ 
+-/* EVEX.b selects embedded rounding for these register-only packed operations.
+- * The caller has checked six bytes, register addressing and the EVEX.b bit. */
+-static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+-				  uint16_t *insn_size)
++static inline bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
++					 uint16_t *insn_size)
+ {
+-	const unsigned index = X86_roundedRegisterRow(code);
+-	if (!index)
+-		return false;
+-	const unsigned flags = code[2], w = flags >> 7;
+-	const unsigned rc = code[3] >> 5, rxb = (~(unsigned)code[1] >> 5) & 7;
+-	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
+-					  (~(unsigned)code[1] & 16),
+-				  ((~flags >> 3) & 15) |
+-					  ((~(unsigned)code[3] & 8) << 1),
+-				  (code[5] & 7) | ((rxb & 3) << 3) };
+-	writeVectorRegisters(code, insn, insn_size, &evex_rounded_rows[index],
+-			     4, 2, 0x40 | (w << 3) | rxb, 2, regs, 3);
+-	static const char suffix[][11] = { ", {rn-sae}", ", {rd-sae}",
+-					   ", {ru-sae}", ", {rz-sae}" };
+-	/* Three ZMM names and two separators take 16 bytes plus a digit
+-	 * for each two-digit register number. */
+-	const unsigned end =
+-		16 + (regs[0] >= 10) + (regs[1] >= 10) + (regs[2] >= 10);
+-	memcpy(insn->op_str + end, suffix[rc], sizeof(suffix[rc]));
+-	if (insn->detail) {
+-		static const x86_avx_rm modes[] = { X86_AVX_RM_RN,
+-						    X86_AVX_RM_RD,
+-						    X86_AVX_RM_RU,
+-						    X86_AVX_RM_RZ };
+-		insn->detail->x86.avx_sae = true;
+-		insn->detail->x86.avx_rm = modes[rc];
+-	}
+-	return true;
++	return writeRoundedRegistersDialect(code, insn, insn_size, false);
+ }
+-
+ #define X86_FIXED_ROUNDED writeRoundedRegisters
+ #define X86_FIXED_OUTPUT tryOutput64
+ #define X86_FIXED_WIDE true
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
 index 504682a4..9752a369 100644
 --- a/arch/X86/X86VectorFallback64.c
@@ -2391,7 +2485,7 @@ index 504682a4..9752a369 100644
  			} else if (code[0] == 0x66 && opcode >= 0x70 &&
  				   opcode <= 0x73 && size > offset &&
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..4b8e567c 100644
+index dceebc42..830c2df6 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -9,6 +9,7 @@
@@ -2599,7 +2693,7 @@ index dceebc42..4b8e567c 100644
  	if (!row || (row->immediate && size < 7))
  		return false;
  	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
-@@ -66,12 +209,46 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -66,12 +209,49 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
  			return false;
  		const unsigned pair[] = { regs[2], regs[0] };
@@ -2616,6 +2710,7 @@ index dceebc42..4b8e567c 100644
 +}
 +
 +#ifndef CAPSTONE_X86_ATT_DISABLE
++#include "X86RoundedRegisterOutput.h"
 +#if defined(__ELF__) && defined(__clang__)
 +__attribute__((section(".cs_x86_att_record_text")))
 +#endif
@@ -2625,6 +2720,8 @@ index dceebc42..4b8e567c 100644
 +	/* The AT&T path accepts only unmasked register forms in 64-bit mode. */
 +	if (size < 6 || code[5] < 0xc0)
 +		return false;
++	if (code[3] & 0x10)
++		return writeRoundedRegistersDialect(code, insn, insn_size, true);
 +	return writeEvexRegisters(code, size, insn, insn_size, true);
 +}
 +#endif
@@ -2650,7 +2747,7 @@ index dceebc42..4b8e567c 100644
  }
  
  /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
-@@ -184,7 +361,7 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+@@ -184,7 +364,7 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
  
  static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  				      cs_insn *insn, uint16_t *insn_size,
@@ -2659,7 +2756,7 @@ index dceebc42..4b8e567c 100644
  {
  	if (size < 4)
  		return false;
-@@ -210,9 +387,17 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -210,9 +390,17 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
@@ -2680,7 +2777,7 @@ index dceebc42..4b8e567c 100644
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
  		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -228,7 +413,7 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -228,7 +416,7 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  		x->encoding.modrm_offset = (uint8_t)(length - 1);
  		x->op_count = 2;
  		for (unsigned i = 0; i < 2; ++i) {
@@ -2689,7 +2786,7 @@ index dceebc42..4b8e567c 100644
  			op->type = X86_OP_REG;
  			op->reg =
  				(x86_reg)(X86_REG_XMM0 + (i ? second : first));
-@@ -297,15 +482,14 @@ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -297,15 +485,14 @@ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
  	return true;
  }
  
@@ -2707,7 +2804,7 @@ index dceebc42..4b8e567c 100644
  		row = 8 + (code[3] & 1);
  	} else if (operand_prefix && size >= 2 && code[1] == 0x90) {
  		row = 5;
-@@ -313,7 +497,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -313,7 +500,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		const size_t lead = operand_prefix;
  		if (size < lead + 3 || code[lead] != 0x0f ||
  		    code[lead + 1] != 0x1f)
@@ -2716,7 +2813,7 @@ index dceebc42..4b8e567c 100644
  		const uint8_t modrm = code[lead + 2];
  		unsigned trailing;
  		switch (modrm) {
-@@ -338,26 +522,42 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -338,26 +525,42 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			trailing = 5;
  			break;
  		default:
@@ -2764,7 +2861,7 @@ index dceebc42..4b8e567c 100644
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
  		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -386,14 +586,81 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -386,14 +589,81 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			m->mem.scale = (int)p->scale;
  		}
  	}
@@ -2847,7 +2944,7 @@ index dceebc42..4b8e567c 100644
  {
  	const unsigned flags = code[prefix - 1];
  	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
-@@ -411,9 +678,9 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -411,9 +681,9 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  			return false;
  		const unsigned regs[] = { (~flags >> 3) & 15,
  					  (modrm & 7) | ((rxb & 1) << 3) };
@@ -2859,7 +2956,7 @@ index dceebc42..4b8e567c 100644
  	}
  	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
  	const unsigned index = vex_register_widths[plan][w * 2 + ll];
-@@ -425,22 +692,56 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -425,22 +695,56 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
  				  (~flags >> 3) & 15,
  				  (modrm & 7) | ((rxb & 1) << 3) };
@@ -2921,7 +3018,7 @@ index dceebc42..4b8e567c 100644
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
-@@ -448,7 +749,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -448,7 +752,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
@@ -2930,7 +3027,7 @@ index dceebc42..4b8e567c 100644
  	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
-@@ -458,15 +759,9 @@ __declspec(noinline)
+@@ -458,15 +762,9 @@ __declspec(noinline)
  #elif defined(__GNUC__)
  __attribute__((noinline))
  #endif
@@ -2949,7 +3046,7 @@ index dceebc42..4b8e567c 100644
  {
  	if (
  #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
-@@ -497,24 +792,30 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -497,24 +795,30 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
@@ -2997,7 +3094,7 @@ index dceebc42..4b8e567c 100644
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
  		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -536,7 +837,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -536,7 +840,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  			x->sib_base = (x86_reg)base->reg;
  		}
  		x->op_count = 2;
@@ -3006,7 +3103,7 @@ index dceebc42..4b8e567c 100644
  		op->type = X86_OP_REG;
  		op->size = (uint8_t)(16u << ll);
  		static const x86_reg vector_bases[] = { X86_REG_XMM0,
-@@ -544,7 +845,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -544,7 +848,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  							X86_REG_ZMM0 };
  		op->reg = (x86_reg)(vector_bases[ll] + dst);
  		op->access = (cs_ac_type)row->access[0];
@@ -3015,7 +3112,7 @@ index dceebc42..4b8e567c 100644
  		op->type = X86_OP_MEM;
  		op->size = 16;
  		op->mem.base = (x86_reg)base->reg;
-@@ -555,5 +856,36 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -555,5 +859,36 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  	return true;
  }
  
@@ -3053,7 +3150,7 @@ index dceebc42..4b8e567c 100644
  #endif
  #endif
 diff --git a/arch/X86/X86VectorRegisterOutput.h b/arch/X86/X86VectorRegisterOutput.h
-index 1f238c20..98334c98 100644
+index 1f238c20..75dc8167 100644
 --- a/arch/X86/X86VectorRegisterOutput.h
 +++ b/arch/X86/X86VectorRegisterOutput.h
 @@ -5,13 +5,14 @@
@@ -3063,17 +3160,17 @@ index 1f238c20..98334c98 100644
 +#include "X86UnsignedImmediate.h"
  
 -static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
-+static bool writeVectorRegistersDialect(const uint8_t *code, cs_insn *insn,
++static bool writeVectorRegistersWithRounding(const uint8_t *code, cs_insn *insn,
  				 uint16_t *insn_size,
  				 const struct VectorOutputRow *row,
  				 unsigned prefix, unsigned ll, unsigned rex,
  				 unsigned first_ll, const unsigned *regs,
 -				 unsigned reg_count)
-+				 unsigned reg_count, bool att)
++				 unsigned reg_count, bool att, const char *rounding)
  {
  	const unsigned len = prefix + 2 + row->immediate;
  	*insn_size = insn->size = (uint16_t)len;
-@@ -20,24 +21,42 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -20,24 +21,47 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
@@ -3093,6 +3190,11 @@ index 1f238c20..98334c98 100644
 -			memcpy(out, "0x", 2);
 +	if (att) {
 +		char *out = insn->op_str;
++		if (rounding) {
++			memcpy(out, rounding, 8);
++			memcpy(out + 8, ", ", 2);
++			out += 10;
++		}
 +		if (row->immediate) {
 +			*out++ = '$';
 +			out = writeUnsignedImmediate(out, code[prefix + 2]);
@@ -3133,7 +3235,7 @@ index 1f238c20..98334c98 100644
  		}
  	}
  	if (insn->detail) {
-@@ -55,7 +74,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -55,7 +79,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  		static const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0,
  						 X86_REG_ZMM0 };
  		for (unsigned n = 0; n != reg_count; ++n) {
@@ -3142,7 +3244,7 @@ index 1f238c20..98334c98 100644
  			op->type = X86_OP_REG;
  			const unsigned width = n == 0 ? first_ll : ll;
  			op->reg = (x86_reg)(bases[width] + regs[n]);
-@@ -63,11 +82,12 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -63,11 +87,12 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  			op->size = (uint8_t)(16 << width);
  		}
  		if (row->immediate) {
@@ -3159,10 +3261,21 @@ index 1f238c20..98334c98 100644
  			x->encoding.imm_offset = (uint8_t)(prefix + 2);
  			x->encoding.imm_size = 1;
  		}
-@@ -75,4 +95,15 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -75,4 +100,26 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  	return true;
  }
  
++static inline bool writeVectorRegistersDialect(const uint8_t *code, cs_insn *insn,
++				 uint16_t *insn_size,
++				 const struct VectorOutputRow *row,
++				 unsigned prefix, unsigned ll, unsigned rex,
++				 unsigned first_ll, const unsigned *regs,
++				 unsigned reg_count, bool att)
++{
++	return writeVectorRegistersWithRounding(code, insn, insn_size, row, prefix,
++						ll, rex, first_ll, regs, reg_count, att, NULL);
++}
++
 +static inline bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
 +				 uint16_t *insn_size,
 +				 const struct VectorOutputRow *row,
@@ -3814,7 +3927,7 @@ index b202bca4..e8b2a44e 100644
  	RegisterTable regs{};
  	describe_registers(x64, regs);
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index f0312e90..52939485 100644
+index f0312e90..338b3e46 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
 @@ -584,28 +584,30 @@ template <class T, size_t N> void emit_array(std::ostream &out, const T (&v)[N])
@@ -4012,7 +4125,65 @@ index f0312e90..52939485 100644
  }
  
  enum class EvexRegisterOrder { Three, Pair, ReversePair, Rounded };
-@@ -2527,6 +2602,10 @@ void emit_output(Decoder &decoder, bool scan_only)
+@@ -1773,7 +1848,8 @@ struct EvexRegisterRecord {
+ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
+ 			    unsigned pp, unsigned w, unsigned rc, unsigned dst,
+ 			    unsigned src, unsigned rm, EvexRegisterOrder order,
+-			    EvexRegisterRecord &row, int immediate = -1)
++			    EvexRegisterRecord &row, int immediate = -1,
++			    bool att_rounding = false)
+ {
+ 	const bool rounded = order == EvexRegisterOrder::Rounded;
+ 	const bool pair = order == EvexRegisterOrder::Pair ||
+@@ -1805,7 +1881,7 @@ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
+ 		row.group_count = detail.groups_count;
+ 		std::copy_n(detail.groups, row.group_count, row.groups.begin());
+ 		for (unsigned n = 0; n < count + (immediate >= 0); ++n)
+-			row.access[n] = detail.x86.operands[n].access;
++			row.access[n] = detail.x86.operands[att_rounding ? count - 1 - n : n].access;
+ 	}
+ 	const char *const endings[] = { ", {rn-sae}", ", {rd-sae}",
+ 					", {ru-sae}", ", {rz-sae}" };
+@@ -1817,7 +1893,10 @@ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
+ 	const char *const names[] = { "xmm", "ymm", "zmm" };
+ 	const char *name = names[ll];
+ 	char text[64];
+-	if (pair)
++	if (att_rounding)
++		std::snprintf(text, sizeof(text), "%s, %%%s%u, %%%s%u, %%%s%u",
++			      endings[rc] + 2, name, rm, name, src, name, dst);
++	else if (pair)
+ 		std::snprintf(text, sizeof(text), "%s%u, %s%u", name,
+ 			      numbers[0], name, numbers[1]);
+ 	else
+@@ -1858,7 +1937,7 @@ bool observe_evex_registers(Decoder &decoder, unsigned map, unsigned opcode,
+ 	}
+ 	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
+ 	for (unsigned n = 0; n < count; ++n) {
+-		auto &op = x.operands[n];
++		auto &op = x.operands[att_rounding ? count - 1 - n : n];
+ 		op.type = X86_OP_REG;
+ 		op.size = uint8_t(16u << ll);
+ 		op.reg = x86_reg(bases[ll] + numbers[n]);
+@@ -2320,7 +2399,7 @@ void emit_evex_rip_memory(Decoder &decoder)
+ 		forms, static_cast<unsigned long long>(decoder.probes));
+ }
+ 
+-void emit_rounded_vectors(Decoder &decoder)
++void emit_rounded_vectors(Decoder &decoder, bool att = false)
+ {
+ 	using PrefixRow = std::array<unsigned, 8>;
+ 	std::array<std::array<unsigned, 256>, 3> plans{};
+@@ -2338,7 +2417,7 @@ void emit_rounded_vectors(Decoder &decoder)
+ 							       opcode, key & 3,
+ 							       key >> 2, rc,
+ 							       dst, src, rm,
+-							       EvexRegisterOrder::Rounded, row);
++							       EvexRegisterOrder::Rounded, row, -1, att);
+ 				};
+ 				if (!same(0, 3, 2, 1))
+ 					continue;
+@@ -2527,6 +2606,10 @@ void emit_output(Decoder &decoder, bool scan_only)
  
  int main(int argc, char **argv)
  {
@@ -4023,7 +4194,22 @@ index f0312e90..52939485 100644
  	if (argc == 2 && !std::strcmp(argv[1], "--vex-base-memory")) {
  		Decoder decoder;
  		emit_vex_base_memory(decoder);
-@@ -2570,6 +2649,13 @@ int main(int argc, char **argv)
+@@ -2561,15 +2644,26 @@ int main(int argc, char **argv)
+ 			     static_cast<unsigned long long>(decoder.probes));
+ 		return 0;
+ 	}
+-	if (argc == 2 && !std::strcmp(argv[1], "--rounded-registers64")) {
++	if (argc == 2 && (!std::strcmp(argv[1], "--rounded-registers64") ||
++			  !std::strcmp(argv[1], "--rounded-registers64-att"))) {
+ 		Decoder decoder;
+ 		std::puts(
+ 			"/* Generated by suite/synctools/x86_vector_output.cpp --rounded-registers64. */");
+-		emit_rounded_vectors(decoder);
++		const bool att = !std::strcmp(argv[1], "--rounded-registers64-att");
++		if (att && cs_option(decoder.handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT))
++			throw std::runtime_error("AT&T formatter unavailable");
++		emit_rounded_vectors(decoder, att);
+ 		std::fprintf(stderr, "%llu ordinary decoder probes\n",
  			     static_cast<unsigned long long>(decoder.probes));
  		return 0;
  	}
@@ -4037,12 +4223,12 @@ index f0312e90..52939485 100644
  	if (argc == 2 && !std::strcmp(argv[1], "--vex32-memory")) {
  		emit_vex32_memory();
  		return 0;
-@@ -2589,7 +2675,7 @@ int main(int argc, char **argv)
+@@ -2589,7 +2683,7 @@ int main(int argc, char **argv)
  	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
  	if (argc > 1 && !scan_only)
  		throw std::runtime_error(
 -			"usage: x86_vector_output [--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers|--legacy-register-immediates|--vex-base-memory|--evex-rip-memory|--legacy-map38-registers]");
-+			"usage: x86_vector_output [--att-padding|--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--evex-shifts|--plain-evex-registers|--legacy-register-immediates|--vex-base-memory|--evex-rip-memory|--legacy-map38-registers]");
++			"usage: x86_vector_output [--att-padding|--evex-scan|--evex-memory|--vex-register-immediates|--vex32-memory|--rounded-registers64|--rounded-registers64-att|--evex-shifts|--plain-evex-registers|--legacy-register-immediates|--vex-base-memory|--evex-rip-memory|--legacy-map38-registers]");
  	Decoder decoder;
  	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
  	emit_output(decoder, scan_only);
