@@ -167,7 +167,7 @@ try:
                 select('candidate' if engine=='twin' else engine)
                 return list(map(int,get(*invoke,engine if other else route,str(mode),str(n),f,path,str(bits)).split()))
             for mode in (0,1,2):
-                if (name,mode) not in {('putty-64-0.85',0),('jpeg-avx2-i386',2),('libssl3t64-i386',2)}:continue
+                if (name,mode) not in {('putty-64-0.85',0),('jpeg-avx2-i386',2),('libssl3t64-i386',2),('libssl3t64-i386',1),('putty-32-0.85',1)}:continue
                 labels=['base','duplicate','candidate','twin']
                 repeats=max(1,math.ceil(50e6/take('base',mode,1)[0]))
                 expected={k:take(k,mode,repeats)[2:]for k in labels}
@@ -181,7 +181,7 @@ try:
                     rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
                 key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
                 save('observations',observations)
-    assert len(observations)==3
+    assert len(observations)==5
     save('fixed-image',dict(inode=inode,verified=verified,images=images))
     time_foreign(foreign_rows,w,save)
     save('complete',dict(complete=True,source=maps,host=host,images=images))
