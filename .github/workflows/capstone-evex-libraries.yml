@@ -1,7 +1,7 @@
-name: Measure VEX record copies scoped to the variable prefix reader on real PE and ELF
+name: Validate generated VEX packed-single records and time early versus late dispatch
 on:
   push:
-    branches: [codex/variable-vex-register-copies]
+    branches: [codex/vex-packed-single-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: variable-vex-copies-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: packed-single-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -49,6 +49,7 @@ try:
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        (base/'arch/X86/X86GenVexPackedSingle.inc').unlink(missing_ok=True)
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -58,6 +59,12 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        if label=='base':regenerated=[]
+        else:
+            run('clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'row-generator')
+            calculated=get(w/'row-generator','--vex-packed-single')
+            assert calculated==(base/'arch/X86/X86GenVexPackedSingle.inc').read_text()
+            regenerated.append(label);save('regeneration',dict(matches=regenerated,sha256=hashlib.sha256(calculated.encode()).hexdigest()))
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
