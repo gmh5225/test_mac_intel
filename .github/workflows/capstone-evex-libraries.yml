@@ -1,7 +1,7 @@
-name: Measure the two unsigned moffs address printers versus shipped Capstone on PE32 SIMD libraries and five other backends
+name: Time RIP-relative indirect control transfers with final memory details on PE32 PE64 SIMD and other backends
 on:
   push:
-    branches: [codex/moffs-width-correctness-and-real-cost]
+    branches: [codex/near-rip-control-transfer-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-moffs-unsigned-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-rip-indirect-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

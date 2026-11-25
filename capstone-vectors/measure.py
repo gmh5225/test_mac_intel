@@ -107,15 +107,14 @@ try:
         proof[label]=list(map(int,get(w/'cmov-guard',w/'base.so',w/(label+'.so')).split()))
         assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
     assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
-    moffs={}
-    for label in ('base','candidate','outlined'):
-        library=w/(label+'.so');exe=w/(label+'-moffs')
-        run('clang++','-O2','-std=c++17','-I',base/'include',r/'moffs.cpp',library,'-o',exe)
-        p=sp.run([exe],capture_output=True,text=True)
-        assert p.returncode==0,(label,p.stderr[-400:])
-        counts=list(map(int,p.stdout.split()));assert counts==[11520,864 if label=='base' else 0,0],(label,counts)
-        moffs[label]=counts
-    save('moffs',moffs)
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'rip.cpp','-ldl','-o',w/'rip')
+    outcomes={}
+    for label in ('candidate','outlined'):
+        z=sp.run([w/'rip',w/'base.so',w/(label+'.so')],capture_output=True,text=True)
+        assert z.returncode==0,(label,z.stderr[-1000:])
+        outcomes[label]=json.loads(z.stdout)
+    assert outcomes['candidate']==outcomes['outlined'] and outcomes['candidate']['cases']==820176
+    save('rip-record',outcomes)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
