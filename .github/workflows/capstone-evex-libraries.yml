@@ -1,7 +1,7 @@
-name: Measure shared ARM punctuation helpers on mapped code and check callback behavior
+name: Compare ARM single-character call targets with identical instruction-printer code
 on:
   push:
-    branches: [codex/arm-mixed-shared-character-output]
+    branches: [codex/arm-punctuation-call-relocations]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 909177c3b7819868e6fef03579e20f77531c51b7
+          ref: ce00fc089a123d4149a1a39e458a6a81b9778a5b
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-shared-character-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm-literal-call-target-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
