@@ -1,7 +1,7 @@
-name: Measure the default and AT&T paths in the LLVM-source NeverD product with hash-addressed OpenSSL inputs
+name: Verify the combined public Intel and AT&T formatter in the source-built NeverD product on PE ELF SIMD and five other architectures
 on:
   push:
-    branches: [codex/x86-vex-scalar-records-neverd-snapshot]
+    branches: [codex/neverd-joint-mode-and-att-records]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 6c8f34a05913b31f0fd28a0964171e3c724ac8b9
+          ref: 963db8c6b5b74c876535ce335cd82fff394a66da
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -51,7 +51,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "6c8f34a05913b31f0fd28a0964171e3c724ac8b9"
+          test "$(git rev-parse HEAD)" = "963db8c6b5b74c876535ce335cd82fff394a66da"
           test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "acb6a6298e4642828981a72acc6022ee36fcd0be"
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           git -C third_party/capstone fetch --depth=1 origin acb6a6298e4642828981a72acc6022ee36fcd0be
@@ -67,6 +67,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-frozen-records-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: x86-combined-records-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
