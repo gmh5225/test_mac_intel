@@ -171,7 +171,7 @@ try:
                 assert all(v[:3]==expected['base'][:3] for v in expected.values())
                 assert expected['base']==expected['duplicate']==expected['candidate']
                 assert expected['outlined']==expected['base']
-                rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
+                rows=[];rng=random.Random(name+'/independent-alignment-repeat/'+str(mode))
                 for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
                     rng.shuffle(labels);sample={k:[] for k in labels}
                     for k in labels+labels[::-1]:
