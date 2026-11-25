@@ -35,14 +35,9 @@ int main(int argc,char **argv){
                 std::fputc(10,stderr);return 10;
             }
             check(!std::memcmp(&x,&y,sizeof x),"complete detail");
-            if(decoded) {
-                const unsigned op = a.bytes[0];
-                const unsigned prefix = op==0xc5 ? 2 : 3;
-                if ((op==0xc4 || op==0xc5) && a.size==prefix+2 && (prefix==2 || (a.bytes[1]&31)==1)) {
-                    const unsigned code=a.bytes[prefix];
-                    fixed += (a.bytes[prefix-1]&3)==0 && a.bytes[prefix+1]>=0xc0 &&
-                             code>=0x54 && code<=0x5f && code!=0x5a && code!=0x5b;
-                }
+            if (decoded && (route & 1)) {
+                for (unsigned i = 0; i < x.x86.op_count; ++i)
+                    fixed += x.x86.operands[i].type == X86_OP_REG;
             }
             if(decoded){++ok;hash=hash*131+a.address+a.id+a.size;}
             else{++invalid;++p;--len;++ip;}

@@ -1,7 +1,7 @@
-name: Validate generated VEX packed-single records and time early versus late dispatch
+name: Measure directly indexed Intel register spellings with exact stream writes
 on:
   push:
-    branches: [codex/vex-packed-single-output]
+    branches: [codex/direct-intel-register-spellings]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-single-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: direct-register-spelling-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
