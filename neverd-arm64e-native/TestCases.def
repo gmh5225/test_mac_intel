@@ -13,6 +13,15 @@
   },
   "projection_policy": {"build": "build-r6", "output": "--output", "require_native": "--require-native", "qualified_key": "native_generated_arm64e_x1_qualified", "control_receipt": "native_controls"},
   "projection_model": {"cases": ["explicit", "prefix"], "routes": ["high", "llvm", "llvm-opt"], "backend_objects": ["backend", "backend-opt"], "optimizations": ["O0", "O2"]},
+  "ordered_export": {"directory": "ordered-memory", "receipt": "generated_ordered_memory", "inputs": "ordered_inputs"},
+  "ordered_model": {
+    "sources": {"high": "high.c", "llvm-c": "llvm.c"}, "object_route": "llvm-object", "raw_object_route": "llvm-object-raw",
+    "native": {"profile": "native ordered test", "gpr_key": "gpr_executed", "simd_key": "simd_executed",
+               "object_file": "llvm-macho.o", "raw_object_file": "llvm-macho-raw.o", "gpr": "GPR", "simd": "GPR and Q",
+               "skip_exit": 77, "unavailable": "no GPR", "rules": ["natural alignment"]}
+  },
+  "export_manifest": "projections.json",
+  "guest_manifest": "guests.json",
   "host_cpu": "Apple test CPU",
   "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "wrong_revision": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

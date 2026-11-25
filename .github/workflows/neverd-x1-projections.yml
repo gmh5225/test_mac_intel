@@ -46,7 +46,7 @@ jobs:
           ref: ${{ needs.source.outputs.revision }}
           path: neverd
           persist-credentials: false
-      - name: Export current HighC, LLVM C and raw backend inputs with r6
+      - name: Export signing and ordered-memory sources and backend objects with r6
         run: python3 neverd-arm64e-native/projections.py build neverd "$RUNNER_TEMP"
       - id: inputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -85,7 +85,7 @@ jobs:
           artifact-ids: ${{ needs.export.outputs.artifact }}
           merge-multiple: true
           path: ${{ runner.temp }}/inputs
-      - name: Measure original controls and generated x1 images on one host
+      - name: Measure the original controls and generated signing and memory programs on one host
         run: |
           ulimit -c 0
           python3 neverd-arm64e-native/projections.py check neverd "$RUNNER_TEMP"

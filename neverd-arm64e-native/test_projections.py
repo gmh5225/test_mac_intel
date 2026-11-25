@@ -118,3 +118,54 @@ class ProjectionWorkflowTests(unittest.TestCase):
                         self.assertEqual(host["report_sha256"], hashlib.sha256(top.read_bytes()).hexdigest())
                         self.assertIn(status, summary.read_text())
                     self.assertIn(policy["require_native"], run.call_args.args[0])
+
+    def test_ordered_receipt_requires_six_consistent_processes_and_the_transferred_objects(self):
+        p = projections.CONFIG
+        ordered = CASES["ordered_export"]
+        routes = CASES["ordered_model"]
+        target = routes["native"]
+        policy = {"ordered": ordered, "manifest": CASES["export_manifest"]}
+        model = {**CASES["projection_model"], "ordered": routes, "manifest": CASES["guest_manifest"], "report": p["report"]}
+        labels = [f"{route}-{opt}" for route in routes["sources"] for opt in model["optimizations"]]
+        labels += [routes["object_route"], routes["raw_object_route"]]
+        for scope, damage in (("simd", None), ("gpr", None), ("unavailable", None), ("simd", "control"),
+                              ("simd", "sha256"), ("simd", "exporter_sha256"), ("simd", "object_sha256"),
+                              ("simd", "records"), ("gpr", "observations"), ("unavailable", "exit_code")):
+            with self.subTest(scope=scope, damage=damage), tempfile.TemporaryDirectory() as tmp:
+                work = Path(tmp)
+                directory = work / ordered["directory"]
+                directory.mkdir()
+                export_path = work / policy["manifest"]
+                files = {name: name for name in (*routes["sources"].values(), target["object_file"], target["raw_object_file"])}
+                identity = {"files": files, "fixtures": {CASES["payload"]: CASES["revision"]}}
+                export = {"source_revision": CASES["revision"], "exporter_sha256": CASES["revision"], ordered["inputs"]: identity}
+                export_path.write_text(json.dumps(export))
+                guests = dict.fromkeys(labels, {})
+                for route, filename in (("object_route", "object_file"), ("raw_object_route", "raw_object_file")):
+                    guests[routes[route]] = {"object_sha256": CASES["wrong_revision"] if damage == "object_sha256" else files[target[filename]]}
+                guest_path = directory / model["manifest"]
+                guest_path.write_text(json.dumps({"guests": guests, "exports": files, "fixtures": identity["fixtures"],
+                                                  "ordered_profile": target["profile"], "test_binary_sha256": CASES["revision"]}))
+                gpr = scope != "unavailable"
+                flags = {target["gpr_key"]: gpr, target["simd_key"]: scope == "simd"}
+                records = [target[scope], target["rules"][0]] if gpr else [target[scope]]
+                row = {"exit_code": 0 if gpr or damage == "exit_code" else target["skip_exit"], "records": records}
+                observations = dict.fromkeys(labels, row)
+                if damage == "records":
+                    observations[labels[-1]] = {**row, "records": [target["gpr"], target["rules"][0]]}
+                if damage == "observations":
+                    del observations[labels[-1]]
+                path = directory / model["report"]
+                path.write_text(json.dumps({**flags, "manifest_sha256": projections.digest(guest_path), "observations": observations}))
+                receipt = {**flags, "report": path.relative_to(work).as_posix(),
+                           "sha256": CASES["wrong_revision"] if damage == "sha256" else projections.digest(path)}
+                report = {**export, ordered["receipt"]: receipt, "input_manifest_sha256": projections.digest(export_path)}
+                if damage == "exporter_sha256":
+                    report["exporter_sha256"] = CASES["wrong_revision"]
+                original_q = scope == "simd" and damage != "control"
+                if damage:
+                    with self.assertRaisesRegex(ValueError, p["ordered_error"]):
+                        projections.check_ordered(work, work, policy, model, report, original_q)
+                else:
+                    self.assertEqual(projections.check_ordered(work, work, policy, model, report, original_q),
+                                     {p["ordered_count"]: len(labels), **flags})

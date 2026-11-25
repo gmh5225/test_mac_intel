@@ -170,13 +170,19 @@ pushes to the repository and can also be tested with a manual run.
 **Verify generated NeverD arm64e.x1 images** resolves a branch in
 NeverSight/NeverD to one revision for both jobs. The macOS producer builds
 the Release tests with the checksum-pinned r6 package and exports the signing
-projections. Xcode 27 downloads that job's artifact by ID. With a NeverD
+and ordered-memory inputs. Xcode 27 downloads that job's artifact by ID. With a NeverD
 revision supporting `check --require-native`, the same Mac runs the five
 original native controls and measures all 20 linked and signed images. An
 available instruction family can execute its own comparisons independently.
+Revisions that export ordered memory also link and run six ordinary arm64
+programs on this host. HighC and LLVM C run at O0 and O2, alongside both
+direct backend objects. The workflow checks the exported input and guest
+manifests, the six process outcomes and the compiler-original 128-bit probe.
+Full acceptance requires all six routes to execute their Q comparisons.
 
 The Actions summary and `host.json` report the hardware, verifier exit code,
-original control result and generated comparison count. Full native acceptance
+original control result, generated signing comparison count and measured GPR
+and 128-bit ordered execution. Full native acceptance
 requires exit 0. Exit 2 records unavailable hardware as a hosted observation.
 Failed controls, mismatched reports and inconsistent image counts fail the
 job. The measurement artifact contains the original probe reports, signatures,
