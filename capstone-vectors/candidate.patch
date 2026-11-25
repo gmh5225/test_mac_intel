@@ -1,11 +1,38 @@
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..55d04e85 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -564,6 +564,19 @@ static const struct X86SimpleRegister x86_simple_registers[4][16] = {
+ 	},
+ };
+ 
++#ifdef X86_GROUP_BYTE_MEMORY_ROWS
++static const struct X86SimpleOutput x86_group_byte_memory[2][2] = {
++	{
++		{ 105, "cmp", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 0, 0, { { 0, 1, 1 }, { 0, 1, 1 } } },
++		{ 734, "test", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 0, 0, { { 0, 1, 1 }, { 0, 1, 1 } } },
++	},
++	{
++		{ 105, "cmp", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 1, 1 }, { 0, 1, 1 } } },
++		{ 734, "test", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 1, 1 }, { 0, 1, 1 } } },
++	},
++};
++#endif
++
+ static const uint16_t x86_shift_rows[2][3][8] = {
+ 	{
+ 		{ 267, 268, 269, 270, 271, 272, 273, 274 },
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..138738a6 100644
+index 504682a4..6442dbe4 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -27,6 +27,12 @@
+@@ -26,7 +26,15 @@
+ #undef X86_EVEX_MEMORY_DATA
  #endif
  
++#define X86_GROUP_BYTE_MEMORY_ROWS
  #include "X86GenSimpleOutput.inc"
++#undef X86_GROUP_BYTE_MEMORY_ROWS
 +#include "X86GenIndirect64Output.inc"
 +#define X86_MEMORY_IMMEDIATE writeGroupByteImmediate64
 +#define X86_IMMEDIATE_WIDE 1
@@ -15,7 +42,7 @@ index 504682a4..138738a6 100644
  #ifdef CAPSTONE_X86_ONLY
  #include "X86VexBaseMemory.h"
  #endif
-@@ -152,6 +158,37 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+@@ -152,6 +160,35 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
  }
  #endif
  
@@ -43,11 +70,9 @@ index 504682a4..138738a6 100644
 +		return X86_writeMemoryOutput(code, size, insn, length,
 +					     &x86_indirect64[lead][group == 4],
 +					     x86_simple_registers);
-+	const unsigned bank = lead ? 1 + ((code[0] >> 3) & 1) : 0;
-+	const unsigned form = opcode == 0xf6 ? 0x84 : 0x38;
-+	const unsigned row = x86_simple_plans[1][bank][form] >> 2;
-+	return writeGroupByteImmediate64(code, size, insn, length,
-+					 &x86_simple_outputs[row], x86_simple_registers);
++	const struct X86SimpleOutput *row = &x86_group_byte_memory[lead][opcode == 0xf6];
++	return writeGroupByteImmediate64(code, size, insn, length, row,
++					 x86_simple_registers);
 +}
 +
  /* The fixed-width AMD64 iterator has already tried its common records. */
@@ -62,3 +87,29 @@ index 504682a4..138738a6 100644
  #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
  	defined(__x86_64__)
  	/* The fixed AMD64 decoder has just tried the shared output plans.
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index b202bca4..7698779c 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -1361,6 +1361,21 @@ int main(int argc, char **argv)
+ 		return 0;
+ 	}
+ 	emit_tables(plans, regs, rows);
++	// The fallback needs only the CMP and TEST byte rows. Encoding a REX.W
++	// prefix gives the same rows as any other REX for these byte operations.
++	std::cout << "\n#ifdef X86_GROUP_BYTE_MEMORY_ROWS\n"
++		     "static const struct X86SimpleOutput x86_group_byte_memory[2][2] = {\n";
++	for (unsigned bank = 0; bank < 2; ++bank) {
++		std::cout << "\t{\n";
++		for (unsigned opcode : { 0x38u, 0x84u }) {
++			const unsigned row = plans[1][bank][opcode] >> 2;
++			if (!row || (bank && row != (plans[1][2][opcode] >> 2)))
++				throw std::runtime_error("invalid AMD64 byte memory row");
++			std::cout << "\t\t" << rows.at(row) << ",\n";
++		}
++		std::cout << "\t},\n";
++	}
++	std::cout << "};\n#endif\n";
+ 	std::cout << "\nstatic const uint16_t x86_shift_rows[2][3][8] = {\n";
+ 	for (const auto &mode : shifts) {
+ 		std::cout << "\t{\n";

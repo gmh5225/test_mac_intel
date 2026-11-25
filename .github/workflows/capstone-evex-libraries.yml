@@ -1,7 +1,7 @@
-name: Measure AMD64 grouped memory operands with exact output on PE scalar SIMD and firmware inputs
+name: Measure four generated AMD64 operand descriptors and the terminal memory writer with real x86 and cross-ISA controls
 on:
   push:
-    branches: [codex/grouped-amd64-memory-terminals]
+    branches: [codex/compact-amd64-memory-descriptors]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: grouped-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: compact-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

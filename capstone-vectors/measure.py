@@ -63,7 +63,7 @@ try:
         assert sp.check_output([w/'generator'])==table.read_bytes()
         if label=='base':projections={}
         projections[label]=sha(table)
-        assert len(set(projections.values()))==1
+        if label!='base':assert projections[label]=='409083724c92742de8a3c44a40b5a62ff4588ec88e53a629824916420fe6f9f3' and projections[label]!=projections['base']
         save('generated-plans',projections)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
