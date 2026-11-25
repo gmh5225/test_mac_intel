@@ -149,10 +149,12 @@ current hosted Macs. Each runner uses the same resolved NeverD dev commit and
 writes its CPU and qualification result in the job summary. The artifact contains
 the compiler, original PAC call, cursor, scalar arithmetic, checked writeback
 and ordered-memory probe reports. The summary verifies component report hashes
-and revisions. It reports 128-bit LRCPC3, explicit PAuth_LR, PC-sensitive PACM,
-PACM HINT, scalar CPTA, signed-product overflow (CPTM) and checked writeback
-separately, including capabilities that ran on a host with an unavailable aggregate x1 result. The artifact also
-contains the scalar, signing-key, PACM-mode and Q-lane regression log.
+and revisions. It reports 128-bit LRCPC3, PACM HINT, scalar CPTA,
+signed-product overflow (CPTM) and checked writeback. Explicit PAuth_LR and
+PC-sensitive PACM each get a row for ordinary arm64e and a row for the signed
+arm64e.x1 slice. A check absent from an older source policy is unmeasured.
+The artifact includes the fixed-value load/store regressions and the cursor
+subtype, entitlement and launch controls.
 Baseline instructions exercise mixed IA/IB outcomes and faults at unexpected
 instruction addresses. The job reports hardware capabilities from the original
 instructions. Changes to the workflow or its probe controller are checked on

@@ -57,6 +57,16 @@ class HostedFeatureTests(unittest.TestCase):
             self.features[section][field] = False
             self.save(section)
 
+    def test_absent_probe_in_older_policy_is_unmeasured(self):
+        section, _, _ = hosted.CONFIG["feature_rows"][0]
+        del self.policy[section]
+        del self.report["probes"][section]
+        summary = hosted.feature_summary(self.policy, self.report, self.output)
+        for name, _, label in hosted.CONFIG["feature_rows"]:
+            if name == section:
+                row = hosted.CONFIG["feature_row"].format(feature=label, result=hosted.CONFIG["unmeasured"])
+                self.assertIn(row, summary)
+
     def test_failed_measurement_and_invalid_receipts(self):
         section, key, label = hosted.CONFIG["feature_rows"][0]
         self.save(section, self.policy["failed"])
