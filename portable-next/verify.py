@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib,io,json,os,platform,shutil,subprocess as sp,tarfile,tempfile
+import shlex
 import corpus
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True);profile=os.environ['SCAN_PROFILE'];q=json.loads((d/'tree.json').read_text());source=json.loads((d/'sample.json').read_text());win=os.name=='nt';t=Path(tempfile.mkdtemp())
 sha=lambda raw:hashlib.sha256(raw).hexdigest()
@@ -96,6 +97,12 @@ try:
             assert all('CAPSTONE_RISCV_ONLY' not in row['command']for row in commands if row['file'].endswith('/RISCVInstPrinter.c'))
             objects={str(p.relative_to(bmix)):sha(p.read_bytes())for p in bmix.rglob('*.o')};lib,=bmix.rglob('libcapstone.a')
             cmd('mixed-library-'+stage,[os.environ.get('CC','cc'),'-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',t/('scan-'+stage+'.so')])
+            if stage=='candidate':
+                printer,=[c for c in commands if Path(c['file']).name=='RISCVInstPrinter.c']
+                args=shlex.split(printer['command'])
+                cmd('register-stream-build',args[:args.index('-o')]+['-I',s,d/'register-stream.c',lib,'-o',t/'register-stream'])
+                count=int(sp.check_output([t/'register-stream'],text=True))
+                save('register-stream',dict(states=count,tree=q['tree']))
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
             shutil.copyfile(bmix/'consumer',timing/('riscv-option-'+stage))
