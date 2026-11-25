@@ -1,44 +1,48 @@
-diff --git a/SStream.c b/SStream.c
-index 5d387fb0..dcdcfcd5 100644
---- a/SStream.c
-+++ b/SStream.c
-@@ -353,13 +353,35 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
- 	if (cs_vsnprintf == cs_default_vsnprintf) {
- 		assert(ss);
- 		SSTREAM_RETURN_IF_CLOSED(ss);
-+		static const char byte_digits[] =
-+			"000102030405060708090a0b0c0d0e0f"
-+			"101112131415161718191a1b1c1d1e1f"
-+			"202122232425262728292a2b2c2d2e2f"
-+			"303132333435363738393a3b3c3d3e3f"
-+			"404142434445464748494a4b4c4d4e4f"
-+			"505152535455565758595a5b5c5d5e5f"
-+			"606162636465666768696a6b6c6d6e6f"
-+			"707172737475767778797a7b7c7d7e7f"
-+			"808182838485868788898a8b8c8d8e8f"
-+			"909192939495969798999a9b9c9d9e9f"
-+			"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
-+			"b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
-+			"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
-+			"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
-+			"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
-+			"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
- 		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
- 		char *end = buffer + sizeof(buffer);
- 		char *p = end;
--		do {
--			*--p = "0123456789abcdef"[value & 15];
--			value >>= 4;
--		} while (value);
-+		while (value >= 0x100) {
-+			p -= 2;
-+			memcpy(p, byte_digits + 2 * (uint8_t)value, 2);
-+			value >>= 8;
-+		}
-+		const char *first = byte_digits + 2 * (unsigned)value;
-+		*--p = first[1];
-+		if (value >= 0x10)
-+			*--p = first[0];
- 		*--p = 'x';
- 		*--p = '0';
- 		if (negative)
+diff --git a/arch/X86/X86IntelInstPrinterNumbers.c b/arch/X86/X86IntelInstPrinterNumbers.c
+index 2d0665a0..8116a091 100644
+--- a/arch/X86/X86IntelInstPrinterNumbers.c
++++ b/arch/X86/X86IntelInstPrinterNumbers.c
+@@ -5,6 +5,24 @@
+ #include "../../MathExtras.h"
+ 
+ #if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_X86_PRECHECKED_PRINTER)
++static const char byte_digits[] =
++	"000102030405060708090a0b0c0d0e0f"
++	"101112131415161718191a1b1c1d1e1f"
++	"202122232425262728292a2b2c2d2e2f"
++	"303132333435363738393a3b3c3d3e3f"
++	"404142434445464748494a4b4c4d4e4f"
++	"505152535455565758595a5b5c5d5e5f"
++	"606162636465666768696a6b6c6d6e6f"
++	"707172737475767778797a7b7c7d7e7f"
++	"808182838485868788898a8b8c8d8e8f"
++	"909192939495969798999a9b9c9d9e9f"
++	"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
++	"b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
++	"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
++	"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
++	"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
++	"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
++
+ // The private printer entry proves a plain open stream, default formatter and
+ // capacity for the complete generated output. A signed uint64 hexadecimal
+ // spelling needs at most 19 bytes, already included in that generated bound.
+@@ -21,9 +39,14 @@ void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
+ 	*out = 'x';
+ 	*end = '\0';
+ 
+-	do {
+-		*--end = "0123456789abcdef"[value & 15];
+-		value >>= 4;
+-	} while (value);
++	while (value >= 0x100) {
++		end -= 2;
++		memcpy(end, byte_digits + 2 * (uint8_t)value, 2);
++		value >>= 8;
++	}
++	const char *first = byte_digits + 2 * (unsigned)value;
++	*--end = first[1];
++	if (value >= 0x10)
++		*--end = first[0];
+ }
+ #endif

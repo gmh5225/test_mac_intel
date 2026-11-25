@@ -1,7 +1,7 @@
-name: Count actual default and prechecked hexadecimal output calls and measure six architecture libraries
+name: Measure byte-pair and direct short hex output in the actual prechecked x86 printer with PE32 and other architecture controls
 on:
   push:
-    branches: [codex/public-hex-byte-and-small-value-cost]
+    branches: [codex/prechecked-intel-hex-widths]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-stream-hex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: prechecked-intel-hex-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

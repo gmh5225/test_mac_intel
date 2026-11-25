@@ -59,11 +59,8 @@ try:
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         if label!='base':
-            stream=(base/'SStream.c').read_text()
-            a=stream.index('void SStream_concat_hex64(');b=stream.index('void SStream_concat_dec64(',a)
-            (w/'hex.c').write_text(stream[a:b].replace('void SStream_concat_hex64(','static void tested_hex('))
-            run('clang','-std=c11','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include','-I',w,r/'stream-guard.c',lib,'-o',w/'check-stream')
-            checks=int(get(w/'check-stream'));assert checks==1780064;save('stream-'+label,checks)
+            run('clang','-std=c11','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',r/'hex-guard.c',lib,'-o',w/'check-stream')
+            checks=int(get(w/'check-stream').split()[0]);assert checks==1340192;save('stream-'+label,checks)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
