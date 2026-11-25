@@ -33,15 +33,22 @@ int main(int argc,char **argv) {
                 ++queries;}
             ++cases;valid+=ok;
         };
-        for (unsigned prefix=0;prefix!=24;++prefix) for(unsigned mr=0;mr!=256;++mr) {
-            for(uint32_t disp : {0u,1u,9u,10u,0x7fu,0xffffff81u,0xffffff80u,0x7fffffffu,0x80000000u,0xfffffffeu,0x80010002u}) {
-                uint8_t code[16]={};unsigned n=0;
-                if(prefix!=0)code[n++]=prefix<=16 ? uint8_t(0x3f+prefix) :
-                    std::array<uint8_t,7>{0x66,0x67,0xf0,0x64,0x2e,0xf2,0xff}[prefix-17];
-                code[n++]=0xff;code[n++]=uint8_t(mr);for(unsigned k=0;k!=4;++k)code[n++]=uint8_t(disp>>(8*k));
-                verify(code,sizeof code,0xfffff073);
-                if((mr==0x15||mr==0x25||mr==0x14||mr==0x24) && disp==0x80010002u)
-                    for(unsigned k=0;k<=n;++k)verify(code,k,0x4000);
+        for (unsigned mr=0;mr<256;++mr) for(unsigned ll=0;ll<4;++ll)
+        for(unsigned op : {0x10u,0x11u,0x28u,0x29u,0x6fu,0x7fu}) {
+            for(unsigned lead : {0xf1u,0x71u,0xb1u,0xd1u,0xe1u,0xa1u}) {
+                for(unsigned flags : {0x7cu,0x7du,0x7eu,0x7fu,0xfcu,0xfdu,0xfeu,0xffu}){
+                    const uint8_t sib=uint8_t((mr%3==0)?0x24:(mr%3==1)?0xd5:0x9c);
+                    uint8_t code[]={0x62,uint8_t(lead),uint8_t(flags),uint8_t(8+32*ll),
+                                    uint8_t(op),uint8_t(mr),sib,0x80,0x7f,0xff,0xe5};
+                    verify(code,sizeof code,0xf042);
+                    if(lead==0xf1 && flags==0x7c && (mr&7)==4)
+                        for(unsigned s=0;s!=256;++s){
+                            code[6]=uint8_t(s);
+                            verify(code,sizeof code,0x4020);
+                        }
+                    if(lead==0xf1 && flags==0x7c && (mr&0x38)==0)
+                        for(size_t n=0;n<sizeof code;++n)verify(code,n,0x6000);
+                }
             }
         }
     }

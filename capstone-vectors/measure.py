@@ -63,6 +63,12 @@ try:
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
+        path,=build.rglob('X86EvexMemoryOutput.c.o')
+        body=get('objdump','-dr','--disassemble=X86_writeEvexMemoryOutput',path)
+        seen=body.split('<X86_writeEvexMemoryOutput>:')
+        assert len(seen)==2
+        # objdump can print relocations from another symbol; retain the instructions and relocations.
+        (e/('evex-'+label+'.txt')).write_text(seen[1])
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
@@ -113,7 +119,7 @@ try:
         z=sp.run([w/'rip',w/'base.so',w/(label+'.so')],capture_output=True,text=True)
         assert z.returncode==0,(label,z.stderr[-1000:])
         outcomes[label]=json.loads(z.stdout)
-    assert outcomes['candidate']==outcomes['outlined'] and outcomes['candidate']['cases']==820176
+    assert outcomes['candidate']==outcomes['outlined'] and outcomes['candidate']['cases']==5999616
     save('rip-record',outcomes)
     guards={};records={}
     for lbl in ('candidate','outlined'):
