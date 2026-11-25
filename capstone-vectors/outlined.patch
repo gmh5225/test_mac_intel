@@ -1,35 +1,37 @@
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..90356abf 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -21,7 +21,10 @@ struct PaddingOutput {
+diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
+index 0fa421fc..4930778f 100644
+--- a/arch/PowerPC/PPCMapping.c
++++ b/arch/PowerPC/PPCMapping.c
+@@ -9,6 +9,9 @@
+ 
+ #include "../../cs_simple_types.h"
+ #include "../../Mapping.h"
++#if defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && !defined(CAPSTONE_USE_ALIAS_TRIE) && !defined(CAPSTONE_DIET)
++#include "../../MappingAlias.h"
++#endif
+ #include "../../MCDisassembler.h"
+ #include "../../utils.h"
+ 
+@@ -153,7 +156,7 @@ static const name_map insn_alias_mnem_map[] = {
+ 	{ PPC_INS_ALIAS_END, NULL },
  };
  
- #include "X86GenVectorOutput.inc"
-+/* This reader accepts both two- and three-byte VEX prefixes. */
-+#define X86_VECTOR_VARIABLE_PREFIX
- #include "X86VectorRegisterOutput.h"
-+#undef X86_VECTOR_VARIABLE_PREFIX
- 
- #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
- static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
-diff --git a/arch/X86/X86VectorRegisterOutput.h b/arch/X86/X86VectorRegisterOutput.h
-index 1f238c20..cb4b1f4e 100644
---- a/arch/X86/X86VectorRegisterOutput.h
-+++ b/arch/X86/X86VectorRegisterOutput.h
-@@ -16,7 +16,15 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 	const unsigned len = prefix + 2 + row->immediate;
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
-+#ifdef X86_VECTOR_VARIABLE_PREFIX
-+	/* The validated register form has a 2-4 byte prefix, opcode and
-+	 * ModR/M, and at most one immediate byte. Both copies stay inside
-+	 * the resulting 4-7 byte instruction, including at a page boundary. */
-+	memcpy(insn->bytes, code, 4);
-+	memcpy(insn->bytes + (len - 4), code + (len - 4), 4);
+-#ifdef CAPSTONE_USE_ALIAS_TRIE
++#if defined(CAPSTONE_USE_ALIAS_TRIE) || defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
+ static const alias_trie_node alias_trie[] = {
+ #include "PPCGenAliasTrie.inc"
+ };
+@@ -339,9 +342,13 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
+ 	PPC_LLVM_printInst(MI, MI->address, "", O);
+ #ifndef CAPSTONE_DIET
++#if defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && !defined(CAPSTONE_USE_ALIAS_TRIE)
++	map_set_alias_id_trie_impl(MI, O, alias_trie, ARR_SIZE(alias_trie));
 +#else
- 	memcpy(insn->bytes, code, len);
+ 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+ 			ARR_SIZE(insn_alias_mnem_map), alias_trie);
+ #endif
 +#endif
- 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
- 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ }
+ 
+ bool PPC_getInstruction(csh handle, const uint8_t *bytes, size_t bytes_len,

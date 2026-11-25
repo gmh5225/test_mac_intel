@@ -45,7 +45,13 @@ try:
         run('clang++','-O2','-std=c++17','-I',base/'include',r/('trial-'+stem+'.cpp'),'-ldl','-o',w/('trial-'+stem))
     from training import fetch
     from foreign_time import measure as time_foreign
-    foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
+    samples=rd(r/'ppc-samples.json')['fixtures'];training=rd(r/'training.json');origin,=(z for z in training if z['arch']=='ppc64el')
+    extra=[dict(origin,name=n,command=n.split('-',1)[1],text_sha256=v['sha256'])for n,v in samples.items()if n!=origin['name']]
+    docs=w/'corpus-config';docs.mkdir();(docs/'training.json').write_text(json.dumps(training+extra));all_rows=fetch(docs,w)
+    foreign_rows=all_rows[:len(training)];save('foreign-corpus',all_rows)
+    for row in all_rows:
+        if row['arch']=='ppc64el':assert samples[row['name']]['sha256']==row['text_sha256'] and samples[row['name']]['package']==row['package_sha256']
+
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -101,6 +107,17 @@ try:
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
+    for tool in ('ppc-states','real-ppc'):
+        run('clang++','-std=c++17','-O2','-I',base/'include',r/(tool+'.cpp'),'-ldl','-o',w/tool)
+    run('clang','-O2','-std=c11','-DCAPSTONE_HAS_POWERPC','-I',base,'-I',base/'include',r/'parser.c',lib,'-o',w/'ppc-parser')
+    ppc=dict(parser=int(get(w/'ppc-parser')),cases={},records={})
+    assert ppc['parser']>50000
+    for tag in ('candidate','outlined'):
+        rec=sp.run([w/'ppc-states',w/'base.so',w/(tag+'.so'),'2048'],check=True,capture_output=True,text=True)
+        ppc['cases'][tag]=dict(options=rec.stderr.count('case arch='),verified=rec.stdout.strip());ppc['records'][tag]={}
+        for name in samples:
+            ppc['records'][tag][name]=[get(w/'real-ppc',w/'base.so',w/(tag+'.so'),w/(name+'.text'),str(i)).splitlines() for i in range(4)]
+    assert ppc['cases']['candidate']==ppc['cases']['outlined'] and ppc['records']['candidate']==ppc['records']['outlined'];save('ppc-exact',ppc)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
@@ -179,6 +196,7 @@ try:
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
     time_foreign(foreign_rows,w,save)
+    time_foreign(all_rows[len(training):],w,lambda name,value:save('extra-ppc-'+name,value))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:

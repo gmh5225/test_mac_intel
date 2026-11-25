@@ -1,48 +1,69 @@
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..90356abf 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -21,7 +21,10 @@ struct PaddingOutput {
- };
+diff --git a/AliasMapping.c b/AliasMapping.c
+index 77e2395c..06ebd1d6 100644
+--- a/AliasMapping.c
++++ b/AliasMapping.c
+@@ -6,7 +6,8 @@
+ #if defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && \
+ 	!defined(CAPSTONE_USE_ALIAS_TRIE) && \
+ 	(defined(CAPSTONE_HAS_AARCH64) || \
+-	 (defined(CAPSTONE_HAS_MIPS) && !defined(CAPSTONE_DIET)))
++	 ((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_POWERPC)) && \
++	  !defined(CAPSTONE_DIET)))
+ #define CAPSTONE_ALIAS_ROLLED_LOOP
  
- #include "X86GenVectorOutput.inc"
-+/* This reader accepts both two- and three-byte VEX prefixes. */
-+#define X86_VECTOR_VARIABLE_PREFIX
- #include "X86VectorRegisterOutput.h"
-+#undef X86_VECTOR_VARIABLE_PREFIX
+ #if defined(__ELF__) && defined(__GNUC__)
+@@ -57,4 +58,20 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
+ }
+ #endif
  
- #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
- static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
-diff --git a/arch/X86/X86VectorRegisterOutput.h b/arch/X86/X86VectorRegisterOutput.h
-index 1f238c20..bf68abee 100644
---- a/arch/X86/X86VectorRegisterOutput.h
-+++ b/arch/X86/X86VectorRegisterOutput.h
-@@ -16,7 +16,15 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 	const unsigned len = prefix + 2 + row->immediate;
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
-+#ifdef X86_VECTOR_VARIABLE_PREFIX
-+	/* The validated register form has a 2-4 byte prefix, opcode and
-+	 * ModR/M, and at most one immediate byte. Both copies stay inside
-+	 * the resulting 4-7 byte instruction, including at a page boundary. */
-+	memcpy(insn->bytes, code, 4);
-+	memcpy(insn->bytes + (len - 4), code + (len - 4), 4);
-+#else
- 	memcpy(insn->bytes, code, len);
++#if defined(CAPSTONE_HAS_POWERPC) && !defined(CAPSTONE_DIET)
++static const alias_trie_node ppc_alias_trie[] ALIAS_LOOKUP_DATA = {
++#include "arch/PowerPC/PPCGenAliasTrie.inc"
++};
++
++ALIAS_LOOKUP_CODE
++void map_set_ppc_alias_id(MCInst *MI, const SStream *O, const name_map *map,
++			   int map_size)
++{
++	(void)map;
++	(void)map_size;
++	map_set_alias_id_trie_impl(MI, O, ppc_alias_trie,
++				   ARR_SIZE(ppc_alias_trie));
++}
 +#endif
- 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
- 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
-@@ -46,7 +54,12 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 		memcpy(d->groups, row->groups, sizeof(row->groups));
- 		d->groups_count = row->group_count;
- 		cs_x86 *x = &d->x86;
-+#ifdef X86_VECTOR_VARIABLE_PREFIX
-+		memcpy(x->opcode, code, 2);
-+		memcpy(x->opcode + (prefix - 2), code + (prefix - 2), 2);
-+#else
- 		memcpy(x->opcode, code, prefix);
++
+ #endif
+diff --git a/Mapping.h b/Mapping.h
+index dd340ed5..122569b7 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -315,6 +315,10 @@ CAPSTONE_INTERNAL void map_set_aarch64_alias_id(MCInst *MI, const SStream *O,
+ CAPSTONE_INTERNAL void map_set_mips_alias_id(MCInst *MI, const SStream *O,
+ 					     const name_map *map, int map_size);
+ #endif
++#if defined(CAPSTONE_HAS_POWERPC) && !defined(CAPSTONE_DIET)
++CAPSTONE_INTERNAL void map_set_ppc_alias_id(MCInst *MI, const SStream *O,
++					     const name_map *map, int map_size);
 +#endif
- 		x->addr_size = 8;
- 		x->rex = (uint8_t)rex;
- 		x->modrm = code[prefix + 1];
+ 
+ #ifdef CAPSTONE_USE_ALIAS_TRIE
+ 
+diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
+index 0fa421fc..87da58d7 100644
+--- a/arch/PowerPC/PPCMapping.c
++++ b/arch/PowerPC/PPCMapping.c
+@@ -339,9 +339,14 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
+ 	PPC_LLVM_printInst(MI, MI->address, "", O);
+ #ifndef CAPSTONE_DIET
++#if defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && !defined(CAPSTONE_USE_ALIAS_TRIE)
++	map_set_ppc_alias_id(MI, O, insn_alias_mnem_map,
++			     ARR_SIZE(insn_alias_mnem_map));
++#else
+ 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+ 			ARR_SIZE(insn_alias_mnem_map), alias_trie);
+ #endif
++#endif
+ }
+ 
+ bool PPC_getInstruction(csh handle, const uint8_t *bytes, size_t bytes_len,

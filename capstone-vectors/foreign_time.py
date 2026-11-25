@@ -44,5 +44,5 @@ def measure(rows, w, save):
                 cycles.append({k:[sum(x[i]for x in xs)for i in (0,1)]for k,xs in pairs.items()})
             data[row['name']+'/'+str(mode)]=dict(reps=n,checks=expected,cycles=cycles)
             save('foreign-observations',data)
-    assert len(data)==15 and len(verified)==4
+    assert len(data)==3*sum(row["arch"] not in ("amd64","i386") for row in rows) and len(verified)==4
     save('foreign-fixed',dict(inode=inode,original=image_shas,verified=verified,bytes=length,blocks=len(offsets)))
