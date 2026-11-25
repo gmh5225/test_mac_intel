@@ -1,7 +1,7 @@
-name: Compare corrected absolute offsets to the independently decoded width across Capstone build profiles
+name: Check decoded operand kinds and effective-address output across nineteen build configurations
 on:
   push:
-    branches: [codex/absolute-offset-profiles-current]
+    branches: [codex/x86-operand-kinds-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 08844cf483fb5ce17bba3681ad91ae084c191bab
+          ref: 571a1592ff48d148257b7ae1146d2fb593470783
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: corrected-address-profiles-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: canonical-operand-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
