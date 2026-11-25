@@ -33,9 +33,9 @@ try:
     save('corpus',corpus)
     from bisect import bisect_right
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',r/'profile-foreign.cpp',lib,'-no-pie','-o',w/'base')
-    src=base/'SStream.c';original=src.read_text();t='\\tva_start(ap, fmt);\\n\\tret = cs_vsnprintf'
+    src=base/'SStream.c';original=src.read_text();t='\tva_start(ap, fmt);\n\tret = cs_vsnprintf'
     assert original.count(t)==1
-    src.write_text(original.replace(t,"\\tva_start(ap, fmt);\\n\\textern void trace_format_owner(void *, const char *, va_list);\\n\\ttrace_format_owner(__builtin_return_address(0), fmt, ap);\\n\\tret = cs_vsnprintf"))
+    src.write_text(original.replace(t,"\tva_start(ap, fmt);\n\textern void trace_format_owner(void *, const char *, va_list);\n\ttrace_format_owner(__builtin_return_address(0), fmt, ap);\n\tret = cs_vsnprintf"))
     run('cmake','--build',build,'--target','capstone_static','--parallel','4')
     exe=w/'traced';run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',r/'profile-foreign.cpp',r/'owners.cpp',lib,'-Wl,--wrap=clock','-no-pie','-o',exe)
     src.write_text(original)
@@ -56,7 +56,7 @@ try:
             assert actual==expected and actual[0]>0
             rows=[]
             for line in (w/'counts.tsv').read_text().splitlines():
-                pc,n,fmt,a,b=line.split('\\t');addr=int(pc,16)-1;j=bisect_right(order,addr)-1;start=order[j];assert j>=0 and addr<start+sz[start],line
+                pc,n,fmt,a,b=line.split('\t');addr=int(pc,16)-1;j=bisect_right(order,addr)-1;start=order[j];assert j>=0 and addr<start+sz[start],line
                 rows.append([starts[start],hex(addr-start+1),*(bytes.fromhex(x).decode('ascii') for x in (fmt,a,b)),int(n)])
             panels[str(mode)]=dict(signature=actual,calls=sum(a[-1]for a in rows),sites=rows)
             save('owners',out)

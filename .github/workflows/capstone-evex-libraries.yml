@@ -1,7 +1,7 @@
-name: Count live formatter calls and literal tokens in five architecture backends without changing the output
+name: Trace original printf formats against independent result signatures on real ELF
 on:
   push:
-    branches: [codex/architecture-printf-callers]
+    branches: [codex/architecture-live-format-calls]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: architecture-format-owners-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: decoded-architecture-format-calls-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
