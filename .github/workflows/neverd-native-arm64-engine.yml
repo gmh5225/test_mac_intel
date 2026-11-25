@@ -12,6 +12,8 @@ on:
       - native-driver-entry/export-entry-inputs.json
       - native-driver-entry/check_com_callbacks.py
       - native-driver-entry/process_sdk_smoke.c
+      - native-driver-entry/check_process_prng.py
+      - native-driver-entry/process_prng.c
       - native-driver-entry/native_dispatcher_queue.py
       - native-driver-entry/dispatcher_queue_main.cpp
       - native-driver-entry/native_system_smoke.c
@@ -85,6 +87,9 @@ jobs:
           if ($deps -notmatch '(?im)^\s*neverd\.dll\s*$') { throw 'Unexpected native CLI dependency list' }
           Push-Location $bundle
           try { & "./neverd.exe" types --help | Out-Null } finally { Pop-Location }
+      - name: Run the documented CNG export through the original caller and both recovered views
+        shell: pwsh
+        run: python native-driver-entry/check_process_prng.py "$env:RUNNER_TEMP/neverd-provider-tools/neverd.exe" source "$env:GITHUB_WORKSPACE/prng"
       - name: Cache the unprofiled native Windows SDK reader and engine DLL
         uses: actions/cache/save@0400d5f644dc74513175e3cd8d07132dd4860809
         with:
@@ -266,6 +271,7 @@ jobs:
         with:
           name: native-windows-arm64-engine
           path: |
+            prng/native-prng-callers.json
             native-driver-verification.json
             native-entry-observations.json
             native-export-verification.json

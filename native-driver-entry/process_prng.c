@@ -6,7 +6,14 @@
 
 typedef BOOL (WINAPI *ProcessPrngRoutine)(PBYTE, SIZE_T);
 
+#ifdef TEST_RECOVERED_PRNG_CALLER
+extern BOOL WINAPI InspectProcessPrng(PBYTE, SIZE_T);
+#endif
+
 int main(void) {
+#ifdef TEST_RECOVERED_PRNG_CALLER
+    ProcessPrngRoutine random_bytes = InspectProcessPrng;
+#else
     HMODULE module = LoadLibraryExW(L"bcryptprimitives.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!module)
         return 1;
@@ -16,6 +23,7 @@ int main(void) {
     ProcessPrngRoutine random_bytes;
     _Static_assert(sizeof(random_bytes) == sizeof(address), "function-pointer ABI");
     memcpy(&random_bytes, &address, sizeof(random_bytes));
+#endif
 
     const SIZE_T lengths[] = {0, 1, 7, 32, 63};
     unsigned changed = 0;
@@ -37,6 +45,8 @@ int main(void) {
     printf("{\"pointer_bits\":%u,\"result_bits\":%u,\"calls\":%u,\"changed_bytes\":%u}\n",
            (unsigned)(8 * sizeof(void *)), (unsigned)(8 * sizeof(BOOL)),
            (unsigned)ARRAYSIZE(lengths), changed);
+#ifndef TEST_RECOVERED_PRNG_CALLER
     FreeLibrary(module);
+#endif
     return 0;
 }
