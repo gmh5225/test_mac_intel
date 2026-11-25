@@ -1,7 +1,7 @@
-name: Measure normal ELF static links with RISC-V printer code grouped at its source on PE32, PE64 and five architectures
+name: Compare current Capstone and three numeric register fixes on RISC-V ELF, PuTTY x86 and four other architectures
 on:
   push:
-    branches: [codex/riscv-ordinary-printer-code-placement]
+    branches: [codex/riscv-resolve-numeric-names-normal-links]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 994ce74539381ccfe41411455924c8933825d004
+          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 7c158ca1c194c0a2b56d830eaeee9fa901732618
+          ref: 24dec367114bc2c5c326967a41879eec58a330ae
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rv-code-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rv-numeric-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
