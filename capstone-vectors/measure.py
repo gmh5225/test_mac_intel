@@ -11,9 +11,9 @@ def read(p):return json.loads(p.read_text())
 def run(*args):sp.run(args,check=True)
 def get(*args):return sp.check_output(args,text=True).strip()
 def sig(p):return hashlib.sha256(p.read_bytes()).hexdigest()
-m=read(r/'layout-source.json');q=m['candidate']
+m=read(r/'layout-source.json');q=m['sources']['base']
 assert get('git','-C',src,'rev-parse','HEAD')==q['parent'] and get('git','-C',nd,'rev-parse','HEAD')==m['neverd']
-assert sig(r/'layout.patch')==q['sha256']
+assert all(sig(r/(tag+'.patch'))==record['sha256']for tag,record in m['sources'].items())
 w=Path(tempfile.mkdtemp());build=w/'build'
 try:
     project=w/'project';(project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(src);(project/'cmake').mkdir()
@@ -32,96 +32,38 @@ try:
     driver=driver.replace('  cs_insn *insn =', '  if (setting>2 && (arch!=CS_ARCH_X86 || cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT)!=CS_ERR_OK)) return 7;\n  cs_insn *insn =')
     assert driver.count('setting')==5 and 'CS_OPT_SYNTAX_ATT' in driver
     (w/'driver.cpp').write_text(driver);run('clang++','-std=c++17','-O3','-DNDEBUG','-I',src/'include','-c',w/'driver.cpp','-o',w/'driver.o')
-    local_names=set(m['possible_objects'])
-    versions={};archives={};objects={}
-    ar=shutil.which('llvm-ar') or shutil.which('ar')
-    objcopy=shutil.which('llvm-objcopy') or shutil.which('objcopy')
-    for v in ('base','candidate'):
-        tag=q if v=='candidate' else m['reference']
-        patch=r/('layout.patch' if v=='candidate' else 'baseline.patch')
-        assert sig(patch)==tag['sha256']
+    bins={};layout={};ar=shutil.which('llvm-ar') or shutil.which('ar')
+    for tag,record in m['sources'].items():
         run('git','-C',src,'reset','--hard',q['parent'])
-        run('git','-C',src,'apply','--index',patch);assert get('git','-C',src,'write-tree')==tag['tree']
+        run('git','-C',src,'apply','--index',r/(tag+'.patch'));assert get('git','-C',src,'write-tree')==record['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        orig,=build.rglob('libcapstone.a');dest=versions[v]=w/('obj-'+v);dest.mkdir()
-        lib=archives[v]=dest/'libcapstone.a';shutil.copyfile(orig,lib)
-        objects[v]={str(x.relative_to(build)):sig(x) for x in build.rglob('*.c.o')}
-        for member in sorted(local_names):
-            matches=list(build.rglob(member))
-            if not matches:continue
-            obj,=matches;shutil.copy2(obj,dest/member)
-            assert sp.check_output([ar,'p',lib,member])==obj.read_bytes()
-    ch=[Path(k).name for k in objects['base'] if objects['base'][k]!=objects['candidate'][k]]
-    required={'cs.c.o','X86ATTInstPrinter.c.o','X86OutputIterator.c.o','X86VectorOutput.c.o','X86ImmediateOutput.c.o'}
-    assert required <= set(ch) <= local_names,ch
-    other,script=plan(versions,archives,w,ar,objcopy,sorted(ch))
-    def link(bin,lib,controlled):
-        mapfile=bin.with_suffix('.map')
-        args=['clang++',w/'driver.o','-no-pie','-fuse-ld=bfd','-Wl,-Map,'+str(mapfile)]
-        if controlled:
-            args+=['-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-Wl,-T,'+str(script)]
-        else:args.append(lib)
-        run(*args,'-o',bin)
+        lib,=build.rglob('libcapstone.a');binary=w/tag;mapfile=w/(tag+'.map')
+        run('clang++',w/'driver.o',lib,'-no-pie','-fuse-ld=bfd','-Wl,-Map,'+str(mapfile),'-o',binary)
         members=sorted(set(re.findall(re.escape(str(lib))+r'\(([^()\n]+\.o)\)',mapfile.read_text())))
-        assert members,(lib,mapfile)
-        return members
-    original=script.read_text()
-    anchors={}
-    for group in ('exec','const','write','zero'):
-        section='.csprobe_'+group
-        if section+' : ALIGN' not in original:continue
-        positions=[]
-        for tag,lib in other.items():
-            exe=w/('bounds-'+tag);link(exe,lib,True)
-            with exe.open('rb')as stream:positions.append(ELFFile(stream).get_section_by_name(section)['sh_addr'])
-        anchor=(max(positions)+4095)&~4095
-        spec=script.read_text();mark=section+' : ALIGN(64)';assert spec.count(mark)==1
-        script.write_text(spec.replace(mark,section+' '+hex(anchor)+' : ALIGN(64)'))
-        anchors[section]=anchor
-    (e/'diagnostic.ld').write_bytes(script.read_bytes())
-    closure={}
-
+        assert len(members)>=40
+        symbols_,sections=symbols(binary)
+        compile=read(build/'compile_commands.json')
+        settings={'fixed_readers':any('CAPSTONE_STATIC_X86_READERS' in cmd['command']for cmd in compile),
+                  'fixed_functions':[name for name in ('X86_decodeFixedRecord32','X86_decodeFixedRecord64')if name in symbols_]}
+        assert settings['fixed_readers']==(tag=='fixed') and len(settings['fixed_functions'])==(2 if tag=='fixed'else 0),(tag,settings)
+        hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_ATT_printInst','X86_Intel_printInst','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction']
+        layout[tag]=dict(members=members,settings=settings,hot={n:symbols_[n]for n in hot},sections=sections,sha256=sig(binary))
+        bins[tag]=binary.read_bytes()
+        save('layout',dict(source=m,variants=layout))
     cases=training.fetch(r,w)
     for name,bits,f,spans,meta in pe_panels.prepare(w):
         assert bits in (32,64) and spans
         bases={base-off for off,_,base in spans};assert len(bases)==1
         cases.append(dict(name=name,arch='i386' if bits==32 else 'amd64',address=bases.pop(),text_sha256=sig(f),bytes=f.stat().st_size))
     assert len(cases)==7;save('corpus',cases)
-    hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_ATT_printInst','X86_Intel_printInst','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction']
-    stamps={};addresses={};bins={}
-    for kind,libs in [('regular',archives),('controlled',other)]:
-        for v,lib in libs.items():
-            tag=kind+'-'+v;exe=w/tag
-            closure[tag]=link(exe,lib,kind=='controlled')
-            sy,sec=symbols(exe);assert set(hot)<=sy.keys(),sy.keys()
-            stamps[tag]=dict(hot={n:sy[n]for n in hot},sections=sec,sha256=sig(exe))
-            if kind=='controlled':
-                with exe.open('rb')as stream:
-                    symtab=ELFFile(stream).get_section_by_name('.symtab')
-                    stamps[tag]['slots']={a.name:a['st_value'] for a in symtab.iter_symbols() if a.name.startswith('csprobe_') and a.name.endswith(('_start','_end'))}
-                assert len(stamps[tag]['slots'])>=8
-            addresses[tag]=sy;bins[tag]=exe.read_bytes()
-        ref=kind+'-base';cand=kind+'-candidate'
-        common=addresses[ref].keys() & addresses[cand].keys()
-        stamps[cand].update(equal_address=sum(addresses[ref][f][0]==addresses[cand][f][0]for f in common),
-                             equal_address_and_bytes=sum(addresses[ref][f]==addresses[cand][f] for f in common),unique_functions=len(common))
-    controlled=stamps['controlled-base']['sections']
-    slots=[s for s in controlled if s.startswith('.csprobe_')]
-    assert {'.csprobe_exec','.csprobe_const'}<=set(slots) and all(controlled[s][1]==stamps['controlled-candidate']['sections'][s][1]for s in slots)
-    assert closure['controlled-base']==closure['controlled-candidate']==sorted(get(ar,'t',archives['base']).splitlines()),closure
-    ends=stamps['controlled-base']['slots'];diff={k:v-stamps['controlled-candidate']['slots'][k]for k,v in ends.items()if v!=stamps['controlled-candidate']['slots'][k]}
-    assert not diff,diff
-    for k,p in anchors.items():assert controlled[k][0]==stamps['controlled-candidate']['sections'][k][0]==p
-    save('archive-closure',dict(members=closure,anchors=anchors,script=sig(script),new=sorted(set(closure['regular-candidate'])-set(closure['regular-base'])),removed=sorted(set(closure['regular-base'])-set(closure['regular-candidate']))))
-    save('layout',dict(objects=ch,syms=stamps,driver_sha=sig(w/'driver.cpp'),script=sig(script),source=m))
     length=max(map(len,bins.values()));bins={k:v.ljust(length,b'\0')for k,v in bins.items()}
-    for kind in ['regular','controlled']:bins[kind+'-duplicate']=bins[kind+'-base']
-    path=w/'selected';path.write_bytes(bins['regular-base']);path.chmod(0o755);inode=path.stat().st_ino
+    bins['duplicate']=bins['base']
+    path=w/'selected';path.write_bytes(bins['base']);path.chmod(0o755);inode=path.stat().st_ino
     checked={};changes={}
     for prev in bins:
         for cur in bins:
             changes[prev,cur]=[p for p in range(0,length,4096) if bins[prev][p:p+4096]!=bins[cur][p:p+4096]]
-    previous=['regular-base']
+    previous=['base']
     def once(row,tag,mode,reps):
         with path.open('r+b',buffering=0)as f:
             for off in changes[previous[0],tag]:
@@ -135,9 +77,12 @@ try:
     results={}
     for row in cases:
         for mode in (range(5) if row['arch'] in ('amd64','i386') else range(3)):
-            reps=max(1,math.ceil(20e6/once(row,'regular-base',mode,1)[0]))
-            expected=once(row,'regular-base',mode,reps)[2:];assert expected[0]>0
-            assert all(once(row,k,mode,reps)[2:]==expected for k in bins)
+            reps=max(1,math.ceil(20e6/once(row,'base',mode,1)[0]))
+            expected=once(row,'base',mode,reps)[2:];assert expected[0]>0
+            for k in bins:
+                actual=once(row,k,mode,reps)[2:]
+                if actual!=expected:
+                    save('semantic-mismatch',dict(sample=row,mode=mode,variant=k,wanted=expected,got=actual));raise ValueError((row['name'],mode,k,expected,actual))
             rng=random.Random(row['name']+str(mode));labels=list(bins);cycles=[]
             for _ in range(17):
                 rng.shuffle(labels);times={k:[] for k in labels}
@@ -147,7 +92,7 @@ try:
                 cycles.append({k:[a+b for a,b in zip(*xs)] for k,xs in times.items()})
             results[row['name']+'/'+str(mode)]=dict(reps=reps,output=expected,pairs=cycles)
             save('pairs',results)
-    assert len(checked)==6 and len(results)==25
+    assert len(checked)==5 and len(results)==25
     save('complete',dict(complete=True,source=m,checks=checked,inode=inode,compiler=get('clang','--version'),host=platform.machine()))
 finally:
     size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink())

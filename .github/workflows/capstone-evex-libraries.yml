@@ -1,7 +1,7 @@
-name: Match archive membership and absolute ELF section bounds on normal PE and mixed architecture workloads
+name: Compare archive membership and normal public Intel and AT&T iteration after assigning records to the syntax printer
 on:
   push:
-    branches: [codex/x86-att-matched-static-members]
+    branches: [codex/x86-att-owner-native-public-dialect]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: matched-members-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: syntax-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
