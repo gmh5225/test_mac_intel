@@ -1,3 +1,48 @@
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index e1790f39..bae48202 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -804,6 +804,4 @@ bool RISCV_LLVM_getInstruction(csh handle, const uint8_t *Bytes, size_t ByteLen,
+ 	return ret != MCDisassembler_Fail;
+ }
+ 
+-#ifdef CAPSTONE_RISCV_ONLY
+ #include "RISCVScan.h"
+-#endif
+diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
+index b10db879..75ea6703 100644
+--- a/arch/RISCV/RISCVGenDirectDecoder.inc
++++ b/arch/RISCV/RISCVGenDirectDecoder.inc
+@@ -17240,17 +17240,16 @@ Decode:
+ 	return decodeToMCInst_2(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ }
+ 
+-#ifdef CAPSTONE_RISCV_ONLY
+-static const uint16_t RISCVScanOpcodes[32][8] = {
+-	{ 12094, 12097, 12108, 0, 12095, 12098, 0, 0 },
++static const int16_t RISCVScanOpcodes[32][8] = {
++	{ 12094, 12097, 12108, -12096, 12095, 12098, -12109, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 11276, 0, 12225, 12226, 13084, 0, 0, 11380 },
+ 	{ 11382, 11382, 11382, 11382, 11382, 11382, 11382, 11382 },
++	{ -11277, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+-	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+-	{ 12182, 12197, 12254, 0, 0, 0, 0, 0 },
++	{ 12182, 12197, 12254, -12191, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+@@ -17275,7 +17274,6 @@ static const uint16_t RISCVScanOpcodes[32][8] = {
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0 },
+ };
+-#endif
+ 
+ #define RISCV_EXTENSION_MAJORS UINT32_C(0x405f0c04)
+ 
 diff --git a/arch/RISCV/RISCVGenGPRNames.inc b/arch/RISCV/RISCVGenGPRNames.inc
 new file mode 100644
 index 00000000..301944f7
@@ -292,6 +337,150 @@ index a3e2892f..b3de54a6 100644
  static const insn_map insns[] = {
  #include "RISCVGenCSMappingInsn.inc"
  };
+diff --git a/arch/RISCV/RISCVModule.c b/arch/RISCV/RISCVModule.c
+index 4105553b..fd3f5b5a 100644
+--- a/arch/RISCV/RISCVModule.c
++++ b/arch/RISCV/RISCVModule.c
+@@ -42,9 +42,7 @@ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		handle->syntax |= (int)value;
+ 	} else if (type == CS_OPT_MODE) {
+ 		handle->mode = (cs_mode)value;
+-#ifdef CAPSTONE_RISCV_ONLY
+ 		RISCV_selectScanDecoder(handle);
+-#endif
+ 	}
+ 
+ 	return CS_ERR_OK;
+diff --git a/arch/RISCV/RISCVModule.h b/arch/RISCV/RISCVModule.h
+index 9d154c2d..cb14313f 100644
+--- a/arch/RISCV/RISCVModule.h
++++ b/arch/RISCV/RISCVModule.h
+@@ -7,9 +7,7 @@
+ #include "../../utils.h"
+ 
+ cs_err RISCV_global_init(cs_struct *ud);
+-#ifdef CAPSTONE_RISCV_ONLY
+ void RISCV_selectScanDecoder(cs_struct *handle);
+-#endif
+ cs_err RISCV_option(cs_struct *handle, cs_opt_type type, size_t value);
+ 
+ #endif
+diff --git a/arch/RISCV/RISCVScan.h b/arch/RISCV/RISCVScan.h
+index 14362d77..d8bd53bd 100644
+--- a/arch/RISCV/RISCVScan.h
++++ b/arch/RISCV/RISCVScan.h
+@@ -87,14 +87,17 @@ static bool getScanInstruction(csh handle, const uint8_t *code, size_t length,
+ #else
+ 	if (length >= 4 && (code[0] & 3) == 3 && !inst->flat_insn->detail) {
+ #endif
+-		/* Only base encodings with unconditional GPR and immediate
+-		 * operands reach this row. Feature predicates, reserved fields
+-		 * and overlapping extension tables keep the full decoder. */
+-		const unsigned opcode =
++		/* The table proves the operand readers cannot fail. Negative rows
++		 * additionally require a 64-bit hart. */
++		int opcode =
+ 			RISCVScanOpcodes[(code[0] & 0x7f) >> 2][(code[1] >> 4) & 7];
+-		if (!opcode)
+-			goto full;
+-		MCInst_setOpcode(inst, opcode);
++		if (opcode <= 0) {
++			if (!opcode || !RISCV_getFeatureBits(inst->csh->mode,
++							     RISCV_Feature64Bit))
++				goto full;
++			opcode = -opcode;
++		}
++		MCInst_setOpcode(inst, (unsigned)opcode);
+ 		*size = 4;
+ 		return true;
+ 	}
+diff --git a/cs.c b/cs.c
+index d0b8b045..cda6f395 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1407,8 +1407,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
+ #endif
+-#ifdef CAPSTONE_RISCV_ONLY
+-		RISCV_selectScanDecoder(handle);
++#ifdef CAPSTONE_HAS_RISCV
++		if (handle->arch == CS_ARCH_RISCV)
++			RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+@@ -1422,8 +1423,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
+ #endif
+-#ifdef CAPSTONE_RISCV_ONLY
+-		RISCV_selectScanDecoder(handle);
++#ifdef CAPSTONE_HAS_RISCV
++		if (handle->arch == CS_ARCH_RISCV)
++			RISCV_selectScanDecoder(handle);
+ #endif
+ 		return CS_ERR_OK;
+ 
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index 09bd1aa7..a42cf3dd 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -380,10 +380,10 @@ def riscv_scan_decoders(text):
+     return result
+ 
+ 
+-def riscv_scan_opcodes(nodes, decoders, extension_majors):
++def riscv_scan_opcodes(nodes, decoders, extension_majors, rv64_predicate):
+     """Resolve the base row only if opcode and funct3 determine every decision."""
+     known = 0x707f
+-    def resolve(major, funct3):
++    def resolve(major, funct3, rv64):
+         if extension_majors & (1 << major):
+             return 0
+         word = (major << 2) | 3 | (funct3 << 12)
+@@ -402,17 +402,21 @@ def riscv_scan_opcodes(nodes, decoders, extension_majors):
+                     pos = n.end if value == n.args[2] else n.target
+                 else:
+                     field, pos = value, n.end
++            elif n.op == "CheckPredicate" and rv64 and n.args[0] == rv64_predicate:
++                pos = n.end
+             elif n.op == "FilterValue":
+                 pos = n.end if field == n.args[0] else n.target
+             else:
+                 return 0
+ 
+-    rows = [[resolve(major, f) for f in range(8)] for major in range(32)]
+-    require(max(max(row) for row in rows) <= 0xffff, "RISC-V scan opcode exceeds table width")
+-    return "\n".join(["#ifdef CAPSTONE_RISCV_ONLY",
+-                      "static const uint16_t RISCVScanOpcodes[32][8] = {",
++    # A negative row can bypass the full decoder only when XLEN is 64.
++    rows = [[resolve(major, f, False) or -resolve(major, f, True)
++             for f in range(8)] for major in range(32)]
++    require(all(abs(opcode) <= 0x7fff for row in rows for opcode in row),
++            "RISC-V scan opcode exceeds the signed table width")
++    return "\n".join(["static const int16_t RISCVScanOpcodes[32][8] = {",
+                       *["\t{ " + ", ".join(map(str, row)) + " }," for row in rows],
+-                      "};", "#endif"])
++                      "};"])
+ 
+ 
+ def main():
+@@ -472,7 +476,13 @@ def main():
+             output.append(emit(name, nodes, width, w, arch == "RISCV" and name == "DecoderTable16"))
+             counts.append((name, len(nodes)))
+         if arch == "RISCV":
+-            output.append(riscv_scan_opcodes(riscv_base, riscv_scan_decoders(text), extension_majors))
++            predicates = re.findall(
++                r"case (\d+):\s*return \(RISCV_getFeatureBits\(Inst->csh->mode, RISCV_Feature64Bit\)\);",
++                text,
++            )
++            require(len(predicates) == 1, "Expected one RISC-V XLEN64 predicate")
++            output.append(riscv_scan_opcodes(riscv_base, riscv_scan_decoders(text),
++                                             extension_majors, int(predicates[0])))
+             output.append(
+                 f"#define RISCV_EXTENSION_MAJORS UINT32_C(0x{extension_majors:08x})"
+             )
 diff --git a/suite/synctools/riscv_gpr_names.py b/suite/synctools/riscv_gpr_names.py
 new file mode 100644
 index 00000000..1ecd3d23

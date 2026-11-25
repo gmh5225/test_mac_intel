@@ -125,7 +125,7 @@ index 00000000..301944f7
 +	},
 +};
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index f778e3b7..7d1a49ef 100644
+index f778e3b7..0bf1ee4d 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
 @@ -57,7 +57,7 @@ static void printCustomAliasOperand(MCInst *MI, uint64_t Address,
@@ -180,7 +180,7 @@ index f778e3b7..7d1a49ef 100644
 +static inline void printRegName(const MCInst *MI, SStream *O, MCRegister Reg)
  {
 -	SStream_concat0(markup_OS(O, Markup_Register), doGetRegisterName(Reg));
-+	SStream *out = markup_OS(O, Markup_Register);
++	SStream *out = O->markup_stream ? markup_OS(O, Markup_Register) : O;
 +#ifndef CAPSTONE_DIET
 +	unsigned index = (unsigned)Reg - RISCV_X0;
 +	if (index < ARR_SIZE(riscv_gpr_names[0])) {

@@ -1,274 +1,127 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 396ab047..d305ef98 100644
+index d305ef98..6050d7c2 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -175,7 +175,7 @@ if(capstone_enabled_architectures STREQUAL "XCORE")
- endif()
+@@ -161,6 +161,12 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
+ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
++    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++       AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$"
++       AND NOT CAPSTONE_BUILD_DIET)
++        add_compile_definitions(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
++        set(capstone_arm_char_source arch/ARM/ARMFormattedChar.c)
++    endif()
+     # Linux x86-64 retains its inlined initialization for MIPS text throughput.
+     if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
+@@ -1064,7 +1070,7 @@ set_property(GLOBAL PROPERTY VERSION ${PROJECT_VERSION})
  
- if(capstone_enabled_architectures STREQUAL "ARM")
--    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
-+    add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "MIPS")
+ ## targets
+ add_library(capstone_build_settings INTERFACE)
+-add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${ALL_HEADERS})
++add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+ target_link_libraries(capstone PUBLIC capstone_build_settings)
+ set_property(TARGET capstone PROPERTY C_STANDARD 99)
+ target_include_directories(capstone_build_settings INTERFACE
+@@ -1113,9 +1119,10 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+             # ahead of the optional native readers even when all are linked.
+             # Keep alias rows and the mixed operand initializer after the native readers.
+             set(capstone_static_tail
+-                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>")
++                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/(AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
++                "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/ARMFormattedChar[.]c[.]o$>")
+             set(capstone_static_objects
+-                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage)[.]c[.]o$>"
++                "$<FILTER:$<TARGET_OBJECTS:capstone>,EXCLUDE,/(AliasMapping|AliasPatternLookup|MCInstStorage|ARMFormattedChar)[.]c[.]o$>"
+                 $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
+                 "$<FILTER:$<TARGET_OBJECTS:capstone>,INCLUDE,/AliasMapping[.]c[.]o$>")
+         else()
 diff --git a/Makefile b/Makefile
-index fb13d941..99eb30fe 100644
+index 99eb30fe..06b05013 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -135,7 +135,7 @@ endif
+@@ -127,11 +127,16 @@ MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev
+ 	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+ 	     $$2 == "__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__" { macos=1 } \
+ 	     $$2 == "__linux__" { linux_target=1 } $$2 == "__aarch64__" { arm64=1 } \
+-	     END { if (clang_cc && ptr==8 && (macos || (linux_target && arm64))) print macos ? "macos" : "linux-arm64" }')
+-ifneq ($(MIXED_STORAGE_TARGET),)
++	     $$2 == "__x86_64__" { amd64=1 } \
++	     END { if (clang_cc && ptr==8) { if (macos) print "macos"; else if (linux_target && arm64) print "linux-arm64"; else if (linux_target && amd64) print "linux-amd64" } }')
++ifneq ($(filter macos linux-arm64,$(MIXED_STORAGE_TARGET)),)
+ CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
+ MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
+ endif
++ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_DIET),linux-amd64:no)
++CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
++ARM_FORMAT_CHAR_OBJ = $(OBJDIR)/arch/ARM/ARMFormattedChar.o
++endif
  endif
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
--CFLAGS += -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
-+CFLAGS += -DCAPSTONE_ARM_ONLY -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
+@@ -180,7 +185,7 @@ DEP_ARM += $(wildcard arch/ARM/ARM*.inc)
+ LIBOBJ_ARM =
+ ifneq (,$(filter arm,$(CAPSTONE_ARCHS)))
+ 	CFLAGS += -DCAPSTONE_HAS_ARM
+-	LIBSRC_ARM += $(wildcard arch/ARM/ARM*.c)
++	LIBSRC_ARM += $(filter-out arch/ARM/ARMFormattedChar.c,$(wildcard arch/ARM/ARM*.c))
+ 	LIBOBJ_ARM += $(LIBSRC_ARM:%.c=$(OBJDIR)/%.o)
  endif
  
- ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
-diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index 37012242..26a96fff 100644
---- a/arch/ARM/ARMInstPrinter.c
-+++ b/arch/ARM/ARMInstPrinter.c
-@@ -219,7 +219,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
- 	ARM_printMarkup(O, "<imm:");
- 	printInt32Bang(O, OffImm);
- 	SStream_concat0(O, markup(">"));
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -288,7 +288,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
- 				ARM_AM_getAM2Offset(MCOperand_getImm(MO3)));
- 			SStream_concat0(O, markup(">"));
- 		}
--		SStream_concat(O, "%s", "]");
-+		ARM_printFormattedChar(O, "]");
- 		SStream_concat0(O, markup(">"));
- 		return;
- 	}
-@@ -301,7 +301,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
- 	printRegImmShift(MI, O, ARM_AM_getAM2ShiftOpc(MCOperand_getImm(MO3)),
- 			 ARM_AM_getAM2Offset(MCOperand_getImm(MO3)),
- 			 getUseMarkup());
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -315,7 +315,7 @@ static inline void printAddrModeTBB(MCInst *MI, unsigned Op, SStream *O)
- 	printRegName(O, MCOperand_getReg(MO1));
- 	SStream_concat0(O, ", ");
- 	printRegName(O, MCOperand_getReg(MO2));
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -516,7 +516,7 @@ static inline void printPostIdxImm8s4Operand(MCInst *MI, unsigned OpNum,
- 			printRegImmShift(MI, O, ARM_AM_uxtw, shift, \
- 					 getUseMarkup()); \
- \
--		SStream_concat(O, "%s", "]"); \
-+		ARM_printFormattedChar(O, "]"); \
- 		SStream_concat0(O, markup(">")); \
- 	}
- DEFINE_printMveAddrModeRQOperand(0);
-@@ -547,7 +547,7 @@ DEFINE_printMveAddrModeRQOperand(2);
- 			printUInt32(O, ImmOffs * 4); \
- 			SStream_concat0(O, markup(">")); \
- 		} \
--		SStream_concat(O, "%s", "]"); \
-+		ARM_printFormattedChar(O, "]"); \
- 		SStream_concat0(O, markup(">")); \
- 	}
- DEFINE_printAddrMode5Operand(false);
-@@ -584,7 +584,7 @@ DEFINE_printAddrMode5Operand(true);
- 			printUInt32(O, ImmOffs * 2); \
- 			SStream_concat0(O, markup(">")); \
- 		} \
--		SStream_concat(O, "%s", "]"); \
-+		ARM_printFormattedChar(O, "]"); \
- 		SStream_concat0(O, markup(">")); \
- 	}
- DEFINE_printAddrMode5FP16Operand(false);
-@@ -599,10 +599,10 @@ static inline void printAddrMode6Operand(MCInst *MI, unsigned OpNum, SStream *O)
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	if (MCOperand_getImm(MO2)) {
--		SStream_concat(O, "%s", ":");
-+		ARM_printFormattedChar(O, ":");
- 		printInt64(O, ((uint32_t)MCOperand_getImm(MO2)) << 3);
- 	}
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -613,7 +613,7 @@ static inline void printAddrMode7Operand(MCInst *MI, unsigned OpNum, SStream *O)
- 	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -918,7 +918,7 @@ static inline void printCImmediate(MCInst *MI, unsigned OpNum, SStream *O)
- static inline void printCoprocOptionImm(MCInst *MI, unsigned OpNum, SStream *O)
- {
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_CoprocOptionImm, OpNum);
--	SStream_concat(O, "%s", "{");
-+	ARM_printFormattedChar(O, "{");
- 	printInt64(O, MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
- 	SStream_concat0(O, "}");
- }
-@@ -1014,7 +1014,7 @@ static inline void printThumbAddrModeRROperand(MCInst *MI, unsigned Op,
- 		SStream_concat0(O, ", ");
- 		printRegName(O, RegNum);
- 	}
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -1039,7 +1039,7 @@ static inline void printThumbAddrModeImm5SOperand(MCInst *MI, unsigned Op,
- 		printUInt32Bang(O, ImmOffs * Scale);
- 		SStream_concat0(O, markup(">"));
- 	}
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -1125,7 +1125,7 @@ static inline void printT2SOOperand(MCInst *MI, unsigned OpNum, SStream *O)
- 			printInt32Bang(O, OffImm); \
- 			SStream_concat0(O, markup(">")); \
- 		} \
--		SStream_concat(O, "%s", "]"); \
-+		ARM_printFormattedChar(O, "]"); \
- 		SStream_concat0(O, markup(">")); \
- 	}
- DEFINE_printAddrModeImm12Operand(false);
-@@ -1161,7 +1161,7 @@ DEFINE_printAddrModeImm12Operand(true);
- 			printInt32Bang(O, OffImm); \
- 			SStream_concat0(O, markup(">")); \
- 		} \
--		SStream_concat(O, "%s", "]"); \
-+		ARM_printFormattedChar(O, "]"); \
- 		SStream_concat0(O, markup(">")); \
- 	}
- DEFINE_printT2AddrModeImm8Operand(true);
-@@ -1203,7 +1203,7 @@ DEFINE_printT2AddrModeImm8Operand(false);
- 			printInt32Bang(O, OffImm); \
- 			SStream_concat0(O, markup(">")); \
- 		} \
--		SStream_concat(O, "%s", "]"); \
-+		ARM_printFormattedChar(O, "]"); \
- 		SStream_concat0(O, markup(">")); \
- 	}
- 
-@@ -1226,7 +1226,7 @@ static inline void printT2AddrModeImm0_1020s4Operand(MCInst *MI, unsigned OpNum,
- 		printInt64Bang(O, (int32_t)(MCOperand_getImm(MO2) * 4));
- 		SStream_concat0(O, markup(">"));
- 	}
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -1290,7 +1290,7 @@ static inline void printT2AddrModeSoRegOperand(MCInst *MI, unsigned OpNum,
- 		printUInt32(O, ShAmt);
- 		SStream_concat0(O, markup(">"));
- 	}
--	SStream_concat(O, "%s", "]");
-+	ARM_printFormattedChar(O, "]");
- 	SStream_concat0(O, markup(">"));
- }
- 
-@@ -1367,7 +1367,7 @@ static inline void printModImmOperand(MCInst *MI, unsigned OpNum, SStream *O)
- 	int32_t Rotated = ARM_AM_rotr32(Bits, Rot);
- 	if (ARM_AM_getSOImmVal(Rotated) == MCOperand_getImm(Op)) {
- 		// #rot has the least possible value
--		SStream_concat(O, "%s", "#");
-+		ARM_printFormattedChar(O, "#");
- 		SStream_concat0(O, markup("<imm:"));
- 		if (PrintUnsigned)
- 			printUInt32(O, (uint32_t)(Rotated));
-@@ -1404,7 +1404,7 @@ static inline void printFBits32(MCInst *MI, unsigned OpNum, SStream *O)
- static inline void printVectorIndex(MCInst *MI, unsigned OpNum, SStream *O)
- {
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_VectorIndex, OpNum);
--	SStream_concat(O, "%s", "[");
-+	ARM_printFormattedChar(O, "[");
- 	printInt64(O,
- 		   (int32_t)MCOperand_getImm(MCInst_getOperand(MI, (OpNum))));
- 	SStream_concat0(O, "]");
+@@ -462,8 +467,8 @@ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ
+ LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
+ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
+ LIBOBJ += $(LIBOBJ_X86_NUMBERS)
+-LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
+-LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
++LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ) $(ARM_FORMAT_CHAR_OBJ)
++LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ) $(ARM_FORMAT_CHAR_OBJ)
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ LIBOBJ_SHARED := $(LIBOBJ)
+ endif
+diff --git a/arch/ARM/ARMFormattedChar.c b/arch/ARM/ARMFormattedChar.c
+new file mode 100644
+index 00000000..588a22f2
+--- /dev/null
++++ b/arch/ARM/ARMFormattedChar.c
+@@ -0,0 +1,21 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "ARMMapping.h"
++
++#ifdef ARM_FORMATTED_CHAR_CALL
++/* The printer supplies "%s" and one NUL-terminated, single-character
++ * string at every call. A custom formatter receives these same arguments. */
++__attribute__((section(".cs_arm_formatted_char")))
++void ARM_formatChar(SStream *O, const char *fmt, ...)
++{
++	va_list args;
++	va_start(args, fmt);
++	const char *literal = va_arg(args, const char *);
++	va_end(args);
++	if (cs_vsnprintf == cs_default_vsnprintf)
++		SStream_concat1(O, literal[0]);
++	else
++		SStream_concat(O, fmt, literal);
++}
++#endif
 diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
-index 98805f06..d6833e63 100644
+index d6833e63..66d2fa9c 100644
 --- a/arch/ARM/ARMMapping.h
 +++ b/arch/ARM/ARMMapping.h
-@@ -22,6 +22,24 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
- // return name of register in friendly string
- const char *ARM_reg_name(csh handle, unsigned int reg);
- 
-+/* Formatted single-character literals preserve the original %s call for
-+ * applications that install a formatter through CS_OPT_MEM. */
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE) && defined(__linux__) && defined(__clang__) && \
-+	(defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__)))
-+static inline void ARM_printFormattedChar(SStream *O, const char *literal)
-+{
-+	if (cs_vsnprintf == cs_default_vsnprintf) {
-+		SStream_concat1(O, literal[0]);
-+		return;
-+	}
-+	SStream_concat(O, "%s", literal);
-+}
-+#else
-+#define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
-+#endif
-+
- /* A disabled markup tag contributes no text. A callback can observe
-  * even an empty argument, and a markup stream can close a pending tag. */
- #if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-index 5eb4f77d..74b6dc6e 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-+++ b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-@@ -633,6 +633,20 @@ public:
-         syntax = b"{ int y = 1; int x = 1; OS << x; }"
-         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
- 
-+    def test_arm_formatted_literal(self):
-+        suffix = b'SStream_concat0(O, markup(">"));'
-+        self.check_patching_result(
-+            StreamOperations(0, "ARM"),
-+            b'{ O << "]" << markup(">"); }',
-+            b'ARM_printFormattedChar(O, "]");\n' + suffix,
-+        )
-+        for arch, literal in (("AArch64", b'"]"'), ("ARM", b'", "'), ("ARM", b'""')):
-+            self.check_patching_result(
-+                StreamOperations(0, arch),
-+                b'{ O << ' + literal + b' << markup(">"); }',
-+                b'SStream_concat(O, "%s", ' + literal + b');\n' + suffix,
-+            )
-+
-     def test_arm_single_markup_before_operand(self):
-         source = b"""{ O << markup("<imm:") << '#' << amount; }"""
-         suffix = b"SStream_concat1(O, '#');\nSStream_concat0(O, amount);"
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-index 6068ef0f..113e716d 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-+++ b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-@@ -32,6 +32,10 @@ class StreamOperations(Patch):
-         return "stream"
- 
-     def _concat_strings(self, s_name: bytes, ops: list[Node], src: bytes) -> bytes:
-+        if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "string_literal":
-+            literal = get_text_from_node(src, ops[0])
-+            if len(literal) == 3 and literal[:1] == b'"' and 0x20 <= literal[1] < 0x7F:
-+                return b"ARM_printFormattedChar(" + s_name + b", " + literal + b");\n"
-         if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "call_expression":
-             function = ops[0].child_by_field_name("function")
-             arguments = ops[0].child_by_field_name("arguments")
+@@ -36,6 +36,13 @@ static inline void ARM_printFormattedChar(SStream *O, const char *literal)
+ 	}
+ 	SStream_concat(O, "%s", literal);
+ }
++#elif defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && !defined(CAPSTONE_DIET) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE) && defined(__linux__) && \
++	defined(__clang__) && defined(__x86_64__)
++#define ARM_FORMATTED_CHAR_CALL
++CAPSTONE_INTERNAL void ARM_formatChar(SStream *O, const char *fmt, ...);
++#define ARM_printFormattedChar(O, literal) ARM_formatChar((O), "%s", (const char *)(literal))
+ #else
+ #define ARM_printFormattedChar(O, literal) SStream_concat((O), "%s", (literal))
+ #endif
