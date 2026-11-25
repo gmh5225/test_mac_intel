@@ -12,6 +12,7 @@ import sys
 from native_dbghelp import check_metadata_calendar
 from native_dbghelp import check_boolean_tag
 from native_dbghelp import check_legacy_module_base
+from native_dispatcher_queue import check_dispatcher_queue
 from native_record_input import check_record_input
 from qualified_ordinal_sdk import verify as verify_ordinal_sdk
 
@@ -126,7 +127,7 @@ def main():
                         "RealtimeWorkQueue": 34, "WindowsRemoteManagement": 33,
                         "OlePropertyConversion": 1, "DebugDataModelManager": 1,
                         "DirectCompositionControls": 3, "DirectCompositionClock": 5,
-                        "VolumeShadowCopyRuntime": 7}
+                        "VolumeShadowCopyRuntime": 7, "DispatcherQueueRuntime": 1}
     system_abi = args.output / "system-abis"
     system_calls = args.output / "system-calls"
     provider_options = [arg for name in system_providers for arg in ("--provider", name)]
@@ -164,6 +165,7 @@ def main():
     report["sdk_boolean"] = check_boolean_tag(args.engine, manifest, args.output / "sdk-bool", args.cache)
     report["dbghelp_legacy"] = check_legacy_module_base(args.engine, manifest, args.output / "dbghelp-legacy")
     report["register_record"] = check_record_input(args.engine, manifest, args.output / "record-input")
+    report["dispatcher_queue"] = check_dispatcher_queue(args.engine, manifest, args.output / "dispatcher-queue")
     report["ordinal_exports"] = verify_ordinal_sdk(args.source, args.output, args.cache, invoke, digest)
     report["work_queue_and_winrm"] = work_queue_and_winrm
     args.report.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
