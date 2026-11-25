@@ -14,123 +14,22 @@ index 1cc3d3a9..34666027 100644
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..c5ff1731 100644
+index 457485ab..e63f5fa3 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -326,72 +326,40 @@ static bool need_zero_prefix(uint64_t imm)
- 		return true;
- }
- 
-+static void printUnsignedHex(const MCInst *MI, SStream *O, uint64_t value)
-+{
-+	if (MI->csh->syntax != CS_OPT_SYNTAX_MASM)
-+		SStream_concat_hex64(O, value, false);
-+	else if (value == (UINT64_C(1) << 63))
-+		SStream_concat0(O, "8000000000000000h");
-+	else if (need_zero_prefix(value))
-+		SStream_concat(O, "0%" PRIx64 "h", value);
-+	else
-+		SStream_concat(O, "%" PRIx64 "h", value);
-+}
-+
- static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- {
- 	if (positive) {
--		// always print this number in positive form
--		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
--			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
--					default:
--						break;
--					case 1:
--						imm &= 0xff;
--						break;
--					case 2:
--						imm &= 0xffff;
--						break;
--					case 4:
--						imm &= 0xffffffff;
--						break;
--					}
--				}
--
--				if (imm == 0x8000000000000000LL) // imm == -imm
--					SStream_concat0(O, "8000000000000000h");
--				else if (need_zero_prefix(imm))
--					SStream_concat(O, "0%" PRIx64 "h", imm);
--				else
--					SStream_concat(O, "%" PRIx64 "h", imm);
--			} else {
--				if (imm > HEX_THRESHOLD) {
--					if (need_zero_prefix(imm))
--						SStream_concat(O,
--							       "0%" PRIx64 "h",
--							       imm);
--					else
--						SStream_concat(
--							O, "%" PRIx64 "h", imm);
--				} else
--					SStream_concat_dec64(O, imm, false);
-+		if (imm < 0) {
-+			switch (MI->op1_size) {
-+			case 1:
-+				imm = (uint8_t)imm;
-+				break;
-+			case 2:
-+				imm = (uint16_t)imm;
-+				break;
-+			case 4:
-+				imm = (uint32_t)imm;
-+				break;
-+			default:
-+				break;
- 			}
--		} else { // Intel syntax
--			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
--					default:
--						break;
--					case 1:
--						imm &= 0xff;
--						break;
--					case 2:
--						imm &= 0xffff;
--						break;
--					case 4:
--						imm &= 0xffffffff;
--						break;
--					}
--				}
--
--				SStream_concat_hex64(O, imm, false);
--			} else {
--				if (imm > HEX_THRESHOLD)
--					SStream_concat_hex64(O, imm, false);
--				else
--					SStream_concat_dec64(O, imm, false);
--			}
--		}
-+			printUnsignedHex(MI, O, (uint64_t)imm);
-+		} else if (imm > HEX_THRESHOLD)
-+			printUnsignedHex(MI, O, (uint64_t)imm);
-+		else
-+			SStream_concat_dec64(O, imm, false);
- 	} else {
- 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
- 			if (imm < 0) {
-@@ -1235,11 +1203,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -1235,11 +1235,12 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
--					printImm(MI, O,
++					const uint8_t original_size = MI->op1_size;
++					MI->op1_size = 8;
+ 					printImm(MI, O,
 -						 x86_get_address_mask(
 -							 MI->csh->mode) &
 -							 DispVal,
--						 true);
-+					printUnsignedHex(MI, O,
-+							 x86_absolute_address(MI, DispVal));
++						 x86_absolute_address(MI, DispVal),
+ 						 true);
++					MI->op1_size = original_size;
  				} else {
  					printImm(MI, O, DispVal, true);
  				}

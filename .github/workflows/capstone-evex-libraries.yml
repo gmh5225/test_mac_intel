@@ -1,7 +1,7 @@
-name: Verify unsigned absolute addresses across mode changes with real PE ELF and foreign controls
+name: Check effective absolute address output at the printer boundary on real programs
 on:
   push:
-    branches: [codex/x86-unsigned-absolute-addresses]
+    branches: [codex/x86-absolute-offset-print-boundary]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 571a1592ff48d148257b7ae1146d2fb593470783
+          ref: 994ce74539381ccfe41411455924c8933825d004
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ce00fc089a123d4149a1a39e458a6a81b9778a5b
+          ref: 7c158ca1c194c0a2b56d830eaeee9fa901732618
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: absolute-only-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: absolute-print-boundary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

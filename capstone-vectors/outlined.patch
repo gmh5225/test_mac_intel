@@ -1,15 +1,3 @@
-diff --git a/MCInst.h b/MCInst.h
-index e0409109..e28eb1d6 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -154,6 +154,7 @@ struct MCInst {
- 	uint64_t address; // address of this insn
- 	cs_struct *csh; // save the main csh
- 	uint8_t x86opsize; // opsize for [mem] operand
-+	uint8_t x86_addr_size; // decoded address size in bytes
- 
- 	// These flags could be used to pass some info from one target subcomponent
- 	// to another, for example, from disassembler to asm printer. The values of
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
 index 1cc3d3a9..34666027 100644
 --- a/arch/X86/X86ATTInstPrinter.c
@@ -25,126 +13,11 @@ index 1cc3d3a9..34666027 100644
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..a45802f5 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -674,6 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 				insn.vectorExtensionPrefix[3] =
- 					original_scalar_compare_p2;
- 			instr->imm_size = insn.immSize;
-+			instr->x86_addr_size = insn.addressSize;
- 
- 			// copy all prefixes
- 			instr->x86_prefix[0] = insn.prefix0;
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..c5ff1731 100644
+index 457485ab..92ea1ec2 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -326,72 +326,40 @@ static bool need_zero_prefix(uint64_t imm)
- 		return true;
- }
- 
-+static void printUnsignedHex(const MCInst *MI, SStream *O, uint64_t value)
-+{
-+	if (MI->csh->syntax != CS_OPT_SYNTAX_MASM)
-+		SStream_concat_hex64(O, value, false);
-+	else if (value == (UINT64_C(1) << 63))
-+		SStream_concat0(O, "8000000000000000h");
-+	else if (need_zero_prefix(value))
-+		SStream_concat(O, "0%" PRIx64 "h", value);
-+	else
-+		SStream_concat(O, "%" PRIx64 "h", value);
-+}
-+
- static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- {
- 	if (positive) {
--		// always print this number in positive form
--		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
--			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
--					default:
--						break;
--					case 1:
--						imm &= 0xff;
--						break;
--					case 2:
--						imm &= 0xffff;
--						break;
--					case 4:
--						imm &= 0xffffffff;
--						break;
--					}
--				}
--
--				if (imm == 0x8000000000000000LL) // imm == -imm
--					SStream_concat0(O, "8000000000000000h");
--				else if (need_zero_prefix(imm))
--					SStream_concat(O, "0%" PRIx64 "h", imm);
--				else
--					SStream_concat(O, "%" PRIx64 "h", imm);
--			} else {
--				if (imm > HEX_THRESHOLD) {
--					if (need_zero_prefix(imm))
--						SStream_concat(O,
--							       "0%" PRIx64 "h",
--							       imm);
--					else
--						SStream_concat(
--							O, "%" PRIx64 "h", imm);
--				} else
--					SStream_concat_dec64(O, imm, false);
-+		if (imm < 0) {
-+			switch (MI->op1_size) {
-+			case 1:
-+				imm = (uint8_t)imm;
-+				break;
-+			case 2:
-+				imm = (uint16_t)imm;
-+				break;
-+			case 4:
-+				imm = (uint32_t)imm;
-+				break;
-+			default:
-+				break;
- 			}
--		} else { // Intel syntax
--			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
--					default:
--						break;
--					case 1:
--						imm &= 0xff;
--						break;
--					case 2:
--						imm &= 0xffff;
--						break;
--					case 4:
--						imm &= 0xffffffff;
--						break;
--					}
--				}
--
--				SStream_concat_hex64(O, imm, false);
--			} else {
--				if (imm > HEX_THRESHOLD)
--					SStream_concat_hex64(O, imm, false);
--				else
--					SStream_concat_dec64(O, imm, false);
--			}
--		}
-+			printUnsignedHex(MI, O, (uint64_t)imm);
-+		} else if (imm > HEX_THRESHOLD)
-+			printUnsignedHex(MI, O, (uint64_t)imm);
-+		else
-+			SStream_concat_dec64(O, imm, false);
- 	} else {
- 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
- 			if (imm < 0) {
-@@ -1235,11 +1203,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -1235,11 +1235,18 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
@@ -153,33 +26,43 @@ index 457485ab..c5ff1731 100644
 -							 MI->csh->mode) &
 -							 DispVal,
 -						 true);
-+					printUnsignedHex(MI, O,
-+							 x86_absolute_address(MI, DispVal));
++					const uint64_t address =
++						x86_absolute_address(MI, DispVal);
++					if (address <= INT64_MAX)
++						printImm(MI, O, (int64_t)address, true);
++					else if (MI->csh->syntax != CS_OPT_SYNTAX_MASM)
++						SStream_concat_hex64(O, address, false);
++					else if (address == (UINT64_C(1) << 63))
++						SStream_concat0(O, "8000000000000000h");
++					else
++						SStream_concat(O, need_zero_prefix(address) ?
++								   "0%" PRIx64 "h" : "%" PRIx64 "h",
++							       address);
  				} else {
  					printImm(MI, O, DispVal, true);
  				}
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..aa5d1111 100644
+index 380faa79..d1bd525b 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,14 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,16 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* Truncate an absolute offset to the address width chosen by the decoder. */
++/* The absolute address wraps at the effective address width. */
 +static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
  {
--	if (x86_has_feature(mode, CS_MODE_16))
++	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
++	const cs_mode mode = mi->csh->mode;
+ 	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
--	if (x86_has_feature(mode, CS_MODE_32))
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
+ 	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+	if (mi->x86_addr_size == 2)
-+		return (uint16_t)disp;
-+	if (mi->x86_addr_size == 4)
-+		return (uint32_t)disp;
-+	return (uint64_t)disp;
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
  }
  
  #endif
