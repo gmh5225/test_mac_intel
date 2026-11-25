@@ -1,7 +1,7 @@
-name: Measure the effect of the NeverD x86 archive roots with the same two libraries on PE32, PE64 and vector ELF
+name: Measure i386 memory and register fallback placement and replicate residual OpenSSL32 detail on fixed archives
 on:
   push:
-    branches: [codex/i386-static-link-order-factorial]
+    branches: [codex/preserve-i386-fallback-placement]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-link-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-fallback-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
