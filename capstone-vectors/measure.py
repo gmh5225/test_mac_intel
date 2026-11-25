@@ -1,54 +1,52 @@
 from pathlib import Path
 import hashlib,json,os,shutil,subprocess as sp,tempfile
-from training import fetch
-from extra_mips_time import measure
-r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir(exist_ok=True);src=r.parent/'source';nd=r.parent/'neverd-config'
+from arm_corpus import prepare
+from arm_time import measure
+r=Path(__file__).resolve().parent;src=r.parent/'source';nd=r.parent/'neverd-config';e=r.parent/'evidence';e.mkdir(exist_ok=True)
 rd=lambda f:json.loads(f.read_text())
 def save(k,v):(e/(k+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def run(*a,**kw):sp.run(a,check=True,**kw)
+def run(*a):sp.run(a,check=True)
 def out(*a):return sp.check_output(a,text=True).strip()
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-q=rd(r/'source.json');w=Path(tempfile.mkdtemp());mix=w/'mixed';one=w/'standalone';project=w/'project'
+q=rd(r/'source.json');w=Path(tempfile.mkdtemp());proj=w/'project'
 try:
     assert out('git','-C',src,'rev-parse','HEAD')==q['base']['commit'] and out('git','-C',nd,'rev-parse','HEAD')==q['neverd']
-    (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(src);cm='cmake/NeverDCapstoneCompilerOptions.inc'
-    (project/'cmake').mkdir();(project/cm).write_bytes((nd/cm).read_bytes())
-    v=(nd/'CMakeLists.txt').read_text()
-    (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Mixed LANGUAGES C CXX)\n'+v[v.index('# --- Capstone (our fork'):v.index('# --- NeverD CMake helpers')])
-    flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON']
-    run('cmake','-G','Ninja','-S',project,'-B',mix,*flags)
-    run('cmake','-G','Ninja','-S',src,'-B',one,*flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF')
-    singlecmd=next(z['command'] for z in rd(one/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
-    mixcmd=next(z['command'] for z in rd(mix/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
-    assert '-DCAPSTONE_MIPS_ONLY' in singlecmd and '-DCAPSTONE_MIPS_ONLY' not in mixcmd
-    mixed={};products={};domain={};streams={}
-    shutil.copyfile(r/'public-compare.cpp',w/'trial-compare.cpp');shutil.copyfile(r/'mips-domain.cpp',w/'mips-domain.cpp')
-    run('clang++','-O2','-std=c++17','-I',src/'include',w/'mips-domain.cpp','-ldl','-o',w/'domain')
-    corpus=fetch(r,w);manifest=rd(r/'mips-samples.json')['fixtures'];assert len(corpus)==4
-    assert all(a['binary_sha256']==manifest[a['name']]['binary_sha256'] and a['text_sha256']==manifest[a['name']]['sha256']for a in corpus);save('mips-corpus',corpus)
+    (proj/'third_party').mkdir(parents=True);(proj/'third_party/capstone').symlink_to(src);(proj/'cmake').mkdir()
+    cm='cmake/NeverDCapstoneCompilerOptions.inc';(proj/cm).write_bytes((nd/cm).read_bytes())
+    main=(nd/'CMakeLists.txt').read_text();(proj/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(ARMFormat LANGUAGES C CXX)\n'+main[main.index('# --- Capstone (our fork'):main.index('# --- NeverD CMake helpers')])
+    stages={'mixed':(w/'mix',w/'mixed'),'standalone':(w/'one',w/'standalone')}
+    corpus=prepare(w,rd(r/'arm-samples.json'));save('arm-corpus',corpus)
+    for name,(build,stage) in stages.items():
+        stage.mkdir()
+        opts=[] if name=='mixed' else ['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+        run('cmake','-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-S',proj if name=='mixed' else src,'-B',build,*opts)
+        for file in w.glob('arm-*.text'): (stage/file.name).symlink_to(file)
+        for file in w.glob('arm-*.ranges'): (stage/file.name).symlink_to(file)
+    run('clang++','-O2','-std=c++17','-I',src/'include',r/'domain.cpp','-ldl','-o',w/'domain')
+    products={};guards={}
     for v in ('base','candidate','outlined'):
         run('git','-C',src,'restore','--source=HEAD','--staged','--worktree','--','.')
         if v!='base':
             patch=r/(v+'.patch');assert sha(patch)==q[v]['sha256'];run('git','-C',src,'apply','--index',patch)
         assert out('git','-C',src,'write-tree')==q[v]['tree']
-        run('cmake','--build',mix,'--target','capstone_static','--parallel','4')
-        archive,=mix.rglob('libcapstone.a');objects={str(obj.relative_to(mix)):sha(obj)for obj in mix.rglob('*.c.o')}
-        assert len(objects)>40;mixed[v]=dict(objects=objects,archive=sha(archive));assert mixed[v]==mixed['base'];save('mixed',mixed)
-        run('cmake','--build',one,'--target','capstone_static','capstone_shared','--parallel','4')
-        lib,=one.rglob('libcapstone.a');shared,=one.rglob('libcapstone.so');output=w/(v+'.so');shutil.copy2(shared,output)
-        run('clang++','-O3','-std=c++17','-no-pie','-I',src/'include',r/'foreign.cpp',lib,'-o',w/('foreign-'+v))
-        products[v]=dict(archive=sha(lib),shared=sha(output),program=sha(w/('foreign-'+v)));save('products',products)
-        if v!='base':
-            code=(src/'arch/Mips/MipsInstPrinter.c').read_text()
-            helper=(r/(v+'.inc')).read_text()
-            assert helper.split('#define MEASURE_WRITE')[0].strip() in code
-            (w/'alias-writer.inc').write_text(helper)
-            run('clang','-O2','-std=gnu99','-DCAPSTONE_MIPS_ONLY','-DCAPSTONE_USE_SYS_DYN_MEM','-I',w,'-I',src,'-I',src/'include',r/'stream-guard.c',lib,'-o',w/'guard')
-            streams[v]=int(out(w/'guard'));assert streams[v]==458752
-            domain[v]=json.loads(out(w/'domain',w/'base.so',output));assert domain[v]['trials']==5242880 and 0<domain[v]['accepted']<5242880
-    assert domain['candidate']==domain['outlined'];save('guards',dict(domain=domain,streams=streams))
+        for name,(build,stage) in stages.items():
+            run('cmake','--build',build,'--parallel','4','--target','capstone_static',*(['capstone_shared'] if name=='standalone' else []))
+            lib,=build.rglob('libcapstone.a');target=stage/('foreign-'+v)
+            run('clang++','-O3','-std=c++17','-no-pie','-I',src/'include',r/'arm-timing.cpp',lib,'-o',target)
+            products.setdefault(name,{})[v]=dict(archive=sha(lib),driver=sha(target),objects={str(o.relative_to(build)):sha(o)for o in build.rglob('*.c.o')})
+            if name=='standalone':
+                libso,=build.rglob('libcapstone.so');output=w/(v+'.so');shutil.copyfile(libso,output)
+                if v!='base':
+                    guard=json.loads(out(w/'domain',w/'base.so',output,w))
+                    assert guard==rd(r/'local-expectations.json')['domain']
+                    run('clang','-std=gnu99','-O2','-DCAPSTONE_HAS_ARM','-DCAPSTONE_USE_SYS_DYN_MEM','-DTEST_PAIR='+str(int(v=='outlined')),'-I',src,'-I',src/'include',r/'stream.c',lib,'-o',w/'stream')
+                    stream=list(map(int,out(w/'stream').split()))
+                    assert stream==rd(r/'local-expectations.json')['stream'];guards[v]=dict(stream=stream,domain=guard)
+        save('products',products)
+    save('guards',guards)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});save('host',dict(cpu=out('lscpu'),compiler=out('clang','--version')))
-    measure(corpus,w,save)
-    save('complete',dict(complete=True,source=q,hosts=1,pairs=35))
+    for name,(_,stage) in stages.items():
+        measure(corpus['fixtures'].values(),stage,lambda k,v:save(name+'-'+k,v))
+    save('complete',dict(complete=True,source=q,pairs=35))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
