@@ -18,19 +18,26 @@ int main(int argc, char **argv) {
                 s->set(CS_OPT_UNSIGNED,config&2?CS_OPT_ON:CS_OPT_OFF);
                 s->set(CS_OPT_TEXT,config&4?CS_OPT_OFF:CS_OPT_ON);
             }
-            for (unsigned pre:{0,0x26,0x2e,0x36,0x3e,0x64,0x65,0x66,0x67,0x40,0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4a,0x4b,0x4c,0x4d,0x4e,0x4f}) {
-                for(unsigned op:{0x80,0x81,0xf6,0xf7,0xfe,0xff})
-                for(unsigned mr=0;mr<256;++mr)for(unsigned v=0;v<((mr&7)==4?256u:1u);++v) {
-                    const unsigned ext=(mr>>3)&7;
-                    const bool selected=(op==0x80&&ext==7)||(op==0xf6&&ext==0)||(op==0xff&&(ext==2||ext==4));
-                    if (!selected && v>1 && v!=0x24 && v!=255)continue;
-                    if (mode!=CS_MODE_64 && v>1 && v!=0x24 && v!=255)continue;
-                    uint8_t bytes[12]={};unsigned len=0;
-                    if(pre)bytes[len++]=pre;
-                    bytes[len++]=op;bytes[len++]=mr;if((mr&7)==4)bytes[len++]=v;
-                    for(unsigned i=0;i<5;++i)bytes[len++]=uint8_t(73*(i+1)+mr+v);
+            for(unsigned ext=0;ext<16;++ext) for(unsigned vv=0;vv<32;++vv)
+            for(unsigned ll=0;ll<4;++ll) for(unsigned mr=0;mr<256;++mr)
+            for(unsigned op:{0xb4u,0xb5u}) {
+                if((mode!=CS_MODE_64 || config>1) && (vv!=0 && vv!=31 || ext!=0 && ext!=15))continue;
+                const unsigned salt=(ll+vv+mr+ext)&255, mod=mr>>6, rm=mr&7;
+                const unsigned pre=(ext<<4)|2, v=vv;
+                for(unsigned invalid:{0u,1u,2u,3u,4u,5u,6u,7u}) {
+                    if(invalid && (vv!=0 || ext!=15 || mr%17))continue;
+                    uint8_t bytes[]={0x62,uint8_t(pre),uint8_t(0x85|((~vv&15)<<3)),uint8_t((ll<<5)|((~vv&16)>>1)),uint8_t(op),uint8_t(mr),uint8_t(salt),uint8_t(0x80+salt),0xb4,0xc9,0x91};
+                    switch(invalid) {
+                    case 1:bytes[1]^=4;break;case 2:bytes[2]^=4;break;case 3:bytes[2]^=0x80;break;
+                    case 4:bytes[2]^=1;break;case 5:bytes[3]^=0x80;break;case 6:bytes[3]^=0x10;break;case 7:bytes[3]|=7;break;
+                    }
+                    unsigned len=6;
+                    if(mod!=3){
+                        if(rm==4)++len;
+                        len+=mod==2||(!mod&&(rm==5||rm==4&&(bytes[6]&7)==5))?4:mod;
+                    }
                     for(unsigned avail=0;avail<=len;++avail){
-                        if(!selected && avail!=len)continue;
+                        if((vv!=0 || ext!=15) && avail!=len)continue;
                         const uint8_t *pos=p+pg-avail;std::memcpy(p+pg-avail,bytes,avail);
                         const uint8_t *in[2]={pos,pos};size_t sz[2]={avail,avail};uint64_t ip[2]={0xfffffffffffffffeULL,0xfffffffffffffffeULL};
                         cs_insn entries[2];cs_detail dt[2];bool ok[2];

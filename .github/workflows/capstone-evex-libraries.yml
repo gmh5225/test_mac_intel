@@ -1,7 +1,7 @@
-name: Measure AMD64 grouped memory operands with exact output on PE scalar SIMD and firmware inputs
+name: Measure EVEX integer multiply-add memory records on held-out PE, OpenSSL, vector, firmware and other-ISA samples
 on:
   push:
-    branches: [codex/grouped-amd64-memory-terminals]
+    branches: [codex/evex-ifma-operand-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: grouped-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ifma-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
