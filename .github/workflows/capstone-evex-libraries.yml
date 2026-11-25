@@ -1,7 +1,7 @@
-name: Measure x86 register reporting on actual decoded records and end-to-end PE and ELF throughput
+name: Compare fixed-size implicit register copies in isolated queries and complete x86 decoding
 on:
   push:
-    branches: [codex/x86-register-membership-output-cursors]
+    branches: [codex/x86-short-implicit-register-copies]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 08844cf483fb5ce17bba3681ad91ae084c191bab
+          ref: 571a1592ff48d148257b7ae1146d2fb593470783
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1263831f6cf4d59c45372480665fc1d8c898b820
+          ref: 909177c3b7819868e6fef03579e20f77531c51b7
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: register-cursors-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: implicit-copy-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

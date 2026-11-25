@@ -68,5 +68,23 @@ int main(int argc,char **argv) {
             ++packed;
         }
     }
-    std::cout<<queries<<" "<<first<<" "<<load<<" "<<packed<<"\n";
+    uint64_t copies=0;
+    cs_insn insn{};cs_detail detail{};
+    insn.id=X86_INS_MOV;insn.detail=&detail;
+    for(unsigned nr=0;nr<=std::size(detail.regs_read);++nr) {
+        for(unsigned nw=0;nw<=std::size(detail.regs_write);++nw) {
+            detail.regs_read_count=nr;detail.regs_write_count=nw;
+            for(unsigned i=0;i<nr;++i) detail.regs_read[i]=uint16_t(0xa000+i);
+            for(unsigned i=0;i<nw;++i) detail.regs_write[i]=uint16_t(0xb000+i);
+            for(unsigned shift:{0u,1u,2u,64u}) for(bool shared:{false,true}) {
+                Query left=query(base,insn,shift,shared),right=query(trial,insn,shift,shared);
+                if(std::memcmp(left.regs,right.regs,sizeof left.regs)||left.nr!=right.nr||left.nw!=right.nw)return 4;
+                if(shift==64&&!shared&&(right.nr!=nr||right.nw!=nw||
+                    !std::equal(detail.regs_read,detail.regs_read+nr,right.regs)||
+                    !std::equal(detail.regs_write,detail.regs_write+nw,right.regs+64)))return 5;
+                ++copies;
+            }
+        }
+    }
+    std::cout<<queries<<" "<<first<<" "<<load<<" "<<packed<<" "<<copies<<"\n";
 }
