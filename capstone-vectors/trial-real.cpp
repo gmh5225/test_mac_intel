@@ -36,6 +36,13 @@ int main(int argc,char **argv){
             }
             check(!std::memcmp(&x,&y,sizeof x),"complete detail");
             if (decoded && (route & 1)) {
+                a.detail=&x;b.detail=&y;
+                cs_regs ar,aw,br,bw;uint8_t nr1=0, nw1=0, nr2=0, nw2=0;
+                std::memset(ar,0x5a,sizeof ar);std::memset(aw,0xa5,sizeof aw);
+                std::memcpy(br,ar,sizeof ar);std::memcpy(bw,aw,sizeof aw);
+                if (refs.regs(left.h,&a,ar,&nr1,aw,&nw1)!=CS_ERR_OK ||
+                    tested.regs(right.h,&b,br,&nr2,bw,&nw2)!=CS_ERR_OK || nr1!=nr2 || nw1!=nw2 ||
+                    std::memcmp(ar,br,sizeof ar) || std::memcmp(aw,bw,sizeof aw)) return 15;
                 for (unsigned i = 0; i < x.x86.op_count; ++i)
                     fixed += x.x86.operands[i].type == X86_OP_REG;
             }

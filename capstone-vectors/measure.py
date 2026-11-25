@@ -49,7 +49,6 @@ try:
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        (base/'arch/X86/X86GenPrinterRegisterNames.inc').unlink(missing_ok=True)
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -59,13 +58,6 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        if label=='base':regenerated={}
-        else:
-            run(sys.executable,'-B',base/'suite/synctools/x86_register_name_sizes.py','--check')
-            run('clang','-std=c11','-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',base,'-I',base/'include',r/'register-check.c',lib,'-o',w/'register-check')
-            counts=list(map(int,get(w/'register-check').split()))
-            assert counts[0]==276 and counts[1]>250000
-            regenerated[label]=counts;save('regeneration',regenerated)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
@@ -109,6 +101,12 @@ try:
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'access.cpp','-ldl','-o',w/'access-replay')
+    proof={}
+    for label in ('outlined','candidate'):
+        proof[label]=list(map(int,get(w/'access-replay',w/'base.so',w/(label+'.so')).split()))
+        assert proof[label][0]==1920000
+    assert proof['outlined']==proof['candidate'];save('register-query',proof)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
