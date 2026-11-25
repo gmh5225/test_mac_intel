@@ -5,9 +5,12 @@ static const name_map names[] = {
 #include "arch/PowerPC/PPCGenCSAliasMnemMap.inc"
  {PPC_INS_ALIAS_SLWI,"slwi"},{PPC_INS_ALIAS_SRWI,"srwi"},{PPC_INS_ALIAS_SLDI,"sldi"},{PPC_INS_ALIAS_END,NULL}
 };
-static const alias_trie_node trie[] = {
-#include "arch/PowerPC/PPCGenAliasTrie.inc"
+#include "arch/PowerPC/PPCMapping.h"
+static const ppc_alias_name indexed[] = {
+#include "arch/PowerPC/PPCGenAliasNameIndex.inc"
 };
+_Static_assert(sizeof(name_map)==sizeof(ppc_alias_name), "64-bit table changed size");
+_Static_assert(offsetof(name_map,name)==offsetof(ppc_alias_name,name), "name relocation moved");
 static uint64_t checked;
 static int compare(MCInst *mi,SStream *ss) {
  for(unsigned flag=0;flag<=1;++flag){
@@ -16,13 +19,17 @@ static int compare(MCInst *mi,SStream *ss) {
   map_set_alias_id(mi,ss,names,ARR_SIZE(names));
   uint64_t old=mi->flat_insn->alias_id;
   mi->flat_insn->alias_id=UINT64_MAX;
-  map_set_alias_id_trie_impl(mi,ss,trie,ARR_SIZE(trie));
+  PPC_setAliasId(mi,ss,indexed,PPC_ALIAS_BUCKET_MASK);
   if(mi->flat_insn->alias_id!=old) {fprintf(stderr,"alias mismatch [%.30s]\n",ss->buffer);return 1;}
   ++checked;
  }
  return 0;
 }
 int main(void) {
+ if(ARR_SIZE(names)!=ARR_SIZE(indexed))return 6;
+ for(unsigned i=0;names[i].name;++i){
+  if(names[i].id!=indexed[i].id||strcmp(names[i].name,indexed[i].name))return 7;
+ }
  cs_struct handle={0};handle.arch=CS_ARCH_PPC;
  cs_insn insn={0};MCInst mi={0};mi.csh=&handle;mi.flat_insn=&insn;SStream ss={0};
  const char *suffixes[]={""," ","\t0"," r3, r4",".",".\t","x123456789abcdef",",x","+","-","\xff"};

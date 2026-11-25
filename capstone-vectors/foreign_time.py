@@ -38,11 +38,11 @@ def measure(rows, w, save):
             n=max(1,math.ceil(50e6/run('base',row,mode,1)[0]))
             expected=run('base',row,mode,n)[2:]
             assert expected[0]>0
-            cycles=[];labels=['base','duplicate','outlined','twin'];rng=random.Random('replicate-'+row['name']+'/'+str(mode))
+            cycles=[];labels=['base','duplicate','candidate','twin'];rng=random.Random('hashed-replicate-'+row['name']+'/'+str(mode))
             for _ in range(101 if target in held else 35):
                 rng.shuffle(labels);pairs={k:[]for k in labels}
                 for k in labels+labels[::-1]:
-                    x=run('outlined' if k=='twin' else k,row,mode,n);assert x[2:]==expected
+                    x=run('candidate' if k=='twin' else k,row,mode,n);assert x[2:]==expected
                     pairs[k].append(x[:2])
                 cycles.append({k:[sum(x[i]for x in xs)for i in (0,1)]for k,xs in pairs.items()})
             data[row['name']+'/'+str(mode)]=dict(reps=n,checks=expected,cycles=cycles)

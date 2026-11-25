@@ -1,7 +1,7 @@
-name: Recheck five held PowerPC control workloads with 101 paired blocks on independent hosts
+name: Retest the indexed PowerPC map on all five previously held non-PowerPC controls using independent paired runs
 on:
   push:
-    branches: [codex/ppc-replicate-five-held-cases]
+    branches: [codex/recheck-indexed-powerpc-side-effects]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -16,8 +16,6 @@ jobs:
           - { host: ubuntu-24.04, cc: clang, replica: 2 }
           - { host: ubuntu-24.04, cc: clang, replica: 3 }
           - { host: ubuntu-24.04, cc: clang, replica: 4 }
-          - { host: ubuntu-24.04, cc: clang, replica: 5 }
-          - { host: ubuntu-24.04, cc: clang, replica: 6 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -60,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: repeated-powerpc-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: indexed-powerpc-controls-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

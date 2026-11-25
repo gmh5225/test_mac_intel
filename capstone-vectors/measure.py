@@ -109,7 +109,8 @@ try:
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
     for tool in ('ppc-states','real-ppc'):
         run('clang++','-std=c++17','-O2','-I',base/'include',r/(tool+'.cpp'),'-ldl','-o',w/tool)
-    run('clang','-O2','-std=c11','-DCAPSTONE_HAS_POWERPC','-I',base,'-I',base/'include',r/'parser.c',lib,'-o',w/'ppc-parser')
+    run('clang','-O2','-std=c11','-DCAPSTONE_HAS_POWERPC','-DCAPSTONE_HAS_AARCH64','-I',base,'-I',base/'include',r/'parser.c',lib,'-o',w/'ppc-parser')
+    run(sys.executable,'-B',base/'suite/synctools/alias_mnemonic_trie.py','--check')
     ppc=dict(parser=int(get(w/'ppc-parser')),cases={},records={})
     assert ppc['parser']>50000
     for tag in ('candidate','outlined'):
@@ -163,15 +164,15 @@ try:
         for route in ('private',):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')
-                select('outlined' if engine=='twin' else engine)
+                select('candidate' if engine=='twin' else engine)
                 return list(map(int,get(*invoke,engine if other else route,str(mode),str(n),f,path,str(bits)).split()))
             for mode in (0,1,2):
                 if (name,mode) not in {('putty-64-0.85',0),('jpeg-avx2-i386',2)}:continue
-                labels=['base','duplicate','outlined','twin']
+                labels=['base','duplicate','candidate','twin']
                 repeats=max(1,math.ceil(50e6/take('base',mode,1)[0]))
                 expected={k:take(k,mode,repeats)[2:]for k in labels}
                 assert len({tuple(z)for z in expected.values()})==1
-                rows=[];rng=random.Random(name+'/replicate-ordered-lookup/'+str(mode))
+                rows=[];rng=random.Random(name+'/replicate-indexed-lookup/'+str(mode))
                 for _ in range(101):
                     rng.shuffle(labels);sample={k:[] for k in labels}
                     for k in labels+labels[::-1]:
