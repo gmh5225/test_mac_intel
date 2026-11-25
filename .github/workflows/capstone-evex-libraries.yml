@@ -1,7 +1,7 @@
-name: Separate cache-line placement from RIP output semantics on identical OpenSSL PuTTY JPEG and libmvec inputs
+name: Isolate i386 writer position from the aligned AMD64 and scan loops on identical PuTTY PE32 and ELF input
 on:
   push:
-    branches: [codex/amd64-scan-placement-crossover]
+    branches: [codex/pe32-output-code-placement]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rip-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: pe32-writer-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

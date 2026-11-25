@@ -41,7 +41,8 @@ try:
     maps=rd(r/'source.json')
     text_section='.cs_x86_amd64_text'
     data_section='.cs_x86_vector_fallback64_rodata'
-    sections={text_section:'ax'}
+    previous='.cs_x86_evex_output'
+    sections={text_section:'ax',previous:'ax'}
     layouts={};addresses={};objects={};checksums={}
     def link(tag,libpath,gaps):
         tail=[]
@@ -64,17 +65,24 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         objects[tag]={str(o.relative_to(build)):sha(o)for o in build.rglob('*.c.o')}
         shutil.copy2(lib,w/(tag+'.a'));link(tag,w/(tag+'.a'),{})
-    assert [Path(k).name for k,v in objects['base'].items()if v!=objects['candidate'][k]]==['X86Sse64Output.c.o']
-    gap=layouts['candidate'][text_section][1]-layouts['base'][text_section][1]
-    assert 0<gap<4096 and gap%64!=0
-    short=gap%64;aligned=gap+(64-short)
-    for name,source,extra in [('matched','base',gap),('short','base',short),('rounded','base',aligned),('aligned_candidate','candidate',64-short)]:
-        link(name,w/(source+'.a'),{text_section:extra})
-    watch=['.cs_x86_native_batch_text','.cs_x86_batch32_text','.cs_x86_batch64_text','.cs_x86_i386_text','.cs_x86_amd64_rodata','.cs_x86_native_batch_rodata']
+    changed={Path(k).name for k,v in objects['base'].items()if v!=objects['candidate'][k]}
+    assert changed=={'X86Sse64Output.c.o','X86BatchScan.c.o'}
+    first='.cs_x86_i386_text'
+    gap=layouts['candidate'][first][0]-layouts['base'][first][0]
+    assert 0<gap<4096 and gap%64==0
+    short=gap%512;aligned=4096
+    link('matched',w/'base.a',{text_section:gap})
+    link('i386_only',w/'base.a',{previous:gap})
+    link('i386_low',w/'base.a',{previous:short})
+    link('page_base',w/'base.a',{previous:aligned})
+    link('page_candidate',w/'candidate.a',{previous:aligned-gap})
+    watch=[first,'.cs_x86_memory_fallback32_text','.cs_x86_register_fallback32_text']
     for key in watch:
-        for x,y in [('matched','candidate'),('rounded','aligned_candidate')]:
-            assert layouts[x][key][:2]==layouts[y][key][:2]
-    assert layouts['base']['.cs_x86_batch64_text'][0]%64==layouts['rounded']['.cs_x86_batch64_text'][0]%64
+        assert layouts['candidate'][key][:2]==layouts['matched'][key][:2]==layouts['i386_only'][key][:2]
+        assert layouts['page_base'][key][:2]==layouts['page_candidate'][key][:2]
+        assert layouts['i386_low'][key][0]-layouts['base'][key][0]==short
+    for key in ('.cs_x86_native_batch_text','.cs_x86_batch64_text'):
+        assert layouts['base'][key][:2]==layouts['i386_only'][key][:2]==layouts['i386_low'][key][:2]
     all_batches={}
     for tag in layouts:
         with (w/tag).open('rb')as f:
@@ -103,7 +111,7 @@ try:
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
     for name,bits,f,spans,_ in fixtures:
-        if name not in ('libssl3t64-amd64','jpeg-avx2-i386','putty-64-0.85','libmvec-amd64'):continue
+        if name not in ('putty-32-0.85','libssl3t64-i386','jpeg-avx2-i386','libssl3t64-amd64'):continue
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
@@ -135,7 +143,7 @@ try:
                 pairs.append({k:[sum(col)for col in zip(*v)]for k,v in times.items()})
             rows[name+'/'+str(mode)]=dict(reps=reps,checks=expected,pairs=pairs)
             save('paired',rows)
-    assert len(checked)==7 and len(rows)==12 and len(audits)==4
+    assert len(checked)==8 and len(rows)==12 and len(audits)==4
     save('complete',dict(complete=True,source=maps,verified=checked,inode=inode,audits=audits))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
