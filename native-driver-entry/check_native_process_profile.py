@@ -127,7 +127,8 @@ def main():
                         "RealtimeWorkQueue": 34, "WindowsRemoteManagement": 33,
                         "OlePropertyConversion": 1, "DebugDataModelManager": 1,
                         "DirectCompositionControls": 3, "DirectCompositionClock": 5,
-                        "VolumeShadowCopyRuntime": 7, "DispatcherQueueRuntime": 1}
+                        "VolumeShadowCopyRuntime": 7, "DispatcherQueueRuntime": 1,
+                        "PresentationFactoryRuntime": 1}
     system_abi = args.output / "system-abis"
     system_calls = args.output / "system-calls"
     provider_options = [arg for name in system_providers for arg in ("--provider", name)]
