@@ -78,6 +78,18 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+            import struct
+            maps=[]
+            for sym in elf.get_section_by_name('.symtab').iter_symbols():
+                if 'insn_alias_mnem_map' not in sym.name or sym['st_info']['type']!='STT_OBJECT' or sym['st_size']<16:continue
+                sec=elf.get_section(sym['st_shndx']);offset=sym['st_value']-sec['sh_addr'];raw=sec.data()[offset:offset+sym['st_size']]
+                ro=elf.get_section_by_name('.rodata');start=ro['sh_addr'];const=ro.data()
+                pointers=[struct.unpack_from('<Q',raw,off)[0] for off in range(8,len(raw),16)]
+                if not pointers or not start<=pointers[0]<start+len(const) or not const.startswith(b'rfebb\0',pointers[0]-start):continue
+                assert len(raw)%16==0
+                maps.append(dict(address=sym['st_value'],size=sym['st_size'],pointer_sha=hashlib.sha256(b''.join(struct.pack('<Q',x)for x in pointers)).hexdigest(),ids=[struct.unpack_from('<I',raw,off)[0] for off in range(0,len(raw),16)]))
+            assert len(maps)==1,(label,len(maps))
+            save('name-map-'+label,maps[0])
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
@@ -109,7 +121,8 @@ try:
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
     for tool in ('ppc-states','real-ppc'):
         run('clang++','-std=c++17','-O2','-I',base/'include',r/(tool+'.cpp'),'-ldl','-o',w/tool)
-    run('clang','-O2','-std=c11','-DCAPSTONE_HAS_POWERPC','-I',base,'-I',base/'include',r/'parser.c',lib,'-o',w/'ppc-parser')
+    run('clang','-O2','-std=c11','-DCAPSTONE_HAS_POWERPC','-DCAPSTONE_HAS_AARCH64','-I',base,'-I',base/'include',r/'parser.c',lib,'-o',w/'ppc-parser')
+    run(sys.executable,'-B',base/'suite/synctools/alias_mnemonic_trie.py','--check')
     ppc=dict(parser=int(get(w/'ppc-parser')),cases={},records={})
     assert ppc['parser']>50000
     for tag in ('candidate','outlined'):
