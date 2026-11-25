@@ -1,3 +1,36 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 06cc61ae..c65caa52 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -35,6 +35,11 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
++#ifndef CAPSTONE_X86_ATT_DISABLE
++#define CAPSTONE_X86_ATT_SCALAR_OUTPUT
++CAPSTONE_INTERNAL bool X86_tryAttScalarOutput(cs_struct *handle,
++		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size);
++#endif
+ /* Linux already selects the scalar writer in its full decode entry. */
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+ #include "../../cs_priv.h"
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 8c6444ab..e618b5ab 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -24,6 +24,12 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+ }
+ #endif
+ 
++#ifdef CAPSTONE_X86_ATT_SCALAR_OUTPUT
++#define X86_ATT_SCALAR_IMPL
++#include "X86SimpleOutputImpl.h"
++#undef X86_ATT_SCALAR_IMPL
++#endif
++
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+ #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
+ #endif
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
 index 62d4288a..524d147a 100644
 --- a/arch/X86/X86OutputOptions.h
@@ -27,16 +60,51 @@ index 62d4288a..524d147a 100644
 +
  #endif
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..b5b697aa 100644
+index 21414e7a..e78bc2a0 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -111,6 +111,23 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1,7 +1,8 @@
+ /* Capstone Disassembly Engine */
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+-#ifndef CS_X86_SIMPLE_OUTPUT_IMPL_H
++/* The generic iterator instantiates this body once more for AT&T output. */
++#if !defined(CS_X86_SIMPLE_OUTPUT_IMPL_H) || defined(X86_ATT_SCALAR_IMPL)
+ #define CS_X86_SIMPLE_OUTPUT_IMPL_H
+ 
+ /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+@@ -36,7 +37,10 @@ static void writeRelativeHex(char *out, uint64_t value)
+ #ifdef X86_MEMORY32_OUTPUT
+ #include "X86GenIndirectMemory.inc"
+ #endif
+-#ifdef X86_FIXED_OUTPUT
++#if defined(X86_ATT_SCALAR_IMPL)
++CAPSTONE_INTERNAL bool X86_tryAttScalarOutput(cs_struct *handle,
++		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size)
++#elif defined(X86_FIXED_OUTPUT)
+ static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size)
+ #else
+@@ -49,6 +53,12 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			 cs_insn *insn, uint16_t *insn_size)
+ #endif
+ {
++#if defined(CAPSTONE_X86_ATT_SCALAR_OUTPUT) && defined(CAPSTONE_X86_DEDICATED_OUTPUT) && \
++	!defined(X86_FIXED_OUTPUT) && !defined(X86_ATT_SCALAR_IMPL)
++	if (handle->syntax == CS_OPT_SYNTAX_ATT)
++		return (!insn->detail || handle->detail_opt) &&
++		       X86_tryAttScalarOutput(handle, code, size, insn, insn_size);
++#endif
+ #ifdef X86_FIXED_OUTPUT
+ 	const bool wide = X86_FIXED_WIDE;
+ #else
+@@ -111,8 +121,26 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
  		}
  	}
-+#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_X86_ATT_DISABLE)
-+	const bool att = handle->syntax == CS_OPT_SYNTAX_ATT;
-+	if (att) {
++#ifdef X86_ATT_SCALAR_IMPL
++	const bool att = true;
++	{
 +		const bool branch = !has_rex && form == X86_SIMPLE_RELATIVE;
 +		const bool pair = modrm >= 0xc0 &&
 +			(form == X86_SIMPLE_RM_REG || form == X86_SIMPLE_REG_RM) &&
@@ -44,17 +112,20 @@ index 21414e7a..b5b697aa 100644
 +			 (opcode & 0xfc) == 0x88 || (opcode & 0xfe) == 0x84);
 +		if (plan >= X86_PLAN_PUSH_IMMEDIATE || !(branch || pair) ||
 +		    X86_OUTPUT_UNSUPPORTED_FOR(handle,
-+				!wide && handle->mode != CS_MODE_32, false,
++				!wide && handle->mode != CS_MODE_32,
++				handle->syntax != CS_OPT_SYNTAX_ATT,
 +				X86_ATT_printInst))
 +			return false;
-+	} else
++	}
 +#else
 +	const bool att = false;
-+#endif
  	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
  		return false;
++#endif
  
-@@ -193,6 +210,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR) {
+@@ -193,6 +221,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  		memcpy(insn->op_str, row->operands, sizeof(row->operands));
  		*insn_size = insn->size = (uint16_t)(1 + has_rex);
  	} else if (relative) {
@@ -63,7 +134,7 @@ index 21414e7a..b5b697aa 100644
  		const uint8_t *bytes = code + row->imm_offset;
  		int64_t delta;
  		if (row->imm_size == 1) {
-@@ -239,11 +258,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -239,11 +269,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
  		const struct X86SimpleRegister *b =
  			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
@@ -90,7 +161,7 @@ index 21414e7a..b5b697aa 100644
  		first = a->reg;
  		second = b->reg;
  		insn->bytes[1] = code[1];
-@@ -262,6 +291,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -262,6 +302,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			}
  			x->operands[0].type = X86_OP_IMM;
  			x->operands[0].imm = (int64_t)target;
@@ -102,3 +173,20 @@ index 21414e7a..b5b697aa 100644
  		}
  	}
  	return true;
+diff --git a/cs.c b/cs.c
+index d0b8b045..cf25571e 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1112,6 +1112,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
++#endif
++#if defined(CAPSTONE_X86_ATT_SCALAR_OUTPUT) && !defined(CAPSTONE_X86_DEDICATED_OUTPUT)
++	if (size && handle->syntax == CS_OPT_SYNTAX_ATT &&
++	    (!insn->detail || handle->detail_opt) &&
++	    X86_tryAttScalarOutput(handle, code, size, insn, insn_size))
++		return true;
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
