@@ -1,7 +1,7 @@
-name: Isolate the link placement of the i386 text path when measuring the AMD64 prefix decoder
+name: Measure matched i386 placements for the AMD64 output decoder
 on:
   push:
-    branches: [codex/x86-prefix-constant-section-placement]
+    branches: [codex/amd64-output-fixed-placement]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: amd64-placement-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: matched-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

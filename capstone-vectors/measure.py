@@ -44,7 +44,7 @@ try:
         args=[]
         if padding:
             assembly=w/'dummy.s';obj=w/'dummy.o'
-            assembly.write_text('.section '+sec_name+',"ax"\\n.space '+str(padding)+',0\\n.section .note.GNU-stack,""\\n')
+            assembly.write_text('.section '+sec_name+',"ax"\n.space '+str(padding)+',0\n.section .note.GNU-stack,""\n')
             run('clang','-c',assembly,'-o',obj);args=[obj]
         run('clang++',w/'driver.o',archive[src],*args,ice_lib,*flags,'-o',w/label)
         with (w/label).open('rb') as f:
