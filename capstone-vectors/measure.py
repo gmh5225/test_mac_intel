@@ -108,6 +108,8 @@ try:
         assert proof[label][0]==1920000 and proof[label][3]==2048
     assert proof['outlined']==proof['candidate'];save('register-query',proof)
     guards={};records={}
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'query-replay.cpp','-ldl','-o',w/'query-replay')
+    replay={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
         guards[lbl]=dict(states=parts.stderr.count('case arch='),status=parts.returncode,stderr=parts.stderr.splitlines()[-8:])
@@ -149,6 +151,12 @@ try:
             assert vals[0][2]==spec['bytes']
             records[name][lbl]=vals[0]
         save('extra-real',records)
+        query=get(w/'query-replay',w/'base.so',w/'candidate.so',w/'outlined.so',f,path,str(bits),str(records[name]['candidate'][0]))
+        lines=[list(map(int,row.split())) for row in query.splitlines()]
+        head=lines.pop(0);assert head[0]==records[name]['candidate'][0] and len(head)==5 and 0<head[1]<=8192 and len(lines)==35
+        assert all(len(z)==8 for z in lines)
+        replay[name]=dict(records=head[0],sampled=head[1],stride=head[2],repeats=head[3],accessed=head[4],cycles=lines)
+        save('isolated-queries',replay)
         for route in ('private','capstone'):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')
