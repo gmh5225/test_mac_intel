@@ -1,6 +1,7 @@
 from pathlib import Path
 import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
 from elf_slots import plan,symbols
+from elftools.elf.elffile import ELFFile
 import training,pe_panels
 r=Path(__file__).resolve().parent
 root=r.parent; e=root/'evidence';e.mkdir(exist_ok=True);src=root/'source';nd=root/'neverd-config'
@@ -60,6 +61,11 @@ try:
             run(*args,'-o',exe)
             sy,sec=symbols(exe);assert set(hot)<=sy.keys(),sy.keys()
             stamps[tag]=dict(hot={n:sy[n]for n in hot},sections=sec,sha256=sig(exe))
+            if kind=='controlled':
+                with exe.open('rb')as stream:
+                    symtab=ELFFile(stream).get_section_by_name('.symtab')
+                    stamps[tag]['slots']={a.name:a['st_value'] for a in symtab.iter_symbols() if a.name.startswith('csprobe_') and a.name.endswith(('_start','_end'))}
+                assert len(stamps[tag]['slots'])>=8
             addresses[tag]=sy;bins[tag]=exe.read_bytes()
         ref=kind+'-base';cand=kind+'-candidate'
         common=addresses[ref].keys() & addresses[cand].keys()

@@ -17,10 +17,17 @@ def capture(file):
 
 def plan(versions,archives,work,ar,objcopy):
     members=['RISCVDisassembler.c.o','RISCVInstPrinter.c.o','RISCVMapping.c.o']
-    slots={}
+    slots={}; mergeable=set()
     for variant in versions:
         for member in members:
             rows=capture(versions[variant]/member)
+            with (versions[variant]/member).open('rb') as stream:
+                elf=ELFFile(stream)
+                for sect in elf.iter_sections():
+                    if sect.name in rows and sect['sh_flags']&16:
+                        assert rows[sect.name][0]=='const'
+                        mergeable.add((member,sect.name))
+
             for section,(group,alignment,size) in rows.items():
                 k=member,section;prev=slots.get(k,(group,1,0));assert prev[0]==group
                 slots[k]=(group,max(alignment,prev[1]),max(size,prev[2]))
@@ -33,9 +40,9 @@ def plan(versions,archives,work,ar,objcopy):
         lines+=['SECTIONS {','.csprobe_'+group+' : ALIGN(64) {']
         for k,(_,alignment,size) in records:
             ident=identifiers[k]
-            lines+=['. = ALIGN('+str(max(1,alignment))+');',ident+'_start = .;',
+            lines+=['. = ALIGN('+str(max(64,alignment))+');',ident+'_start = .;',
                     'KEEP(*(.probe_'+ident+'))',
-                    '. = '+ident+'_start + '+str(size)+';']
+                    '. = MAX(., '+ident+'_start + '+str(size)+');',ident+'_end = .;']
         lines+=['}', '} INSERT AFTER '+after+';']
     script.write_text('\n'.join(lines)+'\n')
     prepared={}
@@ -45,7 +52,8 @@ def plan(versions,archives,work,ar,objcopy):
         for member in members:
             rows=capture(dirpath/member);opts=[]
             for sect in rows:
-                opts+=['--rename-section',sect+'=.probe_'+identifiers[(member,sect)]]
+                flags=',alloc,load,readonly,data,contents' if (member,sect) in mergeable else ''
+                opts+=['--rename-section',sect+'=.probe_'+identifiers[(member,sect)]+flags]
             run(objcopy,*opts,dirpath/member,dest/member)
         run(ar,'rcs',lib,*[dest/k for k in members])
         assert subprocess.check_output([ar,'t',archives[version]])==subprocess.check_output([ar,'t',lib])

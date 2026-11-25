@@ -1,7 +1,7 @@
-name: Separate RISC-V algorithm effects from ELF code and data placement on six real programs
+name: Measure RISC-V code and data placement with fixed ELF input ranges and intact relocation records
 on:
   push:
-    branches: [codex/riscv-elf-address-controlled]
+    branches: [codex/riscv-matched-elf-input-addresses]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: riscv-slot-check-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rv-slot-bounds-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
