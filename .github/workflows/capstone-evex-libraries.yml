@@ -1,7 +1,7 @@
-name: Verify corrected absolute offsets against decoded widths and time the real-formatting routes
+name: Measure printing corrected absolute offsets using the decoded effective address width
 on:
   push:
-    branches: [codex/current-shared-absolute-printer]
+    branches: [codex/decoded-offset-mask-on-next]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b7a40bec54cdcb46fd6555b3335e3965a06a3740
+          ref: 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 961146191161cfb1dc1584a1e9c8946d2166ad45
+          ref: c6df2f25c9189936a7b57ee8a01d123be11aba68
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: common-offset-printer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: decoded-offset-mask-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -1,5 +1,17 @@
+diff --git a/MCInst.h b/MCInst.h
+index e0409109..59e1a593 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -154,6 +154,7 @@ struct MCInst {
+ 	uint64_t address; // address of this insn
+ 	cs_struct *csh; // save the main csh
+ 	uint8_t x86opsize; // opsize for [mem] operand
++	uint8_t x86_addr_mask_shift; // 64 minus the effective address width in bits
+ 
+ 	// These flags could be used to pass some info from one target subcomponent
+ 	// to another, for example, from disassembler to asm printer. The values of
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..cb65d0a4 100644
+index 1cc3d3a9..34666027 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
 @@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
@@ -9,45 +21,24 @@ index 1cc3d3a9..cb65d0a4 100644
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
-+						       X86_absoluteAddress(MI, DispVal));
++						       x86_absolute_address(MI, DispVal));
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
-diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..575bd418 100644
---- a/arch/X86/X86InstPrinterCommon.c
-+++ b/arch/X86/X86InstPrinterCommon.c
-@@ -290,3 +290,15 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
- 	}
- }
- #endif
-+
-+/* An absolute displacement is an offset of the effective address width. */
-+uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp)
-+{
-+	const cs_mode mode = mi->csh->mode;
-+	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
-+	if (x86_has_feature(mode, CS_MODE_16))
-+		return address_override ? (uint32_t)disp : (uint16_t)disp;
-+	if (x86_has_feature(mode, CS_MODE_32))
-+		return address_override ? (uint16_t)disp : (uint32_t)disp;
-+	return address_override ? (uint32_t)disp : (uint64_t)disp;
-+}
-diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
-index 37b02959..bb4919aa 100644
---- a/arch/X86/X86InstPrinterCommon.h
-+++ b/arch/X86/X86InstPrinterCommon.h
-@@ -22,6 +22,8 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
- 	return target;
- }
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..e2accc28 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -674,6 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 				insn.vectorExtensionPrefix[3] =
+ 					original_scalar_compare_p2;
+ 			instr->imm_size = insn.immSize;
++			instr->x86_addr_mask_shift = (uint8_t)(64 - 8 * insn.addressSize);
  
-+uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp);
-+
- void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
- 
- void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
+ 			// copy all prefixes
+ 			instr->x86_prefix[0] = insn.prefix0;
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..2768fe6a 100644
+index 457485ab..78ba0cf5 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
 @@ -1236,9 +1236,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
@@ -57,27 +48,30 @@ index 457485ab..2768fe6a 100644
 -						 x86_get_address_mask(
 -							 MI->csh->mode) &
 -							 DispVal,
-+						 X86_absoluteAddress(MI, DispVal),
++						 x86_absolute_address(MI, DispVal),
  						 true);
  				} else {
  					printImm(MI, O, DispVal, true);
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..97d6bb42 100644
+index 380faa79..6383abdf 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,4 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,10 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
--{
++/* Truncate an absolute offset to the address width chosen by the decoder. */
++static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
+ {
 -	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
 -	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
--}
--
++	return (uint64_t)disp & (UINT64_MAX >> mi->x86_addr_mask_shift);
+ }
+ 
  #endif
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
 index cfd13cba..3b436991 100644
