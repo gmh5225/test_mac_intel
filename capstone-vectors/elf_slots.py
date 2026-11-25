@@ -15,8 +15,8 @@ def capture(file):
             out[name]=(group,sect['sh_addralign'],sect['sh_size'])
         return out
 
-def plan(versions,archives,work,ar,objcopy):
-    members=['RISCVDisassembler.c.o','RISCVInstPrinter.c.o','RISCVMapping.c.o']
+def plan(versions,archives,work,ar,objcopy,groups):
+    members=['RISCVInstPrinter.c.o']
     slots={}; mergeable=set()
     for variant in versions:
         for member in members:
@@ -29,9 +29,10 @@ def plan(versions,archives,work,ar,objcopy):
                         mergeable.add((member,sect.name))
 
             for section,(group,alignment,size) in rows.items():
+                if group not in groups:continue
                 k=member,section;prev=slots.get(k,(group,1,0));assert prev[0]==group
                 slots[k]=(group,max(alignment,prev[1]),max(size,prev[2]))
-    identifiers={k:'csprobe_'+str(i)for i,k in enumerate(sorted(slots))}
+    identifiers={k:'csprobe_'+slots[k][0]+'_'+str(i)for i,k in enumerate(sorted(slots))}
     script=work/'diagnostic.ld'
     lines=[]
     for group,after in [('exec','.text'),('const','.rodata'),('write','.data'),('zero','.bss')]:
@@ -52,6 +53,7 @@ def plan(versions,archives,work,ar,objcopy):
         for member in members:
             rows=capture(dirpath/member);opts=[]
             for sect in rows:
+                if (member,sect) not in slots:continue
                 flags=',alloc,load,readonly,data,contents' if (member,sect) in mergeable else ''
                 opts+=['--rename-section',sect+'=.probe_'+identifiers[(member,sect)]+flags]
             run(objcopy,*opts,dirpath/member,dest/member)

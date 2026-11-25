@@ -28,7 +28,7 @@ try:
     driver=driver.replace('size_t(arch == CS_ARCH_RISCV ? 2 : 4)', 'size_t(arch == CS_ARCH_X86 ? 1 : arch == CS_ARCH_RISCV ? 2 : 4)')
     assert driver.count('initial_ip')==2 and driver.count('target == "i386"')==1
     (w/'driver.cpp').write_text(driver);run('clang++','-std=c++17','-O3','-DNDEBUG','-I',src/'include','-c',w/'driver.cpp','-o',w/'driver.o')
-    names=['RISCVDisassembler.c.o','RISCVInstPrinter.c.o','RISCVMapping.c.o']
+    names=['RISCVInstPrinter.c.o']
     versions={};archives={};objects={}
     ar=shutil.which('llvm-ar') or shutil.which('ar')
     objcopy=shutil.which('llvm-objcopy') or shutil.which('objcopy')
@@ -44,7 +44,12 @@ try:
             assert sp.check_output([ar,'p',lib,member])==obj.read_bytes()
     ch=[Path(k).name for k in objects['base'] if objects['base'][k]!=objects['candidate'][k]]
     assert set(ch)==set(names),ch
-    other,script=plan(versions,archives,w,ar,objcopy);(e/'diagnostic.ld').write_bytes(script.read_bytes())
+    classes={'regular':None,'exec':{'exec'},'const':{'const'},'both':{'exec','const','write','zero'}}
+    scripts={};prepared={'regular':archives}
+    for kind,groups in classes.items():
+        if kind=='regular':continue
+        sub=w/kind;sub.mkdir();prepared[kind],script=plan(versions,archives,sub,ar,objcopy,groups)
+        scripts[kind]=script;(e/(kind+'.ld')).write_bytes(script.read_bytes())
     cases=training.fetch(r,w)
     for name,bits,f,spans,meta in pe_panels.prepare(w):
         if bits!=32:continue
@@ -53,30 +58,37 @@ try:
     assert len(cases)==6;save('corpus',cases)
     hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction','cs_regs_access']
     stamps={};addresses={};bins={}
-    for kind,libs in [('regular',archives),('controlled',other)]:
+    for kind,libs in prepared.items():
         for v,lib in libs.items():
             tag=kind+'-'+v;exe=w/tag
             args=['clang++',w/'driver.o',lib,'-no-pie','-fuse-ld=bfd']
-            if kind=='controlled':args+=['-Wl,-T,'+str(script)]
+            if kind!='regular':args+=['-Wl,-T,'+str(scripts[kind])]
+            if kind in ('const','both'):
+                anchor=max(stamps['regular-'+k]['sections']['.rodata'][0]for k in archives)
+                anchor=(anchor+131071)&~65535
+                args+=['-Wl,--section-start,.rodata='+hex(anchor)]
             run(*args,'-o',exe)
             sy,sec=symbols(exe);assert set(hot)<=sy.keys(),sy.keys()
             stamps[tag]=dict(hot={n:sy[n]for n in hot},sections=sec,sha256=sig(exe))
-            if kind=='controlled':
+            if kind!='regular':
                 with exe.open('rb')as stream:
                     symtab=ELFFile(stream).get_section_by_name('.symtab')
                     stamps[tag]['slots']={a.name:a['st_value'] for a in symtab.iter_symbols() if a.name.startswith('csprobe_') and a.name.endswith(('_start','_end'))}
-                assert len(stamps[tag]['slots'])>=8
+                assert len(stamps[tag]['slots'])>=2
             addresses[tag]=sy;bins[tag]=exe.read_bytes()
         ref=kind+'-base';cand=kind+'-candidate'
         common=addresses[ref].keys() & addresses[cand].keys()
         stamps[cand].update(equal_address=sum(addresses[ref][f][0]==addresses[cand][f][0]for f in common),
                              equal_address_and_bytes=sum(addresses[ref][f]==addresses[cand][f] for f in common),unique_functions=len(common))
-    controlled=stamps['controlled-base']['sections']
-    slots=[s for s in controlled if s.startswith('.csprobe_')]
-    assert {'.csprobe_exec','.csprobe_const'}<=set(slots) and all(controlled[s][1]==stamps['controlled-candidate']['sections'][s][1]for s in slots)
-    save('layout',dict(objects=ch,syms=stamps,driver_sha=sig(w/'driver.cpp'),script=sig(script),source=m))
+    for kind in ('exec','const','both'):
+        a=stamps[kind+'-base'];b=stamps[kind+'-candidate']
+        got={k.split('_')[1]for k in a['slots']}
+        assert a['slots']==b['slots'] and (got=={kind} if kind!='both' else {'exec','const'}<=got),(kind,a['slots'],b['slots'])
+        if kind in ('const','both'):
+            assert a['sections']['.rodata'][0]==b['sections']['.rodata'][0]==anchor
+    save('layout',dict(objects=ch,syms=stamps,driver_sha=sig(w/'driver.cpp'),scripts={k:sig(v)for k,v in scripts.items()},source=m))
     length=max(map(len,bins.values()));bins={k:v.ljust(length,b'\0')for k,v in bins.items()}
-    for kind in ['regular','controlled']:bins[kind+'-duplicate']=bins[kind+'-base']
+    for kind in prepared:bins[kind+'-duplicate']=bins[kind+'-base']
     path=w/'selected';path.write_bytes(bins['regular-base']);path.chmod(0o755);inode=path.stat().st_ino
     checked={};changes={}
     for prev in bins:
@@ -108,7 +120,7 @@ try:
                 cycles.append({k:[a+b for a,b in zip(*xs)] for k,xs in times.items()})
             results[row['name']+'/'+str(mode)]=dict(reps=reps,output=expected,pairs=cycles)
             save('pairs',results)
-    assert len(checked)==6 and len(results)==18
+    assert len(checked)==12 and len(results)==18
     save('complete',dict(complete=True,source=m,checks=checked,inode=inode,compiler=get('clang','--version'),host=platform.machine()))
 finally:
     size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink())

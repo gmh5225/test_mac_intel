@@ -1,7 +1,7 @@
-name: Measure RISC-V code and data placement with fixed ELF input ranges and intact relocation records
+name: Isolate code and constant movement from a single RISC-V printer object on real PE32 and five ELF binaries
 on:
   push:
-    branches: [codex/riscv-matched-elf-input-addresses]
+    branches: [codex/riscv-text-and-rodata-independent]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rv-slot-bounds-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: rv-code-constant-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
