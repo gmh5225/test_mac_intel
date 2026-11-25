@@ -57,6 +57,12 @@ try:
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
+        # Test the default from a fresh option cache for each source tree.
+        run('cmake','-U','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT','-S',project,'-B',build)
+        command=next(x['command'] for x in rd(build/'compile_commands.json') if Path(x['file']).name=='X86Sse64Output.c')
+        flag='-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in command
+        assert flag==(platform.machine()=='x86_64' or label!='base'),(label,command)
+        save('near-'+label,dict(enabled=flag))
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
@@ -72,6 +78,14 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+    if platform.machine()=='aarch64':
+        run('cmake','-S',project,'-B',build,'-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=OFF')
+        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        assert sha(lib)==images['base']['archive']
+        save('override',dict(off=sha(lib),release=images['base']['archive']))
+        run('cmake','-U','CAPSTONE_X86_NEAR_INDIRECT_OUTPUT','-S',project,'-B',build)
+        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        assert sha(lib)==images['candidate']['archive']
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}

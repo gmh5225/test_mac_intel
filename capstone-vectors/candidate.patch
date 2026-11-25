@@ -1,38 +1,46 @@
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..fa2407b3 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -72,6 +72,33 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- {
- 	const struct X86SimpleOutput *row =
- 		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
-+	/* A bare RIP-relative target is always a six-byte memory record. */
-+	if (!rex && (modrm == 0x15 || modrm == 0x25)) {
-+		if (size < 6)
-+			return false;
-+		const int32_t displacement = X86_readDisp32(code + 2);
-+		insn->id = row->id;
-+		*insn_size = insn->size = 6;
-+		memcpy(insn->bytes, code, 6);
-+		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+		memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+		memset(insn->op_str, 0, sizeof(insn->op_str));
-+		memcpy(insn->op_str, "qword ptr [rip", 14);
-+		*X86_writeDisplacement(insn->op_str + 14, displacement) = ']';
-+		if (insn->detail) {
-+			X86_writeSimpleDetail(insn->detail, row, 0xff, 0,
-+					      code[1], 0, 0);
-+			cs_x86 *x = &insn->detail->x86;
-+			cs_x86_op *mem = &x->operands[0];
-+			mem->type = X86_OP_MEM;
-+			mem->mem.base = X86_REG_RIP;
-+			mem->mem.scale = 1;
-+			mem->mem.disp = x->disp = displacement;
-+			x->encoding.disp_offset = 2;
-+			x->encoding.disp_size = 4;
-+		}
-+		return true;
-+	}
- 	if (modrm < 0xc0)
- 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
- 					     x86_simple_registers);
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6050d7c2..38c9127c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -238,7 +238,15 @@ option(CAPSTONE_MIPS_FINAL_OUTPUT_TRIM "Remove leading whitespace once at the MI
+ option(CAPSTONE_MIPS_PRECHECK_PRINTED_ALIAS "Check the MIPS printer alias flag before calling the isolated mnemonic lookup" OFF)
+ option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
+ option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
+-option(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT "Enable near CALL/JMP output in the static x86-64 iterator" OFF)
++set(capstone_default_near_indirect OFF)
++if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
++   AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++   AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$"
++   AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
++   AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE)
++    set(capstone_default_near_indirect ON)
++endif()
++option(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT "Enable near CALL/JMP output in the static x86-64 iterator" ${capstone_default_near_indirect})
+ option(CAPSTONE_X86_SCAN_ADAPTER "Build the private x86 scan adapter hook" OFF)
+ option(CAPSTONE_OSXKERNEL_SUPPORT "Support to embed Capstone into OS X Kernel extensions" OFF)
+ 
+diff --git a/Makefile b/Makefile
+index 06b05013..c02c8c3d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -133,6 +133,9 @@ ifneq ($(filter macos linux-arm64,$(MIXED_STORAGE_TARGET)),)
+ CFLAGS += -DCAPSTONE_MIXED_CONSTRUCTED_OPERANDS
+ MCINST_STORAGE_OBJ = $(OBJDIR)/MCInstStorage.o
+ endif
++ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),linux-arm64:yes:no:no:no)
++CAPSTONE_X86_NEAR_INDIRECT_OUTPUT ?= yes
++endif
+ ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_DIET),linux-amd64:no)
+ CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
+ ARM_FORMAT_CHAR_OBJ = $(OBJDIR)/arch/ARM/ARMFormattedChar.o
+@@ -727,6 +730,10 @@ $(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86MemoryOutput.o $(O
+ endif
+ endif
+ 
++ifeq ($(CAPSTONE_X86_NEAR_INDIRECT_OUTPUT),yes)
++$(OBJDIR)/arch/X86/X86Sse64Output.o: CFLAGS += -DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT
++endif
++
+ $(OBJDIR)/%.o: %.c
+ 	@mkdir -p $(@D)
+ ifeq ($(V),0)
