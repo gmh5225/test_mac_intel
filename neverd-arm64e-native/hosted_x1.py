@@ -26,6 +26,9 @@ def feature_summary(policy, report, output):
     details = {}
     summary = CONFIG["feature_heading"]
     for section, key, label in CONFIG["feature_rows"]:
+        if section not in policy:
+            summary += CONFIG["feature_row"].format(feature=label, result=CONFIG["unmeasured"])
+            continue
         probe = policy[section]
         mode = probe["mode"]
         if mode not in details:

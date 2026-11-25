@@ -19,6 +19,8 @@
   "control_command": [
     "-m", "unittest", "-v",
     "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_native_scalar_instruction_sites_and_results",
+    "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_native_writeback_rejects_constant_load_and_store",
+    "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_x1_cursor_requires_signed_subtype_and_consistent_execution",
     "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_native_explicit_cursor_requires_both_instruction_sites",
     "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_native_cursor_requires_all_samples_for_each_key",
     "scripts.tests.test_verify_arm64e_native.Arm64eNativeQualificationTests.test_ordered_q_lane_and_signal_controls_with_baseline_instructions",
@@ -27,8 +29,10 @@
   "control_log": "native-probe-controls.log",
   "feature_rows": [
     ["ordered_probe", "qualified_key", "128-bit LRCPC3"],
-    ["cursor_probe", "explicit_key", "Two-modifier PAuth_LR"],
-    ["cursor_probe", "pacm_pc_key", "PC-sensitive PACM"],
+    ["cursor_probe", "explicit_key", "Two-modifier PAuth_LR on arm64e"],
+    ["cursor_probe", "pacm_pc_key", "PC-sensitive PACM on arm64e"],
+    ["x1_cursor_probe", "explicit_key", "Two-modifier PAuth_LR on arm64e.x1"],
+    ["x1_cursor_probe", "pacm_pc_key", "PC-sensitive PACM on arm64e.x1"],
     ["cursor_probe", "pacm_hint_key", "PACM HINT with active IA and IB"],
     ["cpta_probe", "scalar_qualified_key", "EL0 checked scalar arithmetic on arm64e.x1"],
     ["cpta_probe", "product_qualified_key", "EL0 checked signed-product overflow on arm64e.x1"],
