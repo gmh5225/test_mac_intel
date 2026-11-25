@@ -51,9 +51,9 @@ try:
         directives=[]
         for section,flag in sections.items():
             count=padding.get(section,0)
-            if count:directives.append('.section '+section+',"'+flag+'"\\n.space '+str(count)+',0')
+            if count:directives.append('.section '+section+',"'+flag+'"\n.space '+str(count)+',0')
         if directives:
-            f=w/'tail.s';f.write_text('\\n'.join(directives)+'\\n.section .note.GNU-stack,""\\n')
+            f=w/'tail.s';f.write_text('\n'.join(directives)+'\n.section .note.GNU-stack,""\n')
             run('clang','-c',f,'-o',w/'tail.o');extra=[w/'tail.o']
         ld=['-Wl,'+k for k in options]
         run('clang++',w/'driver.o',*ld,w/(label+'.a'),*extra,ice_lib,*flags,'-o',path)

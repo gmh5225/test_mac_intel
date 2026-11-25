@@ -1,7 +1,7 @@
-name: Isolate the effect of AMD64 constant-table placement on PE32 with fixed code addresses
+name: Compare i386 with matched code alone and with matched code plus constant tables
 on:
   push:
-    branches: [codex/match-amd64-code-and-constant-placement]
+    branches: [codex/match-relocated-i386-code-and-constants]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -58,6 +58,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-matched-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: matched-i386-code-data-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
