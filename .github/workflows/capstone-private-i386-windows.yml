@@ -1,7 +1,7 @@
-name: Verify RISC-V operand mapping and real syntax across mixed and dedicated configurations
+name: Verify dedicated RISC-V register printing across compilers, linkages, real ELF programs and identical mixed products
 on:
   push:
-    branches: [codex/riscv-type-permission-row-configs]
+    branches: [codex/riscv-dedicated-canonical-short-register]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-demanded-views-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: rv-dedicated-register-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7

@@ -1,6 +1,5 @@
 from pathlib import Path
 import hashlib,io,json,os,platform,shutil,subprocess as sp,tarfile,tempfile
-import shlex
 import corpus
 d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True);profile=os.environ['SCAN_PROFILE'];q=json.loads((d/'tree.json').read_text());source=json.loads((d/'sample.json').read_text());win=os.name=='nt';t=Path(tempfile.mkdtemp())
 sha=lambda raw:hashlib.sha256(raw).hexdigest()
@@ -33,7 +32,7 @@ try:
     if linux and profile=='full':
         lines.extend([f'add_executable(rv_time "{(d/"riscv_options.cpp").as_posix()}")','target_compile_features(rv_time PRIVATE cxx_std_17)','target_link_libraries(rv_time PRIVATE capstone_static)','target_link_options(rv_time PRIVATE -no-pie)'])
     (project/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
-    cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    cfg=['cmake','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     chosen=os.environ.get('NATIVE_COMPILER','')
     if chosen in ('gcc','clang'):
         os.environ.update(CC=chosen,CXX='g++' if chosen=='gcc' else 'clang++')
@@ -51,32 +50,32 @@ try:
         opts=code[code.index('# --- Capstone (our fork'):code.index('# --- NeverD CMake helpers')]
         (product/'CMakeLists.txt').write_text(chr(10).join(('cmake_minimum_required(VERSION 3.22)','project(Mixed LANGUAGES C CXX)',opts,'add_executable(consumer reader.cpp)','target_link_libraries(consumer PRIVATE capstone_static)','')))
         shutil.copyfile(d/'riscv_options.cpp',product/'reader.cpp')
-    variants={};mixed={};libs={}
-    if verify_mixed:
-        timing=t/'mixed-timing';timing.mkdir()
-        for name,path in texts.items():shutil.copyfile(path,timing/(name+'.text'))
-
+    variants={};mixed={}
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
-        if stage=='candidate':
-            gen=s/'suite/synctools/riscv_gpr_names.py'
-            cmd('scan-generator',[os.sys.executable,'-B',s/'suite/synctools/fixed_len_decoder.py','--check'])
-            cmd('generated-check',[os.sys.executable,'-B',gen,'--check'])
-            cmd('generated-repeat',[os.sys.executable,'-B',gen])
-            assert g('diff','--name-only')==''
         units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_scan_options', 'riscv_instruction_groups', 'riscv_op_count_iter', 'riscv_sysreg', 'riscv_reg_access', 'riscv_insn_name_segv'] if profile=='full' else ['riscv_scan_options']
         targets=['records_static','records_shared',*units]+(['rv_time'] if linux and profile=='full' else [])
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target',*targets])
         if linux and profile=='full':shutil.copyfile(b/'rv_time',t/('riscv-option-'+stage))
+        if not win and profile=='full':
+            ext='dylib' if platform.system()=='Darwin' else 'so'
+            lib,=[f for f in b.rglob('libcapstone.'+ext)if f.is_file()]
+            shutil.copyfile(lib,t/(stage+'.'+ext))
+        if linux and profile=='full' and stage=='candidate':
+            lib,=b.rglob('libcapstone.a')
+            calls=json.loads((b/'compile_commands.json').read_text())
+            argo,=[x for x in calls if Path(x['file']).name=='RISCVInstPrinter.c']
+            import shlex
+            args=shlex.split(argo['command']);i=args.index('-o')
+            cmd('compile-register-stream',args[:i]+['-I',s,d/'register-stream.c',lib,'-o',t/'stream'])
+            assert int(sp.check_output([t/'stream'],text=True))==2109440
+            save('register-stream',dict(states=2109440,source=q))
+
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
             dll,=[f for f in b.rglob('*.dll')if 'capstone' in f.name.lower()];env['PATH']=str(dll.parent)+os.pathsep+env['PATH']
-        if not win and profile=='full':
-            ext='dylib' if platform.system()=='Darwin' else 'so'
-            lib,=[p for p in b.rglob('libcapstone.'+ext)if p.is_file()]
-            libs[stage]=t/(stage+'.'+ext);shutil.copyfile(lib,libs[stage])
         outputs={}
         for suffix in ('static','shared'):
             exe,=[f for f in b.rglob('records_'+suffix+('.exe'if win else'')) if f.is_file()]
@@ -96,43 +95,20 @@ try:
             names={Path(c['file']).name for c in commands};assert {'X86Mapping.c','MipsMapping.c','PPCMapping.c','ARMMapping.c','AArch64Mapping.c','RISCVInstPrinter.c'}<=names
             assert all('CAPSTONE_RISCV_ONLY' not in row['command']for row in commands if row['file'].endswith('/RISCVInstPrinter.c'))
             objects={str(p.relative_to(bmix)):sha(p.read_bytes())for p in bmix.rglob('*.o')};lib,=bmix.rglob('libcapstone.a')
-            cmd('mixed-library-'+stage,[os.environ.get('CC','cc'),'-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',t/('scan-'+stage+'.so')])
-            if stage=='candidate':
-                printer,=[c for c in commands if Path(c['file']).name=='RISCVInstPrinter.c']
-                args=shlex.split(printer['command'])
-                cmd('register-stream-build',args[:args.index('-o')]+['-I',s,d/'register-stream.c',lib,'-o',t/'register-stream'])
-                count=int(sp.check_output([t/'register-stream'],text=True))
-                save('register-stream',dict(states=count,tree=q['tree']))
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
-            shutil.copyfile(bmix/'consumer',timing/('riscv-option-'+stage))
-    if verify_mixed:
-        cmd('mixed-guard-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'mixed-scan.cpp','-ldl','-o',t/'scan-guard'])
-        guard=sp.run([t/'scan-guard',t/'scan-base.so',t/'scan-candidate.so'],text=True,capture_output=True)
-        save('mixed-guard',dict(code=guard.returncode,counts=guard.stdout.strip(),message=guard.stderr.strip()))
-        if guard.returncode:raise RuntimeError((guard.returncode,guard.stderr))
-        cmd('printer-guard-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'printer-guard.cpp','-ldl','-o',t/'print-guard'])
-        z=sp.run([t/'print-guard',t/'scan-base.so',t/'scan-candidate.so'],text=True,capture_output=True,check=True)
-        save('printed-records',dict(counts=z.stdout.strip(),options=z.stderr.strip(),tree=q['tree']))
-        a,both=mixed['base']['objects'],mixed['candidate']['objects']
-        assert a.keys()==both.keys()
-        delta=[Path(p).name for p in a if a[p]!=both[p]]
-        assert sorted(delta)==['RISCVDisassembler.c.o', 'RISCVInstPrinter.c.o', 'RISCVMapping.c.o'],delta
+    if verify_mixed:assert mixed['base']==mixed['candidate']
     if not win and profile=='full':
-        cmd('numeric-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'numeric.cpp','-o',t/'numeric']+(['-ldl']if linux else []))
-        rows={}
-        for name,path in texts.items():
-            z=sp.run([t/'numeric',libs['base'],libs['candidate'],path],text=True,capture_output=True)
-            if z.returncode:raise RuntimeError((z.returncode,z.stderr))
-            rows[name]=json.loads(z.stdout)
-        save('numeric',rows)
+        cmd('compile-boundaries',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'guard.cpp','-o',t/'guard']+(['-ldl']if linux else []))
+        checks=sp.check_output([t/'guard',t/('base.'+ext),t/('candidate.'+ext)],text=True).strip()
+        assert int(checks.split()[0])>13000000
+        save('guard',dict(checks=checks,source=q))
 
 
     if linux and profile=='full':
         from riscv_time import measure
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         measure([dict(arch='riscv64',name=n)for n in texts],t,save)
-        measure([dict(arch='riscv64',name=n)for n in texts],timing,lambda n,v:save('mixed-'+n,v))
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))

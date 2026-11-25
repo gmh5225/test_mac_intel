@@ -1,104 +1,60 @@
-#include "arch/X86/X86ScanAdapter.h"
-#include <cstdio>
+#include <capstone/capstone.h>
+#include <array>
 #include <cstdint>
-#include <cstdlib>
-#include <initializer_list>
+#include <cstdio>
 #include <cstring>
-#ifdef _WIN32
-#include <windows.h>
-#else
+#include <dlfcn.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#endif
 
-#ifdef CHECK_ADAPTER
-static uint32_t custom(void *calls, const uint8_t *code, size_t size) {
-    ++*static_cast<uint64_t *>(calls);
-    return size && code[0] == 0xcc ? (uint32_t(X86_INS_NOP) << 8) | 1 : 0;
-}
-#endif
-int main() {
-#ifdef _WIN32
-    SYSTEM_INFO si; GetSystemInfo(&si);
-    const size_t page = si.dwPageSize;
-    auto mem = static_cast<uint8_t *>(VirtualAlloc(nullptr,2*page,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
-    DWORD old;
-    if (!mem || !VirtualProtect(mem+page,page,PAGE_NOACCESS,&old)) return 2;
-#else
-    const size_t page = sysconf(_SC_PAGESIZE);
-    auto mem = static_cast<uint8_t *>(mmap(nullptr,2*page,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0));
-    if (mem == MAP_FAILED || mprotect(mem+page,page,PROT_NONE)) return 2;
-#endif
-    uint8_t bytes[16] = {0x80,0x90,0x25,0,0,0x7f,0x80,0x1f,0xff,0x10,0x70,0xfd,0xc5,0xf8,0x77,0};
-    csh handles[2]{};
-    uint64_t records=0, accepted=0, calls[2]{}, digest=14695981039346656037ull;
-    auto compare=[&](unsigned n, size_t cap) {
-        auto p=mem+page-n; std::memcpy(p,bytes,n);
-        uint32_t a[4]={0x12345678,2,3,4}, b[4]; std::memcpy(b,a,sizeof(a));
-        auto ref=X86_scanBatch(handles[0],p,n,UINT64_MAX-7,a,cap);
-        auto cur=X86_scanNativeBatch(handles[1],p,n,UINT64_MAX-7,b,cap);
-        if (ref.bytes!=cur.bytes || ref.count!=cur.count || std::memcmp(a,b,sizeof(a)) ||
-            cs_errno(handles[0])!=cs_errno(handles[1]) || calls[0]!=calls[1]) {
-            std::fprintf(stderr,"opcode %02x %02x %02x %02x extent %u capacity %zu\n",bytes[0],bytes[1],bytes[2],bytes[3],n,cap); std::exit(3);
+struct API {
+    void *lib;
+    decltype(&cs_open) open;
+    decltype(&cs_close) close;
+    decltype(&cs_option) option;
+    decltype(&cs_disasm_iter) next;
+    explicit API(const char *p) : lib(dlopen(p,RTLD_NOW|RTLD_LOCAL)),
+       open((decltype(open))dlsym(lib,"cs_open")),close((decltype(close))dlsym(lib,"cs_close")),
+       option((decltype(option))dlsym(lib,"cs_option")),next((decltype(next))dlsym(lib,"cs_disasm_iter")) {}
+};
+int main(int argc,char **argv) {
+    if (argc!=3) return 1;
+    API original(argv[1]),candidate(argv[2]);
+    const size_t page=sysconf(_SC_PAGESIZE);
+    auto area=(uint8_t*)mmap(nullptr,page*2,PROT_READ|PROT_WRITE,MAP_ANON|MAP_PRIVATE,-1,0);
+    if (!original.lib||!candidate.lib||area==MAP_FAILED||mprotect(area+page,page,PROT_NONE)) return 2;
+    uint64_t checks=0,valid16=0,valid32=0;
+    for (auto base:{CS_MODE_RISCV32,CS_MODE_RISCV64})
+    for (unsigned extensions:{0u,unsigned(CS_MODE_RISCV_C | CS_MODE_RISCV_FD | CS_MODE_RISCV_V | CS_MODE_RISCV_ZCMP_ZCMT_ZCE | CS_MODE_RISCV_ZICFISS)})
+    for (auto syntax:{CS_OPT_SYNTAX_DEFAULT,CS_OPT_SYNTAX_REAL,CS_OPT_SYNTAX_UNCOMPRESSED_REAL,CS_OPT_SYNTAX_ALIAS,CS_OPT_SYNTAX_NOREGNAME})
+    for (unsigned detail:{0u,unsigned(CS_OPT_ON),unsigned(CS_OPT_ON|CS_OPT_DETAIL_REAL),unsigned(CS_OPT_ON|CS_OPT_DETAIL_UNCOMPRESSED_REAL),unsigned(CS_OPT_ON|CS_OPT_DETAIL_ALIAS)}) {
+        unsigned mode=unsigned(base)|extensions;csh a=0,b=0;
+        if (original.open(CS_ARCH_RISCV,cs_mode(mode),&a) || candidate.open(CS_ARCH_RISCV,cs_mode(mode),&b)) return 3;
+        if (original.option(a,CS_OPT_SYNTAX,syntax)||candidate.option(b,CS_OPT_SYNTAX,syntax)||
+            original.option(a,CS_OPT_DETAIL,detail)||candidate.option(b,CS_OPT_DETAIL,detail)) return 4;
+        for (unsigned word=0;word<65536;++word) {
+            auto compare=[&](size_t n) {
+                uint8_t *p=area+page-n;
+                uint32_t raw=(uint32_t(word*0x9e37u+0x7141u)<<16)|word;
+                for (size_t i=0;i<n;++i) p[i]=i<4?uint8_t(raw>>(i*8)):uint8_t(word>>(i&7));
+                cs_insn x,y;cs_detail dx,dy;
+                memset(&x,0xa5,sizeof(x));x.is_alias=false;x.illegal=false;x.usesAliasDetails=false;
+                memset(&dx,0x5a,sizeof(dx));memcpy(&y,&x,sizeof(x));memcpy(&dy,&dx,sizeof(dx));
+                x.detail=detail?&dx:nullptr;y.detail=detail?&dy:nullptr;
+                const uint8_t *pa=p,*pb=p;size_t na=n,nb=n;uint64_t ia=0x100000+word,ib=ia;
+                bool va=original.next(a,&pa,&na,&ia,&x),vb=candidate.next(b,&pb,&nb,&ib,&y);
+                x.detail=y.detail=nullptr;++checks;
+                if (va && x.size==2) ++valid16;
+                if (va && x.size==4) ++valid32;
+                if (va==vb && pa==pb && na==nb && ia==ib && !memcmp(&x,&y,sizeof(x)) && !memcmp(&dx,&dy,sizeof(dx))) return true;
+                fprintf(stderr,"word=%04x length=%zu mode=%x syntax=%u detail=%u\n",word,n,mode,unsigned(syntax),detail);return false;
+            };
+            if (!compare(2)||!compare(4))return 5;
+            if (word%97==0)for (auto n:{0u,1u,3u,5u,6u})if(!compare(n))return 6;
         }
-        ++records; accepted+=ref.count;
-        digest=(digest^(ref.bytes+ref.count))*1099511628211ull;
-        for (size_t i=0;i<ref.count;++i)digest=(digest^a[i])*1099511628211ull;
-    };
-    for (auto mode : {CS_MODE_16, CS_MODE_32, CS_MODE_64}) {
-        for (auto &h:handles)if (cs_open(CS_ARCH_X86,mode,&h)||cs_option(h,CS_OPT_TEXT,CS_OPT_OFF))return 4;
-        for (unsigned op=0;op<256;++op)for(unsigned mr=0;mr<256;++mr) {
-            bytes[0]=op;bytes[1]=mr;
-            if (mode!=CS_MODE_16) {
-                for (unsigned base=0;base<8;++base) {
-                    bytes[2]=uint8_t((mr^op)&0xf8)|base;
-                    for (unsigned n=0;n<=15;++n)compare(n,1);
-                }
-            }else{compare(15,4);compare((op+mr)&15,1);}
-        }
-        if (mode!=CS_MODE_16) {
-            bytes[0]=0xc5;
-            for(unsigned flags=0;flags<256;++flags)for(unsigned op=0;op<256;++op) {
-                bytes[1]=flags;bytes[2]=op;
-                for(unsigned j=0;j<16;++j) {
-                    bytes[3]=uint8_t(17*j);compare(j,1);compare(15,4);
-                }
-            }
-
-        }
-        if (mode==CS_MODE_64) {
-            for (unsigned rex=0x40;rex<0x50;++rex)for(unsigned op=0;op<256;++op)for(unsigned mr=0;mr<256;mr+=3) {
-                bytes[0]=uint8_t(rex);bytes[1]=uint8_t(op);bytes[2]=uint8_t(mr);
-                bytes[3]=uint8_t((rex^op^mr)&255);compare((op+mr)&15,1);compare(15,4);
-            }
-            bytes[0]=0x62;
-            for(unsigned op=0;op<256;++op)for(unsigned p=0;p<256;++p){
-                bytes[1]=uint8_t(0xf1+(p%3));bytes[2]=uint8_t(0x7c|(p&3)|((p&4)<<5));
-                bytes[3]=uint8_t(8|((p&3)<<5));bytes[4]=uint8_t(op);bytes[5]=uint8_t(p);
-                compare((op+p)&15,1);compare(15,4);
-            }
-        }
-        if(mode!=CS_MODE_16){
-#ifdef CHECK_ADAPTER
-            for(unsigned i=0;i<2;++i)if(!X86_setScanAdapter(handles[i],mode,custom,&calls[i]))return 5;
-            for(unsigned op=0;op<256;++op){bytes[0]=op;compare(15,2);}
-            if(!calls[0])return 6;
-#endif
-        }
-        for (unsigned option=0;option<8;++option) {
-            for(auto h:handles) {
-                cs_option(h,CS_OPT_DETAIL,option&1?CS_OPT_ON:CS_OPT_OFF);
-                cs_option(h,CS_OPT_TEXT,option&2?CS_OPT_ON:CS_OPT_OFF);
-                cs_option(h,CS_OPT_SKIPDATA,option&4?CS_OPT_ON:CS_OPT_OFF);
-            }
-            for (unsigned op=0;op<256;++op){bytes[0]=op;compare(op&15,op%5);}
-        }
-        for(auto &h:handles)if(cs_close(&h))return 7;
+        original.close(&a);candidate.close(&b);
     }
-    std::printf("%llu %llu %016llx\n",(unsigned long long)records,(unsigned long long)accepted,(unsigned long long)digest);
-#ifdef _WIN32
-    VirtualFree(mem,0,MEM_RELEASE);
-#else
-    munmap(mem,2*page);
-#endif
+    munmap(area,page*2);
+    printf("%llu %llu %llu\n",(unsigned long long)checks,(unsigned long long)valid16,(unsigned long long)valid32);
+    return checks>10000000 && valid16 && valid32?0:7;
 }
