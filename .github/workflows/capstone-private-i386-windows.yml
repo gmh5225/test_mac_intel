@@ -1,7 +1,7 @@
-name: Verify bounded PowerPC name equality and scalar conditional-move output across compiler profiles
+name: Check the scoped PowerPC name index against the expected library and public records on every host
 on:
   push:
-    branches: [codex/portable-name-equality-and-cmov]
+    branches: [codex/ppc-target-identity-portable]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: local-name-cmov-map-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: ppc-target-identity-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

@@ -24,7 +24,7 @@ try:
     arches=['X86','AARCH64','ARM','MIPS','PPC','RISCV'] if profile not in ('diet','reduced') else ['X86','PPC']
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in arches]]
     flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
-    units=['mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
+    units=['mapping','mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
     if profile not in ('diet','reduced'):
         units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access']
     if len(arches)>2:
@@ -85,6 +85,15 @@ try:
                 run(name+'-make-'+unit,exe)
             shutil.rmtree(obj)
 
+        if name=='scoped':
+            reference='all_hosts' if (platform.system()=='Linux' and platform.machine()=='x86_64') else 'base'
+            for link in ('static','shared','static_only','make_only'):
+                if link not in rows[name]:continue
+                state=rows[name][link]
+                expected=rows[reference][link]
+                assert state['ppc_index_symbol']==expected['ppc_index_symbol'],(link,state['ppc_index_symbol'],reference)
+                if platform.system()=='Linux':assert state['library_sha256']==expected['library_sha256'],(link,reference)
+                if reference=='base':assert not state['ppc_index_symbol']
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:

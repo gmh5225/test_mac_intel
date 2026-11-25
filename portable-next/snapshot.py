@@ -68,4 +68,4 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
             if profile!='diet' and detail:assert counts['named']>0,counts
             results['powerpc/'+str(big)+'/'+str(detail)]=dict(counts=counts,sha256=digest.hexdigest(),corpus_sha256=hashlib.sha256(corpus).hexdigest())
 
-    return dict(records=records,bytes=len(source),sha256=hashlib.sha256(source).hexdigest(),snapshots=results)
+    return dict(library_sha256=hashlib.sha256(raw).hexdigest(),ppc_index_symbol=b"PPC_setAliasId" in raw,records=records,bytes=len(source),sha256=hashlib.sha256(source).hexdigest(),snapshots=results)
