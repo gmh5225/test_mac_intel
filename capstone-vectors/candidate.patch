@@ -1,36 +1,92 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..8762ccda 100644
+index 1cc3d3a9..89ca5182 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -579,14 +579,28 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 		MI->flat_insn->detail->x86.op_count++;
+@@ -316,32 +316,38 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
+ 	}
  }
  
--static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
-+static void printUnsignedByte(SStream *O, uint8_t val)
- {
--	uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;
--
-+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+	if (cs_vsnprintf == cs_default_vsnprintf && !O->is_closed &&
-+	    O->index < SSTREAM_BUF_LEN - 2) {
-+		O->buffer[O->index++] = '$';
-+		printUInt64(O, val);
-+		return;
+-static void fixup_evex_opmask_access(MCInst *MI)
++static unsigned int accessCount(const uint8_t *access)
++{
++	unsigned int count = 0;
++	if (access) {
++		while (access[count])
++			++count;
 +	}
-+#endif
- 	if (val > HEX_THRESHOLD)
- 		SStream_concat(O, "$0x%x", val);
- 	else
- 		SStream_concat(O, "$%" PRIu8, val);
++	return count;
 +}
 +
-+static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
++static inline uint8_t operandAccess(uint8_t access)
 +{
-+	uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;
++	return access == CS_AC_IGNORE ? 0 : access;
++}
 +
-+	printUnsignedByte(O, val);
++static void setFinalOperandAccess(MCInst *MI)
+ {
+ 	cs_x86 *x86 = &MI->flat_insn->detail->x86;
+-	const uint8_t *arr;
+-	uint8_t count, i, access_index = 0;
+-	if (!(MI->flags & X86_IP_HAS_EVEX_OPMASK))
+-		return;
++	const uint8_t *access =
++		X86_get_op_access(MI->csh, MCInst_getOpcode(MI), &x86->eflags);
++	unsigned int count = accessCount(access);
+ 
+-	arr = X86_get_op_access(MI->csh, MCInst_getOpcode(MI), &x86->eflags);
+-	if (!arr)
+-		return;
+-	for (count = 0; count < CS_X86_MAXIMUM_OPERAND_SIZE; ++count) {
+-		if (!arr[count])
+-			break;
++	for (unsigned int i = 0; i < x86->op_count && i < ARR_SIZE(x86->operands); ++i) {
++		x86->operands[i].access =
++			i < count ? operandAccess(access[count - 1 - i]) : 0;
+ 	}
+-	if (count < 2 || count != x86->op_count)
+-		return;
+-
+-	for (i = count; i > 2; --i) {
+-		x86->operands[access_index].access = arr[i - 1];
+-		if (x86->operands[access_index].access == CS_AC_IGNORE)
+-			x86->operands[access_index].access = 0;
+-		access_index++;
++	/* AT&T prints the masked destination before its mask register. */
++	if ((MI->flags & X86_IP_HAS_EVEX_OPMASK) && count >= 2 &&
++	    count == x86->op_count) {
++		x86->operands[count - 2].access = access[0];
++		x86->operands[count - 1].access = access[1];
+ 	}
+-	x86->operands[access_index++].access = arr[0];
+-	x86->operands[access_index].access = arr[1];
+ }
+ 
+ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -1117,8 +1123,6 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ 	}
  
  	if (MI->csh->detail_opt) {
- 		MI->flat_insn->detail->x86
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE] = { 0 };
+-
+ 		// some instructions need to supply immediate 1 in the first op
+ 		switch (MCInst_getOpcode(MI)) {
+ 		default:
+@@ -1252,17 +1256,7 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ 			}
+ 		}
+ 
+-#ifndef CAPSTONE_DIET
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		for (i = 0; i < MI->flat_insn->detail->x86.op_count &&
+-			    i < ARR_SIZE(access);
+-		     i++) {
+-			MI->flat_insn->detail->x86.operands[i].access =
+-				access[i];
+-		}
+-		fixup_evex_opmask_access(MI);
+-#endif
++		setFinalOperandAccess(MI);
+ 	}
+ }
+ 

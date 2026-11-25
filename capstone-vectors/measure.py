@@ -72,10 +72,10 @@ try:
             import shlex
             command,=[v for v in rd(build/'compile_commands.json')if Path(v['file']).name=='X86ATTInstPrinter.c']
             args=shlex.split(command['command'])
-            run(*args[:args.index('-o')],'-I',base,r/'byte-stream.c',lib,'-o',w/'byte-stream')
-            proof=json.loads(get(w/'byte-stream'))
-            assert proof['states']==8437760 and proof['callbacks']==3139584
-            save('byte-stream-'+label,proof)
+            run(*args[:args.index('-o')],'-I',base,*(['-DTEST_CURRENT_ACCESS'] if label=='outlined' else []),r/'access-test.c',lib,'-o',w/'access-proof')
+            proof=json.loads(get(w/'access-proof'))
+            assert proof['checked']==214060 and (proof['early']>0)==(label=='outlined')
+            save('access-'+label,proof)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols

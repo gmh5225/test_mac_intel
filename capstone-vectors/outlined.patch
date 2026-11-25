@@ -1,46 +1,243 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..d8de5e67 100644
+index 1cc3d3a9..fc21cdf3 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -579,14 +579,38 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 		MI->flat_insn->detail->x86.op_count++;
+@@ -284,64 +284,49 @@ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 	}
  }
  
--static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
--{
--	uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;
-+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#include "X86UnsignedImmediate.h"
-+#endif
- 
-+static void printUnsignedByte(SStream *O, uint8_t val)
-+{
-+#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+	/* An unsigned byte takes at most "$0xff" and its terminator. */
-+	if (cs_vsnprintf == cs_default_vsnprintf && !O->is_closed &&
-+	    O->index <= SSTREAM_BUF_LEN - sizeof("$0xff") &&
-+	    !(O->markup_stream && O->prefixed_by_markup)) {
-+		char *out = O->buffer + O->index;
-+		*out++ = '$';
-+		out = writeUnsignedImmediate(out, val);
-+		*out = '\0';
-+		O->index = (size_t)(out - O->buffer);
-+		return;
-+	}
-+#endif
- 	if (val > HEX_THRESHOLD)
- 		SStream_concat(O, "$0x%x", val);
- 	else
- 		SStream_concat(O, "$%" PRIu8, val);
+-// convert Intel access info to AT&T access info
+-static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
+-			  uint64_t *eflags)
++static unsigned int accessCount(const uint8_t *access)
+ {
+-	uint8_t count, i;
+-	const uint8_t *arr = X86_get_op_access(h, id, eflags);
+-
+-	// initialize access
+-	memset(access, 0, CS_X86_MAXIMUM_OPERAND_SIZE * sizeof(access[0]));
+-	if (!arr) {
+-		return;
++	unsigned int count = 0;
++	if (access) {
++		while (access[count])
++			++count;
+ 	}
++	return count;
 +}
-+
-+static void printU8Imm(MCInst *MI, unsigned Op, SStream *O)
+ 
+-	// find the non-zero last entry
+-	for (count = 0; arr[count]; count++)
+-		;
+-
+-	if (count == 0)
+-		return;
++static inline uint8_t operandAccess(uint8_t access)
 +{
-+	uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;
-+
-+	printUnsignedByte(O, val);
++	return access == CS_AC_IGNORE ? 0 : access;
++}
+ 
+-	// copy in reverse order this access array from Intel syntax -> AT&T syntax
+-	count--;
+-	for (i = 0; i <= count && ((count - i) < CS_X86_MAXIMUM_OPERAND_SIZE) &&
+-		    i < CS_X86_MAXIMUM_OPERAND_SIZE;
+-	     i++) {
+-		if (arr[count - i] != CS_AC_IGNORE)
+-			access[i] = arr[count - i];
+-		else
+-			access[i] = 0;
+-	}
++static void setCurrentOperandAccess(MCInst *MI)
++{
++	cs_x86 *x86 = &MI->flat_insn->detail->x86;
++	const uint8_t *access =
++		X86_get_op_access(MI->csh, MCInst_getOpcode(MI), &x86->eflags);
++	unsigned int count = accessCount(access);
++	unsigned int i = x86->op_count;
++	x86->operands[i].access =
++		i < count ? operandAccess(access[count - 1 - i]) : 0;
+ }
+ 
+-static void fixup_evex_opmask_access(MCInst *MI)
++static void setFinalOperandAccess(MCInst *MI)
+ {
+ 	cs_x86 *x86 = &MI->flat_insn->detail->x86;
+-	const uint8_t *arr;
+-	uint8_t count, i, access_index = 0;
+-	if (!(MI->flags & X86_IP_HAS_EVEX_OPMASK))
+-		return;
++	const uint8_t *access =
++		X86_get_op_access(MI->csh, MCInst_getOpcode(MI), &x86->eflags);
++	unsigned int count = accessCount(access);
+ 
+-	arr = X86_get_op_access(MI->csh, MCInst_getOpcode(MI), &x86->eflags);
+-	if (!arr)
+-		return;
+-	for (count = 0; count < CS_X86_MAXIMUM_OPERAND_SIZE; ++count) {
+-		if (!arr[count])
+-			break;
++	for (unsigned int i = 0; i < x86->op_count && i < ARR_SIZE(x86->operands); ++i) {
++		x86->operands[i].access =
++			i < count ? operandAccess(access[count - 1 - i]) : 0;
+ 	}
+-	if (count < 2 || count != x86->op_count)
+-		return;
+-
+-	for (i = count; i > 2; --i) {
+-		x86->operands[access_index].access = arr[i - 1];
+-		if (x86->operands[access_index].access == CS_AC_IGNORE)
+-			x86->operands[access_index].access = 0;
+-		access_index++;
++	/* AT&T prints the masked destination before its mask register. */
++	if ((MI->flags & X86_IP_HAS_EVEX_OPMASK) && count >= 2 &&
++	    count == x86->op_count) {
++		x86->operands[count - 2].access = access[0];
++		x86->operands[count - 1].access = access[1];
+ 	}
+-	x86->operands[access_index++].access = arr[0];
+-	x86->operands[access_index].access = arr[1];
+ }
+ 
+ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -350,8 +335,6 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+ 	int reg;
  
  	if (MI->csh->detail_opt) {
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+-
  		MI->flat_insn->detail->x86
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.type = X86_OP_MEM;
+@@ -374,11 +357,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.mem.disp = 0;
+ 
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		MI->flat_insn->detail->x86
+-			.operands[MI->flat_insn->detail->x86.op_count]
+-			.access = access[MI->flat_insn->detail->x86.op_count];
++		setCurrentOperandAccess(MI);
+ 	}
+ 
+ 	SegReg = MCInst_getOperand(MI, Op + 1);
+@@ -407,8 +386,6 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
+ {
+ 	if (MI->csh->detail_opt) {
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+-
+ 		MI->flat_insn->detail->x86
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.type = X86_OP_MEM;
+@@ -431,11 +408,7 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.mem.disp = 0;
+ 
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		MI->flat_insn->detail->x86
+-			.operands[MI->flat_insn->detail->x86.op_count]
+-			.access = access[MI->flat_insn->detail->x86.op_count];
++		setCurrentOperandAccess(MI);
+ 	}
+ 
+ 	// DI accesses are always ES-based on non-64bit mode
+@@ -512,8 +485,6 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 	int reg;
+ 
+ 	if (MI->csh->detail_opt) {
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+-
+ 		MI->flat_insn->detail->x86
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.type = X86_OP_MEM;
+@@ -536,11 +507,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.mem.disp = 0;
+ 
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		MI->flat_insn->detail->x86
+-			.operands[MI->flat_insn->detail->x86.op_count]
+-			.access = access[MI->flat_insn->detail->x86.op_count];
++		setCurrentOperandAccess(MI);
+ 	}
+ 
+ 	// If this has a segment register, print it.
+@@ -672,8 +639,6 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 							  .op_count]
+ 					.mem.base = X86_register_map(reg);
+ 			} else {
+-				uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+-
+ 				MI->flat_insn->detail->x86
+ 					.operands[MI->flat_insn->detail->x86
+ 							  .op_count]
+@@ -689,15 +654,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 					MI->csh->regsize_map[X86_register_map(
+ 						reg)];
+ 
+-				get_op_access(
+-					MI->csh, MCInst_getOpcode(MI), access,
+-					&MI->flat_insn->detail->x86.eflags);
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.access =
+-					access[MI->flat_insn->detail->x86
+-						       .op_count];
++				setCurrentOperandAccess(MI);
+ 
+ 				MI->flat_insn->detail->x86.op_count++;
+ 			}
+@@ -876,8 +833,6 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 	int64_t DispVal = 1;
+ 
+ 	if (MI->csh->detail_opt) {
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
+-
+ 		MI->flat_insn->detail->x86
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.type = X86_OP_MEM;
+@@ -903,11 +858,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 			.operands[MI->flat_insn->detail->x86.op_count]
+ 			.mem.disp = 0;
+ 
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		MI->flat_insn->detail->x86
+-			.operands[MI->flat_insn->detail->x86.op_count]
+-			.access = access[MI->flat_insn->detail->x86.op_count];
++		setCurrentOperandAccess(MI);
+ 	}
+ 
+ 	// If this has a segment register, print it.
+@@ -1117,8 +1068,6 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ 	}
+ 
+ 	if (MI->csh->detail_opt) {
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE] = { 0 };
+-
+ 		// some instructions need to supply immediate 1 in the first op
+ 		switch (MCInst_getOpcode(MI)) {
+ 		default:
+@@ -1252,17 +1201,7 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ 			}
+ 		}
+ 
+-#ifndef CAPSTONE_DIET
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		for (i = 0; i < MI->flat_insn->detail->x86.op_count &&
+-			    i < ARR_SIZE(access);
+-		     i++) {
+-			MI->flat_insn->detail->x86.operands[i].access =
+-				access[i];
+-		}
+-		fixup_evex_opmask_access(MI);
+-#endif
++		setFinalOperandAccess(MI);
+ 	}
+ }
+ 

@@ -24,25 +24,24 @@ def run(r,w,source,build,paths,patch=None,tree=None):
         s,count=re.subn(r'MCOperand_is(Imm|Reg)\((Op|DispSpec)\)',counted,s)
         assert count==7
         s=s[:at]+(r/'counters.inc').read_text()+'\n'+s[at:]
-        # Both dialects have a conversion for early and final accesses. Count a final call
-        # immediately before it runs; EVEX mask fixups use a separate mapping query.
-        pos=s.index('\n{',s.index('static void get_op_access('))+2
-        s=s[:pos]+'\n\t++profile_names[14];'+s[pos:]
         entry=s.index('void X86_'+spelling+'_printInst(')
-        pat='get_op_access(MI->csh, MCInst_getOpcode(MI), access,'
-        at=s.index(pat,entry)
-        s=s[:at]+'++profile_names[15];\n\t\t'+s[at:]
+        key='setFinalOperandAccess(MI);' if spelling=='ATT' and patch else 'get_op_access(MI->csh, MCInst_getOpcode(MI), access,'
+        pos=s.index(key,entry);s=s[:pos]+'++profile_names[15];'+chr(10)+chr(9)*2+s[pos:]
         if spelling=='ATT':
-            at=s.index('const char *extension_name',s.index('static void printRegName(SStream *OS, unsigned RegNo)\n{'))
-            s=s[:at]+'++profile_names[16];\n\t'+s[at:]
-
+            key='const char *extension_name';pos=s.index(key,s.index('static void printRegName(SStream *OS, unsigned RegNo)'+chr(10)+'{'))
+            s=s[:pos]+'++profile_names[16];'+chr(10)+chr(9)+s[pos:]
             if patch:
-                key='char *out = O->buffer + O->index;'
-                assert s.count(key)==1;s=s.replace(key,'++profile_names[17];\n\t\t'+key)
+                key='unsigned int count = accessCount(access);'
+                pos=s.index(key,s.index('static void setFinalOperandAccess('))
             else:
-                key='uint8_t val = MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0xff;'
-                assert s.count(key)==1;s=s.replace(key,key+'\n\t++profile_names[17];')
+                key='arr = X86_get_op_access(MI->csh, MCInst_getOpcode(MI), &x86->eflags);'
+                pos=s.index(key,s.index('static void fixup_evex_opmask_access'))
+            event=('if (MI->flags & X86_IP_HAS_EVEX_OPMASK) ' if patch else '')+'++profile_names[17];'
+            s=s[:pos]+event+chr(10)+chr(9)+s[pos:]
         f.write_text(s)
+    f=source/'arch/X86/X86Mapping.c';s=f.read_text()
+    pos=s.index('{',s.index('const uint8_t *X86_get_op_access('))+1
+    f.write_text(s[:pos]+chr(10)+'  extern uint64_t profile_names[18]; ++profile_names[14];'+s[pos:])
     call('cmake','--build',build,'--target','capstone_static','--parallel','4')
     lib,=build.rglob('libcapstone.a')
     call('clang++','-O2','-std=c++17','-I',source,'-I',source/'include',r/'census.cpp',lib,'-o',w/'route-profile')
