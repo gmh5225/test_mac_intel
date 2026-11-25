@@ -1,7 +1,7 @@
-name: Compare materializing RIP-relative memory records in the active AMD64 near-transfer writer
+name: Measure single-base and first-register query paths separately on decoded records and full PE and ELF iterators
 on:
   push:
-    branches: [codex/emit-active-rip-near-targets]
+    branches: [codex/real-instruction-register-query-replay]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: actual-rip-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: register-query-replay-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

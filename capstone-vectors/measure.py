@@ -101,6 +101,11 @@ try:
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'replay.cpp','-ldl','-o',w/'query-replay')
+    run('clang','-O2','-I',base/'include',r/'overlap.c','-ldl','-o',w/'overlap')
+    overlaps={tag:get(w/'overlap',w/'base.so',w/(tag+'.so')).strip() for tag in ('candidate','outlined')}
+    assert all('750000 overlapping' in val for val in overlaps.values())
+    save('overlaps',overlaps);queries={}
     run('clang++','-O2','-std=c++17','-I',base/'include',r/'cmov-guard.cpp','-ldl','-o',w/'cmov-guard')
     proof={}
     for label in ('candidate','outlined'):
@@ -144,6 +149,12 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        res=get(w/'query-replay',w/'base.so',w/'candidate.so',w/'outlined.so',f,path,str(bits)).splitlines()
+        accepted,loads,first,digest=map(int,res[0].split());pairs=[list(map(int,line.split())) for line in res[1:]]
+        assert len(pairs)==17 and all(len(x)==8 and min(x)>0 for x in pairs) and 0<loads<first<accepted
+        queries[name]=dict(accepted=accepted,single_base_loads=loads,first_register=first,digest=digest,pairs=pairs)
+        save('register-replays',queries)
+
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
