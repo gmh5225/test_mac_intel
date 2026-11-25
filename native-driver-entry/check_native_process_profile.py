@@ -123,7 +123,8 @@ def main():
                         "ComputeStorage": 14, "WebSockets": 13, "RestartManager": 11,
                         "FontEmbedding": 14, "PerformanceCounters": 12, "QoSTraffic": 11,
                         "OverlayFiles": 11, "SetupAdministration": 50,
-                        "RealtimeWorkQueue": 34, "WindowsRemoteManagement": 33}
+                        "RealtimeWorkQueue": 34, "WindowsRemoteManagement": 33,
+                        "OlePropertyConversion": 1}
     system_abi = args.output / "system-abis"
     system_calls = args.output / "system-calls"
     provider_options = [arg for name in system_providers for arg in ("--provider", name)]
