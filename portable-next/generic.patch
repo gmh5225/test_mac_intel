@@ -1,0 +1,238 @@
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..4200594a 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -12,13 +12,117 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
++#include "X86ScanAdapter.h"
+ #include "X86SimpleOutput.h"
+ #include "X86VectorRegisterOutput.h"
+ #define X86_VEX32_REGISTER_MOVES
+ #include "X86GenVex32MemoryOutput.inc"
+ #undef X86_VEX32_REGISTER_MOVES
+ #include "X86GenSimpleOutput.inc"
++#include "X86RegisterImmediateOutput.h"
++#include "X86ExtendRegisterOutput.h"
++
++/* A single operand-size prefix selects 32-bit registers in real mode.
++ * Register-only operations keep their generated i386 effects. The address
++ * size and encoded offsets belong to the original prefixed instruction. */
++static bool writeOperandOverride16(cs_struct *handle, const uint8_t *code,
++				   size_t size, cs_insn *insn, uint16_t *length)
++{
++	if (size < 3 || code[0] != X86_PREFIX_OPSIZE)
++		return false;
++	const unsigned opcode = code[1];
++	const bool mov = (opcode & 0xf8) == 0xb8;
++	const bool pair = (opcode < 0x40 && (opcode & 7) <= 3) ||
++			  (opcode >= 0x84 && opcode <= 0x8b);
++	if (mov ? size < 6 : (!pair || code[2] < 0xc0))
++		return false;
++	if (X86_OUTPUT_UNSUPPORTED(handle, handle->mode != CS_MODE_16))
++		return false;
++	const unsigned plan = x86_simple_plans[0][0][mov ? 0x8b : opcode];
++	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
++	if (mov) {
++		writeUnsignedRegisterImmediate(insn, row,
++					       &x86_simple_registers[2][opcode & 7],
++					       code, 0, 0, 2, 4, length);
++	} else {
++		const unsigned mr = code[2], reg = (mr >> 3) & 7, rm = mr & 7;
++		const bool reg_first = (plan & 3) == X86_SIMPLE_REG_RM;
++		const struct X86SimpleRegister *regs =
++			x86_simple_registers[(opcode & 1) ? 2 : 0];
++		writeExtendRegisters(code, 3, insn, length, row,
++				     &regs[reg_first ? reg : rm],
++				     &regs[reg_first ? rm : reg], 0, opcode,
++				     mr, false);
++	}
++	if (insn->detail) {
++		cs_x86 *x = &insn->detail->x86;
++		x->addr_size = 2;
++		x->prefix[2] = X86_PREFIX_OPSIZE;
++		if (mov)
++			x->opcode[0] = opcode;
++		else
++			x->encoding.modrm_offset = 2;
++	}
++	return true;
++}
++
++/* Relative jumps use the existing mnemonic and flag records. The operand
++ * width of a real-mode target and the encoded displacement are distinct. */
++static bool writeLegacyOutput16(cs_struct *handle, const uint8_t *code,
++				size_t size, cs_insn *insn, uint16_t *length)
++{
++	if (code[0] == X86_PREFIX_OPSIZE)
++		return writeOperandOverride16(handle, code, size, insn, length);
++	if (size < 2)
++		return false;
++	const bool escaped = code[0] == 0x0f;
++	const unsigned opcode = code[escaped];
++	const bool short_jump = !escaped &&
++				((opcode & 0xf0) == 0x70 || opcode == 0xeb);
++	if (!short_jump && (escaped ? (opcode & 0xf0) != 0x80 : opcode != 0xe9))
++		return false;
++	const unsigned offset = 1 + escaped;
++	const unsigned disp_size = short_jump ? 1 : 2;
++	const unsigned len = offset + disp_size;
++	if (size < len || X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	const int32_t disp = short_jump ? (int8_t)code[offset] :
++			     (int16_t)((unsigned)code[offset] |
++				       ((unsigned)code[offset + 1] << 8));
++	const uint64_t target = X86_relativeBranchTarget(handle->mode,
++				insn->address, len, (uint64_t)disp, disp_size);
++	const unsigned plan = x86_simple_plans[0][escaped ? 3 : 0][opcode];
++	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
++	*length = insn->size = len;
++	insn->id = row->id;
++	memcpy(insn->bytes, code, len);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	writeUnsignedImmediate(insn->op_str, target);
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
++		/* A jump reads its instruction pointer after any flags and
++		 * writes it first. The i386 records name the 32-bit view. */
++		assert(row->read_count && row->reads[row->read_count - 1] == X86_REG_EIP);
++		assert(row->write_count && row->writes[0] == X86_REG_EIP);
++		insn->detail->regs_read[row->read_count - 1] = X86_REG_IP;
++		insn->detail->regs_write[0] = X86_REG_IP;
++		cs_x86 *x = &insn->detail->x86;
++		x->addr_size = 2;
++		if (escaped)
++			x->opcode[1] = opcode;
++		x->encoding.imm_size = disp_size;
++		x->operands[0].type = X86_OP_IMM;
++		x->operands[0].size = 2;
++		x->operands[0].imm = (int64_t)target;
++	}
++	return true;
++}
++
++#define CS_DECODE_TRY_OUTPUT writeLegacyOutput16
+ #include "../../cs_disasm_internal.h"
++#undef CS_DECODE_TRY_OUTPUT
+ #define X86_MEMORY32_OUTPUT
+ #define X86_MEMORY_IMMEDIATE writeCompare32
+ #define X86_IMMEDIATE_WIDE 0
+@@ -97,5 +201,10 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	}
+ 	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
+ }
++CAPSTONE_INTERNAL bool X86_disasmIter16(csh ud, const uint8_t **code, size_t *size,
++			 uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_core(ud, code, size, address, insn);
++}
+ #endif
+ #endif
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 8c6444ab..35b9fc64 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -9,6 +9,7 @@
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
++#define X86_LEGACY_OUTPUT
+ #include "X86OutputOptions.h"
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+@@ -34,10 +35,15 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ 				      size_t *size, uint64_t *address,
+ 				      cs_insn *insn)
+ {
+-#ifdef CS_DECODE_TRY_OUTPUT
++#ifdef X86_LEGACY_OUTPUT
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
++	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text) {
++		if (handle->mode == CS_MODE_16)
++			return X86_disasmIter16(ud, code, size, address, insn);
++#ifdef CS_DECODE_TRY_OUTPUT
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
++#endif
++	}
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..3ea69caa 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -11,6 +11,10 @@
+ #include "X86InstPrinterCommon.h"
+ #include "X86Mapping.h"
+ 
++/* Called by the generic x86 iterator with a 16-bit text handle. */
++CAPSTONE_INTERNAL bool X86_disasmIter16(csh ud, const uint8_t **code, size_t *size,
++			 uint64_t *address, cs_insn *insn);
++
+ /* Called by the static i386 iterator with at least one input byte. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index e6eec867..b0fb08f0 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1618,6 +1618,25 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
+ 	return true;
+ }
+ 
++static bool check_register_overrides16(csh handles[2])
++{
++	for (unsigned opcode = 0; opcode < 256; ++opcode) {
++		bool pair = (opcode < 0x40 && (opcode & 7) <= 3) ||
++			    (opcode >= 0x84 && opcode <= 0x8b);
++		if (!pair && (opcode & 0xf8) != 0xb8)
++			continue;
++		for (unsigned reg = 0; reg < 8; ++reg) {
++			uint8_t bytes[] = { 0x66, (uint8_t)opcode,
++				(uint8_t)(0xc0 | (reg << 3) | (7 - reg)),
++				0x80, 0xff, 0xa5 };
++			for (size_t len = 1; len <= sizeof(bytes); ++len)
++				if (!compare(handles, bytes, len, reg))
++					return false;
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1633,6 +1652,11 @@ static bool check_mode(cs_mode mode)
+ 			if (cs_option(handles[side], CS_OPT_DETAIL,
+ 				      detail ? CS_OPT_ON : CS_OPT_OFF))
+ 				goto done;
++		if (mode == CS_MODE_16) {
++			if (!check_branches(handles) || !check_register_overrides16(handles))
++				goto done;
++			continue;
++		}
+ 		if (!check_branches(handles) || !check_memory(handles, mode) ||
+ 		    !check_lea(handles, mode) ||
+ 		    !check_mov_disp32(handles, mode) ||
+@@ -1708,7 +1732,7 @@ static bool check_mode(cs_mode mode)
+ 			}
+ 		}
+ 	}
+-	ok = check_callbacks(handles) && check_primary_batches(handles[0]);
++	ok = mode == CS_MODE_16 || (check_callbacks(handles) && check_primary_batches(handles[0]));
+ done:
+ 	for (unsigned i = 0; i < 2; ++i)
+ 		if (handles[i])
+@@ -1722,7 +1746,7 @@ int main(void)
+ 	if (!check_mode(CS_MODE_32))
+ 		return 1;
+ 	private_iter = X86_disasmIterText;
+-	if (!check_mode(CS_MODE_32) || !check_mode(CS_MODE_64))
++	if (!check_mode(CS_MODE_16) || !check_mode(CS_MODE_32) || !check_mode(CS_MODE_64))
+ 		return 1;
+ 	private_iter = X86_disasmIter;
+ 	return check_mode(CS_MODE_32) && check_mode(CS_MODE_64) ? 0 : 1;
