@@ -1,7 +1,7 @@
-name: Measure canonical i386 AT&T VEX memory forms and checked register moves on JPEG, OpenSSL and PuTTY against iced GAS
+name: Time direct EVEX immediate shift register records before or after the existing register table on OpenSSL, JPEG and PuTTY
 on:
   push:
-    branches: [codex/x86-i386-att-checked-vector-moves]
+    branches: [codex/x86-amd64-att-evex-shift-lookup]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-vex-memory-and-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-att-shift-lookup-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
