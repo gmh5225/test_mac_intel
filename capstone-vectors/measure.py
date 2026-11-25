@@ -172,7 +172,7 @@ try:
                 assert expected['base']==expected['duplicate']==expected['candidate']
                 assert expected['outlined']==expected['base']
                 rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-                for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
+                for _ in range(101 if (name,mode)==('putty-32-0.85',1) else 35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
                     rng.shuffle(labels);sample={k:[] for k in labels}
                     for k in labels+labels[::-1]:
                         row=take(k,mode,repeats);assert row[2:]==expected[k]

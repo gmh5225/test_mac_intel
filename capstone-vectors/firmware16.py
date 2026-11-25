@@ -63,7 +63,7 @@ def compare(image,path,images,invoke,select):
         for route in ('capstone','private'):
             assert len({tuple(expected[route+'/'+k])for k in images})==1,expected
         rng=random.Random(9917+mode);pairs=[]
-        for _ in range(35):
+        for _ in range(101):
             rng.shuffle(keys);v={k:[]for k in keys}
             for k in keys+keys[::-1]:
                 x=take(k,mode,reps);assert x[2:]==expected[k];v[k].append(x[:2])

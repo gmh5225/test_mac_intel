@@ -1,7 +1,7 @@
-name: Measure canonical 16-bit short and near jump output with the fixed and general iterator fallback
+name: Replicate real-mode register and relative branch output and the PuTTY32 text control with 101 paired rotations
 on:
   push:
-    branches: [codex/real-mode-relative-final-record]
+    branches: [codex/repeat-real-branches-and-pe32]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-mode-branches-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: replicate-branches-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
