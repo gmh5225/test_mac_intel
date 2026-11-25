@@ -1,45 +1,3 @@
-diff --git a/AliasMapping.c b/AliasMapping.c
-index 77e2395c..0d6765d1 100644
---- a/AliasMapping.c
-+++ b/AliasMapping.c
-@@ -57,4 +57,37 @@ void map_set_mips_alias_id(MCInst *MI, const SStream *O, const name_map *map,
- }
- #endif
- 
-+#ifdef CAPSTONE_HAS_POWERPC
-+#include "arch/PowerPC/PPCMapping.h"
-+#ifdef PPC_INDEXED_ALIAS_NAMES
-+ALIAS_LOOKUP_CODE
-+void PPC_setAliasId(MCInst *MI, const SStream *O,
-+		    const ppc_alias_name *names, unsigned mask)
-+{
-+	unsigned id = 0;
-+	if (MCInst_isAlias(MI)) {
-+		const char *name = O->buffer;
-+		while (is_blank_char(*name))
-+			++name;
-+		size_t length = 0;
-+		unsigned hash = 0;
-+		while (length < 15 && !char_ends_mnem(name[length], CS_ARCH_PPC)) {
-+			hash = hash * 33 + (unsigned char)name[length];
-+			++length;
-+		}
-+		for (unsigned index = names[hash & mask].first; index;) {
-+			const ppc_alias_name *entry = &names[index - 1];
-+			if (strncmp(entry->name, name, length) == 0 &&
-+			    entry->name[length] == '\0') {
-+				id = entry->id;
-+				break;
-+			}
-+			index = entry->next;
-+		}
-+	}
-+	MI->flat_insn->alias_id = id;
-+}
-+#endif
-+#endif
-+
- #endif
 diff --git a/arch/PowerPC/PPCGenAliasNameIndex.inc b/arch/PowerPC/PPCGenAliasNameIndex.inc
 new file mode 100644
 index 00000000..02649c84
@@ -735,6 +693,54 @@ index 00000000..02649c84
 +	{ PPC_INS_ALIAS_SRWI, 0, 0, "srwi" },
 +	{ PPC_INS_ALIAS_SLDI, 0, 0, "sldi" },
 +	{ PPC_INS_ALIAS_END, 0, 0, NULL },
+diff --git a/arch/PowerPC/PPCInstPrinter.c b/arch/PowerPC/PPCInstPrinter.c
+index 9ac02f0a..ee5e09c4 100644
+--- a/arch/PowerPC/PPCInstPrinter.c
++++ b/arch/PowerPC/PPCInstPrinter.c
+@@ -574,6 +574,43 @@ static inline void printTLSCall(MCInst *MI, unsigned OpNo, SStream *O)
+ #ifndef CAPSTONE_DIET
+ #include "../../AliasPatternLookup.h"
+ #define matchAliasPatterns matchPPCAliasPatterns
++#ifdef PPC_INDEXED_ALIAS_NAMES
++#include "../../MappingAlias.h"
++/* This lookup uses the PowerPC name map only. Keep its loop out of the
++ * shared ELF instruction decoder and alias lookup sections. */
++#if defined(__ELF__)
++__attribute__((noinline, minsize, section(".cs_ppc_alias_text")))
++#else
++__attribute__((noinline, minsize))
++#endif
++void PPC_setAliasId(MCInst *MI, const SStream *O,
++		    const ppc_alias_name *names, unsigned mask)
++{
++	unsigned id = 0;
++	if (MCInst_isAlias(MI)) {
++		const char *name = O->buffer;
++		while (is_blank_char(*name))
++			++name;
++		size_t length = 0;
++		unsigned hash = 0;
++		while (length < 15 && !char_ends_mnem(name[length], CS_ARCH_PPC)) {
++			hash = hash * 33 + (unsigned char)name[length];
++			++length;
++		}
++		for (unsigned index = names[hash & mask].first; index;) {
++			const ppc_alias_name *entry = &names[index - 1];
++			if (strncmp(entry->name, name, length) == 0 &&
++			    entry->name[length] == '\0') {
++				id = entry->id;
++				break;
++			}
++			index = entry->next;
++		}
++	}
++	MI->flat_insn->alias_id = id;
++}
++#endif
++
+ #endif
+ #include "PPCGenAsmWriter.inc"
+ #undef matchAliasPatterns
 diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
 index 0fa421fc..b5cd4a41 100644
 --- a/arch/PowerPC/PPCMapping.c

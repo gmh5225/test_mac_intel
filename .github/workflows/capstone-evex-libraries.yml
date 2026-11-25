@@ -1,7 +1,7 @@
-name: Measure indexed PowerPC names while retaining separate source and ELF evidence
+name: Keep the PowerPC indexed name lookup in PowerPC modules and verify sibling code and throughput
 on:
   push:
-    branches: [codex/index-ppc-in-name-map]
+    branches: [codex/ppc-local-name-lookup-code]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: indexed-ppc-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: local-ppc-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
