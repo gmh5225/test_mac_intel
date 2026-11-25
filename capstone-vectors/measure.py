@@ -148,7 +148,9 @@ try:
     save('host',host);observations={};summary={};audits={}
     from att_timing import start
     time_gas,att_images=start(w);att_rows={}
-    for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
+    fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
+    assert {x[0] for x in fixtures}==set(m["samples"])
+    for name,bits,f,spans,_ in fixtures:
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
