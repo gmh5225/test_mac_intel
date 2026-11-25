@@ -15,8 +15,7 @@ def capture(file):
             out[name]=(group,sect['sh_addralign'],sect['sh_size'])
         return out
 
-def plan(versions,archives,work,ar,objcopy):
-    members=['RISCVDisassembler.c.o','RISCVInstPrinter.c.o','RISCVMapping.c.o']
+def plan(versions,archives,work,ar,objcopy,members):
     slots={}; mergeable=set()
     for variant in versions:
         for member in members:

@@ -27,31 +27,41 @@ try:
     driver=driver.replace('uint64_t ip = 0x100000;', 'uint64_t ip = initial_ip;')
     driver=driver.replace('size_t(arch == CS_ARCH_RISCV ? 2 : 4)', 'size_t(arch == CS_ARCH_X86 ? 1 : arch == CS_ARCH_RISCV ? 2 : 4)')
     assert driver.count('initial_ip')==2 and driver.count('target == "i386"')==1
+    driver=driver.replace('  else if (target == "i386")','  else if (target == "amd64") { arch = CS_ARCH_X86; mode = CS_MODE_64; }\\n  else if (target == "i386")'.replace('\\n','\n'))
+    driver=driver.replace('const unsigned output =','const unsigned setting =').replace('  cs_arch arch;', '  const unsigned output=setting<=2?setting:setting-2;\n  cs_arch arch;')
+    driver=driver.replace('  cs_insn *insn =', '  if (setting>2 && (arch!=CS_ARCH_X86 || cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT)!=CS_ERR_OK)) return 7;\n  cs_insn *insn =')
+    assert driver.count('setting')==5 and 'CS_OPT_SYNTAX_ATT' in driver
     (w/'driver.cpp').write_text(driver);run('clang++','-std=c++17','-O3','-DNDEBUG','-I',src/'include','-c',w/'driver.cpp','-o',w/'driver.o')
-    names=['RISCVDisassembler.c.o','RISCVInstPrinter.c.o','RISCVMapping.c.o']
+    local_names=set(m['possible_objects'])
     versions={};archives={};objects={}
     ar=shutil.which('llvm-ar') or shutil.which('ar')
     objcopy=shutil.which('llvm-objcopy') or shutil.which('objcopy')
     for v in ('base','candidate'):
-        if v=='candidate':
-            run('git','-C',src,'apply','--index',r/'layout.patch');assert get('git','-C',src,'write-tree')==q['tree']
+        tag=q if v=='candidate' else m['reference']
+        patch=r/('layout.patch' if v=='candidate' else 'baseline.patch')
+        assert sig(patch)==tag['sha256']
+        run('git','-C',src,'reset','--hard',q['parent'])
+        run('git','-C',src,'apply','--index',patch);assert get('git','-C',src,'write-tree')==tag['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         orig,=build.rglob('libcapstone.a');dest=versions[v]=w/('obj-'+v);dest.mkdir()
         lib=archives[v]=dest/'libcapstone.a';shutil.copyfile(orig,lib)
         objects[v]={str(x.relative_to(build)):sig(x) for x in build.rglob('*.c.o')}
-        for member in names:
-            obj,=build.rglob(member);shutil.copy2(obj,dest/member)
+        for member in sorted(local_names):
+            matches=list(build.rglob(member))
+            if not matches:continue
+            obj,=matches;shutil.copy2(obj,dest/member)
             assert sp.check_output([ar,'p',lib,member])==obj.read_bytes()
     ch=[Path(k).name for k in objects['base'] if objects['base'][k]!=objects['candidate'][k]]
-    assert set(ch)==set(names),ch
-    other,script=plan(versions,archives,w,ar,objcopy);(e/'diagnostic.ld').write_bytes(script.read_bytes())
+    required={'cs.c.o','X86ATTInstPrinter.c.o','X86OutputIterator.c.o','X86VectorOutput.c.o','X86ImmediateOutput.c.o'}
+    assert required <= set(ch) <= local_names,ch
+    other,script=plan(versions,archives,w,ar,objcopy,sorted(ch));(e/'diagnostic.ld').write_bytes(script.read_bytes())
     cases=training.fetch(r,w)
     for name,bits,f,spans,meta in pe_panels.prepare(w):
-        if bits!=32:continue
-        assert len(spans)==1 and spans[0][:2] in (tuple([0,f.stat().st_size]),[0,f.stat().st_size])
-        cases.append(dict(name=name,arch='i386',address=spans[0][2],text_sha256=sig(f),bytes=f.stat().st_size))
-    assert len(cases)==6;save('corpus',cases)
-    hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction','cs_regs_access']
+        assert bits in (32,64) and spans
+        bases={base-off for off,_,base in spans};assert len(bases)==1
+        cases.append(dict(name=name,arch='i386' if bits==32 else 'amd64',address=bases.pop(),text_sha256=sig(f),bytes=f.stat().st_size))
+    assert len(cases)==7;save('corpus',cases)
+    hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_ATT_printInst','X86_Intel_printInst','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction']
     stamps={};addresses={};bins={}
     for kind,libs in [('regular',archives),('controlled',other)]:
         for v,lib in libs.items():
@@ -95,7 +105,7 @@ try:
         return list(map(int,sp.check_output(args,text=True).split()))
     results={}
     for row in cases:
-        for mode in (0,1,2):
+        for mode in (range(5) if row['arch'] in ('amd64','i386') else range(3)):
             reps=max(1,math.ceil(20e6/once(row,'regular-base',mode,1)[0]))
             expected=once(row,'regular-base',mode,reps)[2:];assert expected[0]>0
             assert all(once(row,k,mode,reps)[2:]==expected for k in bins)
@@ -108,7 +118,7 @@ try:
                 cycles.append({k:[a+b for a,b in zip(*xs)] for k,xs in times.items()})
             results[row['name']+'/'+str(mode)]=dict(reps=reps,output=expected,pairs=cycles)
             save('pairs',results)
-    assert len(checked)==6 and len(results)==18
+    assert len(checked)==6 and len(results)==25
     save('complete',dict(complete=True,source=m,checks=checked,inode=inode,compiler=get('clang','--version'),host=platform.machine()))
 finally:
     size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink())
