@@ -45,7 +45,7 @@ try:
         compile=read(build/'compile_commands.json')
         settings={'fixed_readers':any('CAPSTONE_STATIC_X86_READERS' in cmd['command']for cmd in compile),
                   'fixed_functions':[name for name in ('X86_decodeFixedRecord32','X86_decodeFixedRecord64')if name in symbols_]}
-        assert settings['fixed_readers']==(tag=='fixed') and len(settings['fixed_functions'])==(2 if tag=='fixed'else 0),(tag,settings)
+        assert not settings['fixed_readers'] and not settings['fixed_functions'],(tag,settings)
         hot=['cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_ATT_printInst','X86_Intel_printInst','RISCV_getInstruction','ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction','PPC_getInstruction']
         layout[tag]=dict(members=members,settings=settings,hot={n:symbols_[n]for n in hot},sections=sections,sha256=sig(binary))
         bins[tag]=binary.read_bytes()

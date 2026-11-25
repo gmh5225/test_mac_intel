@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..a5e6c11f 100644
+index 1cc3d3a9..c7829233 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
 @@ -237,6 +237,27 @@ static void printf512mem(MCInst *MI, unsigned OpNo, SStream *O)
@@ -294,6 +294,25 @@ index 1cc3d3a9..a5e6c11f 100644
  }
  
  void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+@@ -1266,4 +1276,18 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ 	}
+ }
+ 
++/* Keep the public AT&T records with this syntax's printer. Static public
++ * consumers can use them without linking the private Intel iterator. */
++#include "X86OutputOptions.h"
++#ifdef CAPSTONE_X86_ATT_RECORD_OUTPUT
++#include "X86SimpleOutput.h"
++#include "X86GenSimpleOutput.inc"
++#define X86_ATT_MEMORY X86_writeATTMemoryOutput
++#include "X86MemoryOutputImpl.h"
++#undef X86_ATT_MEMORY
++#define X86_ATT_OUTPUT
++#include "X86SimpleOutputImpl.h"
++#undef X86_ATT_OUTPUT
++#endif
++
+ #endif
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index 06cc61ae..74e17b69 100644
 --- a/arch/X86/X86Disassembler.h
@@ -956,26 +975,6 @@ index 11582041..51217ea9 100644
  	}
  	return true;
  }
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..e4bdaadd 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -15,6 +15,15 @@
- 
- #include "X86SimpleOutputImpl.h"
- 
-+#ifdef CAPSTONE_X86_ATT_RECORD_OUTPUT
-+#define X86_ATT_MEMORY X86_writeATTMemoryOutput
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_ATT_MEMORY
-+#define X86_ATT_OUTPUT
-+#include "X86SimpleOutputImpl.h"
-+#undef X86_ATT_OUTPUT
-+#endif
-+
- #ifdef CAPSTONE_X86_BATCH_OUTPUT
- CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code,
- 					 size_t size, cs_insn *insn,
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
 index 62d4288a..524d147a 100644
 --- a/arch/X86/X86OutputOptions.h
