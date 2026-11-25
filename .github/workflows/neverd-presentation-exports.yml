@@ -1,0 +1,41 @@
+name: Read the DirectComposition presentation export on Windows
+on:
+  push:
+    branches: [codex/neverd-windows-native-20261120]
+    paths: [.github/workflows/neverd-presentation-exports.yml]
+permissions:
+  contents: read
+jobs:
+  exports:
+    strategy:
+      matrix:
+        os: [windows-2025, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - name: Inspect the installed native and WOW64 PE tables
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reader = Get-Command llvm-readobj -ErrorAction SilentlyContinue
+          if ($reader) { $tool = $reader.Source } else { $tool = Join-Path $env:ProgramFiles 'LLVM/bin/llvm-readobj.exe' }
+          $rows = foreach ($subdir in 'System32', 'SysWOW64') {
+            $file = Join-Path $env:SystemRoot "$subdir/dcomp.dll"
+            if (!(Test-Path -LiteralPath $file)) { continue }
+            $text = (& $tool --file-headers --coff-exports $file) -join "`n"
+            if ($LASTEXITCODE -ne 0) { throw "llvm-readobj failed on $file" }
+            $arch = [regex]::Match($text, '(?m)^Arch: (\S+)$').Groups[1].Value
+            if (!$arch) { throw "Missing architecture in $file" }
+            $entry = @([regex]::Matches($text, '(?ms)^Export \{\n(.*?)^\}') | Where-Object { $_.Value -match '(?m)^  Name: CreatePresentationFactory$' })
+            if ($entry.Count -gt 1) { throw "Duplicate export in $file" }
+            $ordinal = if ($entry.Count) { [int][regex]::Match($entry[0].Value, '(?m)^  Ordinal: ([0-9]+)$').Groups[1].Value } else { $null }
+            $stamp = Get-AuthenticodeSignature -FilePath $file
+            [pscustomobject]@{ directory=$subdir; architecture=$arch; sha256=(Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant(); signature=[string]$stamp.Status; signer=$stamp.SignerCertificate.Subject; ordinal=$ordinal }
+          }
+          $rows | ConvertTo-Json -AsArray | Set-Content -LiteralPath witnessed-exports.json -Encoding utf8
+          $rows | Format-Table
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: presentation-exports-${{ matrix.os }}
+          path: witnessed-exports.json
+          if-no-files-found: error
