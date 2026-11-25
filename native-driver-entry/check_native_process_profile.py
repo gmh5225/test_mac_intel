@@ -128,7 +128,8 @@ def main():
                         "OlePropertyConversion": 1, "DebugDataModelManager": 1,
                         "DirectCompositionControls": 3, "DirectCompositionClock": 5,
                         "VolumeShadowCopyRuntime": 7, "DispatcherQueueRuntime": 1,
-                        "PresentationFactoryRuntime": 1, "MediaChanger": 5}
+                        "PresentationFactoryRuntime": 1, "MediaChanger": 5,
+                        "AcpiOpRegion": 2, "KernelStreamingCOM": 4}
     system_abi = args.output / "system-abis"
     system_calls = args.output / "system-calls"
     provider_options = [arg for name in system_providers for arg in ("--provider", name)]
@@ -147,6 +148,9 @@ def main():
         (api, route) for api in system_apis for route in ("highc", "llvmc")}
     assert all(r["architecture"] == "arm64" and r["passed"] and r["retains_call"]
                and r["object_exit"] == 0 and r["link_exit"] == 0 for r in system_rows)
+    callback_types = {r["provider"]: r["callback_types"] for r in new_abis["cases"] if "callback_types" in r}
+    assert set(callback_types["AcpiOpRegion"]) == {"PACPI_OP_REGION_HANDLER", "PACPI_OP_REGION_CALLBACK"}
+    assert callback_types["KernelStreamingCOM"] == ["KoCreateObjectHandler"]
     work_queue_and_winrm = execute_work_queue_and_winrm(manifest, system_abi, args.output)
     data = args.engine.read_bytes()
     nt, = struct.unpack_from("<I", data, 60)
@@ -155,7 +159,7 @@ def main():
     report = dict(revision=os.environ["NEVERD_REV"], machine=machine,
                   engine_sha256=digest(args.engine.with_name("neverd.dll")),
                   cli_sha256=digest(args.engine), provider_abis=counts,
-                  system_provider_abis=system_providers,
+                  system_provider_abis=system_providers, wdk_callbacks=callback_types,
                   system_runtime=execute_system_calls(system_calls / "arm64"),
                   system_linked_caller_views=[{key: r[key] for key in ("architecture", "api", "route", "passed", "object_exit", "link_exit", "input_sha256")}
                                               for r in system_rows],
