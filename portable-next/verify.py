@@ -41,6 +41,7 @@ try:
             git('apply','--index',patch)
             assert git('write-tree')==tree['tree']
         run(name+'-register-projection',os.sys.executable,'-B',s/'suite/synctools/x86_register_name_sizes.py','--check')
+        run(name+'-printer-projection',os.sys.executable,'-B',s/'suite/synctools/x86_printer_dispatch.py','--check')
         run(name+'-alias-projection',os.sys.executable,'-B',s/'suite/synctools/alias_mnemonic_trie.py','--check')
         run(name+'-build','cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
         run(name+'-units','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
