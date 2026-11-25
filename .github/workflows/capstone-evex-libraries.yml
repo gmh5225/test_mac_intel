@@ -1,7 +1,7 @@
-name: Verify full MOV addresses and measure MASM Intel PE32 SIMD and other architecture throughput
+name: Measure MASM integer tokens and removed formatter calls on real x86-32 and x86-64 code
 on:
   push:
-    branches: [codex/moffs-correct-masm-hex]
+    branches: [codex/masm-complete-token-and-real-formatting-calls]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: moffs-masm-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: masm-token-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

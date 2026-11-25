@@ -39,6 +39,7 @@ try:
     anchor='  cs_insn *insn=cs_malloc(handle);';assert masm.count(anchor)==1
     (w/'masm.cpp').write_text(masm.replace(anchor,'  if(cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_MASM)!=CS_ERR_OK)return 9;'+chr(10)+anchor))
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'masm.cpp','-o',w/'masm.o')
+    run('clang','-std=c11','-O2','-c',r/'count.c','-o',w/'count.o');counters={}
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
     maps=rd(r/'source.json')
@@ -64,6 +65,13 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'masm.o',lib,ice_lib,*flags,'-o',w/('masm-'+label))
+        run('clang++',w/'masm.o',w/'count.o','-Wl,--wrap=vsnprintf',lib,ice_lib,*flags,'-o',w/('count-'+label))
+        if label!='base':
+            printer=(base/'arch/X86/X86IntelInstPrinter.c').read_text()
+            (w/'token.c').write_text(printer[printer.index('static bool need_zero_prefix'):printer.index('static void printImm(MCInst *MI')])
+            run('clang','-O2','-std=c11','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',w,'-I',base,'-I',base/'include',r/'token-guard.c',lib,'-o',w/'token-guard')
+            checks=int(get(w/'token-guard'));assert checks==1774432;save('stream-'+label,checks)
+
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
@@ -152,6 +160,18 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        for mode in (1,2):
+            key=name+'/'+str(mode);args=['capstone',str(mode),'1',f,path,str(bits)];counts={}
+            for tag in ('base','candidate','outlined'):
+                ref=get(w/('masm-'+tag),*args).split()[2:]
+                out=sp.run([w/('count-'+tag),*args],capture_output=True,text=True,check=True)
+                assert out.stdout.split()[2:]==ref
+                bins=list(map(int,out.stderr.split()));assert len(bins)==5 and all(x%2==0 for x in bins[:4])
+                counts[tag]=dict(accepted=int(ref[0]),hex_per_pass=[x//2 for x in bins[:4]],other_both_passes=bins[4])
+            assert counts['candidate']==counts['outlined'] and sum(counts['base']['hex_per_pass'])>sum(counts['candidate']['hex_per_pass'])
+            counters[key]=counts
+        save('formatter-calls',counters)
+
         for mode in (1,2):
             masm_results[name+'/'+str(mode)]=take_masm(name,mode,f,path,bits)
             save('masm-cost',masm_results)
