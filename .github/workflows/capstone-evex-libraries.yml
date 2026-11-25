@@ -1,7 +1,7 @@
-name: Attribute current mixed Capstone and iced FastFormatter work on real x86 inputs
+name: Isolate mnemonic boundary data in identical printer machine code
 on:
   push:
-    branches: [codex/current-real-formatter-costs]
+    branches: [codex/isolate-printer-record-hints]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,13 +25,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b7a40bec54cdcb46fd6555b3335e3965a06a3740
+          ref: 1113f4dd163f3da5cc1dc2cf65eea9aa26b8142a
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 961146191161cfb1dc1584a1e9c8946d2166ad45
+          ref: c6df2f25c9189936a7b57ee8a01d123be11aba68
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-real-formatter-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: merged-table-data-only-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

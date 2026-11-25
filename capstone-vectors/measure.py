@@ -43,8 +43,17 @@ try:
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'base')
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     audits={}; wanted={'putty-32-0.85','libmvec-amd64','jpeg-avx2-i386'}
-    results=[]
     from costs import profile
+    from stage import recipe_values,variants
+    source=rd(r/'merged.json');assert q['commit']==source['parent'] and sha(r/'candidate.patch')==source['sha256']
+    generated=base/'arch/X86/X86GenPrinterQuick.inc';original=recipe_values(generated.read_text())
+    run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==source['tree']
+    run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'on')
+    select,path_used,proof=variants(w,original,recipe_values(generated.read_text()));save('image',proof)
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rows={};profiles=[]
+
     save('build',dict(capstone=q,neverd=dev,iced=m['iced_revision'],lib=sha(lib),exe=sha(w/'base'),host=platform.machine(),driver=sha(w/'driver.cpp'),inputs=m['drivers']))
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
@@ -66,18 +75,23 @@ try:
         assert len(traces)==len(selected) and all(x[3]==x[4] and x[1]==x[5]for x in traces)
         audits[name]=dict(extents=len(selected),boundaries=sum(x[3]for x in traces),extent_sha256=sha(path),text_sha256=sha(f))
         save('audit',audits)
-        for mode in (1,2,4):
-            engines=('capstone','private','fast') if mode!=4 else ('private',)
-            same=None
-            for engine in engines:
-                row=profile(w/'base',engine,mode,bits,f,path,w,e,name)
-                signature=row['raw_signature'][:3];assert same is None or signature==same
-                same=signature
-                reference=list(map(int,get(w/'base',engine,str(mode),'1',f,path,str(bits)).split()))[2:]
-                assert reference==row['raw_signature'] and reference[0]+reference[1]==audits[name]['boundaries']
-                results.append(row)
-            save('profile',results)
-    assert set(audits)==wanted and len(results)==21
-    save('complete',dict(complete=True,cases=len(results),inputs=audits,dev=dev,capstone=q,iced=m['iced_revision']))
+        for mode in (1,2):
+            def visit(tag,reps):
+                select(tag)
+                return list(map(int,get('setarch',os.uname().machine,'-R',path_used,'private',str(mode),str(reps),f,path,str(bits)).split()))
+            reps=max(1,math.ceil(35e6/visit('base',1)[0]))
+            expected=visit('base',reps)[2:];labels=['off','duplicate','on','base'];rng=random.Random(name+'/recipe-data/'+str(mode));cycles=[]
+            for k in range(35):
+                rng.shuffle(labels);times={tag:[] for tag in labels}
+                for tag in labels+labels[::-1]:
+                    v=visit(tag,reps);assert v[2:]==expected;times[tag].append(v[:2])
+                cycles.append({t:[sum(v[i] for v in pairs)for i in (0,1)]for t,pairs in times.items()})
+            rows[name+'/'+str(mode)]=dict(cycles=cycles,signature=expected,repeats=reps);save('observations',rows)
+            for tag in ('base','on','off'):
+                z=profile(w/tag,'private',mode,bits,f,path,w,e,name+'-'+tag)
+                assert z['raw_signature']==visit(tag,1)[2:]
+                profiles.append(z);save('profiles',profiles)
+    assert len(rows)==6 and len(profiles)==18 and set(audits)==wanted
+    save('complete',dict(complete=True,source=q,merged=source,cases=len(rows),profiles=len(profiles),neverd=dev,inputs=audits))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
