@@ -1,7 +1,7 @@
-name: Measure separately linked AMD64 RIP transfers and i386 code placement on the new Capstone next
+name: Track GNU and LLVM linkers across normal archive orders for the isolated AMD64 reader and PE32 controls
 on:
   push:
-    branches: [codex/arm64-isolated-rip-transfer]
+    branches: [codex/indirect-static-member-order]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: independent-indirect-module-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: normal-archive-rip-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
