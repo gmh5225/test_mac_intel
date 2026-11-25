@@ -1,50 +1,33 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..5cba9e64 100644
+index 1cc3d3a9..34666027 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -934,20 +934,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 			    MCOperand_getReg(BaseReg)) {
- 				printInt64(O, DispVal);
- 			} else {
--				// only immediate as address of memory
--				if (DispVal < 0) {
--					SStream_concat(O, "0x%" PRIx64,
+@@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				// only immediate as address of memory
+ 				if (DispVal < 0) {
+ 					SStream_concat(O, "0x%" PRIx64,
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
--				} else {
--					if (DispVal > HEX_THRESHOLD)
--						SStream_concat(O, "0x%" PRIx64,
--							       DispVal);
--					else
--						SStream_concat(O, "%" PRIu64,
--							       DispVal);
--				}
-+				printUInt64(O, x86_absolute_address(MI, DispVal));
- 			}
- 		}
- 	}
++						       x86_absolute_address(MI, DispVal));
+ 				} else {
+ 					if (DispVal > HEX_THRESHOLD)
+ 						SStream_concat(O, "0x%" PRIx64,
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..5bc1d014 100644
+index 457485ab..78ba0cf5 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -1234,15 +1234,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				// memory reference to an immediate address
- 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
+@@ -1236,9 +1236,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  					MI->op1_size = 8;
--				if (DispVal < 0) {
--					printImm(MI, O,
+ 				if (DispVal < 0) {
+ 					printImm(MI, O,
 -						 x86_get_address_mask(
 -							 MI->csh->mode) &
 -							 DispVal,
--						 true);
--				} else {
--					printImm(MI, O, DispVal, true);
--				}
-+				printImm(MI, O, x86_absolute_address(MI, DispVal), true);
- 			}
- 
- 		} else {
++						 x86_absolute_address(MI, DispVal),
+ 						 true);
+ 				} else {
+ 					printImm(MI, O, DispVal, true);
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
 index 380faa79..22142c46 100644
 --- a/arch/X86/X86Mapping.h

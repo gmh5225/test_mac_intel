@@ -1,225 +1,83 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..1bd0ce56 100644
+index 1cc3d3a9..cb65d0a4 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -867,12 +867,14 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 
- static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- {
--	MCOperand *BaseReg = MCInst_getOperand(MI, Op + X86_AddrBaseReg);
--	MCOperand *IndexReg = MCInst_getOperand(MI, Op + X86_AddrIndexReg);
-+	const unsigned base =
-+		MCOperand_getReg(MCInst_getOperand(MI, Op + X86_AddrBaseReg));
-+	const unsigned index =
-+		MCOperand_getReg(MCInst_getOperand(MI, Op + X86_AddrIndexReg));
- 	MCOperand *DispSpec = MCInst_getOperand(MI, Op + X86_AddrDisp);
--	MCOperand *SegReg = MCInst_getOperand(MI, Op + X86_AddrSegmentReg);
-+	const unsigned segment =
-+		MCOperand_getReg(MCInst_getOperand(MI, Op + X86_AddrSegmentReg));
- 	uint64_t ScaleVal;
--	int segreg;
- 	int64_t DispVal = 1;
- 
- 	if (MI->csh->detail_opt) {
-@@ -889,12 +891,12 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 			.mem.segment = X86_REG_INVALID;
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
--			.mem.base = X86_register_map(MCOperand_getReg(BaseReg));
--		if (MCOperand_getReg(IndexReg) != X86_EIZ) {
-+			.mem.base = X86_register_map(base);
-+		if (index != X86_EIZ) {
- 			MI->flat_insn->detail->x86
- 				.operands[MI->flat_insn->detail->x86.op_count]
- 				.mem.index =
--				X86_register_map(MCOperand_getReg(IndexReg));
-+				X86_register_map(index);
- 		}
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -911,15 +913,14 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 	}
- 
- 	// If this has a segment register, print it.
--	segreg = MCOperand_getReg(SegReg);
--	if (segreg) {
--		_printOperand(MI, Op + X86_AddrSegmentReg, O);
-+	if (segment) {
-+		printRegName(O, segment);
- 		SStream_concat0(O, ":");
- 
- 		if (MI->csh->detail_opt) {
- 			MI->flat_insn->detail->x86
- 				.operands[MI->flat_insn->detail->x86.op_count]
--				.mem.segment = X86_register_map(segreg);
-+				.mem.segment = X86_register_map(segment);
- 		}
- 	}
- 
-@@ -930,38 +931,23 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				.operands[MI->flat_insn->detail->x86.op_count]
- 				.mem.disp = DispVal;
- 		if (DispVal) {
--			if (MCOperand_getReg(IndexReg) ||
--			    MCOperand_getReg(BaseReg)) {
-+			if (index || base) {
- 				printInt64(O, DispVal);
- 			} else {
--				// only immediate as address of memory
--				if (DispVal < 0) {
--					SStream_concat(O, "0x%" PRIx64,
+@@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				// only immediate as address of memory
+ 				if (DispVal < 0) {
+ 					SStream_concat(O, "0x%" PRIx64,
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
--				} else {
--					if (DispVal > HEX_THRESHOLD)
--						SStream_concat(O, "0x%" PRIx64,
--							       DispVal);
--					else
--						SStream_concat(O, "%" PRIu64,
--							       DispVal);
--				}
-+				printUInt64(O, x86_absolute_address(MI, DispVal));
- 			}
- 		}
++						       X86_absoluteAddress(MI, DispVal));
+ 				} else {
+ 					if (DispVal > HEX_THRESHOLD)
+ 						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
+index 2ee82ef7..575bd418 100644
+--- a/arch/X86/X86InstPrinterCommon.c
++++ b/arch/X86/X86InstPrinterCommon.c
+@@ -290,3 +290,15 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
  	}
+ }
+ #endif
++
++/* An absolute displacement is an offset of the effective address width. */
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp)
++{
++	const cs_mode mode = mi->csh->mode;
++	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
++	if (x86_has_feature(mode, CS_MODE_16))
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
++	if (x86_has_feature(mode, CS_MODE_32))
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
++}
+diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
+index 37b02959..bb4919aa 100644
+--- a/arch/X86/X86InstPrinterCommon.h
++++ b/arch/X86/X86InstPrinterCommon.h
+@@ -22,6 +22,8 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
+ 	return target;
+ }
  
--	if (MCOperand_getReg(IndexReg) || MCOperand_getReg(BaseReg)) {
-+	if (index || base) {
- 		SStream_concat0(O, "(");
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp);
++
+ void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
  
--		if (MCOperand_getReg(BaseReg))
--			_printOperand(MI, Op + X86_AddrBaseReg, O);
-+		if (base)
-+			printRegName(O, base);
- 
--		if (MCOperand_getReg(IndexReg) &&
--		    MCOperand_getReg(IndexReg) != X86_EIZ) {
-+		if (index && index != X86_EIZ) {
- 			SStream_concat0(O, ", ");
--			_printOperand(MI, Op + X86_AddrIndexReg, O);
-+			printRegName(O, index);
- 			ScaleVal = MCOperand_getImm(
- 				MCInst_getOperand(MI, Op + X86_AddrScaleAmt));
- 			if (MI->csh->detail_opt)
+ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..b2b3be5d 100644
+index 457485ab..2768fe6a 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -1147,13 +1147,15 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- {
- 	bool NeedPlus = false;
--	MCOperand *BaseReg = MCInst_getOperand(MI, Op + X86_AddrBaseReg);
-+	const unsigned base =
-+		MCOperand_getReg(MCInst_getOperand(MI, Op + X86_AddrBaseReg));
- 	uint64_t ScaleVal =
- 		MCOperand_getImm(MCInst_getOperand(MI, Op + X86_AddrScaleAmt));
--	MCOperand *IndexReg = MCInst_getOperand(MI, Op + X86_AddrIndexReg);
-+	const unsigned index =
-+		MCOperand_getReg(MCInst_getOperand(MI, Op + X86_AddrIndexReg));
- 	MCOperand *DispSpec = MCInst_getOperand(MI, Op + X86_AddrDisp);
--	MCOperand *SegReg = MCInst_getOperand(MI, Op + X86_AddrSegmentReg);
--	int reg;
-+	const unsigned segment =
-+		MCOperand_getReg(MCInst_getOperand(MI, Op + X86_AddrSegmentReg));
- 
- 	if (MI->csh->detail_opt) {
- 		MI->flat_insn->detail->x86
-@@ -1167,12 +1169,12 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 			.mem.segment = X86_REG_INVALID;
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
--			.mem.base = X86_register_map(MCOperand_getReg(BaseReg));
--		if (MCOperand_getReg(IndexReg) != X86_EIZ) {
-+			.mem.base = X86_register_map(base);
-+		if (index != X86_EIZ) {
- 			MI->flat_insn->detail->x86
- 				.operands[MI->flat_insn->detail->x86.op_count]
- 				.mem.index =
--				X86_register_map(MCOperand_getReg(IndexReg));
-+				X86_register_map(index);
- 		}
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -1187,29 +1189,27 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 	}
- 
- 	// If this has a segment register, print it.
--	reg = MCOperand_getReg(SegReg);
--	if (reg) {
--		_printOperand(MI, Op + X86_AddrSegmentReg, O);
-+	if (segment) {
-+		printRegName(O, segment);
- 		if (MI->csh->detail_opt) {
- 			MI->flat_insn->detail->x86
- 				.operands[MI->flat_insn->detail->x86.op_count]
--				.mem.segment = X86_register_map(reg);
-+				.mem.segment = X86_register_map(segment);
- 		}
- 		SStream_concat0(O, ":");
- 	}
- 
- 	SStream_concat0(O, "[");
- 
--	if (MCOperand_getReg(BaseReg)) {
--		_printOperand(MI, Op + X86_AddrBaseReg, O);
-+	if (base) {
-+		printRegName(O, base);
- 		NeedPlus = true;
- 	}
- 
--	if (MCOperand_getReg(IndexReg) &&
--	    MCOperand_getReg(IndexReg) != X86_EIZ) {
-+	if (index && index != X86_EIZ) {
- 		if (NeedPlus)
- 			SStream_concat0(O, " + ");
--		_printOperand(MI, Op + X86_AddrIndexReg, O);
-+		printRegName(O, index);
- 		if (ScaleVal != 1)
- 			X86_printMemoryScale(O, ScaleVal, false);
- 		NeedPlus = true;
-@@ -1234,15 +1234,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				// memory reference to an immediate address
- 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
+@@ -1236,9 +1236,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  					MI->op1_size = 8;
--				if (DispVal < 0) {
--					printImm(MI, O,
+ 				if (DispVal < 0) {
+ 					printImm(MI, O,
 -						 x86_get_address_mask(
 -							 MI->csh->mode) &
 -							 DispVal,
--						 true);
--				} else {
--					printImm(MI, O, DispVal, true);
--				}
-+				printImm(MI, O, x86_absolute_address(MI, DispVal), true);
- 			}
- 
- 		} else {
++						 X86_absoluteAddress(MI, DispVal),
+ 						 true);
+ 				} else {
+ 					printImm(MI, O, DispVal, true);
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..22142c46 100644
+index 380faa79..97d6bb42 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,16 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,4 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* An absolute displacement is an offset of the effective address width. */
-+static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
- {
-+	const cs_mode mode = mi->csh->mode;
-+	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
- 	if (x86_has_feature(mode, CS_MODE_16))
+-{
+-	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
-+		return address_override ? (uint32_t)disp : (uint16_t)disp;
- 	if (x86_has_feature(mode, CS_MODE_32))
+-	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+		return address_override ? (uint16_t)disp : (uint32_t)disp;
-+	return address_override ? (uint32_t)disp : (uint64_t)disp;
- }
- 
+-}
+-
  #endif
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
 index cfd13cba..3b436991 100644

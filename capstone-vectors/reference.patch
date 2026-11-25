@@ -1,3 +1,15 @@
+diff --git a/MCInst.h b/MCInst.h
+index e0409109..e28eb1d6 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -154,6 +154,7 @@ struct MCInst {
+ 	uint64_t address; // address of this insn
+ 	cs_struct *csh; // save the main csh
+ 	uint8_t x86opsize; // opsize for [mem] operand
++	uint8_t x86_addr_size; // decoded address size in bytes
+ 
+ 	// These flags could be used to pass some info from one target subcomponent
+ 	// to another, for example, from disassembler to asm printer. The values of
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
 index 1cc3d3a9..34666027 100644
 --- a/arch/X86/X86ATTInstPrinter.c
@@ -13,6 +25,18 @@ index 1cc3d3a9..34666027 100644
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..a45802f5 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -674,6 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 				insn.vectorExtensionPrefix[3] =
+ 					original_scalar_compare_p2;
+ 			instr->imm_size = insn.immSize;
++			instr->x86_addr_size = insn.addressSize;
+ 
+ 			// copy all prefixes
+ 			instr->x86_prefix[0] = insn.prefix0;
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
 index 457485ab..78ba0cf5 100644
 --- a/arch/X86/X86IntelInstPrinter.c
@@ -29,27 +53,27 @@ index 457485ab..78ba0cf5 100644
  				} else {
  					printImm(MI, O, DispVal, true);
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..22142c46 100644
+index 380faa79..aa5d1111 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,16 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,14 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* An absolute displacement is an offset of the effective address width. */
++/* Truncate an absolute offset to the address width chosen by the decoder. */
 +static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
  {
-+	const cs_mode mode = mi->csh->mode;
-+	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
- 	if (x86_has_feature(mode, CS_MODE_16))
+-	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
-+		return address_override ? (uint32_t)disp : (uint16_t)disp;
- 	if (x86_has_feature(mode, CS_MODE_32))
+-	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+		return address_override ? (uint16_t)disp : (uint32_t)disp;
-+	return address_override ? (uint32_t)disp : (uint64_t)disp;
++	if (mi->x86_addr_size == 2)
++		return (uint16_t)disp;
++	if (mi->x86_addr_size == 4)
++		return (uint32_t)disp;
++	return (uint64_t)disp;
  }
  
  #endif
