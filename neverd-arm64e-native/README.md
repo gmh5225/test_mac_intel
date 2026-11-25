@@ -153,6 +153,9 @@ and revisions. It reports 128-bit LRCPC3, PACM HINT, scalar CPTA,
 signed-product overflow (CPTM) and checked writeback. Explicit PAuth_LR and
 PC-sensitive PACM each get a row for ordinary arm64e and a row for the signed
 arm64e.x1 slice. A check absent from an older source policy is unmeasured.
+The controller selects `qualify-x1-full` when the source supports it. The
+summary records the x1 execution environment separately from full qualification,
+which also requires the independent 128-bit LRCPC3 result on that runner.
 The artifact includes the fixed-value load/store regressions and the cursor
 subtype, entitlement and launch controls.
 Baseline instructions exercise mixed IA/IB outcomes and faults at unexpected

@@ -67,6 +67,34 @@ class HostedFeatureTests(unittest.TestCase):
                 row = hosted.CONFIG["feature_row"].format(feature=label, result=hosted.CONFIG["unmeasured"])
                 self.assertIn(row, summary)
 
+    def test_complete_result_requires_the_environment_and_q_on_the_same_host(self):
+        gate = self.policy["x1_qualification"]
+        gate.update(CASES["full_hosted_gate"])
+        ordered = self.policy["ordered_probe"]
+        q_key = ordered["qualified_key"]
+        for environment in (False, True):
+            for q in (False, True):
+                with self.subTest(environment=environment, q=q):
+                    complete = environment and q
+                    status = self.policy["passed" if complete else "unavailable"]
+                    self.features[ordered["mode"]][q_key] = q
+                    self.save(ordered["mode"], self.policy["passed" if q else "unavailable"])
+                    self.report.update({
+                        "status": status,
+                        "missing": [] if q else [{"feature": q_key}],
+                        gate["qualified_key"]: environment,
+                        gate["complete_key"]: complete,
+                        q_key: q,
+                    })
+                    args = (self.policy, self.report, self.report["source_revision"],
+                            self.policy["exit_codes"][status], ordered["mode"], self.output)
+                    summary = hosted.summarize(*args)
+                    self.assertIn(hosted.CONFIG["complete_summary"].format(
+                        environment=json.dumps(environment), complete=status), summary)
+                    self.report[gate["complete_key"]] = not complete
+                    with self.assertRaises(ValueError):
+                        hosted.summarize(*args)
+
     def test_failed_measurement_and_invalid_receipts(self):
         section, key, label = hosted.CONFIG["feature_rows"][0]
         self.save(section, self.policy["failed"])

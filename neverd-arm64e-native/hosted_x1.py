@@ -60,17 +60,28 @@ def feature_summary(policy, report, output):
 def summarize(policy, report, revision, exit_code, hardware, output):
     status = report["status"]
     passed = status == policy["passed"]
+    gate = policy["x1_qualification"]
+    environment = report[gate["qualified_key"]]
+    qualification = environment
+    if "complete_mode" in gate:
+        ordered = report[policy["ordered_probe"]["qualified_key"]]
+        qualification = report[gate["complete_key"]]
+        if (type(environment) is not bool or type(ordered) is not bool
+                or qualification is not (environment and ordered)):
+            raise ValueError(CONFIG["inconsistent_result"])
     if (
         status not in (policy["passed"], policy["unavailable"], policy["failed"])
         or policy["exit_codes"][status] != exit_code
         or report["source_revision"] != revision
-        or report[policy["x1_qualification"]["qualified_key"]] is not passed
+        or qualification is not passed
         or (passed and report["missing"])
     ):
         raise ValueError(CONFIG["inconsistent_result"])
     summary = CONFIG["summary"].format(
         hardware=hardware, status=status, revision=revision
     )
+    if "complete_mode" in gate:
+        summary += CONFIG["complete_summary"].format(environment=json.dumps(environment), complete=status)
     summary += feature_summary(policy, report, output)
     if report["missing"]:
         summary += CONFIG["missing_heading"]
@@ -81,7 +92,8 @@ def summarize(policy, report, revision, exit_code, hardware, output):
 
 def measure(source, output):
     policy = json.loads((source / CONFIG["policy"]).read_text())
-    mode = policy["x1_qualification"]["mode"]
+    gate = policy["x1_qualification"]
+    mode = gate.get("complete_mode", gate["mode"])
     result = subprocess.run(
         [sys.executable, CONFIG["verifier"], mode, "--output", output], cwd=source
     )
