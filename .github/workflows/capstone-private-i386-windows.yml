@@ -1,7 +1,7 @@
-name: Measure short RISC-V register spellings with handle-selected syntax on real programs
+name: Verify RISC-V output and scan mode transitions on real mixed and dedicated libraries
 on:
   push:
-    branches: [codex/riscv-handle-short-registers]
+    branches: [codex/riscv-mixed-no-text-selection]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-short-registers-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: riscv-scans-and-registers-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7

@@ -60,6 +60,7 @@ try:
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
         if stage=='candidate':
             gen=s/'suite/synctools/riscv_gpr_names.py'
+            cmd('scan-generator',[os.sys.executable,'-B',s/'suite/synctools/fixed_len_decoder.py','--check'])
             cmd('generated-check',[os.sys.executable,'-B',gen,'--check'])
             cmd('generated-repeat',[os.sys.executable,'-B',gen])
             assert g('diff','--name-only')==''
@@ -94,14 +95,19 @@ try:
             names={Path(c['file']).name for c in commands};assert {'X86Mapping.c','MipsMapping.c','PPCMapping.c','ARMMapping.c','AArch64Mapping.c','RISCVInstPrinter.c'}<=names
             assert all('CAPSTONE_RISCV_ONLY' not in row['command']for row in commands if row['file'].endswith('/RISCVInstPrinter.c'))
             objects={str(p.relative_to(bmix)):sha(p.read_bytes())for p in bmix.rglob('*.o')};lib,=bmix.rglob('libcapstone.a')
+            cmd('mixed-library-'+stage,[os.environ.get('CC','cc'),'-shared','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',t/('scan-'+stage+'.so')])
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
             shutil.copyfile(bmix/'consumer',timing/('riscv-option-'+stage))
     if verify_mixed:
+        cmd('mixed-guard-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'mixed-scan.cpp','-ldl','-o',t/'scan-guard'])
+        guard=sp.run([t/'scan-guard',t/'scan-base.so',t/'scan-candidate.so'],text=True,capture_output=True)
+        save('mixed-guard',dict(code=guard.returncode,counts=guard.stdout.strip(),message=guard.stderr.strip()))
+        if guard.returncode:raise RuntimeError((guard.returncode,guard.stderr))
         a,both=mixed['base']['objects'],mixed['candidate']['objects']
         assert a.keys()==both.keys()
         delta=[Path(p).name for p in a if a[p]!=both[p]]
-        assert sorted(delta)==['RISCVInstPrinter.c.o','RISCVMapping.c.o'],delta
+        assert sorted(delta)==['RISCVDisassembler.c.o', 'RISCVInstPrinter.c.o', 'RISCVMapping.c.o', 'RISCVModule.c.o', 'cs.c.o'],delta
     if not win and profile=='full':
         cmd('numeric-build',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'numeric.cpp','-o',t/'numeric']+(['-ldl']if linux else []))
         rows={}
