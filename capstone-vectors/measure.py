@@ -53,6 +53,21 @@ try:
         if row['arch']=='ppc64el':assert samples[row['name']]['sha256']==row['text_sha256'] and samples[row['name']]['package']==row['package_sha256']
 
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    def dynamic(label,image):
+        with image.open('rb') as f:
+            elf=ELFFile(f);sym=elf.get_section_by_name('.dynsym')
+            imports=sorted(x.name for x in sym.iter_symbols() if x.name and x['st_shndx']=='SHN_UNDEF')
+            entries=[]
+            for segment in elf.iter_segments():
+                entries.append([segment['p_type'],segment['p_flags'],segment['p_offset'],segment['p_vaddr'],segment['p_filesz']])
+            alloc={sec.name:[sec['sh_addr'],sec['sh_size']] for sec in elf.iter_sections() if sec['sh_flags']&2}
+        save('dynamic-'+label,dict(imports=imports,program_headers=entries,sections=alloc))
+    assert sha(r/'previous.patch')==maps['previous']['sha256']
+    run('git','-C',base,'apply','--index',r/'previous.patch')
+    assert get('git','-C',base,'write-tree').strip()==maps['previous']['tree']
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'previous')
+    dynamic('previous',w/'previous')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
@@ -65,6 +80,11 @@ try:
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
+        dynamic(label,w/label)
+        if label!='base':
+            run('clang','-O2','-std=c11','-DCAPSTONE_HAS_POWERPC','-DCAPSTONE_HAS_AARCH64','-I',base,'-I',base/'include',r/'parser.c',lib,'-o',w/'candidate-parser')
+            assert int(get(w/'candidate-parser'))==144126
+
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
