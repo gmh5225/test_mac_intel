@@ -1,12 +1,12 @@
-name: NeverD microMIPS R6 native ELF r11
+name: NeverD n32 ELF32 memory and r11 SDK
 on:
   push:
-    branches: [codex/micromips-r6-neverd-r11]
+    branches: [codex/mips-n32-elf32-memory]
     paths: ['.github/workflows/neverd-mips-native-elf.yml']
 permissions:
   contents: read
 env:
-  REVISION: f182b9ab565e13915793f4e846046c9ff52590b8
+  REVISION: f36ae44d679f836f26b04d2b53438c17ac3ac933
   LLVM_REVISION: 2bc46a924391617452eeed3a6846621147eaf889
   UNICORN_REVISION: 456fbb3b4f4b1c08ac95a562b736cd289c286ff4
   HOMEBREW_NO_AUTO_UPDATE: '1'
@@ -78,7 +78,7 @@ jobs:
             echo "Retrying the public LLVM release download after an HTTP failure."
           done
           python scripts/build.py build-check --config Release --parallel 4 --target \
-            neverd-mips-bench NeverDMIPSTests NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDNativeExceptionRewriteContractTests NeverDLowScalarConstantTests NeverDFiniteScalarBranchTests
+            neverd-mips-bench NeverDMIPSTests NeverDMIPSFlowTests NeverDMIPSPipelineTests NeverDMIPSIntegerTests NeverDMIPSObjectTests NeverDMIPSSDKTests NeverDNativeExceptionRewriteContractTests NeverDLowScalarConstantTests NeverDFiniteScalarBranchTests NeverDMedPhiRecompositionTests
       - name: Run MIPS decoding, lifting, native object and public SDK suites
         run: |
           mkdir -p evidence
@@ -87,6 +87,7 @@ jobs:
             --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/results.xml"
           ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error -R '^(ReplacementNativeCode[.]|ELFPatchSections[.]|MachOExceptionPatch[.])' --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/layout.xml"
           ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error -L '^(NeverDLowScalarConstantTests|NeverDFiniteScalarBranchTests)$' --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/scalar.xml"
+          ctest --test-dir build-check --build-config Release --parallel 4 --no-tests=error -L '^NeverDMedPhiRecompositionTests$' --output-on-failure --output-junit "$GITHUB_WORKSPACE/evidence/med.xml"
           python - <<'PY'
           import os, re, subprocess
           from pathlib import Path
@@ -95,6 +96,7 @@ jobs:
           assert cases and all(c.find('failure') is None and c.find('error') is None and c.find('skipped') is None for c in cases)
           names = [t.get('name', '') for t in cases]
           assert len(names)>=1194 and len(names)==len(set(names))
+          assert names.count('MIPSEntryGP.N32HighDataAddressesKeepTheirELF32IdentityInAWideGPR') == 1
           assert sum('CompactRegisterCallsSampleTheCallableBeforeLink' in n for n in names)==4
           assert sum('ScalarMicroReleaseUsesTheABIRecord' in n for n in names)==4
           assert sum('Release6ZeroBaseAUIRetainsUpperSymbol' in n for n in names)==6
@@ -227,7 +229,7 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: micromips64-r11-${{ runner.os }}
+          name: n32-elf32-memory-${{ runner.os }}
           path: |
             evidence/
             build-check/Testing/Temporary/LastTest.log
