@@ -24,7 +24,75 @@ def resolve():
         print(f"repository={CONFIG['repository']}", file=stream)
 
 
-def check_acceptance(source, output, policy, report, fields, revision, code):
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def host_profiles(policy):
+    x1 = CONFIG["x1_runner"]
+    catalog = Path(__file__).with_name(CONFIG["host_catalog"])
+    runners = json.loads(catalog.read_bytes())["runners"] if "ordered" in policy else [x1]
+    return [{"runner": runner, "artifact": CONFIG["x1_artifact"] if runner == x1 else
+             CONFIG["ordered_artifact"].format(runner=runner)} for runner in runners]
+
+
+def confirm_unavailable_compiler(native, control_dir, controls, report):
+    mode = native["x1_cursor_probe"]["mode"]
+    receipt = controls["probes"][mode]
+    cursor_path = control_dir / mode / native["report_name"]
+    cursor = json.loads(cursor_path.read_bytes())
+    policy = native["cursor_probe"]
+    labels = {policy["profile_label"].format(optimization=opt, recipe=recipe)
+              for opt in policy["optimizations"] for recipe in policy["recipes"]}
+    rows = cursor["profiles"]
+    unavailable = native["cpta_probe"]["slice_unavailable"]
+    if (cursor["source_revision"] != controls["source_revision"] or receipt["sha256"] != digest(cursor_path) or
+            report["cursor_sha256"] != receipt["sha256"] or cursor["status"] != native["unavailable"] or
+            set(rows) != labels or any(row.get("outcome") != unavailable or row["status"] != native["unavailable"] or
+                                       "sha256" in row for row in rows.values())):
+        raise ValueError(CONFIG["link_error"])
+
+
+def check_ordered(inputs, output, policy, model, report, original_q):
+    ordered = policy["ordered"]
+    routes = model["ordered"]
+    native = routes["native"]
+    labels = {f"{route}-{opt}" for route in routes["sources"] for opt in model["optimizations"]}
+    labels.update((routes["object_route"], routes["raw_object_route"]))
+    directory = output / ordered["directory"]
+    result_path = directory / model["report"]
+    guests_path = directory / model["manifest"]
+    input_path = inputs / policy["manifest"]
+    result, guests, exported = (json.loads(path.read_bytes()) for path in (result_path, guests_path, input_path))
+    receipt = report[ordered["receipt"]]
+    identity = exported[ordered["inputs"]]
+    if (report["input_manifest_sha256"] != digest(input_path) or exported["source_revision"] != report["source_revision"] or
+            guests["test_binary_sha256"] != exported["exporter_sha256"] or exported["exporter_sha256"] != report["exporter_sha256"] or
+            identity["files"] != guests["exports"] or identity["fixtures"] != guests["fixtures"] or
+            guests["ordered_profile"] != native["profile"] or set(guests["guests"]) != labels or
+            result["manifest_sha256"] != digest(guests_path) or set(result["observations"]) != labels or
+            receipt["report"] != result_path.relative_to(output).as_posix() or receipt["sha256"] != digest(result_path)):
+        raise ValueError(CONFIG["ordered_error"])
+    for route_key, file_key in (("object_route", "object_file"), ("raw_object_route", "raw_object_file")):
+        if guests["guests"][routes[route_key]]["object_sha256"] != identity["files"][native[file_key]]:
+            raise ValueError(CONFIG["ordered_error"])
+    observations = iter(result["observations"].values())
+    first = next(observations)
+    records = first["records"]
+    gpr = first["exit_code"] == 0
+    simd = gpr and records[:1] == [native["simd"]]
+    if gpr:
+        valid = len(records) == 2 and records[0] in (native["gpr"], native["simd"]) and records[1] in native["rules"]
+    else:
+        valid = first["exit_code"] == native["skip_exit"] and records == [native["unavailable"]]
+    if (not valid or any(row != first for row in observations) or (gpr and simd != original_q) or
+            any(result[key] is not flag or receipt[key] is not flag
+                for key, flag in ((native["gpr_key"], gpr), (native["simd_key"], simd)))):
+        raise ValueError(CONFIG["ordered_error"])
+    return {CONFIG["ordered_count"]: len(labels), native["gpr_key"]: gpr, native["simd_key"]: simd}
+
+
+def check_acceptance(source, inputs, output, policy, report, fields, revision, code):
     native = json.loads((source / CONFIG["native_policy"]).read_text())
     gate = native["x1_qualification"]
     control_path = output / gate["complete_mode"] / native["report_name"]
@@ -34,18 +102,27 @@ def check_acceptance(source, output, policy, report, fields, revision, code):
     model = json.loads((source / CONFIG["model_policy"]).read_text())
     labels = {"-".join((family, route, opt)) for family in model["cases"]
               for route in (*model["routes"], *model["backend_objects"]) for opt in model["optimizations"]}
-    if set(report["images"]) != labels or report["all_executed"] != (fields["executed"] == len(labels)):
+    if not report["all_linked"]:
+        if ("ordered" not in policy or qualified or report["images"] or report["all_executed"] or
+                os.environ.get(CONFIG["runner_env"], CONFIG["x1_runner"]) == CONFIG["x1_runner"]):
+            raise ValueError(CONFIG["link_error"])
+        confirm_unavailable_compiler(native, control_path.parent, controls, report)
+    elif set(report["images"]) != labels or report["all_executed"] != (fields["executed"] == len(labels)):
         raise ValueError(CONFIG["link_error"])
+    ordered = {}
     passed = qualified and report["all_executed"]
+    if "ordered" in policy:
+        ordered = check_ordered(inputs, output, policy, model, report, controls[native["ordered_probe"]["qualified_key"]])
+        passed = passed and ordered[model["ordered"]["native"]["simd_key"]]
     status = native["passed" if passed else "unavailable"]
     if (receipt["report"] != control_path.relative_to(output).as_posix() or
-            receipt["sha256"] != hashlib.sha256(control_path.read_bytes()).hexdigest() or
+            receipt["sha256"] != digest(control_path) or
             controls["source_revision"] != revision or qualified != report[gate["complete_key"]] or
             controls["status"] != native["passed" if qualified else "unavailable"] or
             report[policy["qualified_key"]] != passed or report["status"] != status or
             code != native["exit_codes"][status]):
         raise ValueError(CONFIG["acceptance_error"])
-    return {"status": status, "code": code, "controls": qualified}
+    return {"status": status, "code": code, "controls": qualified, **ordered}
 
 
 def run(stage, source, work):
@@ -87,7 +164,7 @@ def run(stage, source, work):
     report = json.loads(path.read_text())
     if report["source_revision"] != revision:
         raise ValueError(CONFIG["revision_error"])
-    if not report["all_linked"]:
+    if not strict and not report["all_linked"]:
         raise ValueError(CONFIG["link_error"])
     hardware = subprocess.check_output(CONFIG["cpu"], text=True).strip()
     images = list(report["images"].values())
@@ -95,10 +172,12 @@ def run(stage, source, work):
               "executed": sum(item["execution"] == CONFIG["compared"] for item in images)}
     summary = CONFIG["summary"]
     if strict:
-        fields.update(check_acceptance(source, output, policy, report, fields, revision, result.returncode))
-        host = {**fields, "report_sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        fields.update(check_acceptance(source, inputs, output, policy, report, fields, revision, result.returncode))
+        host = {**fields, "report_sha256": digest(path)}
         (output / CONFIG["host_report"]).write_text(json.dumps(host, indent=2) + "\n")
         summary = CONFIG["acceptance_summary"]
+        if "ordered" in policy:
+            summary += " " + CONFIG["ordered_summary"]
     with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a") as stream:
         print(summary.format(**fields), file=stream)
 
@@ -106,5 +185,9 @@ def run(stage, source, work):
 if __name__ == "__main__":
     if sys.argv[1:] == [CONFIG["resolve"]]:
         resolve()
+    elif sys.argv[1] == CONFIG["host_mode"]:
+        path = (Path(sys.argv[2]) / CONFIG["verifier"]).with_suffix(".def")
+        with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
+            print(f"profiles={json.dumps(host_profiles(json.loads(path.read_bytes())))}", file=output)
     else:
         run(sys.argv[1], Path(sys.argv[2]).resolve(), Path(sys.argv[3]).resolve())

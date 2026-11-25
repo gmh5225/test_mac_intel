@@ -33,6 +33,7 @@ jobs:
     timeout-minutes: 210
     outputs:
       artifact: ${{ steps.inputs.outputs.artifact-id }}
+      profiles: ${{ steps.profiles.outputs.profiles }}
     env:
       SOURCE_REVISION: ${{ needs.source.outputs.revision }}
     steps:
@@ -46,8 +47,10 @@ jobs:
           ref: ${{ needs.source.outputs.revision }}
           path: neverd
           persist-credentials: false
-      - name: Export current HighC, LLVM C and raw backend inputs with r6
+      - name: Export signing and ordered-memory sources and backend objects with r6
         run: python3 neverd-arm64e-native/projections.py build neverd "$RUNNER_TEMP"
+      - id: profiles
+        run: python3 neverd-arm64e-native/projections.py hosts neverd
       - id: inputs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -58,10 +61,15 @@ jobs:
 
   measure:
     needs: [source, export]
-    runs-on: xcode-27
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: ${{ fromJSON(needs.export.outputs.profiles) }}
+    runs-on: ${{ matrix.profile.runner }}
     timeout-minutes: 20
     env:
       SOURCE_REVISION: ${{ needs.source.outputs.revision }}
+      PROJECTION_RUNNER: ${{ matrix.profile.runner }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -85,14 +93,14 @@ jobs:
           artifact-ids: ${{ needs.export.outputs.artifact }}
           merge-multiple: true
           path: ${{ runner.temp }}/inputs
-      - name: Measure original controls and generated x1 images on one host
+      - name: Measure the original controls and generated signing and memory programs on one host
         run: |
           ulimit -c 0
           python3 neverd-arm64e-native/projections.py check neverd "$RUNNER_TEMP"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: signed-x1-projection-results-${{ github.run_attempt }}
+          name: ${{ matrix.profile.artifact }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/measurements
           retention-days: 7
           if-no-files-found: error
