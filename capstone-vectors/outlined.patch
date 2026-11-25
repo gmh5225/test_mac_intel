@@ -1,45 +1,139 @@
-diff --git a/MCInst.h b/MCInst.h
-index e0409109..e28eb1d6 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -154,6 +154,7 @@ struct MCInst {
- 	uint64_t address; // address of this insn
- 	cs_struct *csh; // save the main csh
- 	uint8_t x86opsize; // opsize for [mem] operand
-+	uint8_t x86_addr_size; // decoded address size in bytes
- 
- 	// These flags could be used to pass some info from one target subcomponent
- 	// to another, for example, from disassembler to asm printer. The values of
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..1053eaa8 100644
+index 1cc3d3a9..9a6ce307 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -937,9 +937,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				// only immediate as address of memory
- 				if (DispVal < 0) {
+@@ -241,9 +241,9 @@ static void printRegName(SStream *OS, unsigned RegNo);
+ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		printRegName(O, MCOperand_getReg(Op));
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		uint8_t encsize;
+ 		uint8_t opsize =
+ 			X86_immediate_size(MCInst_getOpcode(MI), &encsize);
+@@ -556,23 +556,21 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 		}
+ 	}
+ 
+-	if (MCOperand_isImm(DispSpec)) {
+-		int64_t imm = MCOperand_getImm(DispSpec);
+-		if (MI->csh->detail_opt)
+-			MI->flat_insn->detail->x86
+-				.operands[MI->flat_insn->detail->x86.op_count]
+-				.mem.disp = imm;
+-		if (imm < 0) {
+-			SStream_concat(
+-				O, "0x%" PRIx64,
+-				arch_masks[x86_get_bit_mode(MI->csh->mode)] &
+-					imm);
+-		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "%" PRIu64, imm);
+-		}
++	int64_t imm = MCOperand_getImm(DispSpec);
++	if (MI->csh->detail_opt)
++		MI->flat_insn->detail->x86
++			.operands[MI->flat_insn->detail->x86.op_count]
++			.mem.disp = imm;
++	if (imm < 0) {
++		SStream_concat(
++			O, "0x%" PRIx64,
++			arch_masks[x86_get_bit_mode(MI->csh->mode)] &
++				imm);
++	} else {
++		if (imm > HEX_THRESHOLD)
++			SStream_concat(O, "0x%" PRIx64, imm);
++		else
++			SStream_concat(O, "%" PRIu64, imm);
+ 	}
+ 
+ 	if (MI->csh->detail_opt)
+@@ -633,7 +631,7 @@ static void printMemOffs64(MCInst *MI, unsigned OpNo, SStream *O)
+ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isImm(Op)) {
++	if (Op->Kind == kImmediate) {
+ 		int64_t imm = X86_relativeBranchTarget(
+ 			MI->csh->mode, MI->address, MI->flat_insn->size,
+ 			MCOperand_getImm(Op), MI->imm_size);
+@@ -662,7 +660,7 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		unsigned int reg = MCOperand_getReg(Op);
+ 		printRegName(O, reg);
+ 		if (MI->csh->detail_opt) {
+@@ -702,7 +700,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 				MI->flat_insn->detail->x86.op_count++;
+ 			}
+ 		}
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		// Print X86 immediates as signed values.
+ 		uint8_t encsize = 0;
+ 		int64_t imm = MCOperand_getImm(Op);
+@@ -923,31 +921,28 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 		}
+ 	}
+ 
+-	if (MCOperand_isImm(DispSpec)) {
+-		DispVal = MCOperand_getImm(DispSpec);
+-		if (MI->csh->detail_opt)
+-			MI->flat_insn->detail->x86
+-				.operands[MI->flat_insn->detail->x86.op_count]
+-				.mem.disp = DispVal;
+-		if (DispVal) {
+-			if (MCOperand_getReg(IndexReg) ||
+-			    MCOperand_getReg(BaseReg)) {
+-				printInt64(O, DispVal);
++	DispVal = MCOperand_getImm(DispSpec);
++	if (MI->csh->detail_opt)
++		MI->flat_insn->detail->x86
++			.operands[MI->flat_insn->detail->x86.op_count]
++			.mem.disp = DispVal;
++	if (DispVal) {
++		if (MCOperand_getReg(IndexReg) ||
++		    MCOperand_getReg(BaseReg)) {
++			printInt64(O, DispVal);
++		} else {
++			// only immediate as address of memory
++			if (DispVal < 0) {
++				SStream_concat(O, "0x%" PRIx64,
++					       (uint64_t)DispVal &
++					       (UINT64_MAX >> (64 - 8 * X86_effectiveAddressSize(MI))));
+ 			} else {
+-				// only immediate as address of memory
+-				if (DispVal < 0) {
++				if (DispVal > HEX_THRESHOLD)
  					SStream_concat(O, "0x%" PRIx64,
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
-+						       (uint64_t)DispVal &
-+						       (UINT64_MAX >> (64 - 8 * X86_effectiveAddressSize(MI))));
- 				} else {
- 					if (DispVal > HEX_THRESHOLD)
- 						SStream_concat(O, "0x%" PRIx64,
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..a45802f5 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -674,6 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 				insn.vectorExtensionPrefix[3] =
- 					original_scalar_compare_p2;
- 			instr->imm_size = insn.immSize;
-+			instr->x86_addr_size = insn.addressSize;
- 
- 			// copy all prefixes
- 			instr->x86_prefix[0] = insn.prefix0;
+-				} else {
+-					if (DispVal > HEX_THRESHOLD)
+-						SStream_concat(O, "0x%" PRIx64,
+-							       DispVal);
+-					else
+-						SStream_concat(O, "%" PRIu64,
+-							       DispVal);
+-				}
++						       DispVal);
++				else
++					SStream_concat(O, "%" PRIu64,
++						       DispVal);
+ 			}
+ 		}
+ 	}
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..bed743fe 100644
+index 457485ab..4be84898 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
 @@ -326,14 +326,15 @@ static bool need_zero_prefix(uint64_t imm)
@@ -72,7 +166,7 @@ index 457485ab..bed743fe 100644
  					default:
  						break;
  					case 1:
-@@ -443,6 +444,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+@@ -443,13 +444,18 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
  	}
  }
  
@@ -84,25 +178,149 @@ index 457485ab..bed743fe 100644
  // local printOperand, without updating public operands
  static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  {
-@@ -1235,11 +1241,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
- 					MI->op1_size = 8;
- 				if (DispVal < 0) {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		printRegName(O, MCOperand_getReg(Op));
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		int64_t imm = MCOperand_getImm(Op);
+ 		printImm(MI, O, imm, MI->csh->imm_unsigned);
+ 	}
+@@ -714,21 +720,19 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 
+ 	SStream_concat0(O, "[");
+ 
+-	if (MCOperand_isImm(DispSpec)) {
+-		int64_t imm = MCOperand_getImm(DispSpec);
+-		if (MI->csh->detail_opt)
+-			MI->flat_insn->detail->x86
+-				.operands[MI->flat_insn->detail->x86.op_count]
+-				.mem.disp = imm;
++	int64_t imm = MCOperand_getImm(DispSpec);
++	if (MI->csh->detail_opt)
++		MI->flat_insn->detail->x86
++			.operands[MI->flat_insn->detail->x86.op_count]
++			.mem.disp = imm;
+ 
+-		if (imm < 0)
+-			printImm(MI, O,
+-				 arch_masks[x86_get_bit_mode(MI->csh->mode)] &
+-					 imm,
+-				 true);
+-		else
+-			printImm(MI, O, imm, true);
+-	}
++	if (imm < 0)
++		printImm(MI, O,
++			 arch_masks[x86_get_bit_mode(MI->csh->mode)] &
++				 imm,
++			 true);
++	else
++		printImm(MI, O, imm, true);
+ 
+ 	SStream_concat0(O, "]");
+ 
+@@ -929,7 +933,7 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isImm(Op)) {
++	if (Op->Kind == kImmediate) {
+ 		int64_t imm = X86_relativeBranchTarget(
+ 			MI->csh->mode, MI->address, MI->flat_insn->size,
+ 			MCOperand_getImm(Op), MI->imm_size);
+@@ -979,7 +983,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+ 
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		unsigned int reg = MCOperand_getReg(Op);
+ 
+ 		printRegName(O, reg);
+@@ -1016,7 +1020,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 		if (MI->op1_size == 0)
+ 			MI->op1_size =
+ 				MI->csh->regsize_map[X86_register_map(reg)];
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		uint8_t encsize = 0;
+ 		int64_t imm = MCOperand_getImm(Op);
+ 		uint8_t opsize =
+@@ -1215,41 +1219,36 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 		NeedPlus = true;
+ 	}
+ 
+-	if (MCOperand_isImm(DispSpec)) {
+-		int64_t DispVal = MCOperand_getImm(DispSpec);
+-		if (MI->csh->detail_opt)
+-			MI->flat_insn->detail->x86
+-				.operands[MI->flat_insn->detail->x86.op_count]
+-				.mem.disp = DispVal;
+-		if (DispVal) {
+-			if (NeedPlus) {
+-				if (DispVal < 0) {
+-					SStream_concat0(O, " - ");
+-					printImm(MI, O, -DispVal, true);
+-				} else {
+-					SStream_concat0(O, " + ");
+-					printImm(MI, O, DispVal, true);
+-				}
++	int64_t DispVal = MCOperand_getImm(DispSpec);
++	if (MI->csh->detail_opt)
++		MI->flat_insn->detail->x86
++			.operands[MI->flat_insn->detail->x86.op_count]
++			.mem.disp = DispVal;
++	if (DispVal) {
++		if (NeedPlus) {
++			if (DispVal < 0) {
++				SStream_concat0(O, " - ");
++				printImm(MI, O, -DispVal, true);
+ 			} else {
+-				// memory reference to an immediate address
+-				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
+-					MI->op1_size = 8;
+-				if (DispVal < 0) {
 -					printImm(MI, O,
 -						 x86_get_address_mask(
 -							 MI->csh->mode) &
 -							 DispVal,
 -						 true);
-+					printImmWithSize(MI, O, DispVal, true,
-+							 X86_effectiveAddressSize(MI));
- 				} else {
- 					printImm(MI, O, DispVal, true);
- 				}
+-				} else {
+-					printImm(MI, O, DispVal, true);
+-				}
++				SStream_concat0(O, " + ");
++				printImm(MI, O, DispVal, true);
+ 			}
+-
+ 		} else {
+-			// DispVal = 0
+-			if (!NeedPlus) // [0]
+-				SStream_concat0(O, "0");
++			// memory reference to an immediate address
++			if (x86_has_feature(MI->csh->mode, CS_MODE_64))
++				MI->op1_size = 8;
++			if (DispVal < 0) {
++				printImmWithSize(MI, O, DispVal, true,
++						 X86_effectiveAddressSize(MI));
++			} else {
++				printImm(MI, O, DispVal, true);
++			}
+ 		}
++
++	} else {
++		// DispVal = 0
++		if (!NeedPlus) // [0]
++			SStream_concat0(O, "0");
+ 	}
+ 
+ 	SStream_concat0(O, "]");
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..8b48ab3c 100644
+index 380faa79..2bc4a5f2 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,11 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,17 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
@@ -111,12 +329,16 @@ index 380faa79..8b48ab3c 100644
 + * width even if the memory operand or a following immediate is narrower. */
 +static inline unsigned X86_effectiveAddressSize(const MCInst *mi)
  {
--	if (x86_has_feature(mode, CS_MODE_16))
++	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
++	const cs_mode mode = mi->csh->mode;
+ 	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
--	if (x86_has_feature(mode, CS_MODE_32))
++		return address_override ? 4 : 2;
+ 	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+	return mi->x86_addr_size;
++		return address_override ? 2 : 4;
++	return address_override ? 4 : 8;
  }
  
  #endif

@@ -1,7 +1,64 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..1053eaa8 100644
+index 1cc3d3a9..f38285fb 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
+@@ -241,9 +241,9 @@ static void printRegName(SStream *OS, unsigned RegNo);
+ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		printRegName(O, MCOperand_getReg(Op));
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		uint8_t encsize;
+ 		uint8_t opsize =
+ 			X86_immediate_size(MCInst_getOpcode(MI), &encsize);
+@@ -556,7 +556,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 		}
+ 	}
+ 
+-	if (MCOperand_isImm(DispSpec)) {
++	if (DispSpec->Kind == kImmediate) {
+ 		int64_t imm = MCOperand_getImm(DispSpec);
+ 		if (MI->csh->detail_opt)
+ 			MI->flat_insn->detail->x86
+@@ -633,7 +633,7 @@ static void printMemOffs64(MCInst *MI, unsigned OpNo, SStream *O)
+ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isImm(Op)) {
++	if (Op->Kind == kImmediate) {
+ 		int64_t imm = X86_relativeBranchTarget(
+ 			MI->csh->mode, MI->address, MI->flat_insn->size,
+ 			MCOperand_getImm(Op), MI->imm_size);
+@@ -662,7 +662,7 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		unsigned int reg = MCOperand_getReg(Op);
+ 		printRegName(O, reg);
+ 		if (MI->csh->detail_opt) {
+@@ -702,7 +702,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 				MI->flat_insn->detail->x86.op_count++;
+ 			}
+ 		}
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		// Print X86 immediates as signed values.
+ 		uint8_t encsize = 0;
+ 		int64_t imm = MCOperand_getImm(Op);
+@@ -923,7 +923,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 		}
+ 	}
+ 
+-	if (MCOperand_isImm(DispSpec)) {
++	if (DispSpec->Kind == kImmediate) {
+ 		DispVal = MCOperand_getImm(DispSpec);
+ 		if (MI->csh->detail_opt)
+ 			MI->flat_insn->detail->x86
 @@ -937,9 +937,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				// only immediate as address of memory
  				if (DispVal < 0) {
@@ -15,7 +72,7 @@ index 1cc3d3a9..1053eaa8 100644
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..bed743fe 100644
+index 457485ab..bdc933f1 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
 @@ -326,14 +326,15 @@ static bool need_zero_prefix(uint64_t imm)
@@ -48,7 +105,7 @@ index 457485ab..bed743fe 100644
  					default:
  						break;
  					case 1:
-@@ -443,6 +444,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+@@ -443,13 +444,18 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
  	}
  }
  
@@ -60,6 +117,60 @@ index 457485ab..bed743fe 100644
  // local printOperand, without updating public operands
  static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		printRegName(O, MCOperand_getReg(Op));
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		int64_t imm = MCOperand_getImm(Op);
+ 		printImm(MI, O, imm, MI->csh->imm_unsigned);
+ 	}
+@@ -714,7 +720,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 
+ 	SStream_concat0(O, "[");
+ 
+-	if (MCOperand_isImm(DispSpec)) {
++	if (DispSpec->Kind == kImmediate) {
+ 		int64_t imm = MCOperand_getImm(DispSpec);
+ 		if (MI->csh->detail_opt)
+ 			MI->flat_insn->detail->x86
+@@ -929,7 +935,7 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+-	if (MCOperand_isImm(Op)) {
++	if (Op->Kind == kImmediate) {
+ 		int64_t imm = X86_relativeBranchTarget(
+ 			MI->csh->mode, MI->address, MI->flat_insn->size,
+ 			MCOperand_getImm(Op), MI->imm_size);
+@@ -979,7 +985,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+ 
+-	if (MCOperand_isReg(Op)) {
++	if (Op->Kind == kRegister) {
+ 		unsigned int reg = MCOperand_getReg(Op);
+ 
+ 		printRegName(O, reg);
+@@ -1016,7 +1022,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 		if (MI->op1_size == 0)
+ 			MI->op1_size =
+ 				MI->csh->regsize_map[X86_register_map(reg)];
+-	} else if (MCOperand_isImm(Op)) {
++	} else if (Op->Kind == kImmediate) {
+ 		uint8_t encsize = 0;
+ 		int64_t imm = MCOperand_getImm(Op);
+ 		uint8_t opsize =
+@@ -1215,7 +1221,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 		NeedPlus = true;
+ 	}
+ 
+-	if (MCOperand_isImm(DispSpec)) {
++	if (DispSpec->Kind == kImmediate) {
+ 		int64_t DispVal = MCOperand_getImm(DispSpec);
+ 		if (MI->csh->detail_opt)
+ 			MI->flat_insn->detail->x86
 @@ -1235,11 +1241,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;

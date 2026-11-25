@@ -32,6 +32,7 @@ try:
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
     run('cargo','build','--release','--locked',cwd=ad)
     ice_lib=ad/'target/release/libiced_compare.a'
+    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'att_bench.cpp','-o',w/'att-bench.o')
     shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
@@ -51,6 +52,7 @@ try:
     assert get('git','-C',base,'write-tree').strip()==reference['tree']
     run('cmake','--build',build,'--target','capstone_static','--parallel','4')
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'reference')
+    run('clang++',w/'att-bench.o',lib,'-no-pie','-o',w/'att-reference')
     save('offset-reference',dict(source=reference,archive=sha(lib),exe=sha(w/'reference')))
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -85,6 +87,7 @@ try:
             assert count==1600
             save('transitions-'+label,{'checked':count})
 
+        run('clang++',w/'att-bench.o',lib,'-no-pie','-o',w/('att-'+label))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -122,6 +125,9 @@ try:
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
     host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
+    replay_paths={}
+    from att_timing import start
+    att_measure,att_images=start(w);att={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
@@ -140,6 +146,9 @@ try:
             return rows
         assert audit_engine('base')==audit_engine('outlined')==audit_engine('candidate')
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
+        replay_paths[name]=(bits,f,path,spec['extent_sha256'])
+        att[name]={str(detail):att_measure(name,bits,f,path,detail) for detail in (0,1)}
+        save('att-timing',att);save('att-images',att_images)
         for route in ('private','capstone'):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')
@@ -177,6 +186,8 @@ try:
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
     time_foreign(foreign_rows,w,save)
+    from route_profile import run as profile_routes
+    save('route-profile',profile_routes(r,w,base,build,replay_paths))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
