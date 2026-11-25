@@ -1,0 +1,12 @@
+[package]
+name="iced_compare"
+version="0.1.0"
+edition="2021"
+[lib]
+crate-type=["staticlib"]
+path="iced.rs"
+[dependencies]
+iced-x86={path="ICED_ROOT/src/rust/iced-x86",default-features=false,features=["std","decoder","gas","instr_info","fast_fmt"]}
+[profile.release]
+panic="abort"
+opt-level=3

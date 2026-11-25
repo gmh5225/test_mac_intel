@@ -12,7 +12,7 @@
 #include <vector>
 
 extern "C" uint64_t profile_full_decodes;
-extern "C" uint64_t profile_names[16];
+extern "C" uint64_t profile_names[18];
 using Next = decltype(&cs_disasm_iter);
 
 struct Reader {
@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     struct Family { Outcome count{}; std::map<std::string, unsigned> encodings; };
     std::map<std::pair<std::string,std::string>,Family> families;
     std::array<uint64_t,4> misses{};
-    std::array<std::array<uint64_t,16>,4> addresses{};
+    std::array<std::array<uint64_t,18>,4> addresses{};
     uint64_t accepted = 0, rejected = 0, consumed = 0, digest = 0;
     size_t begin, length;
     uint64_t address;
@@ -56,10 +56,10 @@ int main(int argc, char **argv) {
                 const auto *start = &bytes[begin+offset], *ptr = start;
                 size_t left = length-offset;
                 uint64_t ip = address+offset, before = profile_full_decodes;
-                std::array<uint64_t,16> prior{};
-                for (unsigned k=0;k<16;++k) prior[k]=profile_names[k];
+                std::array<uint64_t,18> prior{};
+                for (unsigned k=0;k<18;++k) prior[k]=profile_names[k];
                 bool ok = r.step(r.handle,&ptr,&left,&ip,r.out);
-                for (unsigned k=0;k<16;++k) addresses[i][k]+=profile_names[k]-prior[k];
+                for (unsigned k=0;k<18;++k) addresses[i][k]+=profile_names[k]-prior[k];
                 fallback[i] = unsigned(profile_full_decodes-before);
                 if (fallback[i] > 1 || (ok && (r.out->size != ptr-start ||
                     left+r.out->size != length-offset || ip != address+offset+r.out->size))) return 5;

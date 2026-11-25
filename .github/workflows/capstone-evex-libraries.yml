@@ -1,7 +1,7 @@
-name: Time decoded x86 operand kinds for Intel and AT&T on real binaries and validate address widths
+name: Compare AT&T final access and register names with iced GasFormatter on six PE and ELF programs
 on:
   push:
-    branches: [codex/decoded-operand-kinds-and-address-timing]
+    branches: [codex/att-final-access-and-register-format]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ce00fc089a123d4149a1a39e458a6a81b9778a5b
+          ref: b20891634f83e245f43ab87e15cdf47800d5d4bb
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-operand-kinds-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-access-and-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -1,17 +1,20 @@
 from pathlib import Path
 import hashlib,re,subprocess
-def run(r,w,source,build,paths):
+def run(r,w,source,build,paths,patch=None,tree=None):
     def replace(data,left,right):
         assert data.count(left)==1,left
         return data.replace(left,right)
     def call(*cmd):subprocess.run(cmd,check=True)
     call('git','-C',source,'restore','--source','HEAD','--staged','--worktree','--','.')
+    if patch:
+        call('git','-C',source,'apply','--index',patch)
+        assert subprocess.check_output(['git','-C',source,'write-tree'],text=True).strip()==tree
     core=source/'cs.c';s=core.read_text()
-    s=replace(s,'/* Keep the full decoder','uint64_t profile_full_decodes, profile_names[16];\n\n/* Keep the full decoder')
+    s=replace(s,'/* Keep the full decoder','uint64_t profile_full_decodes, profile_names[18];\n\n/* Keep the full decoder')
     mark='\t\tMCInst_InitX86(&mci);'
     s=replace(s,mark,'\t\t++profile_full_decodes;\n'+mark)
     mark='\t\tpostprinter((csh)handle, insn, OS, mci);\n'
-    core.write_text(replace(s,mark,mark+'\textern uint64_t profile_names[16];\n\t++profile_names[0];\n'))
+    core.write_text(replace(s,mark,mark+'\textern uint64_t profile_names[18];\n\t++profile_names[0];\n'))
     for spelling in ('Intel','ATT'):
         f=source/('arch/X86/X86'+spelling+'InstPrinter.c');s=f.read_text()
         at=s.index('// local printOperand, without updating public operands')
@@ -29,6 +32,11 @@ def run(r,w,source,build,paths):
         pat='get_op_access(MI->csh, MCInst_getOpcode(MI), access,'
         at=s.index(pat,entry)
         s=s[:at]+'++profile_names[15];\n\t\t'+s[at:]
+        if spelling=='ATT':
+            at=s.index('const char *extension_name',s.index('static void printRegName(SStream *OS, unsigned RegNo)\n{'))
+            s=s[:at]+'++profile_names[16];\n\t'+s[at:]
+            if patch:
+                at=s.index('SStream_concat2(OS, "%", name);',at);s=s[:at]+'++profile_names[17];\n\t\t'+s[at:]
         f.write_text(s)
     call('cmake','--build',build,'--target','capstone_static','--parallel','4')
     lib,=build.rglob('libcapstone.a')
@@ -43,7 +51,7 @@ def run(r,w,source,build,paths):
             rows=[list(map(int,line.split()))for line in z.stderr.splitlines()]
             assert len(rows)==4 and totals[4:]==[totals[1]]*4
             for i,row in enumerate(rows):
-                assert len(row)==16 and row[1]==row[2]+row[3]==row[4]+row[5]
+                assert len(row)==18 and row[1]==row[2]+row[3]==row[4]+row[5]
                 assert row[6]==row[7]==row[9]==row[11]==0 and row[8]==row[12]+row[13]
                 assert row[14]>=row[15] and (i%2 or row[14]==row[15]==0)
             report[name][syntax]=dict(totals=totals,counts=rows)

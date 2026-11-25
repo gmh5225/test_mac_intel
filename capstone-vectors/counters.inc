@@ -1,4 +1,4 @@
-extern uint64_t profile_names[16];
+extern uint64_t profile_names[18];
 static bool observedKind(const MCOperand *op, bool reg, bool displacement)
 {
 	const int tag = reg ? kRegister : kImmediate;

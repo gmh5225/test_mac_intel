@@ -32,7 +32,13 @@ try:
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
     run('cargo','build','--release','--locked',cwd=ad)
     ice_lib=ad/'target/release/libiced_compare.a'
-    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'att_bench.cpp','-o',w/'att-bench.o')
+    gas=w/'gas-adapter';gas.mkdir()
+    assert {f:sha(r/f) for f in ('gas.rs','gas_driver.cpp','gas-Cargo.toml')}==rd(r/'gas-sources.json')
+    shutil.copyfile(r/'Cargo.lock',gas/'Cargo.lock');shutil.copyfile(r/'gas.rs',gas/'iced.rs')
+    (gas/'Cargo.toml').write_text((r/'gas-Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
+    run('cargo','build','--release','--locked',cwd=gas)
+    gas_lib=gas/'target/release/libiced_compare.a'
+    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',r/'gas_driver.cpp','-o',w/'att-bench.o')
     shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
@@ -52,7 +58,7 @@ try:
     assert get('git','-C',base,'write-tree').strip()==reference['tree']
     run('cmake','--build',build,'--target','capstone_static','--parallel','4')
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'reference')
-    run('clang++',w/'att-bench.o',lib,'-no-pie','-o',w/'att-reference')
+    run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/'att-reference')
     save('offset-reference',dict(source=reference,archive=sha(lib),exe=sha(w/'reference')))
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
@@ -87,7 +93,7 @@ try:
             assert count==1600
             save('transitions-'+label,{'checked':count})
 
-        run('clang++',w/'att-bench.o',lib,'-no-pie','-o',w/('att-'+label))
+        run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/('att-'+label))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
@@ -188,6 +194,7 @@ try:
     time_foreign(foreign_rows,w,save)
     from route_profile import run as profile_routes
     save('route-profile',profile_routes(r,w,base,build,replay_paths))
+    save('candidate-profile',profile_routes(r,w,base,build,replay_paths,r/'outlined.patch',maps['outlined']['tree']))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
