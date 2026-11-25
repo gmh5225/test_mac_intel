@@ -125,7 +125,7 @@ try:
     assert m['oracle']==m['layout']
     products['oracle']=products['layout'];identities['oracle']=identities['layout']
     save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-layout.json').read_text()))
-    expected=3 if os.uname().machine=="aarch64" else 1
+    expected=1 if os.uname().machine=="aarch64" else 3
     assert len({z['archive']for z in identities.values()})==expected and len({z['binary']for z in identities.values()})==expected,identities
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -136,7 +136,7 @@ try:
     image=t/'selected';image.write_bytes(imgs['base'])
     inode=image.stat().st_ino;block=4096
     offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
-    assert bool(offsets)==(os.uname().machine=="aarch64")
+    assert bool(offsets)==(os.uname().machine!="aarch64")
     checked={}
     def execute(k,case,mode,reps):
         # Touch exactly the same file pages, in the same order, before every exec.
@@ -158,8 +158,7 @@ try:
             single=execute('base',c,mode,1)
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
-            corrected=execute('oracle',c,mode,n)[1:];assert corrected[:3]==expected[:3]
-            if mode==0 or c['selector'] not in (32,64):assert corrected==expected
+            corrected=execute('oracle',c,mode,n)[1:];assert corrected==expected,(c['name'],mode,corrected,expected)
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             pairs=35 if c['selector']==4 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('putty-32-0.85',3),('arm-ls',1),('arm-ls',2),('arm64-ls',1),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):

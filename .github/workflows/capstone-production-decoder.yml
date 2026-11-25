@@ -1,7 +1,7 @@
-name: Measure mixed MIPS register names in source-built NeverD, with x86 SIMD and PE32 controls
+name: Measure the active near-indirect x86 reader in source-built NeverD with PE32 controls
 on:
   push:
-    branches: [codex/real-neverd-mips-register-strings]
+    branches: [codex/near-indirect-source-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -51,11 +51,17 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: |
-          test "$(git rev-parse HEAD)" = "f47e72ea35c2b8f2270ac80a20ff79915eeffdb9"
-          test "$(git ls-tree HEAD third_party/capstone | cut -d" " -f3 | cut -f1)" = "acb6a6298e4642828981a72acc6022ee36fcd0be"
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          config=json.loads(Path('../capstone-product/source.json').read_text())
+          def git(*args):
+              return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD')==config['dev']
+          assert git('rev-parse','HEAD:third_party/capstone')==config['checkout']==config['dev_gitlink']
+          PY
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-          git -C third_party/capstone fetch --depth=1 origin acb6a6298e4642828981a72acc6022ee36fcd0be
-          git -C third_party/capstone checkout --detach acb6a6298e4642828981a72acc6022ee36fcd0be
+          test "$(git -C third_party/capstone rev-parse HEAD)" = "$(git rev-parse HEAD:third_party/capstone)"
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -67,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-mips-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: primary-rip-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
