@@ -2,6 +2,28 @@
 import hashlib
 from pathlib import Path
 import subprocess
+import tempfile
+
+
+MAIN = Path(__file__).with_name("dispatcher_queue_main.cpp").resolve()
+ENTRY = ["/entry:RunDispatcherTest", "/subsystem:console"]
+SYSTEM_LIBS = ["runtimeobject.lib", "user32.lib", "kernel32.lib"]
+
+
+def run_dispatcher(executable):
+    try:
+        result = subprocess.run([executable], capture_output=True, timeout=30)
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(f"{executable.name} timed out after {error.stdout!r}") from error
+    stages = {}
+    for line in result.stdout.decode("ascii").splitlines():
+        name, value = line.split("=")
+        stages[name] = int(value, 16)
+    print(executable.name, result.returncode, stages, flush=True)
+    assert result.returncode == 0 and stages["apartment"] < 0x80000000
+    assert stages["create"] < 0x80000000 and stages["duplicate"] >= 0x80000000
+    assert stages["shutdown"] < 0x80000000 and stages["uninitialized"] == 0
+    return stages
 
 
 def check_dispatcher_queue(engine, manifest, out):
@@ -31,26 +53,10 @@ extern "C" __declspec(dllexport) HRESULT InspectDispatcher(
     return CreateDispatcherQueueController(options, result);
 }
 """, encoding="utf-8")
-    runner = out / "main.cpp"
-    runner.write_text(include + """
-extern "C" HRESULT InspectDispatcher(DispatcherQueueOptions, PDISPATCHERQUEUECONTROLLER *);
-extern "C" int main() {
-    if (CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED) < 0) return 1;
-    DispatcherQueueOptions options{sizeof(DispatcherQueueOptions), DQTYPE_THREAD_CURRENT, DQTAT_COM_NONE};
-    PDISPATCHERQUEUECONTROLLER first = nullptr, second = nullptr;
-    HRESULT created = InspectDispatcher(options, &first);
-    HRESULT duplicate = created < 0 ? created : InspectDispatcher(options, &second);
-    bool passed = created >= 0 && first && duplicate < 0;
-    if (second) second->Release();
-    if (first) first->Release();
-    CoUninitialize();
-    return passed ? 0 : 2;
-}
-""", encoding="utf-8")
     original = out / "caller.obj"
     main = out / "main.obj"
     compile_file(caller, cpp, original)
-    compile_file(runner, cpp, main)
+    compile_file(MAIN, cpp, main)
     image = out / "input.dll"
     link(image, "/dll", "/noentry", original, library)
 
@@ -66,8 +72,21 @@ extern "C" int main() {
             compile_file(source, ["clang", "--target=aarch64-pc-windows-msvc",
                                   "-std=c23", "-ffreestanding", "-fms-extensions"], obj)
         executable = out / (route + ".exe")
-        link(executable, "/entry:main", "/subsystem:console", main, obj, library, "ole32.lib")
-        subprocess.run([executable], check=True, timeout=30)
+        link(executable, *ENTRY, main, obj, library, *SYSTEM_LIBS)
+        stages = run_dispatcher(executable)
         observations.append(dict(route=route, sha256=hashlib.sha256(executable.read_bytes()).hexdigest(),
-                                 created_controller=True, duplicate_rejected=True))
+                                 created_controller=True, duplicate_rejected=True,
+                                 shutdown_completed=True, hresults=stages))
     return observations
+
+
+if __name__ == "__main__":
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        obj, exe = root / "sdk.obj", root / "sdk.exe"
+        subprocess.run(["clang", "--target=aarch64-pc-windows-msvc", "-fms-extensions", "-std=c++17",
+                        "-O1", "-fno-stack-protector", "-DNEVERD_CHECK_SDK_DISPATCHER",
+                        "-c", MAIN, "-o", obj], check=True)
+        subprocess.run(["lld-link", "/machine:arm64", "/nodefaultlib", *ENTRY,
+                        "/out:" + str(exe), obj, "coremessaging.lib", *SYSTEM_LIBS], check=True)
+        run_dispatcher(exe)
