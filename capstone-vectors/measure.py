@@ -36,6 +36,13 @@ try:
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
     run('cargo','build','--release','--locked',cwd=ad)
     ice_lib=ad/'target/release/libiced_compare.a'
+    gas=w/'gas-adapter';gas.mkdir()
+    assert {f:sha(r/f) for f in ('gas.rs','gas_driver.cpp','gas-Cargo.toml')}==rd(r/'gas-sources.json')
+    shutil.copyfile(r/'Cargo.lock',gas/'Cargo.lock');shutil.copyfile(r/'gas.rs',gas/'iced.rs')
+    (gas/'Cargo.toml').write_text((r/'gas-Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
+    run('cargo','build','--release','--locked',cwd=gas)
+    gas_lib=gas/'target/release/libiced_compare.a'
+    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',r/'gas_driver.cpp','-o',w/'gas-driver.o')
     shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
@@ -70,6 +77,7 @@ try:
         assert len(set(projections.values()))==1
         save('generated-plans',projections)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
+        run('clang++',w/'gas-driver.o',lib,gas_lib,*flags,'-o',w/('att-'+label))
         run('cmake','--build',mixed,'--target','capstone_static','--parallel','4')
         archive,=mixed.rglob('libcapstone.a');objs={str(f.relative_to(mixed)):sha(f) for f in mixed.rglob('*.c.o')}
         assert len(objs)>45 and any('ARMMapping.c.o' in name for name in objs)
@@ -138,6 +146,8 @@ try:
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
     host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
+    from att_timing import start
+    time_gas,att_images=start(w);att_rows={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
@@ -165,6 +175,12 @@ try:
             assert vals[0][2]==spec['bytes']
             records[name][lbl]=vals[0]
         save('extra-real',records)
+        for route in ('capstone','private'):
+            for detail in (0,1):
+                key=name+'/'+route+'/'+str(detail+1)
+                att_rows[key]=time_gas(name,bits,f,path,detail,route)
+                save('att-same-image',att_rows);save('att-images',att_images)
+
         for route in ('private','capstone'):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')

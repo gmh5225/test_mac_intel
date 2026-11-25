@@ -1,25 +1,60 @@
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..8f27e8d9 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -159,6 +159,20 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
- 	}
- 	if (primary != 0x0f) {
- 		const uint8_t mr = code[has_rex + 1];
-+#ifdef CAPSTONE_X86_ONLY
-+		if ((primary == 0x80 && (mr & 0x38) == 0x38) ||
-+		    (primary == 0xf6 && !(mr & 0x38))) {
-+			if (mr >= 0xc0 || X86_OUTPUT_UNSUPPORTED(handle, false))
-+				return false;
-+			/* Byte CMP and TEST ignore REX.W. Any REX shifts the
-+			 * ModRM offset by one, as in the register/memory row. */
-+			const unsigned form = primary == 0x80 ? 0x38 : 0x84;
-+			const unsigned row = x86_simple_plans[1][has_rex][form] >> 2;
-+			return writeMemoryImmediate64(code, size, insn, insn_size,
-+						      &x86_simple_outputs[row],
-+						      x86_simple_registers);
-+		}
-+#endif
- 		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
- 		    X86_OUTPUT_UNSUPPORTED(handle, false))
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..524d147a 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -29,15 +29,19 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ /* Keep the mode, option and callback checks in a single short-circuit chain
+  * in both instantiations of the scalar writer. */
+-#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++#define X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, syntax_mismatch, expected_printer) \
+ 	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
+ 	 (handle)->mnem_list || (handle)->doing_mem || \
+-	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
+-	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
++	 (syntax_mismatch) || \
+ 	 (handle)->disasm != X86_getInstruction || \
+ 	 (handle)->insn_id != X86_get_insn_id || \
+-	 (handle)->printer != X86_Intel_printInst || \
++	 (handle)->printer != (expected_printer) || \
+ 	 (handle)->post_printer != X86_postprinter || \
+ 	 cs_vsnprintf != cs_default_vsnprintf)
+ 
++#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++	X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, \
++		(handle)->syntax != CS_OPT_SYNTAX_INTEL && \
++		(handle)->syntax != CS_OPT_SYNTAX_DEFAULT, X86_Intel_printInst)
++
+ #endif
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..79bbc24c 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -111,6 +111,18 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
+ 		}
+ 	}
++#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_X86_ATT_DISABLE)
++	const bool att = handle->syntax == CS_OPT_SYNTAX_ATT;
++	if (att) {
++		if (plan >= X86_PLAN_PUSH_IMMEDIATE || !(!has_rex && form == X86_SIMPLE_RELATIVE) ||
++		    X86_OUTPUT_UNSUPPORTED_FOR(handle,
++				!wide && handle->mode != CS_MODE_32, false,
++				X86_ATT_printInst))
++			return false;
++	} else
++#else
++	const bool att = false;
++#endif
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+ 		return false;
+ 
+@@ -193,6 +205,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
+ 		*insn_size = insn->size = (uint16_t)(1 + has_rex);
+ 	} else if (relative) {
++		if (att && row->id == X86_INS_CALL)
++			insn->mnemonic[4] = wide ? 'q' : 'l';
+ 		const uint8_t *bytes = code + row->imm_offset;
+ 		int64_t delta;
+ 		if (row->imm_size == 1) {

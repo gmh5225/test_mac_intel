@@ -1,7 +1,7 @@
-name: Time standalone x86 memory forms against iced and prove mixed images stay identical
+name: Verify dedicated x86 AT&T branches and register pairs against same-image iced GAS and mixed archive controls
 on:
   push:
-    branches: [codex/standalone-x86-memory-form-controls]
+    branches: [codex/dedicated-x86-att-register-and-branches]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 571a1592ff48d148257b7ae1146d2fb593470783
+          ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ce00fc089a123d4149a1a39e458a6a81b9778a5b
+          ref: f47e72ea35c2b8f2270ac80a20ff79915eeffdb9
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: standalone-memory-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: dedicated-att-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
