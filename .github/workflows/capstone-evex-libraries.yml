@@ -1,7 +1,7 @@
-name: Measure AT&T vector and immediate records against memory records and iced GAS on real ELF and PE programs
+name: Measure AT&T VEX and SSE register records with EVEX moves and broadcasts on real ELF and PE binaries against iced GAS
 on:
   push:
-    branches: [codex/x86-att-evex-scalar-real-programs]
+    branches: [codex/x86-att-simd-moves-and-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-evex-scalar-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-vector-and-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
