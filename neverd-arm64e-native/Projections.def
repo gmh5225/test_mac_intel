@@ -24,6 +24,12 @@
   "report": "report.json",
   "summary": "Signed arm64e.x1 projections on {hardware} at {revision}. Linked and verified {images} images. Executed {executed} comparisons.",
   "cpu": ["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"],
+  "host_report": "host.json",
+  "model_policy": "scripts/verify_arm64e_return_model.def",
+  "native_policy": "scripts/verify_arm64e_native.def",
+  "acceptance_summary": "Same-host native acceptance on {hardware} at {revision} was {status} (exit {code}). Original controls qualified: {controls}. Generated comparisons completed: {executed}/{images}.",
+  "acceptance_error": "inconsistent native qualification reports or verifier exit status",
   "compared": "compared",
+  "link_error": "projection build did not link the complete image inventory",
   "revision_error": "projection checkout does not match the resolved branch"
 }

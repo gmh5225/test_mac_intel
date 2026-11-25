@@ -170,8 +170,15 @@ pushes to the repository and can also be tested with a manual run.
 **Verify generated NeverD arm64e.x1 images** resolves a branch in
 NeverSight/NeverD to one revision for both jobs. The macOS producer builds
 the Release tests with the checksum-pinned r6 package and exports the signing
-projections. Xcode 27 compiles, links and verifies all 20 images. The
-measurement artifact contains the image hashes, link maps, signatures and
-per-image launch results. A virtual M1 can qualify the link and signature.
-Full native qualification additionally requires the comparison to complete
-in every image. The input artifact expires after one day.
+projections. Xcode 27 downloads that job's artifact by ID. With a NeverD
+revision supporting `check --require-native`, the same Mac runs the five
+original native controls and measures all 20 linked and signed images. An
+available instruction family can execute its own comparisons independently.
+
+The Actions summary and `host.json` report the hardware, verifier exit code,
+original control result and generated comparison count. Full native acceptance
+requires exit 0. Exit 2 records unavailable hardware as a hosted observation.
+Failed controls, mismatched reports and inconsistent image counts fail the
+job. The measurement artifact contains the original probe reports, signatures,
+link maps and per-image process results. Replays of earlier NeverD revisions
+retain their link and signature checks. The input artifact expires after one day.
