@@ -7,7 +7,7 @@ def symbols(path):
         'X86_disasmIterText', 'tryOutput32', 'writeExtraOutput32',
         'X86_decodeRegisterFallback32', 'X86_decodeOutputMiss32',
         'X86_scanNativeBatch', 'X86_reg_access', 'X86_writeSimpleDetail',
-        'X86_writeVectorOutput',
+        'X86_writeVectorOutput', 'X86_decodeOutputMiss64', 'X86_decodeScalarMemory64', 'writeMemoryImmediate64',
     )
     result = {}
     with path.open('rb') as source:

@@ -1,7 +1,7 @@
-name: Time standalone x86 memory forms against iced and prove mixed images stay identical
+name: Measure relocated AMD64 scalar memory output and i386 layout against iced
 on:
   push:
-    branches: [codex/standalone-x86-memory-form-controls]
+    branches: [codex/standalone-terminal-scalar-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ce00fc089a123d4149a1a39e458a6a81b9778a5b
+          ref: b20891634f83e245f43ab87e15cdf47800d5d4bb
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: standalone-memory-forms-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: terminal-scalar-groups-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
