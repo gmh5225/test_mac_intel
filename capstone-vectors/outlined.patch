@@ -1,30 +1,29 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..fd122362 100644
+index 1cc3d3a9..cb65d0a4 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -936,10 +936,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 			} else {
+@@ -937,9 +937,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				// only immediate as address of memory
  				if (DispVal < 0) {
--					SStream_concat(O, "0x%" PRIx64,
+ 					SStream_concat(O, "0x%" PRIx64,
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
-+					X86_printNegativeAbsolute(MI, O, DispVal, true);
++						       X86_absoluteAddress(MI, DispVal));
  				} else {
  					if (DispVal > HEX_THRESHOLD)
  						SStream_concat(O, "0x%" PRIx64,
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..558b95ea 100644
+index 2ee82ef7..575bd418 100644
 --- a/arch/X86/X86InstPrinterCommon.c
 +++ b/arch/X86/X86InstPrinterCommon.c
-@@ -290,3 +290,32 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
+@@ -290,3 +290,15 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
  	}
  }
  #endif
 +
 +/* An absolute displacement is an offset of the effective address width. */
-+static uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp)
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp)
 +{
 +	const cs_mode mode = mi->csh->mode;
 +	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
@@ -34,114 +33,195 @@ index 2ee82ef7..558b95ea 100644
 +		return address_override ? (uint16_t)disp : (uint32_t)disp;
 +	return address_override ? (uint32_t)disp : (uint64_t)disp;
 +}
-+
-+/* An absolute offset has no base or index. Use its address width while
-+ * leaving the signed displacement and the following operand unchanged. */
-+void X86_printNegativeAbsolute(const MCInst *mi, SStream *out,
-+			      int64_t displacement, bool att)
-+{
-+	const uint64_t address = X86_absoluteAddress(mi, displacement);
-+	if (att) {
-+		SStream_concat(out, "0x%" PRIx64, address);
-+	} else if (mi->csh->syntax == CS_OPT_SYNTAX_MASM) {
-+		const char *format = X86_masmNeedsLeadingZero(address) ?
-+					     "0%" PRIx64 "h" : "%" PRIx64 "h";
-+		SStream_concat(out, format, address);
-+	} else {
-+		SStream_concat_hex64(out, address, false);
-+	}
-+}
 diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
-index 37b02959..689d446d 100644
+index 37b02959..bb4919aa 100644
 --- a/arch/X86/X86InstPrinterCommon.h
 +++ b/arch/X86/X86InstPrinterCommon.h
-@@ -22,6 +22,26 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
+@@ -22,6 +22,8 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
  	return target;
  }
  
-+// for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h
-+// this function tell us if we need to have prefix 0 in front of a number
-+static inline bool X86_masmNeedsLeadingZero(uint64_t imm)
-+{
-+	// find the first hex letter representing imm
-+	while (imm >= 0x10)
-+		imm >>= 4;
-+
-+	if (imm < 0xa)
-+		return false;
-+	else // this need 0 prefix
-+		return true;
-+}
-+
-+#if defined(__GNUC__)
-+__attribute__((cold, noinline))
-+#endif
-+void X86_printNegativeAbsolute(const MCInst *mi, SStream *out,
-+			       int64_t displacement, bool att);
++uint64_t X86_absoluteAddress(const MCInst *mi, int64_t disp);
 +
  void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
  
  void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..ccf218d9 100644
+index 457485ab..f2bd413f 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -312,20 +312,6 @@ static void printRegName(SStream *OS, unsigned RegNo)
- 				      getRegisterNameLength(RegNo));
+@@ -326,120 +326,61 @@ static bool need_zero_prefix(uint64_t imm)
+ 		return true;
  }
  
--// for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h
--// this function tell us if we need to have prefix 0 in front of a number
--static bool need_zero_prefix(uint64_t imm)
--{
--	// find the first hex letter representing imm
--	while (imm >= 0x10)
--		imm >>= 4;
--
--	if (imm < 0xa)
--		return false;
--	else // this need 0 prefix
--		return true;
--}
--
- static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+-static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
++static void printUnsignedHex(MCInst *MI, SStream *O, uint64_t value)
  {
- 	if (positive) {
-@@ -350,13 +336,13 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+-	if (positive) {
+-		// always print this number in positive form
+-		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
+-			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
+-					default:
+-						break;
+-					case 1:
+-						imm &= 0xff;
+-						break;
+-					case 2:
+-						imm &= 0xffff;
+-						break;
+-					case 4:
+-						imm &= 0xffffffff;
+-						break;
+-					}
+-				}
++	if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
++		const char *fmt = need_zero_prefix(value) ? "0%" PRIx64 "h" :
++							    "%" PRIx64 "h";
++		SStream_concat(O, fmt, value);
++	} else {
++		SStream_concat_hex64(O, value, false);
++	}
++}
  
- 				if (imm == 0x8000000000000000LL) // imm == -imm
- 					SStream_concat0(O, "8000000000000000h");
+-				if (imm == 0x8000000000000000LL) // imm == -imm
+-					SStream_concat0(O, "8000000000000000h");
 -				else if (need_zero_prefix(imm))
-+				else if (X86_masmNeedsLeadingZero(imm))
- 					SStream_concat(O, "0%" PRIx64 "h", imm);
- 				else
- 					SStream_concat(O, "%" PRIx64 "h", imm);
- 			} else {
- 				if (imm > HEX_THRESHOLD) {
+-					SStream_concat(O, "0%" PRIx64 "h", imm);
+-				else
+-					SStream_concat(O, "%" PRIx64 "h", imm);
+-			} else {
+-				if (imm > HEX_THRESHOLD) {
 -					if (need_zero_prefix(imm))
-+					if (X86_masmNeedsLeadingZero(imm))
- 						SStream_concat(O,
- 							       "0%" PRIx64 "h",
- 							       imm);
-@@ -398,7 +384,7 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 				if (imm == 0x8000000000000000LL) // imm == -imm
- 					SStream_concat0(O, "8000000000000000h");
- 				else if (imm < -HEX_THRESHOLD) {
+-						SStream_concat(O,
+-							       "0%" PRIx64 "h",
+-							       imm);
+-					else
+-						SStream_concat(
+-							O, "%" PRIx64 "h", imm);
+-				} else
+-					SStream_concat_dec64(O, imm, false);
+-			}
+-		} else { // Intel syntax
+-			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
+-					default:
+-						break;
+-					case 1:
+-						imm &= 0xff;
+-						break;
+-					case 2:
+-						imm &= 0xffff;
+-						break;
+-					case 4:
+-						imm &= 0xffffffff;
+-						break;
+-					}
+-				}
++static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
++{
++	if (imm >= 0) {
++		if (imm <= HEX_THRESHOLD)
++			SStream_concat_dec64(O, (uint64_t)imm, false);
++		else
++			printUnsignedHex(MI, O, (uint64_t)imm);
++		return;
++	}
+ 
+-				SStream_concat_hex64(O, imm, false);
+-			} else {
+-				if (imm > HEX_THRESHOLD)
+-					SStream_concat_hex64(O, imm, false);
+-				else
+-					SStream_concat_dec64(O, imm, false);
+-			}
++	uint64_t value = (uint64_t)imm;
++	if (positive) {
++		switch (MI->op1_size) {
++		case 1:
++			value = (uint8_t)imm;
++			break;
++		case 2:
++			value = (uint16_t)imm;
++			break;
++		case 4:
++			value = (uint32_t)imm;
++			break;
+ 		}
+-	} else {
+-		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
+-			if (imm < 0) {
+-				if (imm == 0x8000000000000000LL) // imm == -imm
+-					SStream_concat0(O, "8000000000000000h");
+-				else if (imm < -HEX_THRESHOLD) {
 -					if (need_zero_prefix(imm))
-+					if (X86_masmNeedsLeadingZero(imm))
- 						SStream_concat(O,
- 							       "-0%" PRIx64 "h",
- 							       -imm);
-@@ -411,7 +397,7 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 							     true);
- 			} else {
- 				if (imm > HEX_THRESHOLD) {
+-						SStream_concat(O,
+-							       "-0%" PRIx64 "h",
+-							       -imm);
+-					else
+-						SStream_concat(O,
+-							       "-%" PRIx64 "h",
+-							       -imm);
+-				} else
+-					SStream_concat_dec64(O, (uint64_t)-imm,
+-							     true);
+-			} else {
+-				if (imm > HEX_THRESHOLD) {
 -					if (need_zero_prefix(imm))
-+					if (X86_masmNeedsLeadingZero(imm))
- 						SStream_concat(O,
- 							       "0%" PRIx64 "h",
- 							       imm);
-@@ -1235,11 +1221,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+-						SStream_concat(O,
+-							       "0%" PRIx64 "h",
+-							       imm);
+-					else
+-						SStream_concat(
+-							O, "%" PRIx64 "h", imm);
+-				} else
+-					SStream_concat_dec64(O, imm, false);
+-			}
+-		} else { // Intel syntax
+-			if (imm < 0) {
+-				if (imm == 0x8000000000000000LL) // imm == -imm
+-					SStream_concat0(O,
+-							"0x8000000000000000");
+-				else if (imm < -HEX_THRESHOLD)
+-					SStream_concat_hex64(O, (uint64_t)-imm,
+-							     true);
+-				else
+-					SStream_concat_dec64(O, (uint64_t)-imm,
+-							     true);
+-
+-			} else {
+-				if (imm > HEX_THRESHOLD)
+-					SStream_concat_hex64(O, imm, false);
+-				else
+-					SStream_concat_dec64(O, imm, false);
+-			}
++		if (value == (UINT64_C(1) << 63) &&
++		    MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
++			SStream_concat0(O, "8000000000000000h");
++		} else {
++			printUnsignedHex(MI, O, value);
+ 		}
++		return;
++	}
++	if (imm == INT64_MIN) {
++		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM)
++			SStream_concat0(O, "8000000000000000h");
++		else
++			SStream_concat0(O, "0x8000000000000000");
++	} else if (imm >= -HEX_THRESHOLD) {
++		SStream_concat_dec64(O, 0 - value, true);
++	} else if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
++		const char *fmt = need_zero_prefix(value) ? "-0%" PRIx64 "h" :
++							   "-%" PRIx64 "h";
++		SStream_concat(O, fmt, 0 - value);
++	} else {
++		SStream_concat_hex64(O, 0 - value, true);
+ 	}
+ }
+ 
+@@ -1235,11 +1176,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
@@ -150,7 +230,7 @@ index 457485ab..ccf218d9 100644
 -							 MI->csh->mode) &
 -							 DispVal,
 -						 true);
-+					X86_printNegativeAbsolute(MI, O, DispVal, false);
++					printUnsignedHex(MI, O, X86_absoluteAddress(MI, DispVal));
  				} else {
  					printImm(MI, O, DispVal, true);
  				}

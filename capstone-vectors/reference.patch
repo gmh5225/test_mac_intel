@@ -38,20 +38,25 @@ index b88dfbc7..a45802f5 100644
  			// copy all prefixes
  			instr->x86_prefix[0] = insn.prefix0;
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..78ba0cf5 100644
+index 457485ab..e63f5fa3 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -1236,9 +1236,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -1235,11 +1235,12 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
++					const uint8_t original_size = MI->op1_size;
++					MI->op1_size = 8;
  					printImm(MI, O,
 -						 x86_get_address_mask(
 -							 MI->csh->mode) &
 -							 DispVal,
 +						 x86_absolute_address(MI, DispVal),
  						 true);
++					MI->op1_size = original_size;
  				} else {
  					printImm(MI, O, DispVal, true);
+ 				}
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
 index 380faa79..aa5d1111 100644
 --- a/arch/X86/X86Mapping.h
