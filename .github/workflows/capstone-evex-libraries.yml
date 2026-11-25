@@ -1,7 +1,7 @@
-name: Qualify MIPS register spellings with matched release archives public records and same-executable ELF timings
+name: Measure the verified MIPS register tables in the actual six-architecture NeverD Capstone configuration
 on:
   push:
-    branches: [codex/qualify-linux-arm64-mips-registers]
+    branches: [codex/mixed-mips-register-name-banks]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: acb6a6298e4642828981a72acc6022ee36fcd0be
+          ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 6f748e8de6d414c64319dd4287e976568f2d4b6b
+          ref: f47e72ea35c2b8f2270ac80a20ff79915eeffdb9
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-arm64-banks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-mixed-bank-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
