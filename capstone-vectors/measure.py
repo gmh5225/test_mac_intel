@@ -43,171 +43,86 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    images={}
-    maps=rd(r/'source.json')
-    assert maps['prefix']==q and maps['base']['commit']==q['parent']
-    layout={}
-    from elftools.elf.elffile import ELFFile
-    from training import fetch
-    from foreign_time import measure as time_foreign
-    foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
-    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
-    reference=maps['reference']
-    assert sha(r/'reference.patch')==reference['sha256']
-    run('git','-C',base,'apply','--index',r/'reference.patch')
-    assert get('git','-C',base,'write-tree').strip()==reference['tree']
+    candidate = rd(r/'source.json')['outlined']
+    assert sha(r/'outlined.patch') == candidate['sha256'] and candidate['parent'] == m['checkout_commit']
+    run('git','-C',base,'apply','--index',r/'outlined.patch')
+    assert get('git','-C',base,'write-tree').strip() == candidate['tree']
     run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'reference')
-    run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/'att-reference')
-    save('offset-reference',dict(source=reference,archive=sha(lib),exe=sha(w/'reference')))
-    run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-    old_names=maps['previous']
-    assert sha(r/'previous.patch')==old_names['sha256']
-    run('git','-C',base,'apply','--index',r/'previous.patch')
-    assert get('git','-C',base,'write-tree').strip()==old_names['tree']
-    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-    run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/'att-previous')
-    save('register-control',dict(source=old_names,exe=sha(w/'att-previous')))
-    for label in ('base','outlined','candidate'):
-        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
-        if label=='outlined':
-            assert sha(r/'outlined.patch')==maps['outlined']['sha256']
-            run('git','-C',base,'apply','--index',r/'outlined.patch');assert get('git','-C',base,'write-tree').strip()==maps['outlined']['tree']
-        if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
-        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
-        from symbol_layout import symbols
-        section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
-        assert len(section_data)>=45
-        save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
-        run('clang++','-O2','-std=c++17','-I',base/'include',r/'sample.cpp',lib,'-o',w/'offset-unit')
-        actual=get(w/'offset-unit');target=rd(r/'offset-expected.json')['base' if label=='base'else 'fixed']
-        assert actual==target and len(actual.splitlines())==48,label
-        save('offsets-'+label,actual.splitlines())
-        run('clang','-fPIC','-shared','-I',base/'include',r/'trailing-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/'trailing.so')
-        run('clang++','-O2','-std=c++17','-I',base/'include',r/'trailing-immediate.cpp','-ldl','-o',w/'trailing')
-        suffix=json.loads(get(w/'trailing',w/'trailing.so'))
-        assert suffix['cases']==31104 and suffix['changed_operands']==0 and suffix['suffix_hash']==8508379939118731520,suffix
-        assert suffix['wrong_address']==(15696 if label=='base' else 0),suffix
-        save('trailing-'+label,suffix)
-
-        if label!='base':
-            run('clang','-std=c11','-O2','-I',base/'include',r/'transitions.c',lib,'-o',w/'transitions')
-            count=int(get(w/'transitions'))
-            assert count==1600
-            save('transitions-'+label,{'checked':count})
-
-        run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/('att-'+label))
-        images[label]=dict(archive=sha(lib),exe=sha(w/label))
-        with (w/label).open('rb')as f:
-            elf=ELFFile(f)
-            layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-    save('linked-sections',layout)
-    imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
-    original_sizes={k:len(v) for k,v in imgs.items()}
-    imgs={k:v+bytes(length-len(v)) for k,v in imgs.items()};imgs['duplicate']=imgs['base']
-    current=w/'selected';shutil.copy2(w/'base',current);current.write_bytes(imgs['base'])
-    inode=current.stat().st_ino;verified={}
-    offsets=[pos for pos in range(0,length,4096) if len({v[pos:pos+4096] for v in imgs.values()})>1] or [0]
-    def select(k):
-        with current.open('r+b',buffering=0) as out:
-            for at in offsets:
-                out.seek(at);part=imgs[k][at:at+4096];assert out.write(part)==len(part)
-        assert current.stat().st_ino==inode and current.stat().st_size==length
-        if k not in verified:
-            assert hashlib.sha256(current.read_bytes()[:original_sizes.get(k,original_sizes['base'])]).hexdigest()==images['base' if k=='duplicate' else k]['exe']
-            verified[k]=sha(current);assert verified[k]==hashlib.sha256(imgs[k]).hexdigest()
+    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'intel')
+    run('clang++',w/'att-bench.o',lib,gas_lib,*flags,'-o',w/'att')
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    invoke=['setarch',os.uname().machine,'-R',current]
-    mode_probe={};probe=w/'probe.bin';probe.write_bytes(bytes.fromhex('66 b8 78 56 34 12'))
-    span=w/'probe.tsv';span.write_text('0 6 1048576'+chr(10))
-    for tag in images:
-        select(tag)
-        for engine in ('iced','capstone','private'):
-            counts=[list(map(int,get(*invoke,engine,'0','1',probe,span,str(bits)).split()))[2:4] for bits in (16,32,64)]
-            assert counts==[[1,0],[2,0],[2,0]],(tag,engine,counts)
-            mode_probe[tag+'/'+engine]=counts
-    save('mode-probe',mode_probe)
-    cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
-    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
-    sys.path.insert(0,str(w));import pe_panels,frozen_deb
-    run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
-    save('host',host);observations={};summary={};audits={}
-    replay_paths={}
-    from att_timing import start
-    att_measure,att_images=start(w);att={};private_att={}
-    fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
-    assert {row[0] for row in fixtures}==set(m["samples"])
-    for name,bits,f,spans,_ in fixtures:
-        spec=m['provenance'][name]
-        assert sha(f)==spec['text_sha256']
-        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
+    cohort = rd(r/'cohort.json')
+    assert cohort['complete'] and cohort['source']==candidate
+    host = dict(cpu=get('lscpu'),affinity=sorted(os.sched_getaffinity(0)),system=platform.platform(),compiler=get('clang','--version').splitlines()[0],images={s:sha(w/s) for s in ('intel','att')},archive=sha(lib),iced=m['iced_revision'],source=candidate,neverd=dev,drivers={**m['drivers'],**rd(r/'gas-sources.json')})
+    save('host',host)
+    policies = dict(intel=('capstone','private','iced','fast'),att=('capstone','private','iced'))
+    sys.path.insert(0,str(w))
+    import pe_panels
+    run(sys.executable,'-B',w/'libmvec.py')
+    meta = rd(w/'libmvec.json')
+    pe = rd(w/'pe-images.json')
+    (w/'pe-images.json').write_text(json.dumps([row for row in pe if row['bits']==32]))
+    putty, = pe_panels.prepare(w)
+    vec = ('libmvec-amd64',64,w/'libmvec.text',[(0,meta['bytes'],meta['address'])],meta)
+    def bench_case(name,group,bits,blob,ranges,accepted,rejected):
+        policy = policies if group=='whole' else {'att':('capstone','iced')}
+        modes = (1,3,4,2)
+        def take(syntax,engine,mode,repeats):
+            value = list(map(int,get('setarch',os.uname().machine,'-R',w/syntax,engine,str(mode),str(repeats),blob,ranges,str(bits)).split()))
+            assert len(value)==6 and value[2:4]==[accepted*repeats,rejected*repeats],(name,group,engine,mode,value)
+            return value
+        def call(label,n):
+            dialect,engine,mode = label.split('/')
+            return take(dialect,engine,int(mode),n)
+        labels = [f'{dialect}/{engine}/{mode}' for dialect,engines in policy.items() for engine in engines for mode in modes]
+        def audit(dialect):
+            actual = [list(map(int,line.split())) for line in get('setarch',os.uname().machine,'-R',w/dialect,'audit','0','1',blob,ranges,str(bits)).splitlines()]
+            assert len(actual)==len(ranges.read_text().splitlines()) and all(a[3]==a[4] and a[1]==a[5] for a in actual)
+            assert sum(a[3] for a in actual)==accepted+rejected
+            return actual
+        audits = [audit(dialect) for dialect in policy]
+        assert all(a==audits[0] for a in audits)
+        n = max(1,math.ceil(15e6/min(call(label,1)[0] for label in labels)))
+        expected = {label:call(label,n)[2:] for label in labels}
+        assert len({tuple(z[:3]) for z in expected.values()})==1
+        for dialect,engines in policy.items():
+            for engine in engines:
+                assert expected[f'{dialect}/{engine}/1']==expected[f'{dialect}/{engine}/3']
+                if engine=='private':
+                    assert all(expected[f'{dialect}/{engine}/{mode}']==expected[f'{dialect}/capstone/{mode}'] for mode in modes)
+        cycles=[]
+        rng=random.Random(name+'/'+group+'/stages')
+        for j in range(17):
+            order=labels.copy()
+            rng.shuffle(order)
+            clocks={label:[0,0] for label in order}
+            for label in order+order[::-1]:
+                value=call(label,n)
+                assert value[2:]==expected[label],(name,group,label,j,value)
+                for i in (0,1):clocks[label][i]+=value[i]
+            cycles.append(clocks)
+        return dict(accepted=accepted,rejected=rejected,spans=len(audits[0]),bytes=sum(a[1] for a in audits[0]),sha256=sha(blob),extents_sha256=sha(ranges),repeats=n,visits=2,checks=expected,cycles=cycles)
+    panels={}
+    for name,bits,blob,spans,_ in (vec,putty):
+        expected=m['provenance'][name]
+        assert sha(blob)==expected['text_sha256'] and len(spans)==1
         path=w/(name+'.tsv')
-        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-        emit(selected)
-        if m['samples'][name]=='simd-functions':
-            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-            assert len(view)==len(selected)
-            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-        assert sha(path)==spec['extent_sha256']
-        def audit_engine(exe):
-            rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
-            assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
-            return rows
-        assert audit_engine('base')==audit_engine('outlined')==audit_engine('candidate')
-        audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
-        replay_paths[name]=(bits,f,path,spec['extent_sha256'])
-        att[name]={str(detail):att_measure(name,bits,f,path,detail) for detail in (0,1)}
-        save('att-timing',att);save('att-images',att_images)
-        private_att[name]={str(detail):att_measure(name,bits,f,path,detail,'private') for detail in (0,1)}
-        save('att-native-timing',private_att)
-        for route in ('private','capstone'):
-            def take(engine,mode,n):
-                other=engine in ('iced','fast')
-                select('base' if other else engine)
-                return list(map(int,get(*invoke,engine if other else route,str(mode),str(n),f,path,str(bits)).split()))
-            for mode in (0,1,2):
-                labels=[*imgs,'iced'] + (['fast'] if mode else [])
-                repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
-                expected={k:take(k,mode,repeats)[2:]for k in labels}
-                assert all(v[:3]==expected['base'][:3] for v in expected.values())
-                oracle=list(map(int,get(w/'reference',route,str(mode),str(repeats),f,path,str(bits)).split()))[2:]
-                assert expected['base']==expected['duplicate'] and expected['outlined']==expected['candidate']==oracle
-                if mode==0:assert expected['base']==oracle
-                rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-                for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
-                    rng.shuffle(labels);sample={k:[] for k in labels}
-                    for k in labels+labels[::-1]:
-                        row=take(k,mode,repeats);assert row[2:]==expected[k]
-                        sample[k].append(row[:2])
-                    rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,oracle=oracle,cycles=rows)
-                summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
-                save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==36
-    from firmware16 import compare
-    sources=rd(r/'input-sources.json');assert sha(r/'scalar.c')==sources['c_sha']
-    run('clang',*sources['compile'],r/'scalar.c','-o',w/'scalar.o')
-    with (w/'scalar.o').open('rb')as f:
-        elf=ELFFile(f);assert elf['e_machine']=='EM_386';blob=elf.get_section_by_name('.text').data()
-    path=w/'scalar16.bin';path.write_bytes(blob);spans=w/'scalar16.tsv';spans.write_text(f'0 {len(blob)} 1048576'+chr(10))
-    scalar=compare(path,spans,imgs,invoke,select)
-    save('scalar16',dict(sha256=sha(path),bytes=len(blob),source=sources['c_sha'],results=scalar))
-    save('fixed-image',dict(inode=inode,blocks=len(offsets),verified=verified,bytes=length,original_sizes=original_sizes,staged_sha256={k:hashlib.sha256(v).hexdigest()for k,v in imgs.items()}))
-    if platform.machine()=='x86_64':
-        from firmware16 import verify
-        save('seabios16',verify(w,imgs,invoke,select))
-    time_foreign(foreign_rows,w,save)
-    from route_profile import run as profile_routes
-    save('route-profile',profile_routes(r,w,base,build,replay_paths))
-    save('candidate-profile',profile_routes(r,w,base,build,replay_paths,r/'outlined.patch',maps['outlined']['tree']))
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
-
+        path.write_text(''.join('%d %d %d\n'%tuple(row) for row in spans))
+        assert sha(path)==expected['extent_sha256']
+        accepted,rejected=(25021,0) if bits==64 else (282906,3)
+        panels[name+'/whole']=bench_case(name,'whole',bits,blob,path,accepted,rejected)
+        save('observations',panels)
+        if bits==64:
+            assert cohort['section_sha256']==sha(blob) and cohort['extents_sha256']==sha(path)
+            for group,data in cohort['groups'].items():
+                path=r/(group+'.tsv')
+                assert sha(path)==data['sha256']
+                result=bench_case(name,group,bits,blob,path,data['instructions'],0)
+                assert (result['spans'],result['bytes'])==(data['spans'],data['bytes'])
+                panels[name+'/'+group]=result
+                save('observations',panels)
+    save('complete',dict(complete=True,panels=sorted(panels),host=host))
 finally:
-    n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
+    n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink())
+    shutil.rmtree(w)
+    save('cleanup',dict(removed=not w.exists(),bytes=n))
