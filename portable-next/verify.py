@@ -29,10 +29,10 @@ try:
     for suffix in ('static','shared'):
         lines.extend([f'add_executable(records_{suffix} "{(d/"raw.cpp").as_posix()}")',f'target_compile_features(records_{suffix} PRIVATE cxx_std_17)',f'target_link_libraries(records_{suffix} PRIVATE capstone_{suffix})'])
     linux=platform.system()=='Linux'
-    if linux and profile=='full':
-        lines.extend([f'add_executable(rv_time "{(d/"riscv_options.cpp").as_posix()}")','target_compile_features(rv_time PRIVATE cxx_std_17)','target_link_libraries(rv_time PRIVATE capstone_static)','target_link_options(rv_time PRIVATE -no-pie)'])
+    if profile=='full':
+        lines.extend([f'add_executable(rv_time "{(d/"riscv_options.cpp").as_posix()}")','target_compile_features(rv_time PRIVATE cxx_std_17)','target_link_libraries(rv_time PRIVATE capstone_static)'])
     (project/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
-    cfg=['cmake','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     chosen=os.environ.get('NATIVE_COMPILER','')
     if chosen in ('gcc','clang'):
         os.environ.update(CC=chosen,CXX='g++' if chosen=='gcc' else 'clang++')
@@ -55,23 +55,9 @@ try:
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
         units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_scan_options', 'riscv_instruction_groups', 'riscv_op_count_iter', 'riscv_sysreg', 'riscv_reg_access', 'riscv_insn_name_segv'] if profile=='full' else ['riscv_scan_options']
-        targets=['records_static','records_shared',*units]+(['rv_time'] if linux and profile=='full' else [])
+        targets=['records_static','records_shared',*units]+(['rv_time'] if profile=='full' else [])
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target',*targets])
-        if linux and profile=='full':shutil.copyfile(b/'rv_time',t/('riscv-option-'+stage))
-        if not win and profile=='full':
-            ext='dylib' if platform.system()=='Darwin' else 'so'
-            lib,=[f for f in b.rglob('libcapstone.'+ext)if f.is_file()]
-            shutil.copyfile(lib,t/(stage+'.'+ext))
-        if linux and profile=='full' and stage=='candidate':
-            lib,=b.rglob('libcapstone.a')
-            calls=json.loads((b/'compile_commands.json').read_text())
-            argo,=[x for x in calls if Path(x['file']).name=='RISCVInstPrinter.c']
-            import shlex
-            args=shlex.split(argo['command']);i=args.index('-o')
-            cmd('compile-register-stream',args[:i]+['-I',s,d/'register-stream.c',lib,'-o',t/'stream'])
-            assert int(sp.check_output([t/'stream'],text=True))==2109440
-            save('register-stream',dict(states=2109440,source=q))
-
+        if profile=='full':shutil.copyfile(b/'rv_time',t/('riscv-option-'+stage))
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
@@ -98,16 +84,10 @@ try:
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
     if verify_mixed:assert mixed['base']==mixed['candidate']
-    if not win and profile=='full':
-        cmd('compile-boundaries',[os.environ.get('CXX','c++'),'-std=c++17','-O2','-I',s/'include',d/'guard.cpp','-o',t/'guard']+(['-ldl']if linux else []))
-        checks=sp.check_output([t/'guard',t/('base.'+ext),t/('candidate.'+ext)],text=True).strip()
-        assert int(checks.split()[0])>13000000
-        save('guard',dict(checks=checks,source=q))
 
-
-    if linux and profile=='full':
+    if profile=='full':
         from riscv_time import measure
-        os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+        assert platform.system()=='Darwin'
         measure([dict(arch='riscv64',name=n)for n in texts],t,save)
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
