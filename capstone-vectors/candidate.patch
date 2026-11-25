@@ -1179,7 +1179,7 @@ index 00000000..8c6c906d
 +	}
 +}
 diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index 45de9b87..50c078cd 100644
+index 45de9b87..98199e72 100644
 --- a/arch/X86/X86ImmediateOutput.c
 +++ b/arch/X86/X86ImmediateOutput.c
 @@ -14,7 +14,7 @@
@@ -1211,7 +1211,7 @@ index 45de9b87..50c078cd 100644
  {
  	const unsigned offset = 2 + (rex != 0);
  	const bool shift = opcode == 0xc1;
-@@ -82,13 +86,24 @@ static void writeRegisterImmediate(cs_insn *insn,
+@@ -82,23 +86,34 @@ static void writeRegisterImmediate(cs_insn *insn,
  	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
@@ -1241,21 +1241,26 @@ index 45de9b87..50c078cd 100644
 +		writeUnsignedImmediate(out, value);
 +	}
  	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      reg->reg, 0);
-@@ -101,6 +116,11 @@ static void writeRegisterImmediate(cs_insn *insn,
- 			x->operands[1].access = 0;
+-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+-				      reg->reg, 0);
++		X86_writeSimpleDetailInOrder(insn->detail, row, opcode, rex,
++					     modrm, reg->reg, 0, att);
+ 		cs_x86 *x = &insn->detail->x86;
+-		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = logical && !wide ?
+-					     (int64_t)(uint32_t)immediate :
+-					     immediate;
++		cs_x86_op *op = &x->operands[att ? 0 : 1];
++		op->type = X86_OP_IMM;
++		op->imm = logical && !wide ? (int64_t)(uint32_t)immediate :
++					    immediate;
+ 		if (!shift)
+-			x->operands[1].access = 0;
++			op->access = 0;
  		x->encoding.imm_offset = (uint8_t)offset;
  		x->encoding.imm_size = (uint8_t)imm_size;
-+		if (att) {
-+			cs_x86_op dest = x->operands[0];
-+			x->operands[0] = x->operands[1];
-+			x->operands[1] = dest;
-+		}
  	}
- }
- 
-@@ -112,13 +132,33 @@ void X86_writeImmediateOutput(const uint8_t *code, cs_insn *insn,
+@@ -112,13 +127,33 @@ void X86_writeImmediateOutput(const uint8_t *code, cs_insn *insn,
  	const uint8_t opcode = code[rex != 0];
  	if (opcode == 0x68 || opcode == 0x6a)
  		writePushImmediate(insn, code, row, row->address_size == 8,
@@ -1268,7 +1273,7 @@ index 45de9b87..50c078cd 100644
  		writeRegisterImmediate(insn, row, reg, code, rex,
 -				       code[1 + (rex != 0)], opcode, insn_size);
 +				       code[1 + (rex != 0)], opcode, insn_size, false);
- }
++}
 +#ifndef CAPSTONE_X86_ATT_DISABLE
 +#if defined(__ELF__) && defined(__clang__)
 +__attribute__((section(".cs_x86_att_record_text")))
@@ -1286,7 +1291,7 @@ index 45de9b87..50c078cd 100644
 +	}
 +	writeRegisterImmediate(insn, row, reg, code, rex, code[1 + (rex != 0)],
 +			       opcode, insn_size, true);
-+}
+ }
 +#endif
 +
  #endif
@@ -1478,7 +1483,7 @@ index cffc4e81..6f12d080 100644
  		}
  		break;
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..62404426 100644
+index 11582041..ff6b2cd8 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
 @@ -4,7 +4,14 @@
@@ -1497,16 +1502,43 @@ index 11582041..62404426 100644
  #include "X86UnsignedImmediate.h"
  static bool X86_MEMORY_IMMEDIATE(
  #elif defined(X86_SEGMENT_LEA32)
-@@ -120,6 +127,23 @@ bool X86_writeMemoryOutput(
+@@ -87,19 +94,19 @@ bool X86_writeMemoryOutput(
+ 	}
+ 
+ #ifdef X86_EXTEND64_MEMORY
+-	const bool push = false, load = true;
++	const bool single_memory = false, load = true;
+ 	const unsigned reg_width = rex & 8 ? 3 : 2;
+ #elif defined(X86_EXTEND32_MEMORY)
+-	const bool push = false, load = true;
++	const bool single_memory = false, load = true;
+ 	const unsigned reg_width = 2; /* r32 destination */
+ #else
+ #ifdef X86_SEGMENT_LEA32
+-	const bool lea = true, load = true, push = false;
++	const bool lea = true, load = true, single_memory = false;
+ #elif defined(X86_MEMORY_IMMEDIATE)
+ 	const bool lea = false, load = false;
+ #else
+-	const bool push = opcode == 0xff, lea = opcode == 0x8d;
+-	const bool load = !push && (lea || (opcode & 2));
++	const bool single_memory = opcode == 0xff, lea = opcode == 0x8d;
++	const bool load = !single_memory && (lea || (opcode & 2));
+ #endif
+ 	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) : lead;
+ #endif
+@@ -120,6 +127,25 @@ bool X86_writeMemoryOutput(
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
  	char *out = insn->op_str;
 +#ifdef X86_ATT_MEMORY
-+	const unsigned operand_size = push ? row->ops[0].size :
++	const unsigned operand_size = single_memory ? row->ops[0].size :
 +		((opcode & 1) ? (rex & 8 ? 8 : 4) : 1);
 +	insn->mnemonic[strlen(row->mnemonic)] =
 +		operand_size == 8 ? 'q' : operand_size == 4 ? 'l' : 'b';
-+	if (!load && !push) {
++	if (single_memory && (modrm & 0x38) != 0x30)
++		*out++ = '*';
++	if (!load && !single_memory) {
 +		out = writeATTMemoryRegister(out, reg);
 +		memcpy(out, ", ", 2);
 +		out += 2;
@@ -1521,7 +1553,13 @@ index 11582041..62404426 100644
  	if (load) {
  		memcpy(out, reg->name, sizeof(reg->name));
  		out += reg->length;
-@@ -217,9 +241,16 @@ bool X86_writeMemoryOutput(
+@@ -212,14 +238,21 @@ bool X86_writeMemoryOutput(
+ 	writeUnsignedImmediate(out + 2, value);
+ #endif
+ #else
+-	if (!load && !push) {
++	if (!load && !single_memory) {
+ 		memcpy(out, ", ", 2);
  		memcpy(out + 2, reg->name, sizeof(reg->name));
  	}
  #endif
@@ -1540,7 +1578,7 @@ index 11582041..62404426 100644
  		cs_x86 *x = &insn->detail->x86;
  #ifdef X86_EXTEND64_MEMORY
  		if (opcode != 0x63) {
-@@ -242,7 +273,9 @@ bool X86_writeMemoryOutput(
+@@ -242,7 +275,9 @@ bool X86_writeMemoryOutput(
  		x->encoding.imm_offset = (uint8_t)imm_offset;
  		x->encoding.imm_size = (uint8_t)imm_size;
  #endif
@@ -1865,7 +1903,7 @@ index 450dc468..daa0a5d3 100644
 +
  #endif
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..29c1a098 100644
+index 21414e7a..22d92069 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
 @@ -1,8 +1,7 @@
@@ -1878,11 +1916,18 @@ index 21414e7a..29c1a098 100644
  
  /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
   * present. Memory admission and bounds checks belong to the address writer. */
-@@ -36,7 +35,13 @@ static void writeRelativeHex(char *out, uint64_t value)
- #ifdef X86_MEMORY32_OUTPUT
+@@ -33,10 +32,19 @@ static void writeRelativeHex(char *out, uint64_t value)
+ #define X86_FIXED_RELATIVE_HEX writeRelativeHex
+ #endif
+ 
+-#ifdef X86_MEMORY32_OUTPUT
++#if defined(X86_MEMORY32_OUTPUT) || defined(X86_ATT_OUTPUT)
  #include "X86GenIndirectMemory.inc"
  #endif
 -#ifdef X86_FIXED_OUTPUT
++#ifdef X86_ATT_OUTPUT
++#include "X86GenIndirect64Output.inc"
++#endif
 +#ifdef X86_ATT_OUTPUT
 +#if defined(__ELF__) && defined(__clang__)
 +__attribute__((section(".cs_x86_att_record_text")))
@@ -1893,7 +1938,7 @@ index 21414e7a..29c1a098 100644
  static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
  			     size_t size, cs_insn *insn, uint16_t *insn_size)
  #else
-@@ -53,6 +58,46 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -53,6 +61,46 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  	const bool wide = X86_FIXED_WIDE;
  #else
  	const bool wide = handle->mode == CS_MODE_64;
@@ -1940,7 +1985,16 @@ index 21414e7a..29c1a098 100644
  #endif
  	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
  	const uint8_t rex = has_rex ? code[0] : 0;
-@@ -111,8 +156,33 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -95,7 +143,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const bool alu = opcode < 0x40;
+ 			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
+ 						 (opcode & 0xfc) == 0x88;
+-#ifdef X86_MEMORY32_OUTPUT
++#if defined(X86_MEMORY32_OUTPUT) || defined(X86_ATT_OUTPUT)
+ 			const unsigned group = (modrm >> 3) & 7;
+ 			const bool single =
+ 				opcode == 0xff &&
+@@ -111,8 +159,33 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
  		}
  	}
@@ -1974,7 +2028,7 @@ index 21414e7a..29c1a098 100644
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
  		if (plan == X86_PLAN_VECTOR) {
-@@ -157,13 +227,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -157,13 +230,26 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  						   [((rex & 1) << 3) |
  						    (modrm & 7)];
  		}
@@ -1991,13 +2045,18 @@ index 21414e7a..29c1a098 100644
  	if (base_memory) {
 -#ifdef X86_MEMORY32_OUTPUT
 +#ifdef X86_ATT_OUTPUT
++		if (opcode == 0xff && (modrm & 0x38) != 0x30) {
++			const unsigned jump = (modrm & 0x20) != 0;
++			row = wide ? &x86_indirect64[has_rex][jump] :
++				     &x86_indirect_memory[jump];
++		}
 +		return X86_writeATTMemoryOutput(code, size, insn, insn_size, row,
 +					       x86_simple_registers);
 +#elif defined(X86_MEMORY32_OUTPUT)
  		if (opcode == 0xff && (modrm & 0x38) != 0x30)
  			row = &x86_indirect_memory[(modrm & 0x20) != 0];
  		return X86_MEMORY32_OUTPUT(code, size, insn, insn_size, row,
-@@ -190,9 +268,22 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -190,9 +276,22 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			first = row->ops[0].reg;
  			insn->bytes[1] = opcode;
  		}
@@ -2020,7 +2079,7 @@ index 21414e7a..29c1a098 100644
  		const uint8_t *bytes = code + row->imm_offset;
  		int64_t delta;
  		if (row->imm_size == 1) {
-@@ -239,11 +330,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -239,11 +338,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
  		const struct X86SimpleRegister *b =
  			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
@@ -2042,7 +2101,7 @@ index 21414e7a..29c1a098 100644
  		first = a->reg;
  		second = b->reg;
  		insn->bytes[1] = code[1];
-@@ -262,9 +363,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -262,9 +371,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			}
  			x->operands[0].type = X86_OP_IMM;
  			x->operands[0].imm = (int64_t)target;
