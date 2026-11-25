@@ -124,7 +124,9 @@ def main():
                         "FontEmbedding": 14, "PerformanceCounters": 12, "QoSTraffic": 11,
                         "OverlayFiles": 11, "SetupAdministration": 50,
                         "RealtimeWorkQueue": 34, "WindowsRemoteManagement": 33,
-                        "OlePropertyConversion": 1}
+                        "OlePropertyConversion": 1, "DebugDataModelManager": 1,
+                        "DirectCompositionControls": 3, "DirectCompositionClock": 5,
+                        "VolumeShadowCopyRuntime": 7}
     system_abi = args.output / "system-abis"
     system_calls = args.output / "system-calls"
     provider_options = [arg for name in system_providers for arg in ("--provider", name)]
