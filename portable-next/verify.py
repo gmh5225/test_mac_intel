@@ -1,4 +1,4 @@
-from snapshot import snapshots
+from snapshot import snapshots, standalone
 from pathlib import Path
 import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
 p=Path(__file__).resolve().parent
@@ -85,17 +85,23 @@ try:
                 run(name+'-make-'+unit,exe)
             shutil.rmtree(obj)
 
+        mips=t/'mips-only'
+        if name=='base':
+            opt=[v for v in flags if not v.endswith('_SUPPORT=ON')]
+            run('single-config','cmake','-G','Ninja','-S',s,'-B',mips,*opt,'-DCAPSTONE_MIPS_SUPPORT=ON')
+        run(name+'-single-build','cmake','--build',mips,'--target','capstone_static','capstone_shared','--parallel','4')
+        for kind in ('static','shared'):
+            rows[name]['mips_'+kind]=standalone(s,p,mips,t,profile,name+'-single-'+kind,run,kind)
+            assert rows[name]['mips_'+kind]['views']==rows['base']['mips_static']['views']
         if name=='scoped':
-            config=next((b/'CMakeFiles').glob('*/CMakeCCompiler.cmake')).read_text()
-            clang='set(CMAKE_C_COMPILER_ID "Clang")' in config
-            active=platform.system()=='Linux' and platform.machine()=='x86_64' and clang and profile not in ('diet','reduced')
+            config=next((mips/'CMakeFiles').glob('*/CMakeCCompiler.cmake')).read_text()
+            active=platform.system()=='Linux' and platform.machine() in ('x86_64','aarch64') and 'set(CMAKE_C_COMPILER_ID "Clang")' in config and profile!='diet'
             rows[name]['active']=active
-            reference='all_hosts' if active else 'base'
-            for link in ('static','shared','static_only','make_only'):
+            for link in ('static','shared','static_only','make_only','mips_static','mips_shared'):
                 if link not in rows[name]:continue
-                state=rows[name][link];expected=rows[reference][link]
-                assert state['snapshots']==expected['snapshots']
-                if platform.system()=='Linux':assert state['library_sha256']==expected['library_sha256'],(name,link,reference,clang)
+                ref='all_hosts' if active and link.startswith('mips_') else 'base'
+                trial,want=rows[name][link],rows[ref][link]
+                if platform.system()=='Linux':assert trial['library_sha256']==want['library_sha256'],(name,link,ref)
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:

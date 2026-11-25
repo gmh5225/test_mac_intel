@@ -1,7 +1,7 @@
-name: Validate AMD64 grouped memory instructions and unchanged inactive builds on Linux macOS and Windows
+name: Qualify standalone MIPS alias formatting and compare complete mixed and single-architecture builds across platforms
 on:
   push:
-    branches: [codex/grouped-memory-active-configs]
+    branches: [codex/mips-only-alias-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: amd64-grouped-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: standalone-alias-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

@@ -69,3 +69,32 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
             results['powerpc/'+str(big)+'/'+str(detail)]=dict(counts=counts,sha256=digest.hexdigest(),corpus_sha256=hashlib.sha256(corpus).hexdigest())
 
     return dict(library_sha256=hashlib.sha256(raw).hexdigest(),ppc_index_symbol=b"PPC_setAliasId" in raw,records=records,bytes=len(source),sha256=hashlib.sha256(source).hexdigest(),snapshots=results)
+
+def standalone(src, bench, build, temp, profile, label, run, linkage):
+    shared=linkage=='shared'
+    if os.name=='nt':
+        library=build/('capstone.lib' if shared else 'capstone_static.lib')
+        exe=(build if shared else temp)/'mips-record.exe'
+    else:
+        import sys
+        library=build/(('libcapstone.dylib' if sys.platform=='darwin' else 'libcapstone.so') if shared else 'libcapstone.a')
+        exe=temp/'mips-record'
+    assert library.is_file(),library
+    if os.name=='nt':
+        runtime='/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (build/'CMakeCache.txt').read_text() else '/MD'
+        run(label+'-snapshot-link','cl','/nologo','/O2',runtime,'/EHsc','/std:c++17','/I'+str(src/'include'),bench/'mips-record.cpp',library,'/Fo:'+str(temp/'snapshot.obj'),'/Fe:'+str(exe))
+    else:
+        cxx='g++' if profile=='gcc' else 'clang++'
+        run(label+'-snapshot-link',cxx,'-O2','-std=c++17','-I',src/'include',bench/'mips-record.cpp',library,*(['-Wl,-rpath,'+str(build)] if shared else []),'-o',exe)
+    raw=library.read_bytes()
+    stream=bytearray()
+    for file in sorted((src/'suite/MC/Mips').glob('*.s.cs')):
+        for line in file.read_text().splitlines():
+            text=line.partition('=')[0].strip()
+            if re.fullmatch(r'0x[0-9a-fA-F]{2}(?:,\s*0x[0-9a-fA-F]{2}){3}',text):
+                stream.extend(int(byte,16)for byte in text.split(','))
+    assert len(stream)>256
+    data=temp/'mips-full-record.bin';data.write_bytes(stream)
+    views=sp.check_output([exe,data],text=True).splitlines()
+    assert len(views)==(8 if profile=='diet' else 16) and all(int(v.split()[3])>0 for v in views)
+    return dict(library_sha256=hashlib.sha256(raw).hexdigest(),views=views,bytes=len(stream),input=hashlib.sha256(stream).hexdigest())
