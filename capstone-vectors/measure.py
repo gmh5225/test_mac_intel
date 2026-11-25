@@ -65,6 +65,12 @@ try:
         projections[label]=sha(table)
         assert len(set(projections.values()))==1
         save('generated-plans',projections)
+        if label=='base':evex={}
+        if label!='candidate':
+            run('clang++','-O2','-std=c++17','-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator')
+            inc=base/'arch/X86/X86GenEvexRipMemory.inc'
+            assert sp.check_output([w/'vector-generator','--evex-rip-memory'])==inc.read_bytes()
+            evex[label]=sha(inc);save('evex-plans',evex)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols

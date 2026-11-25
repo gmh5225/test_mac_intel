@@ -1,7 +1,7 @@
-name: Compare grouped AMD64 operands at the existing scalar writer on real PE and ELF, firmware and foreign-ISA controls
+name: Compare unified and separate final writers for 626 EVEX vector tuples on real PE, ELF, firmware and foreign controls
 on:
   push:
-    branches: [codex/amd64-reuse-memory-immediate-writer]
+    branches: [codex/full-width-evex-memory-tuples]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-memory-groups-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: full-tuple-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
