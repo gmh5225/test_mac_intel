@@ -17,7 +17,7 @@ try:
     (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Mixed LANGUAGES C CXX)\n'+v[v.index('# --- Capstone (our fork'):v.index('# --- NeverD CMake helpers')])
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON']
     run('cmake','-G','Ninja','-S',project,'-B',mix,*flags)
-    run('cmake','-G','Ninja','-S',src,'-B',one,*flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF')
+    run('cmake','-G','Ninja','-S',src,'-B',one,*flags,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF')
     singlecmd=next(z['command'] for z in rd(one/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
     mixcmd=next(z['command'] for z in rd(mix/'compile_commands.json')if z['file'].endswith('/MipsInstPrinter.c'))
     assert '-DCAPSTONE_MIPS_ONLY' in singlecmd and '-DCAPSTONE_MIPS_ONLY' not in mixcmd
@@ -40,6 +40,12 @@ try:
         run('clang++','-O3','-std=c++17','-no-pie','-I',src/'include',r/'foreign.cpp',lib,'-o',w/('foreign-'+v))
         products[v]=dict(archive=sha(lib),shared=sha(output),program=sha(w/('foreign-'+v)));save('products',products)
         run('python3','-B',src/'suite/synctools/mips_register_names.py','--check')
+        units=['mips_register_names','mips_scan','mips_reglist_offset','mips_msa_control','mips16_word_order','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_frames','mips16e2']
+        run('cmake','--build',one,'--target',*units,'--parallel','4')
+        report=out('ctest','--test-dir',one,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['mips_register_names_generator'])+')$')
+        assert '100% tests passed' in report
+        (e/(v+'-units.log')).write_text(report+'\n')
+
         args=shlex.split(singlecmd);slot=args.index('-o')
         run(*args[:slot],'-I',src,r/'stream.c',lib,'-o',w/'guard')
         streams[v]=list(map(int,out(w/'guard').split()))
@@ -47,6 +53,8 @@ try:
         if v!='base':
             domain[v]=json.loads(out(w/'domain',w/'base.so',output));assert domain[v]['trials']==20971520 and domain[v]['accepted']==15190912
             real[v]={row['name']:list(map(int,out(w/'real',w/'base.so',output,w/(row['name']+'.text')).split())) for row in corpus}
+    same='outlined' if os.uname().machine=='aarch64' else 'base'
+    assert products['candidate']==products[same],(same,products)
     assert domain['candidate']==domain['outlined'] and real['candidate']==real['outlined']
     save('guards',dict(domain=domain,streams=streams,real=real))
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});save('host',dict(cpu=out('lscpu'),compiler=out('clang','--version')))

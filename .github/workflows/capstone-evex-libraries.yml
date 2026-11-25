@@ -1,7 +1,7 @@
-name: Time MIPS register spellings through the verified public API on four ELF binaries
+name: Qualify MIPS register spellings with matched release archives public records and same-executable ELF timings
 on:
   push:
-    branches: [codex/mips-public-name-bench]
+    branches: [codex/qualify-linux-arm64-mips-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-public-names-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mips-arm64-banks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
