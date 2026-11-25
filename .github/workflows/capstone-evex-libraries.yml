@@ -1,7 +1,7 @@
-name: Measure AT&T stack-register and zero-operand records against the prior writer and iced GasFormatter
+name: Time AT&T memory records on verified ELF and PE functions against the preceding stack writer, shipping Capstone and iced GAS
 on:
   push:
-    branches: [codex/att-fixed-stack-and-empty-records]
+    branches: [codex/x86-att-memory-record-performance]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 571a1592ff48d148257b7ae1146d2fb593470783
+          ref: 994ce74539381ccfe41411455924c8933825d004
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: b20891634f83e245f43ab87e15cdf47800d5d4bb
+          ref: 7c158ca1c194c0a2b56d830eaeee9fa901732618
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-stack-and-empty-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-memory-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
