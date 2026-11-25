@@ -1,7 +1,7 @@
-name: Measure the AT&T SIMD byte-immediate formatter on the released Capstone and NeverD with full-stream proofs
+name: Check the typed AT&T immediate writer against all four public and native formatter controls
 on:
   push:
-    branches: [codex/x86-att-byte-immediate-controls]
+    branches: [codex/att-simd-immediate-real-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-byte-immediate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-typed-control-byte-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
