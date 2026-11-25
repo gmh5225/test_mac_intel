@@ -42,58 +42,35 @@ try:
     assert q['commit']==m['checkout_commit'] and q['tree']==m['checkout_tree']
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'base')
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    audits={}; wanted={'libmvec-amd64'}
-    from costs import profile
-    from stage import recipe_values,variants
-    source=rd(r/'merged.json');assert q['commit']==source['parent'] and sha(r/'candidate.patch')==source['sha256']
-    generated=base/'arch/X86/X86GenPrinterQuick.inc';original=recipe_values(generated.read_text())
-    run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==source['tree']
-    run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
-    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'on')
-    select,path_used,proof=variants(w,original,recipe_values(generated.read_text()));save('image',proof)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});rows={};profiles=[]
-
+    audits={}; wanted={'libmvec-amd64','putty-32-0.85','jpeg-avx2-i386'}
+    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    from phases import case
+    from probe import hardware
+    stage_groups={}
     save('build',dict(capstone=q,neverd=dev,iced=m['iced_revision'],lib=sha(lib),exe=sha(w/'base'),host=platform.machine(),driver=sha(w/'driver.cpp'),inputs=m['drivers']))
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
-        if name not in wanted:continue
-        spec=m['provenance'][name]
-        assert sha(f)==spec['text_sha256']
-        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
-        path=w/(name+'.tsv')
-        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-        emit(selected)
-        if m['samples'][name]=='simd-functions':
-            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-            assert len(view)==len(selected)
-            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-        assert sha(path)==spec['extent_sha256']
-        traces=[list(map(int,line.split()))for line in get(w/'base','audit','0','1',f,path,str(bits)).splitlines()]
-        assert len(traces)==len(selected) and all(x[3]==x[4] and x[1]==x[5]for x in traces)
-        audits[name]=dict(extents=len(selected),boundaries=sum(x[3]for x in traces),extent_sha256=sha(path),text_sha256=sha(f))
-        save('audit',audits)
-        for mode in (1,2):
-            def visit(tag,reps):
-                select(tag)
-                return list(map(int,get('setarch',os.uname().machine,'-R',path_used,'private',str(mode),str(reps),f,path,str(bits)).split()))
-            reps=max(1,math.ceil(35e6/visit('base',1)[0]))
-            expected=visit('base',reps)[2:];labels=['off','duplicate','on','base'];rng=random.Random(name+'/recipe-data/'+str(mode));cycles=[]
-            for k in range(35):
-                rng.shuffle(labels);times={tag:[] for tag in labels}
-                for tag in labels+labels[::-1]:
-                    v=visit(tag,reps);assert v[2:]==expected;times[tag].append(v[:2])
-                cycles.append({t:[sum(v[i] for v in pairs)for i in (0,1)]for t,pairs in times.items()})
-            rows[name+'/'+str(mode)]=dict(cycles=cycles,signature=expected,repeats=reps);save('observations',rows)
-            from probe import hardware,record
-            with hardware(r,w,save) as (groups,measure):
-                if 'work' in groups:
-                    summary=record(groups,measure,w,path_used,select,visit,f,path,bits,mode,reps,save)
-                    assert set(summary)==set(groups)
-    assert len(rows)==2 and set(audits)==wanted
-    save('complete',dict(complete=True,source=q,merged=source,cases=len(rows),neverd=dev,inputs=audits))
-
+    with hardware(r,w,save) as (groups,measure):
+        for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
+            if name not in wanted:continue
+            spec=m['provenance'][name]
+            assert sha(f)==spec['text_sha256']
+            selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
+            path=w/(name+'.tsv')
+            def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
+            emit(selected)
+            if m['samples'][name]=='simd-functions':
+                view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
+                assert len(view)==len(selected)
+                selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
+            assert sha(path)==spec['extent_sha256']
+            traces=[list(map(int,line.split()))for line in get(w/'base','audit','0','1',f,path,str(bits)).splitlines()]
+            assert len(traces)==len(selected) and all(x[3]==x[4] and x[1]==x[5]for x in traces)
+            audits[name]=dict(extents=len(selected),boundaries=sum(x[3]for x in traces),extent_sha256=sha(path),text_sha256=sha(f))
+            save('audit',audits)
+            stage_groups[name]=case(name,bits,w/'base',f,path,groups,measure,save)
+    assert set(audits)==set(stage_groups)==wanted
+    save('complete',dict(complete=True,source=q,iced=m['iced_revision'],neverd=dev,inputs=audits,groups=stage_groups))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
