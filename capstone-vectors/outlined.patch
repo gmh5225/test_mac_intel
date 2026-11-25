@@ -1,8 +1,48 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..8ddc5cce 100644
+index 1cc3d3a9..d47d55af 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -316,6 +316,21 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
+@@ -237,6 +237,27 @@ static void printf512mem(MCInst *MI, unsigned OpNo, SStream *O)
+ 
+ static void printRegName(SStream *OS, unsigned RegNo);
+ 
++/* Both positive immediates and branch targets use the same radix threshold.
++ * An AT&T immediate's dollar sign belongs to its number's markup token. */
++static void printUnsignedNumber(SStream *O, uint64_t value, bool dollar)
++{
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	if (cs_vsnprintf == cs_default_vsnprintf && !O->is_closed &&
++	    O->index < SSTREAM_BUF_LEN - 1 - (size_t)dollar) {
++		if (dollar)
++			O->buffer[O->index++] = '$';
++		printUInt64(O, value);
++		return;
++	}
++#endif
++	if (value > HEX_THRESHOLD)
++		SStream_concat(O, dollar ? "$0x%" PRIx64 : "0x%" PRIx64, value);
++	else
++		SStream_concat(O, dollar ? "$%" PRIu64 : "%" PRIu64, value);
++}
++
+ // local printOperand, without updating public operands
+ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+@@ -276,10 +297,7 @@ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 					SStream_concat(O, "$-%" PRIu64, -imm);
+ 			}
+ 		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "$0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "$%" PRIu64, imm);
++			printUnsignedNumber(O, (uint64_t)imm, true);
+ 		}
+ 	}
+ }
+@@ -316,6 +334,21 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
  	}
  }
  
@@ -24,7 +64,7 @@ index 1cc3d3a9..8ddc5cce 100644
  static void fixup_evex_opmask_access(MCInst *MI)
  {
  	cs_x86 *x86 = &MI->flat_insn->detail->x86;
-@@ -350,7 +365,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -350,7 +383,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
  	int reg;
  
  	if (MI->csh->detail_opt) {
@@ -33,7 +73,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -374,11 +389,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -374,11 +407,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -46,7 +86,7 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	SegReg = MCInst_getOperand(MI, Op + 1);
-@@ -407,7 +418,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -407,7 +436,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
  static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
  {
  	if (MI->csh->detail_opt) {
@@ -55,7 +95,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -431,11 +442,7 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -431,11 +460,7 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -68,7 +108,7 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	// DI accesses are always ES-based on non-64bit mode
-@@ -512,7 +519,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+@@ -512,7 +537,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
  	int reg;
  
  	if (MI->csh->detail_opt) {
@@ -77,7 +117,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -536,11 +543,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+@@ -536,11 +561,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -90,7 +130,35 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	// If this has a segment register, print it.
-@@ -672,7 +675,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -568,10 +589,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 				arch_masks[x86_get_bit_mode(MI->csh->mode)] &
+ 					imm);
+ 		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "%" PRIu64, imm);
++			printUnsignedNumber(O, (uint64_t)imm, false);
+ 		}
+ 	}
+ 
+@@ -638,14 +656,7 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ 			MI->csh->mode, MI->address, MI->flat_insn->size,
+ 			MCOperand_getImm(Op), MI->imm_size);
+ 
+-		if (imm < 0) {
+-			SStream_concat(O, "0x%" PRIx64, imm);
+-		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "%" PRIu64, imm);
+-		}
++		printUnsignedNumber(O, (uint64_t)imm, false);
+ 		if (MI->csh->detail_opt) {
+ 			MI->flat_insn->detail->x86
+ 				.operands[MI->flat_insn->detail->x86.op_count]
+@@ -672,7 +683,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  							  .op_count]
  					.mem.base = X86_register_map(reg);
  			} else {
@@ -99,7 +167,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  				MI->flat_insn->detail->x86
  					.operands[MI->flat_insn->detail->x86
-@@ -689,15 +692,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -689,15 +700,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  					MI->csh->regsize_map[X86_register_map(
  						reg)];
  
@@ -116,7 +184,31 @@ index 1cc3d3a9..8ddc5cce 100644
  
  				MI->flat_insn->detail->x86.op_count++;
  			}
-@@ -876,7 +871,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -716,10 +719,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 		switch (MI->flat_insn->id) {
+ 		default:
+ 			if (imm >= 0) {
+-				if (imm > HEX_THRESHOLD)
+-					SStream_concat(O, "$0x%" PRIx64, imm);
+-				else
+-					SStream_concat(O, "$%" PRIu64, imm);
++				printUnsignedNumber(O, (uint64_t)imm, true);
+ 			} else {
+ 				if (MI->csh->imm_unsigned) {
+ 					// the mask is for display only: the value
+@@ -763,10 +763,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 		case X86_INS_MOV:
+ 			// do not print number in negative form
+ 			// Use unsigned comparison to handle values >= 2^63 correctly
+-			if ((uint64_t)imm > HEX_THRESHOLD)
+-				SStream_concat(O, "$0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "$%" PRIu64, imm);
++			printUnsignedNumber(O, (uint64_t)imm, true);
+ 			break;
+ 
+ 		case X86_INS_IN:
+@@ -876,7 +873,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  	int64_t DispVal = 1;
  
  	if (MI->csh->detail_opt) {
@@ -125,7 +217,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -903,11 +898,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -903,11 +900,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -138,7 +230,7 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	// If this has a segment register, print it.
-@@ -937,9 +928,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -937,16 +930,10 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				// only immediate as address of memory
  				if (DispVal < 0) {
  					SStream_concat(O, "0x%" PRIx64,
@@ -148,9 +240,17 @@ index 1cc3d3a9..8ddc5cce 100644
 +						       (uint64_t)DispVal &
 +						       (UINT64_MAX >> (64 - 8 * X86_effectiveAddressSize(MI))));
  				} else {
- 					if (DispVal > HEX_THRESHOLD)
- 						SStream_concat(O, "0x%" PRIx64,
-@@ -1034,9 +1024,15 @@ static void printRegName(SStream *OS, unsigned RegNo)
+-					if (DispVal > HEX_THRESHOLD)
+-						SStream_concat(O, "0x%" PRIx64,
+-							       DispVal);
+-					else
+-						SStream_concat(O, "%" PRIu64,
+-							       DispVal);
++					printUnsignedNumber(O, (uint64_t)DispVal, false);
+ 				}
+ 			}
+ 		}
+@@ -1034,9 +1021,15 @@ static void printRegName(SStream *OS, unsigned RegNo)
  			X86_featureExtensionMCRegisterName(RegNo) :
  			NULL;
  

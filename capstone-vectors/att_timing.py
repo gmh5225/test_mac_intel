@@ -2,7 +2,7 @@ from pathlib import Path
 import hashlib,math,os,random,shutil,statistics,subprocess
 def digest(data):return hashlib.sha256(data).hexdigest()
 def start(work):
-    images={tag:(work/('att-'+tag)).read_bytes()for tag in ('base','candidate','outlined')}
+    images={tag:(work/('att-'+tag)).read_bytes()for tag in ('base','previous','candidate','outlined')}
     original={tag:digest(v) for tag,v in images.items()};length=max(map(len,images.values()))
     images={tag:image.ljust(length,b'\x00')for tag,image in images.items()};images['duplicate']=images['base']
     path=work/'att-selected';shutil.copy2(work/'att-base',path);path.write_bytes(images['base'])
@@ -24,7 +24,7 @@ def start(work):
         n=max(1,math.ceil(25e6/take('base',1)[0]))
         labels=[*images,'gas'];expected={k:take(k,n)[2:]for k in labels}
         oracle=take('oracle',n)[2:]
-        assert expected['base']==expected['duplicate'] and expected['candidate']==expected['outlined']==oracle
+        assert expected['base']==expected['duplicate'] and expected['previous']==expected['candidate']==expected['outlined']==oracle
         assert expected['gas'][:3]==expected['base'][:3]==oracle[:3]
         pairs=[];rng=random.Random(name+'/AT&T/public/'+str(detail))
         for _ in range(17):

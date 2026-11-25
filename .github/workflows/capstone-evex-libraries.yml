@@ -1,7 +1,7 @@
-name: Compare AT&T final access and register names with iced GasFormatter on six PE and ELF programs
+name: Measure shared AT&T target and immediate number writers with real ELF and PE records and iced GasFormatter
 on:
   push:
-    branches: [codex/att-final-access-and-register-format]
+    branches: [codex/att-unsigned-target-and-immediate]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-access-and-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-unsigned-number-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
