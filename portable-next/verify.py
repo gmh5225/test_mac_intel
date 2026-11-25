@@ -33,7 +33,7 @@ try:
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
     for name,tree in [('base',None),*q['variants'].items()]:
-        if name.startswith('mips') and profile!='clang':continue
+        if name=='align' and profile!='clang':continue
         if tree:
             git('restore','--staged','--worktree','--source=HEAD','--','.')
             patch=t/(name+'.patch')
@@ -76,21 +76,9 @@ try:
             commands=json.loads((solo/'compile_commands.json').read_text())
             amd=next(c['command']for c in commands if Path(c['file']).name=='X86Sse64Output.c')
             assert 'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in amd
-            mips=next(c['command']for c in commands if Path(c['file']).name=='MipsInstPrinter.c')
-            assert ('CAPSTONE_MIPS_MIXED_REGISTER_NAMES' in mips)==(name.startswith('mips') and platform.machine()=='aarch64')
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result
-        if linux and name.startswith('mips'):
-            obj=t/'make'
-            flags_make=['make','-C',s,'-j4','V=1','CC=clang','AR=ar','BUILDDIR='+str(obj),'CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CAPSTONE_STATIC=yes','CAPSTONE_SHARED=no']
-            run(name+'-make-build',*flags_make)
-            commands=(e/(name+'-make-build.log')).read_text()
-            assert ('-DCAPSTONE_MIPS_MIXED_REGISTER_NAMES' in commands)==(platform.machine()=='aarch64')
-            lib,=[f for f in obj.rglob('libcapstone.a') if not f.is_symlink()]
-            rows[name]['make_only']=snapshots(s,p,lib.parent,t,profile,name+'-make',run,'static')
-            assert rows[name]['make_only']['snapshots']==rows['base']['static']['snapshots']
-            shutil.rmtree(obj)
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:

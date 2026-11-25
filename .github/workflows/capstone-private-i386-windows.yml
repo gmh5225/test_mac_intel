@@ -1,7 +1,7 @@
-name: Cross-check address rendering, the near RIP reader and MIPS names in Release DIET reduced static and shared configurations
+name: Verify ordinary and reduced x86 readers, MASM tokens and 64-bit scan alignment in nineteen build profiles
 on:
   push:
-    branches: [codex/verify-near-rip-moffs-and-mips]
+    branches: [codex/batch-alignment-and-masm-token-matrix]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rip-offset-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: scan-masm-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

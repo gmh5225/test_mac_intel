@@ -1,0 +1,28 @@
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..085fc6fc 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -314,7 +314,11 @@ static X86ScanBatchResult scanBatch32(csh ud, const uint8_t *code, size_t size,
+ 	return scanBatch(ud, code, size, address, output, capacity, false);
+ }
+ 
+-/* The width is constant throughout this loop. */
++/* Keep the AMD64 hot loop on a fetch-line boundary as the preceding
++ * optional text writer changes size. */
++#if defined(__linux__) && defined(__x86_64__) && defined(__clang__)
++__attribute__((aligned(64)))
++#endif
+ #if defined(__ELF__) && defined(__clang__)
+ __attribute__((noinline, section(".cs_x86_batch64_text")))
+ #elif defined(_MSC_VER)
+@@ -330,6 +334,10 @@ static X86ScanBatchResult scanBatch64(csh ud, const uint8_t *code, size_t size,
+ }
+ #endif
+ 
++#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
++	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++__attribute__((aligned(64)))
++#endif
+ CAPSTONE_INTERNAL
+ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
+ 				       uint64_t address, uint32_t *output,
