@@ -47,52 +47,33 @@ index 37b02959..bb4919aa 100644
  
  void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..957cb024 100644
+index 457485ab..9272465d 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -326,14 +326,15 @@ static bool need_zero_prefix(uint64_t imm)
+@@ -326,6 +326,22 @@ static bool need_zero_prefix(uint64_t imm)
  		return true;
  }
  
--static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
-+static void printImmWidth(MCInst *MI, SStream *O, int64_t imm, bool positive,
-+			  uint8_t operand_size)
- {
- 	if (positive) {
- 		// always print this number in positive form
- 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -368,8 +369,8 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 			}
- 		} else { // Intel syntax
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -443,6 +444,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 	}
- }
- 
-+static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
++/* A negative displacement with no base or index denotes an unsigned
++ * address. Its encoded width is at least 16 bits, so it always prints
++ * in hexadecimal even when the data operand is only one byte wide. */
++#if defined(__GNUC__)
++__attribute__((cold, noinline))
++#endif
++static void printNegativeAbsolute(MCInst *MI, SStream *O, int64_t displacement)
 +{
-+	printImmWidth(MI, O, imm, positive, MI->op1_size);
++	const uint64_t address = X86_absoluteAddress(MI, displacement);
++	if (MI->csh->syntax == CS_OPT_SYNTAX_MASM)
++		SStream_concat(O, need_zero_prefix(address) ? "0%" PRIx64 "h" : "%" PRIx64 "h",
++			       address);
++	else
++		SStream_concat_hex64(O, address, false);
 +}
 +
- // local printOperand, without updating public operands
- static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
  {
-@@ -1235,11 +1241,9 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 	if (positive) {
+@@ -1235,11 +1251,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
@@ -101,9 +82,7 @@ index 457485ab..957cb024 100644
 -							 MI->csh->mode) &
 -							 DispVal,
 -						 true);
-+					/* The absolute address already has its effective width. */
-+					printImmWidth(MI, O, X86_absoluteAddress(MI, DispVal),
-+						      true, 8);
++					printNegativeAbsolute(MI, O, DispVal);
  				} else {
  					printImm(MI, O, DispVal, true);
  				}
