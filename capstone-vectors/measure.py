@@ -133,7 +133,7 @@ try:
     save('host',host);observations={};summary={};audits={}
     replay_paths={}
     from att_timing import start
-    att_measure,att_images=start(w);att={}
+    att_measure,att_images=start(w);att={};private_att={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
@@ -155,6 +155,8 @@ try:
         replay_paths[name]=(bits,f,path,spec['extent_sha256'])
         att[name]={str(detail):att_measure(name,bits,f,path,detail) for detail in (0,1)}
         save('att-timing',att);save('att-images',att_images)
+        private_att[name]={str(detail):att_measure(name,bits,f,path,detail,'private') for detail in (0,1)}
+        save('att-native-timing',private_att)
         for route in ('private','capstone'):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')

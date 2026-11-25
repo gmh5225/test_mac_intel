@@ -36,7 +36,7 @@ def run(r,w,source,build,paths,patch=None,tree=None):
             at=s.index('const char *extension_name',s.index('static void printRegName(SStream *OS, unsigned RegNo)\n{'))
             s=s[:at]+'++profile_names[16];\n\t'+s[at:]
             if patch:
-                at=s.index('SStream_concat2(OS, "%", name);',at);s=s[:at]+'++profile_names[17];\n\t\t'+s[at:]
+                at=s.index('if (!extension_name) {',at);s=s[:at]+'++profile_names[17];\n\t\t'+s[at:]
         f.write_text(s)
     call('cmake','--build',build,'--target','capstone_static','--parallel','4')
     lib,=build.rglob('libcapstone.a')

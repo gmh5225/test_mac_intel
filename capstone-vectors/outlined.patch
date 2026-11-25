@@ -1,8 +1,48 @@
 diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..8ddc5cce 100644
+index 1cc3d3a9..a5e6c11f 100644
 --- a/arch/X86/X86ATTInstPrinter.c
 +++ b/arch/X86/X86ATTInstPrinter.c
-@@ -316,6 +316,21 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
+@@ -237,6 +237,27 @@ static void printf512mem(MCInst *MI, unsigned OpNo, SStream *O)
+ 
+ static void printRegName(SStream *OS, unsigned RegNo);
+ 
++/* Both positive immediates and branch targets use the same radix threshold.
++ * An AT&T immediate's dollar sign belongs to its number's markup token. */
++static void printUnsignedNumber(SStream *O, uint64_t value, bool dollar)
++{
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	if (cs_vsnprintf == cs_default_vsnprintf && !O->is_closed &&
++	    O->index < SSTREAM_BUF_LEN - 1 - (size_t)dollar) {
++		if (dollar)
++			O->buffer[O->index++] = '$';
++		printUInt64(O, value);
++		return;
++	}
++#endif
++	if (value > HEX_THRESHOLD)
++		SStream_concat(O, dollar ? "$0x%" PRIx64 : "0x%" PRIx64, value);
++	else
++		SStream_concat(O, dollar ? "$%" PRIu64 : "%" PRIu64, value);
++}
++
+ // local printOperand, without updating public operands
+ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+@@ -276,10 +297,7 @@ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 					SStream_concat(O, "$-%" PRIu64, -imm);
+ 			}
+ 		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "$0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "$%" PRIu64, imm);
++			printUnsignedNumber(O, (uint64_t)imm, true);
+ 		}
+ 	}
+ }
+@@ -316,6 +334,21 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
  	}
  }
  
@@ -24,7 +64,7 @@ index 1cc3d3a9..8ddc5cce 100644
  static void fixup_evex_opmask_access(MCInst *MI)
  {
  	cs_x86 *x86 = &MI->flat_insn->detail->x86;
-@@ -350,7 +365,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -350,7 +383,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
  	int reg;
  
  	if (MI->csh->detail_opt) {
@@ -33,7 +73,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -374,11 +389,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -374,11 +407,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -46,7 +86,7 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	SegReg = MCInst_getOperand(MI, Op + 1);
-@@ -407,7 +418,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -407,7 +436,7 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
  static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
  {
  	if (MI->csh->detail_opt) {
@@ -55,7 +95,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -431,11 +442,7 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
+@@ -431,11 +460,7 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -68,7 +108,7 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	// DI accesses are always ES-based on non-64bit mode
-@@ -512,7 +519,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+@@ -512,7 +537,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
  	int reg;
  
  	if (MI->csh->detail_opt) {
@@ -77,7 +117,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -536,11 +543,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+@@ -536,11 +561,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -90,7 +130,35 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	// If this has a segment register, print it.
-@@ -672,7 +675,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -568,10 +589,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
+ 				arch_masks[x86_get_bit_mode(MI->csh->mode)] &
+ 					imm);
+ 		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "%" PRIu64, imm);
++			printUnsignedNumber(O, (uint64_t)imm, false);
+ 		}
+ 	}
+ 
+@@ -638,14 +656,7 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ 			MI->csh->mode, MI->address, MI->flat_insn->size,
+ 			MCOperand_getImm(Op), MI->imm_size);
+ 
+-		if (imm < 0) {
+-			SStream_concat(O, "0x%" PRIx64, imm);
+-		} else {
+-			if (imm > HEX_THRESHOLD)
+-				SStream_concat(O, "0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "%" PRIu64, imm);
+-		}
++		printUnsignedNumber(O, (uint64_t)imm, false);
+ 		if (MI->csh->detail_opt) {
+ 			MI->flat_insn->detail->x86
+ 				.operands[MI->flat_insn->detail->x86.op_count]
+@@ -672,7 +683,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  							  .op_count]
  					.mem.base = X86_register_map(reg);
  			} else {
@@ -99,7 +167,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  				MI->flat_insn->detail->x86
  					.operands[MI->flat_insn->detail->x86
-@@ -689,15 +692,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+@@ -689,15 +700,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  					MI->csh->regsize_map[X86_register_map(
  						reg)];
  
@@ -116,7 +184,31 @@ index 1cc3d3a9..8ddc5cce 100644
  
  				MI->flat_insn->detail->x86.op_count++;
  			}
-@@ -876,7 +871,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -716,10 +719,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 		switch (MI->flat_insn->id) {
+ 		default:
+ 			if (imm >= 0) {
+-				if (imm > HEX_THRESHOLD)
+-					SStream_concat(O, "$0x%" PRIx64, imm);
+-				else
+-					SStream_concat(O, "$%" PRIu64, imm);
++				printUnsignedNumber(O, (uint64_t)imm, true);
+ 			} else {
+ 				if (MI->csh->imm_unsigned) {
+ 					// the mask is for display only: the value
+@@ -763,10 +763,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 		case X86_INS_MOV:
+ 			// do not print number in negative form
+ 			// Use unsigned comparison to handle values >= 2^63 correctly
+-			if ((uint64_t)imm > HEX_THRESHOLD)
+-				SStream_concat(O, "$0x%" PRIx64, imm);
+-			else
+-				SStream_concat(O, "$%" PRIu64, imm);
++			printUnsignedNumber(O, (uint64_t)imm, true);
+ 			break;
+ 
+ 		case X86_INS_IN:
+@@ -876,7 +873,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  	int64_t DispVal = 1;
  
  	if (MI->csh->detail_opt) {
@@ -125,7 +217,7 @@ index 1cc3d3a9..8ddc5cce 100644
  
  		MI->flat_insn->detail->x86
  			.operands[MI->flat_insn->detail->x86.op_count]
-@@ -903,11 +898,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -903,11 +900,7 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  			.operands[MI->flat_insn->detail->x86.op_count]
  			.mem.disp = 0;
  
@@ -138,19 +230,43 @@ index 1cc3d3a9..8ddc5cce 100644
  	}
  
  	// If this has a segment register, print it.
-@@ -937,9 +928,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+@@ -937,16 +930,9 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				// only immediate as address of memory
  				if (DispVal < 0) {
  					SStream_concat(O, "0x%" PRIx64,
 -						       x86_get_address_mask(
 -							       MI->csh->mode) &
 -							       DispVal);
-+						       (uint64_t)DispVal &
-+						       (UINT64_MAX >> (64 - 8 * X86_effectiveAddressSize(MI))));
++						       x86_absolute_address(MI, DispVal));
  				} else {
- 					if (DispVal > HEX_THRESHOLD)
- 						SStream_concat(O, "0x%" PRIx64,
-@@ -1034,9 +1024,15 @@ static void printRegName(SStream *OS, unsigned RegNo)
+-					if (DispVal > HEX_THRESHOLD)
+-						SStream_concat(O, "0x%" PRIx64,
+-							       DispVal);
+-					else
+-						SStream_concat(O, "%" PRIu64,
+-							       DispVal);
++					printUnsignedNumber(O, (uint64_t)DispVal, false);
+ 				}
+ 			}
+ 		}
+@@ -1025,7 +1011,16 @@ static void printanymem(MCInst *MI, unsigned OpNo, SStream *O)
+ #include "X86GenAsmWriter.inc"
+ #endif
+ 
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#include "X86GenATTRegisterSpelling.inc"
++static const char *getRegisterName(unsigned RegNo)
++{
++	return x86_att_registers[RegNo - 1].text + 1;
++}
++#else
+ #include "X86GenRegisterName.inc"
++#endif
+ 
+ static void printRegName(SStream *OS, unsigned RegNo)
+ {
+@@ -1034,9 +1029,24 @@ static void printRegName(SStream *OS, unsigned RegNo)
  			X86_featureExtensionMCRegisterName(RegNo) :
  			NULL;
  
@@ -161,6 +277,15 @@ index 1cc3d3a9..8ddc5cce 100644
 +#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 +	if (cs_vsnprintf == cs_default_vsnprintf) {
++		if (!extension_name) {
++			const struct X86ATTRegisterSpelling *reg =
++				&x86_att_registers[RegNo - 1];
++			if (reg->length < 8)
++				SStream_concat0_small(OS, reg->text, reg->length);
++			else
++				SStream_concat0(OS, reg->text);
++			return;
++		}
 +		SStream_concat2(OS, "%", name);
 +		return;
 +	}
@@ -169,53 +294,424 @@ index 1cc3d3a9..8ddc5cce 100644
  }
  
  void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 06cc61ae..74e17b69 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,6 +20,16 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
+ 
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	!defined(CAPSTONE_X86_ATT_DISABLE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#include "../../cs_priv.h"
++#define CAPSTONE_X86_ATT_RECORD_OUTPUT
++/* The caller selected AT&T syntax and has at least one byte of input. */
++CAPSTONE_INTERNAL bool X86_tryATTOutput(cs_struct *handle, const uint8_t *code,
++				       size_t size, cs_insn *insn, uint16_t *insn_size);
++#endif
++
+ #if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+ 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
+diff --git a/arch/X86/X86GenATTRegisterSpelling.inc b/arch/X86/X86GenATTRegisterSpelling.inc
+new file mode 100644
+index 00000000..39363eb8
+--- /dev/null
++++ b/arch/X86/X86GenATTRegisterSpelling.inc
+@@ -0,0 +1,283 @@
++/* Generated by suite/synctools/x86_register_name_sizes.py. */
++struct X86ATTRegisterSpelling {
++	char text[9];
++	uint8_t length;
++};
++static const struct X86ATTRegisterSpelling x86_att_registers[] = {
++	{ "%ah", 3 },
++	{ "%al", 3 },
++	{ "%ax", 3 },
++	{ "%bh", 3 },
++	{ "%bl", 3 },
++	{ "%bp", 3 },
++	{ "%BPH", 4 },
++	{ "%bpl", 4 },
++	{ "%bx", 3 },
++	{ "%ch", 3 },
++	{ "%cl", 3 },
++	{ "%cs", 3 },
++	{ "%cx", 3 },
++	{ "%dirflag", 8 },
++	{ "%dh", 3 },
++	{ "%di", 3 },
++	{ "%DIH", 4 },
++	{ "%dil", 4 },
++	{ "%dl", 3 },
++	{ "%ds", 3 },
++	{ "%dx", 3 },
++	{ "%eax", 4 },
++	{ "%ebp", 4 },
++	{ "%ebx", 4 },
++	{ "%ecx", 4 },
++	{ "%edi", 4 },
++	{ "%edx", 4 },
++	{ "%flags", 6 },
++	{ "%eip", 4 },
++	{ "%eiz", 4 },
++	{ "%es", 3 },
++	{ "%esi", 4 },
++	{ "%esp", 4 },
++	{ "%fpsw", 5 },
++	{ "%fs", 3 },
++	{ "%gs", 3 },
++	{ "%HAX", 4 },
++	{ "%HBP", 4 },
++	{ "%HBX", 4 },
++	{ "%HCX", 4 },
++	{ "%HDI", 4 },
++	{ "%HDX", 4 },
++	{ "%HIP", 4 },
++	{ "%HSI", 4 },
++	{ "%HSP", 4 },
++	{ "%ip", 3 },
++	{ "%rax", 4 },
++	{ "%rbp", 4 },
++	{ "%rbx", 4 },
++	{ "%rcx", 4 },
++	{ "%rdi", 4 },
++	{ "%rdx", 4 },
++	{ "%rip", 4 },
++	{ "%riz", 4 },
++	{ "%rsi", 4 },
++	{ "%rsp", 4 },
++	{ "%si", 3 },
++	{ "%SIH", 4 },
++	{ "%sil", 4 },
++	{ "%sp", 3 },
++	{ "%SPH", 4 },
++	{ "%spl", 4 },
++	{ "%ss", 3 },
++	{ "%ssp", 4 },
++	{ "%bnd0", 5 },
++	{ "%bnd1", 5 },
++	{ "%bnd2", 5 },
++	{ "%bnd3", 5 },
++	{ "%cr0", 4 },
++	{ "%cr1", 4 },
++	{ "%cr2", 4 },
++	{ "%cr3", 4 },
++	{ "%cr4", 4 },
++	{ "%cr5", 4 },
++	{ "%cr6", 4 },
++	{ "%cr7", 4 },
++	{ "%cr8", 4 },
++	{ "%cr9", 4 },
++	{ "%cr10", 5 },
++	{ "%cr11", 5 },
++	{ "%cr12", 5 },
++	{ "%cr13", 5 },
++	{ "%cr14", 5 },
++	{ "%cr15", 5 },
++	{ "%dr0", 4 },
++	{ "%dr1", 4 },
++	{ "%dr2", 4 },
++	{ "%dr3", 4 },
++	{ "%dr4", 4 },
++	{ "%dr5", 4 },
++	{ "%dr6", 4 },
++	{ "%dr7", 4 },
++	{ "%dr8", 4 },
++	{ "%dr9", 4 },
++	{ "%dr10", 5 },
++	{ "%dr11", 5 },
++	{ "%dr12", 5 },
++	{ "%dr13", 5 },
++	{ "%dr14", 5 },
++	{ "%dr15", 5 },
++	{ "%fp0", 4 },
++	{ "%fp1", 4 },
++	{ "%fp2", 4 },
++	{ "%fp3", 4 },
++	{ "%fp4", 4 },
++	{ "%fp5", 4 },
++	{ "%fp6", 4 },
++	{ "%fp7", 4 },
++	{ "%k0", 3 },
++	{ "%k1", 3 },
++	{ "%k2", 3 },
++	{ "%k3", 3 },
++	{ "%k4", 3 },
++	{ "%k5", 3 },
++	{ "%k6", 3 },
++	{ "%k7", 3 },
++	{ "%mm0", 4 },
++	{ "%mm1", 4 },
++	{ "%mm2", 4 },
++	{ "%mm3", 4 },
++	{ "%mm4", 4 },
++	{ "%mm5", 4 },
++	{ "%mm6", 4 },
++	{ "%mm7", 4 },
++	{ "%r8", 3 },
++	{ "%r9", 3 },
++	{ "%r10", 4 },
++	{ "%r11", 4 },
++	{ "%r12", 4 },
++	{ "%r13", 4 },
++	{ "%r14", 4 },
++	{ "%r15", 4 },
++	{ "%st(0)", 6 },
++	{ "%st(1)", 6 },
++	{ "%st(2)", 6 },
++	{ "%st(3)", 6 },
++	{ "%st(4)", 6 },
++	{ "%st(5)", 6 },
++	{ "%st(6)", 6 },
++	{ "%st(7)", 6 },
++	{ "%xmm0", 5 },
++	{ "%xmm1", 5 },
++	{ "%xmm2", 5 },
++	{ "%xmm3", 5 },
++	{ "%xmm4", 5 },
++	{ "%xmm5", 5 },
++	{ "%xmm6", 5 },
++	{ "%xmm7", 5 },
++	{ "%xmm8", 5 },
++	{ "%xmm9", 5 },
++	{ "%xmm10", 6 },
++	{ "%xmm11", 6 },
++	{ "%xmm12", 6 },
++	{ "%xmm13", 6 },
++	{ "%xmm14", 6 },
++	{ "%xmm15", 6 },
++	{ "%xmm16", 6 },
++	{ "%xmm17", 6 },
++	{ "%xmm18", 6 },
++	{ "%xmm19", 6 },
++	{ "%xmm20", 6 },
++	{ "%xmm21", 6 },
++	{ "%xmm22", 6 },
++	{ "%xmm23", 6 },
++	{ "%xmm24", 6 },
++	{ "%xmm25", 6 },
++	{ "%xmm26", 6 },
++	{ "%xmm27", 6 },
++	{ "%xmm28", 6 },
++	{ "%xmm29", 6 },
++	{ "%xmm30", 6 },
++	{ "%xmm31", 6 },
++	{ "%ymm0", 5 },
++	{ "%ymm1", 5 },
++	{ "%ymm2", 5 },
++	{ "%ymm3", 5 },
++	{ "%ymm4", 5 },
++	{ "%ymm5", 5 },
++	{ "%ymm6", 5 },
++	{ "%ymm7", 5 },
++	{ "%ymm8", 5 },
++	{ "%ymm9", 5 },
++	{ "%ymm10", 6 },
++	{ "%ymm11", 6 },
++	{ "%ymm12", 6 },
++	{ "%ymm13", 6 },
++	{ "%ymm14", 6 },
++	{ "%ymm15", 6 },
++	{ "%ymm16", 6 },
++	{ "%ymm17", 6 },
++	{ "%ymm18", 6 },
++	{ "%ymm19", 6 },
++	{ "%ymm20", 6 },
++	{ "%ymm21", 6 },
++	{ "%ymm22", 6 },
++	{ "%ymm23", 6 },
++	{ "%ymm24", 6 },
++	{ "%ymm25", 6 },
++	{ "%ymm26", 6 },
++	{ "%ymm27", 6 },
++	{ "%ymm28", 6 },
++	{ "%ymm29", 6 },
++	{ "%ymm30", 6 },
++	{ "%ymm31", 6 },
++	{ "%zmm0", 5 },
++	{ "%zmm1", 5 },
++	{ "%zmm2", 5 },
++	{ "%zmm3", 5 },
++	{ "%zmm4", 5 },
++	{ "%zmm5", 5 },
++	{ "%zmm6", 5 },
++	{ "%zmm7", 5 },
++	{ "%zmm8", 5 },
++	{ "%zmm9", 5 },
++	{ "%zmm10", 6 },
++	{ "%zmm11", 6 },
++	{ "%zmm12", 6 },
++	{ "%zmm13", 6 },
++	{ "%zmm14", 6 },
++	{ "%zmm15", 6 },
++	{ "%zmm16", 6 },
++	{ "%zmm17", 6 },
++	{ "%zmm18", 6 },
++	{ "%zmm19", 6 },
++	{ "%zmm20", 6 },
++	{ "%zmm21", 6 },
++	{ "%zmm22", 6 },
++	{ "%zmm23", 6 },
++	{ "%zmm24", 6 },
++	{ "%zmm25", 6 },
++	{ "%zmm26", 6 },
++	{ "%zmm27", 6 },
++	{ "%zmm28", 6 },
++	{ "%zmm29", 6 },
++	{ "%zmm30", 6 },
++	{ "%zmm31", 6 },
++	{ "%r8b", 4 },
++	{ "%r9b", 4 },
++	{ "%r10b", 5 },
++	{ "%r11b", 5 },
++	{ "%r12b", 5 },
++	{ "%r13b", 5 },
++	{ "%r14b", 5 },
++	{ "%r15b", 5 },
++	{ "%R8BH", 5 },
++	{ "%R9BH", 5 },
++	{ "%R10BH", 6 },
++	{ "%R11BH", 6 },
++	{ "%R12BH", 6 },
++	{ "%R13BH", 6 },
++	{ "%R14BH", 6 },
++	{ "%R15BH", 6 },
++	{ "%r8d", 4 },
++	{ "%r9d", 4 },
++	{ "%r10d", 5 },
++	{ "%r11d", 5 },
++	{ "%r12d", 5 },
++	{ "%r13d", 5 },
++	{ "%r14d", 5 },
++	{ "%r15d", 5 },
++	{ "%r8w", 4 },
++	{ "%r9w", 4 },
++	{ "%r10w", 5 },
++	{ "%r11w", 5 },
++	{ "%r12w", 5 },
++	{ "%r13w", 5 },
++	{ "%r14w", 5 },
++	{ "%r15w", 5 },
++	{ "%R8WH", 5 },
++	{ "%R9WH", 5 },
++	{ "%R10WH", 6 },
++	{ "%R11WH", 6 },
++	{ "%R12WH", 6 },
++	{ "%R13WH", 6 },
++	{ "%R14WH", 6 },
++	{ "%R15WH", 6 },
++};
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..bed743fe 100644
+index 457485ab..c5ff1731 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -326,14 +326,15 @@ static bool need_zero_prefix(uint64_t imm)
+@@ -326,72 +326,40 @@ static bool need_zero_prefix(uint64_t imm)
  		return true;
  }
  
--static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
-+static void printImmWithSize(MCInst *MI, SStream *O, int64_t imm, bool positive,
-+			     unsigned operand_size)
- {
- 	if (positive) {
- 		// always print this number in positive form
- 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -368,8 +369,8 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 			}
- 		} else { // Intel syntax
- 			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
-+				if (operand_size) {
-+					switch (operand_size) {
- 					default:
- 						break;
- 					case 1:
-@@ -443,6 +444,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- 	}
- }
- 
-+static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
++static void printUnsignedHex(const MCInst *MI, SStream *O, uint64_t value)
 +{
-+	printImmWithSize(MI, O, imm, positive, MI->op1_size);
++	if (MI->csh->syntax != CS_OPT_SYNTAX_MASM)
++		SStream_concat_hex64(O, value, false);
++	else if (value == (UINT64_C(1) << 63))
++		SStream_concat0(O, "8000000000000000h");
++	else if (need_zero_prefix(value))
++		SStream_concat(O, "0%" PRIx64 "h", value);
++	else
++		SStream_concat(O, "%" PRIx64 "h", value);
 +}
 +
- // local printOperand, without updating public operands
- static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
  {
-@@ -1235,11 +1241,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 	if (positive) {
+-		// always print this number in positive form
+-		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
+-			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
+-					default:
+-						break;
+-					case 1:
+-						imm &= 0xff;
+-						break;
+-					case 2:
+-						imm &= 0xffff;
+-						break;
+-					case 4:
+-						imm &= 0xffffffff;
+-						break;
+-					}
+-				}
+-
+-				if (imm == 0x8000000000000000LL) // imm == -imm
+-					SStream_concat0(O, "8000000000000000h");
+-				else if (need_zero_prefix(imm))
+-					SStream_concat(O, "0%" PRIx64 "h", imm);
+-				else
+-					SStream_concat(O, "%" PRIx64 "h", imm);
+-			} else {
+-				if (imm > HEX_THRESHOLD) {
+-					if (need_zero_prefix(imm))
+-						SStream_concat(O,
+-							       "0%" PRIx64 "h",
+-							       imm);
+-					else
+-						SStream_concat(
+-							O, "%" PRIx64 "h", imm);
+-				} else
+-					SStream_concat_dec64(O, imm, false);
++		if (imm < 0) {
++			switch (MI->op1_size) {
++			case 1:
++				imm = (uint8_t)imm;
++				break;
++			case 2:
++				imm = (uint16_t)imm;
++				break;
++			case 4:
++				imm = (uint32_t)imm;
++				break;
++			default:
++				break;
+ 			}
+-		} else { // Intel syntax
+-			if (imm < 0) {
+-				if (MI->op1_size) {
+-					switch (MI->op1_size) {
+-					default:
+-						break;
+-					case 1:
+-						imm &= 0xff;
+-						break;
+-					case 2:
+-						imm &= 0xffff;
+-						break;
+-					case 4:
+-						imm &= 0xffffffff;
+-						break;
+-					}
+-				}
+-
+-				SStream_concat_hex64(O, imm, false);
+-			} else {
+-				if (imm > HEX_THRESHOLD)
+-					SStream_concat_hex64(O, imm, false);
+-				else
+-					SStream_concat_dec64(O, imm, false);
+-			}
+-		}
++			printUnsignedHex(MI, O, (uint64_t)imm);
++		} else if (imm > HEX_THRESHOLD)
++			printUnsignedHex(MI, O, (uint64_t)imm);
++		else
++			SStream_concat_dec64(O, imm, false);
+ 	} else {
+ 		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
+ 			if (imm < 0) {
+@@ -1235,11 +1203,8 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
  				if (x86_has_feature(MI->csh->mode, CS_MODE_64))
  					MI->op1_size = 8;
  				if (DispVal < 0) {
@@ -224,42 +720,260 @@ index 457485ab..bed743fe 100644
 -							 MI->csh->mode) &
 -							 DispVal,
 -						 true);
-+					printImmWithSize(MI, O, DispVal, true,
-+							 X86_effectiveAddressSize(MI));
++					printUnsignedHex(MI, O,
++							 x86_absolute_address(MI, DispVal));
  				} else {
  					printImm(MI, O, DispVal, true);
  				}
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index 380faa79..2bc4a5f2 100644
+index 380faa79..d1bd525b 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
-@@ -154,13 +154,17 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
+@@ -154,13 +154,16 @@ static inline uint8_t x86_x87_environment_size(cs_mode mode,
  	return (short_environment ? 14 : 28) + (registers ? 80 : 0);
  }
  
 -static inline uint64_t x86_get_address_mask(cs_mode mode)
-+/* A displacement used as an absolute address has the effective address
-+ * width even if the memory operand or a following immediate is narrower. */
-+static inline unsigned X86_effectiveAddressSize(const MCInst *mi)
++/* The absolute address wraps at the effective address width. */
++static inline uint64_t x86_absolute_address(const MCInst *mi, int64_t disp)
  {
 +	const bool address_override = mi->x86_prefix[3] == X86_PREFIX_ADDRSIZE;
 +	const cs_mode mode = mi->csh->mode;
  	if (x86_has_feature(mode, CS_MODE_16))
 -		return UINT16_MAX;
-+		return address_override ? 4 : 2;
++		return address_override ? (uint32_t)disp : (uint16_t)disp;
  	if (x86_has_feature(mode, CS_MODE_32))
 -		return UINT32_MAX;
 -	return UINT64_MAX;
-+		return address_override ? 2 : 4;
-+	return address_override ? 4 : 8;
++		return address_override ? (uint16_t)disp : (uint32_t)disp;
++	return address_override ? (uint32_t)disp : (uint64_t)disp;
  }
  
  #endif
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 8c6444ab..ffcd4e36 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -15,6 +15,12 @@
+ 
+ #include "X86SimpleOutputImpl.h"
+ 
++#ifdef CAPSTONE_X86_ATT_RECORD_OUTPUT
++#define X86_ATT_OUTPUT
++#include "X86SimpleOutputImpl.h"
++#undef X86_ATT_OUTPUT
++#endif
++
+ #ifdef CAPSTONE_X86_BATCH_OUTPUT
+ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code,
+ 					 size_t size, cs_insn *insn,
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..524d147a 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -29,15 +29,19 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ /* Keep the mode, option and callback checks in a single short-circuit chain
+  * in both instantiations of the scalar writer. */
+-#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++#define X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, syntax_mismatch, expected_printer) \
+ 	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
+ 	 (handle)->mnem_list || (handle)->doing_mem || \
+-	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
+-	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
++	 (syntax_mismatch) || \
+ 	 (handle)->disasm != X86_getInstruction || \
+ 	 (handle)->insn_id != X86_get_insn_id || \
+-	 (handle)->printer != X86_Intel_printInst || \
++	 (handle)->printer != (expected_printer) || \
+ 	 (handle)->post_printer != X86_postprinter || \
+ 	 cs_vsnprintf != cs_default_vsnprintf)
+ 
++#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
++	X86_OUTPUT_UNSUPPORTED_FOR(handle, mode_mismatch, \
++		(handle)->syntax != CS_OPT_SYNTAX_INTEL && \
++		(handle)->syntax != CS_OPT_SYNTAX_DEFAULT, X86_Intel_printInst)
++
+ #endif
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..43f7b288 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -1,8 +1,7 @@
+ /* Capstone Disassembly Engine */
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+-#ifndef CS_X86_SIMPLE_OUTPUT_IMPL_H
+-#define CS_X86_SIMPLE_OUTPUT_IMPL_H
++/* Instantiated for the generic AT&T fallback and the existing Intel readers. */
+ 
+ /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+  * present. Memory admission and bounds checks belong to the address writer. */
+@@ -36,7 +35,13 @@ static void writeRelativeHex(char *out, uint64_t value)
+ #ifdef X86_MEMORY32_OUTPUT
+ #include "X86GenIndirectMemory.inc"
+ #endif
+-#ifdef X86_FIXED_OUTPUT
++#ifdef X86_ATT_OUTPUT
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((section(".cs_x86_att_record_text")))
++#endif
++CAPSTONE_INTERNAL bool X86_tryATTOutput(cs_struct *handle, const uint8_t *code,
++				       size_t size, cs_insn *insn, uint16_t *insn_size)
++#elif defined(X86_FIXED_OUTPUT)
+ static bool X86_FIXED_OUTPUT(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size)
+ #else
+@@ -111,8 +116,20 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		}
+ 	}
++#ifdef X86_ATT_OUTPUT
++	const bool branch = !has_rex && form == X86_SIMPLE_RELATIVE;
++	const bool pair = (form == X86_SIMPLE_RM_REG ||
++			   form == X86_SIMPLE_REG_RM) && modrm >= 0xc0 &&
++		((opcode < 0x40 && (opcode & 7) < 4) ||
++		 (opcode & 0xfc) == 0x88 || (opcode & 0xfe) == 0x84);
++	if (plan >= X86_PLAN_PUSH_IMMEDIATE || (!branch && !pair) ||
++	    X86_OUTPUT_UNSUPPORTED_FOR(handle, !wide && handle->mode != CS_MODE_32,
++				       false, X86_ATT_printInst))
++		return false;
++#else
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+ 		return false;
++#endif
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR) {
+@@ -193,6 +210,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		memcpy(insn->op_str, row->operands, sizeof(row->operands));
+ 		*insn_size = insn->size = (uint16_t)(1 + has_rex);
+ 	} else if (relative) {
++#ifdef X86_ATT_OUTPUT
++		if (row->id == X86_INS_CALL)
++			insn->mnemonic[4] = wide ? 'q' : 'l';
++#endif
+ 		const uint8_t *bytes = code + row->imm_offset;
+ 		int64_t delta;
+ 		if (row->imm_size == 1) {
+@@ -239,11 +260,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
+ 		const struct X86SimpleRegister *b =
+ 			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
++#ifdef X86_ATT_OUTPUT
++		insn->mnemonic[strlen(row->mnemonic)] =
++			(opcode & 1) ? (rex & 8 ? 'q' : 'l') : 'b';
++		insn->op_str[0] = '%';
++		memcpy(insn->op_str + 1, b->name, sizeof(b->name));
++		char *separator = insn->op_str + 1 + b->length;
++		memcpy(separator, ", %", 3);
++		memcpy(separator + 3, a->name, sizeof(a->name));
++#else
+ 		memcpy(insn->op_str, a->name, sizeof(a->name));
+ 		char *separator = insn->op_str + a->length;
+ 		separator[0] = ',';
+ 		separator[1] = ' ';
+ 		memcpy(separator + 2, b->name, sizeof(b->name));
++#endif
+ 		first = a->reg;
+ 		second = b->reg;
+ 		insn->bytes[1] = code[1];
+@@ -262,9 +293,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			}
+ 			x->operands[0].type = X86_OP_IMM;
+ 			x->operands[0].imm = (int64_t)target;
++#ifdef X86_ATT_OUTPUT
++		} else {
++			cs_x86_op *ops = insn->detail->x86.operands;
++			cs_x86_op dest = ops[0];
++			ops[0] = ops[1];
++			ops[1] = dest;
++#endif
+ 		}
+ 	}
+ 	return true;
+ }
+-
+-#endif
+diff --git a/cs.c b/cs.c
+index d0b8b045..5b9f830f 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1125,6 +1125,11 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				return X86_decodeFixedRecord64(handle, code, size,
+ 							       insn, insn_size);
+ 		}
++#endif
++#ifdef CAPSTONE_X86_ATT_RECORD_OUTPUT
++		if (!batch && size && handle->syntax == CS_OPT_SYNTAX_ATT &&
++		    X86_tryATTOutput(handle, code, size, insn, insn_size))
++			return true;
+ #endif
+ 		MCInst_InitX86(&mci);
+ 	} else
+diff --git a/suite/synctools/x86_register_name_sizes.py b/suite/synctools/x86_register_name_sizes.py
+index d735f83c..244e45c0 100644
+--- a/suite/synctools/x86_register_name_sizes.py
++++ b/suite/synctools/x86_register_name_sizes.py
+@@ -3,7 +3,7 @@
+ """Project Intel x86 register-name lengths into the existing uint16 offsets.
+ 
+ Run after regenerating X86GenRegisterName1.inc. The strings and original offsets
+-remain authoritative; AT&T and public register-name tables are unchanged.
++remain authoritative. Regenerate the AT&T spellings after changing its name table.
+ """
+ 
+ import argparse
+@@ -119,6 +119,31 @@ def generate(text, enum_text):
+     return result
+ 
+ 
++def att_spellings(text, enum_text):
++    """Emit one printable AT&T token for each register in enum order."""
++    import json
++
++    strings = string_bytes(text)
++    checked = generate(text, enum_text)
++    records = [int(x) for x in re.findall(r"\d+", TABLE.search(checked)[1])]
++    tokens = []
++    for record in records:
++        start, length = record & MASK, record >> SHIFT
++        name = strings[start : start + length].decode("ascii")
++        tokens.append("%" + name)
++    width = max(map(len, tokens)) + 1
++    rows = [
++        "/* Generated by suite/synctools/x86_register_name_sizes.py. */",
++        "struct X86ATTRegisterSpelling {",
++        f"\tchar text[{width}];",
++        "\tuint8_t length;",
++        "};",
++        "static const struct X86ATTRegisterSpelling x86_att_registers[] = {",
++    ]
++    rows.extend(f"\t{{ {json.dumps(token)}, {len(token)} }}," for token in tokens)
++    return "\n".join([*rows, "};", ""])
++
++
+ def main():
+     parser = argparse.ArgumentParser(description=__doc__)
+     parser.add_argument("--check", action="store_true")
+@@ -133,6 +158,12 @@ def main():
+         require(original == expected, f"Stale {path}; rerun {Path(__file__).name}")
+     elif original != expected:
+         path.write_text(expected)
++    output = directory / "X86GenATTRegisterSpelling.inc"
++    records = att_spellings((directory / "X86GenRegisterName.inc").read_text(), enum)
++    if args.check:
++        require(output.read_text() == records, f"Stale {output}; rerun {Path(__file__).name}")
++    else:
++        output.write_text(records)
+ 
+ 
+ if __name__ == "__main__":
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
-index cfd13cba..3b436991 100644
+index cfd13cba..19279ad5 100644
 --- a/tests/unit/x86_legacy_address_size.c
 +++ b/tests/unit/x86_legacy_address_size.c
-@@ -279,9 +279,56 @@ static bool check_other_opcodes(void)
+@@ -279,9 +279,63 @@ static bool check_other_opcodes(void)
  	return ok;
  }
  
@@ -279,12 +993,19 @@ index cfd13cba..3b436991 100644
 +		  8, "eax, dword ptr [0x80001234]", "0x80001234, %eax" },
 +		{ CS_MODE_64, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
 +		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
++		{ 0, { 0x8b, 0x04, 0x25, 0x34, 0x12, 0x00, 0x80 },
++		  7, "eax, dword ptr [0xffffffff80001234]", "0xffffffff80001234, %eax" },
 +	};
 +	bool ok = true;
 +	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
 +		csh handle;
-+		if (cs_open(CS_ARCH_X86, cases[i].mode, &handle) != CS_ERR_OK)
++		if (cs_open(CS_ARCH_X86, cases[i].mode ? cases[i].mode : CS_MODE_64,
++			    &handle) != CS_ERR_OK)
 +			return false;
++		if (!cases[i].mode && cs_option(handle, CS_OPT_MODE, 0) != CS_ERR_OK) {
++			cs_close(&handle);
++			return false;
++		}
 +		for (unsigned att = 0; att < 2; ++att) {
 +			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
 +					       att ? CS_OPT_SYNTAX_ATT : CS_OPT_SYNTAX_INTEL);
