@@ -1,0 +1,99 @@
+//===- CptaPAuthFaultHarness.def - Original SP fault oracle ------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+// Included after the unchanged NeverD native-word harness. The original word
+// and each generated function run through the same exception recovery probe.
+//===----------------------------------------------------------------------===//
+
+#include "CptaFaultProbe.def"
+
+struct GeneratedPAuthObservation {
+  uint64_t Low, High, Completed, ESR, SP, Origin, Word, Faulted;
+};
+typedef unsigned __int128 (*GeneratedPAuthFunction)(uint64_t);
+extern void probeGeneratedPAuth(GeneratedPAuthFunction Function,
+                                uint64_t Address,
+                                struct GeneratedPAuthObservation *Observation);
+_Static_assert(sizeof(struct GeneratedPAuthObservation) ==
+                   CPA_FAULT_OBSERVATION_BYTES,
+               CPA_FAULT_LAYOUT_MESSAGE);
+
+static unsigned GeneratedPAuthFaultCount;
+static const uint32_t GeneratedPAuthFaultWords[] = {
+#define CPA_PAUTH_FAULT_WORD(Word) Word,
+#include "CptaFaultProbe.def"
+};
+_Static_assert(sizeof(GeneratedPAuthFaultWords) /
+                       sizeof(GeneratedPAuthFaultWords[0]) ==
+                   sizeof(pauth_cases) / sizeof(pauth_cases[0]),
+               CPA_FAULT_WORDS_MESSAGE);
+
+unsigned neverdPAuthFaultCount(void) { return GeneratedPAuthFaultCount; }
+
+int neverdPAuthFaultMain(void) {
+  GeneratedPAuthFaultCount = 0;
+  if (neverdMemoryMain())
+    return CPA_FAULT_NORMAL_FAILURE;
+  for (unsigned C = 0; C < sizeof(pauth_cases) / sizeof(pauth_cases[0]); ++C) {
+    _Alignas(CPA_SP_ALIGNMENT) unsigned char Memory[CPA_FAULT_BUFFER_BYTES];
+    for (unsigned I = 0; I < sizeof(Memory); ++I)
+      Memory[I] =
+          (unsigned char)(I * CPA_FAULT_PATTERN_FACTOR +
+                          C * CPA_FAULT_CASE_FACTOR + CPA_FAULT_PATTERN_BIAS);
+    for (unsigned Mode = 0; Mode < CPA_FAULT_MODE_COUNT; ++Mode) {
+      uint64_t Address = (uintptr_t)(Memory + CPA_FAULT_BUFFER_MIDDLE);
+      if (Mode == CPA_FAULT_VALID_MISALIGNED ||
+          Mode == CPA_FAULT_INVALID_MISALIGNED)
+        Address += CPA_FAULT_MISALIGNMENT;
+      uint64_t Signed =
+          pauth_cases[C].key_b ? sign_sp_b(Address) : sign_sp_a(Address);
+      if (Mode == CPA_FAULT_INVALID_ALIGNED ||
+          Mode == CPA_FAULT_INVALID_MISALIGNED)
+        Signed ^= CPA_FAULT_CORRUPT_BIT;
+      struct GeneratedPAuthObservation Actual = {0}, Original = {0};
+      probeGeneratedPAuth(pauth_cases[C].original, Signed, &Original);
+      probeGeneratedPAuth(pauth_cases[C].projected, Signed, &Actual);
+      if (Mode == CPA_FAULT_VALID_ALIGNED) {
+        if (!Actual.Completed || !Original.Completed || Actual.Faulted ||
+            Original.Faulted || Actual.Low != Original.Low ||
+            Actual.High != Original.High)
+          return CPA_FAULT_COMPLETION_FAILURE;
+      } else {
+#if defined(SP_PAUTH_FAULT_EL0)
+        const unsigned Origin = 0;
+        const unsigned DataAbort = CPA_FAULT_EL0_DATA_ABORT;
+#else
+        const unsigned Origin = CPA_FAULT_EL1H;
+        const unsigned DataAbort = CPA_FAULT_EL1_DATA_ABORT;
+#endif
+        unsigned ExpectedEC = Mode == CPA_FAULT_VALID_MISALIGNED
+                                  ? CPA_SP_ALIGNMENT_EC
+                                  : DataAbort;
+#if defined(SP_PAUTH_FAULT_COMBINE)
+        if (Mode != CPA_FAULT_VALID_MISALIGNED)
+          ExpectedEC = CPA_FAULT_PAUTH_EC;
+#else
+        if (Mode == CPA_FAULT_INVALID_MISALIGNED)
+          ExpectedEC = CPA_SP_ALIGNMENT_EC;
+#endif
+        if (Actual.Completed || Original.Completed || !Actual.Faulted ||
+            !Original.Faulted || Actual.ESR != Original.ESR ||
+            (Original.ESR >> CPA_ESR_EC_SHIFT) != ExpectedEC ||
+            Actual.SP != Signed || Original.SP != Signed ||
+            Actual.Origin != Origin || Original.Origin != Origin ||
+            Actual.Word != GeneratedPAuthFaultWords[C] ||
+            Original.Word != GeneratedPAuthFaultWords[C])
+          return CPA_FAULT_OBSERVATION_FAILURE;
+        ++GeneratedPAuthFaultCount;
+      }
+      for (unsigned I = 0; I < sizeof(Memory); ++I)
+        if (Memory[I] !=
+            (unsigned char)(I * CPA_FAULT_PATTERN_FACTOR +
+                            C * CPA_FAULT_CASE_FACTOR + CPA_FAULT_PATTERN_BIAS))
+          return CPA_FAULT_MEMORY_FAILURE;
+    }
+  }
+  return 0;
+}
