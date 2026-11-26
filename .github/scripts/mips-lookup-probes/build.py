@@ -63,6 +63,8 @@ for label,sha1 in revisions.items():
               '-DLLVM_INCLUDE_BENCHMARKS=OFF','-DLLVM_INCLUDE_EXAMPLES=OFF','-DLLVM_INCLUDE_TOOLS=OFF',
               '-DLLVM_ENABLE_TERMINFO=OFF','-DLLVM_ENABLE_LIBEDIT=OFF','-DLLVM_ENABLE_CURL=OFF','-DLLVM_ENABLE_HTTPLIB=OFF']
         run(['cmake','-S',fork/'llvm','-B',build,'-G','Ninja',*opts])
+    # These historical commits do not declare MC's generated-header dependency.
+    run(['cmake','--build',build,'--target','llvm_vcsrevision_h'])
     run(['cmake','--build',build,'--parallel','4','--target','LLVMMipsAsmParser'])
     source_lib=build/'lib/libLLVMMipsAsmParser.a'
     kept=work/('parser-'+label+'.a');shutil.copy2(source_lib,kept)

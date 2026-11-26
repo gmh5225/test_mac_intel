@@ -66,8 +66,10 @@ def main():
     exes = {k: Path(v) for k, v in json.loads((work / "paths.json").read_text()).items()}
     assert set(exes) == {"r13", "r14", "rebuilt", "binary", "early", "set"}
     rare, distinct = rare_source(Path("source/llvm/test/MC/Mips/mips32r2/valid.s"))
+    clang_asm = Path(__file__).with_name("compiler-output.s")
+    assert digest(clang_asm) == "0e1e94dffe6fa393afd65af5064e92778c13697faf81fd80f047c17bd054887e"
     programs = {"empty": ".text\n", "short": ".text\n.set noreorder\naddiu $3,$3,17\n",
-                "rare": rare, **inputs()}
+                "rare": rare, "clang": clang_asm.read_text(), **inputs()}
     sources = {}
     for name, body in programs.items():
         sources[name] = work / (name + ".s")
@@ -92,7 +94,7 @@ def main():
                 rng.shuffle(order)
                 row = {"phase": phase, "trial": it, "order": order}
                 for ver in order:
-                    row[ver] = run(rotated[ver], sources[kind], obj, 8 if kind in ("rare", "short") else 1)
+                    row[ver] = run(rotated[ver], sources[kind], obj, 8 if kind in ("rare", "short", "clang") else 1)
                     value = digest(obj)
                     assert objects.setdefault(kind, value) == value, (kind, ver, value)
                 if it >= 0:
