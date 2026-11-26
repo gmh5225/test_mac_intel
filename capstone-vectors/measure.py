@@ -45,7 +45,9 @@ try:
     run('cmake','-S',project,'-B',build,'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -gline-tables-only')
     run('cmake','--build',build,'--target','capstone_static','--parallel','4')
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'debug-program')
-    save('symbol-map',map_debug(w/'program',w/'debug-program',base))
+    from sites import set_owners
+    symbols=map_debug(w/'program',w/'debug-program',base)
+    set_owners(symbols);save('symbol-map',symbols)
 
     invoke=['setarch',os.uname().machine,'-R']
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

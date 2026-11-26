@@ -1,7 +1,7 @@
-name: Locate the executed instructions in the shipped fixed-width x86 record readers
+name: Attribute executed addresses independently of tail-call stacks in x86 record readers
 on:
   push:
-    branches: [codex/attribute-x86-record-instructions]
+    branches: [codex/physical-record-reader-samples]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-reader-source-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: physical-source-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -41,6 +41,13 @@ def map_debug(program,debug,src):
         out[name]=dict(**fn,source_mapped=same,debug=other[name],instructions=ins)
     return dict(load_bias=bias,symbols=out)
 
+owners={}
+def set_owners(symbols):
+    for name,fn in symbols['symbols'].items():
+        for pc in fn['instructions']:
+            assert pc not in owners
+            owners[pc]=name
+
 def counts(path):
     by={};sums=Counter();whole=Counter();symbol=None;edge=False;pos=None;events=[]
     with path.open()as inp:
@@ -56,7 +63,9 @@ def counts(path):
                 if edge:edge=False;continue
                 n=len(pos);ir=int(parts[n+events.index('Ir')]) if len(parts)>n+events.index('Ir')else 0
                 whole['Ir']+=ir
-                if ir and symbol in tracked:
-                    pc=int(parts[pos.index('instr')],0);by.setdefault(symbol,Counter())[pc]+=ir;sums[symbol]+=ir
+                if ir:
+                    pc=int(parts[pos.index('instr')],0);owner=owners.get(pc)
+                    if owner is not None:
+                        by.setdefault(owner,Counter())[pc]+=ir;sums[owner]+=ir
     assert whole['Ir']>0 and sums
     return dict(ir=whole['Ir'],totals=sums,by_pc=by)
