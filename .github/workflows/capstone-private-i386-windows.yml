@@ -1,7 +1,7 @@
-name: Measure dedicated RISC-V operand detail with the stock mixed library
+name: Measure RISC-V operand compaction on four full RV64GC programs
 on:
   push:
-    branches: [codex/riscv-dedicated-detail-body]
+    branches: [codex/riscv-bounded-operand-compaction]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-dedicated-mapping-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: rv-operand-compaction-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7
