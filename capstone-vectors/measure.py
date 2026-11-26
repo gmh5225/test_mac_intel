@@ -43,17 +43,16 @@ try:
                     stream=list(map(int,out(w/'stream').split()))
                     assert stream==rd(r/'local-expectations.json')['stream'];guards[v]=dict(stream=stream,domain=guard)
         save('products',products)
-    arch='arm64' if os.uname().machine=='aarch64' else 'amd64'
-    prior=rd(r/'reproducible-products.json')[arch]
-    for name,items in products.items():
-        for v,row in items.items():
-            direct=name=='standalone' and v!='base' or v=='outlined' and arch=='amd64'
-            want='candidate' if direct else 'base'
-            assert prior[name][want]=={key:row[key]for key in ('archive','driver')},(name,v,want,prior[name][want],row['archive'],row['driver'])
+    base_mixed=products['mixed']['base']
+    for tag in ('candidate','outlined'):
+        same=products['mixed'][tag]
+        assert same['objects']==base_mixed['objects'] and same['driver']==base_mixed['driver'],tag
+        changes=[k for k,z in products['standalone']['base']['objects'].items() if products['standalone'][tag]['objects'][k]!=z]
+        assert changes and all(k.endswith('/ARMInstPrinter.c.o') for k in changes),changes
     save('guards',guards)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});save('host',dict(cpu=out('lscpu'),compiler=out('clang','--version')))
     for name,(_,stage) in stages.items():
-        measure(corpus['fixtures'].values(),stage,lambda k,v:save(name+'-'+k,v))
+        if name=='standalone':measure(corpus['fixtures'].values(),stage,lambda k,v:save(name+'-'+k,v))
     save('complete',dict(complete=True,source=q,pairs=35))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

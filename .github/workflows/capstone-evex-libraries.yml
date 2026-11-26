@@ -1,7 +1,7 @@
-name: Verify measured ARM-only and mixed formatter output, binary identities, and genuine executable instructions
+name: Measure ordinary and predicate ARM operand callbacks on four source-verified coreutils
 on:
   push:
-    branches: [codex/arm-printf-punctuation-profile-selection]
+    branches: [codex/arm-ordinary-and-predicate-operand-detail]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 76d16380eb2a736a5039c7b3b9c4a72c37aacfd2
+          ref: ac371faa70cb84ddcea8a4a3a1a1f2ea0d141ac3
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 61687bbb579da03cb1f9e47ed5133d75ea027ad3
+          ref: 9c84b2c7ecd883da23045650a794868d6c2ebd5c
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-literal-release-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm-operand-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
