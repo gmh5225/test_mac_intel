@@ -1,7 +1,7 @@
-name: Repeat SQL Brotli and esbuild with longer interleaved WASM iterations on Apple and Linux CPUs
+name: Time branch table address widths on SQL Brotli and esbuild with independent high-address formatter checks
 on:
   push:
-    branches: [codex/wasm-lengths-35-pairs]
+    branches: [codex/webassembly-target-table-64]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 7161cb4d72aad82f89161629790fbe10b7b90d55
+          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
           path: source
           persist-credentials: false
       - name: Verify formatter hooks and time real WASM operators
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-long-literal-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-full-table-va-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
