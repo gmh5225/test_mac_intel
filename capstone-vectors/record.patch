@@ -1,185 +1,210 @@
+diff --git a/MCInst.h b/MCInst.h
+index e0409109..2474ad4f 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -170,7 +170,6 @@ struct MCInst {
+ 		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
+ 	// operand access index for list of registers sharing the same access right (for ARM)
+ 	uint8_t ac_idx;
+-	uint8_t popcode_adjust; // Pseudo X86 instruction adjust
+ 	char assembly[8]; // for special instruction, so that we don't need printer
+ 	unsigned char evm_data[32]; // for EVM PUSH operand
+ 	cs_wasm_op wasm_data; // for WASM operand
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 06cc61ae..ca9e5b76 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -65,7 +65,6 @@ typedef struct X86ScanResult {
+ 	unsigned opcode;
+ 	unsigned opcode_pub;
+ 	uint16_t length;
+-	uint8_t popcode_adjust;
+ } X86ScanResult;
+ 
+ bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..b953cc59 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3308,7 +3308,6 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	instr.Opcode = 0;
+ 	instr.OpcodePub = 0;
+ 	instr.size = 0;
+-	instr.popcode_adjust = 0;
+ 	instr.csh = handle;
+ 	instr.address = insn->address;
+ 	instr.flat_insn = insn;
+@@ -3346,7 +3345,6 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	result->opcode = instr.Opcode;
+ 	result->opcode_pub = instr.OpcodePub;
+ 	result->length = size;
+-	result->popcode_adjust = instr.popcode_adjust;
+ 	return true;
+ }
+ 
+@@ -3375,7 +3373,6 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			result->opcode = 0;
+ 			result->opcode_pub = id;
+ 			result->length = (uint16_t)length;
+-			result->popcode_adjust = 0;
+ 			return true;
+ 		}
+ 	}
+@@ -3402,7 +3399,6 @@ X86_DECODE_INLINE bool completeTerminalScanResult(X86ScanResult *result,
+ 		return false;
+ 	result->opcode = 0;
+ 	result->opcode_pub = instructionID;
+-	result->popcode_adjust = 0;
+ 	return true;
+ }
+ 
+@@ -3497,7 +3493,6 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 	result->opcode = insn.instructionID;
+ 	result->opcode_pub = metadata >> X86_VEX_SCAN_PUBLIC_SHIFT;
+ 	result->length = (uint16_t)insn.length;
+-	result->popcode_adjust = 0;
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index 7b8535ac..172230df 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -23,7 +23,6 @@ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
+ 	    X86_readEvexScanPlan(code, code_len, &id, &length)) {
+ 		instr->Opcode = 0;
+ 		instr->OpcodePub = id;
+-		instr->popcode_adjust = 0;
+ 		*size = (uint16_t)length;
+ 		return X86_FEATURE_DECODED;
+ 	}
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..4fa7ddb2 100644
+index 2ee82ef7..85a7bb97 100644
 --- a/arch/X86/X86InstPrinterCommon.c
 +++ b/arch/X86/X86InstPrinterCommon.c
-@@ -68,154 +68,39 @@ void X86_printMemoryScale(SStream *O, uint64_t scale, bool att)
- #ifndef CAPSTONE_X86_REDUCE
- void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
- {
--	uint8_t Imm =
--		(uint8_t)(MCOperand_getImm(MCInst_getOperand(MI, Op)) & 0x1f);
--	switch (Imm) {
--	default:
--		break; //printf("Invalid avxcc argument!\n"); break;
--	case 0:
--		SStream_concat0(O, "eq");
--		op_addAvxCC(MI, X86_AVX_CC_EQ);
--		break;
--	case 1:
--		SStream_concat0(O, "lt");
--		op_addAvxCC(MI, X86_AVX_CC_LT);
--		break;
--	case 2:
--		SStream_concat0(O, "le");
--		op_addAvxCC(MI, X86_AVX_CC_LE);
--		break;
--	case 3:
--		SStream_concat0(O, "unord");
--		op_addAvxCC(MI, X86_AVX_CC_UNORD);
--		break;
--	case 4:
--		SStream_concat0(O, "neq");
--		op_addAvxCC(MI, X86_AVX_CC_NEQ);
--		break;
--	case 5:
--		SStream_concat0(O, "nlt");
--		op_addAvxCC(MI, X86_AVX_CC_NLT);
--		break;
--	case 6:
--		SStream_concat0(O, "nle");
--		op_addAvxCC(MI, X86_AVX_CC_NLE);
--		break;
--	case 7:
--		SStream_concat0(O, "ord");
--		op_addAvxCC(MI, X86_AVX_CC_ORD);
--		break;
--	case 8:
--		SStream_concat0(O, "eq_uq");
--		op_addAvxCC(MI, X86_AVX_CC_EQ_UQ);
--		break;
--	case 9:
--		SStream_concat0(O, "nge");
--		op_addAvxCC(MI, X86_AVX_CC_NGE);
--		break;
--	case 0xa:
--		SStream_concat0(O, "ngt");
--		op_addAvxCC(MI, X86_AVX_CC_NGT);
--		break;
--	case 0xb:
--		SStream_concat0(O, "false");
--		op_addAvxCC(MI, X86_AVX_CC_FALSE);
--		break;
--	case 0xc:
--		SStream_concat0(O, "neq_oq");
--		op_addAvxCC(MI, X86_AVX_CC_NEQ_OQ);
--		break;
--	case 0xd:
--		SStream_concat0(O, "ge");
--		op_addAvxCC(MI, X86_AVX_CC_GE);
--		break;
--	case 0xe:
--		SStream_concat0(O, "gt");
--		op_addAvxCC(MI, X86_AVX_CC_GT);
--		break;
--	case 0xf:
--		SStream_concat0(O, "true");
--		op_addAvxCC(MI, X86_AVX_CC_TRUE);
--		break;
--	case 0x10:
--		SStream_concat0(O, "eq_os");
--		op_addAvxCC(MI, X86_AVX_CC_EQ_OS);
--		break;
--	case 0x11:
--		SStream_concat0(O, "lt_oq");
--		op_addAvxCC(MI, X86_AVX_CC_LT_OQ);
--		break;
--	case 0x12:
--		SStream_concat0(O, "le_oq");
--		op_addAvxCC(MI, X86_AVX_CC_LE_OQ);
--		break;
--	case 0x13:
--		SStream_concat0(O, "unord_s");
--		op_addAvxCC(MI, X86_AVX_CC_UNORD_S);
--		break;
--	case 0x14:
--		SStream_concat0(O, "neq_us");
--		op_addAvxCC(MI, X86_AVX_CC_NEQ_US);
--		break;
--	case 0x15:
--		SStream_concat0(O, "nlt_uq");
--		op_addAvxCC(MI, X86_AVX_CC_NLT_UQ);
--		break;
--	case 0x16:
--		SStream_concat0(O, "nle_uq");
--		op_addAvxCC(MI, X86_AVX_CC_NLE_UQ);
--		break;
--	case 0x17:
--		SStream_concat0(O, "ord_s");
--		op_addAvxCC(MI, X86_AVX_CC_ORD_S);
--		break;
--	case 0x18:
--		SStream_concat0(O, "eq_us");
--		op_addAvxCC(MI, X86_AVX_CC_EQ_US);
--		break;
--	case 0x19:
--		SStream_concat0(O, "nge_uq");
--		op_addAvxCC(MI, X86_AVX_CC_NGE_UQ);
--		break;
--	case 0x1a:
--		SStream_concat0(O, "ngt_uq");
--		op_addAvxCC(MI, X86_AVX_CC_NGT_UQ);
--		break;
--	case 0x1b:
--		SStream_concat0(O, "false_os");
--		op_addAvxCC(MI, X86_AVX_CC_FALSE_OS);
--		break;
--	case 0x1c:
--		SStream_concat0(O, "neq_os");
--		op_addAvxCC(MI, X86_AVX_CC_NEQ_OS);
--		break;
--	case 0x1d:
--		SStream_concat0(O, "ge_oq");
--		op_addAvxCC(MI, X86_AVX_CC_GE_OQ);
--		break;
--	case 0x1e:
--		SStream_concat0(O, "gt_oq");
--		op_addAvxCC(MI, X86_AVX_CC_GT_OQ);
--		break;
--	case 0x1f:
--		SStream_concat0(O, "true_us");
--		op_addAvxCC(MI, X86_AVX_CC_TRUE_US);
--		break;
--	}
-+	static const struct {
-+		char text[9];
-+		uint8_t length;
-+	} conditions[] = {
-+#define CONDITION(s) { s, sizeof(s) - 1 }
-+		CONDITION("eq"), CONDITION("lt"), CONDITION("le"), CONDITION("unord"),
-+		CONDITION("neq"), CONDITION("nlt"), CONDITION("nle"), CONDITION("ord"),
-+		CONDITION("eq_uq"), CONDITION("nge"), CONDITION("ngt"), CONDITION("false"),
-+		CONDITION("neq_oq"), CONDITION("ge"), CONDITION("gt"), CONDITION("true"),
-+		CONDITION("eq_os"), CONDITION("lt_oq"), CONDITION("le_oq"), CONDITION("unord_s"),
-+		CONDITION("neq_us"), CONDITION("nlt_uq"), CONDITION("nle_uq"), CONDITION("ord_s"),
-+		CONDITION("eq_us"), CONDITION("nge_uq"), CONDITION("ngt_uq"), CONDITION("false_os"),
-+		CONDITION("neq_os"), CONDITION("ge_oq"), CONDITION("gt_oq"), CONDITION("true_us"),
-+#undef CONDITION
-+	};
-+	const unsigned predicate =
-+		(unsigned)MCOperand_getImm(MCInst_getOperand(MI, Op)) & 31;
-+	SStream_concat0_n(O, conditions[predicate].text,
-+			  conditions[predicate].length);
+@@ -203,8 +203,8 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+ 		break;
+ 	}
  
 -	// Legacy SSE aliases retain their family ID. Predicate-index arithmetic
 -	// collides with unrelated public IDs, including string comparisons.
-+	/* SSE and AVX expose their predicates in separate detail fields.
-+	 * The alias keeps its mapped instruction ID. */
++	/* SSE and AVX aliases retain the mapped family ID. Legacy SSE has
++	 * its own condition field. */
  	switch (MI->flat_insn->id) {
  	case X86_INS_CMPPS:
  	case X86_INS_CMPPD:
- 	case X86_INS_CMPSS:
- 	case X86_INS_CMPSD:
--		op_addSseCC(MI, X86_SSE_CC_EQ + Imm);
-+		op_addSseCC(MI, X86_SSE_CC_EQ + predicate);
+@@ -214,9 +214,6 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
  		if (MI->flat_insn->detail)
  			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
  		break;
- 	default:
+-	default:
 -		MI->popcode_adjust = Imm + 1;
-+		op_addAvxCC(MI, X86_AVX_CC_EQ + predicate);
- 		break;
+-		break;
  	}
  }
+ 
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..cf372ace 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12584,7 +12584,6 @@ static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
+ 		return;
+ 	unsigned int index = find_insn_h(mci->csh, mci->Opcode);
+ 	insn->id = insns[index + 1].mapid;
+-	mci->popcode_adjust = 0;
+ #else
+ 	char mnemonic[CS_MNEMONIC_SIZE] = { 0 };
+ 	char operands[2] = { 0 };
+@@ -12597,11 +12596,6 @@ static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
+ 	if (strncmp(mnemonic, "vpcmp", 5) != 0)
+ 		return;
+ 
+-	// The condition printer's pseudo-ID adjustment assumes that every
+-	// predicate spelling has a contiguous public ID. Integer compares expose
+-	// element-family IDs instead, so applying that adjustment can collide with
+-	// an unrelated instruction. Normalize aliases to their family ID here.
+-	mci->popcode_adjust = 0;
+ 	length = strlen(mnemonic);
+ 	if (mnemonic_has_suffix(mnemonic, "ub"))
+ 		insn->id = X86_INS_VPCMPUB;
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..ad6efde4 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -249,7 +249,7 @@ fallback:
+ 	if (!(size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
+ 	      (code[3] & 0x10)))
+ 		return cs_decode_full_insn_body(handle, code, size, insn,
+-						insn_size, batch);
++						insn_size);
+ #endif
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
+diff --git a/cs.c b/cs.c
+index d0b8b045..325b1bba 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1087,15 +1087,15 @@ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
+ {
+-	const bool batch = request == true;
++	(void)request;
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+-	return cs_decode_full_insn_body(handle, code, size, insn, insn_size, batch);
++	return cs_decode_full_insn_body(handle, code, size, insn, insn_size);
+ }
+ 
+ __attribute__((noinline)) CS_PRESERVE_MOST bool
+ cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-		    cs_insn *insn, uint16_t *insn_size, bool batch)
++		    cs_insn *insn, uint16_t *insn_size)
+ {
+ #else
+ #if defined(_MSC_VER)
+@@ -1107,7 +1107,9 @@ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
+ {
+-	const bool batch = request == true;
++#ifndef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++	(void)request;
++#endif
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+@@ -1237,8 +1239,6 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				  code, known_length);
+ 		}
+ 	}
+-	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
+-		insn->id += mci.popcode_adjust;
+ 	return true;
+ }
+ 
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 4c4c34f2..0afb6fcc 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -42,7 +42,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	defined(__x86_64__)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
+-			 cs_insn *insn, uint16_t *insn_size, bool batch);
++			 cs_insn *insn, uint16_t *insn_size);
+ #endif
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+@@ -157,8 +157,6 @@ CS_DECODE_INLINE void finish_x86_scan(cs_struct *handle, cs_insn *insn,
+ 		map_insn_id(handle, insn, result->opcode);
+ 	if (store_bytes)
+ 		fill_insn_without_text(insn, 0, code, !batch);
+-	if (!batch || insn->id != X86_INS_VCMP)
+-		insn->id += result->popcode_adjust;
+ }
+ #endif
+ 
 diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
 index dfa9b451..37732962 100644
 --- a/tests/unit/x86_evex_vpcmp_id.c
