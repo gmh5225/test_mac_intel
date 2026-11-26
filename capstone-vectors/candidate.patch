@@ -1,85 +1,85 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 1c3fc1e2..b71e1e23 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1087,8 +1087,22 @@ target_include_directories(capstone_build_settings INTERFACE
- )
- set_property(TARGET capstone PROPERTY POSITION_INDEPENDENT_CODE ON)
+diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
+index 732c4004..6fda6c90 100644
+--- a/arch/X86/X86PublicOutput.c
++++ b/arch/X86/X86PublicOutput.c
+@@ -2,7 +2,6 @@
+ /* SPDX-License-Identifier: BSD-3-Clause */
  
-+# The mixed fixed-record path needs both address-mode readers at link time.
-+set(capstone_mixed_x86_readers "")
-+if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
-+   AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
-+   AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE)
-+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS)
-+        set(capstone_mixed_x86_readers CAPSTONE_STATIC_X86_READERS)
-+    elseif(CAPSTONE_BUILD_SHARED_LIBS AND NOT CAPSTONE_BUILD_STATIC_LIBS
-+           AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
-+                (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|arm64|aarch64)$")))
-+        set(capstone_mixed_x86_readers CAPSTONE_SHARED_X86_READERS)
-+    endif()
-+endif()
-+
- # The x86-only public iterator uses the fixed-mode readers in both library forms.
--if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_enabled_architectures STREQUAL "X86"))
-+if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST OR capstone_enabled_architectures STREQUAL "X86" OR capstone_mixed_x86_readers))
-     add_library(capstone_x86_iter32 OBJECT arch/X86/X86Vex32Output.c)
-     target_link_libraries(capstone_x86_iter32 PRIVATE capstone_build_settings)
-     set_target_properties(capstone_x86_iter32 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-@@ -1101,15 +1115,11 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
-     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
-     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
--    if(capstone_enabled_architectures STREQUAL "X86" OR
--       (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
--        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
--        AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
--        AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
-+    if(capstone_enabled_architectures STREQUAL "X86" OR capstone_mixed_x86_readers)
-         if(capstone_enabled_architectures STREQUAL "X86")
-             target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
-         else()
--            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
-+            target_compile_definitions(capstone_build_settings INTERFACE ${capstone_mixed_x86_readers})
-         endif()
-         set(capstone_x86_objects
-             $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
-diff --git a/Makefile b/Makefile
-index fafc61bf..b74b5222 100644
---- a/Makefile
-+++ b/Makefile
-@@ -315,6 +315,11 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
- else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
- 	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
-+else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),no:yes:no:no)
-+ifneq ($(filter macos linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
-+	CFLAGS += -DCAPSTONE_SHARED_X86_READERS
-+	MIXED_SHARED_X86_READERS := yes
-+endif
- endif
- 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
- endif
-@@ -475,6 +480,8 @@ LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
- LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ) $(ARM_FORMAT_CHAR_OBJ)
- ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- LIBOBJ_SHARED := $(LIBOBJ)
-+else ifeq ($(MIXED_SHARED_X86_READERS),yes)
-+LIBOBJ_SHARED := $(LIBOBJ)
- endif
+ #include "../../cs_disasm_internal.h"
+-#include "X86ScanAdapter.h"
  
+ #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+ #if defined(__ELF__) && defined(__clang__)
+@@ -13,16 +12,15 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+ 					    cs_insn *insn, uint16_t *length,
+ 					    bool batch)
+ {
+-	/* The caller owns skipdata callbacks, bulk boundaries and the public
+-	 * cursors. A fixed iterator can fill this one record using local cursors. */
+-	if (!batch && !handle->skipdata && !handle->no_text &&
+-	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
+-		uint64_t address = insn->address;
+-		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
+-					     &size, &address, insn);
+-		if (ok)
+-			*length = insn->size;
+-		return ok;
++	/* The outer iterator owns detail visibility, skipdata and cursor updates.
++	 * Its fixed text path only needs the decoded record and its length. */
++	if (!batch && !handle->skipdata && !handle->no_text) {
++		if (handle->mode == CS_MODE_32)
++			return X86_decodeFixedRecord32(handle, code, size, insn,
++						       length);
++		if (handle->mode == CS_MODE_64)
++			return X86_decodeFixedRecord64(handle, code, size, insn,
++						       length);
+ 	}
+ 	return cs_decode_full_insn(handle, code, size, insn, length, batch);
+ }
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 7afca7e4..24e32cce 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -261,7 +261,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
  
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 06cc61ae..3d9df89b 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -45,7 +45,8 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+-#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_PUBLIC_OUTPUT)
+ bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
+ 			     cs_insn *insn, uint16_t *length)
+ {
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 7bbf1c0d..dc2531df 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -202,7 +202,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #include "../../cs_disasm_internal.h"
+ #undef CS_DECODE_OUTPUT_MISS
+ 
+-#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_PUBLIC_OUTPUT)
+ bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
+ 			     cs_insn *insn, uint16_t *length)
+ {
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 4c4c34f2..dedfb15f 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -28,12 +28,14 @@ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ #ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
+ typedef uint8_t cs_record_request;
+ enum { CS_RECORD_PUBLIC_ITER = 2 };
++#else
++typedef bool cs_record_request;
++#endif
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_PUBLIC_OUTPUT)
+ CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
+ 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
+ CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
+ 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
+-#else
+-typedef bool cs_record_request;
  #endif
- #endif
- 
--#if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+#if (defined(CAPSTONE_STATIC_X86_READERS) || defined(CAPSTONE_SHARED_X86_READERS)) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #define CAPSTONE_X86_PUBLIC_FIXED_RECORD
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,

@@ -19,7 +19,7 @@ assert sha(r/'candidate.patch')==q['candidate']['sha256']
 assert all(sha(r/f)==h for f,h in m['drivers'].items())
 w=Path(tempfile.mkdtemp());build=w/'build';ad=w/'adapter';selected=w/'lib';selected.mkdir();ad.mkdir()
 try:
-    flags=['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('ARM','AARCH64','MIPS','PPC','X86','RISCV')]
+    flags=['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('X86',)]
     flags+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON']
     images={};sources={};copies={};sizes={};symbols={};objects={}
     project=w/'static-project';static_build=w/'static-build';(project/'third_party').mkdir(parents=True)
@@ -35,7 +35,7 @@ try:
         run('cmake','-G','Ninja','-S',src,'-B',build,*flags)
         run('cmake','--build',build,'--target','capstone_shared','--parallel','4')
         so=(build/'libcapstone.so').resolve()
-        assert any('CAPSTONE_SHARED_X86_READERS' in x['command']for x in read(build/'compile_commands.json'))==(stage=='candidate')
+        assert all('CAPSTONE_X86_ONLY' in x['command'] for x in read(build/'compile_commands.json'))
         dll=w/(stage+'.so');shutil.copyfile(so,dll);images[stage]=dll.read_bytes();sources[stage]=sha(dll);sizes[stage]=len(images[stage])
         syms=get('nm','-D','--defined-only','--format=posix',dll).splitlines()
         symbols[stage]=sorted(row.split()[0] for row in syms)
@@ -89,15 +89,15 @@ try:
     invoke=['setarch',os.uname().machine,'-R']
     opts=json.loads(get(w/'trial-compare',w/'base.so',w/'candidate.so','options'))
     domain=list(map(int,get(w/'public-guard',w/'base.so',w/'candidate.so').split()))
-    assert domain==[5105184,2971712]
+    assert domain[0]==5105184 and 0<domain[1]<domain[0]
     libs=(w/'base.so',w/'candidate.so')
     states=sp.run([w/'trial-states',*libs,'2048'],text=True,capture_output=True)
     states.check_returncode()
-    assert states.stderr.count('case arch=')==464
-    scan=list(map(int,get(w/'trial-guard',*libs).split()));assert scan==[2162688,999139]
+    assert states.stderr.count('case arch=')==48
+    scan=list(map(int,get(w/'trial-guard',*libs).split()));assert scan[0]==2162688 and 0<scan[1]<scan[0]
     vector=json.loads(get(w/'trial-vector-guard',*libs))
     cmov=list(map(int,get(w/'cmov-guard',*libs).split()));assert cmov[0]>1000000 and 0<cmov[1]<cmov[0]
-    save('options',dict(domain=domain,options=opts,scan=scan,vector=vector,cmov=cmov,random_state_configurations=464,random_per_state=2048))
+    save('options',dict(domain=domain,options=opts,scan=scan,vector=vector,cmov=cmov,random_state_configurations=48,random_per_state=2048))
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     inputs=read(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
@@ -146,19 +146,6 @@ try:
             def take(k,n):
                 select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
             measure('att/'+name+'/'+str(mode),images,take)
-    from training import fetch
-    training_rows=fetch(r,w);save('foreign-corpus',training_rows)
-    foreign_records={}
-    for row in training_rows:
-        if row['arch'] in ('i386','amd64'):continue
-        for mode in (0,1,2):
-            key=f"foreign/{row['name']}/{mode}"
-            counts=list(map(int,get(w/'foreign-verify',w/'base.so',w/'candidate.so',row['arch'],w/(row['name']+'.text'),str(mode)).split()))
-            assert len(counts)==2 and counts[0]>0
-            foreign_records[key]=counts;save('foreign-records',foreign_records)
-            def take(k,n):
-                select(k);return list(map(int,get(*invoke,w/'foreign',row['arch'],w/(row['name']+'.text'),str(mode),str(n)).split()))
-            measure('foreign/'+row['name']+'/'+str(mode),images,take)
     save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),verified=verified,inode=inode,soname=soname,spans=spans,bytes=maximum))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

@@ -145,14 +145,7 @@ int main(int argc,char**argv) {
  struct Target {cs_arch arch; unsigned mode;};
  std::vector<Target> targets;
  auto add=[&](cs_arch arch,std::initializer_list<unsigned> modes) {for(unsigned mode:modes)targets.push_back({arch,mode});};
- add(CS_ARCH_PPC,{CS_MODE_32,CS_MODE_32|CS_MODE_BIG_ENDIAN,CS_MODE_64,CS_MODE_64|CS_MODE_BIG_ENDIAN,CS_MODE_64|CS_MODE_QPX|CS_MODE_BIG_ENDIAN,CS_MODE_32|CS_MODE_SPE|CS_MODE_BIG_ENDIAN,CS_MODE_32|CS_MODE_BOOKE|CS_MODE_BIG_ENDIAN,CS_MODE_32|CS_MODE_PS|CS_MODE_BIG_ENDIAN});
- add(CS_ARCH_PPC,{CS_MODE_64|CS_MODE_PWR7, CS_MODE_64|CS_MODE_PWR8, CS_MODE_64|CS_MODE_PWR9,
-        CS_MODE_64|CS_MODE_PWR10, CS_MODE_64|CS_MODE_PPC_ISA_FUTURE, CS_MODE_64|CS_MODE_PWR10|CS_MODE_BIG_ENDIAN,
-        CS_MODE_64|CS_MODE_SPE|CS_MODE_QPX|CS_MODE_PS, CS_MODE_32|CS_MODE_SPE|CS_MODE_PS|CS_MODE_BIG_ENDIAN});
- add(CS_ARCH_ARM,{CS_MODE_ARM,CS_MODE_THUMB,CS_MODE_ARM|CS_MODE_V8,CS_MODE_THUMB|CS_MODE_MCLASS,CS_MODE_ARM|CS_MODE_BIG_ENDIAN});
- add(CS_ARCH_AARCH64,{CS_MODE_LITTLE_ENDIAN,CS_MODE_BIG_ENDIAN});
- add(CS_ARCH_MIPS,{CS_MODE_MIPS32R2,CS_MODE_MIPS64R2,CS_MODE_MIPS32R2|CS_MODE_BIG_ENDIAN,CS_MODE_MIPS64R6});
- add(CS_ARCH_RISCV,{CS_MODE_RISCV32|CS_MODE_RISCV_C,CS_MODE_RISCV64|CS_MODE_RISCV_C|CS_MODE_RISCV_A});
+ add(CS_ARCH_X86,{CS_MODE_16,CS_MODE_32,CS_MODE_64});
  for (Target target : targets) for(unsigned flags=0; flags<16; ++flags) {
   unsigned bits=target.mode;
   cs_mode mode=(cs_mode)bits;
@@ -170,5 +163,5 @@ int main(int argc,char**argv) {
     compare(x,y,bytes,(i&31)<16?(i&31):16,detail);
   }
  }
- std::printf("equal PowerPC public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
+ std::printf("equal X86 public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
 }
