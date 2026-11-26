@@ -1,23 +1,55 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6050d7c2..5a8f1bff 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -213,6 +213,10 @@ if(capstone_enabled_architectures STREQUAL "RISCV")
+     endif()
+ endif()
+ 
++if(capstone_enabled_architectures STREQUAL "WASM")
++    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "SPARC")
+     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
+ endif()
+diff --git a/Makefile b/Makefile
+index 06b05013..95e046b2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -167,6 +167,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_ONLY
+ endif
+ 
++ifeq ($(sort $(CAPSTONE_ARCHS)),wasm)
++CFLAGS += -DCAPSTONE_WASM_LITERAL_MNEMONICS
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
+ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+ endif
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index 513b52b6..cf28e8b5 100644
+index 513b52b6..3c8c4e7e 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -6,7 +6,17 @@
+@@ -6,7 +6,20 @@
  
  void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  {
--	SStream_concat(O, WASM_insn_name((csh)MI->csh, MI->Opcode));
-+	const char *name = WASM_insn_name((csh)MI->csh, MI->Opcode);
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++#if defined(CAPSTONE_WASM_LITERAL_MNEMONICS) && \
++	!defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
++	const char *name = WASM_insn_name((csh)MI->csh, MI->Opcode);
 +	/* Mnemonics contain no format conversions. A custom formatter still
 +	 * receives the original mnemonic as its format string. */
 +	if (cs_vsnprintf == cs_default_vsnprintf && O->index < SSTREAM_BUF_LEN - 1)
 +		SStream_concat0(O, name);
 +	else
-+#endif
 +		SStream_concat(O, name);
++#else
+ 	SStream_concat(O, WASM_insn_name((csh)MI->csh, MI->Opcode));
++#endif
  
  	switch (MI->wasm_data.type) {
  	default:

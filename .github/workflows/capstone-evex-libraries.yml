@@ -1,7 +1,7 @@
-name: Measure WASM formatting on independently delimited module operators and verify copied byte windows and consumed lengths
+name: Qualify dedicated WASM text and detail on real modules with unchanged mixed x86 and RISC binaries
 on:
   push:
-    branches: [codex/wasm-operator-intervals]
+    branches: [codex/wasm-dedicated-literal-mnemonics]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -37,12 +37,14 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: |
           python3 -B capstone-vectors/wasm/configs.py
+          python3 -B capstone-vectors/wasm/mixed.py
+          python3 -B capstone-vectors/wasm/check_make.py
           python3 -B capstone-vectors/wasm/run.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-window-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-dedicated-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
