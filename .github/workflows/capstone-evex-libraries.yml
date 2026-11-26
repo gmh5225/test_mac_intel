@@ -1,7 +1,7 @@
-name: Compare two 64-byte x86 row designs at their real scalar, SIMD and PE32 consumers
+name: Measure bounded vector register-pair printers on real PE and ELF code
 on:
   push:
-    branches: [codex/fixed-operand-reader-width]
+    branches: [codex/bounded-vector-pair-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-fixed-spellings-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: bounded-vector-pair-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
