@@ -1,120 +1,139 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 5a8f1bff..32277419 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1098,11 +1098,13 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
-     if(capstone_enabled_architectures STREQUAL "X86" OR
-        (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
--        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
--        AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
-+        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|aarch64|amd64|AMD64|arm64)$"))
-+        AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
-         AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
-         if(capstone_enabled_architectures STREQUAL "X86")
-             target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
-+        elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-+            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_ELF_ITERATOR)
-         else()
-             target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
-         endif()
-diff --git a/Makefile b/Makefile
-index 95e046b2..2c4dbe3a 100644
---- a/Makefile
-+++ b/Makefile
-@@ -315,6 +315,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
- else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
- 	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
-+else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
-+ifneq ($(filter linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
-+	CFLAGS += -DCAPSTONE_X86_ELF_ITERATOR
-+endif
- endif
- 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
- endif
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..5112d8db 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3795,10 +3795,16 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 	return true;
- }
+diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
+index ba0526c4..fe462710 100644
+--- a/arch/X86/X86MemoryOutput.c
++++ b/arch/X86/X86MemoryOutput.c
+@@ -9,6 +9,7 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
  
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+CAPSTONE_INTERNAL X86_DECODE_ALIGN
-+bool X86_disasmIterGeneric(csh ud, const uint8_t **code, size_t *size,
-+			   uint64_t *address, cs_insn *insn)
++#define X86_MEMORY_OPCODE_READY
+ #include "X86MemoryOutputImpl.h"
+ 
+ #endif
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 11582041..0483625b 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -20,7 +20,12 @@ bool X86_writeMemoryOutput(
+ #endif
+ 	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
+ 	const struct X86SimpleOutput *row,
++#ifdef X86_MEMORY_OPCODE_READY
++	const struct X86SimpleRegister regs[4][16],
++	struct X86MemoryOpcode selected)
 +#else
- CAPSTONE_EXPORT
- X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
- 				 uint64_t *address, cs_insn *insn)
+ 	const struct X86SimpleRegister regs[4][16])
 +#endif
  {
- 	return cs_disasm_iter_core(ud, code, size, address, insn);
- }
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..f79b7407 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -39,6 +39,10 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- 	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
+ #ifdef X86_MEMORY_IMMEDIATE
+ 	const bool wide = X86_IMMEDIATE_WIDE;
+@@ -31,6 +36,11 @@ bool X86_writeMemoryOutput(
+ #else
+ 	const bool wide = row->address_size == 8;
  #endif
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+	return X86_disasmIterGeneric(ud, code, size, address, insn);
++#ifdef X86_MEMORY_OPCODE_READY
++	const uint8_t rex = selected.rex;
++	const unsigned lead = rex != 0;
++	const uint8_t opcode = selected.opcode, modrm = selected.modrm;
 +#else
- 	return cs_disasm_iter(ud, code, size, address, insn);
+ 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
+ #ifdef X86_EXTEND64_MEMORY
+ 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
+@@ -40,6 +50,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned lead = rex != 0;
+ #endif
+ 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
 +#endif
- }
- #endif
-diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
-index 246ee26c..52c1b56d 100644
---- a/arch/X86/X86ScanAdapter.h
-+++ b/arch/X86/X86ScanAdapter.h
-@@ -10,6 +10,17 @@
- extern "C" {
- #endif
+ 	const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
+ 	const unsigned offset = lead + 2 + sib;
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..7c0d81ad 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -60,10 +60,17 @@ enum X86SimpleForm {
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
  
-+#if defined(CAPSTONE_X86_ELF_ITERATOR) && defined(__ELF__) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define X86_SHARED_ITERATOR_ENTRY
-+/* The public symbol starts in the fixed reader. Its fallback must enter
-+ * the generic iterator directly, including for foreign architectures. */
-+bool X86_disasmIterGeneric(csh handle, const uint8_t **code, size_t *size,
-+			   uint64_t *address, cs_insn *insn);
-+#endif
++struct X86MemoryOpcode {
++	uint8_t rex;
++	uint8_t opcode;
++	uint8_t modrm;
++};
 +
- typedef struct X86ScanBatchResult {
- 	size_t count;
- 	size_t bytes;
+ CAPSTONE_INTERNAL bool
+ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
+-		      const struct X86SimpleRegister regs[4][16]);
++		      const struct X86SimpleRegister regs[4][16],
++		      struct X86MemoryOpcode selected);
+ 
+ CAPSTONE_INTERNAL void X86_writeImmediateOutput(
+ 	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..a3c6487f 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -74,7 +74,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	}
+ 	const unsigned form = plan & 3;
+ 	uint8_t modrm = 0;
+-	bool base_memory = false;
+ 	if (form == X86_SIMPLE_RM_REG || form == X86_SIMPLE_REG_RM) {
+ 		if (size < 2u + has_rex)
+ 			return false;
+@@ -106,7 +105,21 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ #endif
+ 			if (!alu && !test_or_mov && opcode != 0x8d && !single)
+ 				return false;
+-			base_memory = true;
++			if (X86_OUTPUT_UNSUPPORTED(handle,
++					!wide && handle->mode != CS_MODE_32))
++				return false;
++			const struct X86SimpleOutput *row =
++				&x86_simple_outputs[plan >> 2];
++#ifdef X86_MEMORY32_OUTPUT
++			if (opcode == 0xff && (modrm & 0x38) != 0x30)
++				row = &x86_indirect_memory[(modrm & 0x20) != 0];
++			return X86_MEMORY32_OUTPUT(code, size, insn, insn_size, row,
++						   x86_simple_registers);
++#else
++			return X86_writeMemoryOutput(code, size, insn, insn_size, row,
++						     x86_simple_registers,
++						     (struct X86MemoryOpcode){ rex, opcode, modrm });
++#endif
+ 		} else if (opcode == 0x8d || opcode == 0xff) {
+ 			return false;
+ 		}
+@@ -162,17 +175,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return true;
+ 	}
+ 	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
+-	if (base_memory) {
+-#ifdef X86_MEMORY32_OUTPUT
+-		if (opcode == 0xff && (modrm & 0x38) != 0x30)
+-			row = &x86_indirect_memory[(modrm & 0x20) != 0];
+-		return X86_MEMORY32_OUTPUT(code, size, insn, insn_size, row,
+-					   x86_simple_registers);
+-#else
+-		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+-					     x86_simple_registers);
+-#endif
+-	}
+ 	const bool relative = form == X86_SIMPLE_RELATIVE;
+ 	if (relative && size < (size_t)row->imm_offset + row->imm_size)
+ 		return false;
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..3d424404 100644
+index 7afca7e4..aee8b810 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -276,10 +276,22 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
- {
- #ifdef CS_DECODE_TRY_OUTPUT
- 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+	if (!handle || handle->arch != CS_ARCH_X86 || handle->no_text)
-+		return X86_disasmIterGeneric(ud, code, size, address, insn);
-+	if (handle->mode == CS_MODE_64)
-+#else
- 	if (handle && handle->arch == CS_ARCH_X86 &&
- 	    handle->mode == CS_MODE_64 && !handle->no_text)
-+#endif
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
- #endif
- 	return X86_disasmIter32(ud, code, size, address, insn);
- }
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+/* These two interfaces share cursor, skipdata and detail-pointer ownership. */
-+extern __typeof__(X86_disasmIterText) cs_disasm_iter
-+	__attribute__((alias("X86_disasmIterText"), visibility("default")));
-+#endif
-+
- #endif
+@@ -74,7 +74,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
+ 		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
+ 	if (modrm < 0xc0)
+ 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+-					     x86_simple_registers);
++					     x86_simple_registers,
++					     (struct X86MemoryOpcode){ rex, 0xff, modrm });
+ 	const struct X86SimpleRegister *reg =
+ 		&x86_simple_registers[3][((rex & 1) << 3) | (modrm & 7)];
+ 	*insn_size = insn->size = (uint16_t)(2 + (rex != 0));

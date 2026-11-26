@@ -1,7 +1,7 @@
-name: Measure a shared public and private Linux static iterator with PE32, SIMD, firmware and five other architectures
+name: Measure scalar memory dispatch and validated ModRM reuse on real PE32, SIMD, firmware and non-x86 programs
 on:
   push:
-    branches: [codex/elf-public-text-iterator-owner]
+    branches: [codex/memory-operands-at-the-formatter]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: elf-iterator-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-memory-reuse-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
