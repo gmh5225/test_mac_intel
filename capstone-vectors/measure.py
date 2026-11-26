@@ -168,7 +168,7 @@ def main(w):
         from profiles import measure
         tags=w/(name+'.tags')
         counts=list(map(int,sp.check_output([w/'cohorts',str(bits),f,intervals,tags]).split()))
-        assert len(counts)==10 and tags.stat().st_size==9*sum(counts)
+        assert len(counts)==12 and tags.stat().st_size==9*sum(counts)
         modes={}
         for mode in (1,2):
             modes[mode]=measure(bins['mixed_base'],mode,bits,f,intervals,tags,counts,w,evidence,name)

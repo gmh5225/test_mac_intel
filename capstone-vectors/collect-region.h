@@ -17,7 +17,7 @@ static void profile_begin(const uint8_t *start) {
     std::ifstream in(path,std::ios::binary);if(!in)std::abort();
     uint64_t offset;
     while(in.read(reinterpret_cast<char *>(&offset),sizeof(offset))) {
-        int tag=in.get();if(tag<0||tag>9)std::abort();cohorts.push_back({offset,unsigned(tag)});
+        int tag=in.get();if(tag<0||tag>11)std::abort();cohorts.push_back({offset,unsigned(tag)});
     }
     if(!in.eof()||cohorts.empty())std::abort();
     image_start=start;selected=std::strtoul(std::getenv("CG_COHORT"),nullptr,10);armed=true;
@@ -28,7 +28,7 @@ extern "C" __attribute__((noinline)) void profile_instruction(const uint8_t *p) 
     if(position==cohorts.size())std::abort();
     const RecordCohort &r=cohorts[position++];
     if(r.offset!=static_cast<uint64_t>(p-image_start))std::abort();
-    bool current=selected==10 || selected==r.kind;
+    bool current=selected==12 || selected==r.kind;
     selected_visits+=current;
     if(current!=collecting){collecting=current;CALLGRIND_TOGGLE_COLLECT;}
 }

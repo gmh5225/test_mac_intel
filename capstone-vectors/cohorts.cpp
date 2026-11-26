@@ -33,7 +33,7 @@ static unsigned cohort(const cs_insn &rec) {
         return mem ? (move?4:5) : (move?6:7);
     }
     if (imm && !mem) return 8;
-    return 9;
+    return mem ? 10 : 11;
 }
 int main(int argc,char **argv) {
     if(argc!=5)return 1;
@@ -42,7 +42,7 @@ int main(int argc,char **argv) {
     std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(file),{}};
     csh h;if(cs_open(CS_ARCH_X86,argv[1][0]=='3'?CS_MODE_32:CS_MODE_64,&h) || cs_option(h,CS_OPT_DETAIL,CS_OPT_ON))return 3;
     auto rec=cs_malloc(h);if(!rec)return 4;
-    size_t offset,left;uint64_t ip,counts[10]{};
+    size_t offset,left;uint64_t ip,counts[12]{};
     while(spans>>offset>>left>>ip) {
         if(offset>bytes.size()||left>bytes.size()-offset)return 5;
         auto pc=static_cast<const uint8_t *>(bytes.data()+offset);
