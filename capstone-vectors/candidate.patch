@@ -45,7 +45,7 @@ index 1c3fc1e2..b71e1e23 100644
          set(capstone_x86_objects
              $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>
 diff --git a/Makefile b/Makefile
-index fafc61bf..b74b5222 100644
+index 61a663b8..dce535a4 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -315,6 +315,11 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
@@ -60,7 +60,7 @@ index fafc61bf..b74b5222 100644
  endif
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
-@@ -475,6 +480,8 @@ LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
+@@ -476,6 +481,8 @@ LIBOBJ_SHARED := $(LIBOBJ) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ)
  LIBOBJ += $(LIBOBJ_X86_STATIC_OUTPUT) $(OBJDIR)/AliasPatternLookup.o $(MCINST_STORAGE_OBJ) $(ARM_FORMAT_CHAR_OBJ)
  ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
  LIBOBJ_SHARED := $(LIBOBJ)
@@ -105,7 +105,7 @@ index 197453cb..e74790d9 100644
  #define CS_DECODE_SCAN_IMPL decodeIteratorScan
  #include "../../cs_disasm_internal.h"
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..87d3a6f1 100644
+index 7afca7e4..de21fb5c 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
 @@ -261,7 +261,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
@@ -117,30 +117,49 @@ index 7afca7e4..87d3a6f1 100644
  bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
  			     cs_insn *insn, uint16_t *length)
  {
-@@ -282,4 +282,25 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+@@ -282,4 +282,44 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
  #endif
  	return X86_disasmIter32(ud, code, size, address, insn);
  }
 +
 +#ifdef CAPSTONE_X86_SHARED_FIXED_RECORD
-+/* Keep public scan and cursor handling in the original iterator. The full
-+ * decoder and fixed readers share this single-record calling boundary. */
++/* The ordinary decoder has the same calling convention as the public
++ * record entry. Keep the frame needed by the fixed readers on their path. */
++static __attribute__((noinline)) CS_PRESERVE_MOST bool
++decodeSharedIntelRecord(cs_struct *handle, const uint8_t *code, size_t size,
++			cs_insn *insn, uint16_t *insn_size, bool batch)
++{
++	if (handle->mode == CS_MODE_32)
++		return X86_decodeFixedRecord32(handle, code, size, insn,
++					       insn_size);
++	if (handle->mode == CS_MODE_64)
++		return X86_decodeFixedRecord64(handle, code, size, insn,
++					       insn_size);
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
++
++#if __has_attribute(musttail)
++#define X86_RECORD_TAIL __attribute__((musttail))
++#else
++#define X86_RECORD_TAIL
++#endif
++
 +CS_PRESERVE_MOST bool X86_decodeSharedRecord(cs_struct *handle,
 +		const uint8_t *code, size_t size, cs_insn *insn,
 +		uint16_t *insn_size, bool batch)
 +{
-+	if (!batch && handle->arch == CS_ARCH_X86 && !handle->no_text &&
++	if (handle->arch == CS_ARCH_X86 && !batch && !handle->no_text &&
 +	    (handle->syntax == CS_OPT_SYNTAX_DEFAULT ||
 +	     handle->syntax == CS_OPT_SYNTAX_INTEL)) {
-+		if (handle->mode == CS_MODE_32)
-+			return X86_decodeFixedRecord32(handle, code, size, insn,
-+						       insn_size);
-+		if (handle->mode == CS_MODE_64)
-+			return X86_decodeFixedRecord64(handle, code, size, insn,
-+						       insn_size);
++		X86_RECORD_TAIL
++		return decodeSharedIntelRecord(handle, code, size, insn,
++					      insn_size, batch);
 +	}
++	X86_RECORD_TAIL
 +	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 +}
++
++#undef X86_RECORD_TAIL
 +#endif
  #endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c

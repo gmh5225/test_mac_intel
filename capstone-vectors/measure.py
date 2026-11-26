@@ -70,6 +70,21 @@ try:
                     images['linked']=link_image.read_bytes();sources['linked']=sha(link_image);sizes['linked']=len(images['linked'])
                     syms=get('nm','-D','--defined-only','--format=posix',link_image).splitlines()
                     assert sorted(row.split()[0]for row in syms)==symbols['base']
+        if stage=='candidate':
+            orig=m['framed_control'];unit=src/orig['unit'];new_unit=unit.read_bytes()
+            assert sha(r/'framed.c')==orig['sha256']
+            for label,raw in [('framed',(r/'framed.c').read_bytes()),('restore',new_unit)]:
+                unit.write_bytes(raw);run('git','-C',src,'add','--',orig['unit'])
+                want=orig['tree'] if label=='framed' else q['candidate']['tree']
+                assert get('git','-C',src,'write-tree').strip()==want
+                run('cmake','--build',build,'--target','capstone_shared','--parallel','4')
+                if label=='restore':
+                    assert so.read_bytes()==images['candidate']
+                else:
+                    clone=w/'framed.so';shutil.copyfile(so,clone)
+                    images['framed']=clone.read_bytes();sources['framed']=sha(clone);sizes['framed']=len(images['framed'])
+                    syms=get('nm','-D','--defined-only','--format=posix',clone).splitlines()
+                    assert sorted(row.split()[0] for row in syms)==symbols['base']
         run('cmake','-G','Ninja','-S',project,'-B',static_build,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
         run('cmake','--build',static_build,'--target','capstone_static','--parallel','4')
         static_lib,=static_build.rglob('libcapstone.a')
@@ -142,7 +157,7 @@ try:
     save('host',host);records={};timings={}
     def measure(key,engines,take):
         n=max(1,math.ceil(25e6/take('base',1)[0]));expected={k:take(k,n)[2:]for k in engines}
-        assert expected['base']==expected['copy']==expected['candidate']==expected['linked']
+        assert expected['base']==expected['copy']==expected['candidate']==expected['linked']==expected['framed']
         if 'iced' in expected:assert all(v[:3]==expected['base'][:3]for v in expected.values())
         rng=random.Random('shared-library/'+key);blocks=[];order=list(engines)
         for _ in range(17):
@@ -171,13 +186,14 @@ try:
         assert audits[0]==audits[1]
         records[name]=[list(map(int,get(w/'trial-real',w/'base.so',w/'candidate.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
         linked_records=[list(map(int,get(w/'trial-real',w/'base.so',w/'linked.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
-        assert linked_records==records[name]
+        framed_records=[list(map(int,get(w/'trial-real',w/'base.so',w/'framed.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
+        assert framed_records==linked_records==records[name]
         save('records',records)
         for mode in (0,1,2):
             def take(k,n):
                 other=k in ('iced','fast');select('base' if other else k)
                 return list(map(int,get(*invoke,w/'driver',k if other else 'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('intel/'+name+'/'+str(mode),['base','copy','linked','candidate','iced']+(['fast']if mode else []),take)
+            measure('intel/'+name+'/'+str(mode),['base','copy','linked','framed','candidate','iced']+(['fast']if mode else []),take)
         for mode in (1,2):
             def take(k,n):
                 select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))

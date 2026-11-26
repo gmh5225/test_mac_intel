@@ -1,7 +1,7 @@
-name: Measure original and redirected public calls with the identical linked reader set
+name: Time framed and tail-dispatched public readers against the current release
 on:
   push:
-    branches: [codex/shared-iterator-object-link]
+    branches: [codex/shared-record-tail-gate]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 499ddf54d2723f7357e92db138e4e9beb71b28a5
+          ref: eac7e8af8fcc31631f97470d2f01678382c3f2c0
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f73475381f5bf3936bd07139142a4915f9934815
+          ref: d08b432ed881a2192d62125e97bd558553d8569a
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: format-original-object-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-qualified-tail-gate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
