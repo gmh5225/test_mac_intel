@@ -13,7 +13,7 @@ def save(name,value):(e/(name+'.json')).write_text(json.dumps(value,indent=2)+'\
 def get(*a):return sp.check_output(a,text=True).strip()
 def run(*a):sp.run(a,check=True)
 def git(*a):return get('git','-C',src,*a)
-w=Path(tempfile.mkdtemp());build=w/'build';project=w/'project';project.mkdir()
+w=Path(tempfile.mkdtemp()).resolve();build=w/'build';project=w/'project';project.mkdir()
 try:
     assert git('rev-parse','HEAD')==q['base']['commit']
     for f in ('probe.cpp','CMakeLists.txt'):shutil.copyfile(r/f,project/f)
@@ -57,6 +57,10 @@ try:
     else:assert images['candidate']==images[expected],images
     if eligible:assert images['candidate']!=images['base']
     samples=list(fixtures(r,w,m));assert len(samples)==6
+    timing={}
+    if profile=='clang14':
+        shutil.copytree(w/'base',w/'copy')
+        if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     for name,bits,file,spans in samples:
         for syntax,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
             if (profile=='diet' and mode) or (profile=='noatt' and syntax=='att'):continue
@@ -66,6 +70,15 @@ try:
                     return list(map(int,get(exe,'public-att' if syntax=='att' else 'capstone',str(mode),str(reps),file,spans,str(bits)).split()))
                 key='/'.join((kind,syntax,name,str(mode)));row=read('base',1)
                 assert all(read(stage,1)[2:]==row[2:] for stage in stages[1:])
+                if profile=='clang14':
+                    n=max(1,math.ceil(18e6/row[1]));target=read('base',n)[2:];labels=['base','copy','candidate'];rng=random.Random(key+'/compiler14');blocks=[]
+                    for _ in range(13):
+                        rng.shuffle(labels);block={label:[]for label in labels}
+                        for label in labels+labels[::-1]:
+                            value=read(label,n);assert value[2:]==target;block[label].append(value[:2])
+                        blocks.append({label:[sum(x[i] for x in vals)for i in (0,1)]for label,vals in block.items()})
+                    timing[key]=dict(cycles=blocks,checks=row[2:],reps=n)
+                    save('timings',timing)
                 checks[key]=row[2:]
     assert checks;save('checks',checks)
     save('complete',dict(complete=True,source=q,os=platform.platform(),host=host,profile=profile,eligible=eligible,expected=expected,checks=len(checks),
