@@ -77,8 +77,8 @@ try:
                 if gold is not None:assert g==gold
                 gold=g
             assert sum(gold[:3])==spec['operators'] and gold[0]>0
-            reps=max(1,math.ceil(30e6/invoke(path,0,1)[0]));expected=invoke(path,0,reps)[2:];pairs=[];rng=random.Random(name+'/'+str(detail))
-            for _ in range(11 if ci else 7):
+            reps=max(1,math.ceil(120e6/invoke(path,0,1)[0]));expected=invoke(path,0,reps)[2:];pairs=[];rng=random.Random(name+'/'+str(detail))
+            for _ in range(35 if ci else 7):
                 order=list(bins);rng.shuffle(order);row={}
                 for label in order:
                     select(label);v=invoke(path,0,reps);assert v[2:]==expected;row[label]=v[:2]
@@ -88,7 +88,7 @@ try:
                 result[ctrl]=[]
                 for j in (0,1):
                     ratios=sorted(v[ctrl][j]/v['candidate'][j]for v in pairs)
-                    result[ctrl].append([statistics.median(ratios),ratios[2 if ci else 1],ratios[-3 if ci else -2]])
+                    result[ctrl].append([statistics.median(ratios),ratios[11 if ci else 1],ratios[-12 if ci else -2]])
             results[name+'/'+str(detail)]=dict(oracle=gold,ratios=result,pairs=pairs,repeats=reps)
             save('observations',results);print(name,detail,gold,result,flush=True)
     save('decision',dict(complete=True,source=tree,corpus=cover,host=platform.platform(),results=results,streams=by,changed=changed))

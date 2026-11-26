@@ -1,7 +1,7 @@
-name: Measure WASM mnemonic copies using the decoded name length in SQL Brotli and esbuild
+name: Repeat SQL Brotli and esbuild with longer interleaved WASM iterations on Apple and Linux CPUs
 on:
   push:
-    branches: [codex/wasm-size-with-mnemonic]
+    branches: [codex/wasm-lengths-35-pairs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-literal-length-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-long-literal-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
