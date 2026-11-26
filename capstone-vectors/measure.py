@@ -58,6 +58,10 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'secondary.cpp',lib,'-o',w/'check-secondary')
+        check=list(map(int,get(w/'check-secondary').split()))
+        assert check[0]==4194304 and 0<check[1]<check[0]
+        save('secondary-'+label,check)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
