@@ -1,7 +1,7 @@
-name: Verify WASM operand boundaries and callback switching on Windows 32 and 64 bits
+name: Verify signed block type spelling and custom callback behavior in Windows full and DIET builds
 on:
   push:
-    branches: [codex/wasm-operands-msvc-x86-x64]
+    branches: [codex/wasm-empty-block-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: eb7fdeaaeb4f89cbcc5ab24edf41e0a03073884c
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-operand-records-${{ matrix.arch }}-${{ matrix.profile }}
+          name: empty-block-config-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
