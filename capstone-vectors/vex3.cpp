@@ -1,52 +1,47 @@
 #include "arch/X86/X86ScanAdapter.h"
-#include <cstdint>
+#include <capstone/capstone.h>
+#include <cinttypes>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <sys/mman.h>
 #include <unistd.h>
 
-extern "C" uint32_t projected_word(const uint8_t*,size_t);
-int main() {
-    csh scan=0, full=0;
-    if(cs_open(CS_ARCH_X86,CS_MODE_64,&scan)||cs_open(CS_ARCH_X86,CS_MODE_64,&full)||
-       cs_option(scan,CS_OPT_TEXT,CS_OPT_OFF)||cs_option(full,CS_OPT_DETAIL,CS_OPT_ON))return 1;
-    cs_opt_mnem marker{X86_INS_UD2,"ud2"};
-    if(cs_option(full,CS_OPT_MNEMONIC,reinterpret_cast<size_t>(&marker)))return 2;
-    cs_insn *record=cs_malloc(full);if(!record)return 3;
-    const size_t page=sysconf(_SC_PAGESIZE);
-    auto* memory=static_cast<uint8_t*>(mmap(nullptr,2*page,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0));
-    if(memory==MAP_FAILED||mprotect(memory+page,page,PROT_NONE))return 4;
-    uint8_t bytes[15]={0xc4,0,0,0,0,0,0x0a,0xab,0x37,0xff,0x80,0xc7,0,0x98,0x23};
-    uint64_t total=0, claimed=0;
-    for(unsigned map=1;map<=3;++map)for(unsigned key=0;key<16;++key)
-    for(unsigned op=0;op<256;++op)for(unsigned mr=0;mr<256;++mr)
-    for(unsigned variant=0;variant<2;++variant){
-        bytes[1]=uint8_t(map|(((op^mr^key^(variant*5))&7)<<5));
-        bytes[2]=uint8_t(((key&8)<<4)|(variant?((op+mr)&15)<<3:0x78)|(key&7));
-        bytes[3]=uint8_t(op);bytes[4]=uint8_t(mr);bytes[5]=uint8_t((op&0xf8)|(variant?5:((key+mr)&7)));
-        for(unsigned j=0;j<3;++j){
-            const unsigned n=j==0?15:j==1?((op+mr+key)&15):4+((op+key+variant)%7);
-            auto p=memory+page-n;std::memcpy(p,bytes,n);
-            const auto word=n?projected_word(p,n):0;uint32_t a=0x19378456,b=a;
-            const auto x=X86_scanBatch(scan,p,n,0x401000,&a,1);
-            const auto y=X86_scanNativeBatch(scan,p,n,0x401000,&b,1);
-            bool equal=x.count==y.count&&x.bytes==y.bytes&&a==b;
-            if(word){
-                const uint8_t* position=p;size_t remaining=n;uint64_t ip=0x401000;
-                bool ok=cs_disasm_iter(full,&position,&remaining,&ip,record);
-                equal=equal&&ok&&x.count==1&&a==word&&word==((record->id<<8)|record->size);
-                ++claimed;
-            }
-            if(!equal){
-                std::fprintf(stderr,"VEX3 mismatch map=%u key=%u mr=%02x bytes=",map,key,mr);
-                for(unsigned i=0;i<n;++i)std::fprintf(stderr,"%02x",p[i]);
-                std::fprintf(stderr," full=%s/%u:%u before=%x after=%x direct=%x\n",record->mnemonic,record->id,record->size,a,b,word);
-                return 5;
-            }
-            ++total;
-        }
-    }
-    if (!claimed) return 6;
-    std::printf("%llu %llu\n",(unsigned long long)total,(unsigned long long)claimed);
-    cs_free(record,1);cs_close(&full);cs_close(&scan);munmap(memory,page*2);
+int main()
+{
+	const size_t page=size_t(sysconf(_SC_PAGESIZE));
+	auto *mapping=static_cast<uint8_t *>(mmap(nullptr,2*page,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0));
+	if (mapping==MAP_FAILED || mprotect(mapping+page,page,PROT_NONE)) return 1;
+	csh h;
+	if (cs_open(CS_ARCH_X86,CS_MODE_32,&h) || cs_option(h,CS_OPT_TEXT,CS_OPT_OFF))return 2;
+	auto *insn=cs_malloc(h);if (!insn)return 3;
+	uint8_t bytes[15]={0xc4,0xe3,0x7d,0x46,0x44,0x55,0x80,0x76,0x41,0xc0,0x21,0x93,0x00,0x75,0xc7};
+	uint64_t n=0,ok=0,hash=0;
+	auto probe=[&](size_t len){
+		uint8_t *where=mapping+page-len;std::memcpy(where,bytes,len);
+		const uint8_t *pos=where;size_t remain=len;uint64_t address=UINT64_MAX-5;
+		const bool decoded=cs_disasm_iter(h,&pos,&remain,&address,insn);
+		uint32_t out[2]={0xb7a34cde,0xa5e865cd};
+		const auto batch=X86_scanNativeBatch(h,where,len,UINT64_MAX-5,out,1);
+		uint32_t expected=decoded ? (insn->id<<8)|insn->size : 0xb7a34cde;
+		if (batch.count!=unsigned(decoded) || out[0]!=expected || out[1]!=0xa5e865cd ||
+		    batch.bytes!=size_t(pos-where) || batch.bytes!=len-remain || address!=UINT64_MAX-5+batch.bytes) {
+			for(size_t i=0;i<len;++i)std::fprintf(stderr,"%02x",where[i]);
+			std::fprintf(stderr," len=%zu expected=%08x/%zu got=%08x/%zu\n",len,expected,len-remain,out[0],batch.bytes);std::exit(4);
+		}
+		++n;ok+=decoded;hash=hash*131+batch.bytes+out[0];
+	};
+	for (unsigned op=0;op<256;++op) for(unsigned payload=0;payload<256;++payload)for(unsigned mr=0;mr<256;++mr) {
+		bytes[2]=uint8_t(payload);bytes[3]=uint8_t(op);bytes[4]=uint8_t(mr);bytes[5]=uint8_t(mr*53+payload+op);
+		probe(15);probe((mr+op+payload)%13);
+	}
+	const uint8_t ops[]={0,0x0f,0x38,0x46,0x4e,0x7f};
+	const uint8_t mods[]={0x04,0x44,0x85,0xff};
+	for(unsigned prefix=0;prefix<256;++prefix)for(unsigned nibble=0;nibble<16;++nibble)
+		for(uint8_t op:ops)for(uint8_t mr:mods)for(unsigned len=0;len<16;++len) {
+			bytes[1]=uint8_t(prefix);bytes[2]=uint8_t(nibble|(nibble<<4));
+			bytes[3]=op;bytes[4]=mr;bytes[5]=uint8_t(13*op+prefix+len);probe(len);
+		}
+	std::printf("%" PRIu64 " %" PRIu64 " %" PRIu64 "\n",n,ok,hash);
+	cs_free(insn,1);cs_close(&h);return munmap(mapping,2*page)!=0;
 }
