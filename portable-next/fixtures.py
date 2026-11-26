@@ -1,16 +1,17 @@
 from pathlib import Path
-import hashlib,io,platform,shutil,subprocess as sp,tarfile
+import hashlib,io,json,platform,shutil,subprocess as sp,tarfile
 from elftools.elf.elffile import ELFFile
 
 def sha(data):return hashlib.sha256(data).hexdigest()
 
 def fixtures(r,w,m):
+    urls=json.loads((r/'package-urls.json').read_text())
     ar=shutil.which('llvm-ar') or shutil.which('ar')
     if not ar and platform.system()=='Windows':
         ar=str(Path('C:/Program Files/LLVM/bin/llvm-ar.exe'))
     for name,v in m['provenance'].items():
         s=v['source'];pe=name.startswith('putty-')
-        package=w/'package';url=s['source'] if pe else s['url']
+        package=w/'package';url=s['source'] if pe else urls[name]
         sp.run(['curl','-fsSL','--retry','3','--max-time','120','-o',package,url],check=True)
         data=package.read_bytes()
         if pe:

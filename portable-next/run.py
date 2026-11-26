@@ -7,6 +7,7 @@ def save(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def get(*args,**kw):return sp.check_output(args,text=True,**kw).strip()
 def run(*args,**kw):sp.run(args,check=True,**kw)
 if os.environ.get('SCAN_PROFILE')=='gcc':os.environ.update(CC='gcc',CXX='g++')
+if os.environ.get('SCAN_PROFILE')=='clang':os.environ.update(CC='clang',CXX='clang++')
 w=Path(tempfile.mkdtemp())
 try:
     git=lambda *args:get('git','-C',src,*args)

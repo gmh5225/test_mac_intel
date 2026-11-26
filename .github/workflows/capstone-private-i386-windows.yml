@@ -1,7 +1,7 @@
-name: Measure direct public x86 records in native Windows macOS and GCC libraries
+name: Measure standalone public records on verified PE and ELF bytes in eight native profiles
 on:
   push:
-    branches: [codex/standalone-record-native-platforms]
+    branches: [codex/standalone-record-frozen-platforms]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -23,6 +23,10 @@ jobs:
           - { host: ubuntu-24.04, arch: x86_64, profile: gcc, replica: 2 }
           - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 1 }
           - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 2 }
+          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 1 }
+          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 2 }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
@@ -47,6 +51,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: standalone-native-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: frozen-native-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
