@@ -1,7 +1,7 @@
-name: Compare RIP writer and aligned scans in full NeverD with the fork LLVM source on three hosts
+name: Measure the i386 segment operand writer in NeverD from fork LLVM sources on real PE and five ELF targets
 on:
   push:
-    branches: [codex/current-neverd-aligned-rip-writer]
+    branches: [codex/neverd-segment-mov-sub-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: cad258781045b067e2c7779fc8331bcbe487d9f0
+          ref: 73889e52c5ea8b27da97cbcfec7e927f62009d94
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: aligned-rip-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: segment-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

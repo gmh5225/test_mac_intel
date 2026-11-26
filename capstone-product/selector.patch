@@ -1,88 +1,122 @@
-diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..085fc6fc 100644
---- a/arch/X86/X86BatchScan.c
-+++ b/arch/X86/X86BatchScan.c
-@@ -314,7 +314,11 @@ static X86ScanBatchResult scanBatch32(csh ud, const uint8_t *code, size_t size,
- 	return scanBatch(ud, code, size, address, output, capacity, false);
- }
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..f2eb961e 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -28,9 +28,9 @@
+ #undef X86_MEMORY_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
  
--/* The width is constant throughout this loop. */
-+/* Keep the AMD64 hot loop on a fetch-line boundary as the preceding
-+ * optional text writer changes size. */
-+#if defined(__linux__) && defined(__x86_64__) && defined(__clang__)
-+__attribute__((aligned(64)))
-+#endif
- #if defined(__ELF__) && defined(__clang__)
- __attribute__((noinline, section(".cs_x86_batch64_text")))
- #elif defined(_MSC_VER)
-@@ -330,6 +334,10 @@ static X86ScanBatchResult scanBatch64(csh ud, const uint8_t *code, size_t size,
- }
- #endif
+-#define X86_SEGMENT_LEA32 writeSegmentLea32
++#define X86_SEGMENT_MEMORY32 writeSegmentMemory32
+ #include "X86MemoryOutputImpl.h"
+-#undef X86_SEGMENT_LEA32
++#undef X86_SEGMENT_MEMORY32
+ #undef X86_MEMORY32_OUTPUT
  
-+#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
-+	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+__attribute__((aligned(64)))
-+#endif
- CAPSTONE_INTERNAL
- X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
- 				       uint64_t address, uint32_t *output,
+ /* The fixed-width iterator delegates uncommon encodings here. */
+@@ -85,10 +85,11 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x3e:
+ 	case 0x64:
+ 	case 0x65:
+-		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
++		if (size >= 3 && (code[1] == 0x8d || code[1] == 0x2b ||
++		     code[1] == 0x89 || code[1] == 0x8b) && code[2] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+-			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
+-			if (writeSegmentLea32(code, size, insn, insn_size,
++			const unsigned row = x86_simple_plans[0][0][code[1]] >> 2;
++			if (writeSegmentMemory32(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
+ 					      x86_simple_registers))
+ 				return true;
 diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..4aa1c79a 100644
+index 11582041..f4826b66 100644
 --- a/arch/X86/X86MemoryOutputImpl.h
 +++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -4,7 +4,9 @@
- /* Instantiated for the ordinary address writer and the private mode-specific writers. */
- 
- /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
--#ifdef X86_MEMORY_IMMEDIATE
-+#ifdef X86_RIP_INDIRECT64
-+static bool X86_RIP_INDIRECT64(
-+#elif defined(X86_MEMORY_IMMEDIATE)
+@@ -7,8 +7,8 @@
+ #ifdef X86_MEMORY_IMMEDIATE
  #include "X86UnsignedImmediate.h"
  static bool X86_MEMORY_IMMEDIATE(
- #elif defined(X86_SEGMENT_LEA32)
-@@ -22,6 +24,12 @@ bool X86_writeMemoryOutput(
- 	const struct X86SimpleOutput *row,
- 	const struct X86SimpleRegister regs[4][16])
- {
-+#ifdef X86_RIP_INDIRECT64
-+	/* Bare FF /2 and /4 with mod=00 and r/m=101 have a disp32 tail. */
-+	const bool wide = true;
-+	const uint8_t rex = 0, opcode = 0xff, modrm = code[1];
-+	const unsigned lead = 0, mod = 0, rm = 5;
-+#else
- #ifdef X86_MEMORY_IMMEDIATE
- 	const bool wide = X86_IMMEDIATE_WIDE;
+-#elif defined(X86_SEGMENT_LEA32)
+-static bool X86_SEGMENT_LEA32(
++#elif defined(X86_SEGMENT_MEMORY32)
++static bool X86_SEGMENT_MEMORY32(
  #elif defined(X86_EXTEND64_MEMORY)
-@@ -41,6 +49,7 @@ bool X86_writeMemoryOutput(
- #endif
- 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
+ static bool X86_EXTEND64_MEMORY(
+ #elif defined(X86_EXTEND32_MEMORY)
+@@ -34,7 +34,7 @@ bool X86_writeMemoryOutput(
+ 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
+ #ifdef X86_EXTEND64_MEMORY
+ 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
+-#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
++#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_MEMORY32)
+ 	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
+ #else
+ 	const unsigned lead = rex != 0;
+@@ -70,7 +70,7 @@ bool X86_writeMemoryOutput(
+ 		const unsigned index_reg = ((rex & 2) << 2) |
+ 					   ((encoding >> 3) & 7);
+ 		base_reg = encoding & 7;
+-#if defined(X86_SEGMENT_LEA32) || defined(X86_BASE_ONLY_SIB) || \
++#if defined(X86_SEGMENT_MEMORY32) || defined(X86_BASE_ONLY_SIB) || \
+ 	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
+ 		/* A scale-one SIB without an index names only its base. */
+ 		if ((!mod && base_reg == 5) ||
+@@ -93,8 +93,8 @@ bool X86_writeMemoryOutput(
+ 	const bool push = false, load = true;
+ 	const unsigned reg_width = 2; /* r32 destination */
+ #else
+-#ifdef X86_SEGMENT_LEA32
+-	const bool lea = true, load = true, push = false;
++#ifdef X86_SEGMENT_MEMORY32
++	const bool lea = opcode == 0x8d, load = opcode != 0x89, push = false;
+ #elif defined(X86_MEMORY_IMMEDIATE)
+ 	const bool lea = false, load = false;
+ #else
+@@ -139,7 +139,7 @@ bool X86_writeMemoryOutput(
+ 		out += 10;
+ 	}
+ #else
+-#ifdef X86_SEGMENT_LEA32
++#ifdef X86_SEGMENT_MEMORY32
+ 	static const struct X86SimpleRegister segments[] = {
+ 		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
+ 		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
+@@ -147,10 +147,15 @@ bool X86_writeMemoryOutput(
+ 	};
+ 	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
+ 						   (code[0] >> 3) & 3;
++	if (!lea) {
++		memcpy(out, "dword ptr ", 10);
++		out += 10;
++	}
+ 	memcpy(out, segments[segment].name, 2);
+ 	out[2] = ':';
+ 	out += 3;
+-#endif
++	*out++ = '[';
++#else
+ 	if (lea) {
+ 		*out++ = '[';
+ 	} else if (row->ops[0].size == 1) {
+@@ -162,6 +167,7 @@ bool X86_writeMemoryOutput(
+ 		       11);
+ 		out += 11;
+ 	}
 +#endif
- 	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..44681b27 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -64,6 +64,9 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
- 
- #ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
- #include "X86GenIndirect64Output.inc"
-+#define X86_RIP_INDIRECT64 writeRipIndirect64
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_RIP_INDIRECT64
- 
- /* FF /2 and /4 have one explicit 64-bit target. The register and memory
-  * forms share their generated access, implicit register and group records. */
-@@ -72,6 +75,9 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- {
- 	const struct X86SimpleOutput *row =
- 		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
-+	if (!rex && (modrm == 0x15 || modrm == 0x25))
-+		return writeRipIndirect64(code, size, insn, insn_size, row,
-+					  x86_simple_registers);
- 	if (modrm < 0xc0)
- 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
- 					     x86_simple_registers);
+ #endif
+ 	if (disp32_only) {
+ #ifdef X86_MEMORY32_OUTPUT
+@@ -227,10 +233,10 @@ bool X86_writeMemoryOutput(
+ 			x->opcode[1] = opcode;
+ 		}
+ 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
+-#elif defined(X86_SEGMENT_LEA32)
++#elif defined(X86_SEGMENT_MEMORY32)
+ 		x->prefix[1] = code[0];
+ 		x->encoding.modrm_offset = 2;
+-		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
++		x->operands[load ? 1 : 0].mem.segment = (x86_reg)segments[segment].reg;
+ #elif defined(X86_EXTEND32_MEMORY)
+ 		x->opcode[0] = 0x0f;
+ 		x->opcode[1] = opcode;

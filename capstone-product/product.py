@@ -96,6 +96,9 @@ try:
         command(['clang','-O2','-I',cs/'include',r/'probe.c',archive,'-o',t/'mask-access'],'verify-build-'+variant)
         command([t/'mask-access'],'verify-memory-'+variant)
         assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
+        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'segment.cpp',archive,'-o',t/'segment'],'link-segment-'+variant)
+        segment=list(map(int,sp.check_output([t/'segment'],text=True).split()));assert segment==[884736, 405504, 12422393723512408869]
+        save('segment-'+variant,segment)
         test=out/('tests-'+variant+'.log')
         assert '100% tests passed' in test.read_text()
         if variant=='base':
@@ -127,10 +130,7 @@ try:
     save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-layout.json').read_text()))
     archive_count=len({v['archive'] for v in identities.values()})
     image_count=len({v['binary'] for v in identities.values()})
-    if os.uname().machine=='aarch64':
-        assert archive_count==image_count==1
-    else:
-        assert 2<=image_count<=archive_count<=3
+    assert 2<=image_count<=archive_count<=3
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
@@ -140,7 +140,7 @@ try:
     image=t/'selected';image.write_bytes(imgs['base'])
     inode=image.stat().st_ino;block=4096
     offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
-    assert bool(offsets)==(os.uname().machine!="aarch64")
+    assert offsets
     checked={}
     def execute(k,case,mode,reps):
         # Touch exactly the same file pages, in the same order, before every exec.
