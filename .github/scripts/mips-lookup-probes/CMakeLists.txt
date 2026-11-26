@@ -1,0 +1,21 @@
+cmake_minimum_required(VERSION 3.22)
+project(MipsAssemblerMeasurement LANGUAGES C CXX)
+find_package(LLVM REQUIRED CONFIG)
+if(MIPS_PARSER_ARCHIVE)
+  set_property(TARGET LLVMMipsAsmParser PROPERTY IMPORTED_LOCATION_RELEASE "${MIPS_PARSER_ARCHIVE}")
+endif()
+add_executable(llvm-mc
+  "${MC_SOURCE}/llvm-mc.cpp"
+  "${MC_SOURCE}/Disassembler.cpp")
+target_compile_features(llvm-mc PRIVATE cxx_std_17)
+target_include_directories(llvm-mc PRIVATE ${LLVM_INCLUDE_DIRS})
+separate_arguments(llvm_flags NATIVE_COMMAND "${LLVM_DEFINITIONS}")
+target_compile_options(llvm-mc PRIVATE ${llvm_flags})
+if(LLVM_ENABLE_ASSERTIONS)
+  target_compile_options(llvm-mc PRIVATE -UNDEBUG)
+endif()
+foreach(target IN LISTS LLVM_TARGETS_TO_BUILD)
+  target_link_libraries(llvm-mc PRIVATE LLVM${target}AsmParser LLVM${target}Desc
+    LLVM${target}Disassembler LLVM${target}Info)
+endforeach()
+target_link_libraries(llvm-mc PRIVATE LLVMDWARFCFIChecker LLVMMCParser LLVMMC LLVMSupport LLVMTargetParser)

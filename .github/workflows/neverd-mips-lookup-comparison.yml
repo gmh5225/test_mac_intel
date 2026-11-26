@@ -1,0 +1,40 @@
+name: MIPS assembler lookup comparison
+on:
+  push:
+    branches: [codex/mips-lookup-probe-comparison]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/llvm-project
+          ref: 6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312
+          path: source
+          persist-credentials: false
+          sparse-checkout: |
+            cmake
+            llvm
+            third-party
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build clang-18 lld-18 valgrind
+      - name: Build fork revisions and record linked archives
+        run: python .github/scripts/mips-lookup-probes/build.py
+      - name: Measure native CPU and verify byte-identical MIPS outputs
+        run: python .github/scripts/mips-lookup-probes/measure.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: linux-mips-lookup-comparison
+          path: lookup-evidence/
+          if-no-files-found: error
