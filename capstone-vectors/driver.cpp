@@ -1,3 +1,4 @@
+#include <valgrind/callgrind.h>
 //===- compare.cpp - Compare x86 decoder API workloads -------------------===//
 //
 // NeverD Decompiler
@@ -243,7 +244,9 @@ int main(int argc,char **argv) {
 #else
     double t0=process_cpu_ns();
 #endif
+    CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT;
     Result timed=run(reps);
+    CALLGRIND_TOGGLE_COLLECT;
 #ifdef _WIN32
     if(!QueryThreadCycleTime(GetCurrentThread(),&t1)) return 7;
 #else
