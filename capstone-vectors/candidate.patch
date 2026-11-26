@@ -1,8 +1,8 @@
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index 466543c3..b478b772 100644
+index d7db69c3..692d84e1 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -49,7 +49,12 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+@@ -101,7 +101,12 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  
  	case WASM_OP_BRTABLE:
  		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
