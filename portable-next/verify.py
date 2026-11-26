@@ -32,7 +32,7 @@ try:
     if linux and profile=='full':
         lines.extend([f'add_executable(rv_time "{(d/"riscv_options.cpp").as_posix()}")','target_compile_features(rv_time PRIVATE cxx_std_17)','target_link_libraries(rv_time PRIVATE capstone_static)','target_link_options(rv_time PRIVATE -no-pie)'])
     (project/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
-    cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
+    cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=ON','-DCAPSTONE_BUILD_CSTEST=ON']
     chosen=os.environ.get('NATIVE_COMPILER','')
     if chosen in ('gcc','clang'):
         os.environ.update(CC=chosen,CXX='g++' if chosen=='gcc' else 'clang++')
@@ -43,22 +43,25 @@ try:
     mixed_sources=d.parent/'neverd-config'
     verify_mixed=linux and profile=='full'
     if verify_mixed:
-        expected_dev='4a8792d7f80da91b1d852859abafe0684416b38a'
+        expected_dev='f73475381f5bf3936bd07139142a4915f9934815'
         assert sp.check_output(['git','-C',mixed_sources,'rev-parse','HEAD'],text=True).strip()==expected_dev
         product=t/'consumer';(product/'third_party').mkdir(parents=True);(product/'third_party/capstone').symlink_to(s)
         (product/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
         shutil.copyfile(mixed_sources/cm,product/cm)
         code=(mixed_sources/'CMakeLists.txt').read_text()
         opts=code[code.index('# --- Capstone (our fork'):code.index('# --- NeverD CMake helpers')]
-        (product/'CMakeLists.txt').write_text(chr(10).join(('cmake_minimum_required(VERSION 3.22)','project(Mixed LANGUAGES C CXX)',opts,'add_executable(consumer reader.cpp)','target_link_libraries(consumer PRIVATE capstone_static)','')))
+        (product/'CMakeLists.txt').write_text(chr(10).join(('cmake_minimum_required(VERSION 3.22)','project(Mixed LANGUAGES C CXX)',opts,'add_executable(consumer reader.cpp)','target_link_libraries(consumer PRIVATE capstone_static)','target_link_options(consumer PRIVATE -no-pie)','')))
         shutil.copyfile(d/'riscv_options.cpp',product/'reader.cpp')
     variants={};mixed={};compile_scope={}
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
         units=['riscv_writeback_postprocess', 'riscv_mapping_index', 'riscv_scan_options', 'riscv_instruction_groups', 'riscv_op_count_iter', 'riscv_sysreg', 'riscv_reg_access', 'riscv_insn_name_segv'] if profile=='full' else ['riscv_scan_options']
-        targets=['records_static','records_shared',*units]+(['rv_time'] if linux and profile=='full' else [])
+        targets=['records_static','records_shared','cstool',*units]+(['rv_time'] if linux and profile=='full' else [])
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target',*targets])
+        from csr import check
+        exe,=[f for f in b.rglob('cstool') if f.is_file()]
+        save('csr-'+stage,check(s,exe,stage))
         if linux and profile=='full':shutil.copyfile(b/'rv_time',t/('riscv-option-'+stage))
         if linux:
             lib,=[f for f in b.rglob('libcapstone.a') if f.is_file()]
@@ -100,24 +103,17 @@ try:
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             shutil.copyfile(bmix/'consumer',t/('mixed-'+stage))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
-    if verify_mixed:assert mixed['base']==mixed['candidate']
-    if linux:
-        a,built=compile_scope['base'],compile_scope['candidate']
-        assert set(a['objects'])==set(built['objects'])
-        changes=[k for k in a['objects'] if a['objects'][k]!=built['objects'][k]]
-        isgcc=chosen.startswith('gcc')
-        major=int(sp.check_output([chosen,'-dumpversion'],text=True).split('.')[0]) if isgcc else 0
-        enabled=profile=='full' and platform.machine()=='x86_64' and major in [13, 14]
-        assert {Path(k).name for k in changes}==({'RISCVMapping.c.o'}if enabled else set()),(enabled,changes)
-        assert (a['archive']!=built['archive'])==enabled
-        cc=os.environ['NATIVE_COMPILER'] or 'cc'
-        save('selection',dict(enabled=enabled,changed=changes,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],cpu=sp.check_output(['lscpu'],text=True),profile=profile))
-
+    for group in (mixed,compile_scope):
+        left,right=[group[k]['objects']for k in ('base','candidate')];assert left.keys()==right.keys()
+        changed=[f for f in left if left[f]!=right[f]]
+        assert {Path(f).name for f in changed}=={'RISCVInstPrinter.c.o'},changed
 
     if linux and profile=='full':
         from riscv_time import measure
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         measure([dict(arch='riscv64',name=n)for n in texts],t,save)
+        for stage in ('base','candidate'):shutil.copyfile(t/('mixed-'+stage),t/('riscv-option-'+stage))
+        measure([dict(arch='riscv64',name=n)for n in texts],t,lambda key,val:save('mixed-'+key,val))
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))

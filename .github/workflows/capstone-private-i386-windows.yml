@@ -1,7 +1,7 @@
-name: Validate RISC-V detail compaction on qualified GCC targets and compare every mixed binary
+name: Verify all RISC-V CSR names and real records in dedicated and mixed readers
 on:
   push:
-    branches: [codex/riscv-compact-release-validation]
+    branches: [codex/cstool-riscv-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,29 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2022, arch: amd64, profile: full }
-          - { host: windows-2022, arch: amd64, profile: diet }
-          - { host: windows-2022, arch: amd64_x86, profile: full }
-          - { host: windows-2022, arch: amd64_x86, profile: diet }
           - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc, variant: two }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc, variant: three }
-          - { host: ubuntu-22.04, arch: amd64, profile: full, compiler: gcc, variant: earlier }
           - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: clang }
-          - { host: ubuntu-24.04, arch: amd64, profile: diet }
           - { host: ubuntu-24.04-arm, arch: arm64, profile: full, compiler: gcc }
           - { host: ubuntu-24.04-arm, arch: arm64, profile: full, compiler: clang }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: diet }
-          - { host: macos-15, arch: arm64, profile: full }
-          - { host: macos-15, arch: arm64, profile: diet }
-          - { host: macos-15-intel, arch: x86_64, profile: full }
-          - { host: macos-15-intel, arch: x86_64, profile: diet }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-12, variant: one }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-12, variant: two }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-12, variant: three }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-14, variant: one }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-14, variant: two }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-14, variant: three }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 85
     steps:
@@ -44,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d63971a2801bb17b4ade6a9697c19722e0438d
+          ref: 499ddf54d2723f7357e92db138e4e9beb71b28a5
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -55,7 +36,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.profile == 'full'
         with:
           repository: NeverSight/NeverD
-          ref: 4a8792d7f80da91b1d852859abafe0684416b38a
+          ref: f73475381f5bf3936bd07139142a4915f9934815
           path: neverd-config
           sparse-checkout: |
             cmake
@@ -80,6 +61,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-compact-release-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
+          name: rv-cstool-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
           path: evidence
           retention-days: 7
