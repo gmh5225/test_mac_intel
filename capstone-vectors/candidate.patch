@@ -1,60 +1,90 @@
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..4aa1c79a 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -4,7 +4,9 @@
- /* Instantiated for the ordinary address writer and the private mode-specific writers. */
+diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
+index 6fcbe3f4..83e404e8 100644
+--- a/arch/X86/X86Module.c
++++ b/arch/X86/X86Module.c
+@@ -10,6 +10,16 @@
+ #include "X86Mapping.h"
+ #include "X86Module.h"
  
- /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
--#ifdef X86_MEMORY_IMMEDIATE
-+#ifdef X86_RIP_INDIRECT64
-+static bool X86_RIP_INDIRECT64(
-+#elif defined(X86_MEMORY_IMMEDIATE)
- #include "X86UnsignedImmediate.h"
- static bool X86_MEMORY_IMMEDIATE(
- #elif defined(X86_SEGMENT_LEA32)
-@@ -22,6 +24,12 @@ bool X86_writeMemoryOutput(
- 	const struct X86SimpleOutput *row,
- 	const struct X86SimpleRegister regs[4][16])
++static void set_mode(cs_struct *handle, cs_mode mode)
++{
++	/* The decoder defaults to 64-bit when no operand mode was specified. */
++	if (!x86_get_bit_mode(mode))
++		mode = (cs_mode)(mode | CS_MODE_64);
++	handle->mode = mode;
++	handle->regsize_map = x86_has_feature(mode, CS_MODE_64) ?
++				      regsize_map_64 : regsize_map_32;
++}
++
+ cs_err X86_global_init(cs_struct *ud)
  {
-+#ifdef X86_RIP_INDIRECT64
-+	/* Bare FF /2 and /4 with mod=00 and r/m=101 have a disp32 tail. */
-+	const bool wide = true;
-+	const uint8_t rex = 0, opcode = 0xff, modrm = code[1];
-+	const unsigned lead = 0, mod = 0, rm = 5;
-+#else
- #ifdef X86_MEMORY_IMMEDIATE
- 	const bool wide = X86_IMMEDIATE_WIDE;
- #elif defined(X86_EXTEND64_MEMORY)
-@@ -41,6 +49,7 @@ bool X86_writeMemoryOutput(
+ 	MCRegisterInfo *mri;
+@@ -37,10 +47,7 @@ cs_err X86_global_init(cs_struct *ud)
+ 	ud->reg_access = X86_reg_access;
  #endif
- 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+#endif
- 	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..44681b27 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -64,6 +64,9 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
  
- #ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
- #include "X86GenIndirect64Output.inc"
-+#define X86_RIP_INDIRECT64 writeRipIndirect64
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_RIP_INDIRECT64
+-	if (x86_has_feature(ud->mode, CS_MODE_64))
+-		ud->regsize_map = regsize_map_64;
+-	else
+-		ud->regsize_map = regsize_map_32;
++	set_mode(ud, ud->mode);
  
- /* FF /2 and /4 have one explicit 64-bit target. The register and memory
-  * forms share their generated access, implicit register and group records. */
-@@ -72,6 +75,9 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
+ 	X86_build_lookup_tables(ud);
+ 
+@@ -57,14 +64,9 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		     x86_has_feature(value, CS_MODE_X86_AMD)))
+ 			return CS_ERR_OPTION;
+ 
+-		if (x86_has_feature(value, CS_MODE_64))
+-			handle->regsize_map = regsize_map_64;
+-		else
+-			handle->regsize_map = regsize_map_32;
+-
+-		handle->mode = (cs_mode)(value &
+-					 (CS_MODE_16 | CS_MODE_32 | CS_MODE_64 |
+-					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
++		set_mode(handle, (cs_mode)(value & (CS_MODE_16 | CS_MODE_32 |
++						    CS_MODE_64 | CS_MODE_X86_INTEL |
++						    CS_MODE_X86_AMD)));
+ 		break;
+ 	case CS_OPT_SYNTAX:
+ 		switch (value) {
+diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
+index cfd13cba..793a92a3 100644
+--- a/tests/unit/x86_legacy_address_size.c
++++ b/tests/unit/x86_legacy_address_size.c
+@@ -279,9 +279,34 @@ static bool check_other_opcodes(void)
+ 	return ok;
+ }
+ 
++/* The register map, x87 image size and decoder must agree on the default
++ * bitness both for a new handle and after changing its mode. */
++static bool check_default_bitness(cs_mode vendor, bool change_mode)
++{
++	const uint8_t code[] = { 0x66, 0x48, 0xd9, 0x30 };
++	csh handle;
++	cs_insn *insn = NULL;
++	if (cs_open(CS_ARCH_X86, change_mode ? CS_MODE_32 : vendor, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = (!change_mode || cs_option(handle, CS_OPT_MODE, vendor) == CS_ERR_OK) &&
++		  cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
++	size_t count = ok ? cs_disasm(handle, code, sizeof(code), 0, 1, &insn) : 0;
++	ok = count == 1 && insn->size == sizeof(code) && insn->id == X86_INS_FNSTENV &&
++	     insn->detail->x86.op_count == 1 && insn->detail->x86.operands[0].size == 28;
++	if (!ok)
++		fprintf(stderr, "wrong default x87 image, vendor=%u changed=%d\n",
++			(unsigned)vendor, change_mode);
++	cs_free(insn, count);
++	cs_close(&handle);
++	return ok;
++}
++
+ int main(void)
  {
- 	const struct X86SimpleOutput *row =
- 		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
-+	if (!rex && (modrm == 0x15 || modrm == 0x25))
-+		return writeRipIndirect64(code, size, insn, insn_size, row,
-+					  x86_simple_registers);
- 	if (modrm < 0xc0)
- 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
- 					     x86_simple_registers);
+ 	bool ok = check_conversions();
++	ok &= check_default_bitness((cs_mode)0, false);
++	ok &= check_default_bitness(CS_MODE_X86_INTEL, true);
++	ok &= check_default_bitness(CS_MODE_X86_AMD, false);
+ 	ok &= check_other_opcodes();
+ 	return ok ? 0 : 1;
+ }

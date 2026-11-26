@@ -58,6 +58,13 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/'modes.cpp',lib,'-o',w/'mode-equivalence')
+        rows=list(map(int,get(w/'mode-equivalence').split()));assert rows[0]==295776 and rows[2]==sum(rows[3:]) and (rows[2]>0)==(label=='base')
+        save('default-mode-'+label,rows)
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/'spelling.cpp',lib,'-o',w/'spelling')
+        outcome=sp.run([w/'spelling'],text=True,capture_output=True,check=True)
+        words=list(map(int,outcome.stdout.split()));assert words[0]==944640 and words[2]==0 and (words[1]>0)==(label!='outlined'),(label,words)
+        save('absolute-address-'+label,words)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
