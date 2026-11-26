@@ -82,6 +82,37 @@ try:
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        if label=='candidate':
+            import ast
+            table=(base/'arch/X86/X86GenVexBaseMemory.inc').read_text()
+            def rows(symbol):
+                a=table.index(symbol);a=table.index('= {',a)+2;b=table.index('\n};',a)+2
+                return ast.literal_eval(table[a:b].replace('{','[').replace('}',']'))
+            plans=rows('vex_base_plans[');widths=rows('vex_base_widths[')
+            assert widths[0]==[0,0,0,0] and len(plans)==3 and all(len(row)==256 for row in plans)
+            expected=bytes(v for row in plans for v in row)
+            assert len(expected)==768 and any(expected)
+            receipt={}
+            for active,disabled,optional in [('outlined','candidate',False),('outlined.so','candidate.so',False),('foreign-outlined','foreign-candidate',True)]:
+                # Produce the table-off control from a fresh copy of the very same linked image.
+                shutil.copyfile(w/active,w/disabled)
+                payload=(w/active).read_bytes();offset=None;section=None
+                with (w/active).open('rb') as inp:
+                    elf=ELFFile(inp)
+                    found=[v for v in elf.get_section_by_name('.symtab').iter_symbols() if v.name.split('.')[0]=='vex_base_plans' and v['st_info']['type']=='STT_OBJECT']
+                    if found:
+                        entry,=found;sec=elf.get_section(entry['st_shndx']);section=sec.name
+                        assert entry['st_size']==len(expected) and sec['sh_flags']&2 and not(sec['sh_flags']&5)
+                        offset=sec['sh_offset']+entry['st_value']-sec['sh_addr']
+                    else:assert optional
+                if offset is not None:
+                    assert payload[offset:offset+len(expected)]==expected
+                    with (w/disabled).open('r+b')as out:out.seek(offset);out.write(bytes(len(expected)))
+                    after=(w/disabled).read_bytes()
+                    assert after[:offset]==payload[:offset] and after[offset+len(expected):]==payload[offset+len(expected):]
+                    assert after[offset:offset+len(expected)]==bytes(len(expected))
+                receipt[active]=dict(offset=offset,section=section,table_bytes=len(expected) if offset is not None else 0,nonzero_bytes=sum(v!=0 for v in expected) if offset is not None else 0,active=sha(w/active),disabled=sha(w/disabled))
+            save('data-only-control',receipt)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)

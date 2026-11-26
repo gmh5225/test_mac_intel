@@ -1,7 +1,7 @@
-name: Compare memory and immediate VEX plans after ordinary AMD64 record misses
+name: Separate VEX memory admission from linked i386 layout with identical machine code and fixed addresses
 on:
   push:
-    branches: [codex/vex-memory-private-miss]
+    branches: [codex/vex-admission-same-code]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-late-memory-plan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-same-code-table-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

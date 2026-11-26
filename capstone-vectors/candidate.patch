@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..f03844e9 100644
+index 504682a4..0c7a4aa6 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
 @@ -27,9 +27,7 @@
@@ -12,19 +12,30 @@ index 504682a4..f03844e9 100644
  #define X86_LEGACY_PACKED_MEMORY
  #include "X86PackedMemoryOutput.h"
  #undef X86_LEGACY_PACKED_MEMORY
-@@ -230,7 +228,6 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 				return true;
- 		}
- 	}
--#ifdef CAPSTONE_X86_ONLY
- 	if ((code[0] & 0xfe) == 0xc4) {
- 		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
- 		if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
-@@ -239,7 +236,6 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 				       x86_simple_registers[3]))
- 			return true;
- 	}
--#endif
- fallback:
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
- 	defined(__x86_64__)
+@@ -196,10 +194,26 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
++#ifdef CAPSTONE_X86_ONLY
+ 	if (code[0] == 0xc4 &&
+ 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
+ 		return true;
++#else
++	if ((code[0] & 0xfe) == 0xc4) {
++		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
++		if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
++		    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++		    writeVexBaseMemory(code, size, prefix, insn, insn_size,
++				       x86_simple_registers[3]))
++			return true;
++		if (code[0] == 0xc4 &&
++		    X86_writeVexRegisterImmediate(handle, code, size, insn,
++						  insn_size, x86_simple_registers,
++						  true))
++			return true;
++	}
++#endif
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+ 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
+ 		const unsigned offset = 4 + (rex != 0);
