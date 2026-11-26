@@ -1,7 +1,7 @@
 from pathlib import Path
 import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
 r=Path(__file__).resolve().parent;ci=bool(os.environ.get('GITHUB_ACTIONS'));d=lambda n:next(r.parent.glob(f'round{n}-*'));rd=lambda f:json.loads(f.read_text())
-t=rd((r if ci else d(3565))/'tree.json');profile=os.environ.get('SCAN_PROFILE','full')
+t=rd((r if ci else d(3627))/'tree.json');profile=os.environ.get('SCAN_PROFILE','full')
 e=r.parent/'evidence' if ci else r/('local-'+profile);e.mkdir(exist_ok=True)
 def save(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 w=Path(tempfile.mkdtemp(dir=None if ci else r))
@@ -12,7 +12,7 @@ try:
     else:
         s=w/'source';run('git','clone','-q','--shared','--no-checkout',d(579)/'source',s);run('git','-C',s,'checkout','-q','--detach',t['parent'])
     assert get('git','-C',s,'rev-parse','HEAD')==t['parent']
-    raw=sp.check_output(['git','-C',r.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']) if ci else (d(3565)/'candidate.patch').read_bytes()
+    raw=sp.check_output(['git','-C',r.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']) if ci else (d(3627)/'candidate.patch').read_bytes()
     assert hashlib.sha256(raw).hexdigest()==t['sha256']
     patch=w/'raw.patch';patch.write_bytes(raw)
     win=os.name=='nt'
@@ -34,8 +34,8 @@ try:
         else:run(os.environ.get('CC','cc'),'-std=c11','-O2','-I'+str(s/'include'),path,build/'libcapstone.a','-o',exe)
         row=list(map(int,get(exe).split()));assert row[0]==704
         if profile=='diet':assert row[1:]==[0,0],(tag,row)
-        elif tag=='candidate':assert row[1]==0 and row[2]==rows['base'][2],(tag,row)
-        else:assert row[2]>0 and (row[1]>0)==win,(tag,row)
+        elif tag=='candidate':assert row==[704,0,0],(tag,row)
+        else:assert row==[704,0,220],(tag,row)
         rows[tag]=row
     print(profile,rows,flush=True);save('complete',dict(complete=True,profile=profile,platform=platform.platform(),source=t,rows=rows))
 finally:

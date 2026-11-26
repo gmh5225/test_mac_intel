@@ -1,57 +1,57 @@
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index 3c8c4e7e..3358941b 100644
+index 466543c3..b478b772 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -30,7 +30,13 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- 		break;
+@@ -49,7 +49,12 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  
- 	case WASM_OP_VARUINT64:
--		SStream_concat(O, "\t0x%lx", MI->wasm_data.varuint64);
-+		/* Retain the callback's original format for values that fit. */
-+		if ((unsigned long)MI->wasm_data.varuint64 ==
-+		    MI->wasm_data.varuint64)
-+			SStream_concat(O, "\t0x%lx",
-+				       (unsigned long)MI->wasm_data.varuint64);
+ 	case WASM_OP_BRTABLE:
+ 		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
+-		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
++		if (MI->wasm_data.brtable.address <= UINT32_MAX)
++			SStream_concat(O, "0x%x",
++				       (unsigned)MI->wasm_data.brtable.address);
 +		else
-+			SStream_concat(O, "\t0x%" PRIx64, MI->wasm_data.varuint64);
- 		break;
++			SStream_concat(O, "0x%" PRIx64,
++				       MI->wasm_data.brtable.address);
+ 		SStream_concat(O, "], 0x%x",
+ 			       MI->wasm_data.brtable.default_target);
  
- 	case WASM_OP_UINT32:
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
-index 21802ef7..52130880 100644
+index 52130880..f1d5ac2f 100644
 --- a/tests/unit/wasm_brtable_size.c
 +++ b/tests/unit/wasm_brtable_size.c
-@@ -102,6 +102,24 @@ static int check_copy_sizes(csh handle)
- 	return 0;
+@@ -120,6 +120,24 @@ static int check_i64_constant(csh handle)
+ 	return !ok;
  }
  
-+/* The ULEB/SLEB representations agree for this positive i64 constant. */
-+static int check_i64_constant(csh handle)
++static int check_table_address(csh handle)
 +{
-+	const uint8_t code[] = { 0x42, 0x81, 0x80, 0x80, 0x80, 0x10 };
++	const uint8_t code[] = { 0x0e, 0x02, 0x00, 0x01, 0x02 };
++	const uint64_t address = UINT64_C(0xfffffffe);
 +	cs_insn *insn = NULL;
 +	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
 +		return 1;
-+	size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
-+	bool ok = count == 1 && insn[0].id == WASM_INS_I64_CONST &&
-+		  insn[0].detail->wasm.operands[0].varuint64 == UINT64_C(0x100000001);
++	size_t count = cs_disasm(handle, code, sizeof(code), address, 1, &insn);
++	bool ok = count == 1 && insn->id == WASM_INS_BR_TABLE &&
++		  insn->detail->wasm.operands[0].brtable.address == address + 2;
 +	if (ok && !cs_support(CS_SUPPORT_DIET))
-+		ok = strcmp(insn[0].op_str, "0x100000001") == 0;
++		ok = strcmp(insn->op_str, "0x2, [0x100000000], 0x2") == 0;
 +	cs_free(insn, count);
 +	if (!ok)
-+		fprintf(stderr, "WASM i64.const lost high bits\n");
++		fprintf(stderr, "WASM br_table target list address lost high bits\n");
 +	return !ok;
 +}
 +
  int main(void)
  {
  	csh h;
-@@ -109,7 +127,7 @@ int main(void)
+@@ -127,7 +145,8 @@ int main(void)
  		return 1;
  
  	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
--	    run_count_case(h, 65531, 5)) {
-+	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
+-	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
++	    run_count_case(h, 65531, 5) || check_i64_constant(h) ||
++	    check_table_address(h)) {
  		cs_close(&h);
  		return 1;
  	}
