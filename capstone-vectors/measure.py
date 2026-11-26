@@ -15,7 +15,7 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent']==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    assert get('git','-C',base,'rev-parse','HEAD').strip()==m['baseline']['parent']==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -40,6 +40,9 @@ try:
     run('clang++','-O2','-std=c++17','-I',base/'include',r/'ids.cpp',lib,'-o',w/'id-oracle')
     for label in ('base','candidate','record'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        assert q['parent']==m['record']['parent']==m['baseline']['commit']
+        patch=r/'baseline.patch';assert sha(patch)==m['baseline']['sha256']
+        run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==m['baseline']['tree']
         if label!='base':
             tr=q if label=='candidate' else m['record'];patch=r/(label+'.patch')
             assert sha(patch)==tr['sha256']
@@ -56,7 +59,7 @@ try:
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
+    host=dict(capstone=m['baseline']['commit'],checkout=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
     for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
         spec=m['provenance'][name]
