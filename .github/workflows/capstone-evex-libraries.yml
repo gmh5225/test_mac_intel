@@ -1,7 +1,7 @@
-name: Compare shared immediate magnitude selection and an isolated MASM number writer across normal Linux links
+name: Separate the high-address fix from MASM digit emission and measure PE32, normal syntax and other architectures
 on:
   push:
-    branches: [codex/outlined-masm-hex-immediates]
+    branches: [codex/masm-selected-format-writer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: outlined-masm-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: selected-masm-format-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

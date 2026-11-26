@@ -1,19 +1,5 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..3d354e81 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -565,8 +565,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 		if (imm < 0) {
- 			SStream_concat(
- 				O, "0x%" PRIx64,
--				arch_masks[x86_get_bit_mode(MI->csh->mode)] &
--					imm);
-+				(uint64_t)imm);
- 		} else {
- 			if (imm > HEX_THRESHOLD)
- 				SStream_concat(O, "0x%" PRIx64, imm);
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..7c9fb7c2 100644
+index 2ee82ef7..1fa6de1b 100644
 --- a/arch/X86/X86InstPrinterCommon.c
 +++ b/arch/X86/X86InstPrinterCommon.c
 @@ -39,6 +39,7 @@
@@ -24,46 +10,31 @@ index 2ee82ef7..7c9fb7c2 100644
  #include "../../SStream.h"
  
  #include "X86InstPrinterCommon.h"
-@@ -290,3 +291,55 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
+@@ -290,3 +291,50 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
  	}
  }
  #endif
 +
-+static bool need_zero_prefix(uint64_t imm)
++/* The MASM printer selects the sign and leading zero when it selects fmt.
++ * Keep the same format and argument for custom formatters and short streams. */
++void X86_printMasmHexToken(SStream *O, const char *fmt, uint64_t value)
 +{
-+	// find the first hex letter representing imm
-+	while (imm >= 0x10)
-+		imm >>= 4;
-+
-+	if (imm < 0xa)
-+		return false;
-+	else // this need 0 prefix
-+		return true;
-+}
-+
-+/* MASM prints a negative signed immediate with the leading-zero convention
-+ * of its original two's-complement value. Preserve that spelling for hooks. */
-+void X86_printMasmHex(SStream *O, uint64_t value, bool negative)
-+{
-+	if (value == UINT64_C(0x8000000000000000)) {
-+		SStream_concat0(O, "8000000000000000h");
-+		return;
-+	}
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
 +	if (cs_vsnprintf == cs_default_vsnprintf && !O->is_closed &&
 +	    !O->markup_stream && !O->prefixed_by_markup &&
 +	    O->index <= SSTREAM_BUF_LEN - 20) {
++		char *out = O->buffer + O->index;
++		const char *prefix = fmt;
++		if (*prefix == '-') {
++			*out++ = '-';
++			++prefix;
++		}
++		if (*prefix == '0')
++			*out++ = '0';
 +		const unsigned digits = 16U - CountLeadingZeros_64(value | 1) / 4U;
-+		const bool prefix = negative ? ((0 - value) >> 60) >= 10 :
-+					(value >> (4U * (digits - 1))) >= 10;
-+		char *p = O->buffer + O->index;
-+		if (negative)
-+			*p++ = '-';
-+		if (prefix)
-+			*p++ = '0';
-+		char *end = p + digits;
++		char *end = out + digits;
 +		end[0] = 'h';
 +		end[1] = '\0';
 +		O->index = (size_t)(end + 1 - O->buffer);
@@ -74,211 +45,102 @@ index 2ee82ef7..7c9fb7c2 100644
 +		return;
 +	}
 +#endif
-+	const bool prefix = need_zero_prefix(negative ? 0 - value : value);
-+	const char *fmt = negative ?
-+		(prefix ? "-0%" PRIx64 "h" : "-%" PRIx64 "h") :
-+		(prefix ? "0%" PRIx64 "h" : "%" PRIx64 "h");
 +	SStream_concat(O, fmt, value);
 +}
++
++/* An absolute A0-A3 address is already zero-extended by the decoder.
++ * Its high bit is independent of the size of the accumulator being moved. */
++void X86_printHighMemoryOffset(SStream *O, uint64_t address, bool masm)
++{
++	if (!masm)
++		SStream_concat_hex64(O, address, false);
++	else if (address == (UINT64_C(1) << 63))
++		SStream_concat0(O, "8000000000000000h");
++	else if ((address >> 60) >= 10)
++		X86_printMasmHexToken(O, "0%" PRIx64 "h", address);
++	else
++		X86_printMasmHexToken(O, "%" PRIx64 "h", address);
++}
 diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
-index 37b02959..6945cf5a 100644
+index 37b02959..4cf1c425 100644
 --- a/arch/X86/X86InstPrinterCommon.h
 +++ b/arch/X86/X86InstPrinterCommon.h
-@@ -22,6 +22,7 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
+@@ -22,6 +22,8 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
  	return target;
  }
  
-+void X86_printMasmHex(SStream *O, uint64_t value, bool negative);
++void X86_printHighMemoryOffset(SStream *O, uint64_t address, bool masm);
++void X86_printMasmHexToken(SStream *O, const char *fmt, uint64_t value);
  void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
  
  void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..c9d9253a 100644
+index 457485ab..00953f85 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -312,135 +312,35 @@ static void printRegName(SStream *OS, unsigned RegNo)
- 				      getRegisterNameLength(RegNo));
- }
- 
--// for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h
--// this function tell us if we need to have prefix 0 in front of a number
--static bool need_zero_prefix(uint64_t imm)
--{
--	// find the first hex letter representing imm
--	while (imm >= 0x10)
--		imm >>= 4;
--
--	if (imm < 0xa)
--		return false;
--	else // this need 0 prefix
--		return true;
--}
--
- static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
- {
--	if (positive) {
--		// always print this number in positive form
--		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
--			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
--					default:
--						break;
--					case 1:
--						imm &= 0xff;
--						break;
--					case 2:
--						imm &= 0xffff;
--						break;
--					case 4:
--						imm &= 0xffffffff;
--						break;
--					}
--				}
--
--				if (imm == 0x8000000000000000LL) // imm == -imm
--					SStream_concat0(O, "8000000000000000h");
--				else if (need_zero_prefix(imm))
+@@ -351,17 +351,17 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 				if (imm == 0x8000000000000000LL) // imm == -imm
+ 					SStream_concat0(O, "8000000000000000h");
+ 				else if (need_zero_prefix(imm))
 -					SStream_concat(O, "0%" PRIx64 "h", imm);
--				else
++					X86_printMasmHexToken(O, "0%" PRIx64 "h", imm);
+ 				else
 -					SStream_concat(O, "%" PRIx64 "h", imm);
--			} else {
--				if (imm > HEX_THRESHOLD) {
--					if (need_zero_prefix(imm))
++					X86_printMasmHexToken(O, "%" PRIx64 "h", imm);
+ 			} else {
+ 				if (imm > HEX_THRESHOLD) {
+ 					if (need_zero_prefix(imm))
 -						SStream_concat(O,
--							       "0%" PRIx64 "h",
--							       imm);
--					else
++						X86_printMasmHexToken(O,
+ 							       "0%" PRIx64 "h",
+ 							       imm);
+ 					else
 -						SStream_concat(
--							O, "%" PRIx64 "h", imm);
--				} else
--					SStream_concat_dec64(O, imm, false);
--			}
--		} else { // Intel syntax
--			if (imm < 0) {
--				if (MI->op1_size) {
--					switch (MI->op1_size) {
--					default:
--						break;
--					case 1:
--						imm &= 0xff;
--						break;
--					case 2:
--						imm &= 0xffff;
--						break;
--					case 4:
--						imm &= 0xffffffff;
--						break;
--					}
--				}
--
--				SStream_concat_hex64(O, imm, false);
--			} else {
--				if (imm > HEX_THRESHOLD)
--					SStream_concat_hex64(O, imm, false);
--				else
--					SStream_concat_dec64(O, imm, false);
--			}
--		}
--	} else {
--		if (MI->csh->syntax == CS_OPT_SYNTAX_MASM) {
--			if (imm < 0) {
--				if (imm == 0x8000000000000000LL) // imm == -imm
--					SStream_concat0(O, "8000000000000000h");
--				else if (imm < -HEX_THRESHOLD) {
--					if (need_zero_prefix(imm))
++						X86_printMasmHexToken(
+ 							O, "%" PRIx64 "h", imm);
+ 				} else
+ 					SStream_concat_dec64(O, imm, false);
+@@ -399,11 +399,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 					SStream_concat0(O, "8000000000000000h");
+ 				else if (imm < -HEX_THRESHOLD) {
+ 					if (need_zero_prefix(imm))
 -						SStream_concat(O,
--							       "-0%" PRIx64 "h",
--							       -imm);
--					else
++						X86_printMasmHexToken(O,
+ 							       "-0%" PRIx64 "h",
+ 							       -imm);
+ 					else
 -						SStream_concat(O,
--							       "-%" PRIx64 "h",
--							       -imm);
--				} else
--					SStream_concat_dec64(O, (uint64_t)-imm,
--							     true);
--			} else {
--				if (imm > HEX_THRESHOLD) {
--					if (need_zero_prefix(imm))
++						X86_printMasmHexToken(O,
+ 							       "-%" PRIx64 "h",
+ 							       -imm);
+ 				} else
+@@ -412,11 +412,11 @@ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+ 			} else {
+ 				if (imm > HEX_THRESHOLD) {
+ 					if (need_zero_prefix(imm))
 -						SStream_concat(O,
--							       "0%" PRIx64 "h",
--							       imm);
--					else
++						X86_printMasmHexToken(O,
+ 							       "0%" PRIx64 "h",
+ 							       imm);
+ 					else
 -						SStream_concat(
--							O, "%" PRIx64 "h", imm);
--				} else
--					SStream_concat_dec64(O, imm, false);
--			}
--		} else { // Intel syntax
--			if (imm < 0) {
--				if (imm == 0x8000000000000000LL) // imm == -imm
--					SStream_concat0(O,
--							"0x8000000000000000");
--				else if (imm < -HEX_THRESHOLD)
--					SStream_concat_hex64(O, (uint64_t)-imm,
--							     true);
--				else
--					SStream_concat_dec64(O, (uint64_t)-imm,
--							     true);
--
--			} else {
--				if (imm > HEX_THRESHOLD)
--					SStream_concat_hex64(O, imm, false);
--				else
--					SStream_concat_dec64(O, imm, false);
--			}
-+	const bool negative = imm < 0 && !positive;
-+	uint64_t value = negative ? 0 - (uint64_t)imm : (uint64_t)imm;
-+	if (imm < 0 && positive) {
-+		/* A signed immediate requested as unsigned retains hexadecimal
-+		 * spelling even if the operand width reduces it to a small value. */
-+		switch (MI->op1_size) {
-+		case 1:
-+			value &= UINT8_MAX;
-+			break;
-+		case 2:
-+			value &= UINT16_MAX;
-+			break;
-+		case 4:
-+			value &= UINT32_MAX;
-+			break;
- 		}
-+	} else if (value <= HEX_THRESHOLD) {
-+		SStream_concat_dec64(O, value, negative);
-+		return;
- 	}
-+
-+	if (MI->csh->syntax == CS_OPT_SYNTAX_MASM)
-+		X86_printMasmHex(O, value, negative);
-+	else if (negative && imm == INT64_MIN)
-+		SStream_concat0(O, "0x8000000000000000");
-+	else
-+		SStream_concat_hex64(O, value, negative);
- }
- 
- // local printOperand, without updating public operands
-@@ -721,13 +621,15 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 				.operands[MI->flat_insn->detail->x86.op_count]
++						X86_printMasmHexToken(
+ 							O, "%" PRIx64 "h", imm);
+ 				} else
+ 					SStream_concat_dec64(O, imm, false);
+@@ -722,10 +722,8 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
  				.mem.disp = imm;
  
--		if (imm < 0)
+ 		if (imm < 0)
 -			printImm(MI, O,
 -				 arch_masks[x86_get_bit_mode(MI->csh->mode)] &
 -					 imm,
 -				 true);
--		else
-+		/* readMemoryOffset has already zero-extended the encoded offset.
-+		 * Only a full-width address can have its top bit set. */
-+		if (imm >= 0) {
++			X86_printHighMemoryOffset(O, (uint64_t)imm,
++						  MI->csh->syntax == CS_OPT_SYNTAX_MASM);
+ 		else
  			printImm(MI, O, imm, true);
-+		} else if (MI->csh->syntax != CS_OPT_SYNTAX_MASM) {
-+			SStream_concat_hex64(O, (uint64_t)imm, false);
-+		} else {
-+			X86_printMasmHex(O, (uint64_t)imm, false);
-+		}
  	}
- 
- 	SStream_concat0(O, "]");
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
 index cfd13cba..17401f22 100644
 --- a/tests/unit/x86_legacy_address_size.c

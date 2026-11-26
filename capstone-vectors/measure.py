@@ -66,11 +66,9 @@ try:
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'masm.o',lib,ice_lib,*flags,'-o',w/('masm-'+label))
         run('clang++',w/'masm.o',w/'count.o','-Wl,--wrap=vsnprintf',lib,ice_lib,*flags,'-o',w/('count-'+label))
-        if label!='base':
-            (w/'token.c').write_text('#include "arch/X86/X86InstPrinterCommon.h"\n#define printMasmHex X86_printMasmHex\n')
-            run('clang','-O2','-std=c11','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',w,'-I',base,'-I',base/'include',r/'token-guard.c',lib,'-o',w/'token-guard')
-            checks=int(get(w/'token-guard'));assert checks==1774432;save('stream-'+label,checks)
-
+        if label=='candidate':
+            run('clang','-O2','-std=c11','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',r,'-I',base,'-I',base/'include',r/'chosen-guard.c',lib,'-o',w/'chosen-guard')
+            checks=int(get(w/'chosen-guard'));assert checks==2655360;save('immediate-token',checks)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
@@ -167,7 +165,7 @@ try:
                 assert out.stdout.split()[2:]==ref
                 bins=list(map(int,out.stderr.split()));assert len(bins)==5 and all(x%2==0 for x in bins[:4])
                 counts[tag]=dict(accepted=int(ref[0]),hex_per_pass=[x//2 for x in bins[:4]],other_both_passes=bins[4])
-            assert counts['candidate']==counts['outlined'] and sum(counts['base']['hex_per_pass'])>sum(counts['candidate']['hex_per_pass'])
+            assert counts['base']==counts['outlined'] and sum(counts['base']['hex_per_pass'])>0 and sum(counts['candidate']['hex_per_pass'])==0
             counters[key]=counts
         save('formatter-calls',counters)
 
