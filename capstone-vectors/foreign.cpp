@@ -1,3 +1,4 @@
+#include <valgrind/callgrind.h>
 #include <capstone/capstone.h>
 #include <algorithm>
 #include <chrono>
@@ -35,6 +36,7 @@ int main(int argc, char **argv) {
   uint64_t accepted = 0, rejected = 0, value = 0, boundaries = 14695981039346656037ull;
   const auto start = std::chrono::steady_clock::now();
   const auto cpu = std::clock();
+  CALLGRIND_ZERO_STATS; CALLGRIND_TOGGLE_COLLECT;
   for (unsigned rep = 0; rep < repeats; ++rep) {
     const uint8_t *cursor = text.data();
     size_t left = text.size();
@@ -67,6 +69,7 @@ int main(int argc, char **argv) {
       }
     }
   }
+  CALLGRIND_TOGGLE_COLLECT;
   const uint64_t cpu_ns = uint64_t(std::clock()-cpu) * 1000000000ull / CLOCKS_PER_SEC;
   const auto wall = std::chrono::duration_cast<std::chrono::nanoseconds>(
       std::chrono::steady_clock::now()-start).count();
