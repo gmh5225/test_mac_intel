@@ -37,7 +37,7 @@ try:
             git('restore','--staged','--worktree','--source=HEAD','--','.')
             patch=t/(name+'.patch')
             patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/'+name+'.patch']))
-            assert hashlib.sha256(patch.read_bytes()).hexdigest()==tree['sha256']
+            assert hashlib.sha256(patch.read_bytes()).hexdigest()==tree['combined_sha256']
             git('apply','--index',patch)
             assert git('write-tree')==tree['tree']
         run(name+'-typed-register-mappings',os.sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check')
@@ -52,7 +52,7 @@ try:
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
-            if profile not in ('diet','reduced') and name in ('base','segment','digits'):
+            if profile not in ('diet','reduced') and name in ('base','riscv','candidate'):
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
                 assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]
