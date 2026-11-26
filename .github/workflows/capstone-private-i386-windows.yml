@@ -1,7 +1,7 @@
-name: Measure first-gap operand compaction in dedicated and six-architecture RISC-V readers
+name: Compare GCC 12 and 14 RISC-V compaction on six independent runners
 on:
   push:
-    branches: [codex/riscv-first-gap-programs]
+    branches: [codex/riscv-compaction-gcc-generations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,23 +11,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2022, arch: amd64, profile: full }
-          - { host: windows-2022, arch: amd64, profile: diet }
-          - { host: windows-2022, arch: amd64_x86, profile: full }
-          - { host: windows-2022, arch: amd64_x86, profile: diet }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc, variant: two }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc, variant: three }
-          - { host: ubuntu-22.04, arch: amd64, profile: full, compiler: gcc, variant: earlier }
-          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: clang }
-          - { host: ubuntu-24.04, arch: amd64, profile: diet }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: full, compiler: gcc }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: full, compiler: clang }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: diet }
-          - { host: macos-15, arch: arm64, profile: full }
-          - { host: macos-15, arch: arm64, profile: diet }
-          - { host: macos-15-intel, arch: x86_64, profile: full }
-          - { host: macos-15-intel, arch: x86_64, profile: diet }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-12, variant: one }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-12, variant: two }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-12, variant: three }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-14, variant: one }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-14, variant: two }
+          - { host: ubuntu-24.04, arch: amd64, profile: full, compiler: gcc-14, variant: three }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 85
     steps:
@@ -55,6 +44,16 @@ jobs:
             cmake
             CMakeLists.txt
           persist-credentials: false
+      - name: Select the versioned compiler
+        env:
+          C_TOOL: ${{ matrix.compiler }}
+        run: |
+          version="${C_TOOL#gcc-}"
+          if ! command -v "g++-$version" >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y "g++-$version"
+          fi
+          "$C_TOOL" -dumpfullversion
       - name: Compare original and candidate bytes and native tests
         env:
           SCAN_PROFILE: ${{ matrix.profile }}
@@ -63,6 +62,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-first-gap-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
+          name: rv-gcc-generation-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
           path: evidence
           retention-days: 7

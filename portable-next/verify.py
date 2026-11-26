@@ -36,6 +36,8 @@ try:
     chosen=os.environ.get('NATIVE_COMPILER','')
     if chosen in ('gcc','clang'):
         os.environ.update(CC=chosen,CXX='g++' if chosen=='gcc' else 'clang++')
+    if chosen.startswith('gcc-'):
+        os.environ.update(CC=chosen,CXX='g++-'+chosen[4:])
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
     if profile=='diet':cfg.append('-DCAPSTONE_BUILD_DIET=ON')
     mixed_sources=d.parent/'neverd-config'
@@ -69,6 +71,9 @@ try:
             cmd('guard-link-'+stage,[chosen or 'cc','-std=c99','-O2','-DCAPSTONE_HAS_RISCV','-I',s,'-I',s/'include',d/'guard.c',lib,'-lm','-o',t/'guard'])
             assert sp.check_output([t/'guard'],text=True).strip()=='8448'
             save('arbitrary-arrays-'+stage,8448)
+            scan=sp.check_output(['objdump','-d','--no-show-raw-insn','--disassemble=RISCV_compact_operands',b/'rv_time'],text=True)
+            assert '<RISCV_compact_operands>:' in scan
+            (out/('compaction-'+stage+'.asm')).write_text(scan)
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
