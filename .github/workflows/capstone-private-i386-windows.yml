@@ -1,7 +1,7 @@
-name: Check single-record x86 output, x87 hardware extents and option-specific builds
+name: Verify native x86 register spellings, callback configuration and output extents
 on:
   push:
-    branches: [codex/standalone-record-configurations]
+    branches: [codex/att-register-token-builds]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: eac7e8af8fcc31631f97470d2f01678382c3f2c0
+          ref: eb7fdeaaeb4f89cbcc5ab24edf41e0a03073884c
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: standalone-record-profiles-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: register-token-profiles-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
