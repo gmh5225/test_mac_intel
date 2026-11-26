@@ -13,7 +13,7 @@ def once(s,a,b):
     assert s.count(a)==1
     return s.replace(a,b)
 m=read(r/'experiment.json');q=read(r/'source.json')
-assert get('git','-C',src,'rev-parse','HEAD').strip()==q['base']['commit']
+assert get('git','-C',src,'rev-parse','HEAD').strip()==q['base']['parent']
 assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
 assert sha(r/'candidate.patch')==q['candidate']['sha256']
 assert all(sha(r/f)==h for f,h in m['drivers'].items())
@@ -21,6 +21,7 @@ w=Path(tempfile.mkdtemp());build=w/'build';ad=w/'adapter';selected=w/'lib';selec
 try:
     flags=['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('X86',)]
     flags+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON']
+    flags.append('-DCMAKE_SHARED_LINKER_FLAGS=-Wl,--build-id=none')
     images={};sources={};copies={};sizes={};symbols={};objects={}
     project=w/'static-project';static_build=w/'static-build';(project/'third_party').mkdir(parents=True)
     (project/'third_party/capstone').symlink_to(src);(project/'cmake').mkdir()
@@ -30,7 +31,10 @@ try:
     (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(StaticDecode LANGUAGES C CXX)\n'+top[top.index('# --- Capstone (our fork'):top.index('# --- NeverD CMake helpers')])
     static_images={}
     for stage in ('base','candidate'):
-        if stage=='candidate':run('git','-C',src,'apply','--index',r/'candidate.patch')
+        run('git','-C',src,'restore','--source=HEAD','--staged','--worktree','--','.')
+        patch=r/('candidate.patch' if stage=='candidate' else 'disabled.patch')
+        assert sha(patch)==q[stage]['sha256']
+        run('git','-C',src,'apply','--index',patch)
         assert get('git','-C',src,'write-tree').strip()==q[stage]['tree']
         run('cmake','-G','Ninja','-S',src,'-B',build,*flags)
         run('cmake','--build',build,'--target','capstone_shared','--parallel','4')
@@ -51,6 +55,15 @@ try:
     save('identities',dict(source=q,images=sources,sizes=sizes,symbols=delta,objects=objects))
     assert not delta['added'] and not delta['removed'] and sources['base']!=sources['candidate']
     from elftools.elf.elffile import ELFFile
+    ba,ca=images['base'],images['candidate']
+    assert len(ba)==len(ca)
+    with (w/'base.so').open('rb')as fp:
+        elf=ELFFile(fp);syms=elf.get_section_by_name('.symtab')
+        symbol,=[sym for sym in syms.iter_symbols() if sym.name.endswith('att_register_token_enabled')]
+        section=elf.get_section(symbol['st_shndx']);offset=symbol['st_value']-section['sh_addr']+section['sh_offset']
+    assert ba[offset]==103 and ca[offset]==104
+    assert ba[:offset]==ca[:offset] and ba[offset+1:]==ca[offset+1:]
+    save('control-byte',dict(offset=offset,values=[103,104],size=len(ba),section=section.name,symbol=symbol.name,base=sha(w/'base.so'),candidate=sha(w/'candidate.so')))
     with (w/'base.so').open('rb')as f:
         elf=ELFFile(f);soname=next(tag.soname for tag in elf.get_section_by_name('.dynamic').iter_tags() if tag.entry.d_tag=='DT_SONAME')
     maximum=max(sizes.values());images={k:v.ljust(maximum,b'\x00')for k,v in images.items()}
@@ -141,7 +154,7 @@ try:
             def take(k,n):
                 other=k in ('iced','fast');select('base' if other else k)
                 return list(map(int,get(*invoke,w/'driver',k if other else 'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('intel/'+name+'/'+str(mode),['base','copy','candidate','iced']+(['fast']if mode else []),take)
+            measure('intel/'+name+'/'+str(mode),['base','copy','candidate'],take)
         for mode in (1,2):
             def take(k,n):
                 select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))

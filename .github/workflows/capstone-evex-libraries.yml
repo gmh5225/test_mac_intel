@@ -1,7 +1,7 @@
-name: Measure AT&T register formatting and check PE32 and native mixed libraries
+name: Isolate register formatting from linked code layout using a single read-only byte
 on:
   push:
-    branches: [codex/att-register-token-mixed-check]
+    branches: [codex/att-format-identical-library-layout]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: register-token-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-byte-register-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
