@@ -47,7 +47,7 @@ try:
     from foreign_time import measure as time_foreign
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
-    for label in ('base','outlined','candidate'):
+    for label in ('base','candidate','outlined'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':

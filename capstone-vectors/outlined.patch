@@ -1,33 +1,251 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5a8f1bff..a663e216 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1093,7 +1093,7 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+         target_compile_definitions(capstone_x86_iter64 PRIVATE CAPSTONE_X86_NEAR_INDIRECT_OUTPUT)
+     endif()
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+-    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
++    add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86RegisterFallback32.c arch/X86/X86BatchSecondary32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c)
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86" OR
+diff --git a/Makefile b/Makefile
+index 95e046b2..40fd311f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -310,7 +310,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+-	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
++	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o $(OBJDIR)/arch/X86/X86BatchSecondary32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+ else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
+diff --git a/arch/X86/X86BatchModRM.h b/arch/X86/X86BatchModRM.h
+new file mode 100644
+index 00000000..9de4629d
+--- /dev/null
++++ b/arch/X86/X86BatchModRM.h
+@@ -0,0 +1,84 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_BATCH_MODRM_H
++#define CS_X86_BATCH_MODRM_H
++
++/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
++static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
++			 unsigned *tail)
++{
++	if (size <= offset)
++		return false;
++	const uint8_t modrm = code[offset];
++	if (modrm >= 0xc0) {
++		*tail = 0;
++		return true;
++	}
++	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
++					       { 1, 1, 1, 1, 2, 1, 1, 1 },
++					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
++	unsigned length = lengths[modrm >> 6][modrm & 7];
++	if ((modrm & 0xc7) == 4) {
++		if (size <= offset + 1)
++			return false;
++		if ((code[offset + 1] & 7) == 5)
++			length += 4;
++	}
++	*tail = length;
++	return true;
++}
++
++#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)
++
++struct X86Batch32Tables {
++	const uint32_t *secondary;
++	const uint32_t (*groups)[16];
++};
++
++extern CAPSTONE_INTERNAL const struct X86Batch32Tables X86_batch32Tables;
++
++static inline uint32_t readBatchOpcode(const uint8_t *code, size_t size,
++				       unsigned plan, const uint32_t groups[][16])
++{
++	if (plan & X86_BATCH_REG_GROUP) {
++		if (size < 2)
++			return 0;
++		const uint8_t mr = code[1];
++		plan = groups[plan & ~X86_BATCH_REG_GROUP]
++					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
++		if (!plan)
++			return 0;
++	}
++	unsigned length = plan & 15;
++	if (plan & 0x10) {
++		unsigned tail;
++		if (!addressBytes(code, size, 1, &tail))
++			return 0;
++		length += tail;
++	}
++	return length <= size ? (plan & ~0xffu) | length : 0;
++}
++
++CS_DECODE_INLINE uint32_t finishVexPlan(const uint8_t *code, size_t size,
++					unsigned modrm_offset, unsigned payload,
++					unsigned plan)
++{
++	if (!plan)
++		return 0;
++	if ((plan & 2) && (payload & 0x78) != 0x78)
++		return 0;
++	unsigned end = modrm_offset;
++	if (plan & 4) {
++		unsigned tail;
++		if (!addressBytes(code, size, modrm_offset, &tail))
++			return 0;
++		end = modrm_offset + 1 + tail;
++	}
++	end += plan & 1;
++	if (end > size)
++		return 0;
++	return ((plan >> 3) << 8) | end;
++}
++
++#endif
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..b19e1fde 100644
+index b56826b0..0d79423e 100644
 --- a/arch/X86/X86BatchScan.c
 +++ b/arch/X86/X86BatchScan.c
-@@ -12,11 +12,13 @@
+@@ -36,71 +36,11 @@
+ #undef X86_SHIFT_SCAN_IDS
+ #endif
  
- #if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
- #include "../../cs_disasm_internal.h"
+-/* Number of bytes following the ModR/M byte in 32- and 64-bit addressing. */
+-static bool addressBytes(const uint8_t *code, size_t size, unsigned offset,
+-			 unsigned *tail)
+-{
+-	if (size <= offset)
+-		return false;
+-	const uint8_t modrm = code[offset];
+-	if (modrm >= 0xc0) {
+-		*tail = 0;
+-		return true;
+-	}
+-	static const uint8_t lengths[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
+-					       { 1, 1, 1, 1, 2, 1, 1, 1 },
+-					       { 4, 4, 4, 4, 5, 4, 4, 4 } };
+-	unsigned length = lengths[modrm >> 6][modrm & 7];
+-	if ((modrm & 0xc7) == 4) {
+-		if (size <= offset + 1)
+-			return false;
+-		if ((code[offset + 1] & 7) == 5)
+-			length += 4;
+-	}
+-	*tail = length;
+-	return true;
+-}
++#include "X86BatchModRM.h"
+ 
+ static uint32_t readPrimary(const uint8_t *code, size_t size, unsigned plan)
+ {
+-	if (plan & X86_BATCH_REG_GROUP) {
+-		if (size < 2)
+-			return 0;
+-		const uint8_t mr = code[1];
+-		plan = x86BatchRegGroups[plan & ~X86_BATCH_REG_GROUP]
+-					[((mr >> 3) & 7) + (mr >= 0xc0 ? 8 : 0)];
+-		if (!plan)
+-			return 0;
+-	}
+-	unsigned length = plan & 15;
+-	if (plan & 0x10) {
+-		unsigned tail;
+-		if (!addressBytes(code, size, 1, &tail))
+-			return 0;
+-		length += tail;
+-	}
+-	return length <= size ? (plan & ~0xffu) | length : 0;
+-}
+-
+-CS_DECODE_INLINE uint32_t finishVexPlan(const uint8_t *code, size_t size,
+-					unsigned modrm_offset, unsigned payload,
+-					unsigned plan)
+-{
+-	if (!plan)
+-		return 0;
+-	if ((plan & 2) && (payload & 0x78) != 0x78)
+-		return 0;
+-	unsigned end = modrm_offset;
+-	if (plan & 4) {
+-		unsigned tail;
+-		if (!addressBytes(code, size, modrm_offset, &tail))
+-			return 0;
+-		end = modrm_offset + 1 + tail;
+-	}
+-	end += plan & 1;
+-	if (end > size)
+-		return 0;
+-	return ((plan >> 3) << 8) | end;
++	return readBatchOpcode(code, size, plan, x86BatchRegGroups);
+ }
+ 
+ /* Every admitted plan has the same public ID, reserved-vvvv rule and
+@@ -282,8 +222,10 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 		if (!packed) {
+ 			insn.address = address;
+ 			X86ScanResult result;
+-			if (!X86_getInstructionScanResult(ud, code, size, &insn,
+-							  &result))
++			const bool decoded = wide ?
++				X86_getInstructionScanResult(ud, code, size, &insn, &result) :
++				X86_getBatchSecondary32(ud, code, size, &insn, &result);
++			if (!decoded)
+ 				break;
+ 			finish_x86_scan(handle, &insn, &result, code, false,
+ 					false);
+@@ -328,6 +270,10 @@ static X86ScanBatchResult scanBatch64(csh ud, const uint8_t *code, size_t size,
+ {
+ 	return scanBatch(ud, code, size, address, output, capacity, true);
+ }
++CAPSTONE_INTERNAL const struct X86Batch32Tables X86_batch32Tables = {
++	x86Batch32Secondary, x86BatchRegGroups
++};
++
+ #endif
+ 
+ CAPSTONE_INTERNAL
+diff --git a/arch/X86/X86BatchSecondary32.c b/arch/X86/X86BatchSecondary32.c
+new file mode 100644
+index 00000000..3f953fa6
+--- /dev/null
++++ b/arch/X86/X86BatchSecondary32.c
+@@ -0,0 +1,50 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_X86_REDUCE) && \
++	!defined(CAPSTONE_X86_SCAN_ADAPTER)
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_batch32_secondary_text" rodata = \
++	".cs_x86_batch32_secondary_rodata"
++#endif
++#include "../../cs_disasm_internal.h"
++#include "X86FeatureExtension.h"
++#include "X86BatchModRM.h"
 +#define X86_DEFINE_I386_MAP3_PLANS
- #define X86_DEFINE_VEX3_PUBLIC_PLANS
- #define X86_DEFINE_VEX2_PUBLIC_PLANS
- #include "X86GenVexPublicPlans.inc"
- #undef X86_DEFINE_VEX2_PUBLIC_PLANS
- #undef X86_DEFINE_VEX3_PUBLIC_PLANS
++#include "X86GenVexPublicPlans.inc"
 +#undef X86_DEFINE_I386_MAP3_PLANS
- #include "X86GenBatchPrimary.inc"
- #include "X86FeatureExtension.h"
- #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-@@ -163,8 +165,23 @@ static uint32_t readFirst32(const uint8_t *code, size_t size)
- 	const unsigned plan = x86Batch32Primary[code[0]];
- 	if (plan)
- 		return readPrimary(code, size, plan);
++
++static inline uint32_t readSecondary32(const uint8_t *code, size_t size)
++{
 +	if (code[0] == 0x0f && size >= 2) {
-+		const unsigned secondary = x86Batch32Secondary[code[1]];
-+		const uint32_t word = secondary ?
-+			readPrimary(code + 1, size - 1, secondary) : 0;
++		const unsigned plan = X86_batch32Tables.secondary[code[1]];
++		const uint32_t word = plan ? readBatchOpcode(code + 1, size - 1,
++							    plan, X86_batch32Tables.groups) : 0;
 +		return word ? word + 1 : 0;
 +	}
- 	if (code[0] == 0xc5 && size >= 3 && (code[1] & 0xc0) == 0xc0)
- 		return readVex2Plan(code, size);
 +	/* E3 disambiguates VEX from LES. With W=0, 66 and registers 0..7,
 +	 * one generated cell contains the ID, operand checks and tail size. */
 +	if (code[0] == 0xc4 && size >= 5 && code[1] == 0xe3 &&
@@ -37,14 +255,51 @@ index b56826b0..b19e1fde 100644
 +		return finishVexPlan(code, size, 4, code[2],
 +				     x86Vex32Map3OperandPlan[code[3]][form]);
 +	}
- 	return 0;
- }
++	return 0;
++}
++
++bool X86_getBatchSecondary32(csh handle, const uint8_t *code, size_t size,
++			     cs_insn *insn, X86ScanResult *result)
++{
++	const uint32_t packed = readSecondary32(code, size);
++	if (!packed)
++		return X86_getInstructionScanResult(handle, code, size, insn,
++						    result);
++	result->opcode = 0;
++	result->opcode_pub = packed >> 8;
++	result->length = (uint16_t)(packed & 0xff);
++	result->popcode_adjust = 0;
++	return true;
++}
++#endif
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 06cc61ae..cb1e4818 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -72,6 +72,10 @@ bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
+ 				  size_t code_len, cs_insn *insn,
+ 				  X86ScanResult *result);
  
++/* i386 batch fallback after primary opcodes and VEX2 have been tried. */
++CAPSTONE_INTERNAL bool X86_getBatchSecondary32(csh handle, const uint8_t *code, size_t size,
++			     cs_insn *insn, X86ScanResult *result);
++
+ /* Scan-only entry after source extension dispatch. */
+ bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+ 				       size_t code_len, MCInst *instr,
 diff --git a/arch/X86/X86GenBatchPrimary.inc b/arch/X86/X86GenBatchPrimary.inc
-index 2349b148..ab611515 100644
+index 2349b148..633ce540 100644
 --- a/arch/X86/X86GenBatchPrimary.inc
 +++ b/arch/X86/X86GenBatchPrimary.inc
-@@ -142,6 +142,7 @@ static const uint32_t x86Batch64Secondary[256] = {
+@@ -5,7 +5,6 @@
+ #ifdef CAPSTONE_X86_REDUCE
+ /* The private batch entries use the full decoder. */
+ #else
+-#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)
+ static const uint32_t x86Batch32Primary[256] = {
+ 	0x00000812u, 0x00000812u, 0x00000812u, 0x00000812u, 0x00000802u, 0x00000805u, 0x00026101u, 0x00024901u,
+ 	0x00020012u, 0x00020012u, 0x00020012u, 0x00020012u, 0x00020002u, 0x00020005u, 0x00026101u, 0x00000000u,
+@@ -142,6 +141,7 @@ static const uint32_t x86Batch64Secondary[256] = {
  	0x00000000u, 0x0001b412u, 0x0001b212u, 0x0001b312u, 0x0001aa12u, 0x0001a012u, 0x0001ac12u, 0x80000022u,
  	0x0001ba12u, 0x0001c112u, 0x0001bb12u, 0x0001bc12u, 0x00018412u, 0x00018b12u, 0x00018512u, 0x0002ea01u,
  };
@@ -53,13 +308,13 @@ index 2349b148..ab611515 100644
  	0x00000000u, 0x00000000u, 0x00014512u, 0x00016112u, 0x00000000u, 0x0002d701u, 0x00004c01u, 0x0002dc01u,
  	0x0000f201u, 0x0005c701u, 0x00000000u, 0x0002ec01u, 0x00000000u, 0x8000000cu, 0x0000b201u, 0x00000000u,
 diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
-index a8a6252a..da814897 100644
+index a8a6252a..3305713f 100644
 --- a/arch/X86/X86GenVexPublicPlans.inc
 +++ b/arch/X86/X86GenVexPublicPlans.inc
-@@ -462,6 +462,44 @@ static const uint16_t x86Vex3FormPlans[25][2] = {
- 	{ 9844, 0 },
+@@ -463,5 +463,43 @@ static const uint16_t x86Vex3FormPlans[25][2] = {
  	{ 9852, 0 },
  };
+ #endif
 +#ifdef X86_DEFINE_I386_MAP3_PLANS
 +static const uint16_t x86Vex32Map3OperandPlan[256][4] = {
 +	[0x02] = { 8765, 8765, 8765, 8765 },
@@ -98,17 +353,18 @@ index a8a6252a..da814897 100644
 +	[0xdf] = { 6167, 6167, 0, 0 },
 +};
 +#endif
- #endif
  
  #endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index f1ebc59f..c2c96199 100644
+index f1ebc59f..ca0bb55b 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
-@@ -1012,11 +1012,13 @@ def emit_batch_primary(suffix):
+@@ -1011,12 +1011,14 @@ def emit_batch_primary(suffix):
+         tables.require(len(direct) == 256, "Incomplete primary opcode map")
          return direct
  
-     lines = ["#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)"]
+-    lines = ["#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)"]
++    lines = []
 +    bare_amd64 = None
      for name, context, secondary in (
          ("x86Batch32Primary", "X86_TERMINAL_32", False),
@@ -132,12 +388,11 @@ index f1ebc59f..c2c96199 100644
          lines.append(f"static const uint32_t {name}[256] = {{")
          for start in range(0, 256, 8):
              lines.append("\t" + ", ".join(f"0x{v:08x}u" for v in direct[start:start+8]) + ",")
-@@ -1364,7 +1372,34 @@ def emit_vex3_plans(ids, maps, contexts, context_values, attrs, pp, metadata, ta
+@@ -1364,6 +1372,33 @@ def emit_vex3_plans(ids, maps, contexts, context_values, attrs, pp, metadata, ta
      lines += ["};", f"static const uint16_t x86Vex3FormPlans[{len(pairs)}][2] = {{"]
      for row in pairs:
          lines.append("\t{ " + ", ".join(map(str, row)) + " },")
--    return lines + ["};", "#endif", ""]
-+    lines += ["};", "#ifdef X86_DEFINE_I386_MAP3_PLANS"]
++    lines += ["};", "#endif", "#ifdef X86_DEFINE_I386_MAP3_PLANS"]
 +    # The unextended 66/0F3A W=0 form requires ModR/M. Preserve the fallback
 +    # if any register or memory member has a different UID in legacy mode.
 +    _, indices, entries = maps[3]
@@ -164,7 +419,6 @@ index f1ebc59f..c2c96199 100644
 +    for opcode, plan in enumerate(projected):
 +        if any(plan):
 +            lines.append(f"\t[0x{opcode:02x}] = {{ " + ", ".join(map(str, plan)) + " },")
-+    return lines + ["};", "#endif", "#endif", ""]
+     return lines + ["};", "#endif", ""]
  
  
- def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
