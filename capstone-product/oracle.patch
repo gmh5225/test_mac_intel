@@ -1,121 +1,55 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..df1f94fc 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -28,9 +28,9 @@
- #undef X86_MEMORY_IMMEDIATE
- #undef X86_IMMEDIATE_WIDE
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6050d7c2..5a8f1bff 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -213,6 +213,10 @@ if(capstone_enabled_architectures STREQUAL "RISCV")
+     endif()
+ endif()
  
--#define X86_SEGMENT_LEA32 writeSegmentLea32
-+#define X86_SEGMENT_MEMORY32 writeSegmentMemory32
- #include "X86MemoryOutputImpl.h"
--#undef X86_SEGMENT_LEA32
-+#undef X86_SEGMENT_MEMORY32
- #undef X86_MEMORY32_OUTPUT
++if(capstone_enabled_architectures STREQUAL "WASM")
++    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "SPARC")
+     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
+ endif()
+diff --git a/Makefile b/Makefile
+index 06b05013..95e046b2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -167,6 +167,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_ONLY
+ endif
  
- /* The fixed-width iterator delegates uncommon encodings here. */
-@@ -85,10 +85,10 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 	case 0x3e:
- 	case 0x64:
- 	case 0x65:
--		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
-+		if (size >= 3 && (code[1] == 0x8d || code[1] == 0x2b) && code[2] < 0xc0 &&
- 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
--			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
--			if (writeSegmentLea32(code, size, insn, insn_size,
-+			const unsigned row = x86_simple_plans[0][0][code[1]] >> 2;
-+			if (writeSegmentMemory32(code, size, insn, insn_size,
- 					      &x86_simple_outputs[row],
- 					      x86_simple_registers))
- 				return true;
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..d3e2101d 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -7,8 +7,8 @@
- #ifdef X86_MEMORY_IMMEDIATE
- #include "X86UnsignedImmediate.h"
- static bool X86_MEMORY_IMMEDIATE(
--#elif defined(X86_SEGMENT_LEA32)
--static bool X86_SEGMENT_LEA32(
-+#elif defined(X86_SEGMENT_MEMORY32)
-+static bool X86_SEGMENT_MEMORY32(
- #elif defined(X86_EXTEND64_MEMORY)
- static bool X86_EXTEND64_MEMORY(
- #elif defined(X86_EXTEND32_MEMORY)
-@@ -34,7 +34,7 @@ bool X86_writeMemoryOutput(
- 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
- #ifdef X86_EXTEND64_MEMORY
- 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
--#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
-+#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_MEMORY32)
- 	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
- #else
- 	const unsigned lead = rex != 0;
-@@ -70,7 +70,7 @@ bool X86_writeMemoryOutput(
- 		const unsigned index_reg = ((rex & 2) << 2) |
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
--#if defined(X86_SEGMENT_LEA32) || defined(X86_BASE_ONLY_SIB) || \
-+#if defined(X86_SEGMENT_MEMORY32) || defined(X86_BASE_ONLY_SIB) || \
- 	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
- 		/* A scale-one SIB without an index names only its base. */
- 		if ((!mod && base_reg == 5) ||
-@@ -93,8 +93,8 @@ bool X86_writeMemoryOutput(
- 	const bool push = false, load = true;
- 	const unsigned reg_width = 2; /* r32 destination */
- #else
--#ifdef X86_SEGMENT_LEA32
--	const bool lea = true, load = true, push = false;
-+#ifdef X86_SEGMENT_MEMORY32
-+	const bool lea = opcode == 0x8d, load = true, push = false;
- #elif defined(X86_MEMORY_IMMEDIATE)
- 	const bool lea = false, load = false;
- #else
-@@ -139,7 +139,7 @@ bool X86_writeMemoryOutput(
- 		out += 10;
- 	}
- #else
--#ifdef X86_SEGMENT_LEA32
-+#ifdef X86_SEGMENT_MEMORY32
- 	static const struct X86SimpleRegister segments[] = {
- 		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
- 		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
-@@ -147,10 +147,15 @@ bool X86_writeMemoryOutput(
- 	};
- 	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
- 						   (code[0] >> 3) & 3;
-+	if (!lea) {
-+		memcpy(out, "dword ptr ", 10);
-+		out += 10;
-+	}
- 	memcpy(out, segments[segment].name, 2);
- 	out[2] = ':';
- 	out += 3;
--#endif
-+	*out++ = '[';
++ifeq ($(sort $(CAPSTONE_ARCHS)),wasm)
++CFLAGS += -DCAPSTONE_WASM_LITERAL_MNEMONICS
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
+ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+ endif
+diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
+index 513b52b6..3c8c4e7e 100644
+--- a/arch/WASM/WASMInstPrinter.c
++++ b/arch/WASM/WASMInstPrinter.c
+@@ -6,7 +6,20 @@
+ 
+ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ {
++#if defined(CAPSTONE_WASM_LITERAL_MNEMONICS) && \
++	!defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	const char *name = WASM_insn_name((csh)MI->csh, MI->Opcode);
++	/* Mnemonics contain no format conversions. A custom formatter still
++	 * receives the original mnemonic as its format string. */
++	if (cs_vsnprintf == cs_default_vsnprintf && O->index < SSTREAM_BUF_LEN - 1)
++		SStream_concat0(O, name);
++	else
++		SStream_concat(O, name);
 +#else
- 	if (lea) {
- 		*out++ = '[';
- 	} else if (row->ops[0].size == 1) {
-@@ -162,6 +167,7 @@ bool X86_writeMemoryOutput(
- 		       11);
- 		out += 11;
- 	}
+ 	SStream_concat(O, WASM_insn_name((csh)MI->csh, MI->Opcode));
 +#endif
- #endif
- 	if (disp32_only) {
- #ifdef X86_MEMORY32_OUTPUT
-@@ -227,10 +233,10 @@ bool X86_writeMemoryOutput(
- 			x->opcode[1] = opcode;
- 		}
- 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
--#elif defined(X86_SEGMENT_LEA32)
-+#elif defined(X86_SEGMENT_MEMORY32)
- 		x->prefix[1] = code[0];
- 		x->encoding.modrm_offset = 2;
--		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
-+		x->operands[load ? 1 : 0].mem.segment = (x86_reg)segments[segment].reg;
- #elif defined(X86_EXTEND32_MEMORY)
- 		x->opcode[0] = 0x0f;
- 		x->opcode[1] = opcode;
+ 
+ 	switch (MI->wasm_data.type) {
+ 	default:

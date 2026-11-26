@@ -1,7 +1,7 @@
-name: Measure the i386 segment operand writer in NeverD from fork LLVM sources on real PE and five ELF targets
+name: Isolate text expansion from the segment decoder using a layout-matched production NeverD binary
 on:
   push:
-    branches: [codex/neverd-segment-mov-sub-product]
+    branches: [codex/segment-abi-layout-control]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: segment-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: segment-size-control-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

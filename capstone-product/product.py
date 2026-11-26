@@ -53,15 +53,36 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    for variant in ('base','layout','selector'):
+    sizes={}
+    for variant in ('base','selector','layout'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
-        if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
+        if variant=='selector':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
         caller='lib/decode/Decoder.cpp'
         entry='X86_disasmIterText'
         assert entry+'(Handle' in (nd/caller).read_text()
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
+        section='.cs_x86_memory_fallback32_text'
+        obj,=build.rglob('X86MemoryFallback32.c.o')
+        def payload(path):
+            with path.open('rb') as f:
+                elf=ELFFile(f)
+                return elf.get_section_by_name(section).data()
+        raw=payload(obj);sizes[variant]=len(raw)
+        if variant=='base':
+            base_hash=hashlib.sha256(raw).hexdigest()
+        if variant=='layout':
+            assert sizes['layout']==sizes['base'] and hashlib.sha256(raw).hexdigest()==base_hash
+            delta=sizes['selector']-len(raw);assert 0<delta<2048
+            pad=t/'end-of-section';pad.write_bytes(raw+bytes(delta))
+            temp=t/'padded.o'
+            command(['objcopy','--update-section',section+'='+str(pad),obj,temp],'baseline-size-control')
+            assert payload(temp)==pad.read_bytes()
+            shutil.copyfile(temp,obj)
+            command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product',*targets,'--parallel','4'],'relink-control',nd)
+            assert payload(obj)==pad.read_bytes()
+            save('layout-control',dict(base_sha256=base_hash,actual_bytes=sizes['base'],matched_bytes=sizes['selector'],unexecuted_bytes=delta,source_tree=actual,control_sha256=hashlib.sha256(payload(obj)).hexdigest()))
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
