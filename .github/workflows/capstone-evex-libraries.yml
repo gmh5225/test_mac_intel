@@ -1,7 +1,7 @@
-name: Compare the same RIP writer with and without fetch-line alignment against two release controls
+name: Check PE32 and other real programs in a mixed Capstone library that includes the WASM printer
 on:
   push:
-    branches: [codex/scan-alignment-normal-links-repeat]
+    branches: [codex/wasm-plus-neverd-mixed]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: repeated-alignment-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-mixed-regular-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
