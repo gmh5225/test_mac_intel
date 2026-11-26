@@ -24,11 +24,8 @@ try:
     run('cmake','-G','Ninja','-S',src,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_WASM_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON')
     inc=['-I',src,'-I',src/'include','-I',src/'arch/WASM']
     run(cc,'-O2',*inc,'-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM','-DWASM_printInst=wasm_reference','-c',original,'-o',temp/'ref.o')
-    hi=temp/'reference-high.c';original_code=original.read_text()
-    call='SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);'
-    assert original_code.count(call)==1
-    hi.write_text(original_code.replace(call,'SStream_concat(O, "0x%" PRIx64, MI->wasm_data.brtable.address);'))
-    run(cc,'-O2',*inc,'-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM','-DWASM_printInst=wasm_reference','-c',hi,'-o',temp/'high-ref.o')
+    decoder=temp/'reference-decoder.c';shutil.copyfile(src/'arch/WASM/WASMDisassembler.c',decoder)
+    run(cc,'-O2',*inc,'-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM','-DWASM_getInstruction=reference_instruction','-c',decoder,'-o',temp/'reference-decoder.o')
     run(cxx,'-O2','-std=c++17',*inc,'-c',r/'measure.cpp','-o',temp/'driver.o')
     by={};libs={};objects={}
     for label in ('base','candidate'):
@@ -44,8 +41,9 @@ try:
         assert len(shared)==1,shared
         run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'verify-stream.c',temp/'ref.o',lib,'-o',temp/'stream')
         if label=='candidate':
-            run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'high.c',temp/'high-ref.o',lib,'-o',temp/'high')
-            high=int(get(temp/'high'));assert high==172*9*16*4;save('high-stream',dict(cases=high,source=tree))
+            run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'states.c',temp/'reference-decoder.o',lib,'-o',temp/'states')
+            cases,accepted=map(int,get(temp/'states').split());assert cases==2*(1+23*(1+256+65536+4096*10))and 0<accepted<cases
+            save('memory-states',dict(cases=cases,accepted=accepted,source=tree))
         by[label]=int(get(temp/'stream'));assert by[label]==172*8*9*16*4,by
         run(cxx,temp/'driver.o',lib,'-o',temp/label)
         exe=temp/(label+'-shared');run(cxx,temp/'driver.o',shared[0],'-Wl,-rpath,'+str(shared[0].parent),'-o',exe)
@@ -56,7 +54,7 @@ try:
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
     assert by['base']==by['candidate']
     changed=[f for f,x in objects['base'].items() if x!=objects['candidate'][f]]
-    assert {Path(f).name for f in changed}=={'WASMInstPrinter.c.o','wasm_brtable_size.c.o'},changed
+    assert {Path(f).name for f in changed}=={'WASMDisassembler.c.o'},changed
     save('build',dict(complete=True,source=tree,streams=by,libraries=libs,changed=changed,compiler=get(cc,'--version').splitlines()[0],host=platform.platform(),machine=platform.machine()))
     inputs=temp/'inputs' if ci else r/'inputs'
     if ci:run(sys.executable,'-B',r/'corpus.py',inputs)

@@ -1,130 +1,82 @@
-diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index d7db69c3..72775079 100644
---- a/arch/WASM/WASMInstPrinter.c
-+++ b/arch/WASM/WASMInstPrinter.c
-@@ -4,7 +4,10 @@
- #include "WASMInstPrinter.h"
- #include "WASMMapping.h"
- 
--#ifdef WASM_LITERAL_NAMES
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#define WASM_BUILTIN_HEX
- static char *prependHex32(char *end, uint32_t value)
+diff --git a/arch/WASM/WASMDisassembler.c b/arch/WASM/WASMDisassembler.c
+index 063f9d9f..d1e3a35f 100644
+--- a/arch/WASM/WASMDisassembler.c
++++ b/arch/WASM/WASMDisassembler.c
+@@ -444,44 +444,47 @@ static bool read_varuint64(const uint8_t *code, size_t code_len,
+ static bool read_memoryimmediate(const uint8_t *code, size_t code_len,
+ 				 uint16_t *param_size, MCInst *MI)
  {
- 	do {
-@@ -16,6 +19,22 @@ static char *prependHex32(char *end, uint32_t value)
- 	return end;
- }
- 
-+/* A nonzero upper word is followed by exactly eight lower hex digits. */
-+static char *prependTableAddress(char *end, uint64_t address)
-+{
-+	uint32_t word = (uint32_t)address;
-+	if (address > UINT32_MAX) {
-+		for (unsigned i = 0; i < 8; ++i) {
-+			*--end = "0123456789abcdef"[word & 15];
-+			word >>= 4;
-+		}
-+		word = (uint32_t)(address >> 32);
-+	}
-+	return prependHex32(end, word);
-+}
-+#endif
-+
-+#ifdef WASM_LITERAL_NAMES
- static bool printHexOperands32(SStream *out, const uint32_t *values,
- 			      unsigned count)
- {
-@@ -39,6 +58,38 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
- }
- #endif
- 
-+static void printBranchTable(SStream *out, const cs_wasm_brtable *table)
-+{
-+#ifdef WASM_BUILTIN_HEX
-+	char text[sizeof("\t0xffffffff, [0xffffffffffffffff], 0xffffffff")];
-+	if (cs_vsnprintf == cs_default_vsnprintf &&
-+	    !(out->markup_stream && out->prefixed_by_markup) &&
-+	    out->index <= SSTREAM_BUF_LEN - sizeof(text)) {
-+		char *end = text + sizeof(text) - 1;
-+		*end = '\0';
-+		char *p = prependHex32(end, table->default_target);
-+		p -= 3;
-+		memcpy(p, "], ", 3);
-+		p = prependTableAddress(p, table->address);
-+		p -= 3;
-+		memcpy(p, ", [", 3);
-+		p = prependHex32(p, table->length);
-+		*--p = '\t';
-+		SStream_concat0_n(out, p, (size_t)(end - p));
-+		return;
-+	}
-+#endif
-+	SStream_concat(out, "\t0x%x, [", table->length);
-+	if (table->address <= UINT32_MAX)
-+		SStream_concat(out, "0x%x",
-+			       (unsigned)table->address);
-+	else
-+		SStream_concat(out, "0x%" PRIx64,
-+			       table->address);
-+	SStream_concat(out, "], 0x%x",
-+		       table->default_target);
-+}
-+
- void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- {
- #ifdef WASM_LITERAL_NAMES
-@@ -100,11 +151,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- 		break;
- 
- 	case WASM_OP_BRTABLE:
--		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
--		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
--		SStream_concat(O, "], 0x%x",
--			       MI->wasm_data.brtable.default_target);
+-	size_t tmp, len = 0;
+-	uint32_t data[2];
 -
-+		printBranchTable(O, &MI->wasm_data.brtable);
- 		break;
- 	}
- }
-diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
-index 52130880..f1d5ac2f 100644
---- a/tests/unit/wasm_brtable_size.c
-+++ b/tests/unit/wasm_brtable_size.c
-@@ -120,6 +120,24 @@ static int check_i64_constant(csh handle)
- 	return !ok;
- }
- 
-+static int check_table_address(csh handle)
-+{
-+	const uint8_t code[] = { 0x0e, 0x02, 0x00, 0x01, 0x02 };
-+	const uint64_t address = UINT64_C(0xfffffffe);
-+	cs_insn *insn = NULL;
-+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
-+		return 1;
-+	size_t count = cs_disasm(handle, code, sizeof(code), address, 1, &insn);
-+	bool ok = count == 1 && insn->id == WASM_INS_BR_TABLE &&
-+		  insn->detail->wasm.operands[0].brtable.address == address + 2;
-+	if (ok && !cs_support(CS_SUPPORT_DIET))
-+		ok = strcmp(insn->op_str, "0x2, [0x100000000], 0x2") == 0;
-+	cs_free(insn, count);
-+	if (!ok)
-+		fprintf(stderr, "WASM br_table target list address lost high bits\n");
-+	return !ok;
-+}
+-	if (MI->flat_insn->detail) {
+-		MI->flat_insn->detail->wasm.op_count = 2;
++	cs_detail *detail = MI->flat_insn->detail;
++	size_t align_size, offset_size;
++	uint32_t align, offset;
 +
- int main(void)
- {
- 	csh h;
-@@ -127,7 +145,8 @@ int main(void)
- 		return 1;
- 
- 	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
--	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
-+	    run_count_case(h, 65531, 5) || check_i64_constant(h) ||
-+	    check_table_address(h)) {
- 		cs_close(&h);
- 		return 1;
++	if (detail)
++		detail->wasm.op_count = 2;
++
++	if (code_len >= 2 && ((code[0] | code[1]) & 0x80) == 0) {
++		align = code[0];
++		offset = code[1];
++		align_size = offset_size = 1;
++	} else {
++		align = get_varuint32(code, code_len, &align_size);
++		if (align_size == (size_t)-1)
++			return false;
++		offset = get_varuint32(code + align_size, code_len - align_size,
++				       &offset_size);
  	}
+ 
+-	data[0] = get_varuint32(code, code_len, &tmp);
+-	if (tmp == -1) {
+-		return false;
++	if (detail) {
++		cs_wasm_op *op = &detail->wasm.operands[0];
++		op->type = WASM_OP_VARUINT32;
++		op->size = (uint32_t)align_size;
++		op->varuint32 = align;
+ 	}
+-
+-	if (MI->flat_insn->detail) {
+-		MI->flat_insn->detail->wasm.operands[0].type =
+-			WASM_OP_VARUINT32;
+-		MI->flat_insn->detail->wasm.operands[0].size = tmp;
+-		MI->flat_insn->detail->wasm.operands[0].varuint32 = data[0];
+-	}
+-
+-	len = tmp;
+-	data[1] = get_varuint32(&code[len], code_len - len, &tmp);
+-	if (tmp == -1) {
++	/* A malformed offset still leaves the decoded alignment in detail. */
++	if (offset_size == (size_t)-1)
+ 		return false;
+-	}
+ 
+-	if (MI->flat_insn->detail) {
+-		MI->flat_insn->detail->wasm.operands[1].type =
+-			WASM_OP_VARUINT32;
+-		MI->flat_insn->detail->wasm.operands[1].size = tmp;
+-		MI->flat_insn->detail->wasm.operands[1].varuint32 = data[1];
++	if (detail) {
++		cs_wasm_op *op = &detail->wasm.operands[1];
++		op->type = WASM_OP_VARUINT32;
++		op->size = (uint32_t)offset_size;
++		op->varuint32 = offset;
+ 	}
+ 
+-	len += tmp;
+-	MI->wasm_data.size = len;
++	MI->wasm_data.size = align_size + offset_size;
+ 	MI->wasm_data.type = WASM_OP_IMM;
+-	MI->wasm_data.immediate[0] = data[0];
+-	MI->wasm_data.immediate[1] = data[1];
+-	*param_size = len;
++	MI->wasm_data.immediate[0] = align;
++	MI->wasm_data.immediate[1] = offset;
++	*param_size = (uint16_t)(align_size + offset_size);
+ 
+ 	return true;
+ }
