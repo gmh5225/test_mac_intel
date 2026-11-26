@@ -15,6 +15,14 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
+    # Materialize the exact RISC-V parent in this source checkout.
+    start=rd(r/'source.json')['base']
+    assert get('git','-C',base,'rev-parse','HEAD').strip()==start['parent'] and sha(r/'riscv.patch')==start['sha256']
+    run('git','-C',base,'apply','--index',r/'riscv.patch')
+    assert get('git','-C',base,'write-tree').strip()==start['tree']
+    assert get('git','-C',base,'hash-object','-t','commit','-w',r/'riscv-commit').strip()==start['commit']
+    assert get('git','-C',base,'rev-parse',start['commit']+'^').strip()==start['parent']
+    run('git','-C',base,'checkout','-q','--detach',start['commit'])
     assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
@@ -143,7 +151,7 @@ try:
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
     host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
-    save('host',host);observations={};summary={};audits={}
+    save('host',host);observations={};summary={};audits={};att_observations={}
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
     for name,bits,f,spans,_ in fixtures:
@@ -195,7 +203,26 @@ try:
                 key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
                 summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
                 save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==36
+        if bits==32:
+            for route in ('private-att','public-att'):
+                for mode in (1,2):
+                    def sample(stage,repeat):
+                        select(stage)
+                        return list(map(int,get(*invoke,route,str(mode),str(repeat),f,path,str(bits)).split()))
+                    labels=list(imgs)
+                    reps=max(1,math.ceil(24e6/sample('base',1)[0]))
+                    expected=sample('base',reps)[2:]
+                    assert all(sample(stage,reps)[2:]==expected for stage in labels)
+                    blocks=[];rng=random.Random(name+route+str(mode)+'/att-fallback')
+                    for _ in range(35):
+                        rng.shuffle(labels);trial={k:[]for k in labels}
+                        for stage in labels+labels[::-1]:
+                            t=sample(stage,reps);assert t[2:]==expected
+                            trial[stage].append(t[:2])
+                        blocks.append({k:[sum(z[i]for z in v)for i in (0,1)]for k,v in trial.items()})
+                    att_observations[route+'/'+name+'/'+str(mode)]=dict(cycles=blocks,reps=reps,checks=expected)
+                    save('att-observations',att_observations)
+    assert len(att_observations)==12 and len(summary)==36
     from firmware16 import compare
     sources=rd(r/'input-sources.json');assert sha(r/'scalar.c')==sources['c_sha']
     run('clang',*sources['compile'],r/'scalar.c','-o',w/'scalar.o')
