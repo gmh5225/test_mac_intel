@@ -58,6 +58,9 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang','-std=c11','-O2','-I',base/'include',r/'wasm-wide.c',lib,'-o',w/'check-wasm-address')
+        wide=list(map(int,get(w/'check-wasm-address').split()));assert wide[0]==704 and wide[1]==0 and (wide[2]>0)==(label=='base')
+        save('wide-'+label,wide)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols

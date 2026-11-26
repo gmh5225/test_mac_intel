@@ -1,7 +1,7 @@
-name: Recheck mixed WASM x86 and five other targets with two copies of each binary after correcting 64-bit operand printing
+name: Check 64-bit WASM operand accuracy and isolate branch-table formatting in mixed x86 and cross-architecture libraries
 on:
   push:
-    branches: [codex/wasm-wide-mixed-libraries]
+    branches: [codex/wasm-local-branch-table-formatting]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-wide-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-address-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

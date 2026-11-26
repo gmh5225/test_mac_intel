@@ -1,8 +1,30 @@
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index 3c8c4e7e..f7e3a2c0 100644
+index 3c8c4e7e..6f1e5f85 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -30,7 +30,11 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+@@ -4,6 +4,21 @@
+ #include "WASMInstPrinter.h"
+ #include "WASMMapping.h"
+ 
++/* Branch tables have their own address-width and callback formatting rules. */
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((noinline, section(".cs_wasm_brtable_text")))
++#endif
++static void printBranchTable(SStream *O, const cs_wasm_brtable *table)
++{
++	SStream_concat(O, "\t0x%x, [", table->length);
++	if (table->address <= UINT32_MAX)
++		SStream_concat(O, "0x%x", (unsigned)table->address);
++	else
++		SStream_concat(O, "0x%" PRIx64, table->address);
++	SStream_concat(O, "], 0x%x",
++		       table->default_target);
++}
++
+ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ {
+ #if defined(CAPSTONE_WASM_LITERAL_MNEMONICS) && \
+@@ -30,7 +45,11 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  		break;
  
  	case WASM_OP_VARUINT64:
@@ -15,18 +37,18 @@ index 3c8c4e7e..f7e3a2c0 100644
  		break;
  
  	case WASM_OP_UINT32:
-@@ -52,7 +56,10 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+@@ -51,10 +70,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ 		break;
  
  	case WASM_OP_BRTABLE:
- 		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
+-		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
 -		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
-+		if (MI->wasm_data.brtable.address <= UINT32_MAX)
-+			SStream_concat(O, "0x%x", (unsigned)MI->wasm_data.brtable.address);
-+		else
-+			SStream_concat(O, "0x%" PRIx64, MI->wasm_data.brtable.address);
- 		SStream_concat(O, "], 0x%x",
- 			       MI->wasm_data.brtable.default_target);
+-		SStream_concat(O, "], 0x%x",
+-			       MI->wasm_data.brtable.default_target);
++		printBranchTable(O, &MI->wasm_data.brtable);
  
+ 		break;
+ 	}
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
 index 21802ef7..86f94701 100644
 --- a/tests/unit/wasm_brtable_size.c
