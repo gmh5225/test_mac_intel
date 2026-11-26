@@ -1,7 +1,7 @@
-name: Measure complete NeverD with shared i386 VEX clear records on real PE and ELF across six architectures
+name: Verify two floating comparison identifier fixes through actual NeverD output and non-x86 product workloads
 on:
   push:
-    branches: [codex/neverd-i386-vzero-product]
+    branches: [codex/neverd-compare-ids-fork-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 5749e785cfa97fb7160224c96bad60f71ec28f4e
+          ref: c8f0563c28782607794c551737ce106fd25586d6
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vzero-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vcmp-actual-dev-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

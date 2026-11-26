@@ -48,11 +48,14 @@ try:
     cases.append(data)
     shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp')
     with (nd/'CMakeLists.txt').open('a') as f:f.write('\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
+    shutil.copyfile(r/'oracle.cpp',nd/'capstone-id-oracle.cpp')
+    with (nd/'CMakeLists.txt').open('a')as f:f.write('\nadd_executable(capstone-id-oracle capstone-id-oracle.cpp)\ntarget_link_libraries(capstone-id-oracle PRIVATE NeverDDecode)\n')
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
     from elftools.elf.elffile import ELFFile
     decoder=nd/'lib/decode/X86/X86Decoder.cpp'
+    proof={}
     for variant in ('base','layout','selector'):
         command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
         assert git(cs,'rev-parse','HEAD')==m['base']['commit']
@@ -61,11 +64,13 @@ try:
         entry='X86_disasmIterText'
         assert entry+'(Handle' in (nd/caller).read_text()
         actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
-        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+variant,nd)
+        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*(['capstone-id-oracle']if variant=='base'else[]),*targets,'--parallel','4'],'build-'+variant,nd)
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
+        if variant=='base':
+            original_oracle,=build.rglob('capstone-id-oracle');products['oracle']=t/'reference-product';shutil.copy2(original_oracle,products['oracle'])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
         hot=['cs_disasm_iter','cs_regs_access','cs_decode_full_insn','X86_scanNativeBatch','X86_disasmIterText','X86_getInstruction','X86_Vex','AArch64_getInstruction','ARM_getInstruction','Mips_getInstruction','PPC_getInstruction','RISCV_getInstruction','X86_tryATTOutput']
         positions={x.split()[-1]:int(x.split()[0],16) for x in names if len(x.split())==3 and x.split()[-1] in hot}
@@ -100,7 +105,7 @@ try:
         segment=list(map(int,sp.check_output([t/'segment'],text=True).split()));assert segment==[884736, 405504, 12422393723512408869]
         save('segment-'+variant,segment)
         command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'rotate.cpp',archive,'-o',t/'rotate'],'link-rotate-'+variant)
-        counts=list(map(int,sp.check_output([t/'rotate'],text=True).split()));assert counts==[10829824, 3719765, 7276063618347817852, 86824, 192]
+        counts=list(map(int,sp.check_output([t/'rotate'],text=True).split()));assert counts==([10829824, 3719765, 7276063618347817852, 86824, 192] if variant=='base' else [10829824, 3719765, 18263537639128292220, 86824, 0])
         save('rotate-'+variant,counts)
         command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'clear.cpp',archive,'-o',t/'clear'],'link-clear-'+variant)
         counts=list(map(int,sp.check_output([t/'clear'],text=True).split()));assert counts==[1769472, 223848, 4122166208100581125]
@@ -122,7 +127,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('X86VectorFallback64.c.o','X86Sse64Output.c.o','AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
+        for name in ('cs.c.o','X86InstPrinterCommon.c.o','X86VectorFallback64.c.o','X86Sse64Output.c.o','AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
@@ -131,12 +136,10 @@ try:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
             save('linked-sections-'+variant,layout)
         identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert m['oracle']==m['layout']
-    products['oracle']=products['layout'];identities['oracle']=identities['layout']
-    save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-layout.json').read_text()))
-    archive_count=len({v['archive'] for v in identities.values()})
-    image_count=len({v['binary'] for v in identities.values()})
-    assert 2<=image_count<=archive_count<=3
+    assert m['oracle']==m['base']
+    identities['oracle']=dict(identities['base'],binary=sha(products['oracle']),probe=sha(r/'oracle.cpp'))
+    save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-base.json').read_text()))
+    assert len({identities[k]['binary'] for k in ('base','layout','selector')})==3
     save('products',identities)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
@@ -161,14 +164,21 @@ try:
                 checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
 
         sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
-        return list(map(int,sp.check_output(['setarch',os.uname().machine,'-R',products['oracle'] if k=='oracle' else image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])],text=True).split()))
+        args=['setarch',os.uname().machine,'-R',products['oracle'] if k=='oracle' else image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])]
+        got=sp.run(args,capture_output=True,text=True,check=True)
+        if k=='oracle':
+            count=int(got.stderr.strip());assert count>=0 and count%reps==0
+            proof[case['name']+'/'+str(mode)]=dict(projected=count,reps=reps);save('alias-projections',proof)
+        return list(map(int,got.stdout.split()))
     rows=[];rng=random.Random(1739)
     for c in cases:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             single=execute('base',c,mode,1)
             n=max(1,round(25000/single[0]))
             expected=execute('base',c,mode,n)[1:];cycles=[]
-            corrected=execute('oracle',c,mode,n)[1:];assert corrected==expected,(c['name'],mode,corrected,expected)
+            corrected=execute('oracle',c,mode,n)[1:];assert corrected[:3]==expected[:3],(c['name'],mode,corrected,expected)
+            changed=proof[c['name']+'/'+str(mode)]['projected']
+            assert changed <= expected[3]-corrected[3] <= 32*changed,(c['name'],mode,changed,expected,corrected)
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             pairs=35 if c['selector']==4 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('putty-32-0.85',3),('arm-ls',1),('arm-ls',2),('arm64-ls',1),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):

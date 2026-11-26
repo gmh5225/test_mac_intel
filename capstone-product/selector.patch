@@ -1,139 +1,102 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..e7a19760 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -12,6 +12,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
-+#include "X86VectorClearOutput.h"
- #include "X86SimpleOutput.h"
- #include "X86VectorRegisterOutput.h"
- #define X86_VEX32_REGISTER_MOVES
-@@ -46,6 +47,10 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 			return true;
- 		break;
- 	case 0xc5:
-+		if (size >= 3 && code[2] == 0x77 &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		    writeVex2Clear(handle, code, size, insn, insn_size, false))
-+			return true;
- 		if (size >= 4 && (code[1] & 0xf8) == 0xf8 && code[3] >= 0xc0 &&
- 		    (code[2] == 0x6f || code[2] == 0x7f) &&
- 		    ((code[1] & 3) == 1 || (code[1] & 3) == 2) &&
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..925f8619 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -14,8 +14,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#define GET_INSTRINFO_ENUM
--#include "X86GenInstrInfo.inc"
-+#include "X86VectorClearOutput.h"
- #define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-@@ -98,32 +97,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
- 			      size_t size, cs_insn *insn, uint16_t *insn_size)
+diff --git a/cs.c b/cs.c
+index d0b8b045..03dc1c83 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1107,7 +1107,7 @@ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
  {
--	/* The bare vector clear instructions have no ModR/M or operands. */
--	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
--		const bool all = (code[1] & 4) != 0;
--		insn->size = *insn_size = 3;
--		memcpy(insn->bytes, code, 3);
--		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--		if (all)
--			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
--		else
--			memcpy(insn->mnemonic, "vzeroupper",
--			       sizeof("vzeroupper"));
--		memset(insn->op_str, 0, sizeof(insn->op_str));
--		if (insn->detail) {
--			cs_detail *detail = insn->detail;
--			memset(detail, 0,
--			       offsetof(cs_detail, x86) + sizeof(cs_x86));
--			detail->x86.addr_size = 8;
--			detail->x86.rex = 0x40;
--			memcpy(detail->x86.opcode, code, 2);
--			X86_get_insn_id(handle, insn,
--					all ? X86_VZEROALL : X86_VZEROUPPER);
--		} else {
--			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
--		}
-+	if (writeVex2Clear(handle, code, size, insn, insn_size, true))
+-	const bool batch = request == true;
++	(void)request;
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
  		return true;
--	}
- 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
- 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
- 		const uint8_t rex =
-diff --git a/arch/X86/X86VectorClearOutput.h b/arch/X86/X86VectorClearOutput.h
-new file mode 100644
-index 00000000..499e8bae
---- /dev/null
-+++ b/arch/X86/X86VectorClearOutput.h
-@@ -0,0 +1,44 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifndef CS_X86_VECTOR_CLEAR_OUTPUT_H
-+#define CS_X86_VECTOR_CLEAR_OUTPUT_H
-+
-+#include "X86OutputOptions.h"
-+#define GET_INSTRINFO_ENUM
-+#include "X86GenInstrInfo.inc"
-+
-+/* VZEROUPPER and VZEROALL have no ModR/M byte. The mapping table supplies
-+ * their implicit register writes for the selected execution mode. */
-+static inline bool writeVex2Clear(cs_struct *handle, const uint8_t *code,
-+                                  size_t size, cs_insn *insn,
-+                                  uint16_t *insn_size, bool wide)
+@@ -1237,7 +1237,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				  code, known_length);
+ 		}
+ 	}
+-	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
++	/* Both iterator and allocated VCMP records expose the mapped alias ID. */
++	if (handle->arch == CS_ARCH_X86 && insn->id != X86_INS_VCMP)
+ 		insn->id += mci.popcode_adjust;
+ 	return true;
+ }
+diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
+index dfa9b451..37732962 100644
+--- a/tests/unit/x86_evex_vpcmp_id.c
++++ b/tests/unit/x86_evex_vpcmp_id.c
+@@ -55,6 +55,50 @@ static bool test_vpcmp(csh handle, bool expect_detail)
+ 	return success;
+ }
+ 
++/* Both APIs keep the public VCMP alias while the immediate selects the
++ * condition in the instruction text and operand details. */
++static bool test_floating_compare(csh handle)
 +{
-+	if (size < 3 || code[2] != 0x77 || (code[1] & 0xfb) != 0xf8)
++	static const uint8_t bytes[][7] = {
++		{ 0xc5, 0xfb, 0xc2, 0xda, 0x06 },
++		{ 0x62, 0xf1, 0x4c, 0x0b, 0xc2, 0xd0, 0xa5 },
++	};
++	static const size_t sizes[] = { 5, 7 };
++	if (cs_support(CS_SUPPORT_X86_REDUCE))
++		return true;
++	cs_insn *slot = cs_malloc(handle);
++	if (!check(slot != NULL, "allocate compare iterator"))
 +		return false;
-+	const bool all = (code[1] & 4) != 0;
-+	insn->size = *insn_size = 3;
-+	memcpy(insn->bytes, code, 3);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	if (all)
-+		memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
-+	else
-+		memcpy(insn->mnemonic, "vzeroupper",
-+		       sizeof("vzeroupper"));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	if (insn->detail) {
-+		cs_detail *detail = insn->detail;
-+		memset(detail, 0,
-+		       offsetof(cs_detail, x86) + sizeof(cs_x86));
-+		detail->x86.addr_size = wide ? 8 : 4;
-+		detail->x86.rex = wide ? 0x40 : 0;
-+		memcpy(detail->x86.opcode, code, 2);
-+		X86_get_insn_id(handle, insn,
-+				all ? X86_VZEROALL : X86_VZEROUPPER);
-+	} else {
-+		insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
++	bool ok = true;
++	for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i) {
++		const uint8_t *cursor = bytes[i];
++		size_t left = sizes[i];
++		uint64_t address = 0x1000;
++		cs_insn *array = NULL;
++		size_t count = cs_disasm(handle, cursor, left, address, 1, &array);
++		bool decoded = cs_disasm_iter(handle, &cursor, &left,
++					      &address, slot);
++		ok &= check(count == 1 && decoded && left == 0 &&
++				    address == 0x1000 + sizes[i],
++			    "both floating compare decoders consume the instruction");
++		if (count && decoded) {
++			ok &= check(array[0].id == X86_INS_VCMP &&
++					    slot->id == array[0].id,
++				    "floating predicate keeps its public alias ID");
++			ok &= check(strcmp(slot->mnemonic, array[0].mnemonic) == 0 &&
++					    strcmp(slot->op_str, array[0].op_str) == 0,
++				    "floating predicate text agrees across APIs");
++			if (slot->detail && array[0].detail)
++				ok &= check(slot->detail->x86.avx_cc ==
++						    array[0].detail->x86.avx_cc,
++					    "floating predicate detail agrees across APIs");
++		}
++		cs_free(array, count);
 +	}
-+	return true;
++	cs_free(slot, 1);
++	return ok;
 +}
 +
-+#endif
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6543802b..2a1c680b 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1116,6 +1116,13 @@ static bool check_vex_register_immediates(csh handles[2], cs_mode mode)
- 
- static bool check_vex32_register_moves(csh handles[2])
+ int main(void)
  {
-+	/* The operand-free VEX2 forms end immediately after the opcode. */
-+	for (unsigned flags = 0; flags < 256; ++flags) {
-+		const uint8_t code[] = { 0xc5, (uint8_t)flags, 0x77 };
-+		for (size_t size = 1; size <= sizeof(code); ++size)
-+			if (!compare(handles, code, size, flags))
-+				return false;
-+	}
- 	for (unsigned flags = 0; flags < 256; ++flags)
- 		for (unsigned mr = 0xc0; mr <= 0xff; ++mr)
- 			for (unsigned op = 0x6f; op <= 0x7f; op += 0x10) {
+ 	csh handle = 0;
+@@ -64,6 +108,7 @@ int main(void)
+ 		   "open 64-bit mode"))
+ 		return 1;
+ 	success &= test_vpcmp(handle, false);
++	success &= test_floating_compare(handle);
+ 	if (!check(cs_option(handle, CS_OPT_DETAIL,
+ 			    CS_OPT_ON | CS_OPT_DETAIL_REAL) == CS_ERR_OK,
+ 		   "enable detail")) {
+@@ -71,6 +116,7 @@ int main(void)
+ 		return 1;
+ 	}
+ 	success &= test_vpcmp(handle, true);
++	success &= test_floating_compare(handle);
+ #ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_err err = cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	if (cs_support(CS_SUPPORT_DIET))
+@@ -78,6 +124,7 @@ int main(void)
+ 	else {
+ 		success &= check(err == CS_ERR_OK, "select AT&T syntax");
+ 		success &= test_vpcmp(handle, true);
++		success &= test_floating_compare(handle);
+ 	}
+ #endif
+ 	cs_close(&handle);
