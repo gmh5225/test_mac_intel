@@ -1,19 +1,79 @@
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index a60d3d24..efc85548 100644
+index a60d3d24..dc5f0331 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
-@@ -142,7 +142,13 @@ bool haveRequiredFeatures(const RISCV_SysReg *Reg, MCInst *MI)
+@@ -142,7 +142,12 @@ bool haveRequiredFeatures(const RISCV_SysReg *Reg, MCInst *MI)
  
  static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  {
--	RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Operand, OpNo);
 +#ifdef CAPSTONE_RISCV_ONLY
-+	const bool add_detail = detail_is_set(MI);
++	if (detail_is_set(MI))
++		RISCV_add_operand_detail(MI, OpNo);
 +#else
-+	const bool add_detail = true;
+ 	RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Operand, OpNo);
 +#endif
-+	if (add_detail)
-+		RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Operand, OpNo);
  
  	MCOperand *MO = MCInst_getOperand(MI, (OpNo));
+ 
+diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
+index 89cbda0c..0a848269 100644
+--- a/arch/RISCV/RISCVMapping.c
++++ b/arch/RISCV/RISCVMapping.c
+@@ -60,10 +60,17 @@ static const alias_trie_node riscv_alias_trie[] = {
+ };
+ #endif
+ 
++#ifdef CAPSTONE_RISCV_ONLY
++static inline void addOperandDetail(MCInst *MI, riscv_op_group opgroup,
++				    unsigned OpNum)
++#else
+ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
++#endif
+ {
++#ifndef CAPSTONE_RISCV_ONLY
+ 	if (!detail_is_set(MI))
+ 		return;
++#endif
+ 	// Rounding mode: store in detail, not as a regular operand.
+ 	if (opgroup == RISCV_OP_GROUP_FRMArg ||
+ 	    opgroup == RISCV_OP_GROUP_FRMArgLegacy) {
+@@ -197,6 +204,19 @@ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
+ 	RISCV_inc_op_count(MI);
+ }
+ 
++#ifdef CAPSTONE_RISCV_ONLY
++void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
++{
++	if (detail_is_set(MI))
++		addOperandDetail(MI, opgroup, OpNum);
++}
++
++void RISCV_add_operand_detail(MCInst *MI, unsigned OpNum)
++{
++	addOperandDetail(MI, RISCV_OP_GROUP_Operand, OpNum);
++}
++#endif
++
+ static inline void RISCV_add_adhoc_groups(MCInst *MI);
+ 
+ void RISCV_add_groups(MCInst *MI)
+diff --git a/arch/RISCV/RISCVMapping.h b/arch/RISCV/RISCVMapping.h
+index 2b77a303..1827282a 100644
+--- a/arch/RISCV/RISCVMapping.h
++++ b/arch/RISCV/RISCVMapping.h
+@@ -1,4 +1,3 @@
+-
+ #ifndef CS_RISCV_MAP_H
+ #define CS_RISCV_MAP_H
+ 
+@@ -24,6 +23,10 @@ const char *RISCV_group_name(csh handle, unsigned int id);
+ const char *RISCV_reg_name(csh handle, unsigned int reg);
+ 
+ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum);
++#ifdef CAPSTONE_RISCV_ONLY
++/* The ordinary operand printer has already checked that detail is enabled. */
++void RISCV_add_operand_detail(MCInst *MI, unsigned OpNum);
++#endif
+ 
+ void RISCV_add_groups(MCInst *MI);
  
