@@ -1,7 +1,7 @@
-name: Compare each KMOV candidate before and after the dedicated AArch64 publication
+name: Check the dedicated ARM change against all mixed objects and linked consumers on three x86 source revisions
 on:
   push:
-    branches: [codex/kmov-product-archive-equivalence]
+    branches: [codex/arm-ordinary-archive-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 477cdca0b80d3ababa2aa9c40375bad86914eaca
+          ref: ac371faa70cb84ddcea8a4a3a1a1f2ea0d141ac3
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: kmov-product-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm-operand-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

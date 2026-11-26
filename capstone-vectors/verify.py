@@ -15,7 +15,7 @@ def entries(blob):
  return sha(mutable),stamps
 try:
  pr=root/'project';s=pr/'third_party/capstone';s.parent.mkdir(parents=True);(pr/'cmake').mkdir();run('git','clone','-q','--shared','--no-checkout',cap,s);run('git','-C',s,'checkout','-q','--detach',t['parent'])
- assert get('git','-C',nd,'rev-parse',dev+':third_party/capstone')==t['commit'];cm=get('git','-C',nd,'show',dev+':CMakeLists.txt');cm=cm[cm.index('# --- Capstone (our fork'):cm.index('# --- NeverD CMake helpers')]
+ assert get('git','-C',nd,'rev-parse',dev+':third_party/capstone')==q['oldbase']['commit'];cm=get('git','-C',nd,'show',dev+':CMakeLists.txt');cm=cm[cm.index('# --- Capstone (our fork'):cm.index('# --- NeverD CMake helpers')]
  flag='cmake/NeverDCapstoneCompilerOptions.inc';(pr/flag).write_bytes(sp.check_output(['git','-C',nd,'show',dev+':'+flag]))
  driver=pr/'main.c';driver.write_text('''#include <capstone/capstone.h>
 #include <stdio.h>
@@ -42,17 +42,16 @@ int main(void){
  for name,wasm in [('six',False),('seven',True)]:
   (pr/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(MixedLink LANGUAGES C CXX)\n'+('set(CAPSTONE_WASM_SUPPORT ON CACHE BOOL "" FORCE)\n'if wasm else '')+cm+'\nadd_executable(consumer main.c)\ntarget_link_libraries(consumer PRIVATE capstone_static)\ntarget_include_directories(consumer PRIVATE third_party/capstone/include)\n')
   b=root/name;variants={};dates={}
-  combinations={'oldbase':(), 'capstone':('candidate',), 'oldboth':('both',), 'newboth':('candidate','both'), 'oldbatch':('batch',), 'newbatch':('candidate','batch')}
-  patch_sha={'candidate':t['sha256'],'both':q['oldboth']['sha256'],'batch':q['oldbatch']['sha256']}
-  for label,patches in combinations.items():
+  for label in ('oldbase','capstone','oldboth','newboth','oldbatch','newbatch'):
    run('git','-C',s,'restore','--source','HEAD','--staged','--worktree','--','.')
-   for kind in patches:
-    f=r/(kind+'.patch');assert file_sha(f)==patch_sha[kind];run('git','-C',s,'apply','--index',f)
+   if label!='oldbase':
+    f=r/(label+'.patch');assert file_sha(f)==q['patches'][label];run('git','-C',s,'apply','--index',f)
    assert get('git','-C',s,'write-tree')==q[label]['tree']
    if label=='oldbase':run('cmake','-G','Ninja','-S',pr,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON')
    run('cmake','--build',b,'--parallel','4','--target','consumer');lib,=b.rglob('libcapstone.a')
    commands=rd(b/'compile_commands.json');wcmd=[x['command']for x in commands if x['file'].endswith('/WASMInstPrinter.c')]
    acmd=[x['command']for x in commands if x['file'].endswith('/AArch64InstPrinter.c')];assert len(acmd)==1 and 'CAPSTONE_AARCH64_SKIP_UNUSED_OPERAND_DETAIL' not in acmd[0]
+   armcmd=[x['command']for x in commands if x['file'].endswith('/ARMInstPrinter.c')];assert len(armcmd)==1 and 'CAPSTONE_ARM_ONLY' not in armcmd[0]
    assert bool(wcmd)==wasm and all('CAPSTONE_WASM_LITERAL_MNEMONICS' not in x for x in wcmd)
    objects={str(f.relative_to(b)):file_sha(f)for f in b.rglob('*.c.o') if '/capstone' in str(f.relative_to(b))};assert len(objects)>=60 and any('WASMInstPrinter' in f for f in objects)==wasm
    buf=lib.read_bytes();normalized,dates[label]=entries(buf);exe=b/'consumer';runtime=get(exe)
