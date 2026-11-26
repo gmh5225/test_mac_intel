@@ -1,29 +1,29 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 06cc61ae..70aa559b 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -35,6 +35,12 @@ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *cod
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #define CAPSTONE_X86_PUBLIC_OUTPUT
++/* The standalone Linux Clang iterators can enter the fixed record writer
++ * directly. Keep the established entry for the other code generators. */
++#if defined(__linux__) && defined(__clang__) && \
++	(defined(__x86_64__) || defined(__aarch64__))
++#define CAPSTONE_X86_DIRECT_PUBLIC_RECORD
++#endif
+ /* Linux already selects the scalar writer in its full decode entry. */
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+ #include "../../cs_priv.h"
 diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
-index 732c4004..6fda6c90 100644
+index 732c4004..a03a42e9 100644
 --- a/arch/X86/X86PublicOutput.c
 +++ b/arch/X86/X86PublicOutput.c
-@@ -2,7 +2,6 @@
- /* SPDX-License-Identifier: BSD-3-Clause */
- 
- #include "../../cs_disasm_internal.h"
--#include "X86ScanAdapter.h"
- 
- #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
- #if defined(__ELF__) && defined(__clang__)
-@@ -13,16 +12,15 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+@@ -13,6 +13,18 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
  					    cs_insn *insn, uint16_t *length,
  					    bool batch)
  {
--	/* The caller owns skipdata callbacks, bulk boundaries and the public
--	 * cursors. A fixed iterator can fill this one record using local cursors. */
--	if (!batch && !handle->skipdata && !handle->no_text &&
--	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
--		uint64_t address = insn->address;
--		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
--					     &size, &address, insn);
--		if (ok)
--			*length = insn->size;
--		return ok;
++#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
 +	/* The outer iterator owns detail visibility, skipdata and cursor updates.
 +	 * Its fixed text path only needs the decoded record and its length. */
 +	if (!batch && !handle->skipdata && !handle->no_text) {
@@ -33,11 +33,21 @@ index 732c4004..6fda6c90 100644
 +		if (handle->mode == CS_MODE_64)
 +			return X86_decodeFixedRecord64(handle, code, size, insn,
 +						       length);
++	}
++#else
+ 	/* The caller owns skipdata callbacks, bulk boundaries and the public
+ 	 * cursors. A fixed iterator can fill this one record using local cursors. */
+ 	if (!batch && !handle->skipdata && !handle->no_text &&
+@@ -24,6 +36,7 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+ 			*length = insn->size;
+ 		return ok;
  	}
++#endif
  	return cs_decode_full_insn(handle, code, size, insn, length, batch);
  }
+ #endif
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..24e32cce 100644
+index 7afca7e4..324fc05d 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
 @@ -261,7 +261,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
@@ -45,12 +55,12 @@ index 7afca7e4..24e32cce 100644
  #undef CS_DECODE_OUTPUT_MISS
  
 -#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_PUBLIC_OUTPUT)
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
  bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
  			     cs_insn *insn, uint16_t *length)
  {
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 7bbf1c0d..dc2531df 100644
+index 7bbf1c0d..d6f533e0 100644
 --- a/arch/X86/X86Vex32Output.c
 +++ b/arch/X86/X86Vex32Output.c
 @@ -202,7 +202,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
@@ -58,12 +68,12 @@ index 7bbf1c0d..dc2531df 100644
  #undef CS_DECODE_OUTPUT_MISS
  
 -#ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_PUBLIC_OUTPUT)
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
  bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
  			     cs_insn *insn, uint16_t *length)
  {
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 4c4c34f2..dedfb15f 100644
+index 4c4c34f2..08677417 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -28,12 +28,14 @@ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
@@ -73,7 +83,7 @@ index 4c4c34f2..dedfb15f 100644
 +#else
 +typedef bool cs_record_request;
 +#endif
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_PUBLIC_OUTPUT)
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
  CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
  		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
  CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,

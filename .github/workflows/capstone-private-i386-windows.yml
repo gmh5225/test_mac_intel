@@ -1,7 +1,7 @@
-name: Measure standalone public records on verified PE and ELF bytes in eight native profiles
+name: Compare shipping objects and real linked programs with their verified native implementations
 on:
   push:
-    branches: [codex/standalone-record-frozen-platforms]
+    branches: [codex/standalone-record-verified-libraries]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,22 +11,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, arch: arm64, profile: full, replica: 1 }
-          - { host: macos-15, arch: arm64, profile: full, replica: 2 }
-          - { host: macos-15-intel, arch: x86_64, profile: full, replica: 1 }
-          - { host: macos-15-intel, arch: x86_64, profile: full, replica: 2 }
-          - { host: windows-2022, arch: amd64, profile: full, replica: 1 }
-          - { host: windows-2022, arch: amd64, profile: full, replica: 2 }
-          - { host: windows-2022, arch: amd64_x86, profile: full, replica: 1 }
-          - { host: windows-2022, arch: amd64_x86, profile: full, replica: 2 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: gcc, replica: 1 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: gcc, replica: 2 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 2 }
           - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 1 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 2 }
           - { host: ubuntu-24.04-arm, arch: arm64, profile: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang, replica: 2 }
+          - { host: ubuntu-22.04, arch: x86_64, profile: clang14, replica: 1 }
+          - { host: ubuntu-24.04, arch: x86_64, profile: gcc, replica: 1 }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 1 }
+          - { host: macos-15, arch: arm64, profile: full, replica: 1 }
+          - { host: macos-15-intel, arch: x86_64, profile: full, replica: 1 }
+          - { host: windows-2022, arch: amd64, profile: full, replica: 1 }
+          - { host: windows-2022, arch: amd64_x86, profile: full, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
@@ -51,6 +44,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: frozen-native-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: qualified-record-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
