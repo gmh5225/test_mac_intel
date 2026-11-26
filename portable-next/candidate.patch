@@ -1,19 +1,175 @@
 diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index a60d3d24..efc85548 100644
+index a60d3d24..dc5f0331 100644
 --- a/arch/RISCV/RISCVInstPrinter.c
 +++ b/arch/RISCV/RISCVInstPrinter.c
-@@ -142,7 +142,13 @@ bool haveRequiredFeatures(const RISCV_SysReg *Reg, MCInst *MI)
+@@ -142,7 +142,12 @@ bool haveRequiredFeatures(const RISCV_SysReg *Reg, MCInst *MI)
  
  static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  {
--	RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Operand, OpNo);
 +#ifdef CAPSTONE_RISCV_ONLY
-+	const bool add_detail = detail_is_set(MI);
++	if (detail_is_set(MI))
++		RISCV_add_operand_detail(MI, OpNo);
 +#else
-+	const bool add_detail = true;
+ 	RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Operand, OpNo);
 +#endif
-+	if (add_detail)
-+		RISCV_add_cs_detail_0(MI, RISCV_OP_GROUP_Operand, OpNo);
  
  	MCOperand *MO = MCInst_getOperand(MI, (OpNo));
+ 
+diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
+index 89cbda0c..df1b1776 100644
+--- a/arch/RISCV/RISCVMapping.c
++++ b/arch/RISCV/RISCVMapping.c
+@@ -60,6 +60,74 @@ static const alias_trie_node riscv_alias_trie[] = {
+ };
+ #endif
+ 
++static inline void addMappedOperand(MCInst *MI, riscv_op_group opgroup,
++				    unsigned OpNum)
++{
++	cs_riscv_op *op = RISCV_get_detail_op_at(MI, OpNum);
++#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
++	/* Type and access come from one generated operand. Only a tied
++	 * operand can change the access recorded in that entry. */
++	const mapping_op *mapped = map_indexed_operand(MI, OpNum);
++	const cs_op_type type = (cs_op_type)mapped->type;
++	op->type = (riscv_op_type)type;
++	op->access = MI->tied_op_idx_size ? map_get_op_access(MI, OpNum) :
++					    (cs_ac_type)mapped->access;
++#else
++	const cs_op_type type = map_get_op_type(MI, OpNum);
++	op->type = (riscv_op_type)type;
++	op->access = (cs_ac_type)map_get_op_access(MI, OpNum);
++#endif
++	switch (type) {
++	case CS_OP_REG:
++		op->reg = MCInst_getOperand(MI, OpNum)->RegVal;
++		break;
++	case CS_OP_MEM:
++		op->mem.base = 0;
++		op->mem.disp = MCInst_getOperand(MI, OpNum)->ImmVal;
++		break;
++	case CS_OP_IMM: {
++		uint64_t val = MCInst_getOperand(MI, OpNum)->ImmVal;
++		if (opgroup != RISCV_OP_GROUP_CSRSystemRegister) {
++			op->imm = val;
++			if (opgroup == RISCV_OP_GROUP_BranchOperand) {
++				op->imm += MI->address;
++			}
++		} else /* system register read-write */ {
++			op->type = RISCV_OP_CSR;
++			op->csr = val;
++			// CSR instruction always read-writes the system operand
++			op->access = CS_AC_READ_WRITE;
++		}
++		break;
++	}
++	case CS_OP_MEM_REG:
++		op->type = (riscv_op_type)CS_OP_MEM;
++		op->mem.base = MCInst_getOperand(MI, OpNum)->RegVal;
++		break;
++	case CS_OP_MEM_IMM:
++		// fill in the disp in the last operand
++		op = RISCV_get_detail_op_at(MI, OpNum - 1);
++		op->type = (riscv_op_type)CS_OP_MEM;
++		op->mem.disp = MCInst_getOperand(MI, OpNum)->ImmVal;
++		RISCV_dec_op_count(
++			MI); // don't increase the count, cancel the coming increment
++		break;
++	case CS_OP_INVALID:
++		break;
++	default: {
++		CS_ASSERT(0 && "unhandled operand type");
++	}
++	}
++	RISCV_inc_op_count(MI);
++}
++
++#ifdef CAPSTONE_RISCV_ONLY
++void RISCV_add_operand_detail(MCInst *MI, unsigned OpNum)
++{
++	addMappedOperand(MI, RISCV_OP_GROUP_Operand, OpNum);
++}
++#endif
++
+ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
+ {
+ 	if (!detail_is_set(MI))
+@@ -139,62 +207,7 @@ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
+ 		RISCV_inc_op_count(MI);
+ 		return;
+ 	}
+-	cs_riscv_op *op = RISCV_get_detail_op_at(MI, OpNum);
+-#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET)
+-	/* Type and access come from one generated operand. Only a tied
+-	 * operand can change the access recorded in that entry. */
+-	const mapping_op *mapped = map_indexed_operand(MI, OpNum);
+-	const cs_op_type type = (cs_op_type)mapped->type;
+-	op->type = (riscv_op_type)type;
+-	op->access = MI->tied_op_idx_size ? map_get_op_access(MI, OpNum) :
+-					    (cs_ac_type)mapped->access;
+-#else
+-	const cs_op_type type = map_get_op_type(MI, OpNum);
+-	op->type = (riscv_op_type)type;
+-	op->access = (cs_ac_type)map_get_op_access(MI, OpNum);
+-#endif
+-	switch (type) {
+-	case CS_OP_REG:
+-		op->reg = MCInst_getOperand(MI, OpNum)->RegVal;
+-		break;
+-	case CS_OP_MEM:
+-		op->mem.base = 0;
+-		op->mem.disp = MCInst_getOperand(MI, OpNum)->ImmVal;
+-		break;
+-	case CS_OP_IMM: {
+-		uint64_t val = MCInst_getOperand(MI, OpNum)->ImmVal;
+-		if (opgroup != RISCV_OP_GROUP_CSRSystemRegister) {
+-			op->imm = val;
+-			if (opgroup == RISCV_OP_GROUP_BranchOperand) {
+-				op->imm += MI->address;
+-			}
+-		} else /* system register read-write */ {
+-			op->type = RISCV_OP_CSR;
+-			op->csr = val;
+-			// CSR instruction always read-writes the system operand
+-			op->access = CS_AC_READ_WRITE;
+-		}
+-		break;
+-	}
+-	case CS_OP_MEM_REG:
+-		op->type = (riscv_op_type)CS_OP_MEM;
+-		op->mem.base = MCInst_getOperand(MI, OpNum)->RegVal;
+-		break;
+-	case CS_OP_MEM_IMM:
+-		// fill in the disp in the last operand
+-		op = RISCV_get_detail_op_at(MI, OpNum - 1);
+-		op->type = (riscv_op_type)CS_OP_MEM;
+-		op->mem.disp = MCInst_getOperand(MI, OpNum)->ImmVal;
+-		RISCV_dec_op_count(
+-			MI); // don't increase the count, cancel the coming increment
+-		break;
+-	case CS_OP_INVALID:
+-		break;
+-	default: {
+-		CS_ASSERT(0 && "unhandled operand type");
+-	}
+-	}
+-	RISCV_inc_op_count(MI);
++	addMappedOperand(MI, opgroup, OpNum);
+ }
+ 
+ static inline void RISCV_add_adhoc_groups(MCInst *MI);
+diff --git a/arch/RISCV/RISCVMapping.h b/arch/RISCV/RISCVMapping.h
+index 2b77a303..208ac595 100644
+--- a/arch/RISCV/RISCVMapping.h
++++ b/arch/RISCV/RISCVMapping.h
+@@ -24,6 +24,10 @@ const char *RISCV_group_name(csh handle, unsigned int id);
+ const char *RISCV_reg_name(csh handle, unsigned int reg);
+ 
+ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum);
++#ifdef CAPSTONE_RISCV_ONLY
++/* The ordinary operand printer has already checked that detail is enabled. */
++void RISCV_add_operand_detail(MCInst *MI, unsigned OpNum);
++#endif
+ 
+ void RISCV_add_groups(MCInst *MI);
  

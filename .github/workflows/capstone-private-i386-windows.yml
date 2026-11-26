@@ -1,7 +1,7 @@
-name: Compare ordinary RISC-V operand callbacks on four complete RV64GC code sections
+name: Measure single-check RISC-V operand detail against full and DIET controls
 on:
   push:
-    branches: [codex/rv-ordinary-text-detail-lookup]
+    branches: [codex/rv-ordinary-mapped-detail]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-ordinary-operands-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: rv-mapped-detail-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7
