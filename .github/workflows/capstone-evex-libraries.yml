@@ -1,7 +1,7 @@
-name: Verify the changed WASM library and unit test objects before timing three real programs
+name: Measure WASM mnemonic copies using the decoded name length in SQL Brotli and esbuild
 on:
   push:
-    branches: [codex/wasm-wide-text-and-test]
+    branches: [codex/wasm-size-with-mnemonic]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 68be0029b78515fd57eb2ca01540e109037f7760
+          ref: 7161cb4d72aad82f89161629790fbe10b7b90d55
           path: source
           persist-credentials: false
       - name: Verify formatter hooks and time real WASM operators
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-wide-program-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-literal-length-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
