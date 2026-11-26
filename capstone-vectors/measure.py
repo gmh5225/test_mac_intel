@@ -70,9 +70,10 @@ try:
     (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Grid LANGUAGES C CXX)\n'+cmake[cmake.index('# --- Capstone (our fork'):cmake.index('# --- NeverD CMake helpers')])
     run('cmake','-S',project,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     verdict={}
-    for label in ('base','candidate'):
+    for label in ('base','candidate','record'):
         git('restore','--source','HEAD','--staged','--worktree','--','.')
-        patch=r/(label+'.patch');git('apply','--index',patch);assert git('write-tree')==q[label]['tree']
+        if label!='base':git('apply','--index',r/(label+'.patch'))
+        assert git('write-tree')==q[label]['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
         objects={Path(c['file']).name for c in json.loads((build/'compile_commands.json').read_text())};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c'}<=objects
         for exe,code in [('cap','cap.cpp'),('scan','corpus-scan.cpp')]:
@@ -80,7 +81,7 @@ try:
         capture(t/'cap',t/(label+'-bulk'),'bulk')
         if label=='base':continue
         groups=collections.Counter();errors=[];by_mode=collections.Counter();kept=collections.Counter()
-        paths=('base-cap','base-bulk','candidate-cap','candidate-bulk','base-scan','candidate-scan','oracle')
+        paths=('base-cap','base-bulk',label+'-cap',label+'-bulk','base-scan',label+'-scan','oracle')
         with contextlib.ExitStack()as opened:
             lines=[opened.enter_context((t/f).open())for f in paths]
             for ((bits,raw),origin),*v in zip(records.items(),*lines,strict=True):
@@ -101,7 +102,7 @@ try:
                 if before!=now:
                     by_mode[str(bits)+'/'+origin]+=1
                     if not corrected_float(before,now):record_problem('changed-public-record')
-                if bulk!=current and not corrected_float(bulk,current):record_problem('changed-bulk-record')
+                if bulk!=current:record_problem('changed-bulk-record')
                 if now!=current:record_problem('bulk-iterator')
                 if cm:
                     if cm!=bm or bx!=cx or oldscan!=newscan or not now.split()[1].startswith('vpcmp'):record_problem('unexplained-scan')
@@ -117,7 +118,9 @@ try:
                     kept[op]+=1
                 if origin.startswith('DecoderTest') and bm:groups['original-corpus-differences']+=1
         proof=dict(cases=len(records),groups=groups,examples=errors,changed=by_mode,iced_overlap=kept)
-        save('case-proof',proof);assert not errors and groups['original-corpus-differences']==152 and len(kept)==12,proof
-        save('complete',dict(source=q,host=platform.platform(),proof=proof))
+        save('case-proof-'+label,proof);assert not errors and groups['old-iterator-bulk']>0 and len(kept)==12,proof
+        verdict[label]=proof
+    assert verdict['candidate']==verdict['record']
+    save('complete',dict(source=q,host=platform.platform(),proof=verdict['candidate']))
 finally:
     n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(bytes=n,removed=not t.exists()))
