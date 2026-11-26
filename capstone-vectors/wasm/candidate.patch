@@ -1,18 +1,38 @@
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index d7db69c3..692d84e1 100644
+index d7db69c3..b34b6e7c 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -101,7 +101,12 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+@@ -39,6 +39,24 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
+ }
+ #endif
+ 
++static void printTableAddress(SStream *out, uint64_t address)
++{
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	if (cs_vsnprintf == cs_default_vsnprintf &&
++	    out->index < SSTREAM_BUF_LEN - 1) {
++		SStream_concat_hex64(out, address, false);
++		return;
++	}
++#endif
++	/* Custom formatters can observe the format string for a 32-bit address. */
++	if (address <= UINT32_MAX)
++		SStream_concat(out, "0x%x", (unsigned)address);
++	else
++		SStream_concat(out, "0x%" PRIx64, address);
++}
++
+ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ {
+ #ifdef WASM_LITERAL_NAMES
+@@ -101,7 +119,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  
  	case WASM_OP_BRTABLE:
  		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
 -		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
-+		if (MI->wasm_data.brtable.address <= UINT32_MAX)
-+			SStream_concat(O, "0x%x",
-+				       (unsigned)MI->wasm_data.brtable.address);
-+		else
-+			SStream_concat(O, "0x%" PRIx64,
-+				       MI->wasm_data.brtable.address);
++		printTableAddress(O, MI->wasm_data.brtable.address);
  		SStream_concat(O, "], 0x%x",
  			       MI->wasm_data.brtable.default_target);
  
