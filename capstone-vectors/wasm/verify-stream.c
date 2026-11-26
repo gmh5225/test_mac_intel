@@ -33,6 +33,7 @@ int main(void)
 		for (unsigned t=0; t<sizeof(types)/sizeof(*types); ++t) {
 			memset(&mi.wasm_data, 0xb7, sizeof(mi.wasm_data));
 			mi.wasm_data.type=types[t];
+			if (types[t]==WASM_OP_BRTABLE) mi.wasm_data.brtable.address=UINT32_C(0xfedcba98);
 			for (unsigned k=0; k<sizeof(indices)/sizeof(*indices); ++k)
 				for (unsigned flags=0; flags<16; ++flags)
 					for (behavior=0; behavior<4; ++behavior) {

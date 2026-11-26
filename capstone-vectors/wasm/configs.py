@@ -14,7 +14,10 @@ with tempfile.TemporaryDirectory(dir=root)as t:
             sp.run(['cmake','--build',b,'--target','capstone_static','--parallel','3'],check=True)
             obj,=b.rglob('WASMInstPrinter.c.o');lib,=b.rglob('libcapstone.a')
             rows[profile][label]={'object':hashlib.sha256(obj.read_bytes()).hexdigest(),'archive':hashlib.sha256(lib.read_bytes()).hexdigest()}
-        assert rows[profile]['base']['object']==rows[profile]['candidate']['object'],rows[profile]
+            exe=w/'records';sp.run([os.environ['CC'],'-O2','-std=c11','-I'+str(src/'include'),r/'wide.c',lib,'-o',exe],check=True)
+            counts=list(map(int,sp.check_output([exe],text=True).split()))
+            assert counts[0]==704 and counts[1]==0 and (counts[2]>0)==(label=='base' and profile=='external'),counts
+            rows[profile][label]['records']=counts
     disk=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink())
 assert not w.exists()
 (e/'configurations.json').write_text(json.dumps(dict(complete=True,variants=rows,cleanup=dict(bytes=disk,removed=True)),indent=2)+'\n')

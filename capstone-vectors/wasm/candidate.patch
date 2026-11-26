@@ -1,55 +1,71 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 6050d7c2..5a8f1bff 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -213,6 +213,10 @@ if(capstone_enabled_architectures STREQUAL "RISCV")
-     endif()
- endif()
- 
-+if(capstone_enabled_architectures STREQUAL "WASM")
-+    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS)
-+endif()
-+
- if(capstone_enabled_architectures STREQUAL "SPARC")
-     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
- endif()
-diff --git a/Makefile b/Makefile
-index 06b05013..95e046b2 100644
---- a/Makefile
-+++ b/Makefile
-@@ -167,6 +167,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
- CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_ONLY
- endif
- 
-+ifeq ($(sort $(CAPSTONE_ARCHS)),wasm)
-+CFLAGS += -DCAPSTONE_WASM_LITERAL_MNEMONICS
-+endif
-+
- ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
- CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
- endif
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index 513b52b6..3c8c4e7e 100644
+index 3c8c4e7e..f7e3a2c0 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -6,7 +6,20 @@
+@@ -30,7 +30,11 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ 		break;
  
- void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ 	case WASM_OP_VARUINT64:
+-		SStream_concat(O, "\t0x%lx", MI->wasm_data.varuint64);
++		/* Keep the existing formatter argument when unsigned long fits. */
++		if ((unsigned long)MI->wasm_data.varuint64 == MI->wasm_data.varuint64)
++			SStream_concat(O, "\t0x%lx", (unsigned long)MI->wasm_data.varuint64);
++		else
++			SStream_concat(O, "\t0x%" PRIx64, MI->wasm_data.varuint64);
+ 		break;
+ 
+ 	case WASM_OP_UINT32:
+@@ -52,7 +56,10 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ 
+ 	case WASM_OP_BRTABLE:
+ 		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
+-		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
++		if (MI->wasm_data.brtable.address <= UINT32_MAX)
++			SStream_concat(O, "0x%x", (unsigned)MI->wasm_data.brtable.address);
++		else
++			SStream_concat(O, "0x%" PRIx64, MI->wasm_data.brtable.address);
+ 		SStream_concat(O, "], 0x%x",
+ 			       MI->wasm_data.brtable.default_target);
+ 
+diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
+index 21802ef7..86f94701 100644
+--- a/tests/unit/wasm_brtable_size.c
++++ b/tests/unit/wasm_brtable_size.c
+@@ -102,6 +102,28 @@ static int check_copy_sizes(csh handle)
+ 	return 0;
+ }
+ 
++static int check_wide_operands(csh handle)
++{
++	const uint8_t code[] = { 0x42, 0x81, 0x80, 0x80, 0x80, 0x10,
++				 0x0e, 0x02, 0x00, 0x01, 0x02 };
++	const uint64_t address = UINT64_C(0x12345678abcdef00);
++	cs_insn *insn = NULL;
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
++		return 1;
++	size_t count = cs_disasm(handle, code, sizeof(code), address, 0, &insn);
++	bool ok = count == 2 && insn[0].id == WASM_INS_I64_CONST &&
++		  insn[0].detail->wasm.operands[0].varuint64 == UINT64_C(0x100000001) &&
++		  insn[1].id == WASM_INS_BR_TABLE &&
++		  insn[1].detail->wasm.operands[0].brtable.address == address + 8;
++	if (ok && !cs_support(CS_SUPPORT_DIET))
++		ok = strcmp(insn[0].op_str, "0x100000001") == 0 &&
++		     strcmp(insn[1].op_str, "0x2, [0x12345678abcdef08], 0x2") == 0;
++	cs_free(insn, count);
++	if (!ok)
++		fprintf(stderr, "WASM wide operand text or detail mismatch\n");
++	return !ok;
++}
++
+ int main(void)
  {
-+#if defined(CAPSTONE_WASM_LITERAL_MNEMONICS) && \
-+	!defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+	const char *name = WASM_insn_name((csh)MI->csh, MI->Opcode);
-+	/* Mnemonics contain no format conversions. A custom formatter still
-+	 * receives the original mnemonic as its format string. */
-+	if (cs_vsnprintf == cs_default_vsnprintf && O->index < SSTREAM_BUF_LEN - 1)
-+		SStream_concat0(O, name);
-+	else
-+		SStream_concat(O, name);
-+#else
- 	SStream_concat(O, WASM_insn_name((csh)MI->csh, MI->Opcode));
-+#endif
+ 	csh h;
+@@ -109,7 +131,7 @@ int main(void)
+ 		return 1;
  
- 	switch (MI->wasm_data.type) {
- 	default:
+ 	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
+-	    run_count_case(h, 65531, 5)) {
++	    run_count_case(h, 65531, 5) || check_wide_operands(h)) {
+ 		cs_close(&h);
+ 		return 1;
+ 	}

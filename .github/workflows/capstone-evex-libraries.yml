@@ -1,7 +1,7 @@
-name: Qualify dedicated WASM text and detail on real modules with unchanged mixed x86 and RISC binaries
+name: Time corrected wide WASM operand printing on independently delimited SQL Brotli and esbuild code
 on:
   push:
-    branches: [codex/wasm-dedicated-literal-mnemonics]
+    branches: [codex/wasm-wide-text-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
+          ref: 68be0029b78515fd57eb2ca01540e109037f7760
           path: source
           persist-credentials: false
       - name: Verify formatter hooks and time real WASM operators
@@ -37,14 +37,12 @@ jobs:
           CXX: ${{ matrix.cxx }}
         run: |
           python3 -B capstone-vectors/wasm/configs.py
-          python3 -B capstone-vectors/wasm/mixed.py
-          python3 -B capstone-vectors/wasm/check_make.py
           python3 -B capstone-vectors/wasm/run.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-dedicated-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-wide-real-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
