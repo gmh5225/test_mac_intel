@@ -102,6 +102,9 @@ try:
         command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'rotate.cpp',archive,'-o',t/'rotate'],'link-rotate-'+variant)
         counts=list(map(int,sp.check_output([t/'rotate'],text=True).split()));assert counts==[10829824, 3719765, 7276063618347817852, 86824, 192]
         save('rotate-'+variant,counts)
+        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'clear.cpp',archive,'-o',t/'clear'],'link-clear-'+variant)
+        counts=list(map(int,sp.check_output([t/'clear'],text=True).split()));assert counts==[1769472, 223848, 4122166208100581125]
+        save('clear-'+variant,counts)
         test=out/('tests-'+variant+'.log')
         assert '100% tests passed' in test.read_text()
         if variant=='base':

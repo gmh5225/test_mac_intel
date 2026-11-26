@@ -1,7 +1,7 @@
-name: Measure descriptor-based RORX scans in actual NeverD and audit real PE and ELF on three hosts
+name: Measure complete NeverD with shared i386 VEX clear records on real PE and ELF across six architectures
 on:
   push:
-    branches: [codex/neverd-three-operand-vex-product]
+    branches: [codex/neverd-i386-vzero-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4679b157eb1b7a62c606771f894d9d52c97ba316
+          ref: 5749e785cfa97fb7160224c96bad60f71ec28f4e
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-operand-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vzero-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
