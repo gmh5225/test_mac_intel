@@ -26,7 +26,9 @@ try:
     for k,z in q.items():
         git('restore','--source=HEAD','--staged','--worktree','--','.')
         if k!='base':
-            patch=p/(k+'.patch');assert hashlib.sha256(patch.read_bytes()).hexdigest()==z['combined_sha256'];git('apply','--index',patch)
+            patch=t/(k+'.patch')
+            patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/'+k+'.patch']))
+            assert hashlib.sha256(patch.read_bytes()).hexdigest()==z['combined_sha256'];git('apply','--index',patch)
         assert git('write-tree')==z['tree']
         run(k+'-configure','cmake','-G','Ninja','-S',pr,'-B',b,*flags)
         run(k+'-build','cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*names)

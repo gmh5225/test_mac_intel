@@ -1,7 +1,7 @@
-name: Check ARM and Thumb operand callbacks and records on the staged release trees
+name: Verify ARM operands with canonical Git patch bytes on macOS and Windows
 on:
   push:
-    branches: [codex/arm-operand-records-after-kmov]
+    branches: [codex/arm-operand-configs-canonical-patches]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: arm-ordinary-configs-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: arm-canonical-configs-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
