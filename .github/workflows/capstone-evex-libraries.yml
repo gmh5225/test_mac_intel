@@ -1,7 +1,7 @@
-name: Compare i386 segment memory text and register details on real PuTTY OpenSSL and vector functions
+name: Test and time native accumulator offset records with and without a segment prefix on real i386 code
 on:
   push:
-    branches: [codex/i386-segment-operand-records]
+    branches: [codex/i386-absolute-segment-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-segment-fields-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-absolute-fields-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

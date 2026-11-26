@@ -64,6 +64,9 @@ try:
         check=list(map(int,get(w/'check-segment').split()))
         assert check[0]==884736 and 0<check[1]<check[0]
         save('segment-'+label,check)
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'absolute.cpp',lib,'-o',w/'check-absolute')
+        absolute=list(map(int,get(w/'check-absolute').split()));assert absolute==[1343232, 354816, 1256089549016166693]
+        save('absolute-'+label,absolute)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
