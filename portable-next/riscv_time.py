@@ -34,7 +34,7 @@ def measure(rows, w, save):
         for mode in range(6):
             n=max(1,math.ceil(25e6/run('base',row,mode,1)[0]))
             expected=run('base',row,mode,n)[2:]
-            assert expected[0]>0
+            assert expected[:2]==[{'ls': 24982, 'cat': 5992, 'sort': 18335, 'cp': 23108}[row['name']]*n,0],(row['name'],expected,n)
             cycles=[];labels=list(images);rng=random.Random(row['name']+'/'+str(mode))
             for _ in range(17):
                 rng.shuffle(labels);pairs={k:[]for k in labels}

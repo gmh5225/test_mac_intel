@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
   else if (target == "arm") { arch = CS_ARCH_ARM; mode = CS_MODE_ARM; }
   else if (target == "mips64el") { arch = CS_ARCH_MIPS; mode = CS_MODE_MIPS64R2; }
   else if (target == "ppc64el") { arch = CS_ARCH_PPC; mode = CS_MODE_64; }
-  else if (target == "riscv64") { arch = CS_ARCH_RISCV; mode = cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_A); }
+  else if (target == "riscv64") { arch = CS_ARCH_RISCV; mode = cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_A | CS_MODE_RISCV_FD); }
   else return 2;
 
   std::ifstream input(argv[2], std::ios::binary);

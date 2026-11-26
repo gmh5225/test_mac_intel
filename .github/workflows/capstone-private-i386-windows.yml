@@ -1,7 +1,7 @@
-name: Measure shared RISC-V operand metadata lookup and check mixed and dedicated binaries
+name: Compare ordinary RISC-V operand callbacks on four complete RV64GC code sections
 on:
   push:
-    branches: [codex/riscv-operand-map-access]
+    branches: [codex/rv-ordinary-text-detail-lookup]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 236614a333d4bf55faca1960814bb6fbc821a86a
+          ref: 96d63971a2801bb17b4ade6a9697c19722e0438d
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -46,7 +46,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.profile == 'full'
         with:
           repository: NeverSight/NeverD
-          ref: cf7070f32ef716648478d178390c742cbaec5b21
+          ref: 276a657138f58b0ef97a876288347aaacfde0e74
           path: neverd-config
           sparse-checkout: |
             cmake
@@ -60,6 +60,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: riscv-shared-operand-field-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
+          name: rv-ordinary-operands-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}
           path: evidence
           retention-days: 7
