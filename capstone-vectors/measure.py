@@ -40,6 +40,30 @@ try:
         syms=get('nm','-D','--defined-only','--format=posix',dll).splitlines()
         symbols[stage]=sorted(row.split()[0] for row in syms)
         objects[stage]={str(f.relative_to(build)):sha(f) for f in build.rglob('*.c.o')}
+        public,=build.rglob('X86DisassemblerDecoder.c.o')
+        if stage=='base':
+            original_public=public.read_bytes()
+        else:
+            full_public=public.read_bytes()
+            assert full_public!=original_public
+            changed=[k for k,v in objects['base'].items()if objects['candidate'][k]!=v]
+            assert changed==[str(public.relative_to(build))],changed
+            from elftools.elf.elffile import ELFFile
+            import io
+            def section_digests(image):
+                return {sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in ELFFile(io.BytesIO(image)).iter_sections() if sec['sh_flags']&4}
+            base_text=section_digests(original_public);candidate_text=section_digests(full_public)
+            save('public-text',dict(original=base_text,candidate=candidate_text,same=base_text==candidate_text,original_object=hashlib.sha256(original_public).hexdigest(),candidate_object=sha(public)))
+            for which,blob in [('linked',original_public),('restore',full_public)]:
+                public.write_bytes(blob);so.unlink()
+                run('cmake','--build',build,'--target','capstone_shared','--parallel','4')
+                assert public.read_bytes()==blob
+                if which=='restore':assert so.read_bytes()==images['candidate']
+                else:
+                    link_image=w/'linked.so';shutil.copyfile(so,link_image)
+                    images['linked']=link_image.read_bytes();sources['linked']=sha(link_image);sizes['linked']=len(images['linked'])
+                    syms=get('nm','-D','--defined-only','--format=posix',link_image).splitlines()
+                    assert sorted(row.split()[0]for row in syms)==symbols['base']
         run('cmake','-G','Ninja','-S',project,'-B',static_build,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
         run('cmake','--build',static_build,'--target','capstone_static','--parallel','4')
         static_lib,=static_build.rglob('libcapstone.a')
@@ -61,7 +85,7 @@ try:
     images['copy']=images['base'];image=selected/soname;image.write_bytes(images['base']);inode=image.stat().st_ino
     spans=[]
     for i in range(0,maximum,4096):
-        if images['base'][i:i+4096]!=images['candidate'][i:i+4096]:
+        if len({img[i:i+4096]for img in images.values()})>1:
             if spans and spans[-1][1]==i:spans[-1][1]=min(i+4096,maximum)
             else:spans.append([i,min(i+4096,maximum)])
     previous=None;verified={}
@@ -112,7 +136,7 @@ try:
     save('host',host);records={};timings={}
     def measure(key,engines,take):
         n=max(1,math.ceil(25e6/take('base',1)[0]));expected={k:take(k,n)[2:]for k in engines}
-        assert expected['base']==expected['copy']==expected['candidate']
+        assert expected['base']==expected['copy']==expected['candidate']==expected['linked']
         if 'iced' in expected:assert all(v[:3]==expected['base'][:3]for v in expected.values())
         rng=random.Random('shared-library/'+key);blocks=[];order=list(engines)
         for _ in range(17):
@@ -140,12 +164,14 @@ try:
             audits.append(audit)
         assert audits[0]==audits[1]
         records[name]=[list(map(int,get(w/'trial-real',w/'base.so',w/'candidate.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
+        linked_records=[list(map(int,get(w/'trial-real',w/'base.so',w/'linked.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
+        assert linked_records==records[name]
         save('records',records)
         for mode in (0,1,2):
             def take(k,n):
                 other=k in ('iced','fast');select('base' if other else k)
                 return list(map(int,get(*invoke,w/'driver',k if other else 'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('intel/'+name+'/'+str(mode),['base','copy','candidate','iced']+(['fast']if mode else []),take)
+            measure('intel/'+name+'/'+str(mode),['base','copy','linked','candidate','iced']+(['fast']if mode else []),take)
         for mode in (1,2):
             def take(k,n):
                 select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))

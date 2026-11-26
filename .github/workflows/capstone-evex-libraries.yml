@@ -1,7 +1,7 @@
-name: Measure Intel-only public iterator dispatch and unchanged generic decoding
+name: Separate linked reader placement from the public Intel formatting dispatch
 on:
   push:
-    branches: [codex/shared-eligible-intel-records]
+    branches: [codex/shared-record-link-only-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-eligible-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: formatted-link-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

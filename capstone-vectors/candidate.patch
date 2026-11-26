@@ -92,7 +92,7 @@ index 06cc61ae..6cf30f95 100644
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..0ae3d376 100644
+index 197453cb..e74790d9 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3757,6 +3757,8 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
@@ -100,12 +100,12 @@ index 197453cb..0ae3d376 100644
  #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
  #define CS_PUBLIC_FIXED_RECORD
 +#elif defined(CAPSTONE_X86_SHARED_FIXED_RECORD)
-+#define CS_SHARED_FIXED_RECORD
++#define CS_DECODE_OUTPUT_MISS X86_decodeSharedRecord
  #endif
  #define CS_DECODE_SCAN_IMPL decodeIteratorScan
  #include "../../cs_disasm_internal.h"
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..d7582e62 100644
+index 7afca7e4..87d3a6f1 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
 @@ -261,7 +261,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
@@ -117,6 +117,32 @@ index 7afca7e4..d7582e62 100644
  bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
  			     cs_insn *insn, uint16_t *length)
  {
+@@ -282,4 +282,25 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_SHARED_FIXED_RECORD
++/* Keep public scan and cursor handling in the original iterator. The full
++ * decoder and fixed readers share this single-record calling boundary. */
++CS_PRESERVE_MOST bool X86_decodeSharedRecord(cs_struct *handle,
++		const uint8_t *code, size_t size, cs_insn *insn,
++		uint16_t *insn_size, bool batch)
++{
++	if (!batch && handle->arch == CS_ARCH_X86 && !handle->no_text &&
++	    (handle->syntax == CS_OPT_SYNTAX_DEFAULT ||
++	     handle->syntax == CS_OPT_SYNTAX_INTEL)) {
++		if (handle->mode == CS_MODE_32)
++			return X86_decodeFixedRecord32(handle, code, size, insn,
++						       insn_size);
++		if (handle->mode == CS_MODE_64)
++			return X86_decodeFixedRecord64(handle, code, size, insn,
++						       insn_size);
++	}
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++}
++#endif
+ #endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 index 7bbf1c0d..25411f02 100644
 --- a/arch/X86/X86Vex32Output.c
@@ -131,10 +157,20 @@ index 7bbf1c0d..25411f02 100644
  			     cs_insn *insn, uint16_t *length)
  {
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 4c4c34f2..537d1443 100644
+index 4c4c34f2..742561b8 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -28,12 +28,14 @@ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -23,17 +23,24 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ #endif
++#ifdef CAPSTONE_X86_SHARED_FIXED_RECORD
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeSharedRecord(cs_struct *handle, const uint8_t *code, size_t size,
++		       cs_insn *insn, uint16_t *insn_size, bool batch);
++#endif
+ /* The public iterator can enter a fixed x86 reader once. Misses from that
+  * reader call the same full decoder with the ordinary iterator request. */
  #ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
  typedef uint8_t cs_record_request;
  enum { CS_RECORD_PUBLIC_ITER = 2 };
@@ -151,24 +187,3 @@ index 4c4c34f2..537d1443 100644
  #endif
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -186,6 +188,20 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
- 		return true;
- #endif
-+#ifdef CS_SHARED_FIXED_RECORD
-+	/* Only the public iterator can select these readers. Each reader owns
-+	 * its other option checks and sends a miss to the full decoder. */
-+	if (!batch && handle->arch == CS_ARCH_X86 && !handle->no_text &&
-+	    (handle->syntax == CS_OPT_SYNTAX_DEFAULT ||
-+	     handle->syntax == CS_OPT_SYNTAX_INTEL)) {
-+		if (handle->mode == CS_MODE_32)
-+			return X86_decodeFixedRecord32(handle, code, size, insn,
-+						       insn_size);
-+		if (handle->mode == CS_MODE_64)
-+			return X86_decodeFixedRecord64(handle, code, size, insn,
-+						       insn_size);
-+	}
-+#endif
- #ifdef CS_DECODE_OUTPUT_MISS
- 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
- #elif defined(CS_PUBLIC_FIXED_RECORD)
