@@ -64,6 +64,11 @@ try:
         check=list(map(int,get(w/'check-clear').split()))
         assert check[0]==1769472 and 0<check[1]<check[0]
         save('clear-'+label,check)
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'mask-memory.cpp',lib,'-o',w/'mask-memory')
+        mask=list(map(int,get(w/'mask-memory').split()))
+        assert mask[0]==10878976 and mask[4]==0 and mask[3]>0
+        if label!='base':assert mask==rd(e/'mask-memory-base.json')
+        save('mask-memory-'+label,mask)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
