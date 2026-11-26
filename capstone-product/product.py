@@ -67,9 +67,10 @@ try:
         command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
         binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
         names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
-        hot=['cs_disasm_iter','cs_regs_access','cs_decode_full_insn','X86_scanNativeBatch','X86_disasmIterText','X86_getInstruction','X86_Vex','AArch64_getInstruction','ARM_getInstruction','Mips_getInstruction','PPC_getInstruction','RISCV_getInstruction','X86_tryATTOutput']
+        hot=['X86_disasmIterGeneric','cs_disasm_iter','cs_regs_access','cs_decode_full_insn','X86_scanNativeBatch','X86_disasmIterText','X86_getInstruction','X86_Vex','AArch64_getInstruction','ARM_getInstruction','Mips_getInstruction','PPC_getInstruction','RISCV_getInstruction','X86_tryATTOutput']
         positions={x.split()[-1]:int(x.split()[0],16) for x in names if len(x.split())==3 and x.split()[-1] in hot}
         assert {'cs_disasm_iter','cs_regs_access','X86_scanNativeBatch','X86_disasmIterText'}<=positions.keys()
+        assert (positions['cs_disasm_iter']==positions['X86_disasmIterText'])==(variant!='base') and ('X86_disasmIterGeneric' in positions)==(variant!='base'),positions
         save('hot-symbols-'+variant,positions)
         assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
         archive,=build.rglob('libcapstone.a')

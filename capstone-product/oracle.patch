@@ -1,137 +1,108 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 5a8f1bff..32277419 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1098,11 +1098,13 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86" OR
+        (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+-        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
+-        AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
++        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|aarch64|amd64|AMD64|arm64)$"))
++        AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
+         AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
+         if(capstone_enabled_architectures STREQUAL "X86")
+             target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
++        elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
++            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_ELF_ITERATOR)
+         else()
+             target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
+         endif()
+diff --git a/Makefile b/Makefile
+index 95e046b2..2c4dbe3a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -315,6 +315,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+ else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
+ 	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
++else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
++ifneq ($(filter linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
++	CFLAGS += -DCAPSTONE_X86_ELF_ITERATOR
++endif
+ endif
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..5112d8db 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3795,10 +3795,16 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
+ 
++#ifdef X86_SHARED_ITERATOR_ENTRY
++CAPSTONE_INTERNAL X86_DECODE_ALIGN
++bool X86_disasmIterGeneric(csh ud, const uint8_t **code, size_t *size,
++			   uint64_t *address, cs_insn *insn)
++#else
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
++#endif
+ {
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 8c6444ab..f79b7407 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -39,6 +39,10 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ 	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
+ #endif
++#ifdef X86_SHARED_ITERATOR_ENTRY
++	return X86_disasmIterGeneric(ud, code, size, address, insn);
++#else
+ 	return cs_disasm_iter(ud, code, size, address, insn);
++#endif
+ }
+ #endif
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index 246ee26c..52c1b56d 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -10,6 +10,17 @@
+ extern "C" {
+ #endif
+ 
++#if defined(CAPSTONE_X86_ELF_ITERATOR) && defined(__ELF__) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_DIET) && \
++	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define X86_SHARED_ITERATOR_ENTRY
++/* The public symbol starts in the fixed reader. Its fallback must enter
++ * the generic iterator directly, including for foreign architectures. */
++bool X86_disasmIterGeneric(csh handle, const uint8_t **code, size_t *size,
++			   uint64_t *address, cs_insn *insn);
++#endif
++
+ typedef struct X86ScanBatchResult {
+ 	size_t count;
+ 	size_t bytes;
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..925f8619 100644
+index 7afca7e4..c3da7003 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -14,8 +14,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#define GET_INSTRINFO_ENUM
--#include "X86GenInstrInfo.inc"
-+#include "X86VectorClearOutput.h"
- #define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-@@ -98,32 +97,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
- 			      size_t size, cs_insn *insn, uint16_t *insn_size)
- {
--	/* The bare vector clear instructions have no ModR/M or operands. */
--	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
--		const bool all = (code[1] & 4) != 0;
--		insn->size = *insn_size = 3;
--		memcpy(insn->bytes, code, 3);
--		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--		if (all)
--			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
--		else
--			memcpy(insn->mnemonic, "vzeroupper",
--			       sizeof("vzeroupper"));
--		memset(insn->op_str, 0, sizeof(insn->op_str));
--		if (insn->detail) {
--			cs_detail *detail = insn->detail;
--			memset(detail, 0,
--			       offsetof(cs_detail, x86) + sizeof(cs_x86));
--			detail->x86.addr_size = 8;
--			detail->x86.rex = 0x40;
--			memcpy(detail->x86.opcode, code, 2);
--			X86_get_insn_id(handle, insn,
--					all ? X86_VZEROALL : X86_VZEROUPPER);
--		} else {
--			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
--		}
-+	if (writeVex2Clear(handle, code, size, insn, insn_size, true))
- 		return true;
--	}
- 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
- 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
- 		const uint8_t rex =
-diff --git a/arch/X86/X86VectorClearOutput.h b/arch/X86/X86VectorClearOutput.h
-new file mode 100644
-index 00000000..499e8bae
---- /dev/null
-+++ b/arch/X86/X86VectorClearOutput.h
-@@ -0,0 +1,44 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifndef CS_X86_VECTOR_CLEAR_OUTPUT_H
-+#define CS_X86_VECTOR_CLEAR_OUTPUT_H
-+
-+#include "X86OutputOptions.h"
-+#define GET_INSTRINFO_ENUM
-+#include "X86GenInstrInfo.inc"
-+
-+/* VZEROUPPER and VZEROALL have no ModR/M byte. The mapping table supplies
-+ * their implicit register writes for the selected execution mode. */
-+static inline bool writeVex2Clear(cs_struct *handle, const uint8_t *code,
-+                                  size_t size, cs_insn *insn,
-+                                  uint16_t *insn_size, bool wide)
-+{
-+	if (size < 3 || code[2] != 0x77 || (code[1] & 0xfb) != 0xf8)
-+		return false;
-+	const bool all = (code[1] & 4) != 0;
-+	insn->size = *insn_size = 3;
-+	memcpy(insn->bytes, code, 3);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	if (all)
-+		memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
-+	else
-+		memcpy(insn->mnemonic, "vzeroupper",
-+		       sizeof("vzeroupper"));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	if (insn->detail) {
-+		cs_detail *detail = insn->detail;
-+		memset(detail, 0,
-+		       offsetof(cs_detail, x86) + sizeof(cs_x86));
-+		detail->x86.addr_size = wide ? 8 : 4;
-+		detail->x86.rex = wide ? 0x40 : 0;
-+		memcpy(detail->x86.opcode, code, 2);
-+		X86_get_insn_id(handle, insn,
-+				all ? X86_VZEROALL : X86_VZEROUPPER);
-+	} else {
-+		insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
-+	}
-+	return true;
-+}
-+
+@@ -282,4 +282,10 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
++#ifdef X86_SHARED_ITERATOR_ENTRY
++/* These two interfaces share cursor, skipdata and detail-pointer ownership. */
++extern __typeof__(X86_disasmIterText) cs_disasm_iter
++	__attribute__((alias("X86_disasmIterText"), visibility("default")));
 +#endif
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index 7bbf1c0d..019217f2 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -13,6 +13,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
-+#include "X86VectorClearOutput.h"
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
- #include "X86VectorRegisterWriter.h"
-@@ -171,6 +172,8 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- 					      x86_simple_registers);
- 	}
- 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-+	if (prefix == 2 && writeVex2Clear(handle, code, size, insn, insn_size, false))
-+		return true;
- 	/* LDS/LES, extended registers and W=1 retain the
-      * canonical reader. The admitted rows use only XMM/YMM0..7. */
- 	if (size < prefix + 2 ||
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6543802b..2a1c680b 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1116,6 +1116,13 @@ static bool check_vex_register_immediates(csh handles[2], cs_mode mode)
- 
- static bool check_vex32_register_moves(csh handles[2])
- {
-+	/* The operand-free VEX2 forms end immediately after the opcode. */
-+	for (unsigned flags = 0; flags < 256; ++flags) {
-+		const uint8_t code[] = { 0xc5, (uint8_t)flags, 0x77 };
-+		for (size_t size = 1; size <= sizeof(code); ++size)
-+			if (!compare(handles, code, size, flags))
-+				return false;
-+	}
- 	for (unsigned flags = 0; flags < 256; ++flags)
- 		for (unsigned mr = 0xc0; mr <= 0xff; ++mr)
- 			for (unsigned op = 0x6f; op <= 0x7f; op += 0x10) {
++
+ #endif
