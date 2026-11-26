@@ -1,7 +1,7 @@
-name: Measure a shared public and private Linux static iterator with PE32, SIMD, firmware and five other architectures
+name: Count retired model instructions and branches for real Capstone and iced output on x86-64 and ARM64
 on:
   push:
-    branches: [codex/elf-public-text-iterator-owner]
+    branches: [codex/formatter-work-on-live-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -47,7 +45,9 @@ jobs:
           path: iced-source
           sparse-checkout: src/rust/iced-x86
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
+      - name: Install measured-epoch profiler
+        run: sudo apt-get update -qq && sudo apt-get install -qy valgrind
+      - name: Count decoder and formatter work at identical PE and ELF boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: elf-iterator-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: formatter-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
