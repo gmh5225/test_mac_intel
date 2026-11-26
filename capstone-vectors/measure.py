@@ -39,6 +39,10 @@ try:
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     trees=rd(r/'source.json');images={}
+    from paired import compare_files,symbols
+    native={};positions={}
+    shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
+    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'native.o')
     for tag,entry in [('base','base'),('compact','prefix'),('word','outlined')]:
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         if tag!='base':
@@ -48,7 +52,14 @@ try:
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/tag)
         images[tag]=sha(w/tag)
-    assert len(set(images.values()))==3
+        native[tag]=w/(tag+'-native')
+        run('clang++',w/'native.o',lib,ice_lib,*flags,'-o',native[tag])
+        positions[tag]=symbols(native[tag])
+    x86=os.uname().machine=='x86_64'
+    assert len(set(images.values()))==(3 if x86 else 2)
+    if not x86:assert sha(native['base'])==sha(native['word'])
+    timing,checked=compare_files(w,native);timed={}
+    save('native-images',dict(machine=os.uname().machine,cpu=get('lscpu'),images={k:sha(v)for k,v in native.items()},functions=positions))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
@@ -70,6 +81,8 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        reference=list(map(int,get(native['base'],'private','0','1',f,path,str(bits)).split()))[2:]
+        timed[name]=timing(name,reference[0],f,path,bits);save('paired-host',timed);save('fixed-image-hashes',checked)
         variants=[(t,e,m)for t in images for e,m in [('private',0),('private',1),('private',2),('capstone',1)]]
         rows[name]={};boundary=None
         for tree,engine,mode in variants:
