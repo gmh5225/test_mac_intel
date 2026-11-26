@@ -92,6 +92,18 @@ static int ppc_snapshot(const char *fixture, bool big, unsigned mode) {
   return accepted?0:1;
 }
 
+static unsigned integer_family(const uint8_t *p,size_t n) {
+    while(n && (*p==0x26||*p==0x2e||*p==0x36||*p==0x3e||*p==0x64||*p==0x65||*p==0x67)){++p;--n;}
+    if(n<7||p[0]!=0x62||(p[1]&15)!=3||(p[2]&7)!=5)return 0;
+    bool wide=(p[2]&128)!=0;
+    switch(p[4]){
+        case 0x1e:return wide?X86_INS_VPCMPUQ:X86_INS_VPCMPUD;
+        case 0x1f:return wide?X86_INS_VPCMPQ:X86_INS_VPCMPD;
+        case 0x3e:return wide?X86_INS_VPCMPUW:X86_INS_VPCMPUB;
+        case 0x3f:return wide?X86_INS_VPCMPW:X86_INS_VPCMPB;
+        default:return 0;
+    }
+}
 static bool floating_compare(const uint8_t *p,size_t n) {
     while(n && (*p==0x26||*p==0x2e||*p==0x36||*p==0x3e||*p==0x64||*p==0x65||*p==0x67)){++p;--n;}
     return (n>=5&&p[0]==0xc5&&p[2]==0xc2)||(n>=6&&p[0]==0xc4&&(p[1]&31)==1&&p[3]==0xc2)||
@@ -173,6 +185,17 @@ int main(int argc, char **argv) {
             }
           }
           cs_free(reference, count);
+        }
+        if (unsigned family=integer_family(encoded,insn->size)) {
+          if (insn->id==X86_INS_VPCMP) {
+            if (!original) throw std::runtime_error("packed predicate lost its element type");
+            expected_id=family;
+          } else if (insn->id==X86_INS_VPCMPB || insn->id==X86_INS_VPCMPUB ||
+                     insn->id==X86_INS_VPCMPW || insn->id==X86_INS_VPCMPUW ||
+                     insn->id==X86_INS_VPCMPD || insn->id==X86_INS_VPCMPUD ||
+                     insn->id==X86_INS_VPCMPQ || insn->id==X86_INS_VPCMPUQ) {
+            if (insn->id!=family) throw std::runtime_error("incorrect packed predicate element type");
+          }
         }
         value(expected_id);
         value(insn->alias_id);
