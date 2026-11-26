@@ -1,7 +1,7 @@
-name: Separate the high-address fix from MASM digit emission and measure PE32, normal syntax and other architectures
+name: Verify selected MASM format emission and full-width absolute MOV addresses including the default AT&T handle
 on:
   push:
-    branches: [codex/masm-selected-format-writer]
+    branches: [codex/masm-selected-token-full-width]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: selected-masm-format-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: full-width-masm-token-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
