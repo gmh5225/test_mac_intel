@@ -15,7 +15,7 @@ jobs:
     env:
       CC: clang
       CXX: clang++
-      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_AUTO_UPDATE: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -48,9 +48,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$NEVERD_REVISION"
           test "$(git rev-parse HEAD:third_party/llvm-project)" = "$LLVM_BASE"
           brew install ninja
-          python -m pip install --require-hashes --only-binary=:all: -r - <<'REQ'
+          cat > "$RUNNER_TEMP/paired-requirements.txt" <<'REQ'
           pyelftools==0.33 --hash=sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036
           REQ
+          python -m pip install --require-hashes --only-binary=:all: -r "$RUNNER_TEMP/paired-requirements.txt"
           git submodule update --init --depth 1 third_party/capstone signatures third_party/unicorn
           cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
