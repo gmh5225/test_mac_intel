@@ -54,9 +54,9 @@ try:
             if profile not in ('diet','reduced') and name in ('base','address','digits'):
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
-            if linkage=='static' and profile not in ('diet','reduced') and name in ('base','segment'):
-                from segment_link import segment
-                rows[name]['segment_records']=segment(s,p,b,t,profile,name+'-'+linkage,run,linkage)
+            if linkage=='static' and profile not in ('diet','reduced') and name in ('base','segment','digits'):
+                from rotate_link import rotate
+                rows[name]['rotate_records']=rotate(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             if name.startswith('mips'):run(name+'-mips-projection',os.sys.executable,'-B',s/'suite/synctools/mips_register_names.py','--check')
 
             baseline=rows['base'][linkage]['snapshots']

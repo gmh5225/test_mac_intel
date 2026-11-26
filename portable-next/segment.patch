@@ -1,122 +1,40 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..f2eb961e 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -28,9 +28,9 @@
- #undef X86_MEMORY_IMMEDIATE
- #undef X86_IMMEDIATE_WIDE
- 
--#define X86_SEGMENT_LEA32 writeSegmentLea32
-+#define X86_SEGMENT_MEMORY32 writeSegmentMemory32
- #include "X86MemoryOutputImpl.h"
--#undef X86_SEGMENT_LEA32
-+#undef X86_SEGMENT_MEMORY32
- #undef X86_MEMORY32_OUTPUT
- 
- /* The fixed-width iterator delegates uncommon encodings here. */
-@@ -85,10 +85,11 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 	case 0x3e:
- 	case 0x64:
- 	case 0x65:
--		if (size >= 3 && code[1] == 0x8d && code[2] < 0xc0 &&
-+		if (size >= 3 && (code[1] == 0x8d || code[1] == 0x2b ||
-+		     code[1] == 0x89 || code[1] == 0x8b) && code[2] < 0xc0 &&
- 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
--			const unsigned row = x86_simple_plans[0][0][0x8d] >> 2;
--			if (writeSegmentLea32(code, size, insn, insn_size,
-+			const unsigned row = x86_simple_plans[0][0][code[1]] >> 2;
-+			if (writeSegmentMemory32(code, size, insn, insn_size,
- 					      &x86_simple_outputs[row],
- 					      x86_simple_registers))
- 				return true;
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..f4826b66 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -7,8 +7,8 @@
- #ifdef X86_MEMORY_IMMEDIATE
- #include "X86UnsignedImmediate.h"
- static bool X86_MEMORY_IMMEDIATE(
--#elif defined(X86_SEGMENT_LEA32)
--static bool X86_SEGMENT_LEA32(
-+#elif defined(X86_SEGMENT_MEMORY32)
-+static bool X86_SEGMENT_MEMORY32(
- #elif defined(X86_EXTEND64_MEMORY)
- static bool X86_EXTEND64_MEMORY(
- #elif defined(X86_EXTEND32_MEMORY)
-@@ -34,7 +34,7 @@ bool X86_writeMemoryOutput(
- 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
- #ifdef X86_EXTEND64_MEMORY
- 	const unsigned lead = (rex != 0) + (code[rex != 0] == 0x0f);
--#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_LEA32)
-+#elif defined(X86_EXTEND32_MEMORY) || defined(X86_SEGMENT_MEMORY32)
- 	const unsigned lead = 1; /* The caller consumed one prefix or escape. */
- #else
- 	const unsigned lead = rex != 0;
-@@ -70,7 +70,7 @@ bool X86_writeMemoryOutput(
- 		const unsigned index_reg = ((rex & 2) << 2) |
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
--#if defined(X86_SEGMENT_LEA32) || defined(X86_BASE_ONLY_SIB) || \
-+#if defined(X86_SEGMENT_MEMORY32) || defined(X86_BASE_ONLY_SIB) || \
- 	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
- 		/* A scale-one SIB without an index names only its base. */
- 		if ((!mod && base_reg == 5) ||
-@@ -93,8 +93,8 @@ bool X86_writeMemoryOutput(
- 	const bool push = false, load = true;
- 	const unsigned reg_width = 2; /* r32 destination */
- #else
--#ifdef X86_SEGMENT_LEA32
--	const bool lea = true, load = true, push = false;
-+#ifdef X86_SEGMENT_MEMORY32
-+	const bool lea = opcode == 0x8d, load = opcode != 0x89, push = false;
- #elif defined(X86_MEMORY_IMMEDIATE)
- 	const bool lea = false, load = false;
- #else
-@@ -139,7 +139,7 @@ bool X86_writeMemoryOutput(
- 		out += 10;
- 	}
- #else
--#ifdef X86_SEGMENT_LEA32
-+#ifdef X86_SEGMENT_MEMORY32
- 	static const struct X86SimpleRegister segments[] = {
- 		{ X86_REG_ES, 2, "es" }, { X86_REG_CS, 2, "cs" },
- 		{ X86_REG_SS, 2, "ss" }, { X86_REG_DS, 2, "ds" },
-@@ -147,10 +147,15 @@ bool X86_writeMemoryOutput(
- 	};
- 	const unsigned segment = code[0] >= 0x64 ? 4 + (code[0] & 1) :
- 						   (code[0] >> 3) & 3;
-+	if (!lea) {
-+		memcpy(out, "dword ptr ", 10);
-+		out += 10;
-+	}
- 	memcpy(out, segments[segment].name, 2);
- 	out[2] = ':';
- 	out += 3;
--#endif
-+	*out++ = '[';
-+#else
- 	if (lea) {
- 		*out++ = '[';
- 	} else if (row->ops[0].size == 1) {
-@@ -162,6 +167,7 @@ bool X86_writeMemoryOutput(
- 		       11);
- 		out += 11;
- 	}
-+#endif
- #endif
- 	if (disp32_only) {
- #ifdef X86_MEMORY32_OUTPUT
-@@ -227,10 +233,10 @@ bool X86_writeMemoryOutput(
- 			x->opcode[1] = opcode;
- 		}
- 		x->encoding.modrm_offset = (uint8_t)(lead + 1);
--#elif defined(X86_SEGMENT_LEA32)
-+#elif defined(X86_SEGMENT_MEMORY32)
- 		x->prefix[1] = code[0];
- 		x->encoding.modrm_offset = 2;
--		x->operands[1].mem.segment = (x86_reg)segments[segment].reg;
-+		x->operands[load ? 1 : 0].mem.segment = (x86_reg)segments[segment].reg;
- #elif defined(X86_EXTEND32_MEMORY)
- 		x->opcode[0] = 0x0f;
- 		x->opcode[1] = opcode;
+diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
+index a8a6252a..60e6305f 100644
+--- a/arch/X86/X86GenVexPublicPlans.inc
++++ b/arch/X86/X86GenVexPublicPlans.inc
+@@ -186,10 +186,10 @@ static const uint8_t x86Vex3OpcodeRows[3][256] = {
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 241, 242,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 243,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	},
+ };
+-static const uint16_t x86Vex3PublicRows[244][16] = {
++static const uint16_t x86Vex3PublicRows[245][16] = {
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 8414, 8406, 32768, 32769, 8414, 8406, 32768, 32769 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 32770, 32771, 8390, 8198, 0, 0, 8390, 8198 },
+@@ -434,6 +434,7 @@ static const uint16_t x86Vex3PublicRows[244][16] = {
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 7885, 0, 0, 0, 7885, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 7877, 0, 0, 0, 7877, 0, 0 },
+ 	{ 0, 6167, 0, 0, 0, 0, 0, 0, 0, 6167, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 5103, 0, 0, 0, 0, 0, 0, 0, 5103, 0, 0, 0, 0 },
+ };
+ static const uint16_t x86Vex3FormPlans[25][2] = {
+ 	{ 8398, 8396 },
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index f1ebc59f..dfec0d91 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1545,7 +1545,9 @@ def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
+ def emit_vex_scan(suffix, public_plans=False):
+     # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
+     # no gather, mask, register-limit or predicate-dependent opcode checks.
+-    reads = dict(read_specializations(suffix))
++    # The scan result needs the immediate extent, not a materialized operand.
++    # REG, RM and imm8 (for example RORX) are validated by vex_scan_form.
++    reads = dict(read_specializations(suffix, scalar_limit=3 if public_plans else 2))
+     translations = dict(translation_specializations(suffix))
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+     specifiers = instruction_specifiers(source)
