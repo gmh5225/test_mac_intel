@@ -1,7 +1,7 @@
-name: Verify cstool library selection and RISC-V CSR details
+name: Verify cstool on native build paths and canonical Git source
 on:
   push:
-    branches: [codex/make-cstool-selected-library]
+    branches: [codex/cstool-portable-link-verification]
     paths: [capstone-make/**, .github/workflows/capstone-make-cstool.yml]
 permissions:
   contents: read
@@ -33,6 +33,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: cstool-${{ matrix.host }}
+          name: checked-cstool-${{ matrix.host }}
           path: evidence/
           retention-days: 14

@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,os,platform,shutil,subprocess as sp,sys,tempfile
+import hashlib,json,os,platform,shlex,shutil,subprocess as sp,sys,tempfile
 r=Path(__file__).resolve().parent
 local=r.name.startswith('round3867-') and (r.parent/'round3866-make-cstool-library').is_dir()
 if local:
@@ -40,7 +40,7 @@ try:
         expected=ar if static else so
         if oldhash:assert sha(so)!=oldhash
         link=[l for l in result.stdout.splitlines()if l.strip().endswith(' -o cstool')]
-        assert len(link)==1 and str(expected.resolve()) in link[0],link
+        assert len(link)==1 and [Path(t).resolve() for t in shlex.split(link[0]) if Path(t).name==expected.name]==[expected.resolve()],link
         env=dict(os.environ)
         if shared:env['DYLD_LIBRARY_PATH' if osname=='Darwin' else 'LD_LIBRARY_PATH']=str(build)
         libraries=sp.check_output((['otool','-L',tool] if osname=='Darwin' else ['ldd',tool]),text=True,env=env)
