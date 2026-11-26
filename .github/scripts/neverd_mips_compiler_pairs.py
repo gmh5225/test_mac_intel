@@ -1,4 +1,4 @@
-"""Time equivalent r13/r14 assembler, code generator and ELF linker workloads."""
+"""Time equivalent r14/r15 assembler, code generator and ELF linker workloads."""
 import argparse
 import hashlib
 import json
@@ -39,7 +39,7 @@ def signature(file):
 
 
 def summary(samples, key):
-    ratios = [(row["r14"][key] / row["r13"][key] - 1) * 100 for row in samples]
+    ratios = [(row["r15"][key] / row["r14"][key] - 1) * 100 for row in samples]
     rng = random.Random(7714)
     bootstrap = sorted(statistics.median(rng.choices(ratios, k=len(ratios))) for _ in range(6000))
     return {"median_pct": statistics.median(ratios), "ci95_pct": [bootstrap[149], bootstrap[5849]]}
@@ -52,8 +52,8 @@ def main():
     parser.add_argument("receipt", type=Path)
     parser.add_argument("--rounds", type=int, default=32)
     args = parser.parse_args()
-    bins = {"r13": args.old.resolve(), "r14": args.new.resolve()}
-    refs = {"r13": "24ced447e1718432292dc9d54b6eb229323409d1", "r14": "6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312"}
+    bins = {"r14": args.old.resolve(), "r15": args.new.resolve()}
+    refs = {"r14": "6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312", "r15": "54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00"}
     def tool(label, name):
         return bins[label] / (name + (".exe" if sys.platform == "win32" else ""))
     for label, ref in refs.items():
@@ -74,7 +74,7 @@ def main():
         for abi, triple, cpu, directive in [("o32","mips","mips32r2",".4byte"), ("n64","mips64el","mips64r2",".8byte")]:
             source, obj = tmp/(abi+".s"), tmp/(abi+".o")
             source.write_text(".text\n.set noreorder\n.globl f0\nf0:\n jr $ra\n nop\n.data\n.rept 98304\n "+directive+" f0\n.endr\n")
-            measure([tool("r13","llvm-mc"), "-triple="+triple, "-mcpu="+cpu,"-target-abi="+abi,"-filetype=obj",source,"-o",obj])
+            measure([tool("r14","llvm-mc"), "-triple="+triple, "-mcpu="+cpu,"-target-abi="+abi,"-filetype=obj",source,"-o",obj])
             commands["lld-96k-"+abi] = {label:[tool(label,"ld.lld"),"--threads=1","-static","-e","f0",obj] for label in bins}
         output = tmp/"result"
         for case, variants in commands.items():
@@ -85,7 +85,7 @@ def main():
             assert fingerprints[0] and fingerprints[0] == fingerprints[1], case
             samples = []
             for round_id in range(args.rounds):
-                order = ("r13","r14") if round_id % 2 == 0 else ("r14","r13")
+                order = ("r14","r15") if round_id % 2 == 0 else ("r15","r14")
                 samples.append({label:measure([*variants[label], "-o", output]) for label in order})
             data["cases"][case] = {"cpu":summary(samples,"cpu"), "wall":summary(samples,"wall"), "samples":samples, "output":fingerprints[0]}
             print(case, data["cases"][case]["cpu"], data["cases"][case]["wall"], flush=True)
