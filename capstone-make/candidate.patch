@@ -175,3 +175,74 @@ index 6702fe8c..4e90fab0 100644
  }
 +
 +#endif // CAPSTONE_HAS_RISCV
+diff --git a/suite/cstest/include/test_compare.h b/suite/cstest/include/test_compare.h
+index 1908c0ea..b358b156 100644
+--- a/suite/cstest/include/test_compare.h
++++ b/suite/cstest/include/test_compare.h
+@@ -232,15 +232,4 @@ typedef int32_t tbool;
+ 		} \
+ 	}
+ 
+-#define compare_string_from_int_ret(actual, expected, converter, ret_val) \
+-	if (expected) { \
+-		const char *actual_str = converter(actual); \
+-		if (!strings_match(actual_str, expected)) { \
+-			fprintf(stderr, \
+-				#actual " != " #expected ": '%s' != '%s'\n", \
+-				actual_str, expected); \
+-			return ret_val; \
+-		} \
+-	}
+-
+ #endif // TEST_COMPARE_H
+diff --git a/suite/cstest/src/test_detail_riscv.c b/suite/cstest/src/test_detail_riscv.c
+index 4cd8dfb7..deac5cdf 100644
+--- a/suite/cstest/src/test_detail_riscv.c
++++ b/suite/cstest/src/test_detail_riscv.c
+@@ -110,7 +110,18 @@ bool test_expected_riscv(csh *handle, const cs_riscv *actual,
+       break;
+     case RISCV_OP_CSR:
+ #ifdef CAPSTONE_HAS_RISCV
+-      compare_string_from_int_ret(op->csr, eop->csr, getSysRegName, false);
++      if (eop->csr) {
++        const char *name = getSysRegName(op->csr);
++        char number[sizeof("0xffff")];
++        if (!name) {
++          snprintf(number, sizeof(number), "0x%x", (unsigned)op->csr);
++          name = number;
++        }
++        if (!strings_match(name, eop->csr)) {
++          fprintf(stderr, "CSR mismatch: '%s' != '%s'\n", name, eop->csr);
++          return false;
++        }
++      }
+       break;
+ #else
+       return false;
+diff --git a/tests/details/riscv.yaml b/tests/details/riscv.yaml
+index f634ccb6..6e4f518a 100644
+--- a/tests/details/riscv.yaml
++++ b/tests/details/riscv.yaml
+@@ -6925,3 +6925,22 @@ test_cases:
+                   reg: v4
+                   access: CS_AC_READ
+ 
++  - input:
++      bytes: [0x73, 0x95, 0xb5, 0x7c]
++      arch: "CS_ARCH_RISCV"
++      options: [CS_MODE_RISCV64, CS_OPT_DETAIL]
++    expected:
++      insns:
++        - asm_text: "csrrw a0, 0x7cb, a1"
++          details:
++            riscv:
++              operands:
++                - type: RISCV_OP_REG
++                  reg: a0
++                  access: CS_AC_WRITE
++                - type: RISCV_OP_CSR
++                  csr: "0x7cb"
++                  access: CS_AC_READ_WRITE
++                - type: RISCV_OP_REG
++                  reg: a1
++                  access: CS_AC_READ
