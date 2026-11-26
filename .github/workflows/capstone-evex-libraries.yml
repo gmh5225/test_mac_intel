@@ -1,7 +1,7 @@
-name: Verify returning the mapped x86 instruction ID against the fork iced predicate corpus
+name: Check the corrected scan initializer against the full wired iced predicate corpus
 on:
   push:
-    branches: [codex/x86-mapped-id-all-predicates]
+    branches: [codex/mapped-id-oracle-fixed-initializer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mapped-ids-domain-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mapped-ids-domain-complete-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

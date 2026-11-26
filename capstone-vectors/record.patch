@@ -23,7 +23,7 @@ index 06cc61ae..ca9e5b76 100644
  
  bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..b953cc59 100644
+index 197453cb..b111a7ce 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3308,7 +3308,6 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
@@ -66,6 +66,15 @@ index 197453cb..b953cc59 100644
  	return X86_SCAN_COMPLETE;
  }
  
+@@ -3789,7 +3784,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	}
+ 	if (initial != X86_SCAN_COMPLETE)
+ 		return false;
+-	X86ScanResult result = { 0, instructionID, length, 0 };
++	X86ScanResult result = { 0, instructionID, length };
+ 	*insn_size = length;
+ 	finish_x86_scan(handle, insn, &result, code, batch, true);
+ 	return true;
 diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
 index 7b8535ac..172230df 100644
 --- a/arch/X86/X86EvexScan.c
