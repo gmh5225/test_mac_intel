@@ -1,7 +1,7 @@
-name: Count public and private decoder, formatting and detail stages on four native operating-system and CPU combinations
+name: Compare public and private formatter paths with unchanged real output on macOS and Linux
 on:
   push:
-    branches: [codex/public-private-format-path-census]
+    branches: [codex/untimed-mixed-formatter-census]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-stage-census-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mixed-format-coverage-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

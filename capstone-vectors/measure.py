@@ -20,7 +20,7 @@ try:
     run('cmake','-S',proj,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON')
     for variant in ('original','counted'):
         if variant=='counted':
-            f=cap/'cs.c';code=once(f.read_text(),'static inline void fill_insn(', 'extern uint64_t profile_stage[4];\n\nstatic inline void fill_insn(')
+            f=cap/'cs.c';code=once(f.read_text(),'#include "MCRegisterInfo.h"','#include "MCRegisterInfo.h"\n\nextern uint64_t profile_stage[4];')
             code=once(code,'\tSStream_trimls(OS);','\t++profile_stage[1];\n\tprofile_stage[2] += stream_length_valid;\n\tSStream_trimls(OS);')
             marker='\tif (!handle->disasm((csh)(uintptr_t)handle, code, size, &mci, insn_size,'
             code=once(code,marker,'\t++profile_stage[0];\n'+marker)
