@@ -1,7 +1,7 @@
-name: Compare complete static libraries and linked consumers in NeverD six and seven architecture builds
+name: Verify NeverD mixed libraries with and without the WASM target
 on:
   push:
-    branches: [codex/verified-six-seven-wasm-consumers]
+    branches: [codex/empty-block-mixed-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: eb7fdeaaeb4f89cbcc5ab24edf41e0a03073884c
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f45561436bfe3d36819b21ada16aae078eddc8c4
+          ref: 1c62a50d7b0deb4596eeac3d63ebbb78001754f5
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-mixed-link-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: empty-block-consumers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
