@@ -1,7 +1,7 @@
-name: Verify x86 comparison IDs and throughput from immutable Debian snapshots
+name: Measure x86 predicate names and details against both iced formatters on real PE and ELF
 on:
   push:
-    branches: [codex/vcmp-four-host-frozen-inputs]
+    branches: [codex/table-condition-real-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vcmp-snapshot-score-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vcmp-name-iced-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
