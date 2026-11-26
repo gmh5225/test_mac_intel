@@ -1,94 +1,137 @@
-diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..17189593 100644
---- a/arch/X86/X86InstPrinterCommon.c
-+++ b/arch/X86/X86InstPrinterCommon.c
-@@ -214,6 +214,10 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
- 		if (MI->flat_insn->detail)
- 			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
- 		break;
-+	case X86_INS_VCMP:
-+		/* VCMP aliases share a public ID. The immediate selects the
-+		 * spelling and the AVX condition already recorded above. */
-+		break;
- 	default:
- 		MI->popcode_adjust = Imm + 1;
- 		break;
+diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
+index a56ed486..faca5f00 100644
+--- a/arch/X86/X86DisassemblerTranslator.h
++++ b/arch/X86/X86DisassemblerTranslator.h
+@@ -548,7 +548,10 @@ X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
+ #endif
+ 	} else if (type == TYPE_AVX512ICC) {
+ #ifndef CAPSTONE_X86_REDUCE
+-		if (immediate >= 8 || ((immediate & 0x3) == 3)) {
++		/* A record without text needs the element-family ID even when
++		 * this condition would use a mnemonic alias in assembly. */
++		if (!emitOperands || mcInst->csh->no_text || immediate >= 8 ||
++		    (immediate & 3) == 3) {
+ 			unsigned NewOpc = 0;
+ 			switch (MCInst_getOpcode(mcInst)) {
+ 			default: // llvm_unreachable("unexpected opcode");
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..6b2a6ab4 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12575,62 +12575,18 @@ static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
+ 		memory->avx_bcast = broadcast;
+ }
+ 
+-static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
++#ifndef CAPSTONE_X86_REDUCE
++static void repair_vpcmp_id(cs_insn *insn, MCInst *mci)
+ {
+-#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
+-	/* The alternate mapping for this internal opcode names the integer
+-	 * compare family even when the predicate spelling has been omitted. */
+-	if (insn->id != X86_INS_VPCMP)
+-		return;
+-	unsigned int index = find_insn_h(mci->csh, mci->Opcode);
+-	insn->id = insns[index + 1].mapid;
+-	mci->popcode_adjust = 0;
+-#else
+-	char mnemonic[CS_MNEMONIC_SIZE] = { 0 };
+-	char operands[2] = { 0 };
+-	size_t length;
+-
+-	if (insn->id != X86_INS_VPCMP)
+-		return;
+-	SStream_extract_mnem_opstr(assembly, mnemonic, sizeof(mnemonic),
+-				   operands, sizeof(operands));
+-	if (strncmp(mnemonic, "vpcmp", 5) != 0)
+-		return;
+-
+-	// The condition printer's pseudo-ID adjustment assumes that every
+-	// predicate spelling has a contiguous public ID. Integer compares expose
+-	// element-family IDs instead, so applying that adjustment can collide with
+-	// an unrelated instruction. Normalize aliases to their family ID here.
+-	mci->popcode_adjust = 0;
+-	length = strlen(mnemonic);
+-	if (mnemonic_has_suffix(mnemonic, "ub"))
+-		insn->id = X86_INS_VPCMPUB;
+-	else if (mnemonic_has_suffix(mnemonic, "uw"))
+-		insn->id = X86_INS_VPCMPUW;
+-	else if (mnemonic_has_suffix(mnemonic, "ud"))
+-		insn->id = X86_INS_VPCMPUD;
+-	else if (mnemonic_has_suffix(mnemonic, "uq"))
+-		insn->id = X86_INS_VPCMPUQ;
+-	else if (length != 0) {
+-		switch (mnemonic[length - 1]) {
+-		case 'b':
+-			insn->id = X86_INS_VPCMPB;
+-			break;
+-		case 'w':
+-			insn->id = X86_INS_VPCMPW;
+-			break;
+-		case 'd':
+-			insn->id = X86_INS_VPCMPD;
+-			break;
+-		case 'q':
+-			insn->id = X86_INS_VPCMPQ;
+-			break;
+-		default:
+-			break;
+-		}
++	if (insn->id == X86_INS_VPCMP) {
++		/* The predicate alias and its explicit-immediate alternate
++		 * describe the same signedness and element width. */
++		unsigned int index = find_insn_h(mci->csh, mci->Opcode);
++		insn->id = insns[index + 1].mapid;
++		mci->popcode_adjust = 0;
+ 	}
+-#endif
+ }
++#endif
+ 
+ static void repair_vector_mask_conversion_access(cs_x86 *x86,
+ 						 unsigned int instruction_id)
+@@ -12800,7 +12756,9 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
+ 
+ 	if (!insn)
+ 		return;
+-	repair_vpcmp_id(insn, mnem, mci);
++#ifndef CAPSTONE_X86_REDUCE
++	repair_vpcmp_id(insn, mci);
++#endif
+ 	if (!insn->detail)
+ 		return;
+ 
+diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
+index e7704042..7651f34b 100644
+--- a/suite/synctools/x86_mapping_counts.py
++++ b/suite/synctools/x86_mapping_counts.py
+@@ -130,7 +130,7 @@ def generate(directory, suffix):
+                 family and index + 1 < len(rows)
+                 and rows[index + 1][1] == row[1] + "_alt"
+                 and rows[index + 1][2] == "X86_INS_" + family[1],
+-                "DIET integer compares require the adjacent typed alternate mapping",
++                "Integer compares require the adjacent typed alternate mapping",
+             )
+         name = row[1]
+         require(
 diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
-index dfa9b451..37732962 100644
+index dfa9b451..fb1ac515 100644
 --- a/tests/unit/x86_evex_vpcmp_id.c
 +++ b/tests/unit/x86_evex_vpcmp_id.c
-@@ -55,6 +55,50 @@ static bool test_vpcmp(csh handle, bool expect_detail)
+@@ -52,6 +52,16 @@ static bool test_vpcmp(csh handle, bool expect_detail)
+ 	}
+ 
+ 	cs_free(insn, count);
++	if (!check(cs_option(handle, CS_OPT_TEXT, CS_OPT_OFF) == CS_ERR_OK,
++		   "disable text for the same predicate"))
++		return false;
++	insn = NULL;
++	count = cs_disasm(handle, code, sizeof(code), 0x1000, 1, &insn);
++	success &= check(count == 1 && insn[0].id == X86_INS_VPCMPD,
++			 "unformatted predicate keeps its element-family ID");
++	cs_free(insn, count);
++	success &= check(cs_option(handle, CS_OPT_TEXT, CS_OPT_ON) == CS_ERR_OK,
++			 "restore text");
  	return success;
  }
  
-+/* Both APIs keep the public VCMP alias while the immediate selects the
-+ * condition in the instruction text and operand details. */
-+static bool test_floating_compare(csh handle)
-+{
-+	static const uint8_t bytes[][7] = {
-+		{ 0xc5, 0xfb, 0xc2, 0xda, 0x06 },
-+		{ 0x62, 0xf1, 0x4c, 0x0b, 0xc2, 0xd0, 0xa5 },
-+	};
-+	static const size_t sizes[] = { 5, 7 };
-+	if (cs_support(CS_SUPPORT_X86_REDUCE))
-+		return true;
-+	cs_insn *slot = cs_malloc(handle);
-+	if (!check(slot != NULL, "allocate compare iterator"))
-+		return false;
-+	bool ok = true;
-+	for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i) {
-+		const uint8_t *cursor = bytes[i];
-+		size_t left = sizes[i];
-+		uint64_t address = 0x1000;
-+		cs_insn *array = NULL;
-+		size_t count = cs_disasm(handle, cursor, left, address, 1, &array);
-+		bool decoded = cs_disasm_iter(handle, &cursor, &left,
-+					      &address, slot);
-+		ok &= check(count == 1 && decoded && left == 0 &&
-+				    address == 0x1000 + sizes[i],
-+			    "both floating compare decoders consume the instruction");
-+		if (count && decoded) {
-+			ok &= check(array[0].id == X86_INS_VCMP &&
-+					    slot->id == array[0].id,
-+				    "floating predicate keeps its public alias ID");
-+			ok &= check(strcmp(slot->mnemonic, array[0].mnemonic) == 0 &&
-+					    strcmp(slot->op_str, array[0].op_str) == 0,
-+				    "floating predicate text agrees across APIs");
-+			if (slot->detail && array[0].detail)
-+				ok &= check(slot->detail->x86.avx_cc ==
-+						    array[0].detail->x86.avx_cc,
-+					    "floating predicate detail agrees across APIs");
-+		}
-+		cs_free(array, count);
-+	}
-+	cs_free(slot, 1);
-+	return ok;
-+}
-+
- int main(void)
- {
- 	csh handle = 0;
-@@ -64,6 +108,7 @@ int main(void)
- 		   "open 64-bit mode"))
- 		return 1;
- 	success &= test_vpcmp(handle, false);
-+	success &= test_floating_compare(handle);
- 	if (!check(cs_option(handle, CS_OPT_DETAIL,
- 			    CS_OPT_ON | CS_OPT_DETAIL_REAL) == CS_ERR_OK,
- 		   "enable detail")) {
-@@ -71,6 +116,7 @@ int main(void)
- 		return 1;
- 	}
- 	success &= test_vpcmp(handle, true);
-+	success &= test_floating_compare(handle);
- #ifndef CAPSTONE_X86_ATT_DISABLE
- 	cs_err err = cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
- 	if (cs_support(CS_SUPPORT_DIET))
-@@ -78,6 +124,7 @@ int main(void)
- 	else {
- 		success &= check(err == CS_ERR_OK, "select AT&T syntax");
- 		success &= test_vpcmp(handle, true);
-+		success &= test_floating_compare(handle);
- 	}
- #endif
- 	cs_close(&handle);

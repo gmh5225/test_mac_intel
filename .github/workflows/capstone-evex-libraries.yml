@@ -1,7 +1,7 @@
-name: Test both public VCMP ID fixes against bulk records and the iced decoder corpus across execution modes
+name: Verify typed VPCMP scans against printed records and the iced fork for all word sizes
 on:
   push:
-    branches: [codex/vcmp-verified-iterator-alias]
+    branches: [codex/vpcmp-typed-scan-domain]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vcmp-validated-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vpcmp-typed-domain-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

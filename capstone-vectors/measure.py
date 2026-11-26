@@ -90,35 +90,26 @@ try:
                 def record_problem(reason):
                     groups['errors']+=1
                     if len(errors)<25:errors.append([reason,bits,raw,origin,before,bulk,now,current,bs,cs,oracle])
-                def corrected_float(old,new):
-                    if old=='-' or new=='-':return False
-                    a,oldid=old.rsplit('|',1);b,newid=new.rsplit('|',1)
-                    oldlen,_,oa=a.split(' ',2);newlen,op,ob=b.split(' ',2)
-                    # Predicate spelling, conditions, explicit operands and cursor length agree.
-                    offset=int(newlen)*2
-                    if oldlen!=newlen or oa!=ob or oldscan!=int(newid) or op not in ('vcmp','vcmpss','vcmpsd','vcmpps','vcmppd'):return False
-                    return int(oldid)==int(newid)+1+(int(raw[offset-2:offset],16)&31)
+                families=('vpcmpb','vpcmpub','vpcmpw','vpcmpuw','vpcmpd','vpcmpud','vpcmpq','vpcmpuq')
+                if bx!=cx or before!=now or bulk!=current:record_problem('changed-printed-record')
                 if before!=bulk:groups['old-iterator-bulk']+=1
-                if before!=now:
-                    by_mode[str(bits)+'/'+origin]+=1
-                    if not corrected_float(before,now):record_problem('changed-public-record')
-                if bulk!=current:record_problem('changed-bulk-record')
-                if now!=current:record_problem('bulk-iterator')
-                if cm:
-                    if cm!=bm or bx!=cx or oldscan!=newscan or not now.split()[1].startswith('vpcmp'):record_problem('unexplained-scan')
-                    groups['inherited-integer-scan']+=1
-                    if origin.startswith('DecoderTest'):groups['inherited-original-integer']+=1
-                if ((bx>>8)!=(cx>>8) and before==now) or (bx&255)!=(cx&255):record_problem('scan')
                 if bm:groups['old-scan']+=1
-                if origin.startswith(('vex-','evex-')) and now!='-' and oracle!='-':
-                    op=oracle.split()[1]
-                    if now.split()[0]!=oracle.split()[0]:record_problem('oracle-length')
-                    if origin=='evex-int' and now.split()[1]!=op:record_problem('integer-family')
-                    if origin.endswith('-fp') and now.split()[1] not in ('vcmp',op): record_problem('floating-family')
+                if oldscan!=newscan or bm!=cm:
+                    by_mode[str(bits)+'/'+origin]+=1
+                    if before=='-' or before.split()[1] not in families or not bm or cm or newscan!=(cx>>8) or before!=bulk:record_problem('invalid-scan-correction')
+                    else:groups['corrected-integer-scan']+=1
+                if cm:
+                    if before==bulk or current=='-' or current.split()[1] not in ('vcmp','vcmpsd','vcmpss','vcmpps','vcmppd') or oldscan!=newscan or bm!=cm:record_problem('unexpected-surviving-mismatch')
+                    groups['inherited-floating']+=1
+                if origin.startswith(('vex-','evex-')) and current!='-' and oracle!='-':
+                    oplen,op=oracle.split()[:2];render=current.split()
+                    if render[0]!=oplen:record_problem('oracle-length')
+                    if origin=='evex-int' and render[1]!=op:record_problem('integer-family')
+                    if origin.endswith('-fp') and render[1] not in ('vcmp',op):record_problem('floating-family')
                     kept[op]+=1
                 if origin.startswith('DecoderTest') and bm:groups['original-corpus-differences']+=1
         proof=dict(cases=len(records),groups=groups,examples=errors,changed=by_mode,iced_overlap=kept)
-        save('case-proof-'+label,proof);assert not errors and groups['old-iterator-bulk']>0 and len(kept)==12,proof
+        save('case-proof-'+label,proof);assert not errors and groups['corrected-integer-scan']==1738 and groups['old-iterator-bulk']==groups['inherited-floating']==22414 and len(kept)==12,proof
         verdict[label]=proof
     assert verdict['candidate']==verdict['record']
     save('complete',dict(source=q,host=platform.platform(),proof=verdict['candidate']))
