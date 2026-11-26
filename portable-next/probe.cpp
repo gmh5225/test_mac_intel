@@ -1,0 +1,210 @@
+//===- compare.cpp - Compare x86 decoder API workloads -------------------===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+/// \file
+/// Compare x86 decoder API workloads. Benchmark-only; not linked into NeverD.
+
+#include <algorithm>
+#include <cstring>
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iterator>
+#include <stdexcept>
+#include <string>
+#include <vector>
+#ifdef __APPLE__
+#include <pthread/qos.h>
+#endif
+#ifdef USE_BATCH
+#endif
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
+#include <capstone/capstone.h>
+
+struct Result {
+  uint64_t instructions = 0, rejected = 0;
+  uint64_t boundaries = 0xcbf29ce484222325ULL, values = 0;
+};
+static double process_cpu_ns() {
+#ifdef _WIN32
+  FILETIME created, exited, kernel, user;
+  if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user))
+    throw std::runtime_error("GetProcessTimes");
+  auto ticks = [](FILETIME t) {
+    return (uint64_t(t.dwHighDateTime) << 32) | t.dwLowDateTime;
+  };
+  return double(ticks(kernel) + ticks(user)) * 100;
+#else
+  const auto ticks = std::clock();
+  if (ticks == std::clock_t(-1))
+    throw std::runtime_error("clock");
+  return double(ticks) * 1e9 / CLOCKS_PER_SEC;
+#endif
+}
+
+static void record(Result &r, size_t offset, size_t length, bool ok) {
+  r.boundaries =
+      (r.boundaries ^ ((offset << 5) | (length << 1) | ok)) * 1099511628211ULL;
+  if (ok)
+    ++r.instructions;
+  else
+    ++r.rejected;
+}
+static void text_value(Result &r, const char *s) {
+  size_t n = 0;
+  n=std::strlen(s);
+  r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
+}
+
+template<auto Next>
+static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn,uint64_t start_ip,unsigned mode) {
+  Result result;
+  {
+    const uint8_t *cursor = bytes;
+    size_t left = count;
+    uint64_t ip = start_ip;
+    while (left) {
+      size_t offset = cursor - bytes;
+      bool ok = Next(handle, &cursor, &left, &ip, insn);
+      record(result, offset, ok ? insn->size : 1, ok);
+      if (!ok) {
+        ++cursor;
+        --left;
+        ++ip;
+        continue;
+      }
+      if (!insn->size)
+        throw std::runtime_error("zero instruction length");
+      result.values += insn->id;
+      if (mode) {
+        text_value(result, insn->mnemonic);
+        text_value(result, insn->op_str);
+      }
+      if (mode == 2 || mode == 4) {
+        if (mode==2) {
+        cs_regs read, written;
+        uint8_t nr = 0, nw = 0;
+        if (cs_regs_access(handle, insn, read, &nr, written, &nw) != CS_ERR_OK)
+          throw std::runtime_error("cs_regs_access");
+        for (unsigned i = 0; i < nr; ++i)
+          result.values += read[i];
+        for (unsigned i = 0; i < nw; ++i)
+          result.values += written[i];
+        }
+        const auto &x = insn->detail->x86;
+        result.values += x.eflags + insn->detail->groups_count;
+        for (unsigned i = 0; i < x.op_count; ++i) {
+          const auto &o = x.operands[i];
+          result.values += o.type + o.size + o.access;
+          if (o.type == X86_OP_REG)
+            result.values += o.reg;
+          if (o.type == X86_OP_IMM)
+            result.values += o.imm;
+          if (o.type == X86_OP_MEM)
+            result.values += uint64_t(o.mem.segment) + o.mem.base +
+                             o.mem.index + o.mem.scale + o.mem.disp;
+        }
+      }
+    }
+  }
+  return result;
+}
+struct Span { size_t offset, size; uint64_t ip; };
+static void add_result(Result &total,const Result &span,const Span &range) {
+  total.instructions += span.instructions; total.rejected += span.rejected;
+  total.boundaries = ((total.boundaries ^ range.ip) * 1099511628211ULL ^ span.boundaries) * 1099511628211ULL;
+  total.values += span.values;
+}
+
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
+int main(int argc,char **argv) {
+  if(argc==2 && std::strcmp(argv[1],"--library")==0) {
+#ifdef _WIN32
+    HMODULE dll=GetModuleHandleW(L"capstone.dll");
+    if(!dll) dll=GetModuleHandleW(L"libcapstone.dll");
+    char name[MAX_PATH];
+    if(!GetModuleFileNameA(dll,name,MAX_PATH)) return 9;
+    std::puts(name);
+#else
+    Dl_info info;
+    if(!dladdr(reinterpret_cast<const void *>(&cs_version),&info)) return 9;
+    std::puts(info.dli_fname);
+#endif
+    return 0;
+  }
+  if(argc!=7) return 2;
+  std::string engine=argv[1];
+  const bool att=engine=="public-att";
+  if(att) engine="capstone";
+  unsigned mode=std::stoul(argv[2]), reps=std::stoul(argv[3]);
+  if (mode>4 || !reps) return 2;
+  std::ifstream file(argv[4],std::ios::binary), table(argv[5]);
+  std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(file), {}};
+  std::vector<Span> spans;
+  Span span{};
+  while(table>>span.offset>>span.size>>span.ip) {
+    if(!span.size || span.offset>bytes.size() || span.size>bytes.size()-span.offset) return 3;
+    spans.push_back(span);
+  }
+  if(!table.eof() || spans.empty()) return 3;
+  unsigned bits=std::stoul(argv[6]);
+  csh handle=0;
+  if(cs_open(CS_ARCH_X86,bits==16?CS_MODE_16:(bits==32?CS_MODE_32:CS_MODE_64),&handle)!=CS_ERR_OK ||
+     cs_option(handle,CS_OPT_DETAIL,mode>=2 ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK ||
+     cs_option(handle,CS_OPT_TEXT,mode ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK) return 4;
+  if(att && cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT)!=CS_ERR_OK) return 4;
+  cs_insn *insn=cs_malloc(handle);
+  if(!insn || engine!="capstone") return 5;
+  {
+    auto run=[&](unsigned n) {
+      Result all;
+      for(unsigned i=0;i<n;++i) for(auto f:spans) {
+        Result row;
+        row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
+        add_result(all,row,f);
+      }
+      return all;
+    };
+#ifdef _WIN32
+    DWORD_PTR mask,system;
+    if(!GetProcessAffinityMask(GetCurrentProcess(),&mask,&system) || !mask ||
+       !SetThreadAffinityMask(GetCurrentThread(),mask & -mask)) return 7;
+#endif
+    Result warm=run(1);
+    auto start=std::chrono::steady_clock::now();
+#ifdef _WIN32
+    ULONG64 t0,t1; if(!QueryThreadCycleTime(GetCurrentThread(),&t0)) return 7;
+#else
+    double t0=process_cpu_ns();
+#endif
+    Result timed=run(reps);
+#ifdef _WIN32
+    if(!QueryThreadCycleTime(GetCurrentThread(),&t1)) return 7;
+#else
+    double t1=process_cpu_ns();
+#endif
+    auto duration=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-start).count();
+    if(warm.instructions*reps!=timed.instructions || warm.rejected*reps!=timed.rejected) return 8;
+    std::printf("%llu %lld %llu %llu %llu %llu\n",(unsigned long long)(t1-t0),(long long)duration,
+       (unsigned long long)timed.instructions,(unsigned long long)timed.rejected,
+       (unsigned long long)timed.boundaries,(unsigned long long)timed.values);
+  }
+  cs_free(insn,1); cs_close(&handle);
+}
