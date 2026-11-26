@@ -1,7 +1,7 @@
-name: Compare decoded public alias IDs in the full source-built NeverD product
+name: Verify the production NeverD decoder and 60 workloads with current source-built LLVM
 on:
   push:
-    branches: [codex/product-decoded-predicate-alias]
+    branches: [codex/riscv-first-gap-neverd-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 276a657138f58b0ef97a876288347aaacfde0e74
+          ref: 4a8792d7f80da91b1d852859abafe0684416b38a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-decoded-alias-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-rv-compact-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-for k in ('base','layout','selector','oracle'):assert sha(r/(k+'.patch'))==m[k]['sha256']
+assert sha(r/'candidate.patch')==m['candidate']['sha256']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -48,161 +48,34 @@ try:
     cases.append(data)
     shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp')
     with (nd/'CMakeLists.txt').open('a') as f:f.write('\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
-    shutil.copyfile(r/'oracle.cpp',nd/'capstone-id-oracle.cpp')
-    with (nd/'CMakeLists.txt').open('a')as f:f.write('\nadd_executable(capstone-id-oracle capstone-id-oracle.cpp)\ntarget_link_libraries(capstone-id-oracle PRIVATE NeverDDecode)\n')
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
-    targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests'];products={};identities={}
-    from elftools.elf.elffile import ELFFile
-    decoder=nd/'lib/decode/X86/X86Decoder.cpp'
-    proof={}
-    for variant in ('base','layout','selector'):
-        command(['git','restore','--source','HEAD','--staged','--worktree','--','.'],'restore-'+variant,cs)
-        assert git(cs,'rev-parse','HEAD')==m['base']['commit']
-        if variant!='base':command(['git','apply','--index',r/(variant+'.patch')],'apply-'+variant,cs)
-        caller='lib/decode/Decoder.cpp'
-        entry='X86_disasmIterText'
-        assert entry+'(Handle' in (nd/caller).read_text()
-        actual=git(cs,'write-tree');assert actual==m[variant]['tree'] and 'return X86_scanNativeBatch(' in decoder.read_text()
-        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*(['capstone-id-oracle']if variant=='base'else[]),*targets,'--parallel','4'],'build-'+variant,nd)
-        assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
-        assert git(cs,'write-tree')==actual and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
-        command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(variant+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+variant)
-        binary,=build.rglob('capstone-product');products[variant]=t/(variant+'-product');shutil.copy2(binary,products[variant])
-        if variant=='base':
-            original_oracle,=build.rglob('capstone-id-oracle');products['oracle']=t/'reference-product';shutil.copy2(original_oracle,products['oracle'])
-        names=sp.check_output(['nm','--defined-only',binary],text=True).splitlines()
-        hot=['cs_disasm_iter','cs_regs_access','cs_decode_full_insn','X86_scanNativeBatch','X86_disasmIterText','X86_getInstruction','X86_Vex','AArch64_getInstruction','ARM_getInstruction','Mips_getInstruction','PPC_getInstruction','RISCV_getInstruction','X86_tryATTOutput']
-        positions={x.split()[-1]:int(x.split()[0],16) for x in names if len(x.split())==3 and x.split()[-1] in hot}
-        assert {'cs_disasm_iter','cs_regs_access','X86_scanNativeBatch','X86_disasmIterText'}<=positions.keys()
-        save('hot-symbols-'+variant,positions)
-        assert any(x.split()[-1]=='X86_scanNativeBatch' for x in names if x.split())
-        archive,=build.rglob('libcapstone.a')
-        assert all(list(build.rglob(n+'.c.o')) for n in ('PPCMapping','RISCVMapping','X86Mapping','MipsMapping','ARMMapping','AArch64Mapping'))
-        command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'offset.cpp',archive,'-o',t/'offset'],'link-offset-'+variant)
-        vals=sp.check_output([t/'offset'],text=True).strip().splitlines();assert len(vals)==48
-        assert vals==json.loads((r/'offset-expected.json').read_text())['base'].splitlines()
-        save('absolute-offsets-'+variant,vals)
-        command(['clang++','-std=c++17','-O2','-I',cs/'include',r/'moffs.cpp',archive,'-o',t/'moffs'],'link-moffs-'+variant)
-        counts=list(map(int,sp.check_output([t/'moffs'],text=True,stderr=sp.DEVNULL).split()))
-        assert counts==[11520,864,0],(variant,counts)
-        save('moffs-'+variant,counts)
-        command(['clang++','-O2','-std=c++17','-I',cs/'include',r/'alias-raw.cpp',archive,'-o',t/'alias-raw'],'link-alias-'+variant)
-        records={}
-        for z in foreign:
-            for option in range(5):
-                result=list(map(int,sp.check_output([t/'alias-raw','arm'if z['name'].startswith('arm64-')else 'mips',z['path'],str(option)]).split()))
-                assert len(result)==4 and result[0]>0
-                records[z['name']+'/'+str(option)]=result
-        assert len(records)>=10
-        if variant=='base':base_records=records
-        else:assert base_records==records
-        save('alias-records-'+variant,records)
-        command(['clang','-O2','-I',cs/'include',r/'probe.c',archive,'-o',t/'mask-access'],'verify-build-'+variant)
-        command([t/'mask-access'],'verify-memory-'+variant)
-        assert (out/('verify-memory-'+variant+'.log')).read_text().strip()=='3120 encodings and syntax cases, 0 incorrect memory accesses, 0 incorrect shapes'
-        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'segment.cpp',archive,'-o',t/'segment'],'link-segment-'+variant)
-        segment=list(map(int,sp.check_output([t/'segment'],text=True).split()));assert segment==[884736, 405504, 12422393723512408869]
-        save('segment-'+variant,segment)
-        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'rotate.cpp',archive,'-o',t/'rotate'],'link-rotate-'+variant)
-        counts=list(map(int,sp.check_output([t/'rotate'],text=True).split()));assert counts==([10829824, 3719765, 7276063618347817852, 86824, 192] if variant=='base' else [10829824, 3719765, 18263537639128292220, 86824, 0])
-        save('rotate-'+variant,counts)
-        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'clear.cpp',archive,'-o',t/'clear'],'link-clear-'+variant)
-        counts=list(map(int,sp.check_output([t/'clear'],text=True).split()));assert counts==[1769472, 223848, 4122166208100581125]
-        save('clear-'+variant,counts)
-        test=out/('tests-'+variant+'.log')
-        assert '100% tests passed' in test.read_text()
-        if variant=='base':
-            import frozen_ssl64
-            name,bits,path,spans,metadata=next(iter(frozen_ssl64.prepare(t)));q=json.loads((r/'ssl64-extents.json').read_text())
-            assert name=='libssl3t64-amd64' and bits==64 and len(spans)==q['input_functions'] and sha(path)==q['text_sha256']
-            intervals=t/'openssl-amd64.tsv';intervals.write_text(''.join('%d %d %d\n'%s for s in spans))
-            command(['clang++','-O2','-I',cs/'include',r/'vectors.cpp',archive,'-o',t/'vectors'],'vectors')
-            views=[list(map(int,x.split()))for x in sp.check_output([t/'vectors','64',path,intervals],text=True).splitlines()]
-            assert len(views)==len(spans)
-            skip={tuple(s[:3]) for s in q['excluded_incompatible_extents']}
-            chosen=[z for z,(total,vectors) in zip(spans,views)if tuple(z)not in skip and vectors>=8 and vectors>=.15*total]
-            intervals.write_text(''.join('%d %d %d\n'%s for s in chosen));assert len(chosen)==320 and sha(intervals)==q['extent_sha256']
-            cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
-            save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
-
-        import io
-        members=sp.check_output(['ar','t',archive],text=True).splitlines()
-        assert len(members)==len(set(members)) and {'X86Mapping.c.o','X86InstPrinterCommon.c.o','X86BatchScan.c.o'}<=set(members)
-        owners=[line for line in sp.check_output(['nm','-A','--defined-only',archive],text=True).splitlines() if line.split()[-2:] in (['T','X86_postprinter'],['t','X86_postprinter'])]
-        assert len(owners)==1 and any(m in owners[0] for m in ('X86Mapping.c.o','X86PostPrinter.c.o')),owners
-        owner,=[m for m in members if ':'+m+':' in owners[0]]
-        save('postprinter-owner-'+variant,dict(member=owner,archive_members=members))
-        code_sections={}
-        for name in members:
-            assert name.endswith('.c.o'),name
-            elf=ELFFile(io.BytesIO(sp.check_output(['ar','p',archive,name])))
-            code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
-        save('executable-sections-'+variant,code_sections)
-        with binary.open('rb') as file:
-            elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-            save('linked-sections-'+variant,layout)
-        identities[variant]=dict(archive=sha(archive),binary=sha(binary),cap_tree=actual,llvm=llvm,decoder=sha(decoder))
-    assert m['oracle']==m['base']
-    identities['oracle']=dict(identities['base'],binary=sha(products['oracle']),probe=sha(r/'oracle.cpp'))
-    save('absolute-offsets-oracle',json.loads((out/'absolute-offsets-base.json').read_text()))
-    assert len({identities[k]['binary'] for k in ('base','layout','selector')})==3
-    save('products',identities)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    cpu=sp.check_output(['lscpu'],text=True);save('host',dict(cpu=cpu,compiler=sp.check_output(['clang','--version'],text=True)))
-    shutil.copy2(products['base'],t/'selected')
-    imgs={k:v.read_bytes()for k,v in products.items() if k!='oracle'};imgs['copy']=imgs['base']
-    length=max(map(len,imgs.values()));imgs={k:v+bytes(length-len(v))for k,v in imgs.items()}
-    image=t/'selected';image.write_bytes(imgs['base'])
-    inode=image.stat().st_ino;block=4096
-    offsets=[at for at in range(0,length,block) if len({v[at:at+block]for v in imgs.values()})>1]
-    assert offsets
-    checked={}
-    def execute(k,case,mode,reps):
-        # Touch exactly the same file pages, in the same order, before every exec.
-        if k!='oracle':
-            with image.open('r+b',buffering=0) as dest:
-                for at in offsets:
-                    dest.seek(at)
-                    part=imgs[k][at:at+block]
-                    assert dest.write(part)==len(part)
-            assert image.stat().st_ino==inode and image.stat().st_size==length
-            if k not in checked:
-                checked[k]=sha(image);assert checked[k]==hashlib.sha256(imgs[k]).hexdigest()
-
-        sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
-        args=['setarch',os.uname().machine,'-R',products['oracle'] if k=='oracle' else image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])]
-        got=sp.run(args,capture_output=True,text=True)
-        if got.returncode:print(case["name"],mode,k,got.returncode,got.stderr,flush=True);got.check_returncode()
-        if k=='oracle':
-            count,width,integers,delta=map(int,got.stderr.split());assert min(count,width,integers)>=0 and all(v%reps==0 for v in (count,width,integers,delta))
-            proof[case['name']+'/'+str(mode)]=dict(projected=count,typed=width,integers=integers,delta=delta,reps=reps);save('alias-projections',proof)
-        return list(map(int,got.stdout.split()))
-    cases.sort(key=lambda row:row['name']!='libmvec-amd64')
-    rows=[];rng=random.Random(1739)
-    for c in cases:
-        for mode in (range(6) if c['selector'] in (32,64) else range(3)):
-            single=execute('base',c,mode,1)
-            n=max(1,round(25000/single[0]))
-            expected=execute('base',c,mode,n)[1:];cycles=[]
-            corrected=execute('oracle',c,mode,n)[1:];assert corrected[:3]==expected[:3],(c['name'],mode,corrected,expected)
-            changed=proof[c['name']+'/'+str(mode)]['projected']
-            assert corrected[3]-expected[3]==proof[c['name']+'/'+str(mode)]['delta'],(c['name'],mode,changed,expected,corrected)
-            if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
-            pairs=35 if c['selector']==4 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('putty-32-0.85',3),('arm-ls',1),('arm-ls',2),('arm64-ls',1),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
-            for rep in range(pairs):
-                keys=list(imgs);rng.shuffle(keys);ticks={v:[] for v in keys}
-                for k in keys+keys[::-1]:
-                    sample=execute(k,c,mode,n)
-                    wanted=expected if k in ('base','copy') else corrected
-                    assert wanted==sample[1:],(c['name'],mode,k,wanted,sample)
-                    ticks[k].append(sample[0])
-                cycles.append(ticks)
-            rows.append(dict(case=c['name'],mode=mode,sha=c['text_sha256'],counts=expected[:2],boundary=expected[2],score=expected[3],corrected_score=corrected[3],reps=n,cycles=cycles))
-            save('timings',rows)
-    assert set(checked)==set(imgs) and checked['copy']==checked['base']
-    save('fixed-image',dict(inode=inode,verified=checked,bytes=length,block=block,blocks=len(offsets)))
-    save('complete',dict(done=True,pairs=13,ssl_pairs=35,panels=len(rows),source=llvm))
+    targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
+    identities={};results={}
+    for stage in ('base','candidate'):
+        if stage=='candidate':
+            command(['git','apply','--index',r/'candidate.patch'],'apply',cs)
+        assert git(cs,'write-tree')==m[stage]['tree']
+        command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+stage,nd)
+        assert git(cs,'write-tree')==m[stage]['tree'] and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
+        command(['ctest','--test-dir',build,'--no-tests=error','--parallel','4','--output-on-failure','--output-junit',out/(stage+'.xml'),'-L','^('+'|'.join(targets)+')$'],'tests-'+stage)
+        lib,=build.rglob('libcapstone.a');binary,=build.rglob('capstone-product')
+        names=sp.check_output(['nm','--defined-only',binary],text=True)
+        assert all(' '+sym in names for sym in ('X86_scanNativeBatch','X86_disasmIterText','RISCV_compact_operands','cs_disasm_iter'))
+        objs={str(f.relative_to(build)):sha(f) for f in build.rglob('*.c.o') if '/capstone' in str(f.relative_to(build)) or f.name=='RISCVMapping.c.o'}
+        assert len(objs)>=60 and any(k.endswith('RISCVMapping.c.o') for k in objs),list(objs)
+        identities[stage]=dict(archive=sha(lib),exe=sha(binary),objects=objs,llvm=llvm,decoder=sha(nd/'lib/decode/Decoder.cpp'))
+        rows={}
+        for c in cases:
+            sel=str(c['selector']) if c['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[c['selector']]
+            for mode in (range(6) if c['selector'] in (32,64) else range(3)):
+                args=[binary,c['path'],sel,str(mode),'1',*([c['intervals']] if 'intervals' in c else [])]
+                values=list(map(int,sp.check_output(args,text=True).split()))
+                assert len(values)==5 and values[0]>0 and values[1]>0,(c['name'],mode,values)
+                rows[c['name']+'/'+str(mode)]=dict(text=c['text_sha256'],counts=values[1:3],boundary=values[3],score=values[4])
+        assert len(rows)==60
+        results[stage]=rows;save('products',identities);save('records',results)
+    assert identities['candidate']==identities['base'] and results['base']==results['candidate']
+    save('complete',dict(complete=True,inputs=len(cases),workloads=len(results['base']),llvm=llvm,dev=dev,source=m))
 finally:
-    size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink())
-    shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))
+    size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))
