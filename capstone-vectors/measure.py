@@ -40,6 +40,17 @@ try:
         syms=get('nm','-D','--defined-only','--format=posix',dll).splitlines()
         symbols[stage]=sorted(row.split()[0] for row in syms)
         objects[stage]={str(f.relative_to(build)):sha(f) for f in build.rglob('*.c.o')}
+        if stage=='candidate':
+            info=m['direct_reader_control'];unit=src/info['file'];original=unit.read_bytes()
+            assert sha(r/'direct.c')==info['sha256']
+            for label,value in [('direct',(r/'direct.c').read_bytes()),('restore',original)]:
+                unit.write_bytes(value);run('git','-C',src,'add','--',info['file'])
+                want=q['direct' if label=='direct' else 'candidate']['tree']
+                assert get('git','-C',src,'write-tree').strip()==want
+                run('cmake','--build',build,'--target','capstone_shared','--parallel','4')
+                if label=='direct':
+                    clone=w/'direct.so';shutil.copyfile(so,clone);images[label]=clone.read_bytes();sources[label]=sha(clone);sizes[label]=len(images[label])
+                else:assert so.read_bytes()==images['candidate']
         run('cmake','-G','Ninja','-S',project,'-B',static_build,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
         run('cmake','--build',static_build,'--target','capstone_static','--parallel','4')
         static_lib,=static_build.rglob('libcapstone.a')
@@ -57,7 +68,7 @@ try:
     images['copy']=images['base'];image=selected/soname;image.write_bytes(images['base']);inode=image.stat().st_ino
     spans=[]
     for i in range(0,maximum,4096):
-        if images['base'][i:i+4096]!=images['candidate'][i:i+4096]:
+        if any(v[i:i+4096]!=images['base'][i:i+4096]for v in images.values()):
             if spans and spans[-1][1]==i:spans[-1][1]=min(i+4096,maximum)
             else:spans.append([i,min(i+4096,maximum)])
     previous=None;verified={}
@@ -108,7 +119,7 @@ try:
     save('host',host);records={};timings={}
     def measure(key,engines,take):
         n=max(1,math.ceil(25e6/take('base',1)[0]));expected={k:take(k,n)[2:]for k in engines}
-        assert expected['base']==expected['copy']==expected['candidate']
+        assert expected['direct']==expected['base']==expected['copy']==expected['candidate']
         if 'iced' in expected:assert all(v[:3]==expected['base'][:3]for v in expected.values())
         rng=random.Random('shared-library/'+key);blocks=[];order=list(engines)
         for _ in range(17):
@@ -136,12 +147,14 @@ try:
             audits.append(audit)
         assert audits[0]==audits[1]
         records[name]=[list(map(int,get(w/'trial-real',w/'base.so',w/'candidate.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
+        direct_records=[list(map(int,get(w/'trial-real',w/'base.so',w/'direct.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
+        assert direct_records==records[name]
         save('records',records)
         for mode in (0,1,2):
             def take(k,n):
                 other=k in ('iced','fast');select('base' if other else k)
                 return list(map(int,get(*invoke,w/'driver',k if other else 'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('intel/'+name+'/'+str(mode),['base','copy','candidate','iced']+(['fast']if mode else []),take)
+            measure('intel/'+name+'/'+str(mode),['base','copy','direct','candidate','iced']+(['fast']if mode else []),take)
         for mode in (1,2):
             def take(k,n):
                 select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))

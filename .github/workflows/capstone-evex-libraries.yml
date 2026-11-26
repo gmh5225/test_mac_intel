@@ -1,7 +1,7 @@
-name: Measure AT&T register formatting and check PE32 and native mixed libraries
+name: Compare two AT&T register writers under the same executable and fixed program ranges
 on:
   push:
-    branches: [codex/att-register-token-mixed-check]
+    branches: [codex/att-register-writer-comparison]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: register-token-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: existing-stream-token-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
