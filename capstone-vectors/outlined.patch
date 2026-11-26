@@ -1,133 +1,24 @@
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..2606e072 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -564,6 +564,81 @@ static const struct X86SimpleRegister x86_simple_registers[4][16] = {
- 	},
- };
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..a05cf34b 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -487,6 +487,11 @@ static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
  
-+static const char x86_simple_second_names[4][16][8] = {
-+	{
-+		", al",
-+		", cl",
-+		", dl",
-+		", bl",
-+		", ah",
-+		", ch",
-+		", dh",
-+		", bh",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+	},
-+	{
-+		", al",
-+		", cl",
-+		", dl",
-+		", bl",
-+		", spl",
-+		", bpl",
-+		", sil",
-+		", dil",
-+		", r8b",
-+		", r9b",
-+		", r10b",
-+		", r11b",
-+		", r12b",
-+		", r13b",
-+		", r14b",
-+		", r15b",
-+	},
-+	{
-+		", eax",
-+		", ecx",
-+		", edx",
-+		", ebx",
-+		", esp",
-+		", ebp",
-+		", esi",
-+		", edi",
-+		", r8d",
-+		", r9d",
-+		", r10d",
-+		", r11d",
-+		", r12d",
-+		", r13d",
-+		", r14d",
-+		", r15d",
-+	},
-+	{
-+		", rax",
-+		", rcx",
-+		", rdx",
-+		", rbx",
-+		", rsp",
-+		", rbp",
-+		", rsi",
-+		", rdi",
-+		", r8",
-+		", r9",
-+		", r10",
-+		", r11",
-+		", r12",
-+		", r13",
-+		", r14",
-+		", r15",
-+	},
-+};
-+
- static const uint16_t x86_shift_rows[2][3][8] = {
- 	{
- 		{ 267, 268, 269, 270, 271, 272, 273, 274 },
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..48c4d830 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -237,15 +237,13 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			x86_simple_registers[width];
- 		const struct X86SimpleRegister *a =
- 			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
--		const struct X86SimpleRegister *b =
--			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
-+		const unsigned second_index = form == X86_SIMPLE_REG_RM ? rm : reg;
-+		const char *suffix = x86_simple_second_names[width][second_index];
- 		memcpy(insn->op_str, a->name, sizeof(a->name));
--		char *separator = insn->op_str + a->length;
--		separator[0] = ',';
--		separator[1] = ' ';
--		memcpy(separator + 2, b->name, sizeof(b->name));
-+		memcpy(insn->op_str + a->length, suffix,
-+		       sizeof(x86_simple_second_names[0][0]));
- 		first = a->reg;
--		second = b->reg;
-+		second = regs[second_index].reg;
- 		insn->bytes[1] = code[1];
- 		if (has_rex)
- 			insn->bytes[2] = code[2];
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index b202bca4..5e940981 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -629,6 +629,17 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
- 		std::cout << "\t},\n";
- 	}
- 	std::cout << "};\n";
-+	std::cout << "\nstatic const char x86_simple_second_names[4][16][8] = {\n";
-+	for (const auto &bank : regs) {
-+		std::cout << "\t{\n";
-+		for (const auto &reg : bank) {
-+			if (reg.length + 2 >= 8)
-+				throw std::runtime_error("second register spelling exceeds output row");
-+			std::cout << "\t\t\", " << reg.name << "\",\n";
-+		}
-+		std::cout << "\t},\n";
-+	}
-+	std::cout << "};\n";
- }
- bool decode_sse(Decoder &decoder, const uint8_t *code, size_t size)
+ static inline void set_early_operand_access(MCInst *MI)
  {
++#ifdef CAPSTONE_SSTREAM_PRECHECKED
++	/* This printer is entered with the default formatter. Final access is
++	 * assigned after implicit operands have been added. */
++	(void)MI;
++#else
+ #if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+ 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+ 	// A custom formatter can observe detail or change options while printing.
+@@ -498,6 +503,7 @@ static inline void set_early_operand_access(MCInst *MI)
+ 		      &MI->flat_insn->detail->x86.eflags);
+ 	MI->flat_insn->detail->x86.operands[MI->flat_insn->detail->x86.op_count]
+ 		.access = access[MI->flat_insn->detail->x86.op_count];
++#endif
+ }
+ #endif
+ 

@@ -1,56 +1,22 @@
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..b9be1b9f 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -983,39 +983,28 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 		unsigned int reg = MCOperand_getReg(Op);
- 
- 		printRegName(O, reg);
-+		if (!MI->csh->detail_opt && MI->op1_size)
-+			return;
-+
-+		const unsigned short public_reg = X86_register_map(reg);
- 		if (MI->csh->detail_opt) {
-+			cs_x86 *x86 = &MI->flat_insn->detail->x86;
-+			cs_x86_op *operand = &x86->operands[x86->op_count];
- 			if (MI->csh->doing_mem) {
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.mem.base = X86_register_map(reg);
-+				operand->mem.base = public_reg;
- 			} else {
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.type = X86_OP_REG;
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.reg = X86_register_map(reg);
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size =
--					MI->csh->regsize_map[X86_register_map(
--						reg)];
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..f33f76bd 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12076,14 +12076,12 @@ static const struct register_map {
+ // NOTE: reg_map is sorted in order of internal register
+ unsigned short X86_register_map(unsigned short id)
+ {
+-	unsigned int extension = X86_featureExtensionMCRegisterMap(id);
 -
-+				operand->type = X86_OP_REG;
-+				operand->reg = public_reg;
-+				operand->size = MI->csh->regsize_map[public_reg];
- #ifndef CAPSTONE_DIET
- 				set_early_operand_access(MI);
- #endif
--
--				MI->flat_insn->detail->x86.op_count++;
-+				x86->op_count++;
- 			}
- 		}
+-	if (extension != X86_REG_INVALID)
+-		return (unsigned short)extension;
++	/* Ordinary MC register IDs index the generated table. APX GPR IDs
++	 * occupy a separate range beginning at X86_FEATURE_MC_GPR_BASE. */
+ 	if (id < ARR_SIZE(reg_map))
+ 		return reg_map[id].pub_id;
  
- 		if (MI->op1_size == 0)
--			MI->op1_size =
--				MI->csh->regsize_map[X86_register_map(reg)];
-+			MI->op1_size = MI->csh->regsize_map[public_reg];
- 	} else if (MCOperand_isImm(Op)) {
- 		uint8_t encsize = 0;
- 		int64_t imm = MCOperand_getImm(Op);
+-	return 0;
++	return (unsigned short)X86_featureExtensionMCRegisterMap(id);
+ }
+ 
+ static bool is_mask_register(x86_reg reg)
