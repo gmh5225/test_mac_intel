@@ -1,7 +1,7 @@
-name: Time corrected MASM and absolute address formatting against the same libmvec package from the Debian archive
+name: Measure Capstone WASM formatting on SQL.js, Brotli and esbuild and verify stream callbacks
 on:
   push:
-    branches: [codex/masm-tokens-frozen-debian]
+    branches: [codex/wasm-mnemonic-default-format]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,10 +11,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, cxx: clang++ }
+          - { host: ubuntu-24.04, cc: gcc, cxx: g++ }
+          - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++ }
+          - { host: macos-15, cc: clang, cxx: clang++ }
+          - { host: macos-15-intel, cc: clang, cxx: clang++ }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -30,33 +31,18 @@ jobs:
           ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
           path: source
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/NeverD
-          ref: f47e72ea35c2b8f2270ac80a20ff79915eeffdb9
-          path: neverd-config
-          sparse-checkout: |
-            CMakeLists.txt
-            cmake/NeverDCapstoneCompilerOptions.inc
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/iced
-          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
-          path: iced-source
-          sparse-checkout: src/rust/iced-x86
-          persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
+      - name: Verify formatter hooks and time real WASM operators
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
         run: |
-          python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+          python3 -B capstone-vectors/wasm/configs.py
+          python3 -B capstone-vectors/wasm/run.py
       - if: always()
-        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: frozen-masm-token-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-format-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
