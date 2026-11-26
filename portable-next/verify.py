@@ -55,9 +55,9 @@ try:
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
                 assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]
-            if linkage=='static' and profile not in ('diet','reduced') and name in ('base','segment','digits'):
-                from rotate_link import rotate
-                rows[name]['rotate_records']=rotate(s,p,b,t,profile,name+'-'+linkage,run,linkage)
+            if profile not in ('diet','reduced'):
+                from clear_link import clear_records
+                rows[name].setdefault('clear_records',{})[linkage]=clear_records(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             if name.startswith('mips'):run(name+'-mips-projection',os.sys.executable,'-B',s/'suite/synctools/mips_register_names.py','--check')
 
             baseline=rows['base'][linkage]['snapshots']
