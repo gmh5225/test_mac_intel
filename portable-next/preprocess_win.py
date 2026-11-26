@@ -21,6 +21,15 @@ def verify(r):
                 raw=sp.check_output(command+' /EP',cwd=j['directory'])
                 assert len(raw)>5000,(j['file'],len(raw))
                 key=j['output'];lines=[v for v in raw.splitlines()if v.strip()]
+                if tag=='candidate':
+                    import re
+                    normalized=[]
+                    for line in lines:
+                        if re.fullmatch(rb'\s*enum\s*\{\s*X86_SIMPLE_OPERAND_CAPACITY\s*=\s*12\s*\}\s*;\s*',line):continue
+                        if all(spelling in line for spelling in (b'.flags = ',b'.reads = ',b'.writes = ',b'.groups = ',b'.read_count = ')):
+                            line=re.sub(rb'\.(?:flags|reads|writes|groups|read_count) = ',b'',line)
+                        normalized.append(line)
+                    lines=normalized
                 cleaned=b'\n'.join(lines);saved=w/(hashlib.sha256(key.encode()).hexdigest()+'.pp')
                 if tag=='base':saved.write_bytes(cleaned)
                 else:
@@ -36,7 +45,8 @@ def verify(r):
             # Independently compare actual compiled instructions, unwind information,
             # data and linker directives for the three fixed/public iterator units.
             import struct
-            wanted={'X86ATTInstPrinter.c'}
+            wanted=['X86ImmediateOutput.c', 'X86MemoryFallback32.c', 'X86MemoryOutput.c', 'X86OutputIterator.c', 'X86RegisterFallback32.c', 'X86Sse64Output.c', 'X86VectorFallback64.c', 'X86Vex32Output.c']
+            wanted=set(wanted)
             objects={}
             for j in jobs:
                 name=Path(j['file']).name

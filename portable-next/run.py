@@ -1,78 +1,76 @@
 from pathlib import Path
-import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
+import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
 from fixtures import fixtures,sha
 r=Path(__file__).resolve().parent;root=r.parent;src=root/'source';e=root/'evidence';e.mkdir(exist_ok=True)
-rd=lambda f:json.loads(f.read_text());m=rd(r/'experiment.json');q=rd(r/'source.json')
-profile=os.environ['SCAN_PROFILE'];win=os.name=='nt';host=platform.system()
-gcc=profile=='gcc';clang=profile in ('clang','clang14')
-if gcc:os.environ.update(CC='gcc',CXX='g++')
-if clang:os.environ.update(CC='clang',CXX='clang++')
-eligible=host=='Darwin' and profile=='full'
-os.environ['ZERO_AR_DATE']='1'
-def save(name,value):(e/(name+'.json')).write_text(json.dumps(value,indent=2)+'\n')
-def get(*a):return sp.check_output(a,text=True).strip()
-def run(*a):sp.run(a,check=True)
-def git(*a):return get('git','-C',src,*a)
-if win:
+rd=lambda f:json.loads(f.read_text());q=rd(r/'source.json');m=rd(r/'experiment.json');profile=os.environ['SCAN_PROFILE']
+if os.name=='nt':
     from preprocess_win import verify
     verify(r)
     raise SystemExit(0)
-w=Path(tempfile.mkdtemp()).resolve();build=w/'build';project=w/'project';project.mkdir()
+if profile=='gcc':os.environ.update(CC='gcc',CXX='g++')
+if profile in ('clang','clang14'):os.environ.update(CC='clang',CXX='clang++')
+os.environ['ZERO_AR_DATE']='1'
+def save(name,z):(e/(name+'.json')).write_text(json.dumps(z,indent=2)+'\n')
+def get(*a):return sp.check_output(a,text=True).strip()
+def run(*a):sp.run(a,check=True)
+def git(*a):return get('git','-C',src,*a)
+system=platform.system()
+w=Path(tempfile.mkdtemp()).resolve()
+profiles={};checks={};measured=system=='Linux' and profile=='clang'
 try:
     assert git('rev-parse','HEAD')==q['base']['commit']
-    for f in ('probe.cpp','CMakeLists.txt'):shutil.copyfile(r/f,project/f)
-    flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_SOURCE='+str(src),'-DCAPSTONE_BUILD_MACOS_THIN=ON',
-           '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF',
-           '-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON']
-    if profile=='diet':flags.append('-DCAPSTONE_BUILD_DIET=ON')
-    if profile=='noatt':flags.append('-DCAPSTONE_X86_ATT_DISABLE=ON')
-    if profile=='reduced':flags.append('-DCAPSTONE_X86_REDUCE=ON')
-    if win:flags+=['-DCMAKE_'+k+'=/Brepro' for k in ('C_FLAGS','CXX_FLAGS','EXE_LINKER_FLAGS','SHARED_LINKER_FLAGS','STATIC_LINKER_FLAGS')]
-    suffix='.exe'if win else '';images={};objects={};selected={};checks={};expected='direct' if eligible else 'base'
-    stages=['base','direct','candidate']if eligible else ['base','candidate']
-    for stage in stages:
-        if stage!='base':
-            git('restore','--source='+ (q['direct']['parent'] if stage=='direct' else 'HEAD'),'--staged','--worktree','--','.')
-            content=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/'+stage+'.patch'])
-            assert sha(content)==q[stage]['sha256']
-            patch=w/'candidate.patch';patch.write_bytes(content);git('apply','--index',patch)
-        assert git('write-tree')==q[stage]['tree']
-        run('cmake','-G','Ninja','-S',project,'-B',build,*flags)
-        run('cmake','--build',build,'--parallel','4','--target','probe_static','probe_shared')
-        dest=w/stage;dest.mkdir()
-        for kind in ('static','shared'):
-            name='probe_'+kind+suffix;exe,=build.rglob(name);shutil.copy2(exe,dest/name)
-        libs=[f for f in (build/'capstone').rglob('*')if f.is_file() and (f.name.startswith('libcapstone.so') or f.suffix.lower() in ('.dylib','.dll','.lib','.a'))]
-        assert libs
-        for f in libs:shutil.copy2(f,dest/f.name)
-        images[stage]={f.name:sha(f.read_bytes())for f in dest.iterdir()}
-        objects[stage]={str(f.relative_to(build)):sha(f.read_bytes())for f in (build/'capstone').rglob('*') if f.is_file() and f.suffix in ('.obj','.o')}
-        assert len(objects[stage])>20
-        selected[stage]={}
-        for kind in ('static','shared'):
-            exe=dest/('probe_'+kind+suffix);f=Path(get(exe,'--library')).resolve();assert f.parent==dest and (f==exe)==(kind=='static')
-            selected[stage][kind]=f.name
-        save('identities',dict(images=images,objects=objects,loaded=selected,expected=expected))
-    assert objects['candidate']==objects[expected],[(k,v,objects[expected].get(k)) for k,v in objects['candidate'].items()if v!=objects[expected].get(k)]
-    if win:
-        # MSVC import archive metadata is independent of the executable images.
-        loaded=set(selected['candidate'].values())|{'probe_shared.exe'}
-        assert all(images['candidate'][k]==images[expected][k]for k in loaded),(images,loaded)
-    else:assert images['candidate']==images[expected],images
-    if eligible:assert images['candidate']!=images['base']
-    samples=list(fixtures(r,w,m));assert len(samples)==6
-    for name,bits,file,spans in samples:
-        for syntax,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
-            if (profile=='diet' and mode) or (profile=='noatt' and syntax=='att'):continue
-            for kind in ('static','shared'):
-                def read(stage,reps):
-                    exe=w/stage/('probe_'+kind+suffix)
-                    return list(map(int,get(exe,'public-att' if syntax=='att' else 'capstone',str(mode),str(reps),file,spans,str(bits)).split()))
-                key='/'.join((kind,syntax,name,str(mode)));row=read('base',1)
-                assert all(read(stage,1)[2:]==row[2:] for stage in stages[1:])
-                checks[key]=row[2:]
-    assert checks;save('checks',checks)
-    save('complete',dict(complete=True,source=q,os=platform.platform(),host=host,profile=profile,eligible=eligible,expected=expected,checks=len(checks),
-                         objects=len(objects[expected]),images=images,loaded=selected,compiler=get('clang','--version').splitlines()[0] if clang else None))
+    inputs=list(fixtures(r,w,m));assert len(inputs)==6
+    for config in (['product','standalone','shared-mixed']if measured else ['product','standalone']):
+        project=w/config;project.mkdir();build=project/'build';multi=config!='standalone';expect='direct' if measured and config=='product' else 'base'
+        normal=(r/'CMakeLists.txt').read_text()
+        prefix=normal[:normal.index('add_subdirectory')]
+        targets=normal[normal.index('foreach(linkage static shared)'):].replace('    add_executable','    if(NOT TARGET capstone_\u0024{linkage})\n        continue()\n    endif()\n    add_executable',1)
+        if config=='product':
+            fragment=(r/'product.cmake').read_text();assert fragment.count('add_subdirectory(third_party/capstone)')==1
+            fragment=fragment.replace('add_subdirectory(third_party/capstone)','add_subdirectory("\u0024{CAPSTONE_SOURCE}" capstone)')
+            (project/'cmake').mkdir();shutil.copyfile(r/'compiler-options.inc',project/'cmake/NeverDCapstoneCompilerOptions.inc')
+        else:fragment='add_subdirectory("\u0024{CAPSTONE_SOURCE}" capstone)\n'
+        (project/'CMakeLists.txt').write_text(prefix+fragment+targets)
+        shutil.copyfile(r/'probe.cpp',project/'probe.cpp');ident={};cc={};flagsets={};record={};exported={}
+        flags=['-G','Ninja','-S',project,'-B',build,'-DCAPSTONE_SOURCE='+str(src),'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON']
+        if multi:flags+=['-DCAPSTONE_'+isa+'_SUPPORT=ON' for isa in ('ARM','AARCH64','MIPS','PPC','RISCV')]
+        for tag in (['base','direct','candidate'] if expect=='direct' else ['base','candidate']):
+            git('restore','--source=HEAD','--staged','--worktree','--','.')
+            if tag!='base':
+                buf=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/'+tag+'.patch']);assert sha(buf)==q[tag]['sha256']
+                patch=w/'candidate.patch';patch.write_bytes(buf);git('apply','--index',patch)
+            assert git('write-tree')==q[tag]['tree']
+            run('cmake',*flags)
+            names=['static']if config=='product'else['static','shared']
+            run('cmake','--build',build,'--parallel','4','--target',*['probe_'+kind for kind in names])
+            rows=[z for z in rd(build/'compile_commands.json')if Path(z['file']).suffix=='.c'];assert len(rows)>20
+            flags_per={Path(z['file']).name:'CAPSTONE_X86_COMPACT_SCALAR_ROWS' in z['command'] for z in rows}
+            assert all(t==(tag=='candidate' and expect=='direct')for t in flags_per.values()),(config,tag,flags_per)
+            cc[tag]=len(rows);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
+            objs={str(f.relative_to(build)):sha(f.read_bytes()) for f in (build/'capstone').rglob('*.o')}
+            assert len(objs)==len(rows) and any('RISCVMapping.c' in k for k in objs)==multi
+            dest=project/tag;dest.mkdir()
+            for kind in names:shutil.copy2(build/('probe_'+kind),dest)
+            for f in (build/'capstone').rglob('libcapstone*'):
+                if f.is_file() and (f.name.startswith('libcapstone.so') or f.suffix in ('.dylib','.a')):shutil.copy2(f,dest/f.name)
+            images={f.name:sha(f.read_bytes())for f in dest.iterdir()};assert 'libcapstone.a' in images
+            if 'shared' in names:
+                assert Path(get(dest/'probe_shared','--library')).resolve().parent==dest
+            assert Path(get(dest/'probe_static','--library')).resolve()==dest/'probe_static'
+            ident[tag]=dict(objects=objs,images=images);rec={}
+            for stem,bits,file,spans in inputs:
+                for syntax,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
+                    for kind in names:
+                        key='/'.join((kind,syntax,stem,str(mode)))
+                        rec[key]=list(map(int,get(dest/('probe_'+kind),'public-att' if syntax=='att' else 'capstone',str(mode),'1',file,spans,str(bits)).split()))[2:]
+            record[tag]=rec
+            save(config+'-identities',ident)
+        assert ident['candidate']==ident[expect],(config,expect,[(k,v,ident[expect]['objects'].get(k))for k,v in ident['candidate']['objects'].items()if v!=ident[expect]['objects'].get(k)],ident['candidate']['images'],ident[expect]['images'])
+        assert expect=='base' or ident['candidate']!=ident['base']
+        assert all(rec==record['base']for rec in record.values())
+        profiles[config]=dict(expected=expect,object_counts=cc,flags=flagsets,records=len(record['candidate']),identities=ident)
+        checks[config]=record['base'];save('checks',checks);save('profiles',profiles)
+        shutil.rmtree(project)
+    save('complete',dict(complete=True,source=q,profile=profile,host=system,machine=platform.machine(),measured=measured,configs=list(profiles),checks={k:len(v)for k,v in checks.items()}))
 finally:
     size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))

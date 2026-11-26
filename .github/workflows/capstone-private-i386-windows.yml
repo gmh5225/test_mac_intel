@@ -1,7 +1,7 @@
-name: Verify the measured macOS AT&T library and compare Linux and MSVC baselines
+name: Verify final scalar records against the measured Linux product and the standalone baseline
 on:
   push:
-    branches: [codex/apple-att-native-libraries]
+    branches: [codex/linux-mixed-scalar-layout]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/capstone
           fetch-depth: 2
-          ref: 0714b252d0fbec75abe4bdd2149f144ef518f0b6
+          ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: att-native-images-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: scalar-layout-release-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
