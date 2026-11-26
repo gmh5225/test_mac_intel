@@ -1,7 +1,7 @@
-name: Check corrected public predicate families and optional KMOV reads across nineteen configurations
+name: Verify the exact corrected predicate tree with the ARM printer and KMOV scanner in nineteen configurations
 on:
   push:
-    branches: [codex/typed-family-final-platform-matrix]
+    branches: [codex/exact-semantic-tree-portability]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: predicate-families-final-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: corrected-predicate-arm-kmov-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
