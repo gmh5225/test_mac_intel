@@ -1,7 +1,7 @@
-name: Check MSVC preprocessing and compiled COFF sections alongside final native images
+name: Verify the measured macOS AT&T library and compare Linux and MSVC baselines
 on:
   push:
-    branches: [codex/native-fixed-record-release]
+    branches: [codex/apple-att-native-libraries]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -30,7 +30,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: eac7e8af8fcc31631f97470d2f01678382c3f2c0
+          fetch-depth: 2
+          ref: 0714b252d0fbec75abe4bdd2149f144ef518f0b6
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -44,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: native-equivalent-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: att-native-images-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

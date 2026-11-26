@@ -7,7 +7,7 @@ profile=os.environ['SCAN_PROFILE'];win=os.name=='nt';host=platform.system()
 gcc=profile=='gcc';clang=profile in ('clang','clang14')
 if gcc:os.environ.update(CC='gcc',CXX='g++')
 if clang:os.environ.update(CC='clang',CXX='clang++')
-eligible=(host=='Linux' and profile=='clang') or host=='Darwin'
+eligible=host=='Darwin' and profile=='full'
 os.environ['ZERO_AR_DATE']='1'
 def save(name,value):(e/(name+'.json')).write_text(json.dumps(value,indent=2)+'\n')
 def get(*a):return sp.check_output(a,text=True).strip()
@@ -32,7 +32,7 @@ try:
     stages=['base','direct','candidate']if eligible else ['base','candidate']
     for stage in stages:
         if stage!='base':
-            git('restore','--source=HEAD','--staged','--worktree','--','.')
+            git('restore','--source='+ (q['direct']['parent'] if stage=='direct' else 'HEAD'),'--staged','--worktree','--','.')
             content=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/'+stage+'.patch'])
             assert sha(content)==q[stage]['sha256']
             patch=w/'candidate.patch';patch.write_bytes(content);git('apply','--index',patch)

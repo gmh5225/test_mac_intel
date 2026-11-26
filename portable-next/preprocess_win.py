@@ -36,7 +36,7 @@ def verify(r):
             # Independently compare actual compiled instructions, unwind information,
             # data and linker directives for the three fixed/public iterator units.
             import struct
-            wanted={'X86PublicOutput.c','X86Sse64Output.c','X86Vex32Output.c'}
+            wanted={'X86ATTInstPrinter.c'}
             objects={}
             for j in jobs:
                 name=Path(j['file']).name
