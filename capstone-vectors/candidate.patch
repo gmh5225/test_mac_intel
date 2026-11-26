@@ -50,10 +50,10 @@ index 6fcbe3f4..83e404e8 100644
  	case CS_OPT_SYNTAX:
  		switch (value) {
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
-index cfd13cba..793a92a3 100644
+index cfd13cba..b2f397e0 100644
 --- a/tests/unit/x86_legacy_address_size.c
 +++ b/tests/unit/x86_legacy_address_size.c
-@@ -279,9 +279,34 @@ static bool check_other_opcodes(void)
+@@ -279,9 +279,46 @@ static bool check_other_opcodes(void)
  	return ok;
  }
  
@@ -75,6 +75,18 @@ index cfd13cba..793a92a3 100644
 +		fprintf(stderr, "wrong default x87 image, vendor=%u changed=%d\n",
 +			(unsigned)vendor, change_mode);
 +	cs_free(insn, count);
++	if (ok) {
++		const uint8_t mov[] = { 0xa0, 0x34, 0x82, 0x00, 0x80,
++					0xec, 0xcd, 0xbc, 0xbc };
++		insn = NULL;
++		count = cs_disasm(handle, mov, sizeof(mov), 0, 1, &insn);
++		ok = count == 1 && insn->size == sizeof(mov) &&
++		     strcmp(insn->op_str, "al, byte ptr [0xbcbccdec80008234]") == 0;
++		if (!ok)
++			fprintf(stderr, "wrong default absolute MOV address, vendor=%u changed=%d\n",
++				(unsigned)vendor, change_mode);
++		cs_free(insn, count);
++	}
 +	cs_close(&handle);
 +	return ok;
 +}
