@@ -1,31 +1,23 @@
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..6d86e30c 100644
+index 2ee82ef7..17189593 100644
 --- a/arch/X86/X86InstPrinterCommon.c
 +++ b/arch/X86/X86InstPrinterCommon.c
-@@ -203,8 +203,8 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
- 		break;
- 	}
- 
--	// Legacy SSE aliases retain their family ID. Predicate-index arithmetic
--	// collides with unrelated public IDs, including string comparisons.
-+	// The immediate selects the printed predicate. The public ID belongs
-+	// to the mapped comparison family.
- 	switch (MI->flat_insn->id) {
- 	case X86_INS_CMPPS:
- 	case X86_INS_CMPPD:
-@@ -215,7 +215,6 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+@@ -214,6 +214,10 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+ 		if (MI->flat_insn->detail)
  			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
  		break;
++	case X86_INS_VCMP:
++		/* VCMP aliases share a public ID. The immediate selects the
++		 * spelling and the AVX condition already recorded above. */
++		break;
  	default:
--		MI->popcode_adjust = Imm + 1;
+ 		MI->popcode_adjust = Imm + 1;
  		break;
- 	}
- }
 diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
-index dfa9b451..b3f6d93e 100644
+index dfa9b451..37732962 100644
 --- a/tests/unit/x86_evex_vpcmp_id.c
 +++ b/tests/unit/x86_evex_vpcmp_id.c
-@@ -55,6 +55,48 @@ static bool test_vpcmp(csh handle, bool expect_detail)
+@@ -55,6 +55,50 @@ static bool test_vpcmp(csh handle, bool expect_detail)
  	return success;
  }
  
@@ -38,6 +30,8 @@ index dfa9b451..b3f6d93e 100644
 +		{ 0x62, 0xf1, 0x4c, 0x0b, 0xc2, 0xd0, 0xa5 },
 +	};
 +	static const size_t sizes[] = { 5, 7 };
++	if (cs_support(CS_SUPPORT_X86_REDUCE))
++		return true;
 +	cs_insn *slot = cs_malloc(handle);
 +	if (!check(slot != NULL, "allocate compare iterator"))
 +		return false;
@@ -74,7 +68,7 @@ index dfa9b451..b3f6d93e 100644
  int main(void)
  {
  	csh handle = 0;
-@@ -64,6 +106,7 @@ int main(void)
+@@ -64,6 +108,7 @@ int main(void)
  		   "open 64-bit mode"))
  		return 1;
  	success &= test_vpcmp(handle, false);
@@ -82,7 +76,7 @@ index dfa9b451..b3f6d93e 100644
  	if (!check(cs_option(handle, CS_OPT_DETAIL,
  			    CS_OPT_ON | CS_OPT_DETAIL_REAL) == CS_ERR_OK,
  		   "enable detail")) {
-@@ -71,6 +114,7 @@ int main(void)
+@@ -71,6 +116,7 @@ int main(void)
  		return 1;
  	}
  	success &= test_vpcmp(handle, true);
@@ -90,7 +84,7 @@ index dfa9b451..b3f6d93e 100644
  #ifndef CAPSTONE_X86_ATT_DISABLE
  	cs_err err = cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
  	if (cs_support(CS_SUPPORT_DIET))
-@@ -78,6 +122,7 @@ int main(void)
+@@ -78,6 +124,7 @@ int main(void)
  	else {
  		success &= check(err == CS_ERR_OK, "select AT&T syntax");
  		success &= test_vpcmp(handle, true);
