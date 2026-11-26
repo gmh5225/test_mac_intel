@@ -1,119 +1,17 @@
 diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
-index a56ed486..faca5f00 100644
+index a56ed486..08ea87b6 100644
 --- a/arch/X86/X86DisassemblerTranslator.h
 +++ b/arch/X86/X86DisassemblerTranslator.h
-@@ -548,7 +548,10 @@ X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
+@@ -548,7 +548,8 @@ X86_TRANSLATE_INLINE void translateImmediate(MCInst *mcInst, uint64_t immediate,
  #endif
  	} else if (type == TYPE_AVX512ICC) {
  #ifndef CAPSTONE_X86_REDUCE
 -		if (immediate >= 8 || ((immediate & 0x3) == 3)) {
-+		/* A record without text needs the element-family ID even when
-+		 * this condition would use a mnemonic alias in assembly. */
-+		if (!emitOperands || mcInst->csh->no_text || immediate >= 8 ||
-+		    (immediate & 3) == 3) {
++		if (immediate >= 8 || (immediate & 3) == 3 || !emitOperands ||
++		    mcInst->csh->no_text) {
  			unsigned NewOpc = 0;
  			switch (MCInst_getOpcode(mcInst)) {
  			default: // llvm_unreachable("unexpected opcode");
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..6b2a6ab4 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -12575,62 +12575,18 @@ static void repair_avx_broadcast(cs_x86_op *memory, const SStream *assembly)
- 		memory->avx_bcast = broadcast;
- }
- 
--static void repair_vpcmp_id(cs_insn *insn, const SStream *assembly, MCInst *mci)
-+#ifndef CAPSTONE_X86_REDUCE
-+static void repair_vpcmp_id(cs_insn *insn, MCInst *mci)
- {
--#if defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
--	/* The alternate mapping for this internal opcode names the integer
--	 * compare family even when the predicate spelling has been omitted. */
--	if (insn->id != X86_INS_VPCMP)
--		return;
--	unsigned int index = find_insn_h(mci->csh, mci->Opcode);
--	insn->id = insns[index + 1].mapid;
--	mci->popcode_adjust = 0;
--#else
--	char mnemonic[CS_MNEMONIC_SIZE] = { 0 };
--	char operands[2] = { 0 };
--	size_t length;
--
--	if (insn->id != X86_INS_VPCMP)
--		return;
--	SStream_extract_mnem_opstr(assembly, mnemonic, sizeof(mnemonic),
--				   operands, sizeof(operands));
--	if (strncmp(mnemonic, "vpcmp", 5) != 0)
--		return;
--
--	// The condition printer's pseudo-ID adjustment assumes that every
--	// predicate spelling has a contiguous public ID. Integer compares expose
--	// element-family IDs instead, so applying that adjustment can collide with
--	// an unrelated instruction. Normalize aliases to their family ID here.
--	mci->popcode_adjust = 0;
--	length = strlen(mnemonic);
--	if (mnemonic_has_suffix(mnemonic, "ub"))
--		insn->id = X86_INS_VPCMPUB;
--	else if (mnemonic_has_suffix(mnemonic, "uw"))
--		insn->id = X86_INS_VPCMPUW;
--	else if (mnemonic_has_suffix(mnemonic, "ud"))
--		insn->id = X86_INS_VPCMPUD;
--	else if (mnemonic_has_suffix(mnemonic, "uq"))
--		insn->id = X86_INS_VPCMPUQ;
--	else if (length != 0) {
--		switch (mnemonic[length - 1]) {
--		case 'b':
--			insn->id = X86_INS_VPCMPB;
--			break;
--		case 'w':
--			insn->id = X86_INS_VPCMPW;
--			break;
--		case 'd':
--			insn->id = X86_INS_VPCMPD;
--			break;
--		case 'q':
--			insn->id = X86_INS_VPCMPQ;
--			break;
--		default:
--			break;
--		}
-+	if (insn->id == X86_INS_VPCMP) {
-+		/* The predicate alias and its explicit-immediate alternate
-+		 * describe the same signedness and element width. */
-+		unsigned int index = find_insn_h(mci->csh, mci->Opcode);
-+		insn->id = insns[index + 1].mapid;
-+		mci->popcode_adjust = 0;
- 	}
--#endif
- }
-+#endif
- 
- static void repair_vector_mask_conversion_access(cs_x86 *x86,
- 						 unsigned int instruction_id)
-@@ -12800,7 +12756,9 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
- 
- 	if (!insn)
- 		return;
--	repair_vpcmp_id(insn, mnem, mci);
-+#ifndef CAPSTONE_X86_REDUCE
-+	repair_vpcmp_id(insn, mci);
-+#endif
- 	if (!insn->detail)
- 		return;
- 
-diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
-index e7704042..7651f34b 100644
---- a/suite/synctools/x86_mapping_counts.py
-+++ b/suite/synctools/x86_mapping_counts.py
-@@ -130,7 +130,7 @@ def generate(directory, suffix):
-                 family and index + 1 < len(rows)
-                 and rows[index + 1][1] == row[1] + "_alt"
-                 and rows[index + 1][2] == "X86_INS_" + family[1],
--                "DIET integer compares require the adjacent typed alternate mapping",
-+                "Integer compares require the adjacent typed alternate mapping",
-             )
-         name = row[1]
-         require(
 diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
 index dfa9b451..fb1ac515 100644
 --- a/tests/unit/x86_evex_vpcmp_id.c
