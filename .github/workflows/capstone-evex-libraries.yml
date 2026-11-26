@@ -1,7 +1,7 @@
-name: Measure packed FMA3 memory operands with the existing vector effect rows against iced
+name: Measure generated scalar, relative and memory output name storage against current Capstone and fork iced
 on:
   push:
-    branches: [codex/fma-reuse-packed-vector-output]
+    branches: [codex/generated-x86-operand-name-storage]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-fma-register-effects-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-scalar-name-storage-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
