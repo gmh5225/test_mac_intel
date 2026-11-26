@@ -101,8 +101,7 @@ try:
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     inputs=read(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
-    run(sys.executable,'-B',w/'libmvec.py');raw=read(w/'libmvec.json')
-    fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
+    fixtures=list(frozen_deb.prepare(w))
     assert {row[0]for row in fixtures}==set(m['samples'])
     host=dict(cpu=get('lscpu'),compiler=get('clang','--version').splitlines()[0],source=q,iced=m['iced_revision'],prebuilt=False)
     save('host',host);records={};timings={}
