@@ -1,7 +1,7 @@
-name: Compare placement with the original linker commands in source-built NeverD
+name: Measure x86 and PowerPC placement from identical decoder instructions and all original ELF relocations
 on:
   push:
-    branches: [codex/segment-final-link-size-control]
+    branches: [codex/verified-object-relocations-placement]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: segment-native-link-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: segment-relocation-control-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

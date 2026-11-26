@@ -77,7 +77,14 @@ try:
             delta=sizes['selector']-len(raw);assert 0<delta<2048
             pad=t/'end-of-section';pad.write_bytes(raw+bytes(delta))
             temp=t/'padded.o'
-            command(['objcopy','--update-section',section+'='+str(pad),obj,temp],'baseline-size-control')
+            from section_control import extend, describe
+            probe=t/'objcopy-control.o'
+            command(['objcopy','--update-section',section+'='+str(pad),obj,probe],'characterize-previous-control')
+            before=describe(obj.read_bytes());legacy=describe(probe.read_bytes())
+            diff=[k for k in sorted(set(before)|set(legacy)) if before.get(k)!=legacy.get(k)]
+            equivalence=extend(obj,temp,section,delta)
+            save('original-object-semantics',dict(updated_by_objcopy=diff,relocation_entries=equivalence['relocations'],verified=equivalence,old_sections={k:[before.get(k),legacy.get(k)] for k in diff if k!=section}))
+
             assert payload(temp)==pad.read_bytes()
             shutil.copyfile(temp,obj)
             # Normal builds above used scripts/build.py for every source tree. For
