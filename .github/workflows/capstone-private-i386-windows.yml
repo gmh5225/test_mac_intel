@@ -1,7 +1,7 @@
-name: Verify observable AArch64 alias and vector suffix callbacks on Windows and macOS
+name: Verify dedicated operand details and callback order on Windows and macOS
 on:
   push:
-    branches: [codex/aarch64-alias-native-callbacks]
+    branches: [codex/aarch64-ordinary-operands-dedicated]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
+          ref: 4cb47e8f8818d0a85b8de2298722558b51c40fa2
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: aarch64-alias-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: dedicated-operand-details-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
