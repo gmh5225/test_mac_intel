@@ -1,7 +1,7 @@
-name: Read i386 VEX operand extents and legality from one cell without sharing the AMD64 function; compare against iced
+name: Compare i386 segment memory text and register details on real PuTTY OpenSSL and vector functions
 on:
   push:
-    branches: [codex/i386-final-vector-scan-plans]
+    branches: [codex/i386-segment-operand-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-direct-vex3-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-segment-fields-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
