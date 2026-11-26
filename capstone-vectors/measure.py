@@ -100,16 +100,16 @@ try:
                     return int(oldid)==int(newid)+1+(int(raw[offset-2:offset],16)&31)
                 if before!=bulk:groups['old-iterator-bulk']+=1
                 if before!=now:
-                    by_mode[str(bits)+'/'+origin]+=1
-                    if not corrected_float(before,now):record_problem('changed-public-record')
-                if bulk!=current:record_problem('changed-bulk-record')
-                if now!=current:record_problem('bulk-iterator')
-                if cm:
-                    if cm!=bm or bx!=cx or oldscan!=newscan or not now.split()[1].startswith('vpcmp'):record_problem('unexplained-scan')
-                    groups['inherited-integer-scan']+=1
-                    if origin.startswith('DecoderTest'):groups['inherited-original-integer']+=1
-                if ((bx>>8)!=(cx>>8) and before==now) or (bx&255)!=(cx&255):record_problem('scan')
+                    if not corrected_float(before,now):record_problem('changed-printed-record')
+                    else:groups['corrected-float']+=1
+                if bulk!=current or now!=current:record_problem('changed-bulk-record')
+                if cm or (bx&255)!=(cx&255):record_problem('scan-boundary-or-id')
                 if bm:groups['old-scan']+=1
+                if newscan!=oldscan:
+                    families=('vpcmpb','vpcmpub','vpcmpw','vpcmpuw','vpcmpd','vpcmpud','vpcmpq','vpcmpuq')
+                    if before=='-' or before!=bulk or before.split()[1] not in families or not bm or newscan!=(cx>>8):record_problem('invalid-integer-family')
+                    else:groups['corrected-integer-scan']+=1
+                if before!=now or newscan!=oldscan:by_mode[str(bits)+'/'+origin]+=1
                 if origin.startswith(('vex-','evex-')) and now!='-' and oracle!='-':
                     op=oracle.split()[1]
                     if now.split()[0]!=oracle.split()[0]:record_problem('oracle-length')
@@ -118,7 +118,7 @@ try:
                     kept[op]+=1
                 if origin.startswith('DecoderTest') and bm:groups['original-corpus-differences']+=1
         proof=dict(cases=len(records),groups=groups,examples=errors,changed=by_mode,iced_overlap=kept)
-        save('case-proof-'+label,proof);assert not errors and groups['old-iterator-bulk']>0 and len(kept)==12,proof
+        save('case-proof-'+label,proof);assert not errors and groups['old-iterator-bulk']==groups['corrected-float']==22414 and groups['corrected-integer-scan']==1738 and len(kept)==12,proof
         verdict[label]=proof
     assert verdict['candidate']==verdict['record']
     save('complete',dict(source=q,host=platform.platform(),proof=verdict['candidate']))
