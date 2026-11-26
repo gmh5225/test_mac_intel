@@ -63,12 +63,25 @@ try:
     cover=read(inputs/'manifest.json');save('corpus',cover);results={}
     path=temp/'active';shutil.copyfile(temp/'base',path);path.chmod(0o755);inode=path.stat().st_ino
     bins={t:(temp/t).read_bytes() for t in ('base','candidate')};bins['duplicate']=bins['base']
-    current='base'
+    current=None
+    immutable=sys.platform=='darwin'
+    if immutable:
+        shutil.copy2(temp/'base',temp/'duplicate')
+    selections={tag:0 for tag in bins}
     def select(tag):
         global current
         if current!=tag:
-            path.write_bytes(bins[tag]);current=tag
-        assert path.stat().st_ino==inode
+            if immutable:
+                # A mapped Mach-O must retain its contents. Atomically select
+                # another verified file at the common execution path.
+                fresh=temp/'selected-next'
+                os.link(temp/tag,fresh)
+                os.replace(fresh,path)
+            else:
+                path.write_bytes(bins[tag])
+            current=tag
+        assert path.stat().st_ino==((temp/tag).stat().st_ino if immutable else inode)
+        selections[tag]+=1
     for name,spec in cover.items():
         if name=='wabt':continue
         raw=inputs/(name+'.wasm');ranges=inputs/(name+'.ranges');assert sha(raw)==spec['sha256'] and sha(ranges)==spec['ranges_sha256']
@@ -99,6 +112,11 @@ try:
                     result[ctrl].append([statistics.median(ratios),ratios[11 if ci else 1],ratios[-12 if ci else -2]])
             results[name+'/'+str(detail)]=dict(oracle=gold,ratios=result,pairs=pairs,repeats=reps)
             save('observations',results);print(name,detail,gold,result,flush=True)
+    checks={t:hashlib.sha256(buf).hexdigest()for t,buf in bins.items()}
+    assert checks['base']==checks['duplicate']!=checks['candidate']
+    if immutable:
+        assert all(sha(temp/t)==v for t,v in checks.items())
+    save('selection',dict(complete=True,immutable=immutable,source=tree,selections=selections,sha256=checks))
     save('decision',dict(complete=True,source=tree,corpus=cover,host=platform.platform(),results=results,streams=by,changed=changed))
 finally:
     receipt['build']=disk(temp);shutil.rmtree(temp);receipt['removed']=not temp.exists()
