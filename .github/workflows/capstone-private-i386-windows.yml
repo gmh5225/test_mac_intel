@@ -1,7 +1,7 @@
-name: Verify allocated and iterative compare predicate IDs on 19 CMake builds and 32 and 64 bit hosts
+name: Compare every public field on 19 builds using verified predicate-specific baseline IDs
 on:
   push:
-    branches: [codex/vcmp-bulk-iterator-19-profiles]
+    branches: [codex/vcmp-mode-by-mode-public-records]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: vcmp-cross-mode-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: vcmp-id-oracle-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

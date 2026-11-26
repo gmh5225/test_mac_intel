@@ -92,6 +92,12 @@ static int ppc_snapshot(const char *fixture, bool big, unsigned mode) {
   return accepted?0:1;
 }
 
+static bool floating_compare(const uint8_t *p,size_t n) {
+    while(n && (*p==0x26||*p==0x2e||*p==0x36||*p==0x3e||*p==0x64||*p==0x65||*p==0x67)){++p;--n;}
+    return (n>=5&&p[0]==0xc5&&p[2]==0xc2)||(n>=6&&p[0]==0xc4&&(p[1]&31)==1&&p[3]==0xc2)||
+           (n>=7&&p[0]==0x62&&(p[1]&15)==1&&p[4]==0xc2);
+}
+
 int main(int argc, char **argv) {
   try {
 #ifdef _WIN32
@@ -99,7 +105,7 @@ int main(int argc, char **argv) {
       throw std::runtime_error("binary stdout");
 #endif
     if (argc == 4) return ppc_snapshot(argv[1],std::atoi(argv[2])!=0,std::atoi(argv[3]));
-    if (argc != 7)
+    if (argc != 8)
       throw std::runtime_error(
           "snapshot bits att text detail every_offset input");
     int bits = std::atoi(argv[1]);
@@ -122,6 +128,11 @@ int main(int argc, char **argv) {
         cs_option(h, CS_OPT_TEXT, format ? CS_OPT_ON : CS_OPT_OFF) ||
         cs_option(h, CS_OPT_DETAIL, detail ? CS_OPT_ON : CS_OPT_OFF))
       throw std::runtime_error("option");
+    csh bulk;
+    if (cs_open(CS_ARCH_X86, bits == 64 ? CS_MODE_64 : bits == 32 ? CS_MODE_32 : CS_MODE_16, &bulk))
+      throw std::runtime_error("bulk reference");
+    const bool original = std::atoi(argv[7]) != 0;
+    unsigned projected = 0, floating_seen = 0;
     cs_insn *insn = cs_malloc(h);
     if (!insn)
       throw std::runtime_error("allocation");
@@ -146,7 +157,24 @@ int main(int argc, char **argv) {
         ++accepted;
         if (!insn->size || insn->size > bytes.size() - offset)
           throw std::runtime_error("length");
-        value(insn->id);
+        unsigned expected_id = insn->id;
+        const auto *encoded = bytes.data() + offset;
+        if (floating_compare(encoded, insn->size)) {
+          cs_insn *reference = nullptr;
+          const size_t count = cs_disasm(bulk, encoded, insn->size, insn->address, 1, &reference);
+          if (count && reference->size == insn->size && reference->id == X86_INS_VCMP) {
+            ++floating_seen;
+            expected_id = reference->id;
+            if (insn->id != expected_id) {
+              const unsigned adjusted = expected_id + 1 + (encoded[insn->size - 1] & 31);
+              if (!original || insn->id != adjusted)
+                throw std::runtime_error("unexpected floating compare public ID at " + std::to_string(offset));
+              ++projected;
+            }
+          }
+          cs_free(reference, count);
+        }
+        value(expected_id);
         value(insn->alias_id);
         value(insn->address);
         value(insn->size);
@@ -232,9 +260,10 @@ int main(int argc, char **argv) {
     value(accepted);
     value(rejected);
     flush();
-    std::fprintf(stderr, "{\"accepted\":%llu,\"rejected\":%llu}\n",
+    std::fprintf(stderr, "{\"accepted\":%llu,\"rejected\":%llu,\"floating\":%u,\"projected\":%u}\n",
                  static_cast<unsigned long long>(accepted),
-                 static_cast<unsigned long long>(rejected));
+                 static_cast<unsigned long long>(rejected), floating_seen, projected);
+    cs_close(&bulk);
     cs_free(insn, 1);
     cs_close(&h);
   } catch (const std::exception &e) {

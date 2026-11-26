@@ -48,21 +48,24 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
     for m in (0x15,0x25):
         for disp in (0,9,10,0x80,0x2345,0x7fffffff,0x80000000,0xffffffff):
             source.extend(bytes([0xff,m])+disp.to_bytes(4,'little'))
+    source.extend(bytes.fromhex('c5 fb c2 da 06 62 f1 4c 0b c2 d0 a5 c5 f8 c2 c0 1f'))
     sample=temp/'curated-x86.bin';sample.write_bytes(source)
     modes=[(0,0,0),(0,1,0)]
     if profile!='diet':modes.append((0,1,1))
     if profile not in ('diet','noatt'):modes.append((1,1,1))
-    results={}
+    results={};comparisons={}
     for bits in (16,32,64):
         for att,text,detail in modes:
             args=(str(bits),str(att),str(text),str(detail),'1')
-            with sp.Popen([exe,*args,sample],stdout=sp.PIPE,stderr=sp.PIPE) as proc:
+            with sp.Popen([exe,*args,sample,str(int(label.startswith("base-")))],stdout=sp.PIPE,stderr=sp.PIPE) as proc:
                 digest=hashlib.sha256()
                 for chunk in iter(lambda: proc.stdout.read(1<<16),b''):digest.update(chunk)
                 diag=proc.stderr.read().decode()
                 status=proc.wait()
                 assert status==0,(linkage,args,status,diag)
             counts=json.loads(diag)
+            key='/'.join(args[:4]);comparisons[key]={i:counts.pop(i)for i in ('floating','projected')}
+            assert label.startswith('base-') or not comparisons[key]['projected']
             assert counts['accepted']>0 and len(source)==sum(counts.values())
             results['/'.join(args[:4])]=dict(sha256=digest.hexdigest(),counts=counts)
 
@@ -87,4 +90,4 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
             if profile!='diet' and detail:assert counts['named']>0,counts
             results['powerpc/'+str(big)+'/'+str(detail)]=dict(counts=counts,sha256=digest.hexdigest(),corpus_sha256=hashlib.sha256(corpus).hexdigest())
 
-    return dict(library_sha256=hashlib.sha256(raw).hexdigest(),ppc_index_symbol=b"PPC_setAliasId" in raw,records=records,bytes=len(source),sha256=hashlib.sha256(source).hexdigest(),snapshots=results)
+    return dict(comparisons=comparisons,library_sha256=hashlib.sha256(raw).hexdigest(),ppc_index_symbol=b"PPC_setAliasId" in raw,records=records,bytes=len(source),sha256=hashlib.sha256(source).hexdigest(),snapshots=results)
