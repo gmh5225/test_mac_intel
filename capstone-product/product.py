@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-assert all(sha(r/(k+'.patch'))==m[k]['sha256'] for k in ('base','candidate'))
+assert sha(r/'candidate.patch')==m['candidate']['sha256'] and m['base']==m['shipping']
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -53,7 +53,7 @@ try:
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
     identities={};results={}
     for stage in ('shipping','base','candidate'):
-        if stage!='shipping':
+        if stage=='candidate':
             command(['git','apply','--index',r/(stage+'.patch')],'apply-'+stage,cs)
         assert git(cs,'write-tree')==m[stage]['tree']
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+stage,nd)
@@ -97,7 +97,7 @@ try:
     base,candidate=identities['base'],identities['candidate']
     assert base['objects'].keys()==candidate['objects'].keys()
     changed=[Path(k).name for k,v in base['objects'].items() if v!=candidate['objects'][k]]
-    assert set(changed)=={'X86MemoryFallback32.c.o'} and base['exe']!=candidate['exe'],changed
+    assert {'X86Sse64Output.c.o','X86Vex32Output.c.o'}<=set(changed) and all(name.startswith('X86') for name in changed) and base['exe']!=candidate['exe'],changed
     save('checked-objects',dict(changed=changed,mixed_identical=True,objects=len(base['objects'])))
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     image=t/'selected';shutil.copy2(t/'base.exe',image);ino=image.stat().st_ino

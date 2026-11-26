@@ -1,7 +1,7 @@
-name: Verify the RISC-V release and time i386 accumulator records in NeverD with current source-built LLVM
+name: Measure compact x86 records in complete NeverD builds using the LLVM fork main sources
 on:
   push:
-    branches: [codex/neverd-accumulator-and-riscv-records]
+    branches: [codex/compact-scalar-actual-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4a8792d7f80da91b1d852859abafe0684416b38a
+          ref: c9772143c11e10fb199de017eb1c0fcaef115c53
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-rv-accumulator-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: compact-scalar-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
