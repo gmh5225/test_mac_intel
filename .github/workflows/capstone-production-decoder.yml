@@ -1,7 +1,7 @@
-name: Verify the production NeverD decoder and 60 workloads with current source-built LLVM
+name: Verify the RISC-V release and time i386 accumulator records in NeverD with current source-built LLVM
 on:
   push:
-    branches: [codex/riscv-first-gap-neverd-product]
+    branches: [codex/neverd-accumulator-and-riscv-records]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-rv-compact-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-rv-accumulator-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

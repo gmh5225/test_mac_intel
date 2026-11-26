@@ -1,48 +1,35 @@
-diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
-index 89cbda0c..391315a0 100644
---- a/arch/RISCV/RISCVMapping.c
-+++ b/arch/RISCV/RISCVMapping.c
-@@ -348,10 +348,7 @@ void RISCV_init_cs_detail(MCInst *MI)
- 		       offsetof(cs_detail, riscv) + sizeof(cs_riscv));
- }
- 
--// for weird reasons some instructions end up with valid operands that are
--// interspersed with invalid operands, i.e. the operands array is an "island"
--// of valid operands with invalid gaps between them, this function will compactify
--// all the valid operands and pad the rest of the array to invalid
-+/* Keep the order of valid operands and zero every vacated record. */
- void RISCV_compact_operands(MCInst *MI)
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..1d2f90ea 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -13,6 +13,7 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+ #include "X86SimpleOutput.h"
++#include "X86RegisterImmediateOutput.h"
+ #include "X86VectorRegisterOutput.h"
+ #define X86_VEX32_REGISTER_MOVES
+ #include "X86GenVex32MemoryOutput.inc"
+@@ -40,6 +41,22 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
  {
- 	if (!detail_is_set(MI))
-@@ -359,6 +356,23 @@ void RISCV_compact_operands(MCInst *MI)
- 	cs_riscv_op *ops = RISCV_get_detail(MI)->operands;
- 	unsigned int write_pos = 0;
- 
-+#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET) && \
-+	defined(__linux__) && defined(__x86_64__) && \
-+	defined(__GNUC__) && !defined(__clang__) && \
-+	(__GNUC__ == 13 || __GNUC__ == 14)
-+	/* On these GCC builds the first-gap loop speeds up RV64GC detail
-+	 * across compressed and real-operand output modes. */
-+	while (write_pos < NUM_RISCV_OPS &&
-+	       ops[write_pos].type != RISCV_OP_INVALID)
-+		++write_pos;
-+	if (write_pos == NUM_RISCV_OPS)
-+		return;
-+	for (unsigned int read_pos = write_pos + 1; read_pos < NUM_RISCV_OPS;
-+	     ++read_pos) {
-+		if (ops[read_pos].type != RISCV_OP_INVALID)
-+			ops[write_pos++] = ops[read_pos];
+ 	const unsigned opcode = code[0];
+ 	switch (opcode) {
++	case 0x3c:
++	case 0x3d:
++	case 0xa8:
++	case 0xa9: {
++		const unsigned form = opcode & 1, width = form ? 4 : 1;
++		if (size < 1 + width || X86_OUTPUT_UNSUPPORTED(handle, false))
++			break;
++		/* CMP and TEST use the same effects as their register pair. */
++		const unsigned pair = (opcode < 0x80 ? 0x38 : 0x84) | form;
++		const unsigned row = x86_simple_plans[0][0][pair] >> 2;
++		writeUnsignedRegisterImmediate(
++			insn, &x86_simple_outputs[row],
++			&x86_simple_registers[form ? 2 : 0][0], code, 0, 0,
++			1, width, insn_size);
++		return true;
 +	}
-+#else
- 	// Move valid elements to front
- 	for (unsigned int read_pos = 0; read_pos < NUM_RISCV_OPS; read_pos++) {
- 		if (ops[read_pos].type != (riscv_op_type)CS_OP_INVALID) {
-@@ -368,6 +382,7 @@ void RISCV_compact_operands(MCInst *MI)
- 			write_pos++;
- 		}
- 	}
-+#endif
- 	// fill the rest, if any, with invalid
- 	memset((void *)(&ops[write_pos]), CS_OP_INVALID,
- 	       (NUM_RISCV_OPS - write_pos) * sizeof(cs_riscv_op));
+ 	case 0xc4:
+ 		if (X86_writeVexRegisterImmediate(handle, code, size, insn,
+ 						  insn_size, x86_simple_registers, false))
