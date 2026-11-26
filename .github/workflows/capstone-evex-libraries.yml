@@ -1,7 +1,7 @@
-name: Verify selected MASM format emission and full-width absolute MOV addresses including the default AT&T handle
+name: Time corrected MASM and absolute address formatting against the same libmvec package from the Debian archive
 on:
   push:
-    branches: [codex/masm-selected-token-full-width]
+    branches: [codex/masm-tokens-frozen-debian]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: full-width-masm-token-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: frozen-masm-token-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
