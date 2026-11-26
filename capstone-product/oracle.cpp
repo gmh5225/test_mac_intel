@@ -42,15 +42,19 @@ static unsigned reference_id(unsigned old, const uint8_t *code, size_t length, u
   if (!canonical) return old;
   if (unsigned family=integer_family(code,length)) {
     const unsigned raw=old;
-    if (raw==X86_INS_VPCMP || raw==family) {
-      cs_insn *bulk=nullptr;
-      const size_t n=cs_disasm(canonical,code,length,ip,1,&bulk);
-      if (!n || bulk->size!=length || bulk->id!=family) std::exit(12);
-      cs_free(bulk,n);
-      if (raw!=family) { ++integers; correction+=int64_t(family)-raw; }
-      return family;
+    cs_insn *bulk=nullptr;
+    const size_t n=cs_disasm(canonical,code,length,ip,1,&bulk);
+    if (!n || bulk->size!=length) std::exit(12);
+    const unsigned bulk_id=bulk->id;
+    cs_free(bulk,n);
+    if (bulk_id!=family) {
+      // A legacy 32-bit BOUND can share the leading EVEX bytes.
+      if (bulk_id==X86_INS_BOUND && raw==bulk_id) return old;
+      std::exit(13);
     }
-    std::exit(13);
+    if (raw!=X86_INS_VPCMP && raw!=family) std::exit(14);
+    if (raw!=family) { ++integers; correction+=int64_t(family)-raw; }
+    return family;
   }
   if (!floating_compare(code,length)) return old;
   cs_insn *result = nullptr;

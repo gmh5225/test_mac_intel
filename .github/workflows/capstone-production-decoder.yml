@@ -1,7 +1,7 @@
-name: Validate signed predicate families through the real NeverD decoder with and without the KMOV scan
+name: Check predicate families and hash sections from every object in the actual NeverD archive
 on:
   push:
-    branches: [codex/product-typed-predicates-and-kmov]
+    branches: [codex/actual-product-predicate-owner]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: typed-condition-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-predicate-owner-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

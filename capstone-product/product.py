@@ -126,11 +126,18 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
+        import io
+        members=sp.check_output(['ar','t',archive],text=True).splitlines()
+        assert len(members)==len(set(members)) and {'X86Mapping.c.o','X86InstPrinterCommon.c.o','X86BatchScan.c.o'}<=set(members)
+        owners=[line for line in sp.check_output(['nm','-A','--defined-only',archive],text=True).splitlines() if line.split()[-2:] in (['T','X86_postprinter'],['t','X86_postprinter'])]
+        assert len(owners)==1 and any(m in owners[0] for m in ('X86Mapping.c.o','X86PostPrinter.c.o')),owners
+        owner,=[m for m in members if ':'+m+':' in owners[0]]
+        save('postprinter-owner-'+variant,dict(member=owner,archive_members=members))
         code_sections={}
-        for name in ('X86Mapping.c.o','X86PostPrinter.c.o','cs.c.o','X86InstPrinterCommon.c.o','X86VectorFallback64.c.o','X86Sse64Output.c.o','AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
-            obj,=build.rglob(name)
-            with obj.open('rb') as file:
-                elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
+        for name in members:
+            assert name.endswith('.c.o'),name
+            elf=ELFFile(io.BytesIO(sp.check_output(['ar','p',archive,name])))
+            code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
         save('executable-sections-'+variant,code_sections)
         with binary.open('rb') as file:
             elf=ELFFile(file);layout={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
