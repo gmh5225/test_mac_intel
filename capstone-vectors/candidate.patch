@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
-index 732c4004..6fda6c90 100644
+index 732c4004..3c007d14 100644
 --- a/arch/X86/X86PublicOutput.c
 +++ b/arch/X86/X86PublicOutput.c
 @@ -2,7 +2,6 @@
@@ -10,13 +10,17 @@ index 732c4004..6fda6c90 100644
  
  #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
  #if defined(__ELF__) && defined(__clang__)
-@@ -13,16 +12,15 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+@@ -13,16 +12,18 @@ CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
  					    cs_insn *insn, uint16_t *length,
  					    bool batch)
  {
 -	/* The caller owns skipdata callbacks, bulk boundaries and the public
 -	 * cursors. A fixed iterator can fill this one record using local cursors. */
--	if (!batch && !handle->skipdata && !handle->no_text &&
++	/* The outer iterator owns detail visibility, skipdata and cursor updates.
++	 * Its fixed text path only needs the decoded record and its length. */
++	/* Both fixed readers format Intel operands. AT&T already uses the
++	 * full decoder and its selected printer. */
+ 	if (!batch && !handle->skipdata && !handle->no_text &&
 -	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
 -		uint64_t address = insn->address;
 -		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
@@ -24,9 +28,7 @@ index 732c4004..6fda6c90 100644
 -		if (ok)
 -			*length = insn->size;
 -		return ok;
-+	/* The outer iterator owns detail visibility, skipdata and cursor updates.
-+	 * Its fixed text path only needs the decoded record and its length. */
-+	if (!batch && !handle->skipdata && !handle->no_text) {
++	    handle->syntax != CS_OPT_SYNTAX_ATT) {
 +		if (handle->mode == CS_MODE_32)
 +			return X86_decodeFixedRecord32(handle, code, size, insn,
 +						       length);
