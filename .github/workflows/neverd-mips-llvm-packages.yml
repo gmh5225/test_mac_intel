@@ -1,12 +1,12 @@
 name: NeverSight LLVM MIPS packages
 on:
   push:
-    branches: [codex/mips-relink-fork-native]
+    branches: [codex/mips-asm-lookup-native]
     paths: ['.github/workflows/neverd-mips-llvm-packages.yml']
 permissions:
   contents: read
 env:
-  LLVM_REVISION: 6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312
+  LLVM_REVISION: 7efde556745738c7c1384018785d07e44188e4ec
 jobs:
   build:
     name: build ${{ matrix.name }}
@@ -449,5 +449,31 @@ jobs:
           path: |
             ${{ matrix.pkg }}.${{ matrix.archive }}
             ${{ matrix.pkg }}.${{ matrix.archive }}.sha256
+          if-no-files-found: error
+
+      - name: Check out the performance harness at this workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: cost-harness
+          sparse-checkout: .github/scripts/mips-mnemonic
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install the instruction counter
+        if: runner.os == 'Linux'
+        run: sudo apt-get install --yes valgrind
+      - name: Compare the candidate SDK with the published r13 and r14 SDKs
+        env:
+          PACKAGE_NAME: ${{ matrix.pkg }}
+        run: python cost-harness/.github/scripts/mips-mnemonic/run.py
+      - name: Upload assembler performance samples
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mnemonic-performance-${{ runner.os }}
+          path: mnemonic-evidence
           if-no-files-found: error
 
