@@ -99,9 +99,9 @@ try:
         command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'segment.cpp',archive,'-o',t/'segment'],'link-segment-'+variant)
         segment=list(map(int,sp.check_output([t/'segment'],text=True).split()));assert segment==[884736, 405504, 12422393723512408869]
         save('segment-'+variant,segment)
-        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'rotate.cpp',archive,'-o',t/'rotate'],'link-rotate-'+variant)
-        counts=list(map(int,sp.check_output([t/'rotate'],text=True).split()));assert counts==[10829824, 3719765, 7276063618347817852, 86824, 192]
-        save('rotate-'+variant,counts)
+        command(['clang++','-O2','-std=c++17','-I',cs,'-I',cs/'include',r/'kmov.cpp',archive,'-o',t/'kmov'],'link-kmov-'+variant)
+        counts=list(map(int,sp.check_output([t/'kmov'],text=True).split()));assert counts==[10878976, 2702848, 17862040809065791488, 32256, 0]
+        save('kmov-'+variant,counts)
         test=out/('tests-'+variant+'.log')
         assert '100% tests passed' in test.read_text()
         if variant=='base':

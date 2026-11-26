@@ -1,7 +1,7 @@
-name: Measure descriptor-based RORX scans in actual NeverD and audit real PE and ELF on three hosts
+name: Measure KMOV mask-source scan speed in NeverD built against current LLVM fork sources with real PE and ELF
 on:
   push:
-    branches: [codex/neverd-three-operand-vex-product]
+    branches: [codex/neverd-kmov-mask-source-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4679b157eb1b7a62c606771f894d9d52c97ba316
+          ref: fd88bf43c7956397cc67cfdb88e937e359c36a90
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-operand-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: kmov-source-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
