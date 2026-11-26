@@ -1,0 +1,38 @@
+name: Verify cstool library selection and RISC-V CSR details
+on:
+  push:
+    branches: [codex/make-cstool-selected-library]
+    paths: [capstone-make/**, .github/workflows/capstone-make-cstool.yml]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2022]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-make
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 499ddf54d2723f7357e92db138e4e9beb71b28a5
+          path: source
+          persist-credentials: false
+      - name: Reproduce and verify GNU Make library selection
+        if: runner.os != 'Windows'
+        run: python3 -B capstone-make/check.py
+      - name: Build and run five CMake profiles
+        shell: bash
+        run: python -B capstone-make/cmake-check.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: cstool-${{ matrix.host }}
+          path: evidence/
+          retention-days: 14
