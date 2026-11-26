@@ -1,7 +1,7 @@
-name: Measure table-driven SSE and AVX predicate spelling and details on real NeverD workloads
+name: Validate signed predicate families through the real NeverD decoder with and without the KMOV scan
 on:
   push:
-    branches: [codex/neverd-compare-condition-table]
+    branches: [codex/product-typed-predicates-and-kmov]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: fd88bf43c7956397cc67cfdb88e937e359c36a90
+          ref: 9c84b2c7ecd883da23045650a794868d6c2ebd5c
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vcmp-name-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: typed-condition-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

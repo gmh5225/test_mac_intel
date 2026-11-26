@@ -127,7 +127,7 @@ try:
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
         code_sections={}
-        for name in ('cs.c.o','X86InstPrinterCommon.c.o','X86VectorFallback64.c.o','X86Sse64Output.c.o','AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
+        for name in ('X86Mapping.c.o','X86PostPrinter.c.o','cs.c.o','X86InstPrinterCommon.c.o','X86VectorFallback64.c.o','X86Sse64Output.c.o','AliasMapping.c.o','X86RegisterFallback32.c.o','X86OutputIterator.c.o','X86MemoryFallback32.c.o','X86BatchScan.c.o','X86DisassemblerDecoder.c.o','X86Disassembler.c.o','X86Vex32Output.c.o','X86IntelInstPrinter.c.o','X86ATTInstPrinter.c.o','MipsMapping.c.o','MipsInstPrinter.c.o','PPCMapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','AArch64Mapping.c.o','RISCVMapping.c.o'):
             obj,=build.rglob(name)
             with obj.open('rb') as file:
                 elf=ELFFile(file);code_sections[name]={sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in elf.iter_sections() if sec['sh_flags']&4}
@@ -168,8 +168,8 @@ try:
         got=sp.run(args,capture_output=True,text=True)
         if got.returncode:print(case["name"],mode,k,got.returncode,got.stderr,flush=True);got.check_returncode()
         if k=='oracle':
-            count,width=map(int,got.stderr.split());assert min(count,width)>=0 and count%reps==0 and width%reps==0
-            proof[case['name']+'/'+str(mode)]=dict(projected=count,typed=width,reps=reps);save('alias-projections',proof)
+            count,width,integers,delta=map(int,got.stderr.split());assert min(count,width,integers)>=0 and all(v%reps==0 for v in (count,width,integers,delta))
+            proof[case['name']+'/'+str(mode)]=dict(projected=count,typed=width,integers=integers,delta=delta,reps=reps);save('alias-projections',proof)
         return list(map(int,got.stdout.split()))
     cases.sort(key=lambda row:row['name']!='libmvec-amd64')
     rows=[];rng=random.Random(1739)
@@ -180,7 +180,7 @@ try:
             expected=execute('base',c,mode,n)[1:];cycles=[]
             corrected=execute('oracle',c,mode,n)[1:];assert corrected[:3]==expected[:3],(c['name'],mode,corrected,expected)
             changed=proof[c['name']+'/'+str(mode)]['projected']
-            assert changed <= expected[3]-corrected[3] <= 32*changed,(c['name'],mode,changed,expected,corrected)
+            assert corrected[3]-expected[3]==proof[c['name']+'/'+str(mode)]['delta'],(c['name'],mode,changed,expected,corrected)
             if c['name']=='jpeg-avx2-i386':assert expected[:2]==[7764*n,0],expected[:2]
             pairs=35 if c['selector']==4 or (c['name'],mode) in (('jpeg-avx2-i386', 3),('libmvec-amd64', 3),('putty-32-0.85',3),('arm-ls',1),('arm-ls',2),('arm64-ls',1),('libssl3t64-i386', 0),('libssl3t64-i386', 3),('arm64-ls', 0),('arm-ls', 0),('ppc64el-ls', 0),('riscv64-ls', 0),('mips64el-ls', 1),('libssl3t64-amd64',3),('putty-32-0.85',1),('putty-32-0.85',2),('libssl3t64-i386',1)) else 13
             for rep in range(pairs):

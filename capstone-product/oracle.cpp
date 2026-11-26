@@ -10,6 +10,18 @@
 #include <string>
 #include <vector>
 
+static unsigned integer_family(const uint8_t *p,size_t n) {
+    while(n && (*p==0x26||*p==0x2e||*p==0x36||*p==0x3e||*p==0x64||*p==0x65||*p==0x67)){++p;--n;}
+    if(n<7||p[0]!=0x62||(p[1]&15)!=3||(p[2]&7)!=5)return 0;
+    bool wide=(p[2]&128)!=0;
+    switch(p[4]){
+        case 0x1e:return wide?X86_INS_VPCMPUQ:X86_INS_VPCMPUD;
+        case 0x1f:return wide?X86_INS_VPCMPQ:X86_INS_VPCMPD;
+        case 0x3e:return wide?X86_INS_VPCMPUW:X86_INS_VPCMPUB;
+        case 0x3f:return wide?X86_INS_VPCMPW:X86_INS_VPCMPB;
+        default:return 0;
+    }
+}
 static bool floating_compare(const uint8_t *p,size_t n) {
     while(n && (*p==0x26||*p==0x2e||*p==0x36||*p==0x3e||*p==0x64||*p==0x65||*p==0x67)){++p;--n;}
     return (n>=5&&p[0]==0xc5&&p[2]==0xc2)||(n>=6&&p[0]==0xc4&&(p[1]&31)==1&&p[3]==0xc2)||
@@ -17,7 +29,8 @@ static bool floating_compare(const uint8_t *p,size_t n) {
 }
 
 static csh canonical;
-static uint64_t projected, typed;
+static uint64_t projected, typed, integers;
+static int64_t correction;
 static bool lifted_detail;
 static unsigned compare_width(const uint8_t *p,size_t n) {
   while(n && (*p==0x26||*p==0x2e||*p==0x36||*p==0x3e||*p==0x64||*p==0x65||*p==0x67)){++p;--n;}
@@ -26,7 +39,20 @@ static unsigned compare_width(const uint8_t *p,size_t n) {
   return width[pp];
 }
 static unsigned reference_id(unsigned old, const uint8_t *code, size_t length, uint64_t ip) {
-  if (!canonical || !floating_compare(code,length)) return old;
+  if (!canonical) return old;
+  if (unsigned family=integer_family(code,length)) {
+    const unsigned raw=old;
+    if (raw==X86_INS_VPCMP || raw==family) {
+      cs_insn *bulk=nullptr;
+      const size_t n=cs_disasm(canonical,code,length,ip,1,&bulk);
+      if (!n || bulk->size!=length || bulk->id!=family) std::exit(12);
+      cs_free(bulk,n);
+      if (raw!=family) { ++integers; correction+=int64_t(family)-raw; }
+      return family;
+    }
+    std::exit(13);
+  }
+  if (!floating_compare(code,length)) return old;
   cs_insn *result = nullptr;
   size_t count = cs_disasm(canonical,code,length,ip,1,&result);
   unsigned wanted = old;
@@ -38,6 +64,7 @@ static unsigned reference_id(unsigned old, const uint8_t *code, size_t length, u
     if (old != result->id + 1 + (code[length-1]&31)) std::exit(9);
     wanted = result->id;
     projected++;
+    correction+=int64_t(wanted)-old;
   }
   cs_free(result,count);
   return wanted;
@@ -149,7 +176,7 @@ int main(int argc, char **argv) {
     }
   }
   if (canonical) cs_close(&canonical);
-  std::fprintf(stderr, "%llu %llu\n", static_cast<unsigned long long>(projected), static_cast<unsigned long long>(typed));
+  std::fprintf(stderr, "%llu %llu %llu %lld\n", static_cast<unsigned long long>(projected), static_cast<unsigned long long>(typed), static_cast<unsigned long long>(integers), static_cast<long long>(correction));
   std::printf("%lld %llu %llu %llu %llu\n", (long long)(std::clock()-start),
               (unsigned long long)accepted,(unsigned long long)rejected,
               (unsigned long long)boundary,(unsigned long long)value);
