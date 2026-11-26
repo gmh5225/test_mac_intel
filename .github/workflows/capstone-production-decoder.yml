@@ -1,7 +1,7 @@
-name: Measure KMOV mask-source scan speed in NeverD built against current LLVM fork sources with real PE and ELF
+name: Verify register KMOV on current NeverD and source-built LLVM with real PE and ELF
 on:
   push:
-    branches: [codex/neverd-kmov-mask-source-product]
+    branches: [codex/kmov-scan-current-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: fd88bf43c7956397cc67cfdb88e937e359c36a90
+          ref: 5fa4e4da6e9ce253f43d24525c98b3931616da7f
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: kmov-source-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: kmov-current-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
