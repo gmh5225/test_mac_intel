@@ -1,7 +1,7 @@
-name: Count calibrated decoded instructions and simulated cache misses for scalar metadata rows
+name: Locate duplicate immutable tables in all built Capstone architecture backends
 on:
   push:
-    branches: [codex/scalar-output-metadata-events]
+    branches: [codex/static-read-only-tables-across-backends]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,34 +28,16 @@ jobs:
           ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
           path: source
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/NeverD
-          ref: c9772143c11e10fb199de017eb1c0fcaef115c53
-          path: neverd-config
-          sparse-checkout: |
-            CMakeLists.txt
-            cmake/NeverDCapstoneCompilerOptions.inc
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/iced
-          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
-          path: iced-source
-          sparse-checkout: src/rust/iced-x86
-          persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
+      - name: Build all backends and inspect allocated read-only ELF symbols
         run: |
-          if ! command -v valgrind >/dev/null || ! test -f /usr/include/valgrind/callgrind.h; then sudo apt-get -qq update && sudo apt-get -qq -y install valgrind; fi
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
+          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-row-events-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: architecture-tables-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
