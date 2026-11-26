@@ -4,9 +4,10 @@ import hashlib,struct
 from elftools.elf.elffile import ELFFile
 def describe(raw):
     elf=ELFFile(BytesIO(raw))
-    image={}
+    image={};occurrences={}
     for sec in elf.iter_sections():
-        key=sec.name
+        ordinal=occurrences.get(sec.name,0);occurrences[sec.name]=ordinal+1
+        key=sec.name if ordinal==0 else sec.name+" [occurrence "+str(ordinal+1)+"]"
         assert key not in image
         image[key]={'header':{k:v for k,v in sec.header.items() if k!='sh_offset'},
                     'sha256':hashlib.sha256(sec.data()).hexdigest() if sec['sh_type']!='SHT_NOBITS' else None}
@@ -17,6 +18,7 @@ def extend(source,target,name,extra):
     eh=elf.header
     assert extra>0 and elf.elfclass==64 and elf.little_endian and eh['e_type']=='ET_REL' and eh['e_phnum']==0
     assert eh['e_shentsize']==64 and 0<eh['e_shnum']==elf.num_sections()<0xff00
+    assert sum(s.name==name for s in elf.iter_sections())==1
     section=elf.get_section_by_name(name)
     assert section['sh_type']=='SHT_PROGBITS' and section['sh_flags']&4
     end=section['sh_offset']+section['sh_size'];assert eh['e_ehsize']<=end<=eh['e_shoff']
