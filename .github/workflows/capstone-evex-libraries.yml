@@ -1,7 +1,7 @@
-name: Time explicit AArch64 operand detail requests on real ls cp and sort programs
+name: Measure ls cp and sort with shared decoder rows and AArch64 operand detail checks
 on:
   push:
-    branches: [codex/aarch64-dedicated-operand-programs]
+    branches: [codex/shared-rows-arm-operand-coreutils]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 4cb47e8f8818d0a85b8de2298722558b51c40fa2
+          ref: 477cdca0b80d3ababa2aa9c40375bad86914eaca
           path: source
           persist-credentials: false
       - name: Check full operand records and time coreutils executables
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-ordinary-operand-${{ matrix.host }}-${{ matrix.cc }}
+          name: shared-operand-programs-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
