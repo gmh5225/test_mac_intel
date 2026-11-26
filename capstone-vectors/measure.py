@@ -64,6 +64,16 @@ try:
         check=list(map(int,get(w/'check-clear').split()))
         assert check[0]==1769472 and 0<check[1]<check[0]
         save('clear-'+label,check)
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/'aarch64-records.cpp',lib,'-o',w/'operand-records')
+        arm,=[sample for sample in foreign_rows if sample['name']=='arm64-cat']
+        verified={}
+        for hooks in (0,1):
+            for name,args in [('states',[])]+[(str(mode),[w/(arm['name']+'.text'),str(arm['address']),str(mode)]) for mode in range(4)]:
+                output=w/'operand-report.json';test=sp.run([w/'operand-records',output,str(hooks),*args],capture_output=True,check=True)
+                detail=rd(output);detail['diagnostics']=hashlib.sha256(test.stdout+test.stderr).hexdigest();verified[str(hooks)+'/'+name]=detail
+        assert len(verified)==10 and verified['0/states']['accepted']+verified['0/states']['rejected']==51200
+        if label!='base':assert verified==rd(e/'aarch64-records-base.json')
+        save('aarch64-records-'+label,verified)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
