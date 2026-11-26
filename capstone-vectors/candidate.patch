@@ -1,123 +1,40 @@
-diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..4d307a4a 100644
---- a/arch/X86/X86BatchScan.c
-+++ b/arch/X86/X86BatchScan.c
-@@ -12,11 +12,13 @@
- 
- #if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
- #include "../../cs_disasm_internal.h"
-+#define X86_DEFINE_I386_MAP3_PLANS
- #define X86_DEFINE_VEX3_PUBLIC_PLANS
- #define X86_DEFINE_VEX2_PUBLIC_PLANS
- #include "X86GenVexPublicPlans.inc"
- #undef X86_DEFINE_VEX2_PUBLIC_PLANS
- #undef X86_DEFINE_VEX3_PUBLIC_PLANS
-+#undef X86_DEFINE_I386_MAP3_PLANS
- #include "X86GenBatchPrimary.inc"
- #include "X86FeatureExtension.h"
- #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-@@ -165,6 +167,15 @@ static uint32_t readFirst32(const uint8_t *code, size_t size)
- 		return readPrimary(code, size, plan);
- 	if (code[0] == 0xc5 && size >= 3 && (code[1] & 0xc0) == 0xc0)
- 		return readVex2Plan(code, size);
-+	/* E3 disambiguates VEX from LES. With W=0, 66 and registers 0..7,
-+	 * one generated cell contains the ID, operand checks and tail size. */
-+	if (code[0] == 0xc4 && size >= 5 && code[1] == 0xe3 &&
-+	    (code[2] & 0xc3) == 0x41 &&
-+	    X86_vexFeatureFamily(3, code[3]) == X86_VEX_FEATURE_NONE) {
-+		const unsigned form = ((code[2] >> 1) & 2) | (code[4] >= 0xc0);
-+		return finishVexPlan(code, size, 4, code[2],
-+				     x86Vex32Map3OperandPlan[code[3]][form]);
-+	}
- 	return 0;
- }
- 
 diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
-index a8a6252a..da814897 100644
+index a8a6252a..60e6305f 100644
 --- a/arch/X86/X86GenVexPublicPlans.inc
 +++ b/arch/X86/X86GenVexPublicPlans.inc
-@@ -462,6 +462,44 @@ static const uint16_t x86Vex3FormPlans[25][2] = {
- 	{ 9844, 0 },
- 	{ 9852, 0 },
+@@ -186,10 +186,10 @@ static const uint8_t x86Vex3OpcodeRows[3][256] = {
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 241, 242,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 243,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	},
  };
-+#ifdef X86_DEFINE_I386_MAP3_PLANS
-+static const uint16_t x86Vex32Map3OperandPlan[256][4] = {
-+	[0x02] = { 8765, 8765, 8765, 8765 },
-+	[0x04] = { 9311, 9311, 9311, 9311 },
-+	[0x05] = { 9295, 9295, 9295, 9295 },
-+	[0x06] = { 0, 0, 9205, 9205 },
-+	[0x08] = { 11383, 11383, 11383, 11383 },
-+	[0x09] = { 11375, 11375, 11375, 11375 },
-+	[0x0a] = { 11397, 11397, 11397, 11397 },
-+	[0x0b] = { 11389, 11389, 11389, 11389 },
-+	[0x0c] = { 6245, 6245, 6245, 6245 },
-+	[0x0d] = { 6237, 6237, 6237, 6237 },
-+	[0x0e] = { 8813, 8813, 8813, 8813 },
-+	[0x0f] = { 8693, 8693, 8693, 8693 },
-+	[0x14] = { 9431, 9431, 0, 0 },
-+	[0x15] = { 9455, 9455, 0, 0 },
-+	[0x16] = { 9439, 9439, 0, 0 },
-+	[0x17] = { 6975, 6975, 0, 0 },
-+	[0x18] = { 0, 0, 7933, 7933 },
-+	[0x19] = { 0, 0, 6895, 6895 },
-+	[0x1d] = { 6535, 6535, 6535, 6535 },
-+	[0x20] = { 9669, 9669, 0, 0 },
-+	[0x21] = { 8013, 8013, 0, 0 },
-+	[0x22] = { 9677, 9677, 0, 0 },
-+	[0x38] = { 0, 0, 7973, 7973 },
-+	[0x39] = { 0, 0, 6935, 6935 },
-+	[0x40] = { 6837, 6837, 6837, 6837 },
-+	[0x41] = { 6829, 6829, 0, 0 },
-+	[0x42] = { 8421, 8421, 8421, 8421 },
-+	[0x44] = { 8869, 8869, 8869, 8869 },
-+	[0x46] = { 0, 0, 9213, 9213 },
-+	[0x60] = { 8951, 8951, 0, 0 },
-+	[0x61] = { 8943, 8943, 0, 0 },
-+	[0x62] = { 8999, 8999, 0, 0 },
-+	[0x63] = { 8991, 8991, 0, 0 },
-+	[0xdf] = { 6167, 6167, 0, 0 },
-+};
-+#endif
- #endif
- 
- #endif
+-static const uint16_t x86Vex3PublicRows[244][16] = {
++static const uint16_t x86Vex3PublicRows[245][16] = {
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 8414, 8406, 32768, 32769, 8414, 8406, 32768, 32769 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 32770, 32771, 8390, 8198, 0, 0, 8390, 8198 },
+@@ -434,6 +434,7 @@ static const uint16_t x86Vex3PublicRows[244][16] = {
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 7885, 0, 0, 0, 7885, 0, 0 },
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 7877, 0, 0, 0, 7877, 0, 0 },
+ 	{ 0, 6167, 0, 0, 0, 0, 0, 0, 0, 6167, 0, 0, 0, 0, 0, 0 },
++	{ 0, 0, 0, 5103, 0, 0, 0, 0, 0, 0, 0, 5103, 0, 0, 0, 0 },
+ };
+ static const uint16_t x86Vex3FormPlans[25][2] = {
+ 	{ 8398, 8396 },
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index f1ebc59f..56c5bcc5 100644
+index f1ebc59f..dfec0d91 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
-@@ -1364,7 +1364,34 @@ def emit_vex3_plans(ids, maps, contexts, context_values, attrs, pp, metadata, ta
-     lines += ["};", f"static const uint16_t x86Vex3FormPlans[{len(pairs)}][2] = {{"]
-     for row in pairs:
-         lines.append("\t{ " + ", ".join(map(str, row)) + " },")
--    return lines + ["};", "#endif", ""]
-+    lines += ["};", "#ifdef X86_DEFINE_I386_MAP3_PLANS"]
-+    # The unextended 66/0F3A W=0 form requires ModR/M. Preserve the fallback
-+    # if any register or memory member has a different UID in legacy mode.
-+    _, indices, entries = maps[3]
-+    projected = [[0] * 4 for _ in range(256)]
-+    for length in range(2):
-+        flags = attrs["ATTR_VEX"] | pp[1]
-+        if length:
-+            flags |= attrs["ATTR_VEXL"]
-+        narrow = indices[contexts.index(context_values[flags])]
-+        wide = indices[contexts.index(context_values[flags | attrs["ATTR_64BIT"]])]
-+        if not narrow or not wide:
-+            continue
-+        for opcode, (left, right) in enumerate(zip(entries[narrow - 1], entries[wide - 1])):
-+            for register, forms in enumerate((range(192), range(192, 256))):
-+                if left != right and any(tables.source_id(ids, *left, mr) !=
-+                                         tables.source_id(ids, *right, mr) for mr in forms):
-+                    continue
-+                plans = {public_vex_plan(ids, *left, mr, metadata, tails) for mr in forms}
-+                if len(plans) == 1:
-+                    plan = plans.pop()
-+                    if plan & 4:
-+                        projected[opcode][length * 2 + register] = plan
-+    lines.append("static const uint16_t x86Vex32Map3OperandPlan[256][4] = {")
-+    for opcode, plan in enumerate(projected):
-+        if any(plan):
-+            lines.append(f"\t[0x{opcode:02x}] = {{ " + ", ".join(map(str, plan)) + " },")
-+    return lines + ["};", "#endif", "#endif", ""]
- 
- 
- def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
+@@ -1545,7 +1545,9 @@ def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
+ def emit_vex_scan(suffix, public_plans=False):
+     # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
+     # no gather, mask, register-limit or predicate-dependent opcode checks.
+-    reads = dict(read_specializations(suffix))
++    # The scan result needs the immediate extent, not a materialized operand.
++    # REG, RM and imm8 (for example RORX) are validated by vex_scan_form.
++    reads = dict(read_specializations(suffix, scalar_limit=3 if public_plans else 2))
+     translations = dict(translation_specializations(suffix))
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+     specifiers = instruction_specifiers(source)
