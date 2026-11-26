@@ -1,7 +1,7 @@
-name: Verify full br_table target-list addresses across Win32 and Win64 iterator, batch, full and DIET modes
+name: Verify corrected 64-bit list addresses on Windows x86 and x64 with full and DIET libraries
 on:
   push:
-    branches: [codex/wasm-full-target-list-address]
+    branches: [codex/current-wasm-wide-address-msvc]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-table-address-${{ matrix.arch }}-${{ matrix.profile }}
+          name: table-address-msvc-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
