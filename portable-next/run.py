@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
+import hashlib,json,os,platform,shlex,shutil,subprocess as sp,tempfile
 from fixtures import fixtures,sha
 r=Path(__file__).resolve().parent;root=r.parent;src=root/'source';e=root/'evidence';e.mkdir(exist_ok=True)
 rd=lambda f:json.loads(f.read_text());q=rd(r/'source.json');m=rd(r/'experiment.json');profile=os.environ['SCAN_PROFILE']
@@ -43,12 +43,19 @@ try:
             run('cmake',*flags)
             names=['static']if config=='product'else['static','shared']
             run('cmake','--build',build,'--parallel','4','--target',*['probe_'+kind for kind in names])
-            rows=[z for z in rd(build/'compile_commands.json')if Path(z['file']).suffix=='.c'];assert len(rows)>20
-            flags_per={Path(z['file']).name:'CAPSTONE_X86_COMPACT_SCALAR_ROWS' in z['command'] for z in rows}
-            assert all(t==(tag=='candidate' and expect=='direct')for t in flags_per.values()),(config,tag,flags_per)
-            cc[tag]=len(rows);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
-            objs={str(f.relative_to(build)):sha(f.read_bytes()) for f in (build/'capstone').rglob('*.o')}
-            assert len(objs)==len(rows) and any('RISCVMapping.c' in k for k in objs)==multi
+            objs={str(f.relative_to(build)):sha(f.read_bytes()) for f in (build/'capstone').rglob('*.c.o')}
+            built={str((build/path).resolve()):path for path in objs}
+            rows={}
+            for z in rd(build/'compile_commands.json'):
+                if Path(z['file']).suffix!='.c':continue
+                tokens=shlex.split(z['command'])
+                output=z.get('output')or tokens[tokens.index('-o')+1]
+                path=str((Path(z['directory'])/output).resolve())
+                if path in built:rows[built[path]]=z['command']
+            assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
+            flags_per={key:'CAPSTONE_X86_COMPACT_SCALAR_ROWS' in cmd for key,cmd in rows.items()}
+            assert all(v==(tag=='candidate' and expect=='direct')for v in flags_per.values()),(config,tag,flags_per)
+            cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
             dest=project/tag;dest.mkdir()
             for kind in names:shutil.copy2(build/('probe_'+kind),dest)
             for f in (build/'capstone').rglob('libcapstone*'):

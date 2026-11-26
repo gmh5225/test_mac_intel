@@ -1,7 +1,7 @@
-name: Verify final scalar records against the measured Linux product and the standalone baseline
+name: Compare the compiled Capstone objects and loaded scalar release products
 on:
   push:
-    branches: [codex/linux-mixed-scalar-layout]
+    branches: [codex/compiled-scalar-layout-identity]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scalar-layout-release-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: compiled-scalar-layout-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
