@@ -53,7 +53,7 @@ try:
                 row=rd(o);row['diagnostics']=sha(log.read_bytes());rows[str(hooks)+'/'+case]=row
         if k!='base':assert rows==obs['base'],(k,[key for key in rows if rows[key]!=obs['base'][key]])
         assert rows['0/modes']['accepted']+rows['0/modes']['rejected']==51200 and rows['0/arm64-ls/3']['accepted']==23973
-        assert (rows['1/modes']['callbacks']>0)==(profile=='full')
+        assert rows['0/modes']['callbacks']==0 and rows['1/modes']['callbacks']==(376 if profile=='diet' else 31176)
         save('checked',obs)
     save('complete',dict(source=q,profile=profile,records=obs,units=tests,images=images))
 finally:

@@ -1,7 +1,7 @@
-name: Verify dedicated operand details and callback order on Windows and macOS
+name: Verify ordinary AArch64 operand hooks against observed full and DIET profiles
 on:
   push:
-    branches: [codex/aarch64-ordinary-operands-dedicated]
+    branches: [codex/aarch64-dedicated-diet-callbacks]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-operand-details-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: ordinary-diet-callbacks-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
