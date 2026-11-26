@@ -1,7 +1,7 @@
-name: Compare complete static libraries and linked consumers in NeverD six and seven architecture builds
+name: Verify the AArch64 operand change against every object and linked consumer in both NeverD builds
 on:
   push:
-    branches: [codex/verified-six-seven-wasm-consumers]
+    branches: [codex/mixed-build-aarch64-operand-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: 477cdca0b80d3ababa2aa9c40375bad86914eaca
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f45561436bfe3d36819b21ada16aae078eddc8c4
+          ref: 035a081339eaabf8052cc7768cd894fa7bdeaac0
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-mixed-link-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: aarch64-mixed-shared-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

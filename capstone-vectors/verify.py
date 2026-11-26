@@ -23,6 +23,9 @@ int main(void){
  csh h; cs_insn *i; const uint8_t mov[]={0x89,0xc1}, local[]={0x20,0x7f};
  if(cs_open(CS_ARCH_X86,CS_MODE_32,&h)||cs_disasm(h,mov,2,0,1,&i)!=1)return 1;
  printf("%u %s %s\\n",i->id,i->mnemonic,i->op_str);cs_free(i,1);cs_close(&h);
+ const uint8_t add[]={0x21,0x04,0x00,0x91};
+ if(cs_open(CS_ARCH_AARCH64,CS_MODE_LITTLE_ENDIAN,&h)||cs_disasm(h,add,4,0,1,&i)!=1)return 3;
+ printf("%u %s %s\\n",i->id,i->mnemonic,i->op_str);cs_free(i,1);cs_close(&h);
  if(cs_support(CS_ARCH_WASM)){
   if(cs_open(CS_ARCH_WASM,CS_MODE_LITTLE_ENDIAN,&h)||cs_disasm(h,local,2,0,1,&i)!=1)return 2;
   printf("%u %s %s\\n",i->id,i->mnemonic,i->op_str);cs_free(i,1);cs_close(&h);
@@ -40,6 +43,7 @@ int main(void){
    if label=='base':run('cmake','-G','Ninja','-S',pr,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON')
    run('cmake','--build',b,'--parallel','4','--target','consumer');lib,=b.rglob('libcapstone.a')
    commands=rd(b/'compile_commands.json');wcmd=[x['command']for x in commands if x['file'].endswith('/WASMInstPrinter.c')]
+   acmd=[x['command']for x in commands if x['file'].endswith('/AArch64InstPrinter.c')];assert len(acmd)==1 and 'CAPSTONE_AARCH64_SKIP_UNUSED_OPERAND_DETAIL' not in acmd[0]
    assert bool(wcmd)==wasm and all('CAPSTONE_WASM_LITERAL_MNEMONICS' not in x for x in wcmd)
    objects={str(f.relative_to(b)):file_sha(f)for f in b.rglob('*.c.o') if '/capstone' in str(f.relative_to(b))};assert len(objects)>=60 and any('WASMInstPrinter' in f for f in objects)==wasm
    buf=lib.read_bytes();normalized,dates[label]=entries(buf);exe=b/'consumer';runtime=get(exe)

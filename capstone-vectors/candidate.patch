@@ -1,68 +1,45 @@
-diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index 466543c3..d2fdea81 100644
---- a/arch/WASM/WASMInstPrinter.c
-+++ b/arch/WASM/WASMInstPrinter.c
-@@ -4,6 +4,41 @@
- #include "WASMInstPrinter.h"
- #include "WASMMapping.h"
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index e83b0ab9..1c3fc1e2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -222,7 +222,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
+ endif()
  
-+#ifdef WASM_LITERAL_NAMES
-+static char *prependHex32(char *end, uint32_t value)
-+{
-+	do {
-+		*--end = "0123456789abcdef"[value & 15];
-+		value >>= 4;
-+	} while (value);
-+	*--end = 'x';
-+	*--end = '0';
-+	return end;
-+}
-+
-+static bool printHexOperands32(SStream *out, const uint32_t *values,
-+			      unsigned count)
-+{
-+	if (cs_vsnprintf != cs_default_vsnprintf ||
-+	    out->index >= SSTREAM_BUF_LEN - 1)
-+		return false;
-+
-+	char text[sizeof("\t0xffffffff, 0xffffffff")];
-+	char *end = text + sizeof(text) - 1;
-+	char *p = end;
-+	*end = '\0';
-+	if (count == 2) {
-+		p = prependHex32(p, values[1]);
-+		*--p = ' ';
-+		*--p = ',';
-+	}
-+	p = prependHex32(p, values[0]);
-+	*--p = '\t';
-+	SStream_concat0_n(out, p, (size_t)(end - p));
-+	return true;
-+}
-+#endif
-+
- void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ if(capstone_enabled_architectures STREQUAL "AARCH64")
+-    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS CAPSTONE_AARCH64_DEDICATED_SCAN)
++    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS CAPSTONE_AARCH64_DEDICATED_SCAN CAPSTONE_AARCH64_SKIP_UNUSED_OPERAND_DETAIL)
+ endif()
+ 
+ # Dedicated builds of these backends use their generated mnemonic tries.
+diff --git a/Makefile b/Makefile
+index 95e046b2..fafc61bf 100644
+--- a/Makefile
++++ b/Makefile
+@@ -176,7 +176,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
+-CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_AARCH64_DEDICATED_SCAN
++CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_AARCH64_DEDICATED_SCAN -DCAPSTONE_AARCH64_SKIP_UNUSED_OPERAND_DETAIL
+ endif
+ 
+ ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
+diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
+index 7537d3f9..940902b4 100644
+--- a/arch/AArch64/AArch64InstPrinter.c
++++ b/arch/AArch64/AArch64InstPrinter.c
+@@ -1027,7 +1027,13 @@ void printSVCROp(MCInst *MI, unsigned OpNum, SStream *O)
+ 
+ void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  {
- #ifdef WASM_LITERAL_NAMES
-@@ -17,6 +52,10 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- 		break;
- 
- 	case WASM_OP_VARUINT32:
-+#ifdef WASM_LITERAL_NAMES
-+		if (printHexOperands32(O, &MI->wasm_data.varuint32, 1))
-+			break;
+-	AArch64_add_cs_detail_0(MI, AArch64_OP_GROUP_Operand, OpNo);
++#ifdef CAPSTONE_AARCH64_SKIP_UNUSED_OPERAND_DETAIL
++	const bool add_detail = detail_is_set(MI);
++#else
++	const bool add_detail = true;
 +#endif
- 		SStream_concat(O, "\t0x%x", MI->wasm_data.varuint32);
- 		break;
- 
-@@ -39,6 +78,10 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- 		break;
- 
- 	case WASM_OP_IMM:
-+#ifdef WASM_LITERAL_NAMES
-+		if (printHexOperands32(O, MI->wasm_data.immediate, 2))
-+			break;
-+#endif
- 		SStream_concat(O, "\t0x%x, 0x%x", MI->wasm_data.immediate[0],
- 			       MI->wasm_data.immediate[1]);
- 		break;
++	if (add_detail)
++		AArch64_add_cs_detail_0(MI, AArch64_OP_GROUP_Operand, OpNo);
+ 	MCOperand *Op = MCInst_getOperand(MI, (OpNo));
+ 	if (MCOperand_isReg(Op)) {
+ 		unsigned Reg = MCOperand_getReg(Op);
