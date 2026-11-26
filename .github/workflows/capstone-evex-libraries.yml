@@ -1,7 +1,7 @@
-name: Verify mixed WebAssembly and native-architecture library timing with identical address-width fixes
+name: Check PE32 and other architectures in the linked seven-architecture library with the bounded WASM table address writer
 on:
   push:
-    branches: [codex/wasm-full-table-address-mixed]
+    branches: [codex/wasm-bounded-table-linked]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c8f0563c28782607794c551737ce106fd25586d6
+          ref: c9772143c11e10fb199de017eb1c0fcaef115c53
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-table-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: table-hex-linked-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
