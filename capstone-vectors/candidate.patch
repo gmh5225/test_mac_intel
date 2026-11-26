@@ -1,69 +1,86 @@
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..18e787f2 100644
+index a976814e..083cff26 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -151,7 +151,8 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+@@ -151,7 +151,11 @@ static const uint16_t x86_simple_plans[2][4][256] = {
  	},
  };
  
--static const struct X86SimpleOutput x86_simple_outputs[] = {
-+#ifdef X86_DEFINE_SIMPLE_OUTPUT_ROWS
-+CAPSTONE_INTERNAL const struct X86SimpleOutput x86_simple_outputs[] = {
++#ifdef BENCH_SCALAR_OWNER
++CAPSTONE_INTERNAL const struct X86SimpleOutput x86_bench_master[] = {
++#else
+ static const struct X86SimpleOutput x86_simple_outputs[] = {
++#endif
  	{ 0, "", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 0, 0, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
  	{ 8, "add", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
  	{ 8, "add", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
-@@ -488,6 +489,7 @@ static const struct X86SimpleOutput x86_simple_outputs[] = {
- 	{ 585, "pop", "rdi", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 39, 8, 2 }, { 0, 0, 0 } } },
- 	{ 585, "pop", "r15", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 113, 8, 2 }, { 0, 0, 0 } } },
- };
-+#endif
- 
- static const struct X86SimpleRegister x86_simple_registers[4][16] = {
- 	{
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..fdf29247 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -18,6 +18,13 @@
+ #include "X86GenVex32MemoryOutput.inc"
+ #undef X86_VEX32_REGISTER_MOVES
+ #include "X86GenSimpleOutput.inc"
++extern CAPSTONE_INTERNAL const unsigned char x86_bench_shared;
++extern CAPSTONE_INTERNAL const struct X86SimpleOutput x86_bench_master[];
++static const struct X86SimpleOutput *const x86_bench_choices[2] __attribute__((used)) = {
++	x86_simple_outputs, x86_bench_master
++};
++#define x86_simple_outputs (x86_bench_choices[x86_bench_shared])
++
+ #include "../../cs_disasm_internal.h"
+ #define X86_MEMORY32_OUTPUT
+ #define X86_MEMORY_IMMEDIATE writeCompare32
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..01cb491e 100644
+index 8c6444ab..8c905768 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -11,7 +11,10 @@
+@@ -11,7 +11,11 @@
  	!defined(_WIN32_WCE)
  #include "X86OutputOptions.h"
  #include "X86SimpleOutput.h"
-+/* One definition serves the generic and fixed-mode record readers. */
-+#define X86_DEFINE_SIMPLE_OUTPUT_ROWS
++#define BENCH_SCALAR_OWNER
  #include "X86GenSimpleOutput.inc"
-+#undef X86_DEFINE_SIMPLE_OUTPUT_ROWS
++#undef BENCH_SCALAR_OWNER
++CAPSTONE_INTERNAL const unsigned char x86_bench_shared = 1;
++#define x86_simple_outputs x86_bench_master
  
  #include "X86SimpleOutputImpl.h"
  
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..f7c540b8 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -43,6 +43,8 @@ struct X86SimpleRegister {
- 	char name[8];
- };
- 
-+extern CAPSTONE_INTERNAL const struct X86SimpleOutput x86_simple_outputs[];
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 324fc05d..a3dc7339 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -19,6 +19,13 @@
+ #define X86_FIXED_VEX2 writeVex2Output64
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
++extern CAPSTONE_INTERNAL const unsigned char x86_bench_shared;
++extern CAPSTONE_INTERNAL const struct X86SimpleOutput x86_bench_master[];
++static const struct X86SimpleOutput *const x86_bench_choices[2] __attribute__((used)) = {
++	x86_simple_outputs, x86_bench_master
++};
++#define x86_simple_outputs (x86_bench_choices[x86_bench_shared])
 +
- enum X86SimpleForm {
- 	X86_SIMPLE_FIXED,
- 	X86_SIMPLE_RM_REG,
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index b202bca4..e3dfd6a3 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -617,11 +617,12 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
- 		std::cout << "\t},\n";
- 	}
- 	std::cout
--		<< "};\n\nstatic const struct X86SimpleOutput x86_simple_outputs[] = {\n";
-+		<< "};\n\n#ifdef X86_DEFINE_SIMPLE_OUTPUT_ROWS\n"
-+		<< "CAPSTONE_INTERNAL const struct X86SimpleOutput x86_simple_outputs[] = {\n";
- 	for (const auto &v : rows)
- 		std::cout << '\t' << v << ",\n";
- 	std::cout
--		<< "};\n\nstatic const struct X86SimpleRegister x86_simple_registers[4][16] = {\n";
-+		<< "};\n#endif\n\nstatic const struct X86SimpleRegister x86_simple_registers[4][16] = {\n";
- 	for (auto &names : regs) {
- 		std::cout << "\t{\n";
- 		for (auto &v : names)
+ #include "X86VectorRegisterOutput.h"
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate64
+ #define X86_IMMEDIATE_WIDE 1
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index d6f533e0..035602b2 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -15,6 +15,13 @@
+ #include "X86OutputOptions.h"
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
++extern CAPSTONE_INTERNAL const unsigned char x86_bench_shared;
++extern CAPSTONE_INTERNAL const struct X86SimpleOutput x86_bench_master[];
++static const struct X86SimpleOutput *const x86_bench_choices[2] __attribute__((used)) = {
++	x86_simple_outputs, x86_bench_master
++};
++#define x86_simple_outputs (x86_bench_choices[x86_bench_shared])
++
+ #include "X86VectorRegisterWriter.h"
+ #define X86_MEMORY32_OUTPUT writeMemory32
+ #define X86_MEMORY_IMMEDIATE writeMemoryImmediate32

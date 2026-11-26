@@ -82,6 +82,44 @@ try:
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        if label=='candidate':
+            expected=bytes([1]); links={}
+            receipt={}
+            for active,disabled,optional in [('outlined','candidate',False),('outlined.so','candidate.so',False),('foreign-outlined','foreign-candidate',True)]:
+                # Produce the table-off control from a fresh copy of the very same linked image.
+                shutil.copyfile(w/active,w/disabled)
+                payload=(w/active).read_bytes();offset=None;section=None
+                with (w/active).open('rb') as inp:
+                    elf=ELFFile(inp)
+                    found=[v for v in elf.get_section_by_name('.symtab').iter_symbols() if v.name.split('.')[0]=='x86_bench_shared' and v['st_info']['type']=='STT_OBJECT']
+                    if active=='outlined':
+                        import struct
+                        syms=elf.get_section_by_name('.symtab')
+                        assert elf['e_type']=='ET_EXEC' and elf.little_endian and elf.elfclass==64
+                        def contents(sym):
+                            region=elf.get_section(sym['st_shndx'])
+                            start=region['sh_offset']+sym['st_value']-region['sh_addr']
+                            return payload[start:start+sym['st_size']]
+                        rows=[x for x in syms.iter_symbols() if x.name in ('x86_simple_outputs','x86_bench_master') and x['st_size']==335*88]
+                        master,=[x for x in rows if x.name=='x86_bench_master'];others={x['st_value'] for x in rows if x.name=='x86_simple_outputs'}
+                        assert len(others)==3 and len({contents(x) for x in rows})==1
+                        pointers=[struct.unpack('<QQ',contents(x))for x in syms.iter_symbols() if x.name=='x86_bench_choices' and x['st_size']==16]
+                        assert set(pointers)=={(a,master['st_value']) for a in others},pointers
+                        links=dict(master=master['st_value'],pairs=pointers,table_bytes=335*88,table_sha256=hashlib.sha256(contents(master)).hexdigest())
+                        save('scalar-table-links',links)
+                    if found:
+                        entry,=found;sec=elf.get_section(entry['st_shndx']);section=sec.name
+                        assert entry['st_size']==len(expected) and sec['sh_flags']&2 and not(sec['sh_flags']&5)
+                        offset=sec['sh_offset']+entry['st_value']-sec['sh_addr']
+                    else:assert optional
+                if offset is not None:
+                    assert payload[offset:offset+len(expected)]==expected
+                    with (w/disabled).open('r+b')as out:out.seek(offset);out.write(bytes(len(expected)))
+                    after=(w/disabled).read_bytes()
+                    assert after[:offset]==payload[:offset] and after[offset+len(expected):]==payload[offset+len(expected):]
+                    assert after[offset:offset+len(expected)]==bytes(len(expected))
+                receipt[active]=dict(offset=offset,section=section,table_bytes=len(expected) if offset is not None else 0,nonzero_bytes=sum(v!=0 for v in expected) if offset is not None else 0,active=sha(w/active),disabled=sha(w/disabled))
+            save('data-only-control',receipt)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
