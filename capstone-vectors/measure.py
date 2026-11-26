@@ -81,7 +81,9 @@ try:
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        assert ('-DCAPSTONE_STATIC_X86_READERS' in entry)==(label!='base') and 'CAPSTONE_X86_ITERATOR_READERS' not in entry
+        save('reader-selection-'+label,dict(fixed='-DCAPSTONE_STATIC_X86_READERS' in entry,source=maps['base' if label=='base' else 'prefix' if label=='candidate' else 'outlined']))
+
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)

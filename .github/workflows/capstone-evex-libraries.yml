@@ -1,7 +1,7 @@
-name: Compare fixed public record dispatch and architecture-specialized full decoding on PE and ELF
+name: Measure public and private readers with independently verified compile modes
 on:
   push:
-    branches: [codex/mixed-static-full-records]
+    branches: [codex/verified-mixed-static-reader-selection]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-static-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: verified-mixed-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
