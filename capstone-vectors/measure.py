@@ -15,9 +15,7 @@ def interval(values):
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
-    frozen=rd(r/'base.json');assert get('git','-C',base,'rev-parse','HEAD').strip()==frozen['parent'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
-    assert sha(r/'base.patch')==frozen['sha256'] and frozen['commit']==q['parent']
-    run('git','-C',base,'apply','--index',r/'base.patch');assert get('git','-C',base,'write-tree').strip()==frozen['tree']
+    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent']==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -40,15 +38,19 @@ try:
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
     run('clang++','-O2','-std=c++17','-I',base/'include',r/'ids.cpp',lib,'-o',w/'id-oracle')
-    for label in ('base','candidate'):
-        if label=='candidate':
-            assert sha(r/'candidate.patch')==q['sha256']
-            run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+    for label in ('base','candidate','record'):
+        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        if label!='base':
+            tr=q if label=='candidate' else m['record'];patch=r/(label+'.patch')
+            assert sha(patch)==tr['sha256']
+            run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==tr['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
     assert images['base']['exe']!=images['candidate']['exe']
     shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
+    blobs={k:(w/k).read_bytes() for k in ('base','duplicate','candidate','record')}
+    image=w/'active';shutil.copy2(w/'base',image);inode=image.stat().st_ino;current='base'
     cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
@@ -72,21 +74,25 @@ try:
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
             return rows
-        assert audit_engine('base')==audit_engine('candidate')
+        assert audit_engine('base')==audit_engine('candidate')==audit_engine('record')
         observed=list(map(int,get(w/'id-oracle',str(bits),f,path).split()));assert len(observed)==8
         n,invalid,*shifts=observed;assert n>0;save(name+'-untimed-ids',dict(accepted=n,rejected=invalid,counts=shifts[::2],deltas=shifts[1::2]))
 
         audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
         def take(engine,mode,n):
+            global current
             comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in ('candidate','duplicate')else'base'
-            return list(map(int,get(w/exe,comparator,str(mode),str(n),f,path,str(bits)).split()))
+            exe=engine if engine in blobs else 'base'
+            if exe!=current:
+                image.write_bytes(blobs[exe]);current=exe
+            assert image.stat().st_ino==inode
+            return list(map(int,get(image,comparator,str(mode),str(n),f,path,str(bits)).split()))
         for mode in (0,1,2):
-            labels=['base','duplicate','candidate','iced']+(['fast']if mode else[])
+            labels=['base','duplicate','candidate','record','iced']+(['fast']if mode else[])
             repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
             expected={k:take(k,mode,repeats)[2:]for k in labels}
             assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']
-            assert expected['base'][:2]==[repeats*n,repeats*invalid] and expected['candidate'][3]==(expected['base'][3]+repeats*shifts[2*mode+1])%(1<<64),(name,mode,expected,observed,repeats)
+            assert expected['base'][:2]==[repeats*n,repeats*invalid] and expected['candidate']==expected['record'] and expected['candidate'][3]==(expected['base'][3]+repeats*shifts[2*mode+1])%(1<<64),(name,mode,expected,observed,repeats)
             rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
             for _ in range(13):
                 rng.shuffle(labels);sample={k:[] for k in labels}
