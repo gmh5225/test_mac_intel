@@ -1,100 +1,90 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..87eaf0e0 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -563,10 +563,7 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 				.operands[MI->flat_insn->detail->x86.op_count]
- 				.mem.disp = imm;
- 		if (imm < 0) {
--			SStream_concat(
--				O, "0x%" PRIx64,
--				arch_masks[x86_get_bit_mode(MI->csh->mode)] &
--					imm);
-+			SStream_concat(O, "0x%" PRIx64, (uint64_t)imm);
- 		} else {
- 			if (imm > HEX_THRESHOLD)
- 				SStream_concat(O, "0x%" PRIx64, imm);
-diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..b4baefbf 100644
---- a/arch/X86/X86InstPrinterCommon.c
-+++ b/arch/X86/X86InstPrinterCommon.c
-@@ -290,3 +290,17 @@ void printRoundingControl(MCInst *MI, unsigned Op, SStream *O)
- 	}
- }
- #endif
-+
-+/* An absolute A0-A3 address is already zero-extended by the decoder.
-+ * Its high bit is independent of the size of the accumulator being moved. */
-+void X86_printHighMemoryOffset(SStream *O, uint64_t address, bool masm)
+diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
+index 6fcbe3f4..83e404e8 100644
+--- a/arch/X86/X86Module.c
++++ b/arch/X86/X86Module.c
+@@ -10,6 +10,16 @@
+ #include "X86Mapping.h"
+ #include "X86Module.h"
+ 
++static void set_mode(cs_struct *handle, cs_mode mode)
 +{
-+	if (!masm)
-+		SStream_concat_hex64(O, address, false);
-+	else if (address == (UINT64_C(1) << 63))
-+		SStream_concat0(O, "8000000000000000h");
-+	else if ((address >> 60) >= 10)
-+		SStream_concat(O, "0%" PRIx64 "h", address);
-+	else
-+		SStream_concat(O, "%" PRIx64 "h", address);
++	/* The decoder defaults to 64-bit when no operand mode was specified. */
++	if (!x86_get_bit_mode(mode))
++		mode = (cs_mode)(mode | CS_MODE_64);
++	handle->mode = mode;
++	handle->regsize_map = x86_has_feature(mode, CS_MODE_64) ?
++				      regsize_map_64 : regsize_map_32;
 +}
-diff --git a/arch/X86/X86InstPrinterCommon.h b/arch/X86/X86InstPrinterCommon.h
-index 37b02959..4af6867f 100644
---- a/arch/X86/X86InstPrinterCommon.h
-+++ b/arch/X86/X86InstPrinterCommon.h
-@@ -22,6 +22,7 @@ static inline uint64_t X86_relativeBranchTarget(cs_mode mode, uint64_t address,
- 	return target;
- }
++
+ cs_err X86_global_init(cs_struct *ud)
+ {
+ 	MCRegisterInfo *mri;
+@@ -37,10 +47,7 @@ cs_err X86_global_init(cs_struct *ud)
+ 	ud->reg_access = X86_reg_access;
+ #endif
  
-+void X86_printHighMemoryOffset(SStream *O, uint64_t address, bool masm);
- void X86_printMemoryScale(SStream *O, uint64_t scale, bool att);
+-	if (x86_has_feature(ud->mode, CS_MODE_64))
+-		ud->regsize_map = regsize_map_64;
+-	else
+-		ud->regsize_map = regsize_map_32;
++	set_mode(ud, ud->mode);
  
- void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O);
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..75281e93 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -722,10 +722,8 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 				.mem.disp = imm;
+ 	X86_build_lookup_tables(ud);
  
- 		if (imm < 0)
--			printImm(MI, O,
--				 arch_masks[x86_get_bit_mode(MI->csh->mode)] &
--					 imm,
--				 true);
-+			X86_printHighMemoryOffset(O, (uint64_t)imm,
-+						  MI->csh->syntax == CS_OPT_SYNTAX_MASM);
- 		else
- 			printImm(MI, O, imm, true);
- 	}
+@@ -57,14 +64,9 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 		     x86_has_feature(value, CS_MODE_X86_AMD)))
+ 			return CS_ERR_OPTION;
+ 
+-		if (x86_has_feature(value, CS_MODE_64))
+-			handle->regsize_map = regsize_map_64;
+-		else
+-			handle->regsize_map = regsize_map_32;
+-
+-		handle->mode = (cs_mode)(value &
+-					 (CS_MODE_16 | CS_MODE_32 | CS_MODE_64 |
+-					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
++		set_mode(handle, (cs_mode)(value & (CS_MODE_16 | CS_MODE_32 |
++						    CS_MODE_64 | CS_MODE_X86_INTEL |
++						    CS_MODE_X86_AMD)));
+ 		break;
+ 	case CS_OPT_SYNTAX:
+ 		switch (value) {
 diff --git a/tests/unit/x86_legacy_address_size.c b/tests/unit/x86_legacy_address_size.c
-index cfd13cba..17401f22 100644
+index cfd13cba..b2f397e0 100644
 --- a/tests/unit/x86_legacy_address_size.c
 +++ b/tests/unit/x86_legacy_address_size.c
-@@ -279,9 +279,43 @@ static bool check_other_opcodes(void)
+@@ -279,9 +279,46 @@ static bool check_other_opcodes(void)
  	return ok;
  }
  
-+static bool check_moffs_address(cs_mode mode, cs_opt_value syntax,
-+				const char *expected)
++/* The register map, x87 image size and decoder must agree on the default
++ * bitness both for a new handle and after changing its mode. */
++static bool check_default_bitness(cs_mode vendor, bool change_mode)
 +{
-+	const uint8_t code[] = { 0xa0, 0x34, 0x82, 0x00, 0x80,
-+				 0xec, 0xcd, 0xbc, 0xbc };
++	const uint8_t code[] = { 0x66, 0x48, 0xd9, 0x30 };
 +	csh handle;
 +	cs_insn *insn = NULL;
-+	bool ok = false;
-+	if (cs_open(CS_ARCH_X86, mode, &handle) != CS_ERR_OK)
++	if (cs_open(CS_ARCH_X86, change_mode ? CS_MODE_32 : vendor, &handle) != CS_ERR_OK)
 +		return false;
-+	cs_err err = cs_option(handle, CS_OPT_SYNTAX, syntax);
-+	if (err == CS_ERR_X86_ATT && syntax == CS_OPT_SYNTAX_ATT) {
-+		cs_close(&handle);
-+		return true;
-+	}
-+	if (err == CS_ERR_OK) {
-+		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
-+		ok = count == 1 && insn->size == sizeof(code) &&
-+		     strcmp(insn->op_str, expected) == 0;
++	bool ok = (!change_mode || cs_option(handle, CS_OPT_MODE, vendor) == CS_ERR_OK) &&
++		  cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
++	size_t count = ok ? cs_disasm(handle, code, sizeof(code), 0, 1, &insn) : 0;
++	ok = count == 1 && insn->size == sizeof(code) && insn->id == X86_INS_FNSTENV &&
++	     insn->detail->x86.op_count == 1 && insn->detail->x86.operands[0].size == 28;
++	if (!ok)
++		fprintf(stderr, "wrong default x87 image, vendor=%u changed=%d\n",
++			(unsigned)vendor, change_mode);
++	cs_free(insn, count);
++	if (ok) {
++		const uint8_t mov[] = { 0xa0, 0x34, 0x82, 0x00, 0x80,
++					0xec, 0xcd, 0xbc, 0xbc };
++		insn = NULL;
++		count = cs_disasm(handle, mov, sizeof(mov), 0, 1, &insn);
++		ok = count == 1 && insn->size == sizeof(mov) &&
++		     strcmp(insn->op_str, "al, byte ptr [0xbcbccdec80008234]") == 0;
 +		if (!ok)
-+			fprintf(stderr, "expected %s, got %s\n", expected,
-+				count ? insn->op_str : "(decode failed)");
++			fprintf(stderr, "wrong default absolute MOV address, vendor=%u changed=%d\n",
++				(unsigned)vendor, change_mode);
 +		cs_free(insn, count);
 +	}
 +	cs_close(&handle);
@@ -104,12 +94,9 @@ index cfd13cba..17401f22 100644
  int main(void)
  {
  	bool ok = check_conversions();
++	ok &= check_default_bitness((cs_mode)0, false);
++	ok &= check_default_bitness(CS_MODE_X86_INTEL, true);
++	ok &= check_default_bitness(CS_MODE_X86_AMD, false);
  	ok &= check_other_opcodes();
-+	ok &= check_moffs_address(CS_MODE_64, CS_OPT_SYNTAX_INTEL,
-+				  "al, byte ptr [0xbcbccdec80008234]");
-+	ok &= check_moffs_address(CS_MODE_64, CS_OPT_SYNTAX_MASM,
-+				  "al, byte ptr [0bcbccdec80008234h]");
-+	ok &= check_moffs_address((cs_mode)0, CS_OPT_SYNTAX_ATT,
-+				  "0xbcbccdec80008234, %al");
  	return ok ? 0 : 1;
  }

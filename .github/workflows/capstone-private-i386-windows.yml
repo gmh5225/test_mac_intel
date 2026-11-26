@@ -1,7 +1,7 @@
-name: Check generated i386 scan records and MOV absolute-address formatting across nineteen configurations
+name: Verify default x86 bitness and MOV address output with fixed 16, 32 and 64 bit API snapshots across nineteen configurations
 on:
   push:
-    branches: [codex/i386-escape-and-moffs-configurations]
+    branches: [codex/default-bitness-library-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: i386-selected-token-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: canonical-mode-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
