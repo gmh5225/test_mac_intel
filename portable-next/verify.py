@@ -70,13 +70,14 @@ try:
             cmd('guard-link-'+stage,['gcc','-std=c99','-O2','-DCAPSTONE_HAS_RISCV','-DCAPSTONE_RISCV_ONLY','-I',s,'-I',s/'include',t/'guard.c',lib,'-lm','-o',t/'guard'])
             assert sp.check_output([t/'guard'],text=True).strip()=='8448'
             save('arbitrary-arrays-'+stage,8448)
-            import re
+            exe=b/'rv_time';raw=exe.read_bytes()
+            symbols={z[3]:(int(z[0],16),int(z[1],16)) for line in sp.check_output(['nm','-S','--defined-only',exe],text=True).splitlines() if len(z:=line.split())==4}
+            loads=[(int(z[1],16),int(z[2],16),int(z[4],16)) for line in sp.check_output(['readelf','-lW',exe],text=True).splitlines() if (z:=line.split()) and z[0]=='LOAD']
             rows={}
             for name in ('RISCV_compact_operands','RISCV_get_insn_id','RISCV_LLVM_printInstruction','cs_decode_full_insn','cs_disasm_iter'):
-                raw=sp.check_output(['objdump','-d','--disassemble='+name,b/'rv_time'],text=True)
-                m=re.search(r'^([0-9a-f]+) <'+name+r'>:$',raw,re.MULTILINE);assert m,name
-                code=b''.join(bytes.fromhex(i)for i in re.findall(r'^\\s*[0-9a-f]+:\\s+((?:(?:[0-9a-f]{2}) )+)',raw,re.MULTILINE))
-                assert code,name;rows[name]=[int(m.group(1),16),len(code),sha(code)]
+                addr,size=symbols[name];assert size>0
+                off,= [pos+addr-va for pos,va,n in loads if va<=addr and addr+size<=va+n]
+                code=raw[off:off+size];assert len(code)==size;rows[name]=[addr,size,sha(code)]
             save('hot-functions-'+stage,rows)
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
