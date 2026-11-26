@@ -33,7 +33,7 @@ try:
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
     for name,tree in [('base',None),*q['variants'].items()]:
-        if name not in ('base','request','mode') and not (platform.system()=='Windows' and profile in ('full','noatt')):continue
+        if name not in ('base',os.environ['SCAN_VARIANT']):continue
         if tree:
             git('restore','--staged','--worktree','--source=HEAD','--','.')
             patch=t/(name+'.patch')

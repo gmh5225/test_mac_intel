@@ -1,7 +1,7 @@
-name: Validate mixed mode record dispatch and finish MSVC static-only checks for the unsigned MOV address and both reader designs
+name: Complete missing Windows static and shared library checks in isolated two-source jobs
 on:
   push:
-    branches: [codex/verify-existing-arch-request-and-msvc-archive]
+    branches: [codex/final-windows-archive-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,25 +11,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, arch: x86_64, profile: gcc }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang }
-          - { host: windows-2022, arch: amd64, profile: full }
-          - { host: windows-2022, arch: amd64, profile: diet }
-          - { host: windows-2022, arch: amd64, profile: reduced }
-          - { host: windows-2022, arch: amd64, profile: noatt }
-          - { host: windows-2022, arch: amd64_x86, profile: full }
-          - { host: windows-2022, arch: amd64_x86, profile: diet }
-          - { host: windows-2022, arch: amd64_x86, profile: reduced }
-          - { host: windows-2022, arch: amd64_x86, profile: noatt }
-          - { host: macos-15, arch: arm64, profile: full }
-          - { host: macos-15, arch: arm64, profile: diet }
-          - { host: macos-15, arch: arm64, profile: reduced }
-          - { host: macos-15, arch: arm64, profile: noatt }
-          - { host: macos-15-intel, arch: x86_64, profile: full }
-          - { host: macos-15-intel, arch: x86_64, profile: diet }
-          - { host: macos-15-intel, arch: x86_64, profile: reduced }
-          - { host: macos-15-intel, arch: x86_64, profile: noatt }
+          - { host: windows-2022, arch: amd64, profile: full, variant: sized }
+          - { host: windows-2022, arch: amd64, profile: full, variant: unsigned }
+          - { host: windows-2022, arch: amd64, profile: full, variant: scalar }
+          - { host: windows-2022, arch: amd64, profile: full, variant: fixed }
+          - { host: windows-2022, arch: amd64_x86, profile: full, variant: fixed }
+          - { host: windows-2022, arch: amd64_x86, profile: noatt, variant: fixed }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
@@ -50,10 +37,11 @@ jobs:
       - name: Compare original and candidate bytes and native tests
         env:
           SCAN_PROFILE: ${{ matrix.profile }}
+          SCAN_VARIANT: ${{ matrix.variant }}
         run: python -B portable-next/verify.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: mixed-record-and-archive-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: final-windows-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.variant }}
           path: evidence
           retention-days: 7
