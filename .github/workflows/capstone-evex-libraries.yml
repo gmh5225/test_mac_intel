@@ -1,7 +1,7 @@
-name: Isolate i386 writer position from the aligned AMD64 and scan loops on identical PuTTY PE32 and ELF input
+name: Check the PuTTY i386 placement effect on matching AMD EPYC hardware using identical images
 on:
   push:
-    branches: [codex/pe32-output-code-placement]
+    branches: [codex/pe32-amd-placement-controls]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -15,6 +15,8 @@ jobs:
           - { host: ubuntu-24.04, cc: clang, replica: 3 }
           - { host: ubuntu-24.04, cc: clang, replica: 2 }
           - { host: ubuntu-24.04, cc: clang, replica: 4 }
+          - { host: ubuntu-24.04, cc: clang, replica: 5 }
+          - { host: ubuntu-24.04, cc: clang, replica: 6 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pe32-writer-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: epyc-i386-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

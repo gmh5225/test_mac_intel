@@ -13,6 +13,11 @@ def interval(values):
     def rank(q):
         return next(k for k in range(1,n+1) if 40*sum(math.comb(n,i)*k**i*(n-k)**(n-i) for i in range(n//2+1,n+1))>=q*n**n)-1
     return [statistics.median(x),x[rank(1)],x[rank(39)]]
+processor=get('lscpu')
+selected='AMD EPYC 9V74' in processor
+save('processor',dict(cpu=processor,measured=selected))
+if not selected:
+    sys.exit(0)
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
