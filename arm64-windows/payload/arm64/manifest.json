@@ -1,0 +1,197 @@
+{
+  "schema": 1,
+  "source": "676ca0f336344b698b4294479d6e6b3759ed4a7c",
+  "source_tree": "d4d18fc2403bf7eb2de67de81002d5950afbbc79",
+  "source_dirty": false,
+  "baseline_source": "1653e4cfaaf5b9f9138c99750aa7984933f2cc2d",
+  "engine": {
+    "binary_sha256": "3c6a53dfa8253e3c1d3164cf4c71083f0387409be07b47aaed0ee380239779c8",
+    "core_sha256": "ba88ad972f87efab484af658e78eaab41ed86293a23ec3ca8d5c24fea9302582"
+  },
+  "sdk_version": "10.0.26100.0",
+  "sdk_manifest_sha256": "b3e9ac6ae15da26ca8fc299aaf4a0aa8d9cb47f0f73929433a7d2af25cd08a94",
+  "original_object_scope": "User and SDPort/PortCls/StreamClass objects were compiled against the pinned original Microsoft SDK/WDK headers; NDIS is the public synthetic driver-import fixture. Driver functions are relinked to an observable ABI model for native user-process execution. No kernel driver loading is claimed.",
+  "commands": [
+    [
+      "/home/ad/.local/bin/clang",
+      "--target=aarch64-pc-windows-msvc",
+      "-ffreestanding",
+      "-fno-builtin",
+      "-fno-stack-protector",
+      "-fno-optimize-sibling-calls",
+      "-O1",
+      "-c",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-ndis.c",
+      "-o",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-ndis.obj"
+    ],
+    [
+      "/home/ad/.local/bin/lld-link",
+      "/lib",
+      "/machine:arm64",
+      "/def:/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/ndis.def",
+      "/out:/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/ndis.lib"
+    ],
+    [
+      "/home/ad/.local/bin/lld-link",
+      "/dll",
+      "/entry:DriverEntry",
+      "/nodefaultlib",
+      "/subsystem:native",
+      "/timestamp:0",
+      "/out:/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-ndis.sys",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-ndis.obj",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/ndis.lib"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-user.dll",
+      "--func",
+      "UsePath"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-user.dll",
+      "--func",
+      "UseRuntimeString"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-user.dll",
+      "--func",
+      "UseShaderCompile2"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-driver.sys",
+      "--func",
+      "UseSDConfig"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-driver.sys",
+      "--func",
+      "UseAudioAdapter"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-driver.sys",
+      "--func",
+      "UseStreamClock"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-ndis.sys",
+      "--func",
+      "ReadConfiguration"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-user.dll",
+      "--func",
+      "UsePath",
+      "--llvm"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-user.dll",
+      "--func",
+      "UseRuntimeString",
+      "--llvm"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-user.dll",
+      "--func",
+      "UseShaderCompile2",
+      "--llvm"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-driver.sys",
+      "--func",
+      "UseSDConfig",
+      "--llvm"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-driver.sys",
+      "--func",
+      "UseAudioAdapter",
+      "--llvm"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-driver.sys",
+      "--func",
+      "UseStreamClock",
+      "--llvm"
+    ],
+    [
+      "/home/ad/code/NeverD-ida-parity/build-release/bin/neverd",
+      "decompile",
+      "/home/ad/code/NeverD-ida-parity/build-arm64-native-20261101/harness/arm64-windows/payload/arm64/original-ndis.sys",
+      "--func",
+      "ReadConfiguration",
+      "--llvm"
+    ],
+    [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    [
+      "git",
+      "rev-parse",
+      "HEAD^{tree}"
+    ],
+    [
+      "git",
+      "status",
+      "--porcelain"
+    ]
+  ],
+  "files": {
+    "baseline-llvmc/UseShaderCompile2.c": "cfe0ae35e11c5568e62b92b2591b7b4263585a66ab1a82ae1a94f6b460076bb0",
+    "highc/ReadConfiguration.c": "032dc253695c1e0d20504a0714f574b24ef5122216688eaf0fe7e1be862ab2b0",
+    "highc/UseAudioAdapter.c": "119aed878aeaba26d9d1df806f8644471d81270d5bf9a3efd733414b9190c236",
+    "highc/UsePath.c": "d1676a428dd70740d2e8f76abbc31a17fba7359e98f481dc8a8dfc94bdbe4cc6",
+    "highc/UseRuntimeString.c": "55655434e1a706b10520944c0a067d24a6f5d650ac66a39778d07b4cf27aba8f",
+    "highc/UseSDConfig.c": "f44a708950c8a529327f2c679dea38ae65860884e35305e4326c0fdcb606c2d9",
+    "highc/UseShaderCompile2.c": "8652d13e146e95a126282ff54c5fd26ac32464b67bf49bd8f34ffc4ac98df8e0",
+    "highc/UseStreamClock.c": "3aadc9b4bc5b011099e5da7701645c5c2407843b358b02643021b21e7a072841",
+    "llvmc/ReadConfiguration.c": "4ca48cdbf13622126f95dbb2bf80c464cbbf2a42eec0501f7d6ce1f8dae43592",
+    "llvmc/UseAudioAdapter.c": "3b3727ad2a5ddbdc585f3920b4b7a41adf4c11322a71a91905b8c82d42a2e468",
+    "llvmc/UsePath.c": "56188ba4bab80fcd566ed71ef93bfe5a91df6aeae18273f0bf0e17de8637fd6a",
+    "llvmc/UseRuntimeString.c": "ae2598b1ef9a3665e74fc1a6f2845a96840a3a69c5e16bd35c315d6ad4b8e24c",
+    "llvmc/UseSDConfig.c": "58e3a8923e2f4d20a742c9409b6f7a82ac430fb395d63c56941981fd9f85cda4",
+    "llvmc/UseShaderCompile2.c": "b4f7e5779ea8493398a7989807a0b0c77fec2757673e6444a7d54f1bde6114f3",
+    "llvmc/UseStreamClock.c": "c5bb1078e153ed3bbac9a24f2aaf18f7a4ce54f93865eefa6be4affe5dbaf0b8",
+    "ndis.def": "be2062682656f705335a6642f363249e21ed2c8cd74baaa2125b2d9363268467",
+    "ndis.lib": "66048208a3f966c4714963a929310576f0bd03232a3b7dbe3b25342e579f5ba7",
+    "original-driver.c": "5571d9477ea8100dcd4c9cab2de28e4b083ed1dbfb591b76d7ebb8c79e683a22",
+    "original-driver.obj": "4177847054362f5cee138dc08e68423f27dd7a5649c051de0de8a92ecb32b682",
+    "original-driver.sys": "89de1a627ac109ccf91ba8fffe084a284d79235b1257e32298135dd9876dae40",
+    "original-ndis.c": "f8bee5a2f295a93dbb5ef926797186336dbf490743ee26209633244607781025",
+    "original-ndis.lib": "31ce19fc62bc6796ca1af61cc1bd45ae017be9b1352b50fb5371eb3eb272e55b",
+    "original-ndis.obj": "ec538ce095d09f24b8e3006efa6805d11b34f821958ce64b26fe90dafd5a36e5",
+    "original-ndis.sys": "f705f37c8a44ee954201bf2fa314273fa01005e3f37fc25289d03af2ec6e988a",
+    "original-user.c": "27bf49637565886594ec8920f92b2a8622b91623d87dcdbe045be1f7d266570c",
+    "original-user.dll": "03e0a9e30726ef0576ddff453ed1a886913af3b529119a4ffe4511bae302337b",
+    "original-user.obj": "7fb6c07489f6f7d04ed2a397b85f81c0c7ec01d2fe4217644d7cece0770b6b23"
+  },
+  "source_normalization": "Remove CLI banner lines and trailing empty lines only; retain the generated semantic body."
+}
