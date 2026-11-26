@@ -1,7 +1,7 @@
-name: Measure public iterator mode selection against the published library and iced
+name: Compare matched x86 fixed reader calls and retain compiler disassembly for both CPUs
 on:
   push:
-    branches: [codex/public-iterator-fixed-record-mode]
+    branches: [codex/public-fixed-record-tail-calls]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: eb7fdeaaeb4f89cbcc5ab24edf41e0a03073884c
+          ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1c62a50d7b0deb4596eeac3d63ebbb78001754f5
+          ref: c9772143c11e10fb199de017eb1c0fcaef115c53
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: iterator-mode-selection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-reader-calls-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

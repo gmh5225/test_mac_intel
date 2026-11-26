@@ -41,6 +41,17 @@ try:
         symbols[stage]=sorted(row.split()[0] for row in syms)
         objects[stage]={str(f.relative_to(build)):sha(f) for f in build.rglob('*.c.o')}
         run('cmake','-G','Ninja','-S',project,'-B',static_build,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+        import re
+        frames={}
+        for symbol in ('cs_disasm_iter','X86_decodePublicRecord','X86_decodeFixedRecord32','X86_decodeFixedRecord64'):
+            raw=sp.check_output(['objdump','-d','--no-show-raw-insn','--disassemble='+symbol,dll],text=True)
+            assert '<'+symbol+'>:' in raw,(symbol,raw[-400:])
+            code=raw.split('<'+symbol+'>:',1)[1].split('\n\n',1)[0]
+            lines=[z for z in code.splitlines()if re.match(r'^\s*[0-9a-f]+:\s+\S+',z)]
+            outgoing=[z.strip()for z in lines if (('X86_decodeFixedRecord' in z or 'tryOutput' in z or 'cs_decode_full_insn' in z) and '<'+symbol+'+' not in z)]
+            frames[symbol]=dict(instructions=len(lines),stack_pairs=sum(bool(re.search(r'\b(push|pop|stp|ldp)\b',z))for z in lines),outgoing=outgoing)
+            assert lines
+        save('calls-'+stage,frames)
         run('cmake','--build',static_build,'--target','capstone_static','--parallel','4')
         static_lib,=static_build.rglob('libcapstone.a')
         static_images[stage]=dict(archive=sha(static_lib),objects={str(f.relative_to(static_build)):sha(f)for f in static_build.rglob('*.c.o')})
