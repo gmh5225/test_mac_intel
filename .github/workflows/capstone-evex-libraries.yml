@@ -1,7 +1,7 @@
-name: Validate wide WASM addresses with immutable signed Mach-O images and randomized real programs
+name: Measure the complete WASM branch table token on real programs and both callback paths
 on:
   push:
-    branches: [codex/wasm-immutable-benchmark-images]
+    branches: [codex/wasm-branch-table-digits-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-address-immutable-${{ matrix.host }}-${{ matrix.cc }}
+          name: table-digits-programs-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
