@@ -1,7 +1,7 @@
-name: Compare compact x86 mode and syntax setup against two identical released binaries on PE32 PE64 SIMD and foreign architectures
+name: Test direct mode error propagation and isolated width normalization against released code on four machines
 on:
   push:
-    branches: [codex/x86-compact-mode-selection]
+    branches: [codex/x86-cold-width-entry]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-x86-mode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-width-entry-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

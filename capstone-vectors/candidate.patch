@@ -1,8 +1,8 @@
 diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
-index 6fcbe3f4..f813e80b 100644
+index 6fcbe3f4..fef813ea 100644
 --- a/arch/X86/X86Module.c
 +++ b/arch/X86/X86Module.c
-@@ -10,11 +10,29 @@
+@@ -10,12 +10,31 @@
  #include "X86Mapping.h"
  #include "X86Module.h"
  
@@ -13,16 +13,16 @@ index 6fcbe3f4..f813e80b 100644
 +#elif defined(__GNUC__)
 +__attribute__((noinline))
 +#endif
-+static bool select_mode(cs_struct *handle, cs_mode mode)
++static cs_err select_mode(cs_struct *handle, cs_mode mode, cs_err invalid_mode)
 +{
 +	if (x86_has_feature(mode, CS_MODE_X86_INTEL | CS_MODE_X86_AMD))
-+		return false;
++		return invalid_mode;
 +	if (!(mode & (CS_MODE_16 | CS_MODE_32)))
 +		mode = (cs_mode)(mode | CS_MODE_64);
 +	handle->mode = mode;
 +	handle->regsize_map = x86_has_feature(mode, CS_MODE_64) ?
 +				      regsize_map_64 : regsize_map_32;
-+	return true;
++	return CS_ERR_OK;
 +}
 +
  cs_err X86_global_init(cs_struct *ud)
@@ -30,11 +30,14 @@ index 6fcbe3f4..f813e80b 100644
  	MCRegisterInfo *mri;
 -	if (x86_has_feature(ud->mode, CS_MODE_X86_AMD) &&
 -	    x86_has_feature(ud->mode, CS_MODE_X86_INTEL))
-+	if (!select_mode(ud, ud->mode))
- 		return CS_ERR_MODE;
+-		return CS_ERR_MODE;
++	cs_err err = select_mode(ud, ud->mode, CS_ERR_MODE);
++	if (err)
++		return err;
  
  	mri = cs_mem_calloc(1, sizeof(*mri));
-@@ -37,11 +55,6 @@ cs_err X86_global_init(cs_struct *ud)
+ 	if (!mri)
+@@ -37,11 +56,6 @@ cs_err X86_global_init(cs_struct *ud)
  	ud->reg_access = X86_reg_access;
  #endif
  
@@ -46,7 +49,7 @@ index 6fcbe3f4..f813e80b 100644
  	X86_build_lookup_tables(ud);
  
  	return CS_ERR_OK;
-@@ -53,19 +66,9 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
+@@ -53,19 +67,8 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
  	default:
  		break;
  	case CS_OPT_MODE:
@@ -64,8 +67,7 @@ index 6fcbe3f4..f813e80b 100644
 -					  CS_MODE_X86_INTEL | CS_MODE_X86_AMD));
 -		break;
 +		/* cs_option already validated the architecture mode mask. */
-+		return select_mode(handle, (cs_mode)value) ? CS_ERR_OK :
-+							    CS_ERR_OPTION;
++		return select_mode(handle, (cs_mode)value, CS_ERR_OPTION);
  	case CS_OPT_SYNTAX:
  		switch (value) {
  		default:
