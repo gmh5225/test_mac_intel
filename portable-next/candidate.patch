@@ -1,13 +1,26 @@
 diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
-index 89cbda0c..d5524c5d 100644
+index 89cbda0c..b074249f 100644
 --- a/arch/RISCV/RISCVMapping.c
 +++ b/arch/RISCV/RISCVMapping.c
-@@ -358,9 +358,19 @@ void RISCV_compact_operands(MCInst *MI)
+@@ -348,6 +348,12 @@ void RISCV_init_cs_detail(MCInst *MI)
+ 		       offsetof(cs_detail, riscv) + sizeof(cs_riscv));
+ }
+ 
++#if defined(CAPSTONE_RISCV_ONLY) && !defined(CAPSTONE_DIET) && \
++	defined(__linux__) && defined(__x86_64__) && \
++	defined(__GNUC__) && !defined(__clang__)
++#define RISCV_CHECK_ZERO_SUFFIX
++#endif
++
+ // for weird reasons some instructions end up with valid operands that are
+ // interspersed with invalid operands, i.e. the operands array is an "island"
+ // of valid operands with invalid gaps between them, this function will compactify
+@@ -358,9 +364,19 @@ void RISCV_compact_operands(MCInst *MI)
  		return;
  	cs_riscv_op *ops = RISCV_get_detail(MI)->operands;
  	unsigned int write_pos = 0;
 +	unsigned int limit = NUM_RISCV_OPS;
-+#ifdef CAPSTONE_RISCV_ONLY
++#ifdef RISCV_CHECK_ZERO_SUFFIX
 +	/* Compressed forms and aliases can leave holes. Skip only a suffix
 +	 * whose entire public operand records are already zero. */
 +	static const unsigned char zero_ops[sizeof(((cs_riscv *)0)->operands)];
@@ -23,11 +36,11 @@ index 89cbda0c..d5524c5d 100644
  		if (ops[read_pos].type != (riscv_op_type)CS_OP_INVALID) {
  			if (write_pos != read_pos) {
  				ops[write_pos] = ops[read_pos];
-@@ -368,9 +378,13 @@ void RISCV_compact_operands(MCInst *MI)
+@@ -368,9 +384,13 @@ void RISCV_compact_operands(MCInst *MI)
  			write_pos++;
  		}
  	}
-+#ifdef CAPSTONE_RISCV_ONLY
++#ifdef RISCV_CHECK_ZERO_SUFFIX
 +	if (write_pos == limit)
 +		return;
 +#endif

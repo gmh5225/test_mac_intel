@@ -50,7 +50,7 @@ try:
         opts=code[code.index('# --- Capstone (our fork'):code.index('# --- NeverD CMake helpers')]
         (product/'CMakeLists.txt').write_text(chr(10).join(('cmake_minimum_required(VERSION 3.22)','project(Mixed LANGUAGES C CXX)',opts,'add_executable(consumer reader.cpp)','target_link_libraries(consumer PRIVATE capstone_static)','')))
         shutil.copyfile(d/'riscv_options.cpp',product/'reader.cpp')
-    variants={};mixed={}
+    variants={};mixed={};compile_scope={}
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
@@ -58,6 +58,12 @@ try:
         targets=['records_static','records_shared',*units]+(['rv_time'] if linux and profile=='full' else [])
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target',*targets])
         if linux and profile=='full':shutil.copyfile(b/'rv_time',t/('riscv-option-'+stage))
+        if linux:
+            lib,=[f for f in b.rglob('libcapstone.a') if f.is_file()]
+            objs={str(f.relative_to(b)):sha(f.read_bytes()) for f in b.rglob('*.c.o') if 'tests/' not in str(f.relative_to(b))}
+            compile_scope[stage]=dict(objects=objs,archive=sha(lib.read_bytes()))
+            save('compile-scope',compile_scope)
+
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
@@ -84,6 +90,14 @@ try:
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
     if verify_mixed:assert mixed['base']==mixed['candidate']
+    if linux:
+        a,built=compile_scope['base'],compile_scope['candidate'];assert set(a['objects'])==set(built['objects'])
+        changes=[name for name,old in a['objects'].items()if built['objects'][name]!=old]
+        enabled=profile=='full' and platform.machine()=='x86_64' and os.environ['NATIVE_COMPILER']=='gcc'
+        assert ({Path(k).name for k in changes}=={'RISCVMapping.c.o'} and a['archive']!=built['archive']) if enabled else (not changes and a['archive']==built['archive']),(enabled,changes)
+        cc=os.environ['NATIVE_COMPILER'] or 'cc'
+        save('selection',dict(enabled=enabled,changed=changes,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],cpu=sp.check_output(['lscpu'],text=True),profile=profile))
+
 
     if linux and profile=='full':
         from riscv_time import measure
