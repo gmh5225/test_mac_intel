@@ -1,7 +1,7 @@
-name: Check predicate families and hash sections from every object in the actual NeverD archive
+name: Compare decoded public alias IDs in the full source-built NeverD product
 on:
   push:
-    branches: [codex/actual-product-predicate-owner]
+    branches: [codex/product-decoded-predicate-alias]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 9c84b2c7ecd883da23045650a794868d6c2ebd5c
+          ref: 276a657138f58b0ef97a876288347aaacfde0e74
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-predicate-owner-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-decoded-alias-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
