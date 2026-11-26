@@ -1,121 +1,111 @@
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..e7a19760 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -12,6 +12,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
-+#include "X86VectorClearOutput.h"
- #include "X86SimpleOutput.h"
- #include "X86VectorRegisterOutput.h"
- #define X86_VEX32_REGISTER_MOVES
-@@ -46,6 +47,10 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 			return true;
- 		break;
- 	case 0xc5:
-+		if (size >= 3 && code[2] == 0x77 &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		    writeVex2Clear(handle, code, size, insn, insn_size, false))
-+			return true;
- 		if (size >= 4 && (code[1] & 0xf8) == 0xf8 && code[3] >= 0xc0 &&
- 		    (code[2] == 0x6f || code[2] == 0x7f) &&
- 		    ((code[1] & 3) == 1 || (code[1] & 3) == 2) &&
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..925f8619 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -14,8 +14,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
--#define GET_INSTRINFO_ENUM
--#include "X86GenInstrInfo.inc"
-+#include "X86VectorClearOutput.h"
- #define X86_FIXED_VEX2 writeVex2Output64
- #include "X86SimpleOutput.h"
- #include "X86GenSimpleOutput.inc"
-@@ -98,32 +97,8 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- static bool writeVex2Output64(cs_struct *handle, const uint8_t *code,
- 			      size_t size, cs_insn *insn, uint16_t *insn_size)
- {
--	/* The bare vector clear instructions have no ModR/M or operands. */
--	if (size >= 3 && code[2] == 0x77 && (code[1] & 0xfb) == 0xf8) {
--		const bool all = (code[1] & 4) != 0;
--		insn->size = *insn_size = 3;
--		memcpy(insn->bytes, code, 3);
--		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--		if (all)
--			memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
--		else
--			memcpy(insn->mnemonic, "vzeroupper",
--			       sizeof("vzeroupper"));
--		memset(insn->op_str, 0, sizeof(insn->op_str));
--		if (insn->detail) {
--			cs_detail *detail = insn->detail;
--			memset(detail, 0,
--			       offsetof(cs_detail, x86) + sizeof(cs_x86));
--			detail->x86.addr_size = 8;
--			detail->x86.rex = 0x40;
--			memcpy(detail->x86.opcode, code, 2);
--			X86_get_insn_id(handle, insn,
--					all ? X86_VZEROALL : X86_VZEROUPPER);
--		} else {
--			insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
--		}
-+	if (writeVex2Clear(handle, code, size, insn, insn_size, true))
- 		return true;
--	}
- 	if (size >= 4 && (code[1] & 0x78) == 0x78 && code[3] < 0xc0) {
- 		unsigned plan = vex64_packed_plans[code[1] & 7][code[2]];
- 		const uint8_t rex =
-diff --git a/arch/X86/X86VectorClearOutput.h b/arch/X86/X86VectorClearOutput.h
-new file mode 100644
-index 00000000..499e8bae
---- /dev/null
-+++ b/arch/X86/X86VectorClearOutput.h
-@@ -0,0 +1,44 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifndef CS_X86_VECTOR_CLEAR_OUTPUT_H
-+#define CS_X86_VECTOR_CLEAR_OUTPUT_H
-+
-+#include "X86OutputOptions.h"
-+#define GET_INSTRINFO_ENUM
-+#include "X86GenInstrInfo.inc"
-+
-+/* VZEROUPPER and VZEROALL have no ModR/M byte. The mapping table supplies
-+ * their implicit register writes for the selected execution mode. */
-+static inline bool writeVex2Clear(cs_struct *handle, const uint8_t *code,
-+                                  size_t size, cs_insn *insn,
-+                                  uint16_t *insn_size, bool wide)
+diff --git a/cs.c b/cs.c
+index d0b8b045..a1cf2f05 100644
+--- a/cs.c
++++ b/cs.c
+@@ -119,6 +119,7 @@
+ #include "arch/WASM/WASMModule.h"
+ #ifdef CAPSTONE_HAS_X86
+ #include "arch/X86/X86Mapping.h"
++#include "arch/X86/X86InstPrinter.h"
+ #include "arch/X86/X86Disassembler.h"
+ #endif
+ #include "arch/X86/X86Module.h"
+@@ -977,6 +978,40 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ 
+ #include "cs_disasm_internal.h"
+ 
++#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && defined(__GNUC__) && \
++	defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define CS_X86_WORD_MNEMONIC
++/* For a complete short Intel mnemonic, copy the bytes before the first
++ * separator and clear the remainder of the word in the same store. */
++static inline bool copy_short_x86_mnemonic(char *dst, const SStream *stream,
++					  size_t *end)
 +{
-+	if (size < 3 || code[2] != 0x77 || (code[1] & 0xfb) != 0xf8)
++	if (stream->index < sizeof(uint64_t) - 1)
 +		return false;
-+	const bool all = (code[1] & 4) != 0;
-+	insn->size = *insn_size = 3;
-+	memcpy(insn->bytes, code, 3);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	if (all)
-+		memcpy(insn->mnemonic, "vzeroall", sizeof("vzeroall"));
-+	else
-+		memcpy(insn->mnemonic, "vzeroupper",
-+		       sizeof("vzeroupper"));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	if (insn->detail) {
-+		cs_detail *detail = insn->detail;
-+		memset(detail, 0,
-+		       offsetof(cs_detail, x86) + sizeof(cs_x86));
-+		detail->x86.addr_size = wide ? 8 : 4;
-+		detail->x86.rex = wide ? 0x40 : 0;
-+		memcpy(detail->x86.opcode, code, 2);
-+		X86_get_insn_id(handle, insn,
-+				all ? X86_VZEROALL : X86_VZEROUPPER);
-+	} else {
-+		insn->id = all ? X86_INS_VZEROALL : X86_INS_VZEROUPPER;
-+	}
++	uint64_t text;
++	memcpy(&text, stream->buffer, sizeof(text));
++	const uint64_t lanes = UINT64_C(0x0101010101010101);
++	const uint64_t high = lanes * 0x80;
++	/* The least set lane is the first byte below 33. Later lanes may
++	 * also be set by a borrow, which cannot change that position. */
++	const uint64_t separators = (text - lanes * 33) & ~text & high;
++	if (!separators)
++		return false;
++	const unsigned pos = __builtin_ctzll(separators) / 8;
++	const char separator = stream->buffer[pos];
++	if (separator && separator != ' ' && separator != '\t')
++		return false;
++	const uint64_t mask = ((separators & -separators) >> 7) - 1;
++	const uint64_t bars = text ^ (lanes * '|');
++	if (((bars - lanes) & ~bars & high) & mask)
++		return false;
++	text &= mask;
++	memcpy(dst, &text, sizeof(text));
++	*end = pos;
 +	return true;
 +}
-+
 +#endif
++
+ /* Keep the generic copy specialized without the private x86 length checks. */
+ #if defined(__GNUC__)
+ __attribute__((always_inline))
+@@ -984,7 +1019,7 @@ __attribute__((always_inline))
+ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 			     SStream *OS, MCInst *mci,
+ 			     PostPrinter_t postprinter, const uint8_t *code,
+-			     bool stream_length_valid)
++			     bool stream_length_valid, bool intel_mnemonic)
+ {
+ 	SStream_trimls(OS);
+ 	// Copy only decoded instruction bytes before the postprinter observes them.
+@@ -1004,15 +1039,21 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
+ 	memset(insn->op_str, '\0', sizeof(insn->op_str));
+ 	size_t off = 0;
+-	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
+-	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
+-		char c = OS->buffer[off];
+-		insn->mnemonic[off] = c == '|' ? ' ' : c;
+-		off++;
++#ifdef CS_X86_WORD_MNEMONIC
++	if (!intel_mnemonic || !stream_length_valid ||
++	    !copy_short_x86_mnemonic(insn->mnemonic, OS, &off))
++#endif
++	{
++		while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
++		       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
++			char c = OS->buffer[off];
++			insn->mnemonic[off] = c == '|' ? ' ' : c;
++			off++;
++		}
++		while (OS->buffer[off] && OS->buffer[off] != ' ' &&
++		       OS->buffer[off] != '\t')
++			off++;
+ 	}
+-	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
+-	       OS->buffer[off] != '\t')
+-		off++;
+ 	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
+ 		off++;
+ 	const char *operands = OS->buffer + off;
+@@ -1208,7 +1249,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+ 				  code,
+ 				  !mci.assembly[0] && handle->post_printer ==
+-							      X86_postprinter);
++							      X86_postprinter,
++				  handle->printer == X86_Intel_printInst);
+ 		} else
+ #endif
+ 		{
+@@ -1234,7 +1276,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 			SStream_opt_unum(&ss, handle->imm_unsigned);
+ 			handle->printer(&mci, &ss, handle->printer_info);
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+-				  code, known_length);
++				  code, known_length, false);
+ 		}
+ 	}
+ 	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))

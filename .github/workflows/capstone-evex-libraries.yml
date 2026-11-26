@@ -1,7 +1,7 @@
-name: Measure shared three-byte vector clear output in i386 JPEG and PuTTY with cross-mode comparison
+name: Compare bounded Intel mnemonic splits on real PuTTY OpenSSL JPEG and libmvec with 16 bit and foreign controls
 on:
   push:
-    branches: [codex/i386-vex2-no-modrm-output]
+    branches: [codex/word-split-canonical-intel]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3ea3206f1440dc4dbcc89fd9a62ae98bfe6dcb88
+          ref: 7161cb4d72aad82f89161629790fbe10b7b90d55
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vec-clear-bare-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: intel-short-word-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
