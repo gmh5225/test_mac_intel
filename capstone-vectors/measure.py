@@ -1,110 +1,70 @@
 from pathlib import Path
-import hashlib,itertools,json,math,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
-r=Path(__file__).resolve().parent;p=r.parent
-e=p/'evidence';e.mkdir(exist_ok=True);rd=lambda f:json.loads(f.read_text())
-q=rd(r/'tree.json');m=rd(r/'experiment.json');dev=m['neverd'];base=p/'source';root=p/'neverd-config';ice=p/'iced-source'
-def save(name,value):
-    f=e/(name+'.json');temp=f.with_suffix('.tmp');temp.write_text(json.dumps(value,indent=2)+'\n');temp.replace(f)
-def get(*args,**kwargs):return sp.check_output(args,text=True,**kwargs)
-def run(*args,**kwargs):sp.run(args,check=True,**kwargs)
+import hashlib,itertools,json,os,platform,shutil,subprocess as sp,sys,tempfile
+r=Path(__file__).resolve().parent;p=r.parent;out=p/'evidence';out.mkdir(exist_ok=True)
+rd=lambda f:json.loads(f.read_text())
+def save(name,x):(out/(name+'.json')).write_text(json.dumps(x,indent=2)+'\n')
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-def interval(values):
-    x=sorted(values);n=len(x)
-    def rank(q):
-        return next(k for k in range(1,n+1) if 40*sum(math.comb(n,i)*k**i*(n-k)**(n-i) for i in range(n//2+1,n+1))>=q*n**n)-1
-    return [statistics.median(x),x[rank(1)],x[rank(39)]]
-w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
+def run(*args):sp.run(args,check=True)
+def get(*args):return sp.check_output(args,text=True)
+def once(s,a,b):assert s.count(a)==1,a;return s.replace(a,b)
+m=rd(r/'experiment.json');cap=p/'source';nd=p/'neverd-config'
+assert get('git','-C',cap,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',cap,'write-tree').strip()==m['checkout_tree']
+assert get('git','-C',nd,'rev-parse','HEAD').strip()==m['neverd']
+w=Path(tempfile.mkdtemp())
 try:
-    assert get('git','-C',base,'rev-parse','HEAD').strip()==q['parent']==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
-    assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
-    assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
-    assert all(sha(r/f)==v for f,v in m['drivers'].items())
-    (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(base)
-    (project/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
-    (project/cm).write_bytes(sp.check_output(['git','-C',root,'show',dev+':'+cm]))
-    v=get('git','-C',root,'show',dev+':CMakeLists.txt')
-    (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(Layers LANGUAGES C CXX)\n'+v[v.index('# --- Capstone (our fork'):v.index('# --- NeverD CMake helpers')])
-    run('cmake','-G','Ninja','-S',project,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
-    run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
-    files={Path(c['file']).name for c in rd(build/'compile_commands.json')};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c'}<=files and 'X86PublicOutput.c' not in files
-    ad.mkdir()
-    for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
-    (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
-    run('cargo','build','--release','--locked',cwd=ad)
-    ice_lib=ad/'target/release/libiced_compare.a'
-    shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
-    flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
-    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
-    for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    images={}
-    run('clang++','-O2','-std=c++17','-I',base/'include',r/'ids.cpp',lib,'-o',w/'id-oracle')
-    for label in ('base','candidate','record'):
-        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        if label!='base':
-            tr=q if label=='candidate' else m['record'];patch=r/(label+'.patch')
-            assert sha(patch)==tr['sha256']
-            run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==tr['tree']
-        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        images[label]=dict(archive=sha(lib),exe=sha(w/label))
-    assert images['base']['exe']!=images['candidate']['exe']
-    shutil.copy2(w/'base',w/'duplicate');assert sha(w/'duplicate')==images['base']['exe']
-    blobs={k:(w/k).read_bytes() for k in ('base','duplicate','candidate','record')}
-    image=w/'active';shutil.copy2(w/'base',image);inode=image.stat().st_ino;current='base'
-    cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
-    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
+    proj=w/'project';b=w/'build';(proj/'cmake').mkdir(parents=True);(proj/'third_party').mkdir()
+    (proj/'third_party/capstone').symlink_to(cap)
+    cm='cmake/NeverDCapstoneCompilerOptions.inc';shutil.copyfile(nd/cm,proj/cm)
+    s=(nd/'CMakeLists.txt').read_text()
+    (proj/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(StageCounts LANGUAGES C CXX)\n'+s[s.index('# --- Capstone (our fork'):s.index('# --- NeverD CMake helpers')])
+    run('cmake','-S',proj,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON')
+    for variant in ('original','counted'):
+        if variant=='counted':
+            f=cap/'cs.c';code=once(f.read_text(),'static inline void fill_insn(', 'extern uint64_t profile_stage[4];\n\nstatic inline void fill_insn(')
+            code=once(code,'\tSStream_trimls(OS);','\t++profile_stage[1];\n\tprofile_stage[2] += stream_length_valid;\n\tSStream_trimls(OS);')
+            marker='\tif (!handle->disasm((csh)(uintptr_t)handle, code, size, &mci, insn_size,'
+            code=once(code,marker,'\t++profile_stage[0];\n'+marker)
+            marker='if (request == CS_RECORD_PUBLIC_ITER && !handle->no_text) {'
+            f.write_text(once(code,marker,marker+'\n\t\t\t++profile_stage[3];'))
+        run('cmake','--build',b,'--target','capstone_static','--parallel','4');archive,=b.rglob('libcapstone.a')
+        run('clang++','-O2','-std=c++17','-I',cap,'-I',cap/'include',r/'census.cpp',archive,'-o',w/variant)
+        if variant=='original':
+            commands=rd(b/'compile_commands.json');names={Path(v['file']).name for v in commands}
+            assert {'ARMMapping.c','X86Sse64Output.c','PPCMapping.c','RISCVMapping.c','AArch64InstPrinter.c','MipsMapping.c'}<=names and 'X86PublicOutput.c' not in names
+            public_fixed='CAPSTONE_STATIC_X86_READERS' in next(v['command']for v in commands if Path(v['file']).name=='cs.c')
+            run('clang++','-O2','-std=c++17','-I',cap/'include',r/'vectors.cpp',archive,'-o',w/'vectors')
+    for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
+    inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({k:v for k,v in inputs.items()if k in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
-    run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
-    save('host',host);observations={};summary={};audits={}
-    for name,bits,f,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)):
-        spec=m['provenance'][name]
-        assert sha(f)==spec['text_sha256']
-        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
-        path=w/(name+'.tsv')
-        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-        emit(selected)
+    run(sys.executable,'-B',w/'libmvec.py');v=rd(w/'libmvec.json')
+    report={};hist={}
+    for name,bits,image,spans,_ in itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,v['bytes'],v['address'])],v)],pe_panels.prepare(w),frozen_deb.prepare(w)):
+        spec=m['provenance'][name];assert sha(image)==spec['text_sha256'] and len(spans)==spec['input_functions']
+        selected=[z for z in spans if tuple(z) not in {tuple(j[:3])for j in spec['excluded_incompatible_extents']}]
+        ext=w/(name+'.tsv')
+        def emit():ext.write_text(''.join('%d %d %d\n'%tuple(z)for z in selected))
+        emit()
         if m['samples'][name]=='simd-functions':
-            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-            assert len(view)==len(selected)
-            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-        assert sha(path)==spec['extent_sha256']
-        def audit_engine(exe):
-            rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
-            assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
-            return rows
-        assert audit_engine('base')==audit_engine('candidate')==audit_engine('record')
-        observed=list(map(int,get(w/'id-oracle',str(bits),f,path).split()));assert len(observed)==8
-        n,invalid,*shifts=observed;assert n>0;save(name+'-untimed-ids',dict(accepted=n,rejected=invalid,counts=shifts[::2],deltas=shifts[1::2]))
-
-        audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
-        def take(engine,mode,n):
-            global current
-            comparator=engine if engine in ('iced','fast') else 'private'
-            exe=engine if engine in blobs else 'base'
-            if exe!=current:
-                image.write_bytes(blobs[exe]);current=exe
-            assert image.stat().st_ino==inode
-            return list(map(int,get(image,comparator,str(mode),str(n),f,path,str(bits)).split()))
-        for mode in (0,1,2):
-            labels=['base','duplicate','candidate','record','iced']+(['fast']if mode else[])
-            repeats=max(1,math.ceil(25e6/take('iced',mode,1)[0]))
-            expected={k:take(k,mode,repeats)[2:]for k in labels}
-            assert len({tuple(x[:3])for x in expected.values()})==1 and expected['base']==expected['duplicate']
-            assert expected['base'][:2]==[repeats*n,repeats*invalid] and expected['candidate']==expected['record'] and expected['candidate'][3]==(expected['base'][3]+repeats*shifts[2*mode+1])%(1<<64),(name,mode,expected,observed,repeats)
-            rows=[];rng=random.Random(name+'/immediate-byte-pairs/'+str(mode))
-            for _ in range(13):
-                rng.shuffle(labels);sample={k:[] for k in labels}
-                for k in labels+labels[::-1]:
-                    row=take(k,mode,repeats);assert row[2:]==expected[k]
-                    sample[k].append(row[:2])
-                rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-            key=name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-            summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
-            save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==18
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=13,samples=audits,unit='Paired throughput, X86_scanNativeBatch with cs_disasm_iter fallback on scan misses; X86_disasmIterText for text and details. Each executable links the current NeverD static Capstone configuration. iced Intel and Fast formatters run on the same accepted instruction spans; full native results are consumed and the untimed original decoder independently accounts for every corrected public ID in the output checksum.'))
-
+            select=[list(map(int,z.split()))for z in get(w/'vectors',str(bits),image,ext).splitlines()]
+            assert len(select)==len(selected);selected=[z for z,a in zip(selected,select)if a[1]>=8 and a[1]>=.15*a[0]];emit()
+        assert sha(ext)==spec['extent_sha256'] and len(selected)==spec['timed_functions']
+        baseline=None
+        for variant in ('original','counted'):
+            lines=get(w/variant,image,ext,str(bits)).splitlines()
+            totals=list(map(int,lines[0].split('\t')[1:]));rows=[list(map(int,line.split('\t')[1:])) for line in lines[1:5]]
+            assert all(line.startswith('reader\t') for line in lines[1:5]) and all(len(row)==9 for row in rows)
+            families={x[1]:list(map(int,x[2:]))for line in lines[5:] if (x:=line.split('\t'))[0]=='family'}
+            stable=[totals,[x[0] for x in rows],{k:v[0]for k,v in families.items()}]
+            assert sum(z[0]for z in families.values())==totals[0] and totals[2]==spec['bytes']
+            if variant=='original':
+                assert all(not any(z[1:])for z in rows);baseline=stable
+            else:
+                assert stable==baseline,(name,totals,baseline[:2])
+                assert all(row[1]==row[2] and 0<=row[3]<=row[2]<=totals[0] and 0<=row[4]<=totals[0] for row in rows)
+                assert all(sum(z[1+i] for z in families.values())==rows[i][1] for i in range(4))
+                report[name]=dict(totals=totals,extent_sha256=sha(ext),rows=rows,text_sha256=sha(image));hist[name]=families
+    assert set(report)==set(m['samples'])
+    save('histogram',hist);save('observations',report)
+    save('complete',dict(complete=True,capstone=m['checkout_commit'],neverd=m['neverd'],probe=sha(r/'census.cpp'),compiler=get('clang','--version').splitlines()[0],host=platform.platform(),public_fixed=public_fixed,reader_order=['public text','public detail','private text','private detail'],columns=['semantic digest','generic decode','stream split','known stream length','fixed-record entry','generic mnemonic bytes','generic operand bytes','generic explicit operands','rejected generic decode'],totals=['accepted','rejected','covered bytes','boundary digest','text cross-reader differences','detail cross-reader differences']))
 finally:
-    n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
+    n=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
