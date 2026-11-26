@@ -36,6 +36,8 @@ try:
     chosen=os.environ.get('NATIVE_COMPILER','')
     if chosen in ('gcc','clang'):
         os.environ.update(CC=chosen,CXX='g++' if chosen=='gcc' else 'clang++')
+    if chosen.startswith('gcc-'):
+        os.environ.update(CC=chosen,CXX='g++-'+chosen[4:])
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
     if profile=='diet':cfg.append('-DCAPSTONE_BUILD_DIET=ON')
     mixed_sources=d.parent/'neverd-config'
@@ -69,6 +71,9 @@ try:
             cmd('guard-link-'+stage,[chosen or 'cc','-std=c99','-O2','-DCAPSTONE_HAS_RISCV','-I',s,'-I',s/'include',d/'guard.c',lib,'-lm','-o',t/'guard'])
             assert sp.check_output([t/'guard'],text=True).strip()=='8448'
             save('arbitrary-arrays-'+stage,8448)
+            scan=sp.check_output(['objdump','-d','--no-show-raw-insn','--disassemble=RISCV_compact_operands',b/'rv_time'],text=True)
+            assert '<RISCV_compact_operands>:' in scan
+            (out/('compaction-'+stage+'.asm')).write_text(scan)
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
@@ -95,16 +100,16 @@ try:
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
             shutil.copyfile(bmix/'consumer',t/('mixed-'+stage))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
-    if verify_mixed:
-        left,right=mixed['base']['objects'],mixed['candidate']['objects']
-        assert set(left)==set(right)
-        assert {Path(k).name for k in left if left[k]!=right[k]}=={'RISCVMapping.c.o'},[k for k in left if left[k]!=right[k]]
+    if verify_mixed:assert mixed['base']==mixed['candidate']
     if linux:
-        a,built=compile_scope['base'],compile_scope['candidate'];assert set(a['objects'])==set(built['objects'])
-        changes=[name for name,old in a['objects'].items()if built['objects'][name]!=old]
-        enabled=bool(changes)
-        assert all(Path(k).name=='RISCVMapping.c.o' for k in changes) and enabled==(a['archive']!=built['archive'])
-        if profile=='full':assert enabled
+        a,built=compile_scope['base'],compile_scope['candidate']
+        assert set(a['objects'])==set(built['objects'])
+        changes=[k for k in a['objects'] if a['objects'][k]!=built['objects'][k]]
+        isgcc=chosen.startswith('gcc')
+        major=int(sp.check_output([chosen,'-dumpversion'],text=True).split('.')[0]) if isgcc else 0
+        enabled=profile=='full' and platform.machine()=='x86_64' and major in [13, 14]
+        assert {Path(k).name for k in changes}==({'RISCVMapping.c.o'}if enabled else set()),(enabled,changes)
+        assert (a['archive']!=built['archive'])==enabled
         cc=os.environ['NATIVE_COMPILER'] or 'cc'
         save('selection',dict(enabled=enabled,changed=changes,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],cpu=sp.check_output(['lscpu'],text=True),profile=profile))
 
@@ -113,8 +118,6 @@ try:
         from riscv_time import measure
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         measure([dict(arch='riscv64',name=n)for n in texts],t,save)
-        for stage in ('base','candidate'):shutil.copyfile(t/('mixed-'+stage),t/('riscv-option-'+stage))
-        measure([dict(arch='riscv64',name=n)for n in texts],t,lambda name,v:save('mixed-'+name,v))
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))
