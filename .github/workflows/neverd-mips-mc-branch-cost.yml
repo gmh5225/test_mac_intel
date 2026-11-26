@@ -1,0 +1,76 @@
+name: MIPS assembler branch costs
+on:
+  push:
+    branches: [codex/mips-r14-mc-branch-cost]
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      OLD: 24ced447e1718432292dc9d54b6eb229323409d1
+      NEW: 6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts/mips-mc-branch-cost
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/llvm-project
+          ref: ${{ env.OLD }}
+          path: src-r13
+          persist-credentials: false
+          sparse-checkout: llvm/tools/llvm-mc
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/llvm-project
+          ref: ${{ env.NEW }}
+          path: src-r14
+          persist-credentials: false
+          sparse-checkout: llvm/tools/llvm-mc
+      - name: Build the stock assembler drivers against the published SDKs
+        run: |
+          set -euo pipefail
+          mkdir evidence
+          for release in r13 r14; do
+            prefix="neverd-llvm-v23.0.0-$release"
+            filename=neverd-llvm-linux-x86_64.tar.xz
+            sum=9c48f639fa51c5de8d1482ea9e23409d215fc6d6022873cff5899154862c8672
+            revision="$OLD"
+            if [ "$release" = r14 ]; then
+              sum=8bdcf7289ada160858c35ccb6dbf848c46c75161063c65b5653954b3e4d4d2bd
+              revision="$NEW"
+            fi
+            dir="sdk-$release"
+            mkdir "$dir"
+            curl --fail --location --retry 3 --silent --show-error -o "$dir/$filename" "https://github.com/NeverSight/llvm-project/releases/download/$prefix/$filename"
+            echo "$sum  $dir/$filename" | sha256sum --check
+            tar -xJf "$dir/$filename" -C "$dir"
+            sdk="$PWD/$dir/neverd-llvm-linux-x86_64"
+            grep -Fx "llvm_commit: $revision" "$sdk/BUILDINFO.txt"
+            git -C "src-$release" rev-parse HEAD >"evidence/$release-source.txt"
+            grep -Fx "$revision" "evidence/$release-source.txt"
+            git -C "src-$release" rev-parse 'HEAD:llvm/tools/llvm-mc' >"evidence/$release-driver-tree.txt"
+            cp "$sdk/BUILDINFO.txt" "evidence/$release-SDK.txt"
+            cmake -S .github/scripts/mips-mc-branch-cost -B "build-$release" -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-18 -DCMAKE_CXX_COMPILER=clang++-18 \
+              "-DMC_SOURCE=$PWD/src-$release/llvm/tools/llvm-mc" "-DLLVM_DIR=$sdk/lib/cmake/llvm"
+            cmake --build "build-$release" --parallel 2 --target llvm-mc
+            "build-$release/llvm-mc" --version >"evidence/$release-version.txt"
+            ldd "build-$release/llvm-mc" >"evidence/$release-ldd.txt"
+            if grep -i -E 'libLLVM|not found' "evidence/$release-ldd.txt"; then exit 1; fi
+          done
+          cmp evidence/r13-driver-tree.txt evidence/r14-driver-tree.txt
+      - name: Collect native instruction counts and paired CPU and wall times
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install --yes valgrind
+          valgrind --version >evidence/valgrind.txt
+          python3 .github/scripts/mips-mc-branch-cost/measure.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mips-assembler-branch-costs
+          path: evidence
+          if-no-files-found: error
