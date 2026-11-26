@@ -1,7 +1,7 @@
-name: Verify RISC-V library object scope and all CSR detail encodings
+name: Check standalone and mixed decoder binary identity with nullable CSR lookups
 on:
   push:
-    branches: [codex/cstool-riscv-lib-and-csr]
+    branches: [codex/csr-tools-identical-readers]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -61,6 +61,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-csr-library-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
+          name: csr-table-identity-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
           path: evidence
           retention-days: 7

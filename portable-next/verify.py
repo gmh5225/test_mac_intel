@@ -106,14 +106,12 @@ try:
     for group in (mixed,compile_scope):
         left,right=[group[k]['objects']for k in ('base','candidate')];assert left.keys()==right.keys()
         changed=[f for f in left if left[f]!=right[f]]
-        assert {Path(f).name for f in changed}=={'RISCVInstPrinter.c.o'},changed
-
-    if linux and profile=='full':
-        from riscv_time import measure
-        os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-        measure([dict(arch='riscv64',name=n)for n in texts],t,save)
-        for stage in ('base','candidate'):shutil.copyfile(t/('mixed-'+stage),t/('riscv-option-'+stage))
-        measure([dict(arch='riscv64',name=n)for n in texts],t,lambda key,val:save('mixed-'+key,val))
+        assert not changed,changed
+        for field in set(group['base'])-{'objects'}:
+            assert group['base'][field]==group['candidate'][field],field
+    photos={f:(t/f).read_bytes()==(t/g).read_bytes() for f,g in [('mixed-base','mixed-candidate'),('riscv-option-base','riscv-option-candidate')]}
+    assert all(photos.values())
+    save('identical-products',dict(dedicated=compile_scope['base']['archive'],mixed=mixed['base']['library'],dedicated_consumer=sha((t/'riscv-option-base').read_bytes()),mixed_consumer=mixed['base']['consumer'],dedicated_objects=len(compile_scope['base']['objects']),mixed_objects=len(mixed['base']['objects'])))
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))
