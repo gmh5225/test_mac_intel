@@ -21,7 +21,7 @@ try:
             assert sp.check_output(['git','-C',s,'write-tree'],text=True).strip()==t['tree']
         run('cmake','--build',b,'--parallel','3','--target','wasm_brtable_size','capstone_static','capstone_shared')
         run('ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_wasm_brtable_size$')
-        objs=list(b.rglob('WASMInstPrinter.c.obj'));assert objs
+        objs=list(b.rglob('WASMInstPrinter.c.obj'))+list(b.rglob('WASMMapping.c.obj'));assert {f.name for f in objs}=={'WASMInstPrinter.c.obj','WASMMapping.c.obj'}
         row={'objects':{str(f.relative_to(b)):sha(f)for f in objs},'static':sha(b/'capstone_static.lib'),'shared':sha(b/'capstone.dll')}
         if profile=='full':
             rt='/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON' in (b/'CMakeCache.txt').read_text() else '/MD'

@@ -1,7 +1,7 @@
-name: Validate dedicated WASM record formatting and custom hooks on Win32 and Win64 with original Git blob bytes
+name: Check WASM length records and stream boundaries with callbacks on Windows 32 and 64 bits
 on:
   push:
-    branches: [codex/wasm-msvc-native-bytes]
+    branches: [codex/wasm-record-lengths-win32-win64]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
+          ref: 7161cb4d72aad82f89161629790fbe10b7b90d55
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-msvc-bytes-${{ matrix.arch }}-${{ matrix.profile }}
+          name: wasm-length-records-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
