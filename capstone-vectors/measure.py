@@ -64,6 +64,9 @@ try:
         check=list(map(int,get(w/'check-clear').split()))
         assert check[0]==1769472 and 0<check[1]<check[0]
         save('clear-'+label,check)
+        run('clang','-std=c99','-O2','-I',base,'-I',base/'include',r/'map.c',lib,'-o',w/'map')
+        domain=list(map(int,get(w/'map').split()));assert sum(domain[:3])==65536 and domain[1]==64
+        save('map-domain-'+label,domain)
         run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'register-records.cpp',lib,'-o',w/'register-records')
         rows=get(w/'register-records').splitlines()
         assert len(rows)==8 and all(int(v.split()[0]) and int(v.split()[1]) for v in rows)
