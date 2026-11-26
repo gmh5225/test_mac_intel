@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import os
 import platform
 import random
 import statistics as stats
@@ -22,7 +23,7 @@ else:
 p = Path(__file__).resolve().parent
 repo = p.parent.parent
 sys.path.insert(0, str(repo / "scripts"))
-import check_mips_elf_relink as m
+import check_mips_elf_relink as m  # noqa: E402
 
 windows = sys.platform == "win32"
 suffix = ".exe" if windows else ""
@@ -30,7 +31,32 @@ locations = [Path(arg).resolve() for arg in sys.argv[3:5]]
 if not locations:
     locations = [p / "r12-bin", p / "r13-bin"]
 toolchains = dict(zip(("r12", "r13"), locations, strict=True))
+full_pair = os.environ.get("NEVERD_PAIR_FULL_INSTALLATIONS") == "1"
 cli = p.parent / "bin" / ("neverd" + suffix)
+clis = {label: folder / ("neverd" + suffix) if full_pair else cli for label, folder in toolchains.items()}
+cli_envs = {}
+provenance = {}
+for label, executable in clis.items():
+    if not full_pair:
+        continue
+    folder = executable.parent
+    record = json.loads((folder / "source.json").read_text())
+    assert all(m.digest(folder / name) == value for name, value in record["files"].items())
+    env = dict(os.environ)
+    env["PATH"] = str(folder) + os.pathsep + env["PATH"]
+    env_key = "DYLD_LIBRARY_PATH" if sys.platform == "darwin" else "LD_LIBRARY_PATH"
+    if not windows:
+        env[env_key] = str(folder)
+    probe_env = env.copy()
+    if sys.platform == "darwin":
+        probe_env["DYLD_PRINT_LIBRARIES"] = "1"
+    elif not windows:
+        probe_env["LD_DEBUG"] = "libs"
+    probe = subprocess.run([executable, "--version"], env=probe_env, check=True, capture_output=True, text=True)
+    if not windows:
+        assert any(str(folder) in line and "libneverd" in line for line in probe.stderr.splitlines())
+    cli_envs[executable] = env
+    provenance[label] = record
 rng = random.Random(20261126)
 rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 32
 receipt = sys.argv[2] if len(sys.argv) > 2 else "perf.json"
@@ -39,6 +65,7 @@ receipt = sys.argv[2] if len(sys.argv) > 2 else "perf.json"
 def run(argv):
     subprocess.run(
         list(map(str, argv)),
+        env=cli_envs.get(Path(argv[0])),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         check=True,
@@ -100,7 +127,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
         m.Profile("o32", True, "classic", 2, linkage="pic-hard"),
         m.Profile("n64", True, "classic", 5, linkage="msa"),
     ]
-    public_kinds = m.MODES if windows else ("public",)
+    public_kinds = m.MODES if windows or full_pair else ("public",)
     kinds = (*public_kinds, "many-relocations", "codegen")
     commands = {k: {label: [] for label in toolchains} for k in kinds}
     know = {}
@@ -146,7 +173,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
             for mode in m.MODES:
                 output = folder / (label + mode + ".elf")
                 cmd = [
-                    cli,
+                    clis[label],
                     "patch",
                     original,
                     f"--relink={folder}/manifest.json",
@@ -157,7 +184,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 ]
                 run(cmd)
                 hashes.append(guest_hash(output))
-                commands[mode if windows else "public"][label].append(cmd)
+                commands[mode if windows or full_pair else "public"][label].append(cmd)
             if pf.name in know:
                 assert know[pf.name] == hashes, pf.name
             know[pf.name] = hashes
@@ -229,7 +256,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
             if key in know:
                 assert know[key] == h
             know[key] = h
-    if windows:
+    if windows or full_pair:
         kinds = public_kinds
     rows = {k: [] for k in kinds}
     for k in kinds:
@@ -251,7 +278,8 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
     result = dict(
         revisions=meta,
         host=platform.platform(),
-        cli_sha256=m.digest(cli),
+        cli_sha256={label: m.digest(path) for label, path in clis.items()} if full_pair else m.digest(cli),
+        sources=provenance,
         programs=know,
         cli_commands_per_trial=sum(len(commands[k]["r12"]) for k in public_kinds),
         installations={label: folder.name for label, folder in toolchains.items()},

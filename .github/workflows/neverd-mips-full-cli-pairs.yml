@@ -1,0 +1,124 @@
+name: MIPS native Release CLI comparison
+on:
+  push:
+    branches: [codex/mips-r13-native-cli-pairs]
+permissions:
+  contents: read
+env:
+  BASE_PROJECT: 5fa4e4da6e9ce253f43d24525c98b3931616da7f
+  NEW_PROJECT: 07363fba0a75f2ff725efa87021514d50f425aab
+  BASE_LLVM: 6947b7db63e913244e0aa6de087d1ad2e791e86f
+  NEW_LLVM: 24ced447e1718432292dc9d54b6eb229323409d1
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18}
+          - {os: macos-15, cc: clang, cxx: clang++}
+          - {os: windows-latest, cc: clang-cl, cxx: clang-cl}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 330
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.BASE_PROJECT }}
+          path: project
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/llvm-project
+          ref: ${{ env.BASE_LLVM }}
+          path: llvm-src
+          sparse-checkout: |
+            cmake
+            llvm
+            lld
+            libunwind/include
+            third-party
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14
+      - if: runner.os == 'macOS'
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: brew install ninja
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./project/scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
+      - name: Prepare the pinned sources and benchmark reader
+        run: |
+          echo 'pyelftools==0.33 --hash=sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036' > paired-requirements.txt
+          python -m pip install --require-hashes --no-deps -r paired-requirements.txt
+          git -C project fetch --no-tags --depth=1 origin "$NEW_PROJECT"
+          git -C llvm-src fetch --no-tags --depth=1 --filter=blob:none origin "$NEW_LLVM"
+          if [[ "$RUNNER_OS" == Windows ]]; then python .github/scripts/neverd_windows_child_cpu.py; fi
+      - name: Build and stage each complete Release configuration
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          extra=()
+          suffix=
+          if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
+          if [[ "$RUNNER_OS" == Linux ]]; then extra+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14'); fi
+          for release in r12 r13; do
+            rev="$BASE_PROJECT"
+            fork="$BASE_LLVM"
+            if [[ "$release" == r13 ]]; then rev="$NEW_PROJECT"; fork="$NEW_LLVM"; fi
+            git -C project checkout --detach "$rev"
+            git -C project submodule update --init --depth 1 third_party/capstone third_party/unicorn signatures
+            git -C llvm-src checkout --detach "$fork"
+            cmake -S llvm-src/llvm -B build-mips-tools -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_PROJECTS=lld -DLLVM_TARGETS_TO_BUILD=Mips -DLLVM_ENABLE_RTTI=ON \
+              -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+              -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_ENABLE_LIBXML2=OFF -DLLVM_ENABLE_ZLIB=OFF \
+              -DLLVM_ENABLE_ZSTD=OFF -DLLVM_PARALLEL_LINK_JOBS=1 "${extra[@]}"
+            cmake --build build-mips-tools --parallel 4 --target llc llvm-mc lld
+            "build-mips-tools/bin/ld.lld$suffix" --version | grep -F -- "$fork"
+            cmake -S project -B project/build-neverd-pair -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+              -DNEVERD_ENABLE_WEB_ANALYSIS=OFF "${extra[@]}"
+            (cd project && python scripts/build.py build-neverd-pair --config Release --parallel 4 --target neverd)
+            python .github/scripts/neverd_pair_stage.py project project/build-neverd-pair "pair-installs/$release" "$rev" "$fork" "$release"
+            for tool in llc llvm-mc ld.lld; do cp -L "build-mips-tools/bin/$tool$suffix" "pair-installs/$release/"; done
+            cmake -E rm -rf project/build-neverd-pair
+          done
+      - name: Compare public commands with the full installations at swapped paths
+        env:
+          NEVERD_PAIR_FULL_INSTALLATIONS: '1'
+        run: |
+          dest=project/build-neverd-pair/paired
+          mkdir -p "$dest"
+          cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
+          cp .github/scripts/neverd_windows_child_cpu.py "$dest/"
+          mv pair-installs/r12 "$dest/slot-0"
+          mv pair-installs/r13 "$dest/slot-1"
+          python "$dest/bench.py" 24 pairs-0.json "$dest/slot-0" "$dest/slot-1"
+          mv "$dest/slot-0" "$dest/staged"
+          mv "$dest/slot-1" "$dest/slot-0"
+          mv "$dest/staged" "$dest/slot-1"
+          python "$dest/bench.py" 24 pairs-1.json "$dest/slot-1" "$dest/slot-0"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mips-native-pairs-${{ runner.os }}
+          path: project/build-neverd-pair/paired/pairs-*.json
+          if-no-files-found: error
