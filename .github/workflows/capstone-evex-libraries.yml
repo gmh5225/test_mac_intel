@@ -1,7 +1,7 @@
-name: Time verified SSE2 MOVD and MOVQ register pairs on real AMD64 PE and ELF with i386 controls
+name: Measure public shared-library decoding against iced with six architectures
 on:
   push:
-    branches: [codex/sse2-xmm-gpr-moves]
+    branches: [codex/mixed-shared-record-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d63971a2801bb17b4ade6a9697c19722e0438d
+          ref: 499ddf54d2723f7357e92db138e4e9beb71b28a5
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 276a657138f58b0ef97a876288347aaacfde0e74
+          ref: f73475381f5bf3936bd07139142a4915f9934815
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-xmm-gpr-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-record-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

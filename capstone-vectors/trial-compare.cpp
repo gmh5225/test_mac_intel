@@ -35,7 +35,7 @@ struct Api {
   explicit Api(const char *file) : so(dlopen(file, RTLD_NOW | RTLD_LOCAL)),
       open(sym<decltype(open)>("cs_open")), close(sym<decltype(close)>("cs_close")),
       option(sym<decltype(option)>("cs_option")),disasm(sym<decltype(disasm)>("cs_disasm")),
-      next(sym<decltype(next)>("measure_fixed_iterator")),alloc(sym<decltype(alloc)>("cs_malloc")),
+      next(sym<decltype(next)>("cs_disasm_iter")),alloc(sym<decltype(alloc)>("cs_malloc")),
       free(sym<decltype(free)>("cs_free")),error(sym<decltype(error)>("cs_errno")),
       regs(sym<decltype(regs)>("cs_regs_access")) { check(so, file); }
 };

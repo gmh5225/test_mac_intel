@@ -177,6 +177,8 @@ static void add_result(Result &total,const Result &span,const Span &range) {
 int main(int argc,char **argv) {
   if(argc!=7) return 2;
   std::string engine=argv[1];
+  const bool att=engine=="public-att";
+  if(att) engine="capstone";
   unsigned mode=std::stoul(argv[2]), reps=std::stoul(argv[3]);
   if (mode>4 || !reps) return 2;
   std::ifstream file(argv[4],std::ios::binary), table(argv[5]);
@@ -193,13 +195,13 @@ int main(int argc,char **argv) {
   if(cs_open(CS_ARCH_X86,bits==16?CS_MODE_16:(bits==32?CS_MODE_32:CS_MODE_64),&handle)!=CS_ERR_OK ||
      cs_option(handle,CS_OPT_DETAIL,mode>=2 ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK ||
      cs_option(handle,CS_OPT_TEXT,mode ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK) return 4;
+  if(att && cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT)!=CS_ERR_OK) return 4;
   cs_insn *insn=cs_malloc(handle);
   void *iced=iced_create(bits,mode | (engine=="fast" ? 8 : 0));
   if(!insn || !iced) return 5;
   if(engine=="audit") {
     for(auto f : spans) {
       auto ptr=bytes.data()+f.offset;
-      (void)batch_span<true,X86_scanNativeBatch>(ptr,f.size,handle,insn,f.ip);
       std::vector<uint8_t> expected(f.size), actual;
       expected.resize(iced_trace(bits,ptr,f.size,f.ip,expected.data()));
       const uint8_t *cursor=ptr;
@@ -218,14 +220,12 @@ int main(int argc,char **argv) {
                   (unsigned long long)f.ip,actual.size(),expected.size(),offset);
     }
   } else {
-    if(engine!="capstone" && engine!="private" && engine!="iced" && engine!="fast") return 6;
+    if(engine!="capstone" && engine!="iced" && engine!="fast") return 6;
     auto run=[&](unsigned n) {
       Result all;
       for(unsigned i=0;i<n;++i) for(auto f:spans) {
         Result row;
         if(engine=="capstone") row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
-        else if(engine=="private" && !mode) row=batch_span<false,X86_scanNativeBatch>(bytes.data()+f.offset,f.size,handle,insn,f.ip);
-        else if(engine=="private") row=cs_span<X86_disasmIterText>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
         else iced_run(iced,bytes.data()+f.offset,f.size,1,f.ip,&row);
         add_result(all,row,f);
       }
