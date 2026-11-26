@@ -1,29 +1,131 @@
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..f6ba0e10 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -456,6 +456,14 @@ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index dceebc42..faaa6432 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -22,6 +22,9 @@ struct PaddingOutput {
+ 
+ #include "X86GenVectorOutput.inc"
+ #include "X86VectorRegisterOutput.h"
++#ifndef CAPSTONE_X86_ONLY
++#include "X86VexBaseMemory.h"
++#endif
+ 
+ #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -449,6 +452,20 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
+ 		return writeVexRegisterOutput(code, size, insn, insn_size,
+ 					      prefix);
++#ifndef CAPSTONE_X86_ONLY
++	/* Packed VFMADD132, 213 and 231 have the same public effects for
++	 * full-width memory sources as for their last register operand. */
++	if (wide && code[0] == 0xc4 && size >= 5 && (code[1] & 31) == 2 &&
++	    (code[2] & 3) == 1 && (code[3] == 0x98 || code[3] == 0xa8 ||
++				  code[3] == 0xb8) && (code[4] & 0xc7) == 5) {
++		const unsigned flags = code[2];
++		const unsigned wl = ((flags >> 6) & 2) | ((flags >> 2) & 1);
++		const unsigned plan = vex_register_plans[1][code[3]];
++		const unsigned index = vex_register_widths[plan][wl];
++		return writeVexMappedMemory(code, size, 3, insn, insn_size,
++					    regs, &vex_register_rows[index]);
++	}
++#endif
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
+ }
+ /* A regular base, an unmasked destination and a full 128-bit memory tuple.
+diff --git a/arch/X86/X86VexBaseMemory.h b/arch/X86/X86VexBaseMemory.h
+index a8ea43f2..d0a021db 100644
+--- a/arch/X86/X86VexBaseMemory.h
++++ b/arch/X86/X86VexBaseMemory.h
+@@ -4,7 +4,9 @@
+ #define CS_X86_VEX_BASE_MEMORY_H
+ #include "X86SimpleOutput.h"
+ #include "X86VectorRegisterWriter.h"
++#ifdef CAPSTONE_X86_ONLY
+ #include "X86GenVexBaseMemory.inc"
++#endif
+ 
+ static const struct X86SimpleRegister vector_rip = { X86_REG_RIP, 3, "rip" };
+ 
+@@ -70,23 +72,17 @@ static bool writeVectorMemory(const uint8_t *code, cs_insn *insn,
+ 	return true;
  }
  
- #ifndef CAPSTONE_DIET
-+#ifdef CAPSTONE_SSTREAM_PRECHECKED
-+/* The bounded printer runs with the default formatter. Operand access is
-+ * assigned in X86_Intel_printInst after implicit operands have been added. */
-+static inline void set_early_operand_access(MCInst *MI)
-+{
-+	(void)MI;
-+}
-+#else
- // copy & normalize access info
- static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
- 			  uint64_t *eflags)
-@@ -499,7 +507,8 @@ static inline void set_early_operand_access(MCInst *MI)
- 	MI->flat_insn->detail->x86.operands[MI->flat_insn->detail->x86.op_count]
- 		.access = access[MI->flat_insn->detail->x86.op_count];
- }
--#endif
-+#endif // CAPSTONE_SSTREAM_PRECHECKED
-+#endif // CAPSTONE_DIET
- 
- static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
+-/* The AMD64 fallback checked both prefix bytes and a memory ModR/M. */
+-static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix,
+-			    cs_insn *insn, uint16_t *insn_size,
+-			    const struct X86SimpleRegister *regs)
++/* The caller has checked the VEX header and selected a memory ModR/M. */
++static inline bool writeVexMappedMemory(const uint8_t *code, size_t size,
++					unsigned prefix, cs_insn *insn,
++					uint16_t *insn_size,
++					const struct X86SimpleRegister *regs,
++					const struct VectorOutputRow *row)
  {
+ 	const bool short_prefix = prefix == 2;
+ 	const unsigned flags = code[prefix - 1];
+-	const unsigned map = short_prefix ? 1 : code[1] & 31;
+-	if (map < 1 || map > 3 || (flags & 3) != 1)
+-		return false;
+ 	const unsigned w = short_prefix ? 0 : flags >> 7;
+-	const unsigned ll = (flags >> 2) & 1, wl = w * 2 + ll,
+-		       opcode = code[prefix];
+-	const unsigned plan = vex_base_plans[map - 1][opcode];
+-	const unsigned index = vex_base_widths[plan][wl];
+-	if (!index)
+-		return false;
++	const unsigned ll = (flags >> 2) & 1;
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & (short_prefix ? 4 : 7);
+ 	const unsigned dst = ((code[prefix + 1] >> 3) & 7) | ((rxb & 4) << 1);
+ 	const unsigned mod = code[prefix + 1] >> 6;
+@@ -102,8 +98,31 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
+ 			     disp_size == 1 ? (int8_t)code[offset] : 0;
+ 	const struct X86SimpleRegister *base =
+ 		rip ? &vector_rip : &regs[rm | ((rxb & 1) << 3)];
+-	return writeVectorMemory(code, insn, insn_size, &vex_base_rows[index],
++	return writeVectorMemory(code, insn, insn_size, row,
+ 				 prefix, ll, 0x40 | (w << 3) | rxb, dst,
+ 				 (~flags >> 3) & 15, base, disp_size, disp);
+ }
++
++#ifdef CAPSTONE_X86_ONLY
++/* The AMD64 fallback checked both prefix bytes and a memory ModR/M. */
++static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix,
++			    cs_insn *insn, uint16_t *insn_size,
++			    const struct X86SimpleRegister *regs)
++{
++	const bool short_prefix = prefix == 2;
++	const unsigned flags = code[prefix - 1];
++	const unsigned map = short_prefix ? 1 : code[1] & 31;
++	if (map < 1 || map > 3 || (flags & 3) != 1)
++		return false;
++	const unsigned w = short_prefix ? 0 : flags >> 7;
++	const unsigned ll = (flags >> 2) & 1, wl = w * 2 + ll,
++		       opcode = code[prefix];
++	const unsigned plan = vex_base_plans[map - 1][opcode];
++	const unsigned index = vex_base_widths[plan][wl];
++	if (!index)
++		return false;
++	return writeVexMappedMemory(code, size, prefix, insn, insn_size, regs,
++				    &vex_base_rows[index]);
++}
++#endif
+ #endif
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index f0312e90..cf018092 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -2238,6 +2238,13 @@ void emit_vex_base_memory(Decoder &decoder)
+ 			plans[map - 1][opcode] = plan;
+ 		}
+ 	}
++	/* Mixed readers reuse the register rows for packed FMA3 memory sources.
++	 * Each selected W/L pair must pass the memory comparisons above. */
++	for (unsigned opcode : { 0x98u, 0xa8u, 0xb8u }) {
++		const auto &forms = widths[plans[1][opcode]];
++		if (std::find(forms.begin(), forms.end(), 0u) != forms.end())
++			throw std::runtime_error("missing packed FMA3 memory form");
++	}
+ 	if (!plans[0][0xfe] || !plans[1][0xa8])
+ 		throw std::runtime_error("missing VEX integer or FMA memory form");
+ 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp --vex-base-memory. */");
