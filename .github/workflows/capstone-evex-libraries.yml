@@ -1,7 +1,7 @@
-name: Time the mapped instruction ID directly versus the existing scan and formatter completion on real PE and ELF
+name: Measure the corrected scan initializer in native builds with real PE and ELF
 on:
   push:
-    branches: [codex/x86-return-mapped-family-id]
+    branches: [codex/mapped-id-real-fixed-initializer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mapped-ids-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mapped-ids-real-complete-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
