@@ -1,6 +1,6 @@
 // NeverD Decompiler: benchmark-only iced public API adapter.
 use iced_x86::{
-    Decoder, DecoderOptions, Formatter, Instruction, InstructionInfoFactory, IntelFormatter, FastFormatter,
+    Decoder, DecoderOptions, Formatter, Instruction, InstructionInfoFactory, GasFormatter, FastFormatter,
 };
 
 #[repr(C)]
@@ -14,7 +14,7 @@ pub struct Result {
 struct State {
     bits: u32,
     mode: u32,
-    formatter: IntelFormatter,
+    formatter: GasFormatter,
     fast: FastFormatter,
     factory: InstructionInfoFactory,
     text: String,
@@ -25,7 +25,7 @@ pub extern "C" fn iced_create(bits: u32, mode: u32) -> *mut std::ffi::c_void {
     Box::into_raw(Box::new(State {
         bits,
         mode,
-        formatter: IntelFormatter::new(),
+        formatter: GasFormatter::new(),
         fast: FastFormatter::new(),
         factory: InstructionInfoFactory::new(),
         text: String::with_capacity(512),

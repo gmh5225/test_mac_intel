@@ -150,15 +150,12 @@ try:
         direct_records=[list(map(int,get(w/'trial-real',w/'base.so',w/'direct.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
         assert direct_records==records[name]
         save('records',records)
-        for mode in (0,1,2):
-            def take(k,n):
-                other=k in ('iced','fast');select('base' if other else k)
-                return list(map(int,get(*invoke,w/'driver',k if other else 'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('intel/'+name+'/'+str(mode),['base','copy','direct','candidate','iced']+(['fast']if mode else []),take)
         for mode in (1,2):
             def take(k,n):
-                select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('att/'+name+'/'+str(mode),images,take)
+                other=k=='iced'
+                select('base' if other else k)
+                return list(map(int,get(*invoke,w/'driver','iced' if other else 'public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
+            measure('att/'+name+'/'+str(mode),list(images)+['iced'],take)
     save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),verified=verified,inode=inode,soname=soname,spans=spans,bytes=maximum))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
