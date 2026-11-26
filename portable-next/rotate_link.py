@@ -16,5 +16,6 @@ def rotate(src,bench,b,t,profile,label,run,linkage):
     process=sp.run([out],capture_output=True,text=True)
     assert process.returncode==0,(label,process.returncode,process.stderr[-2000:])
     counts=list(map(int,process.stdout.split()))
-    assert counts==[10829824, 3719765, 7276063618347817852, 86824, 192],(label,counts)
+    expected=[10829824, 3719765, 7276063618347817852, 86824, 192] if label.startswith('base-') else [10829824, 3719765, 18263537639128292220, 86824, 0]
+    assert counts==expected,(label,counts)
     return counts

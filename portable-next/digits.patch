@@ -1,164 +1,102 @@
-diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
-index a8a6252a..60e6305f 100644
---- a/arch/X86/X86GenVexPublicPlans.inc
-+++ b/arch/X86/X86GenVexPublicPlans.inc
-@@ -186,10 +186,10 @@ static const uint8_t x86Vex3OpcodeRows[3][256] = {
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 241, 242,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 243,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		244, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 	},
- };
--static const uint16_t x86Vex3PublicRows[244][16] = {
-+static const uint16_t x86Vex3PublicRows[245][16] = {
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 8414, 8406, 32768, 32769, 8414, 8406, 32768, 32769 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 32770, 32771, 8390, 8198, 0, 0, 8390, 8198 },
-@@ -434,6 +434,7 @@ static const uint16_t x86Vex3PublicRows[244][16] = {
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 7885, 0, 0, 0, 7885, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 7877, 0, 0, 0, 7877, 0, 0 },
- 	{ 0, 6167, 0, 0, 0, 0, 0, 0, 0, 6167, 0, 0, 0, 0, 0, 0 },
-+	{ 0, 0, 0, 5103, 0, 0, 0, 0, 0, 0, 0, 5103, 0, 0, 0, 0 },
- };
- static const uint16_t x86Vex3FormPlans[25][2] = {
- 	{ 8398, 8396 },
-diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
-index 2c0da2cd..1779cef3 100644
---- a/arch/X86/X86GenVexScan.inc
-+++ b/arch/X86/X86GenVexScan.inc
-@@ -61,7 +61,7 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
- 	},
- };
+diff --git a/cs.c b/cs.c
+index d0b8b045..03dc1c83 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1107,7 +1107,7 @@ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, cs_record_request request)
+ {
+-	const bool batch = request == true;
++	(void)request;
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+@@ -1237,7 +1237,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				  code, known_length);
+ 		}
+ 	}
+-	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
++	/* Both iterator and allocated VCMP records expose the mapped alias ID. */
++	if (handle->arch == CS_ARCH_X86 && insn->id != X86_INS_VCMP)
+ 		insn->id += mci.popcode_adjust;
+ 	return true;
+ }
+diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
+index dfa9b451..37732962 100644
+--- a/tests/unit/x86_evex_vpcmp_id.c
++++ b/tests/unit/x86_evex_vpcmp_id.c
+@@ -55,6 +55,50 @@ static bool test_vpcmp(csh handle, bool expect_detail)
+ 	return success;
+ }
  
--/* 1570 admitted UIDs, 9 immediate patterns. */
-+/* 1596 admitted UIDs, 9 immediate patterns. */
- enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
-        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
-        X86_VEX_SCAN_PATTERN_SHIFT = 4, X86_VEX_SCAN_PUBLIC_SHIFT = 8 };
-@@ -98,7 +98,7 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x00001836u, 0x00001816u, 0x00001805u, 0x00001806u, 0x00001806u, 0x00001813u, 0x00001815u, 0x00001815u,
- 	0x00001805u, 0x00001816u, 0x00001816u, 0x00001805u, 0x00001806u, 0x00001806u, 0x0000190du, 0x0000190eu,
- 	0x0000190du, 0x0000190eu, 0x00001e05u, 0x00001e06u, 0x00001f0du, 0x00001f0eu, 0x00001f0du, 0x00001f0eu,
--	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0000200du, 0x0000200eu, 0x0000200du, 0x0000200eu,
-+	0x00001f25u, 0x00001f26u, 0x00001f35u, 0x00001f36u, 0x0000200du, 0x0000200eu, 0x0000200du, 0x0000200eu,
- 	0x0000210du, 0x0000210eu, 0x0000210du, 0x0000210eu, 0x0000220du, 0x0000220eu, 0x0000220du, 0x0000220eu,
- 	0x0000230du, 0x0000230eu, 0x0000230du, 0x0000230eu, 0x0000240du, 0x0000240eu, 0x0000240du, 0x0000240eu,
- 	0x0000290du, 0x0000290eu, 0x0000290du, 0x0000290eu, 0x00002a0du, 0x00002a0eu, 0x00002a0du, 0x00002a0eu,
-@@ -140,10 +140,10 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x00009405u, 0x00009406u, 0x0000a403u, 0x0000a503u, 0x0000a653u, 0x0000aa63u, 0x0000aa05u, 0x0000aa73u,
- 	0x00003e05u, 0x0000aa05u, 0x0000ab63u, 0x0000ab05u, 0x0000ab73u, 0x0000ac05u, 0x0000ab05u, 0x0000ce03u,
- 	0x0000d903u, 0x0000df03u, 0x0000e205u, 0x0000e206u, 0x0000e205u, 0x0000e206u, 0x0000e205u, 0x0000e206u,
--	0x0000e205u, 0x0000e206u, 0x0000e405u, 0x0000e406u, 0x0000e405u, 0x00000000u, 0x00000000u, 0x0000e406u,
--	0x00000000u, 0x00000000u, 0x0000e405u, 0x0000e406u, 0x0000e405u, 0x00000000u, 0x00000000u, 0x0000e406u,
--	0x00000000u, 0x00000000u, 0x0000e405u, 0x0000e406u, 0x0000e405u, 0x00000000u, 0x00000000u, 0x0000e406u,
--	0x00000000u, 0x00000000u, 0x0000e405u, 0x0000e406u, 0x0000e513u, 0x0000e503u, 0x0000e513u, 0x0000e503u,
-+	0x0000e205u, 0x0000e206u, 0x0000e405u, 0x0000e406u, 0x0000e405u, 0x0000e425u, 0x0000e415u, 0x0000e406u,
-+	0x0000e426u, 0x0000e416u, 0x0000e405u, 0x0000e406u, 0x0000e405u, 0x0000e425u, 0x0000e415u, 0x0000e406u,
-+	0x0000e426u, 0x0000e416u, 0x0000e405u, 0x0000e406u, 0x0000e405u, 0x0000e435u, 0x0000e415u, 0x0000e406u,
-+	0x0000e436u, 0x0000e416u, 0x0000e405u, 0x0000e406u, 0x0000e513u, 0x0000e503u, 0x0000e513u, 0x0000e503u,
- 	0x0000e513u, 0x0000e503u, 0x0000e605u, 0x0000e606u, 0x0000e603u, 0x0000e605u, 0x0000e606u, 0x0000e603u,
- 	0x0000e605u, 0x0000e606u, 0x0000e605u, 0x0000e606u, 0x0000e706u, 0x0000e806u, 0x00000000u, 0x00000000u,
- 	0x00000000u, 0x0000ee13u, 0x0000ef03u, 0x0000f003u, 0x0000f103u, 0x0000f203u, 0x0000f305u, 0x0000f305u,
-@@ -218,7 +218,7 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x00027c05u, 0x00027c05u, 0x00027c15u, 0x00027c06u, 0x00027c06u, 0x00027c16u, 0x00027c05u, 0x00027c05u,
- 	0x00027c15u, 0x00027c06u, 0x00027c06u, 0x00027c16u, 0x00027c05u, 0x00027c05u, 0x00027c15u, 0x00027c06u,
- 	0x00027c06u, 0x00027c16u, 0x00027c05u, 0x00027c05u, 0x00027c15u, 0x00027c06u, 0x00027c06u, 0x00027c16u,
--	0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00028203u, 0x00028505u, 0x00028603u, 0x00028705u,
-+	0x00027d15u, 0x00027d16u, 0x00027d15u, 0x00027d16u, 0x00028203u, 0x00028505u, 0x00028603u, 0x00028705u,
- 	0x00028705u, 0x00028715u, 0x00028706u, 0x00028706u, 0x00028716u, 0x00028705u, 0x00028705u, 0x00028715u,
- 	0x00028706u, 0x00028706u, 0x00028716u, 0x00028705u, 0x00028705u, 0x00028715u, 0x00028706u, 0x00028706u,
- 	0x00028716u, 0x00028705u, 0x00028705u, 0x00028715u, 0x00028706u, 0x00028706u, 0x00028716u, 0x00028803u,
-@@ -238,13 +238,13 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x0002a305u, 0x0002ab05u, 0x0002ab05u, 0x0002ab15u, 0x0002ab06u, 0x0002ab06u, 0x0002ab16u, 0x0002ab05u,
- 	0x0002ab05u, 0x0002ab15u, 0x0002ab06u, 0x0002ab06u, 0x0002ab16u, 0x0002ab05u, 0x0002ab05u, 0x0002ab15u,
- 	0x0002ab06u, 0x0002ab06u, 0x0002ab16u, 0x0002ab05u, 0x0002ab05u, 0x0002ab15u, 0x0002ab06u, 0x0002ab06u,
--	0x0002ab16u, 0x0002ac05u, 0x00000000u, 0x0002ac06u, 0x00000000u, 0x0002ac05u, 0x00000000u, 0x0002ac06u,
--	0x00000000u, 0x0002ac05u, 0x00000000u, 0x0002ac06u, 0x00000000u, 0x0002ad0du, 0x0002ad0eu, 0x0002ad0du,
-+	0x0002ab16u, 0x0002ac05u, 0x0002ac15u, 0x0002ac06u, 0x00000000u, 0x0002ac05u, 0x0002ac15u, 0x0002ac06u,
-+	0x00000000u, 0x0002ac05u, 0x0002ac15u, 0x0002ac06u, 0x00000000u, 0x0002ad0du, 0x0002ad0eu, 0x0002ad0du,
- 	0x0002ad0eu, 0x0002ae05u, 0x0002ae05u, 0x0002ae15u, 0x0002ae06u, 0x0002ae06u, 0x0002ae16u, 0x0002ae05u,
- 	0x0002ae05u, 0x0002ae15u, 0x0002ae06u, 0x0002ae06u, 0x0002ae16u, 0x0002ae05u, 0x0002ae05u, 0x0002ae15u,
- 	0x0002ae06u, 0x0002ae06u, 0x0002ae16u, 0x0002ae05u, 0x0002ae05u, 0x0002ae15u, 0x0002ae06u, 0x0002ae06u,
--	0x0002ae16u, 0x0002af05u, 0x00000000u, 0x0002af06u, 0x00000000u, 0x0002af05u, 0x00000000u, 0x0002af06u,
--	0x00000000u, 0x0002af05u, 0x00000000u, 0x0002af06u, 0x00000000u, 0x0002b00du, 0x0002b00eu, 0x0002b00du,
-+	0x0002ae16u, 0x0002af05u, 0x0002af15u, 0x0002af06u, 0x00000000u, 0x0002af05u, 0x0002af15u, 0x0002af06u,
-+	0x00000000u, 0x0002af05u, 0x0002af15u, 0x0002af06u, 0x00000000u, 0x0002b00du, 0x0002b00eu, 0x0002b00du,
- 	0x0002b00eu, 0x0002b305u, 0x0002b305u, 0x0002b305u, 0x0002b503u, 0x0002b605u, 0x0002b606u, 0x0002b606u,
- 	0x0002b606u, 0x0002b706u, 0x0002b706u, 0x0002b805u, 0x0002b806u, 0x0002b806u, 0x0002b806u, 0x0002be03u,
- 	0x0002bf03u, 0x0002c003u, 0x0002c103u, 0x0002c203u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u,
-@@ -381,7 +381,7 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
- 	},
- };
- 
--/* 4512 admitted UIDs, 10 immediate patterns. */
-+/* 4538 admitted UIDs, 10 immediate patterns. */
- enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
-        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
-        X86_VEX_SCAN_PATTERN_SHIFT = 4, X86_VEX_SCAN_PUBLIC_SHIFT = 8 };
-@@ -428,7 +428,7 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x00001815u, 0x00001805u, 0x00001816u, 0x00001816u, 0x00001805u, 0x00001806u, 0x00001806u, 0x0000190du,
- 	0x0000190eu, 0x0000190du, 0x0000190eu, 0x00001a05u, 0x00001a06u, 0x00001b05u, 0x00001b06u, 0x00001c05u,
- 	0x00001c06u, 0x00001d05u, 0x00001d06u, 0x00001e05u, 0x00001e06u, 0x00001f0du, 0x00001f0eu, 0x00001f0du,
--	0x00001f0eu, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0000200du, 0x0000200eu, 0x0000200du,
-+	0x00001f0eu, 0x00001f25u, 0x00001f26u, 0x00001f35u, 0x00001f36u, 0x0000200du, 0x0000200eu, 0x0000200du,
- 	0x0000200eu, 0x0000210du, 0x0000210eu, 0x0000210du, 0x0000210eu, 0x0000220du, 0x0000220eu, 0x0000220du,
- 	0x0000220eu, 0x0000230du, 0x0000230eu, 0x0000230du, 0x0000230eu, 0x0000240du, 0x0000240eu, 0x0000240du,
- 	0x0000240eu, 0x00002515u, 0x00002516u, 0x00002615u, 0x00002616u, 0x00002705u, 0x00002706u, 0x00002805u,
-@@ -510,9 +510,9 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x0000e006u, 0x0000e105u, 0x0000e106u, 0x0000e205u, 0x0000e206u, 0x0000e205u, 0x0000e206u, 0x0000e205u,
- 	0x0000e206u, 0x0000e205u, 0x0000e206u, 0x0000e305u, 0x0000e305u, 0x0000e305u, 0x0000e303u, 0x0000e303u,
- 	0x0000e303u, 0x0000e303u, 0x0000e303u, 0x0000e303u, 0x0000e303u, 0x0000e303u, 0x0000e303u, 0x0000e405u,
--	0x0000e406u, 0x0000e405u, 0x00000000u, 0x00000000u, 0x0000e406u, 0x00000000u, 0x00000000u, 0x0000e405u,
--	0x0000e406u, 0x0000e405u, 0x00000000u, 0x00000000u, 0x0000e406u, 0x00000000u, 0x00000000u, 0x0000e405u,
--	0x0000e406u, 0x0000e405u, 0x00000000u, 0x00000000u, 0x0000e406u, 0x00000000u, 0x00000000u, 0x0000e405u,
-+	0x0000e406u, 0x0000e405u, 0x0000e425u, 0x0000e415u, 0x0000e406u, 0x0000e426u, 0x0000e416u, 0x0000e405u,
-+	0x0000e406u, 0x0000e405u, 0x0000e425u, 0x0000e415u, 0x0000e406u, 0x0000e426u, 0x0000e416u, 0x0000e405u,
-+	0x0000e406u, 0x0000e405u, 0x0000e435u, 0x0000e415u, 0x0000e406u, 0x0000e436u, 0x0000e416u, 0x0000e405u,
- 	0x0000e406u, 0x0000e513u, 0x0000e503u, 0x0000e513u, 0x0000e503u, 0x0000e513u, 0x0000e503u, 0x0000e605u,
- 	0x0000e606u, 0x0000e603u, 0x0000e605u, 0x0000e606u, 0x0000e603u, 0x0000e605u, 0x0000e606u, 0x0000e605u,
- 	0x0000e606u, 0x0000e706u, 0x0000e806u, 0x00000000u, 0x0000ea15u, 0x0000ea16u, 0x0000eb06u, 0x0000eb66u,
-@@ -685,8 +685,8 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x00027b05u, 0x00027b15u, 0x00027b06u, 0x00027b06u, 0x00027b16u, 0x00027c05u, 0x00027c05u, 0x00027c15u,
- 	0x00027c06u, 0x00027c06u, 0x00027c16u, 0x00027c05u, 0x00027c05u, 0x00027c15u, 0x00027c06u, 0x00027c06u,
- 	0x00027c16u, 0x00027c05u, 0x00027c05u, 0x00027c15u, 0x00027c06u, 0x00027c06u, 0x00027c16u, 0x00027c05u,
--	0x00027c05u, 0x00027c15u, 0x00027c06u, 0x00027c06u, 0x00027c16u, 0x00000000u, 0x00000000u, 0x00000000u,
--	0x00000000u, 0x00027e15u, 0x00027e16u, 0x00027f15u, 0x00027f16u, 0x00028015u, 0x00028003u, 0x00028016u,
-+	0x00027c05u, 0x00027c15u, 0x00027c06u, 0x00027c06u, 0x00027c16u, 0x00027d15u, 0x00027d16u, 0x00027d15u,
-+	0x00027d16u, 0x00027e15u, 0x00027e16u, 0x00027f15u, 0x00027f16u, 0x00028015u, 0x00028003u, 0x00028016u,
- 	0x00028003u, 0x00028115u, 0x00028103u, 0x00028116u, 0x00028103u, 0x00028203u, 0x00028305u, 0x00028306u,
- 	0x00028405u, 0x00028403u, 0x00028406u, 0x00028403u, 0x00028505u, 0x00028603u, 0x00028705u, 0x00028705u,
- 	0x00028715u, 0x00028706u, 0x00028706u, 0x00028716u, 0x00028705u, 0x00028705u, 0x00028715u, 0x00028706u,
-@@ -710,13 +710,13 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x0002ab05u, 0x0002ab15u, 0x0002ab06u, 0x0002ab06u, 0x0002ab16u, 0x0002ab05u, 0x0002ab05u, 0x0002ab15u,
- 	0x0002ab06u, 0x0002ab06u, 0x0002ab16u, 0x0002ab05u, 0x0002ab05u, 0x0002ab15u, 0x0002ab06u, 0x0002ab06u,
- 	0x0002ab16u, 0x0002ab05u, 0x0002ab05u, 0x0002ab15u, 0x0002ab06u, 0x0002ab06u, 0x0002ab16u, 0x0002ac05u,
--	0x00000000u, 0x0002ac06u, 0x00000000u, 0x0002ac05u, 0x00000000u, 0x0002ac06u, 0x00000000u, 0x0002ac05u,
--	0x00000000u, 0x0002ac06u, 0x00000000u, 0x0002ad0du, 0x0002ad0eu, 0x0002ad0du, 0x0002ad0eu, 0x0002ae05u,
-+	0x0002ac15u, 0x0002ac06u, 0x00000000u, 0x0002ac05u, 0x0002ac15u, 0x0002ac06u, 0x00000000u, 0x0002ac05u,
-+	0x0002ac15u, 0x0002ac06u, 0x00000000u, 0x0002ad0du, 0x0002ad0eu, 0x0002ad0du, 0x0002ad0eu, 0x0002ae05u,
- 	0x0002ae05u, 0x0002ae15u, 0x0002ae06u, 0x0002ae06u, 0x0002ae16u, 0x0002ae05u, 0x0002ae05u, 0x0002ae15u,
- 	0x0002ae06u, 0x0002ae06u, 0x0002ae16u, 0x0002ae05u, 0x0002ae05u, 0x0002ae15u, 0x0002ae06u, 0x0002ae06u,
- 	0x0002ae16u, 0x0002ae05u, 0x0002ae05u, 0x0002ae15u, 0x0002ae06u, 0x0002ae06u, 0x0002ae16u, 0x0002af05u,
--	0x00000000u, 0x0002af06u, 0x00000000u, 0x0002af05u, 0x00000000u, 0x0002af06u, 0x00000000u, 0x0002af05u,
--	0x00000000u, 0x0002af06u, 0x00000000u, 0x0002b00du, 0x0002b00eu, 0x0002b00du, 0x0002b00eu, 0x0002b115u,
-+	0x0002af15u, 0x0002af06u, 0x00000000u, 0x0002af05u, 0x0002af15u, 0x0002af06u, 0x00000000u, 0x0002af05u,
-+	0x0002af15u, 0x0002af06u, 0x00000000u, 0x0002b00du, 0x0002b00eu, 0x0002b00du, 0x0002b00eu, 0x0002b115u,
- 	0x0002b116u, 0x0002b215u, 0x0002b216u, 0x0002b305u, 0x0002b305u, 0x0002b305u, 0x0002b403u, 0x0002b403u,
- 	0x0002b403u, 0x0002b403u, 0x0002b503u, 0x0002b605u, 0x0002b606u, 0x0002b606u, 0x0002b606u, 0x0002b706u,
- 	0x0002b706u, 0x0002b805u, 0x0002b806u, 0x0002b806u, 0x0002b806u, 0x0002b905u, 0x0002b906u, 0x0002ba05u,
-diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index f1ebc59f..87920a2f 100644
---- a/suite/synctools/x86_operand_specializations.py
-+++ b/suite/synctools/x86_operand_specializations.py
-@@ -1545,7 +1545,9 @@ def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
- def emit_vex_scan(suffix, public_plans=False):
-     # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
-     # no gather, mask, register-limit or predicate-dependent opcode checks.
--    reads = dict(read_specializations(suffix))
-+    # The scan result needs the immediate extent, not a materialized operand.
-+    # REG, RM and imm8 (for example RORX) are validated by vex_scan_form.
-+    reads = dict(read_specializations(suffix, scalar_limit=3))
-     translations = dict(translation_specializations(suffix))
-     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
-     specifiers = instruction_specifiers(source)
++/* Both APIs keep the public VCMP alias while the immediate selects the
++ * condition in the instruction text and operand details. */
++static bool test_floating_compare(csh handle)
++{
++	static const uint8_t bytes[][7] = {
++		{ 0xc5, 0xfb, 0xc2, 0xda, 0x06 },
++		{ 0x62, 0xf1, 0x4c, 0x0b, 0xc2, 0xd0, 0xa5 },
++	};
++	static const size_t sizes[] = { 5, 7 };
++	if (cs_support(CS_SUPPORT_X86_REDUCE))
++		return true;
++	cs_insn *slot = cs_malloc(handle);
++	if (!check(slot != NULL, "allocate compare iterator"))
++		return false;
++	bool ok = true;
++	for (size_t i = 0; i < sizeof(sizes) / sizeof(sizes[0]); ++i) {
++		const uint8_t *cursor = bytes[i];
++		size_t left = sizes[i];
++		uint64_t address = 0x1000;
++		cs_insn *array = NULL;
++		size_t count = cs_disasm(handle, cursor, left, address, 1, &array);
++		bool decoded = cs_disasm_iter(handle, &cursor, &left,
++					      &address, slot);
++		ok &= check(count == 1 && decoded && left == 0 &&
++				    address == 0x1000 + sizes[i],
++			    "both floating compare decoders consume the instruction");
++		if (count && decoded) {
++			ok &= check(array[0].id == X86_INS_VCMP &&
++					    slot->id == array[0].id,
++				    "floating predicate keeps its public alias ID");
++			ok &= check(strcmp(slot->mnemonic, array[0].mnemonic) == 0 &&
++					    strcmp(slot->op_str, array[0].op_str) == 0,
++				    "floating predicate text agrees across APIs");
++			if (slot->detail && array[0].detail)
++				ok &= check(slot->detail->x86.avx_cc ==
++						    array[0].detail->x86.avx_cc,
++					    "floating predicate detail agrees across APIs");
++		}
++		cs_free(array, count);
++	}
++	cs_free(slot, 1);
++	return ok;
++}
++
+ int main(void)
+ {
+ 	csh handle = 0;
+@@ -64,6 +108,7 @@ int main(void)
+ 		   "open 64-bit mode"))
+ 		return 1;
+ 	success &= test_vpcmp(handle, false);
++	success &= test_floating_compare(handle);
+ 	if (!check(cs_option(handle, CS_OPT_DETAIL,
+ 			    CS_OPT_ON | CS_OPT_DETAIL_REAL) == CS_ERR_OK,
+ 		   "enable detail")) {
+@@ -71,6 +116,7 @@ int main(void)
+ 		return 1;
+ 	}
+ 	success &= test_vpcmp(handle, true);
++	success &= test_floating_compare(handle);
+ #ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_err err = cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	if (cs_support(CS_SUPPORT_DIET))
+@@ -78,6 +124,7 @@ int main(void)
+ 	else {
+ 		success &= check(err == CS_ERR_OK, "select AT&T syntax");
+ 		success &= test_vpcmp(handle, true);
++		success &= test_floating_compare(handle);
+ 	}
+ #endif
+ 	cs_close(&handle);
