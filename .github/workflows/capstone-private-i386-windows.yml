@@ -1,7 +1,7 @@
-name: Verify ordinary and reduced x86 readers, MASM tokens and 64-bit scan alignment in nineteen build profiles
+name: Check generated i386 scan records and MOV absolute-address formatting across nineteen configurations
 on:
   push:
-    branches: [codex/batch-alignment-and-masm-token-matrix]
+    branches: [codex/i386-escape-and-moffs-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scan-masm-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: i386-selected-token-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
