@@ -1,7 +1,7 @@
-name: Qualify dedicated WASM text and detail on real modules with unchanged mixed x86 and RISC binaries
+name: Verify all mixed architecture instructions, linked records and Mach-O contents on Intel and ARM Macs; time dedicated WASM
 on:
   push:
-    branches: [codex/wasm-dedicated-literal-mnemonics]
+    branches: [codex/wasm-macos-library-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,9 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, cxx: clang++ }
-          - { host: ubuntu-24.04, cc: gcc, cxx: g++ }
-          - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++ }
           - { host: macos-15, cc: clang, cxx: clang++ }
           - { host: macos-15-intel, cc: clang, cxx: clang++ }
     runs-on: ${{ matrix.host }}
@@ -45,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-dedicated-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-dedicated-macho-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

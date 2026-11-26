@@ -1,4 +1,5 @@
 from pathlib import Path
+from binary_identity import identity
 import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
 root=Path(os.environ.get('GITHUB_WORKSPACE',Path(__file__).resolve().parent))
 r=Path(__file__).resolve().parent;remote='GITHUB_WORKSPACE' in os.environ
@@ -25,8 +26,13 @@ try:
         files=sorted(b.rglob('*.c.o')); assert len(files)>50 and any(f.name=='WASMInstPrinter.c.o' for f in files)
         exe=b/'tests/unit/x86_reg_access'
         if not exe.exists():exe,=[f for f in b.rglob('x86_reg_access')if f.is_file()]
-        rows[label]=dict(objects={str(f.relative_to(b)):sha(f) for f in files},libraries={f.name:sha(f)for f in archives},linked_x86_test=sha(exe),units=units)
-    assert rows['candidate']==rows['base'],[k for k in rows['base']if rows['base'][k]!=rows['candidate'][k]]
+        rows[label]=dict(objects={str(f.relative_to(b)):sha(f) for f in files},libraries={f.name:identity(f) for f in archives},linked_x86_test=sha(exe),units=units)
+    (e/'mixed-builds.json').write_text(json.dumps(rows,indent=2)+'\n')
+    for key in ('objects','linked_x86_test','units'):assert rows['candidate'][key]==rows['base'][key],key
+    assert rows['base']['libraries'].keys()==rows['candidate']['libraries'].keys()
+    for f,raw in rows['base']['libraries'].items():
+        assert raw['content']==rows['candidate']['libraries'][f]['content'],(f,raw,rows['candidate']['libraries'][f])
     (e/'mixed.json').write_text(json.dumps(dict(complete=True,source=t,host=platform.platform(),rows=rows),indent=2)+'\n')
+
 finally:
     size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);(e/'mixed-cleanup.json').write_text(json.dumps(dict(bytes=size,removed=not w.exists()))+'\n')
