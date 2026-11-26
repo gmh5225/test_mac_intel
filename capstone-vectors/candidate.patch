@@ -1,30 +1,146 @@
+diff --git a/arch/X86/X86GenLegacyPackedMemory.inc b/arch/X86/X86GenLegacyPackedMemory.inc
+index c0796e49..115c94ce 100644
+--- a/arch/X86/X86GenLegacyPackedMemory.inc
++++ b/arch/X86/X86GenLegacyPackedMemory.inc
+@@ -177,3 +177,31 @@ static const uint8_t legacy_packed_plans[3][256] = {
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	},
+ };
++static const struct X86SimpleRegister legacy_move_xmm[16] = {
++	{ 122, 4, "xmm0" },
++	{ 123, 4, "xmm1" },
++	{ 124, 4, "xmm2" },
++	{ 125, 4, "xmm3" },
++	{ 126, 4, "xmm4" },
++	{ 127, 4, "xmm5" },
++	{ 128, 4, "xmm6" },
++	{ 129, 4, "xmm7" },
++	{ 130, 4, "xmm8" },
++	{ 131, 4, "xmm9" },
++	{ 132, 5, "xmm10" },
++	{ 133, 5, "xmm11" },
++	{ 134, 5, "xmm12" },
++	{ 135, 5, "xmm13" },
++	{ 136, 5, "xmm14" },
++	{ 137, 5, "xmm15" },
++};
++static const struct X86SimpleOutput legacy_gpr_moves[2][2] = {
++	{
++		{ 377, "movd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 4, 1 } } },
++		{ 377, "movd", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 16, 1 } } },
++	},
++	{
++		{ 378, "movq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 16, 2 }, { 0, 8, 1 } } },
++		{ 378, "movq", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 149, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 16, 1 } } },
++	},
++};
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..f03844e9 100644
+index 504682a4..2127079a 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -27,9 +27,7 @@
- #endif
- 
- #include "X86GenSimpleOutput.inc"
--#ifdef CAPSTONE_X86_ONLY
- #include "X86VexBaseMemory.h"
--#endif
- #define X86_LEGACY_PACKED_MEMORY
+@@ -34,6 +34,7 @@
  #include "X86PackedMemoryOutput.h"
  #undef X86_LEGACY_PACKED_MEMORY
-@@ -230,7 +228,6 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 				return true;
- 		}
+ #include "X86GenLegacyPackedMemory.inc"
++#include "X86ExtendRegisterOutput.h"
+ 
+ #include "X86GenLegacyRegisterImmediates.inc"
+ #include "X86GenLegacyMap38Registers.inc"
+@@ -222,6 +223,28 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 						      &legacy_packed_rows[row],
+ 						      rex, offset, size, false))
+ 					return true;
++			} else if (code[0] == 0x66 && (opcode & 0xef) == 0x6e &&
++				   !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++				const uint8_t mr = code[offset - 1];
++				const bool wide = (rex & 8) != 0;
++				const bool store = opcode == 0x7e;
++				const struct X86SimpleRegister *vec =
++					&legacy_move_xmm[((rex & 4) << 1) |
++							 ((mr >> 3) & 7)];
++				const struct X86SimpleRegister *gpr =
++					&x86_simple_registers[2 + wide]
++						[((rex & 1) << 3) | (mr & 7)];
++				writeExtendRegisters(
++					code, offset, insn, insn_size,
++					&legacy_gpr_moves[wide][store],
++					store ? gpr : vec, store ? vec : gpr,
++					rex, opcode, mr, true);
++				if (insn->detail) {
++					insn->detail->x86.prefix[2] = 0x66;
++					insn->detail->x86.encoding.modrm_offset =
++						(uint8_t)(offset - 1);
++				}
++				return true;
+ 			} else if (code[0] == 0x66 && opcode >= 0x70 &&
+ 				   opcode <= 0x73 && size > offset &&
+ 				   !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index b202bca4..a2e65b8d 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -905,6 +905,56 @@ void emit_packed_memory(Decoder &decoder, bool legacy)
+ 		  << " memory rows\n";
+ }
+ 
++void emit_legacy_gpr_moves(Decoder &decoder)
++{
++	RegisterTable regs{};
++	describe_registers(decoder, regs);
++	X86SimpleRegister xmm[16]{};
++	std::cout << "static const struct X86SimpleRegister legacy_move_xmm[16] = {\n";
++	for (unsigned i = 0; i < 16; ++i) {
++		auto &reg = xmm[i];
++		reg.reg = uint16_t(X86_REG_XMM0 + i);
++		const char *name = cs_reg_name(decoder.handle, reg.reg);
++		if (!name || strlen(name) >= sizeof(reg.name))
++			throw std::runtime_error("invalid XMM register name");
++		strcpy(reg.name, name);
++		reg.length = uint8_t(strlen(name));
++		std::cout << "\t{ " << reg.reg << ", " << unsigned(reg.length)
++			  << ", \"" << name << "\" },\n";
++	}
++	std::cout << "};\nstatic const struct X86SimpleOutput legacy_gpr_moves[2][2] = {\n";
++	for (unsigned wide = 0; wide < 2; ++wide) {
++		std::cout << "\t{\n";
++		for (unsigned store = 0; store < 2; ++store) {
++			const uint8_t opcode = store ? 0x7e : 0x6e;
++			CheckedRow row;
++			for (unsigned p = 0; p <= 16; ++p) {
++				const uint8_t rex = p ? uint8_t(0x3f + p) : 0;
++				if (bool(rex & 8) != bool(wide))
++					continue;
++				for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
++					uint8_t code[5] = { 0x66 };
++					unsigned pos = 1;
++					if (rex)
++						code[pos++] = rex;
++					code[pos++] = 0x0f;
++					code[pos++] = opcode;
++					code[pos++] = uint8_t(mr);
++					decoder.decode(code, pos, pos, 0);
++					const auto *vec = &xmm[((rex & 4) << 1) | ((mr >> 3) & 7)];
++					const auto *gpr = &regs[2 + wide][((rex & 1) << 3) | (mr & 7)];
++					row.observe(describe(*decoder.insn, opcode, rex, uint8_t(mr),
++							     store ? gpr : vec, store ? vec : gpr,
++							     false, false, true, 0, 0x66));
++				}
++			}
++			std::cout << "\t\t" << row.fields << ",\n";
++		}
++		std::cout << "\t},\n";
++	}
++	std::cout << "};\n";
++}
++
+ void emit_sse64_registers(Decoder &decoder)
+ {
+ 	X86SimpleRegister regs[16]{};
+@@ -1206,6 +1256,7 @@ int main(int argc, char **argv)
+ 	if (argc == 2 && std::strcmp(argv[1], "--legacy-packed-memory") == 0) {
+ 		Decoder decoder(CS_MODE_64);
+ 		emit_packed_memory(decoder, true);
++		emit_legacy_gpr_moves(decoder);
+ 		return 0;
  	}
--#ifdef CAPSTONE_X86_ONLY
- 	if ((code[0] & 0xfe) == 0xc4) {
- 		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
- 		if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
-@@ -239,7 +236,6 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 				       x86_simple_registers[3]))
- 			return true;
- 	}
--#endif
- fallback:
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
- 	defined(__x86_64__)
+ 	if (argc == 2 && std::strcmp(argv[1], "--sse64-registers") == 0) {
