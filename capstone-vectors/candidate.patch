@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..4d307a4a 100644
+index b56826b0..04a2be1c 100644
 --- a/arch/X86/X86BatchScan.c
 +++ b/arch/X86/X86BatchScan.c
 @@ -12,11 +12,13 @@
@@ -16,10 +16,41 @@ index b56826b0..4d307a4a 100644
  #include "X86GenBatchPrimary.inc"
  #include "X86FeatureExtension.h"
  #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-@@ -165,6 +167,15 @@ static uint32_t readFirst32(const uint8_t *code, size_t size)
- 		return readPrimary(code, size, plan);
- 	if (code[0] == 0xc5 && size >= 3 && (code[1] & 0xc0) == 0xc0)
- 		return readVex2Plan(code, size);
+@@ -267,6 +269,9 @@ static uint32_t readFirst64(const uint8_t *code, size_t size)
+ 	return 0;
+ }
+ 
++static bool X86_getBatchSecondary32(csh handle, const uint8_t *code, size_t size,
++			     cs_insn *insn, X86ScanResult *result);
++
+ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 					      size_t size, uint64_t address,
+ 					      uint32_t *output, size_t capacity,
+@@ -282,8 +287,10 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 		if (!packed) {
+ 			insn.address = address;
+ 			X86ScanResult result;
+-			if (!X86_getInstructionScanResult(ud, code, size, &insn,
+-							  &result))
++			const bool decoded = wide ?
++				X86_getInstructionScanResult(ud, code, size, &insn, &result) :
++				X86_getBatchSecondary32(ud, code, size, &insn, &result);
++			if (!decoded)
+ 				break;
+ 			finish_x86_scan(handle, &insn, &result, code, false,
+ 					false);
+@@ -328,6 +335,47 @@ static X86ScanBatchResult scanBatch64(csh ud, const uint8_t *code, size_t size,
+ {
+ 	return scanBatch(ud, code, size, address, output, capacity, true);
+ }
++static inline uint32_t readSecondary32(const uint8_t *code, size_t size)
++{
++	if (code[0] == 0x0f && size >= 2) {
++		const unsigned secondary = x86Batch32Secondary[code[1]];
++		const uint32_t word = secondary ?
++			readPrimary(code + 1, size - 1, secondary) : 0;
++		return word ? word + 1 : 0;
++	}
 +	/* E3 disambiguates VEX from LES. With W=0, 66 and registers 0..7,
 +	 * one generated cell contains the ID, operand checks and tail size. */
 +	if (code[0] == 0xc4 && size >= 5 && code[1] == 0xe3 &&
@@ -29,9 +60,45 @@ index b56826b0..4d307a4a 100644
 +		return finishVexPlan(code, size, 4, code[2],
 +				     x86Vex32Map3OperandPlan[code[3]][form]);
 +	}
- 	return 0;
- }
++	return 0;
++}
++
++#if defined(__ELF__) && defined(__clang__)
++__attribute__((noinline, section(".cs_x86_batch32_secondary_text")))
++#elif defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool X86_getBatchSecondary32(csh handle, const uint8_t *code, size_t size,
++			     cs_insn *insn, X86ScanResult *result)
++{
++	const uint32_t packed = readSecondary32(code, size);
++	if (!packed)
++		return X86_getInstructionScanResult(handle, code, size, insn,
++						    result);
++	result->opcode = 0;
++	result->opcode_pub = packed >> 8;
++	result->length = (uint16_t)(packed & 0xff);
++	result->popcode_adjust = 0;
++	return true;
++}
++
+ #endif
  
+ CAPSTONE_INTERNAL
+diff --git a/arch/X86/X86GenBatchPrimary.inc b/arch/X86/X86GenBatchPrimary.inc
+index 2349b148..ab611515 100644
+--- a/arch/X86/X86GenBatchPrimary.inc
++++ b/arch/X86/X86GenBatchPrimary.inc
+@@ -142,6 +142,7 @@ static const uint32_t x86Batch64Secondary[256] = {
+ 	0x00000000u, 0x0001b412u, 0x0001b212u, 0x0001b312u, 0x0001aa12u, 0x0001a012u, 0x0001ac12u, 0x80000022u,
+ 	0x0001ba12u, 0x0001c112u, 0x0001bb12u, 0x0001bc12u, 0x00018412u, 0x00018b12u, 0x00018512u, 0x0002ea01u,
+ };
++#define x86Batch32Secondary x86Batch64Secondary
+ static const uint32_t x86Batch64RexWSecondary[256] = {
+ 	0x00000000u, 0x00000000u, 0x00014512u, 0x00016112u, 0x00000000u, 0x0002d701u, 0x00004c01u, 0x0002dc01u,
+ 	0x0000f201u, 0x0005c701u, 0x00000000u, 0x0002ec01u, 0x00000000u, 0x8000000cu, 0x0000b201u, 0x00000000u,
 diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
 index a8a6252a..da814897 100644
 --- a/arch/X86/X86GenVexPublicPlans.inc
@@ -82,10 +149,37 @@ index a8a6252a..da814897 100644
  
  #endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index f1ebc59f..56c5bcc5 100644
+index f1ebc59f..c2c96199 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
-@@ -1364,7 +1364,34 @@ def emit_vex3_plans(ids, maps, contexts, context_values, attrs, pp, metadata, ta
+@@ -1012,11 +1012,13 @@ def emit_batch_primary(suffix):
+         return direct
+ 
+     lines = ["#define X86_BATCH_REG_GROUP UINT32_C(0x80000000)"]
++    bare_amd64 = None
+     for name, context, secondary in (
+         ("x86Batch32Primary", "X86_TERMINAL_32", False),
+         ("x86Batch64Primary", "X86_TERMINAL_64", False),
+         ("x86Batch64RexWPrimary", "X86_TERMINAL_64_REXW", False),
+         ("x86Batch64Secondary", "X86_TERMINAL_64", True),
++        ("x86Batch32Secondary", "X86_TERMINAL_32", True),
+         ("x86Batch64RexWSecondary", "X86_TERMINAL_64_REXW", True),
+         ("x86Batch64OpSizeSecondary", "X86_TERMINAL_64_OPSIZE", True),
+         ("x86Batch64RexWOpSizeSecondary", "X86_TERMINAL_64_REXW_OPSIZE", True),
+@@ -1026,6 +1028,12 @@ def emit_batch_primary(suffix):
+         ("x86Batch64RexWF3Secondary", "X86_BATCH_64_REXW_F3", True),
+     ):
+         direct = opcode_plans(context, secondary)
++        if name == "x86Batch64Secondary":
++            bare_amd64 = direct
++        elif name == "x86Batch32Secondary" and direct == bare_amd64:
++            # Compare the public IDs, extent flags and all ModR/M group indices.
++            lines.append("#define x86Batch32Secondary x86Batch64Secondary")
++            continue
+         lines.append(f"static const uint32_t {name}[256] = {{")
+         for start in range(0, 256, 8):
+             lines.append("\t" + ", ".join(f"0x{v:08x}u" for v in direct[start:start+8]) + ",")
+@@ -1364,7 +1372,34 @@ def emit_vex3_plans(ids, maps, contexts, context_values, attrs, pp, metadata, ta
      lines += ["};", f"static const uint16_t x86Vex3FormPlans[{len(pairs)}][2] = {{"]
      for row in pairs:
          lines.append("\t{ " + ", ".join(map(str, row)) + " },")

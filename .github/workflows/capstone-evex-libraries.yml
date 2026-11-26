@@ -1,7 +1,7 @@
-name: Read i386 VEX operand extents and legality from one cell without sharing the AMD64 function; compare against iced
+name: Retain both primary batch loops and time the secondary i386 result in the linked six-architecture decoder
 on:
   push:
-    branches: [codex/i386-final-vector-scan-plans]
+    branches: [codex/i386-secondary-scan-result]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-direct-vex3-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-secondary-result-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
