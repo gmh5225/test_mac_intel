@@ -1,7 +1,7 @@
-name: Compare Intel operand register reuse and generated second operand spellings on real programs
+name: Compare separated scalar register spellings with an in-register separator and verify ARM64 product identity
 on:
   push:
-    branches: [codex/formatter-reuse-and-register-separator]
+    branches: [codex/scalar-register-suffix-widths]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: register-format-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-reg-suffix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

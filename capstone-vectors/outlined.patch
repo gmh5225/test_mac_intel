@@ -1,133 +1,35 @@
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..2606e072 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -564,6 +564,81 @@ static const struct X86SimpleRegister x86_simple_registers[4][16] = {
- 	},
- };
- 
-+static const char x86_simple_second_names[4][16][8] = {
-+	{
-+		", al",
-+		", cl",
-+		", dl",
-+		", bl",
-+		", ah",
-+		", ch",
-+		", dh",
-+		", bh",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+		", ",
-+	},
-+	{
-+		", al",
-+		", cl",
-+		", dl",
-+		", bl",
-+		", spl",
-+		", bpl",
-+		", sil",
-+		", dil",
-+		", r8b",
-+		", r9b",
-+		", r10b",
-+		", r11b",
-+		", r12b",
-+		", r13b",
-+		", r14b",
-+		", r15b",
-+	},
-+	{
-+		", eax",
-+		", ecx",
-+		", edx",
-+		", ebx",
-+		", esp",
-+		", ebp",
-+		", esi",
-+		", edi",
-+		", r8d",
-+		", r9d",
-+		", r10d",
-+		", r11d",
-+		", r12d",
-+		", r13d",
-+		", r14d",
-+		", r15d",
-+	},
-+	{
-+		", rax",
-+		", rcx",
-+		", rdx",
-+		", rbx",
-+		", rsp",
-+		", rbp",
-+		", rsi",
-+		", rdi",
-+		", r8",
-+		", r9",
-+		", r10",
-+		", r11",
-+		", r12",
-+		", r13",
-+		", r14",
-+		", r15",
-+	},
-+};
-+
- static const uint16_t x86_shift_rows[2][3][8] = {
- 	{
- 		{ 267, 268, 269, 270, 271, 272, 273, 274 },
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..48c4d830 100644
+index 21414e7a..6eb2a2f7 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -237,15 +237,13 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			x86_simple_registers[width];
- 		const struct X86SimpleRegister *a =
- 			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
--		const struct X86SimpleRegister *b =
--			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
-+		const unsigned second_index = form == X86_SIMPLE_REG_RM ? rm : reg;
-+		const char *suffix = x86_simple_second_names[width][second_index];
+@@ -240,10 +240,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		const struct X86SimpleRegister *b =
+ 			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
  		memcpy(insn->op_str, a->name, sizeof(a->name));
 -		char *separator = insn->op_str + a->length;
 -		separator[0] = ',';
 -		separator[1] = ' ';
 -		memcpy(separator + 2, b->name, sizeof(b->name));
-+		memcpy(insn->op_str + a->length, suffix,
-+		       sizeof(x86_simple_second_names[0][0]));
++		char suffix[8] = { ',', ' ' };
++		memcpy(suffix + 2, b->name, sizeof(suffix) - 2);
++		memcpy(insn->op_str + a->length, suffix, sizeof(suffix));
  		first = a->reg;
--		second = b->reg;
-+		second = regs[second_index].reg;
+ 		second = b->reg;
  		insn->bytes[1] = code[1];
- 		if (has_rex)
- 			insn->bytes[2] = code[2];
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index b202bca4..5e940981 100644
+index b202bca4..b04916c1 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -629,6 +629,17 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+@@ -624,8 +624,11 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 		<< "};\n\nstatic const struct X86SimpleRegister x86_simple_registers[4][16] = {\n";
+ 	for (auto &names : regs) {
+ 		std::cout << "\t{\n";
+-		for (auto &v : names)
++		for (const auto &v : names) {
++			if (v.length > 6)
++				throw std::runtime_error("register spelling exceeds separated operand width");
+ 			emit_register(v);
++		}
  		std::cout << "\t},\n";
  	}
  	std::cout << "};\n";
-+	std::cout << "\nstatic const char x86_simple_second_names[4][16][8] = {\n";
-+	for (const auto &bank : regs) {
-+		std::cout << "\t{\n";
-+		for (const auto &reg : bank) {
-+			if (reg.length + 2 >= 8)
-+				throw std::runtime_error("second register spelling exceeds output row");
-+			std::cout << "\t\t\", " << reg.name << "\",\n";
-+		}
-+		std::cout << "\t},\n";
-+	}
-+	std::cout << "};\n";
- }
- bool decode_sse(Decoder &decoder, const uint8_t *code, size_t size)
- {
