@@ -1,60 +1,45 @@
 from pathlib import Path
-import hashlib,io,json,os,shutil,subprocess as sp,sys,tarfile,tempfile
-from corpus import elf_text
-p=Path(__file__).resolve().parent
-s=p.parent/'source'; e=p.parent/'evidence';e.mkdir(exist_ok=True)
-rd=lambda f:json.loads(f.read_text())
-sha=lambda data:hashlib.sha256(data).hexdigest()
-t=Path(tempfile.mkdtemp()); profile=os.environ['SCAN_PROFILE'];q=rd(p/'stages.json')
-def save(name, data):
-    (e/(name+'.json')).write_text(json.dumps(data,indent=2)+'\n')
-def git(*args):
-    return sp.check_output(['git','-C',s,*args],text=True).strip()
-def run(name,*args):
-    with (e/(name+'.log')).open('wb')as f:rc=sp.run(args,stdout=f,stderr=sp.STDOUT)
-    if rc.returncode:print((e/(name+'.log')).read_text(errors='replace')[-2200:]);rc.check_returncode()
+import hashlib,json,os,re,shutil,subprocess as sp,tempfile
+p=Path(__file__).resolve().parent;s=p.parent/'source';e=p.parent/'evidence';e.mkdir(exist_ok=True)
+t=Path(tempfile.mkdtemp());q=json.loads((p/'stages.json').read_text());profile=os.environ['SCAN_PROFILE']
+def save(k,x):(e/(k+'.json')).write_text(json.dumps(x,indent=2)+'\n')
+def git(*args):return sp.check_output(['git','-C',s,*args],text=True).strip()
+def run(k,*args):
+    with (e/(k+'.log')).open('wb')as f:rc=sp.run(args,stdout=f,stderr=sp.STDOUT)
+    if rc.returncode:print((e/(k+'.log')).read_text(errors='replace')[-2500:],flush=True);rc.check_returncode()
 try:
-    project=t/'project';project.mkdir();b=t/'build';obs={};tests={};images={}
-    (project/'CMakeLists.txt').write_text('\n'.join(['cmake_minimum_required(VERSION 3.22)','project(AArch64Verification LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)',f'add_executable(records "{(p/"records.cpp").as_posix()}")','target_compile_features(records PRIVATE cxx_std_17)','target_link_libraries(records PRIVATE capstone_static)'])+'\n')
-    corpus=rd(p/'inputs-a64.json')
-    sample=next(iter(corpus.values()));package=t/'coreutils.deb'
-    run('fetch','curl','-fsSL','--retry','3','--max-time','110',sample['url'],'-o',package)
-    ar=package.read_bytes();assert ar[:8]==b'!<arch>\n' and all(sha(ar)==x['package_sha256'] for x in corpus.values())
-    pos=8; payload=None
-    while pos<len(ar):
-        h=ar[pos:pos+60];assert h[58:]==b'\x60\n';n=int(h[48:58]);name=h[:16].rstrip(b' /')
-        if name.startswith(b'data.tar'):assert payload is None;payload=ar[pos+60:pos+60+n]
-        pos+=60+n+(n%2)
-    assert pos==len(ar) and payload
-    with tarfile.open(fileobj=io.BytesIO(payload),mode='r:*')as tar:
-        for name,x in corpus.items():
-            member,=[m for m in tar.getmembers()if m.name.lstrip('./')in ('usr/bin/'+x['command'],'bin/'+x['command']) and m.isfile()]
-            body=elf_text(tar.extractfile(member).read());assert sha(body)==x['text_sha256'];(t/name).write_bytes(body)
-    package.unlink()
-    flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_DIET='+('ON' if profile=='diet' else 'OFF')]
-    names=['aarch64_scan','aarch64_postprocess']
-    
-    for k in ('base',*q):
-        git('restore','--source','HEAD','--worktree','--staged','--','.')
+    pr=t/'project';pr.mkdir();b=t/'build';env=os.environ.copy()
+    cm=['cmake_minimum_required(VERSION 3.22)','project(ArmRecords LANGUAGES C CXX)','enable_testing()',f'add_subdirectory("{s.as_posix()}" capstone)']
+    for link in ('static','shared'):
+        name='records_'+link;cm+= [f'add_executable({name} "{(p/"arm-record.cpp").as_posix()}")',f'target_compile_features({name} PRIVATE cxx_std_17)',f'target_link_libraries({name} PRIVATE capstone_{link})']
+    (pr/'CMakeLists.txt').write_text('\n'.join(cm)+'\n')
+    stream=bytearray()
+    for f in sorted((s/'suite/MC/ARM').glob('*.s.cs')):
+        for l in f.read_text().splitlines():
+            x=l.partition('=')[0].strip()
+            if re.fullmatch(r'0x[0-9a-fA-F]{2}(?:,\s*0x[0-9a-fA-F]{2}){3}',x):stream.extend(int(c,16) for c in x.split(','))
+    assert len(stream)>256;data=t/'arm.bin';data.write_bytes(stream)
+    flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    if profile=='diet':flags.append('-DCAPSTONE_BUILD_DIET=ON')
+    names=[] if profile=='diet' else ['arm_private_stream','arm_post_index','arm_reg_access']
+    assert git('rev-parse','HEAD')==q['base']['commit'];results={}
+    for k,z in q.items():
+        git('restore','--source=HEAD','--staged','--worktree','--','.')
         if k!='base':
-            z=q[k];assert git('rev-parse','HEAD')==z['parent'];patch=t/'candidate.patch'
-            patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/'+k+'.patch']))
-            assert sha(patch.read_bytes())==z['sha256'];git('apply','--index',patch);assert git('write-tree')==z['tree']
-        run('configure-'+k,'cmake','-G','Ninja','-S',project,'-B',b,*flags)
-        run('build-'+k,'cmake','--build',b,'--parallel','4','--target','records','capstone_shared',*names)
-        run('unit-'+k,'ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(names)+')$')
-        tests[k]=names
-        exe,=[f for f in b.rglob('records.exe'if os.name=='nt'else'records')if f.is_file()];images[k]=sha(exe.read_bytes());rows=obs[k]={}
-        for hooks in (0,1):
-            cases=[('modes',[])]+[(name+'/'+str(mode),[t/name,str(z['ip']),str(mode)])for name,z in corpus.items()for mode in range(4)]
-            for case,extra in cases:
-                o=t/'result.json';log=t/'diagnostics.log'
-                with log.open('wb')as f:sp.run([exe,o,str(hooks),*extra],stdout=f,stderr=sp.STDOUT,check=True)
-                row=rd(o);row['diagnostics']=sha(log.read_bytes());rows[str(hooks)+'/'+case]=row
-        if k!='base':assert rows==obs['base'],(k,[key for key in rows if rows[key]!=obs['base'][key]])
-        assert rows['0/modes']['accepted']+rows['0/modes']['rejected']==51200 and rows['0/arm64-ls/3']['accepted']==23973
-        assert rows['0/modes']['callbacks']==0 and rows['1/modes']['callbacks']==(376 if profile=='diet' else 31176)
-        save('checked',obs)
-    save('complete',dict(source=q,profile=profile,records=obs,units=tests,images=images))
+            patch=p/(k+'.patch');assert hashlib.sha256(patch.read_bytes()).hexdigest()==z['combined_sha256'];git('apply','--index',patch)
+        assert git('write-tree')==z['tree']
+        run(k+'-configure','cmake','-G','Ninja','-S',pr,'-B',b,*flags)
+        run(k+'-build','cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*names)
+        if names:run(k+'-units','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(names)+')$')
+        if os.name=='nt':
+            dlls=list(b.rglob('capstone*.dll'));assert dlls;env['PATH']=os.pathsep.join(str(f.parent)for f in dlls)+os.pathsep+os.environ['PATH']
+        records={}
+        for link in ('static','shared'):
+            exe,=[f for f in b.rglob('records_'+link+('.exe' if os.name=='nt'else ''))if f.is_file()]
+            obs=sp.check_output([exe,data],text=True,env=env).splitlines();assert len(obs)==(8 if profile=='diet'else 16) and all(int(l.split()[3])>0 for l in obs);records[link]=obs
+        assert records['static']==records['shared']
+        if k!='base':assert records==results['base']
+        results[k]=records;save('checked',results)
+    save('complete',dict(complete=True,source=q,profile=profile,cases=len(stream)//4,digest=hashlib.sha256(stream).hexdigest(),views=results,units=names))
 finally:
-    n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=n))
+    n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(bytes=n,removed=not t.exists()))
