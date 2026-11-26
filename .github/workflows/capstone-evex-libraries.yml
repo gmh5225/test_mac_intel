@@ -1,7 +1,7 @@
-name: Compare the same RIP writer with and without fetch-line alignment against two release controls
+name: Time Intel detail construction with direct access row assignment on real PE32 and SIMD records and compare against iced
 on:
   push:
-    branches: [codex/scan-alignment-normal-links-repeat]
+    branches: [codex/intel-final-rights]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: repeated-alignment-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: final-intel-access-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

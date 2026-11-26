@@ -58,6 +58,14 @@ try:
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        if label!='base':
+            import shlex
+            intel=next(row for row in rd(build/'compile_commands.json')if row['file'].endswith('/X86IntelInstPrinter.c'))
+            args=shlex.split(intel['command'])
+            run(*args[:args.index('-o')],'-I',base,r/'access.c',lib,'-o',w/'check-rights')
+            rights=list(map(int,get(w/'check-rights').split()))
+            assert rights==[275220,147,2148,61160],rights
+            save('rights-'+label,rights)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
