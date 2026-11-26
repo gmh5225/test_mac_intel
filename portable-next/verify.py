@@ -64,6 +64,20 @@ try:
             compile_scope[stage]=dict(objects=objs,archive=sha(lib.read_bytes()))
             save('compile-scope',compile_scope)
 
+        if linux and profile=='full' and platform.machine()=='x86_64' and chosen=='gcc':
+            guard=(d/'guard.c').read_text();guard=guard.replace('RISCV_compact_operands(&mi);','RISCV_finish_operand_detail(&mi);') if stage=='candidate' else guard
+            (t/'guard.c').write_text(guard);lib,=b.rglob('libcapstone.a')
+            cmd('guard-link-'+stage,['gcc','-std=c99','-O2','-DCAPSTONE_HAS_RISCV','-DCAPSTONE_RISCV_ONLY','-I',s,'-I',s/'include',t/'guard.c',lib,'-lm','-o',t/'guard'])
+            assert sp.check_output([t/'guard'],text=True).strip()=='8448'
+            save('arbitrary-arrays-'+stage,8448)
+            import re
+            rows={}
+            for name in ('RISCV_compact_operands','RISCV_get_insn_id','RISCV_LLVM_printInstruction','cs_decode_full_insn','cs_disasm_iter'):
+                raw=sp.check_output(['objdump','-d','--disassemble='+name,b/'rv_time'],text=True)
+                m=re.search(r'^([0-9a-f]+) <'+name+r'>:$',raw,re.MULTILINE);assert m,name
+                code=b''.join(bytes.fromhex(i)for i in re.findall(r'^\\s*[0-9a-f]+:\\s+((?:(?:[0-9a-f]{2}) )+)',raw,re.MULTILINE))
+                assert code,name;rows[name]=[int(m.group(1),16),len(code),sha(code)]
+            save('hot-functions-'+stage,rows)
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
@@ -94,7 +108,7 @@ try:
         a,built=compile_scope['base'],compile_scope['candidate'];assert set(a['objects'])==set(built['objects'])
         changes=[name for name,old in a['objects'].items()if built['objects'][name]!=old]
         enabled=profile=='full' and platform.machine()=='x86_64' and os.environ['NATIVE_COMPILER']=='gcc'
-        assert ({Path(k).name for k in changes}=={'RISCVMapping.c.o'} and a['archive']!=built['archive']) if enabled else (not changes and a['archive']==built['archive']),(enabled,changes)
+        assert ({Path(k).name for k in changes}=={'RISCVMapping.c.o','RISCVInstPrinter.c.o'} and a['archive']!=built['archive']) if enabled else (not changes and a['archive']==built['archive']),(enabled,changes)
         cc=os.environ['NATIVE_COMPILER'] or 'cc'
         save('selection',dict(enabled=enabled,changed=changes,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],cpu=sp.check_output(['lscpu'],text=True),profile=profile))
 

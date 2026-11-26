@@ -1,7 +1,7 @@
-name: Replicate RISC-V GCC detail gains and byte-compare unaffected readers
+name: Isolate dense RISC-V detail completion and compare active text paths
 on:
   push:
-    branches: [codex/riscv-gcc-zero-tail-real-programs]
+    branches: [codex/riscv-dedicated-dense-operands]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -63,6 +63,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-gcc-zero-suffix-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
+          name: rv-dense-detail-leaf-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
           path: evidence
           retention-days: 7
