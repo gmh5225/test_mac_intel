@@ -1,7 +1,7 @@
-name: Verify register KMOV on current NeverD and source-built LLVM with real PE and ELF
+name: Check KMOV in the current product on top of the released compact operand mappings
 on:
   push:
-    branches: [codex/kmov-scan-current-neverd]
+    branches: [codex/kmov-shared-rows-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -58,10 +58,12 @@ jobs:
           def git(*args):
               return subprocess.check_output(['git',*args],text=True).strip()
           assert git('rev-parse','HEAD')==config['dev']
-          assert git('rev-parse','HEAD:third_party/capstone')==config['checkout']==config['dev_gitlink']
+          assert git('rev-parse','HEAD:third_party/capstone')==config['dev_gitlink']
           PY
           git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
           test "$(git -C third_party/capstone rev-parse HEAD)" = "$(git rev-parse HEAD:third_party/capstone)"
+          git -C third_party/capstone fetch --quiet --depth=1 origin 477cdca0b80d3ababa2aa9c40375bad86914eaca
+          git -C third_party/capstone checkout --quiet --detach 477cdca0b80d3ababa2aa9c40375bad86914eaca
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: ${{ matrix.cc }}
@@ -73,6 +75,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: kmov-current-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: kmov-shared-rows-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
