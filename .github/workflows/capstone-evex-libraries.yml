@@ -1,7 +1,7 @@
-name: Verify the AArch64 operand change against every object and linked consumer in both NeverD builds
+name: Compare each KMOV candidate before and after the dedicated AArch64 publication
 on:
   push:
-    branches: [codex/mixed-build-aarch64-operand-identity]
+    branches: [codex/kmov-product-archive-equivalence]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 035a081339eaabf8052cc7768cd894fa7bdeaac0
+          ref: 9c84b2c7ecd883da23045650a794868d6c2ebd5c
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: aarch64-mixed-shared-rows-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: kmov-product-identity-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
