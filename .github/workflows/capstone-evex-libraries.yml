@@ -1,7 +1,7 @@
-name: Check PE32 and other real programs in a mixed Capstone library that includes the WASM printer
+name: Recheck mixed WASM x86 and five other targets with two copies of each binary after correcting 64-bit operand printing
 on:
   push:
-    branches: [codex/wasm-plus-neverd-mixed]
+    branches: [codex/wasm-wide-mixed-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
+          ref: 68be0029b78515fd57eb2ca01540e109037f7760
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-mixed-regular-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-wide-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
