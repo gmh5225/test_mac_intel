@@ -1,7 +1,7 @@
-name: Measure general-purpose register record widths in the public and static iterators
+name: Compare Intel operand register reuse and generated second operand spellings on real programs
 on:
   push:
-    branches: [codex/eight-byte-register-record]
+    branches: [codex/formatter-reuse-and-register-separator]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 477cdca0b80d3ababa2aa9c40375bad86914eaca
+          ref: ac371faa70cb84ddcea8a4a3a1a1f2ea0d141ac3
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 035a081339eaabf8052cc7768cd894fa7bdeaac0
+          ref: 9c84b2c7ecd883da23045650a794868d6c2ebd5c
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-gpr-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: register-format-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

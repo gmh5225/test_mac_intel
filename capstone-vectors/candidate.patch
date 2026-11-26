@@ -1,13 +1,56 @@
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 450dc468..d8beaa0b 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -40,7 +40,7 @@ struct VectorOutputRow {
- struct X86SimpleRegister {
- 	uint16_t reg;
- 	uint8_t length;
--	char name[8];
-+	char name[5]; /* Four spelling bytes and a terminator. */
- };
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..b9be1b9f 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -983,39 +983,28 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 		unsigned int reg = MCOperand_getReg(Op);
  
- enum X86SimpleForm {
+ 		printRegName(O, reg);
++		if (!MI->csh->detail_opt && MI->op1_size)
++			return;
++
++		const unsigned short public_reg = X86_register_map(reg);
+ 		if (MI->csh->detail_opt) {
++			cs_x86 *x86 = &MI->flat_insn->detail->x86;
++			cs_x86_op *operand = &x86->operands[x86->op_count];
+ 			if (MI->csh->doing_mem) {
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.mem.base = X86_register_map(reg);
++				operand->mem.base = public_reg;
+ 			} else {
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.type = X86_OP_REG;
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.reg = X86_register_map(reg);
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.size =
+-					MI->csh->regsize_map[X86_register_map(
+-						reg)];
+-
++				operand->type = X86_OP_REG;
++				operand->reg = public_reg;
++				operand->size = MI->csh->regsize_map[public_reg];
+ #ifndef CAPSTONE_DIET
+ 				set_early_operand_access(MI);
+ #endif
+-
+-				MI->flat_insn->detail->x86.op_count++;
++				x86->op_count++;
+ 			}
+ 		}
+ 
+ 		if (MI->op1_size == 0)
+-			MI->op1_size =
+-				MI->csh->regsize_map[X86_register_map(reg)];
++			MI->op1_size = MI->csh->regsize_map[public_reg];
+ 	} else if (MCOperand_isImm(Op)) {
+ 		uint8_t encsize = 0;
+ 		int64_t imm = MCOperand_getImm(Op);
