@@ -1,7 +1,7 @@
-name: Recheck mixed WASM x86 and five other targets with two copies of each binary after correcting 64-bit operand printing
+name: Verify mixed WebAssembly and native-architecture library timing with identical address-width fixes
 on:
   push:
-    branches: [codex/wasm-wide-mixed-libraries]
+    branches: [codex/wasm-full-table-address-mixed]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 68be0029b78515fd57eb2ca01540e109037f7760
+          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f47e72ea35c2b8f2270ac80a20ff79915eeffdb9
+          ref: c8f0563c28782607794c551737ce106fd25586d6
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-wide-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-table-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
