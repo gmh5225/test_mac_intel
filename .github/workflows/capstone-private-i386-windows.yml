@@ -1,7 +1,7 @@
-name: Verify x86 native modes and syntax choices in nineteen complete and reduced library configurations
+name: Qualify 32-bit segment text and operands and native mode handling across 19 library configurations
 on:
   push:
-    branches: [codex/x86-compact-mode-profiles]
+    branches: [codex/x86-segment-and-mode-release-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: compact-mode-profile-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: segment-mode-profile-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
