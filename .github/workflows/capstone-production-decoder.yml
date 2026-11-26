@@ -1,7 +1,7 @@
-name: Verify Capstone raw comparison IDs and NeverD lane-specific IDs from VEX and EVEX prefix bits on real software
+name: Measure table-driven SSE and AVX predicate spelling and details on real NeverD workloads
 on:
   push:
-    branches: [codex/neverd-verify-typed-compare-identifiers]
+    branches: [codex/neverd-compare-condition-table]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: c8f0563c28782607794c551737ce106fd25586d6
+          ref: fd88bf43c7956397cc67cfdb88e937e359c36a90
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vcmp-product-width-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vcmp-name-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
