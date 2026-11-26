@@ -1,8 +1,16 @@
 diff --git a/Makefile b/Makefile
-index fafc61bf..2af132bf 100644
+index fafc61bf..61a663b8 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -572,7 +572,9 @@ PKGCFGF = $(BLDIR)/$(LIBNAME).pc
+@@ -365,6 +365,7 @@ endif
+ 
+ DEP_RISCV =
+ DEP_RISCV += $(wildcard arch/RISCV/RISCV*.inc)
++DEP_RISCV += $(wildcard arch/RISCV/RISCV*.h)
+ 
+ LIBOBJ_RISCV =
+ ifneq (,$(filter riscv,$(CAPSTONE_ARCHS)))
+@@ -572,7 +573,9 @@ PKGCFGF = $(BLDIR)/$(LIBNAME).pc
  
  all: $(LIBRARY) $(ARCHIVE) $(PKGCFGF)
  ifeq (,$(findstring yes,$(CAPSTONE_BUILD_CORE_ONLY)))

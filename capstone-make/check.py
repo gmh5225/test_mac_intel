@@ -38,7 +38,9 @@ try:
         assert result.returncode==0,result.stdout[-1600:]
         assert ar.exists()==static and so.exists()==shared and tool.is_file()
         expected=ar if static else so
-        if oldhash:assert sha(so)!=oldhash
+        if oldhash:
+            assert sha(so)!=oldhash and any(' -c arch/RISCV/RISCVInstPrinter.c ' in l for l in result.stdout.splitlines())
+
         link=[l for l in result.stdout.splitlines()if l.strip().endswith(' -o cstool')]
         assert len(link)==1 and [Path(t).resolve() for t in shlex.split(link[0]) if Path(t).name==expected.name]==[expected.resolve()],link
         env=dict(os.environ)

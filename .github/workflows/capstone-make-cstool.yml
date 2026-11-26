@@ -1,7 +1,7 @@
-name: Verify configured libraries, CSR names and cstest across five native hosts
+name: Verify cstool incremental linking, standalone builds and CSR records
 on:
   push:
-    branches: [codex/csr-table-clients-portable]
+    branches: [codex/cstool-final-library-selection]
     paths: [capstone-make/**, .github/workflows/capstone-make-cstool.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: csr-clients-${{ matrix.host }}
+          name: configured-csr-clients-${{ matrix.host }}
           path: evidence/
           retention-days: 14
