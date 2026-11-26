@@ -1,21 +1,23 @@
-name: NeverSight MIPS relink performance on macOS
+name: NeverSight MIPS relink performance on Windows
 on:
   push:
-    branches: [codex/mips-relink-macos-timings]
+    branches: [codex/mips-relink-windows-timings]
 permissions:
   contents: read
 env:
   LLVM_BASE: 6947b7db63e913244e0aa6de087d1ad2e791e86f
   LLVM_REVISION: 24ced447e1718432292dc9d54b6eb229323409d1
-  NEVERD_REVISION: f181f3f01cf320107e44febec0bbd0968539586d
+  NEVERD_REVISION: fea71a64f82cb74e2e98e69c9282595a8f36bec5
 jobs:
   compare:
-    runs-on: macos-15
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 210
     env:
-      CC: clang
-      CXX: clang++
-      HOMEBREW_NO_AUTO_UPDATE: '1'
+      CC: clang-cl
+      CXX: clang-cl
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,26 +44,40 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
-      - name: Build the public CLI once with the pinned r12 SDK
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+      - name: Select the same clang-cl as the Windows relink workflow
+        shell: pwsh
+        run: ./project/scripts/ci/Install-WindowsFixtureClang.ps1 -AddToPath
+      - name: Verify that CPU accounting includes the executed linker
+        run: python .github/scripts/neverd_windows_child_cpu.py
+      - name: Build the public CLI once with its published r13 SDK
         working-directory: project
         run: |
           test "$(git rev-parse HEAD)" = "$NEVERD_REVISION"
-          test "$(git rev-parse HEAD:third_party/llvm-project)" = "$LLVM_BASE"
-          brew install ninja
-          cat > "$RUNNER_TEMP/paired-requirements.txt" <<'REQ'
+          test "$(git rev-parse HEAD:third_party/llvm-project)" = "$LLVM_REVISION"
+          cat > "../paired-requirements.txt" <<'REQ'
           pyelftools==0.33 --hash=sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036
           REQ
-          python -m pip install --require-hashes --only-binary=:all: -r "$RUNNER_TEMP/paired-requirements.txt"
+          python -m pip install --require-hashes --only-binary=:all: -r "../paired-requirements.txt"
           git submodule update --init --depth 1 third_party/capstone signatures third_party/unicorn
           cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
             -DNEVERD_ENABLE_WEB_ANALYSIS=OFF
-          python3 scripts/build.py build-check --config Release --parallel 4 --target neverd
+          python scripts/build.py build-check --config Release --parallel 4 --target neverd
+          python - <<'PYTHON'
+          from pathlib import Path
+          import os
+          cache = Path("build-check/CMakeCache.txt").read_text()
+          llvm_dir = next(line.split("=", 1)[1] for line in cache.splitlines() if line.startswith("LLVM_DIR:PATH="))
+          assert "llvm_commit: " + os.environ["LLVM_REVISION"] in (Path(llvm_dir).parents[2] / "BUILDINFO.txt").read_text()
+          PYTHON
       - name: Build both MIPS toolchains in the same Release configuration
         run: |
           test "$(git -C llvm-src rev-parse HEAD)" = "$LLVM_BASE"
-          git -C llvm-src fetch --depth=1 origin "$LLVM_REVISION"
-          dest="$GITHUB_WORKSPACE/project/build-check/paired"
+          git -C llvm-src fetch --no-tags --depth=1 --filter=blob:none origin "$LLVM_REVISION"
+          dest=project/build-check/paired
           mkdir -p "$dest"
           for version in r12 r13; do
             revision="$LLVM_BASE"
@@ -69,22 +85,30 @@ jobs:
             git -C llvm-src checkout --detach "$revision"
             cmake -S llvm-src/llvm -B build-tools -G Ninja -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_PROJECTS=lld -DLLVM_TARGETS_TO_BUILD=Mips -DLLVM_ENABLE_RTTI=ON \
-              -DLLVM_ENABLE_ASSERTIONS=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+              -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
               -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_ENABLE_LIBXML2=OFF \
               -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_PARALLEL_LINK_JOBS=1
             cmake --build build-tools --parallel 4 --target llc llvm-mc lld
             mkdir "$dest/$version-bin"
-            cp build-tools/bin/{llc,lld,llvm-mc} "$dest/$version-bin/"
-            ln -s lld "$dest/$version-bin/ld.lld"
-            "$dest/$version-bin/ld.lld" --version | grep -F -- "$revision"
+            cp build-tools/bin/{llc,ld.lld,llvm-mc}.exe "$dest/$version-bin/"
+            "$dest/$version-bin/ld.lld.exe" --version | grep -F -- "$revision"
           done
       - name: Compare CPU and elapsed times on the same runner
         run: |
           dest=project/build-check/paired
           cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
-          python "$dest/bench.py" 48 performance.json
+          cp .github/scripts/neverd_windows_child_cpu.py "$dest/"
+          mkdir "$dest/slot-0" "$dest/slot-1"
+          for assignment in 0 1; do
+            r12_slot="$dest/slot-$assignment"
+            r13_slot="$dest/slot-$((1 - assignment))"
+            rm -f "$r12_slot"/{llc,ld.lld,llvm-mc}.exe "$r13_slot"/{llc,ld.lld,llvm-mc}.exe
+            cp "$dest/r12-bin/"*.exe "$r12_slot/"
+            cp "$dest/r13-bin/"*.exe "$r13_slot/"
+            python "$dest/bench.py" 24 "win-$assignment.json" "$r12_slot" "$r13_slot"
+          done
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mips-paired-release
-          path: project/build-check/paired/performance.json
+          name: mips-paired-windows
+          path: project/build-check/paired/win-*.json
           if-no-files-found: error
