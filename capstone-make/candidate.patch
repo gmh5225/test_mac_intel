@@ -13,28 +13,19 @@ index fafc61bf..2af132bf 100644
  endif
  
  ifeq ($(CAPSTONE_SHARED),yes)
-diff --git a/arch/RISCV/RISCVInstPrinter.c b/arch/RISCV/RISCVInstPrinter.c
-index a60d3d24..6a3bc30a 100644
---- a/arch/RISCV/RISCVInstPrinter.c
-+++ b/arch/RISCV/RISCVInstPrinter.c
-@@ -563,7 +563,7 @@ void RISCV_LLVM_printInstruction(MCInst *MI, SStream *O,
- const char *getSysRegName(unsigned reg)
- {
- 	const RISCV_SysReg *SysReg = RISCV_lookupSysRegByEncoding(reg);
--	return SysReg->Name;
-+	return SysReg ? SysReg->Name : NULL;
- }
- 
- const char *RISCV_LLVM_getRegisterName(unsigned RegNo, unsigned AltIdx)
 diff --git a/arch/RISCV/RISCVInstPrinter.h b/arch/RISCV/RISCVInstPrinter.h
-index 95651fa6..6e7ae5c3 100644
+index 95651fa6..95364220 100644
 --- a/arch/RISCV/RISCVInstPrinter.h
 +++ b/arch/RISCV/RISCVInstPrinter.h
-@@ -57,6 +57,7 @@ void printRegReg(MCInst *MI, unsigned OpNo, SStream *O);
+@@ -57,6 +57,11 @@ void printRegReg(MCInst *MI, unsigned OpNo, SStream *O);
  
  const char *RISCV_LLVM_getRegisterName(unsigned RegNo, unsigned AltIdx);
  
 +CAPSTONE_EXPORT
++const RISCV_SysReg *RISCV_lookupSysRegByEncoding(uint16_t encoding);
++
++/* Legacy name accessor for a known CSR. Use the table lookup for an encoding
++ * from an instruction, which may have no registered name. */
  const char *getSysRegName(unsigned reg);
  
  bool isCompressed(MCInst *MI);
@@ -137,7 +128,7 @@ index c7a39d9e..4d06487e 100644
  				enable_additional_options(handle, plus, arch);
  
 diff --git a/cstool/cstool_riscv.c b/cstool/cstool_riscv.c
-index 6702fe8c..4e90fab0 100644
+index 6702fe8c..78065acf 100644
 --- a/cstool/cstool_riscv.c
 +++ b/cstool/cstool_riscv.c
 @@ -5,6 +5,7 @@
@@ -156,10 +147,10 @@ index 6702fe8c..4e90fab0 100644
 -			printf("\t\toperands[%u].type: CSR = %s\n", i,
 -			       getSysRegName(op->csr));
 +		case RISCV_OP_CSR: {
-+			const char *name = getSysRegName(op->csr);
-+			if (name)
++			const RISCV_SysReg *reg = RISCV_lookupSysRegByEncoding(op->csr);
++			if (reg)
 +				printf("\t\toperands[%u].type: CSR = %s\n", i,
-+				       name);
++				       reg->Name);
 +			else
 +				printf("\t\toperands[%u].type: CSR = 0x%x\n", i,
 +				       (unsigned)op->csr);
@@ -196,18 +187,21 @@ index 1908c0ea..b358b156 100644
 -
  #endif // TEST_COMPARE_H
 diff --git a/suite/cstest/src/test_detail_riscv.c b/suite/cstest/src/test_detail_riscv.c
-index 4cd8dfb7..deac5cdf 100644
+index 4cd8dfb7..0a920b43 100644
 --- a/suite/cstest/src/test_detail_riscv.c
 +++ b/suite/cstest/src/test_detail_riscv.c
-@@ -110,7 +110,18 @@ bool test_expected_riscv(csh *handle, const cs_riscv *actual,
+@@ -110,7 +110,21 @@ bool test_expected_riscv(csh *handle, const cs_riscv *actual,
        break;
      case RISCV_OP_CSR:
  #ifdef CAPSTONE_HAS_RISCV
 -      compare_string_from_int_ret(op->csr, eop->csr, getSysRegName, false);
 +      if (eop->csr) {
-+        const char *name = getSysRegName(op->csr);
++        const RISCV_SysReg *reg = RISCV_lookupSysRegByEncoding(op->csr);
++        const char *name;
 +        char number[sizeof("0xffff")];
-+        if (!name) {
++        if (reg) {
++          name = reg->Name;
++        } else {
 +          snprintf(number, sizeof(number), "0x%x", (unsigned)op->csr);
 +          name = number;
 +        }

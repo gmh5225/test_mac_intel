@@ -1,7 +1,7 @@
-name: Check named and unnamed CSR operands in cstool and cstest
+name: Verify configured libraries, CSR names and cstest across five native hosts
 on:
   push:
-    branches: [codex/riscv-cstest-numeric-csr]
+    branches: [codex/csr-table-clients-portable]
     paths: [capstone-make/**, .github/workflows/capstone-make-cstool.yml]
 permissions:
   contents: read
@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: [ubuntu-24.04, macos-15, windows-2022]
+        host: [ubuntu-24.04, ubuntu-24.04-arm, macos-15, macos-15-intel, windows-2022]
     runs-on: ${{ matrix.host }}
     timeout-minutes: 30
     steps:
@@ -26,12 +26,18 @@ jobs:
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
         if: runner.os == 'Windows'
+      - name: Reproduce and verify GNU Make library selection
+        if: runner.os != 'Windows'
+        run: python3 -B capstone-make/check.py
+      - name: Build and run five CMake profiles
+        shell: bash
+        run: python -B capstone-make/cmake-check.py
       - name: Build cstest and verify the maintained RISC-V suite
         shell: bash
         run: python -B capstone-make/test.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: csr-suite-${{ matrix.host }}
+          name: csr-clients-${{ matrix.host }}
           path: evidence/
           retention-days: 14

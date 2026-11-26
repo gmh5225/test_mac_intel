@@ -26,8 +26,8 @@ try:
     assert negative.returncode==1 and "CSR mismatch: '0x7cb' != '0x123'\n" in negative.stdout,negative.stdout
     tool,=[f for f in b.rglob('cstool.exe' if os.name=='nt' else 'cstool') if f.is_file()]
     cli=get(tool,'-d','riscv64','7395b57c');assert any(l.endswith('CSR = 0x7cb')for l in cli.splitlines())
-    put('complete',dict(complete=True,source=q,host=platform.system(),machine=platform.machine(),positive=positive,negative=negative.stdout,cli=cli,unit=native,decoded=cases))
+    put('suite-complete',dict(complete=True,source=q,host=platform.system(),machine=platform.machine(),positive=positive,negative=negative.stdout,cli=cli,unit=native,decoded=cases))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink())
     def retry(fn,path,error):os.chmod(path,stat.S_IWRITE);fn(path)
-    shutil.rmtree(w,onerror=retry);put('cleanup',dict(removed=not w.exists(),bytes=n))
+    shutil.rmtree(w,onerror=retry);put('suite-cleanup',dict(removed=not w.exists(),bytes=n))
