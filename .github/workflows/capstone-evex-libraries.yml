@@ -1,7 +1,7 @@
-name: Check the single family condition against integer and floating predicate oracles
+name: Verify typed predicate aliases with the original opcode and decoded operands
 on:
   push:
-    branches: [codex/single-compare-condition-oracle]
+    branches: [codex/typed-decode-alias-oracle]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 477cdca0b80d3ababa2aa9c40375bad86914eaca
+          ref: 96d63971a2801bb17b4ade6a9697c19722e0438d
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 035a081339eaabf8052cc7768cd894fa7bdeaac0
+          ref: 276a657138f58b0ef97a876288347aaacfde0e74
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-condition-domain-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: decoded-alias-oracle-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
