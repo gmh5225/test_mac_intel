@@ -1,7 +1,7 @@
-name: Measure the i386 segment operand writer in NeverD from fork LLVM sources on real PE and five ELF targets
+name: Measure descriptor-based RORX scans in actual NeverD and audit real PE and ELF on three hosts
 on:
   push:
-    branches: [codex/neverd-segment-mov-sub-product]
+    branches: [codex/neverd-three-operand-vex-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 73889e52c5ea8b27da97cbcfec7e927f62009d94
+          ref: 4679b157eb1b7a62c606771f894d9d52c97ba316
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: segment-record-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex-operand-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
