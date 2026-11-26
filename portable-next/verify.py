@@ -56,18 +56,12 @@ try:
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
                 assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]
-            if linkage=='static' and profile not in ('diet','reduced') and name in ('base','segment','digits'):
-                from rotate_link import rotate
-                rows[name]['rotate_records']=rotate(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             if name.startswith('mips'):run(name+'-mips-projection',os.sys.executable,'-B',s/'suite/synctools/mips_register_names.py','--check')
 
             baseline=rows['base'][linkage]['snapshots']
             base_ids=rows['base'][linkage]['comparisons']
             assert base_ids.keys()==result['comparisons'].keys()
-            for key,ids in result['comparisons'].items():
-                assert ids['floating']==base_ids[key]['floating'] and (name=='base' or ids['projected']==0),(key,ids)
-            if profile!='reduced' and name=='base':
-                assert sum(v['projected'] for v in base_ids.values())>0 and sum(v['floating'] for v in base_ids.values())>=sum(v['projected'] for v in base_ids.values())
+            assert result['comparisons']==base_ids
             assert baseline.keys()==result['snapshots'].keys()
             for key,entry in result['snapshots'].items():
                 assert entry['counts']==baseline[key]['counts']

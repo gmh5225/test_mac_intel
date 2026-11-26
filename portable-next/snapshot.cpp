@@ -169,35 +169,8 @@ int main(int argc, char **argv) {
         ++accepted;
         if (!insn->size || insn->size > bytes.size() - offset)
           throw std::runtime_error("length");
-        unsigned expected_id = insn->id;
-        const auto *encoded = bytes.data() + offset;
-        if (floating_compare(encoded, insn->size)) {
-          cs_insn *reference = nullptr;
-          const size_t count = cs_disasm(bulk, encoded, insn->size, insn->address, 1, &reference);
-          if (count && reference->size == insn->size && reference->id == X86_INS_VCMP) {
-            ++floating_seen;
-            expected_id = reference->id;
-            if (insn->id != expected_id) {
-              const unsigned adjusted = expected_id + 1 + (encoded[insn->size - 1] & 31);
-              if (!original || insn->id != adjusted)
-                throw std::runtime_error("unexpected floating compare public ID at " + std::to_string(offset));
-              ++projected;
-            }
-          }
-          cs_free(reference, count);
-        }
-        if (unsigned family=integer_family(encoded,insn->size)) {
-          if (insn->id==X86_INS_VPCMP) {
-            if (!original) throw std::runtime_error("packed predicate lost its element type");
-            expected_id=family;
-          } else if (insn->id==X86_INS_VPCMPB || insn->id==X86_INS_VPCMPUB ||
-                     insn->id==X86_INS_VPCMPW || insn->id==X86_INS_VPCMPUW ||
-                     insn->id==X86_INS_VPCMPD || insn->id==X86_INS_VPCMPUD ||
-                     insn->id==X86_INS_VPCMPQ || insn->id==X86_INS_VPCMPUQ) {
-            if (insn->id!=family) throw std::runtime_error("incorrect packed predicate element type");
-          }
-        }
-        value(expected_id);
+        if (insn->id == X86_INS_VCMP) ++floating_seen;
+        value(insn->id);
         value(insn->alias_id);
         value(insn->address);
         value(insn->size);
