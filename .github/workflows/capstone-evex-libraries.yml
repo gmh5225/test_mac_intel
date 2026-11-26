@@ -1,7 +1,7 @@
-name: Measure shared read-only x86 formatting metadata in PE32, ELF and mixed consumers
+name: Compare two 64-byte x86 row designs at their real scalar, SIMD and PE32 consumers
 on:
   push:
-    branches: [codex/one-copy-scalar-rows]
+    branches: [codex/fixed-operand-reader-width]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-scalar-data-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-fixed-spellings-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
