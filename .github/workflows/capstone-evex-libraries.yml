@@ -1,7 +1,7 @@
-name: Measure predicate selection in unprinted records with untouched assembly name and detail mapping
+name: Time typed predicate mappings and direct public instruction IDs in real PE and ELF
 on:
   push:
-    branches: [codex/vpcmp-scan-only-on-published]
+    branches: [codex/typed-predicate-mapping-real]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integer-scan-only-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: typed-predicate-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

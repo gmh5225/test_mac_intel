@@ -60,8 +60,7 @@ int main(int argc,char **argv) {
                     unsigned old=slots[m]->id;
                     bool integer=old==X86_INS_VPCMP && integer_family(at,length)==id;
                     bool floating=floating_compare(at,length) && old==id+1+(at[length-1]&31);
-                    if(floating)continue;
-                    if(!integer || m!=0){std::fprintf(stderr,"Unexpected ID delta at %llx old=%u bulk=%u\n",(unsigned long long)ip,old,id);return 6;}
+                    if(!(floating && m!=0) && !(integer && m==0)){std::fprintf(stderr,"Unexpected ID delta at %llx old=%u bulk=%u\n",(unsigned long long)ip,old,id);return 6;}
                     ++count[m];delta[m]+=int64_t(id)-old;
                 }
             }
