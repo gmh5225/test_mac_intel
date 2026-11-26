@@ -1,7 +1,7 @@
-name: Use the same mode validation on open and explicit mode selection; verify default addressing and profile both normal linked outputs
+name: Compare compact x86 mode and syntax setup against two identical released binaries on PE32 PE64 SIMD and foreign architectures
 on:
   push:
-    branches: [codex/x86-mode-option-layout]
+    branches: [codex/x86-compact-mode-selection]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: unified-x86-mode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: compact-x86-mode-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
