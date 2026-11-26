@@ -41,7 +41,7 @@ try:
     mixed_sources=d.parent/'neverd-config'
     verify_mixed=linux and profile=='full'
     if verify_mixed:
-        expected_dev='276a657138f58b0ef97a876288347aaacfde0e74'
+        expected_dev='4a8792d7f80da91b1d852859abafe0684416b38a'
         assert sp.check_output(['git','-C',mixed_sources,'rev-parse','HEAD'],text=True).strip()==expected_dev
         product=t/'consumer';(product/'third_party').mkdir(parents=True);(product/'third_party/capstone').symlink_to(s)
         (product/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
@@ -64,21 +64,11 @@ try:
             compile_scope[stage]=dict(objects=objs,archive=sha(lib.read_bytes()))
             save('compile-scope',compile_scope)
 
-        if linux and profile=='full' and platform.machine()=='x86_64' and chosen=='gcc':
-            guard=(d/'guard.c').read_text();guard=guard.replace('RISCV_compact_operands(&mi);','RISCV_finish_operand_detail(&mi);') if stage=='candidate' else guard
-            (t/'guard.c').write_text(guard);lib,=b.rglob('libcapstone.a')
-            cmd('guard-link-'+stage,['gcc','-std=c99','-O2','-DCAPSTONE_HAS_RISCV','-DCAPSTONE_RISCV_ONLY','-I',s,'-I',s/'include',t/'guard.c',lib,'-lm','-o',t/'guard'])
+        if linux and profile=='full':
+            lib,=b.rglob('libcapstone.a')
+            cmd('guard-link-'+stage,[chosen or 'cc','-std=c99','-O2','-DCAPSTONE_HAS_RISCV','-I',s,'-I',s/'include',d/'guard.c',lib,'-lm','-o',t/'guard'])
             assert sp.check_output([t/'guard'],text=True).strip()=='8448'
             save('arbitrary-arrays-'+stage,8448)
-            exe=b/'rv_time';raw=exe.read_bytes()
-            symbols={z[3]:(int(z[0],16),int(z[1],16)) for line in sp.check_output(['nm','-S','--defined-only',exe],text=True).splitlines() if len(z:=line.split())==4}
-            loads=[(int(z[1],16),int(z[2],16),int(z[4],16)) for line in sp.check_output(['readelf','-lW',exe],text=True).splitlines() if (z:=line.split()) and z[0]=='LOAD']
-            rows={}
-            for name in ('RISCV_compact_operands','RISCV_get_insn_id','RISCV_LLVM_printInstruction','cs_decode_full_insn','cs_disasm_iter'):
-                addr,size=symbols[name];assert size>0
-                off,= [pos+addr-va for pos,va,n in loads if va<=addr and addr+size<=va+n]
-                code=raw[off:off+size];assert len(code)==size;rows[name]=[addr,size,sha(code)]
-            save('hot-functions-'+stage,rows)
         if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
@@ -103,13 +93,18 @@ try:
             assert all('CAPSTONE_RISCV_ONLY' not in row['command']for row in commands if row['file'].endswith('/RISCVInstPrinter.c'))
             objects={str(p.relative_to(bmix)):sha(p.read_bytes())for p in bmix.rglob('*.o')};lib,=bmix.rglob('libcapstone.a')
             mixed[stage]=dict(objects=objects,library=sha(lib.read_bytes()),consumer=sha((bmix/'consumer').read_bytes()))
+            shutil.copyfile(bmix/'consumer',t/('mixed-'+stage))
             save('mixed-product',dict(source=q,neverd=expected_dev,stages=mixed))
-    if verify_mixed:assert mixed['base']==mixed['candidate']
+    if verify_mixed:
+        left,right=mixed['base']['objects'],mixed['candidate']['objects']
+        assert set(left)==set(right)
+        assert {Path(k).name for k in left if left[k]!=right[k]}=={'RISCVMapping.c.o'},[k for k in left if left[k]!=right[k]]
     if linux:
         a,built=compile_scope['base'],compile_scope['candidate'];assert set(a['objects'])==set(built['objects'])
         changes=[name for name,old in a['objects'].items()if built['objects'][name]!=old]
-        enabled=profile=='full' and platform.machine()=='x86_64' and os.environ['NATIVE_COMPILER']=='gcc'
-        assert ({Path(k).name for k in changes}=={'RISCVMapping.c.o','RISCVInstPrinter.c.o'} and a['archive']!=built['archive']) if enabled else (not changes and a['archive']==built['archive']),(enabled,changes)
+        enabled=bool(changes)
+        assert all(Path(k).name=='RISCVMapping.c.o' for k in changes) and enabled==(a['archive']!=built['archive'])
+        if profile=='full':assert enabled
         cc=os.environ['NATIVE_COMPILER'] or 'cc'
         save('selection',dict(enabled=enabled,changed=changes,compiler=sp.check_output([cc,'--version'],text=True).splitlines()[0],cpu=sp.check_output(['lscpu'],text=True),profile=profile))
 
@@ -118,6 +113,8 @@ try:
         from riscv_time import measure
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
         measure([dict(arch='riscv64',name=n)for n in texts],t,save)
+        for stage in ('base','candidate'):shutil.copyfile(t/('mixed-'+stage),t/('riscv-option-'+stage))
+        measure([dict(arch='riscv64',name=n)for n in texts],t,lambda name,v:save('mixed-'+name,v))
     assert variants['base']==variants['candidate'];save('complete',dict(complete=True,source=q,profile=profile,platform=platform.platform(),records=variants['candidate']['static'],programs=source['programs'],linkages=2))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=size))

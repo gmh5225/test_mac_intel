@@ -1,7 +1,7 @@
-name: Isolate dense RISC-V detail completion and compare active text paths
+name: Measure first-gap operand compaction in dedicated and six-architecture RISC-V readers
 on:
   push:
-    branches: [codex/riscv-dedicated-dense-operands]
+    branches: [codex/riscv-first-gap-programs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -49,7 +49,7 @@ jobs:
         if: runner.os == 'Linux' && matrix.profile == 'full'
         with:
           repository: NeverSight/NeverD
-          ref: 276a657138f58b0ef97a876288347aaacfde0e74
+          ref: 4a8792d7f80da91b1d852859abafe0684416b38a
           path: neverd-config
           sparse-checkout: |
             cmake
@@ -63,6 +63,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-dense-detail-leaf-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
+          name: rv-first-gap-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
           path: evidence
           retention-days: 7
