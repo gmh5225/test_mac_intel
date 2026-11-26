@@ -1,7 +1,7 @@
-name: Measure variable and memory WASM operands on five source builds with SQL.js Brotli and esbuild
+name: Time explicit AArch64 operand detail requests on real ls cp and sort programs
 on:
   push:
-    branches: [codex/wasm-builtin-variable-and-memory]
+    branches: [codex/aarch64-dedicated-operand-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,21 +28,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: 4cb47e8f8818d0a85b8de2298722558b51c40fa2
           path: source
           persist-credentials: false
-      - name: Verify formatter hooks and time real WASM operators
+      - name: Check full operand records and time coreutils executables
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
-          python3 -B capstone-vectors/wasm/configs.py
-          python3 -B capstone-vectors/wasm/run.py
+          python3 -B capstone-vectors/a64/run.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-builtin-operand-${{ matrix.host }}-${{ matrix.cc }}
+          name: dedicated-ordinary-operand-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
