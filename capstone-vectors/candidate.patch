@@ -1,296 +1,23 @@
-diff --git a/arch/X86/X86GenDisassemblerTables.inc b/arch/X86/X86GenDisassemblerTables.inc
-index 5f4a1fd4..24e41b4b 100644
---- a/arch/X86/X86GenDisassemblerTables.inc
-+++ b/arch/X86/X86GenDisassemblerTables.inc
-@@ -112986,6 +112986,57 @@ static const InstrUID modRMTable[] = {
- /* Table19981 */
-   0x3bb7, /* MOVSX16rm32 */
-   0x3bb8, /* MOVSX16rr32 */
-+/* Table19983: immediate EXTRQ requires a register and /0. */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x37c, /* EXTRQI */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+/* Table19999: immediate EXTRQ requires a register and /0. */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x1f78, /* VMREAD32mr */
-+  0x37c, /* EXTRQI */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+/* Table20015: immediate EXTRQ requires a register and /0. */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x1f7a, /* VMREAD64mr */
-+  0x37c, /* EXTRQI */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-+  0x0, /*  */
-   0x0
- };
- 
-diff --git a/arch/X86/X86GenDisassemblerTables2.inc b/arch/X86/X86GenDisassemblerTables2.inc
-index 69c8c75e..c8293344 100644
---- a/arch/X86/X86GenDisassemblerTables2.inc
-+++ b/arch/X86/X86GenDisassemblerTables2.inc
-@@ -5920,7 +5920,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 0 },
--    { MODRM_SPLITRM, 2950 },
-+    { MODRM_SPLITREG, 19983 },
-     { MODRM_SPLITRM, 2952 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -6436,7 +6436,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3175 },
-+    { MODRM_SPLITREG, 19999 },
-     { MODRM_SPLITRM, 3177 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -7984,7 +7984,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3897 },
-+    { MODRM_SPLITREG, 20015 },
-     { MODRM_SPLITRM, 3899 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -8242,7 +8242,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 0 },
--    { MODRM_SPLITRM, 2950 },
-+    { MODRM_SPLITREG, 19983 },
-     { MODRM_SPLITRM, 2952 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -8758,7 +8758,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3897 },
-+    { MODRM_SPLITREG, 20015 },
-     { MODRM_SPLITRM, 3899 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-@@ -10822,7 +10822,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { MODRM_SPLITRM, 2946 },
-     { MODRM_SPLITRM, 2948 },
-     { MODRM_ONEENTRY, 2104 },
--    { MODRM_SPLITRM, 3897 },
-+    { MODRM_SPLITREG, 20015 },
-     { MODRM_SPLITRM, 3899 },
-     { MODRM_ONEENTRY, 0 },
-     { MODRM_ONEENTRY, 0 },
-diff --git a/arch/X86/X86GenDisassemblerTablesPacked.inc b/arch/X86/X86GenDisassemblerTablesPacked.inc
-index 7d781fb9..436c6a45 100644
---- a/arch/X86/X86GenDisassemblerTablesPacked.inc
-+++ b/arch/X86/X86GenDisassemblerTablesPacked.inc
-@@ -640,7 +640,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x00000000u },
--    { 0x41be0000u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 19983u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -674,7 +674,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f78u }, { 0x41bd9fe3u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 19999u }, { 0x41bd9fe3u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -878,7 +878,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x42b10561u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f7au }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x42ae055bu }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 20015u }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x42ae055bu }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -912,7 +912,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x00000000u },
--    { 0x41be0000u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 19983u }, { 0x41bd8000u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -946,7 +946,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43328664u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f7au }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 20015u }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x43450689u }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-@@ -1150,7 +1150,7 @@ static const struct OpcodeDecision x86DisassemblerTwoByteOpcodes[] = {
-     { 0x445808afu }, { 0x445b08b5u }, { 0x445908b1u }, { 0x43b28764u }, { 0x43cd0799u }, { 0x43d0079fu }, { 0x43ce079bu }, { 0x43b48768u },
-     { 0x445408a7u }, { 0x445708adu }, { 0x445508a9u }, { 0x43b18762u }, { 0x445a08b3u }, { 0x445608abu }, { 0x43208640u }, { 0x4337866eu },
-     { 0x44350869u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2896u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2912u }, { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 2928u }, { 0x43c7078du }, { 0x43ca0793u }, { 0x43c8078fu }, { 0x02ac0558u },
--    { 0x41be1f7au }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x4347068du }, { 0x4338066du },
-+    { X86_DECISION_INDEXED | (MODRM_SPLITREG << X86_DECISION_TYPE_SHIFT) | 20015u }, { 0x41bd9fe5u }, { 0x00000000u }, { 0x00000000u }, { 0x41e183c2u }, { 0x41e403c7u }, { 0x4347068du }, { 0x4338066du },
-     { 0x023b0476u }, { 0x0236846du }, { 0x02238447u }, { 0x021f043eu }, { 0x0226044cu }, { 0x0235046au }, { 0x02220444u }, { 0x02208441u },
-     { 0x023e847du }, { 0x02398473u }, { 0x023c8479u }, { 0x02380470u }, { 0x022c0458u }, { 0x0227844fu }, { 0x022a8455u }, { 0x02290452u },
-     { 0x44f789eeu }, { 0x44f489e8u }, { 0x44ed89dau }, { 0x44ea89d4u }, { 0x44ee89dcu }, { 0x44f389e6u }, { 0x44ec89d8u }, { 0x44eb89d6u },
-diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
-index 515ecdcc..5d103efe 100644
---- a/arch/X86/X86GenLegacyTerminal.inc
-+++ b/arch/X86/X86GenLegacyTerminal.inc
-@@ -9887,8 +9887,8 @@ X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
- 	return X86_SCAN_COMPLETE;
- }
- 
--/* 2764 raw terminals, 81 raw handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 112, 215, 112, 215, 113, 215, 113]. */
--/* 3296 public terminals, 14 public handlers; selected opcodes [222, 216, 184, 216, 184, 216, 222, 218, 222, 216, 222, 222, 184, 218, 183, 216, 183, 222, 184, 222, 217, 211, 217, 211, 217, 214, 217, 214]. */
-+/* 2764 raw terminals, 81 raw handlers; selected opcodes [220, 115, 182, 115, 182, 115, 220, 111, 220, 115, 220, 113, 182, 111, 181, 115, 181, 113, 182, 113, 215, 111, 215, 111, 215, 112, 215, 112]. */
-+/* 3296 public terminals, 14 public handlers; selected opcodes [222, 216, 184, 216, 184, 216, 222, 218, 222, 216, 222, 222, 184, 218, 183, 216, 183, 222, 184, 222, 217, 210, 217, 210, 217, 213, 217, 213]. */
- #define X86_TERMINAL_INDEXED UINT64_C(0x8000000000000000)
- #define X86_TERMINAL_SPLIT UINT64_C(0x4000000000000000)
- #define X86_TERMINAL_MASK UINT64_C(0x7fffffff)
-@@ -11701,7 +11701,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -11835,7 +11835,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -11969,7 +11969,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -12103,7 +12103,7 @@ static const uint64_t x86LegacyDecisions[X86_TERMINAL_ROW_COUNT][2][256] = {
- 	0, 0, 0, 0,
- 	0, 0, 0, 0,
- 	0, 0, 0, UINT64_C(0x000000000b000558),
--	UINT64_C(0x5955cfbcb12b1f78), UINT64_C(0x5a55eff23315dfe3), 0, 0,
-+	0, UINT64_C(0x5a55eff23315dfe3), 0, 0,
- 	0, 0, 0, 0,
- 	UINT64_C(0x00000000291c0477), UINT64_C(0x00000000291c046e), UINT64_C(0x00000000291c0448), UINT64_C(0x00000000291c043f),
- 	UINT64_C(0x00000000291c044d), UINT64_C(0x00000000291c046b), UINT64_C(0x00000000291c0445), UINT64_C(0x00000000291c0442),
-@@ -13994,7 +13994,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
-+	0, UINT64_C(0x4080221381004427), 0, 0,
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
-@@ -14128,7 +14128,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
-+	0, UINT64_C(0x4080221381004427), 0, 0,
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
-@@ -14262,7 +14262,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
-+	0, UINT64_C(0x4080221381004427), 0, 0,
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
-@@ -14396,7 +14396,7 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x430060d70600c1ae), UINT64_C(0x800000000003036b), UINT64_C(0x800000000003037b), UINT64_C(0x800000000003038b),
- 	UINT64_C(0x408020c881004191), UINT64_C(0x408020c981004193), UINT64_C(0x408020c901004192), UINT64_C(0x0000000004000177),
--	UINT64_C(0x4080220f8100441f), UINT64_C(0x4080221381004427), 0, 0,
-+	0, UINT64_C(0x4080221381004427), 0, 0,
- 	0, 0, UINT64_C(0x408020bc81004179), UINT64_C(0x408020bd0100417a),
- 	UINT64_C(0x000000000301010d), UINT64_C(0x000000000301010a), UINT64_C(0x0000000003010101), UINT64_C(0x00000000030100fe),
- 	UINT64_C(0x0000000003010104), UINT64_C(0x0000000003010109), UINT64_C(0x0000000003010100), UINT64_C(0x00000000030100ff),
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
-index 2ee82ef7..6d86e30c 100644
+index 2ee82ef7..17189593 100644
 --- a/arch/X86/X86InstPrinterCommon.c
 +++ b/arch/X86/X86InstPrinterCommon.c
-@@ -203,8 +203,8 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
- 		break;
- 	}
- 
--	// Legacy SSE aliases retain their family ID. Predicate-index arithmetic
--	// collides with unrelated public IDs, including string comparisons.
-+	// The immediate selects the printed predicate. The public ID belongs
-+	// to the mapped comparison family.
- 	switch (MI->flat_insn->id) {
- 	case X86_INS_CMPPS:
- 	case X86_INS_CMPPD:
-@@ -215,7 +215,6 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+@@ -214,6 +214,10 @@ void printSSEAVXCC(MCInst *MI, unsigned Op, SStream *O)
+ 		if (MI->flat_insn->detail)
  			MI->flat_insn->detail->x86.avx_cc = X86_AVX_CC_INVALID;
  		break;
++	case X86_INS_VCMP:
++		/* VCMP aliases share a public ID. The immediate selects the
++		 * spelling and the AVX condition already recorded above. */
++		break;
  	default:
--		MI->popcode_adjust = Imm + 1;
+ 		MI->popcode_adjust = Imm + 1;
  		break;
- 	}
- }
 diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
-index dfa9b451..b3f6d93e 100644
+index dfa9b451..37732962 100644
 --- a/tests/unit/x86_evex_vpcmp_id.c
 +++ b/tests/unit/x86_evex_vpcmp_id.c
-@@ -55,6 +55,48 @@ static bool test_vpcmp(csh handle, bool expect_detail)
+@@ -55,6 +55,50 @@ static bool test_vpcmp(csh handle, bool expect_detail)
  	return success;
  }
  
@@ -303,6 +30,8 @@ index dfa9b451..b3f6d93e 100644
 +		{ 0x62, 0xf1, 0x4c, 0x0b, 0xc2, 0xd0, 0xa5 },
 +	};
 +	static const size_t sizes[] = { 5, 7 };
++	if (cs_support(CS_SUPPORT_X86_REDUCE))
++		return true;
 +	cs_insn *slot = cs_malloc(handle);
 +	if (!check(slot != NULL, "allocate compare iterator"))
 +		return false;
@@ -339,7 +68,7 @@ index dfa9b451..b3f6d93e 100644
  int main(void)
  {
  	csh handle = 0;
-@@ -64,6 +106,7 @@ int main(void)
+@@ -64,6 +108,7 @@ int main(void)
  		   "open 64-bit mode"))
  		return 1;
  	success &= test_vpcmp(handle, false);
@@ -347,7 +76,7 @@ index dfa9b451..b3f6d93e 100644
  	if (!check(cs_option(handle, CS_OPT_DETAIL,
  			    CS_OPT_ON | CS_OPT_DETAIL_REAL) == CS_ERR_OK,
  		   "enable detail")) {
-@@ -71,6 +114,7 @@ int main(void)
+@@ -71,6 +116,7 @@ int main(void)
  		return 1;
  	}
  	success &= test_vpcmp(handle, true);
@@ -355,7 +84,7 @@ index dfa9b451..b3f6d93e 100644
  #ifndef CAPSTONE_X86_ATT_DISABLE
  	cs_err err = cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
  	if (cs_support(CS_SUPPORT_DIET))
-@@ -78,6 +122,7 @@ int main(void)
+@@ -78,6 +124,7 @@ int main(void)
  	else {
  		success &= check(err == CS_ERR_OK, "select AT&T syntax");
  		success &= test_vpcmp(handle, true);
@@ -363,44 +92,3 @@ index dfa9b451..b3f6d93e 100644
  	}
  #endif
  	cs_close(&handle);
-diff --git a/tests/unit/x86_integer_vector_access.c b/tests/unit/x86_integer_vector_access.c
-index 85ee1b93..7727dbb7 100644
---- a/tests/unit/x86_integer_vector_access.c
-+++ b/tests/unit/x86_integer_vector_access.c
-@@ -131,6 +131,27 @@ static bool check_scan(csh handle, bool wide)
- 	return ok;
- }
- 
-+static bool check_extrq_selector(csh handle)
-+{
-+	uint8_t code[] = { 0x66, 0x0f, 0x78, 0xc0, 0x04, 0x02 };
-+	for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
-+		code[3] = (uint8_t)mr;
-+		cs_insn *insn;
-+		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
-+		if (!count) {
-+			if (mr < 0xc8)
-+				return false;
-+			continue;
-+		}
-+		bool ok = mr < 0xc8 && insn->id == X86_INS_EXTRQ &&
-+			  insn->size == sizeof(code);
-+		cs_free(insn, count);
-+		if (!ok)
-+			return false;
-+	}
-+	return true;
-+}
-+
- int main(void)
- {
- 	const cs_mode modes[] = { CS_MODE_32, CS_MODE_64 };
-@@ -150,6 +171,8 @@ int main(void)
- 			     check_moves(handle, i != 0, att != 0);
- 		}
- 		ok = ok && check_scan(handle, modes[i] == CS_MODE_64);
-+		if (modes[i] != CS_MODE_16)
-+			ok = ok && check_extrq_selector(handle);
- 		cs_close(&handle);
- 		if (!ok)
- 			return 1;
