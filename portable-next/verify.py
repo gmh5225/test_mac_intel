@@ -82,6 +82,24 @@ try:
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result
+            assert ('CAPSTONE_X86_SELECT_ITERATOR' in amd)==(name!='base')
+            def transitions(label,lib):
+                exe=t/'transitions'
+                run(name+'-'+label+'-options-link','clang++','-std=c++17','-O2','-I',s/'include',p/'transitions.cpp',lib,'-o',exe)
+                vals=list(map(int,sp.check_output([exe],text=True).split()))
+                assert len(vals)==4 and vals[0]>8000 and 0<vals[1]<vals[0] and vals[2]>0,vals
+                return vals
+            rows[name]['option_states']={'cmake':transitions('cmake',solo/'libcapstone.a')}
+            obj=t/('make-'+name)
+            run(name+'-make-build','make','-C',s,'-j4','V=1','CC=clang','AR=ar','BUILDDIR='+str(obj),'CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_ARCHS=aarch64 arm mips powerpc riscv x86','CAPSTONE_STATIC=yes','CAPSTONE_SHARED=no')
+            log=(e/(name+'-make-build.log')).read_text()
+            assert ('-DCAPSTONE_X86_SELECT_ITERATOR' in log)==(name!='base')
+            rows[name]['option_states']['make']=transitions('make',obj/'libcapstone.a')
+            rows[name]['make_only']=snapshots(s,p,obj,t,profile,name+'-make',run,'static')
+            assert rows[name]['make_only']['snapshots']==rows['base']['static']['snapshots']
+            assert len(set(tuple(x)for x in rows[name]['option_states'].values()))==1 and rows[name]['option_states']==rows['base']['option_states']
+            shutil.rmtree(obj)
+
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
