@@ -64,6 +64,9 @@ try:
         check=list(map(int,get(w/'check-vex3').split()))
         assert check[0]==35127296 and 0<check[1]<check[0]
         save('vex3-'+label,check)
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'rotate.cpp',lib,'-o',w/'check-rotate')
+        rotate=list(map(int,get(w/'check-rotate').split()));assert rotate==[10829824, 3719765, 7276063618347817852, 86824, 192]
+        save('rotate-'+label,rotate)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
