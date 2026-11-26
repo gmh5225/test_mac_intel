@@ -64,6 +64,11 @@ try:
         check=list(map(int,get(w/'check-clear').split()))
         assert check[0]==1769472 and 0<check[1]<check[0]
         save('clear-'+label,check)
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'register-records.cpp',lib,'-o',w/'register-records')
+        rows=get(w/'register-records').splitlines()
+        assert len(rows)==8 and all(int(v.split()[0]) and int(v.split()[1]) for v in rows)
+        if label!='base':assert rows==rd(e/'gpr-records-base.json'),(label,rows)
+        save('gpr-records-'+label,rows)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
