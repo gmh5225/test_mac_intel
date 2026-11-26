@@ -1,7 +1,7 @@
-name: Compare condition-table SSE and AVX fields with the fork iced oracle and Capstone bulk API on every predicate
+name: Compare complete static libraries and linked consumers in NeverD six and seven architecture builds
 on:
   push:
-    branches: [codex/vcmp-names-all-predicates]
+    branches: [codex/verified-six-seven-wasm-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,32 +33,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c8f0563c28782607794c551737ce106fd25586d6
+          ref: f45561436bfe3d36819b21ada16aae078eddc8c4
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/iced
-          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
-          path: iced-source
-          sparse-checkout: |
-            src/rust/iced-x86
-            src/UnitTests/Intel/Decoder
-          persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
-        run: |
-          python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
-          "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+      - name: Verify objects, archive contents and linked consumers
+        run: python3 -B capstone-vectors/verify.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vcmp-name-domain-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-mixed-link-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
