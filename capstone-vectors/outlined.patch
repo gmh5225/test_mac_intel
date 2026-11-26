@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..faaa6432 100644
+index dceebc42..9e7a3eee 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -22,6 +22,9 @@ struct PaddingOutput {
@@ -12,27 +12,70 @@ index dceebc42..faaa6432 100644
  
  #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
  static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
-@@ -449,6 +452,20 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -74,29 +77,47 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 				    0x40 | (w << 3) | rxb, ll, regs, 3);
+ }
+ 
+-/* VEX packed loads and FMA with an ordinary base, index and optional disp8.
+- * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
++/* VEX loads and packed FMA. The caller has handled register ModR/M forms. */
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
++static bool writeVexMemoryOutput(const uint8_t *code, size_t size,
+ 				  cs_insn *insn, uint16_t *insn_size,
+-				  const struct X86SimpleRegister *regs)
++				  const struct X86SimpleRegister *regs, bool wide)
+ {
+ 	const bool fma = code[0] == 0xc4;
+ 	const unsigned prefix = fma ? 3 : 2;
+-	if (size < prefix + 3)
++	if (size < prefix + 2)
+ 		return false;
+ 	const uint8_t flags = code[prefix - 1];
+ 	if (fma) {
+-		if ((code[1] & 0x1f) != 2 || (flags & 0x83) != 1 ||
+-		    code[prefix] != 0xa8)
++		const unsigned opcode = code[prefix];
++		if ((code[1] & 31) != 2 || (flags & 3) != 1)
++			return false;
++#ifndef CAPSTONE_X86_ONLY
++		/* The register rows also describe the last operand's full-width
++		 * memory effects for these three families. */
++		if (wide && (code[prefix + 1] & 7) != 4 &&
++		    (opcode == 0x98 || opcode == 0xa8 || opcode == 0xb8)) {
++			const unsigned wl = ((flags >> 6) & 2) | ((flags >> 2) & 1);
++			const unsigned plan = vex_register_plans[1][opcode];
++			const unsigned index = vex_register_widths[plan][wl];
++			return writeVexMappedMemory(code, size, prefix, insn,
++						    insn_size, regs,
++						    &vex_register_rows[index]);
++		}
++#else
++		(void)wide;
++#endif
++		if ((flags & 0x80) || opcode != 0xa8)
+ 			return false;
+ 	} else if ((flags & 0x7b) != 0x78 || code[prefix] != 0x28) {
+ 		return false;
+ 	}
++	if (size < prefix + 3)
++		return false;
+ 	const unsigned modrm = code[prefix + 1];
+ 	const unsigned sib = code[prefix + 2];
+ 	const bool has_disp = (modrm & 0x40) != 0;
+@@ -449,7 +470,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
  					      prefix);
-+#ifndef CAPSTONE_X86_ONLY
-+	/* Packed VFMADD132, 213 and 231 have the same public effects for
-+	 * full-width memory sources as for their last register operand. */
-+	if (wide && code[0] == 0xc4 && size >= 5 && (code[1] & 31) == 2 &&
-+	    (code[2] & 3) == 1 && (code[3] == 0x98 || code[3] == 0xa8 ||
-+				  code[3] == 0xb8) && (code[4] & 0xc7) == 5) {
-+		const unsigned flags = code[2];
-+		const unsigned wl = ((flags >> 6) & 2) | ((flags >> 2) & 1);
-+		const unsigned plan = vex_register_plans[1][code[3]];
-+		const unsigned index = vex_register_widths[plan][wl];
-+		return writeVexMappedMemory(code, size, 3, insn, insn_size,
-+					    regs, &vex_register_rows[index]);
-+	}
-+#endif
- 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
+-	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
++	return writeVexMemoryOutput(code, size, insn, insn_size, regs, wide);
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
+  * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
 diff --git a/arch/X86/X86VexBaseMemory.h b/arch/X86/X86VexBaseMemory.h
 index a8ea43f2..d0a021db 100644
 --- a/arch/X86/X86VexBaseMemory.h
