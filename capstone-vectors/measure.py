@@ -74,6 +74,13 @@ try:
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        assert ('CAPSTONE_X86_ELF_ITERATOR' in entry)==(label!='base'),entry
+        with (w/label).open('rb') as f:
+            table=ELFFile(f).get_section_by_name('.symtab')
+            positions={tag:[sym['st_value']for sym in table.get_symbol_by_name(tag) or []]for tag in ('cs_disasm_iter','X86_disasmIterText','X86_disasmIterGeneric')}
+            assert all(len(positions[k])==1 for k in ('cs_disasm_iter','X86_disasmIterText'))
+            assert (positions['cs_disasm_iter']==positions['X86_disasmIterText'])==(label!='base') and bool(positions['X86_disasmIterGeneric'])==(label!='base'),positions
+            save('iter-symbols-'+label,positions)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
