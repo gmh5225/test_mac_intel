@@ -1,7 +1,7 @@
-name: Measure variable and memory WASM operands on five source builds with SQL.js Brotli and esbuild
+name: Measure actual empty block types in SQL.js Brotli and esbuild
 on:
   push:
-    branches: [codex/wasm-builtin-variable-and-memory]
+    branches: [codex/wasm-empty-block-formatter]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: eb7fdeaaeb4f89cbcc5ab24edf41e0a03073884c
           path: source
           persist-credentials: false
       - name: Verify formatter hooks and time real WASM operators
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-builtin-operand-${{ matrix.host }}-${{ matrix.cc }}
+          name: empty-block-real-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

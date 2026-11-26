@@ -40,7 +40,7 @@ try:
         run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'verify-stream.c',temp/'ref.o',lib,'-o',temp/'stream')
         by[label]=int(get(temp/'stream'));assert by[label]==172*8*9*16*4,by
         run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'values.c',temp/'ref.o',lib,'-o',temp/'values')
-        assert int(get(temp/'values'))==3*(17+17*17)*9*16*5
+        assert int(get(temp/'values'))==3*256*9*16*5
         run(cxx,temp/'driver.o',lib,'-o',temp/label)
         exe=temp/(label+'-shared');run(cxx,temp/'driver.o',shared[0],'-Wl,-rpath,'+str(shared[0].parent),'-o',exe)
         target=temp/(label+'-dynamic');target.mkdir();shutil.copy2(shared[0],target/shared[0].name)
@@ -66,6 +66,14 @@ try:
     for name,spec in cover.items():
         if name=='wabt':continue
         raw=inputs/(name+'.wasm');ranges=inputs/(name+'.ranges');assert sha(raw)==spec['sha256'] and sha(ranges)==spec['ranges_sha256']
+        import struct
+        code=raw.read_bytes();found=0;empty=0
+        for start,length in struct.iter_unpack('<II',ranges.read_bytes()):
+            if code[start] in (2,3,4):
+                found+=1;empty+=(length==2 and code[start+1]==0x40)
+        assert 0<empty<=found<=spec['operators']
+        receipt[name]=dict(operators=spec['operators'],blocks=found,empty=empty)
+        save('block-types',receipt)
         for detail in (0,1):
             args=[raw,ranges,str(detail)]
             def invoke(exe,verify,reps,env=None):
