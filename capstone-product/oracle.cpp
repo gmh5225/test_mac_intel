@@ -17,13 +17,24 @@ static bool floating_compare(const uint8_t *p,size_t n) {
 }
 
 static csh canonical;
-static uint64_t projected;
+static uint64_t projected, typed;
+static bool lifted_detail;
+static unsigned compare_width(const uint8_t *p,size_t n) {
+  while(n && (*p==0x26||*p==0x2e||*p==0x36||*p==0x3e||*p==0x64||*p==0x65||*p==0x67)){++p;--n;}
+  const unsigned pp = p[p[0] == 0xc5 ? 1 : 2] & 3;
+  const unsigned width[] = {X86_INS_VCMPPS,X86_INS_VCMPPD,X86_INS_VCMPSS,X86_INS_VCMPSD};
+  return width[pp];
+}
 static unsigned reference_id(unsigned old, const uint8_t *code, size_t length, uint64_t ip) {
   if (!canonical || !floating_compare(code,length)) return old;
   cs_insn *result = nullptr;
   size_t count = cs_disasm(canonical,code,length,ip,1,&result);
   unsigned wanted = old;
-  if (count && result->size == length && result->id == X86_INS_VCMP && old != result->id) {
+  if (count && result->size == length && result->id == X86_INS_VCMP && lifted_detail) {
+    const unsigned expected=compare_width(code,length);
+    if(old!=expected) {std::fprintf(stderr,"address=%llx width=%u observed=%u\\n",(unsigned long long)ip,expected,old);std::exit(10);}
+    ++typed;
+  } else if (count && result->size == length && result->id == X86_INS_VCMP && old != result->id) {
     if (old != result->id + 1 + (code[length-1]&31)) std::exit(9);
     wanted = result->id;
     projected++;
@@ -59,6 +70,7 @@ int main(int argc, char **argv) {
     decoder.configureFor(image);
   }
   if ((target == "32" || target == "64") && cs_open(CS_ARCH_X86,target=="32"?CS_MODE_32:CS_MODE_64,&canonical)) return 9;
+  lifted_detail=mode==2;
   decoder.setDetail(mode == 2);
   decoder.setText(mode == 1 || mode == 2);
   if (att && ((target != "32" && target != "64") ||
@@ -137,7 +149,7 @@ int main(int argc, char **argv) {
     }
   }
   if (canonical) cs_close(&canonical);
-  std::fprintf(stderr, "%llu\n", static_cast<unsigned long long>(projected));
+  std::fprintf(stderr, "%llu %llu\n", static_cast<unsigned long long>(projected), static_cast<unsigned long long>(typed));
   std::printf("%lld %llu %llu %llu %llu\n", (long long)(std::clock()-start),
               (unsigned long long)accepted,(unsigned long long)rejected,
               (unsigned long long)boundary,(unsigned long long)value);

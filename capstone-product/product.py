@@ -165,11 +165,13 @@ try:
 
         sel=str(case['selector']) if case['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[case['selector']]
         args=['setarch',os.uname().machine,'-R',products['oracle'] if k=='oracle' else image,case['path'],sel,str(mode),str(reps),*([case['intervals']] if 'intervals' in case else [])]
-        got=sp.run(args,capture_output=True,text=True,check=True)
+        got=sp.run(args,capture_output=True,text=True)
+        if got.returncode:print(case["name"],mode,k,got.returncode,got.stderr,flush=True);got.check_returncode()
         if k=='oracle':
-            count=int(got.stderr.strip());assert count>=0 and count%reps==0
-            proof[case['name']+'/'+str(mode)]=dict(projected=count,reps=reps);save('alias-projections',proof)
+            count,width=map(int,got.stderr.split());assert min(count,width)>=0 and count%reps==0 and width%reps==0
+            proof[case['name']+'/'+str(mode)]=dict(projected=count,typed=width,reps=reps);save('alias-projections',proof)
         return list(map(int,got.stdout.split()))
+    cases.sort(key=lambda row:row['name']!='libmvec-amd64')
     rows=[];rng=random.Random(1739)
     for c in cases:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):

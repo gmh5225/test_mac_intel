@@ -1,7 +1,7 @@
-name: Verify two floating comparison identifier fixes through actual NeverD output and non-x86 product workloads
+name: Verify Capstone raw comparison IDs and NeverD lane-specific IDs from VEX and EVEX prefix bits on real software
 on:
   push:
-    branches: [codex/neverd-compare-ids-fork-product]
+    branches: [codex/neverd-verify-typed-compare-identifiers]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vcmp-actual-dev-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vcmp-product-width-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
