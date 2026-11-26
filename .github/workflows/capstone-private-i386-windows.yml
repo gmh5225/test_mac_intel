@@ -1,7 +1,7 @@
-name: Verify all RISC-V CSR names and real records in dedicated and mixed readers
+name: Verify RISC-V library object scope and all CSR detail encodings
 on:
   push:
-    branches: [codex/cstool-riscv-records]
+    branches: [codex/cstool-riscv-lib-and-csr]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -61,6 +61,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: rv-cstool-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
+          name: rv-csr-library-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}-${{ matrix.compiler }}-${{ matrix.variant }}
           path: evidence
           retention-days: 7

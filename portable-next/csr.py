@@ -11,7 +11,7 @@ def check(source,exe,stage):
     for a in range(0,len(cases),128):
         part=cases[a:a+128]
         code=b''.join(((c<<20)|(11<<15)|(1<<12)|(10<<7)|0x73).to_bytes(4,'little')for c in part)
-        out=sp.check_output([exe,'-d','riscv64',code.hex()],text=True)
+        out=sp.check_output([exe,'-d','-r','riscv64',code.hex()],text=True)
         actual=re.findall(r'operands\[1\]\.type: CSR = ([^\n]+)',out)
         expected=[lookup.get(c,hex(c)) for c in part]
         assert actual==expected,(a,list(zip(part,actual,expected))[:10])

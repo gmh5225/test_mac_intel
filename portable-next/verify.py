@@ -65,7 +65,7 @@ try:
         if linux and profile=='full':shutil.copyfile(b/'rv_time',t/('riscv-option-'+stage))
         if linux:
             lib,=[f for f in b.rglob('libcapstone.a') if f.is_file()]
-            objs={str(f.relative_to(b)):sha(f.read_bytes()) for f in b.rglob('*.c.o') if 'tests/' not in str(f.relative_to(b))}
+            objs={str(f.relative_to(b)):sha(f.read_bytes()) for f in b.rglob('*.c.o') if 'CMakeFiles/capstone.dir/' in f.relative_to(b).as_posix()}
             compile_scope[stage]=dict(objects=objs,archive=sha(lib.read_bytes()))
             save('compile-scope',compile_scope)
 
