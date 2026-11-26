@@ -1,7 +1,7 @@
-name: Run the typed predicate comparison with independently verified driver hashes
+name: Time a single condition detail write for x86 compare predicates on verified PE and ELF inputs
 on:
   push:
-    branches: [codex/typed-predicate-verified-oracle]
+    branches: [codex/single-compare-condition-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 4cb47e8f8818d0a85b8de2298722558b51c40fa2
+          ref: 477cdca0b80d3ababa2aa9c40375bad86914eaca
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 5fa4e4da6e9ce253f43d24525c98b3931616da7f
+          ref: 035a081339eaabf8052cc7768cd894fa7bdeaac0
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-typed-predicate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-condition-corpus-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
