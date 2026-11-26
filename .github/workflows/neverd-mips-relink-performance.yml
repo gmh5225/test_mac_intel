@@ -1,7 +1,7 @@
-name: NeverSight MIPS relink performance
+name: NeverSight MIPS relink performance on macOS
 on:
   push:
-    branches: [codex/mips-relink-fork-native]
+    branches: [codex/mips-relink-macos-timings]
 permissions:
   contents: read
 env:
@@ -10,11 +10,12 @@ env:
   NEVERD_REVISION: f181f3f01cf320107e44febec0bbd0968539586d
 jobs:
   compare:
-    runs-on: ubuntu-24.04
+    runs-on: macos-15
     timeout-minutes: 210
     env:
-      CC: clang-18
-      CXX: clang++-18
+      CC: clang
+      CXX: clang++
+      HOMEBREW_NO_AUTO_UPDATE: 1
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,17 +39,22 @@ jobs:
             libunwind/include
             third-party
           persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
       - name: Build the public CLI once with the pinned r12 SDK
         working-directory: project
         run: |
           test "$(git rev-parse HEAD)" = "$NEVERD_REVISION"
           test "$(git rev-parse HEAD:third_party/llvm-project)" = "$LLVM_BASE"
-          sudo apt-get update -qq
-          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14 python3-pyelftools
+          brew install ninja
+          python -m pip install --require-hashes --only-binary=:all: -r - <<'REQ'
+          pyelftools==0.33 --hash=sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036
+          REQ
           git submodule update --init --depth 1 third_party/capstone signatures third_party/unicorn
           cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
-            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF
           python3 scripts/build.py build-check --config Release --parallel 4 --target neverd
       - name: Build both MIPS toolchains in the same Release configuration
         run: |
@@ -62,8 +68,8 @@ jobs:
             git -C llvm-src checkout --detach "$revision"
             cmake -S llvm-src/llvm -B build-tools -G Ninja -DCMAKE_BUILD_TYPE=Release \
               -DLLVM_ENABLE_PROJECTS=lld -DLLVM_TARGETS_TO_BUILD=Mips -DLLVM_ENABLE_RTTI=ON \
-              -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
-              -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_USE_LINKER=lld -DLLVM_ENABLE_LIBXML2=OFF \
+              -DLLVM_ENABLE_ASSERTIONS=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+              -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_ENABLE_LIBXML2=OFF \
               -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_PARALLEL_LINK_JOBS=1
             cmake --build build-tools --parallel 4 --target llc llvm-mc lld
             mkdir "$dest/$version-bin"
@@ -75,7 +81,7 @@ jobs:
         run: |
           dest=project/build-check/paired
           cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
-          /usr/bin/python3 "$dest/bench.py" 48 performance.json
+          python "$dest/bench.py" 48 performance.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mips-paired-release
