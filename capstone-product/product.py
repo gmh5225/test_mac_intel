@@ -80,7 +80,26 @@ try:
             command(['objcopy','--update-section',section+'='+str(pad),obj,temp],'baseline-size-control')
             assert payload(temp)==pad.read_bytes()
             shutil.copyfile(temp,obj)
-            command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product',*targets,'--parallel','4'],'relink-control',nd)
+            # Normal builds above used scripts/build.py for every source tree. For
+            # this size-only control replay exactly the five final CMake commands;
+            # running the configure/build graph again recompiles its input object.
+            edge_data=json.loads(sp.check_output(['ninja','-C',str(build),'-t','compdb','-x'],text=True))
+            edges={v['output']:v for v in edge_data if v.get('output')}
+            archive,=build.rglob('libcapstone.a')
+            paths=[archive,*[build/'bin'/name for name in ['capstone-product',*targets]]]
+            replay={}
+            for dst in paths:
+                key=str(dst.relative_to(build));edge=edges[key];cmd=edge['command']
+                assert dst.is_file() and str(Path(edge['directory']).resolve())==str(build.resolve())
+                if dst==archive:
+                    assert obj.name in cmd and archive.name in cmd
+                else:
+                    assert key in cmd and str(archive.relative_to(build)) in cmd
+                command(['/bin/sh','-c',cmd],'relink-only-'+dst.name,build)
+                replay[key]=hashlib.sha256(cmd.encode()).hexdigest()
+            stored=sp.check_output(['ar','p',str(archive),obj.name])
+            assert stored==obj.read_bytes()
+            save('link-rules',dict(edges=replay,object_sha256=sha(obj),member_sha256=hashlib.sha256(stored).hexdigest()))
             assert payload(obj)==pad.read_bytes()
             save('layout-control',dict(base_sha256=base_hash,actual_bytes=sizes['base'],matched_bytes=sizes['selector'],unexecuted_bytes=delta,source_tree=actual,control_sha256=hashlib.sha256(payload(obj)).hexdigest()))
         assert git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')

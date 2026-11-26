@@ -1,7 +1,7 @@
-name: Isolate text expansion from the segment decoder using a layout-matched production NeverD binary
+name: Compare placement with the original linker commands in source-built NeverD
 on:
   push:
-    branches: [codex/segment-abi-layout-control]
+    branches: [codex/segment-final-link-size-control]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -73,6 +73,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: segment-size-control-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: segment-native-link-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
