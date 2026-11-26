@@ -21,10 +21,10 @@ t=Path(tempfile.mkdtemp())
 b=t/'build'
 try:
     assert git('rev-parse','HEAD')==q['base'] and git('status','--porcelain')==''
-    arches=['X86','AARCH64','ARM','MIPS','PPC','RISCV'] if profile not in ('diet','reduced') else ['X86','PPC']
+    arches=['X86']
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in arches]]
     flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
-    units=['mapping','mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_evex_vpcmp_id','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
+    units=['x86_far_immediate_encoding','x86_x87_environment','x86_x87_environment_hardware','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_evex_vpcmp_id','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
     if profile not in ('diet','reduced'):
         units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
     if len(arches)>2:
@@ -52,7 +52,7 @@ try:
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
-            if profile not in ('diet','reduced') and name in ('base','riscv','candidate'):
+            if profile not in ('diet','reduced') and name in ('base','candidate'):
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
                 assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]

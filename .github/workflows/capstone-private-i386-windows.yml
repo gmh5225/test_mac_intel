@@ -1,7 +1,7 @@
-name: Verify i386 accumulator CMP and TEST in 19 static and shared build configurations
+name: Check single-record x86 output, x87 hardware extents and option-specific builds
 on:
   push:
-    branches: [codex/i386-accumulator-release-configs]
+    branches: [codex/standalone-record-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d63971a2801bb17b4ade6a9697c19722e0438d
+          ref: eac7e8af8fcc31631f97470d2f01678382c3f2c0
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: accumulator-release-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: standalone-record-profiles-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
