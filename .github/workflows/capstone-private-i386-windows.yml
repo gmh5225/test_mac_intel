@@ -1,7 +1,7 @@
-name: Verify final Linux and Darwin record selection and native Windows compiler inputs
+name: Check MSVC preprocessing and compiled COFF sections alongside final native images
 on:
   push:
-    branches: [codex/verified-native-public-records]
+    branches: [codex/native-fixed-record-release]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -44,6 +44,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: release-record-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: native-equivalent-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
