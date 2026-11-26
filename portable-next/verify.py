@@ -8,13 +8,16 @@ def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 try:
     assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==t['parent']
     orig=w/'WASMReference.c';orig.write_bytes((s/'arch/WASM/WASMInstPrinter.c').read_bytes())
+    os.environ['CL']=os.environ.get('CL','')+' /Brepro'
+    os.environ['LINK']=os.environ.get('LINK','')+' /Brepro'
+    patch=w/'raw.patch';patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']))
     flags=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_WASM_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if profile=='diet':flags+=['-DCAPSTONE_BUILD_DIET=ON']
     run('cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release',*flags)
     rows={}
     for label in ('base','candidate'):
         if label=='candidate':
-            assert sha(p/'candidate.patch')==t['sha256'];run('git','-C',s,'apply','--index',p/'candidate.patch')
+            assert sha(patch)==t['sha256'];run('git','-C',s,'apply','--index',patch)
             assert sp.check_output(['git','-C',s,'write-tree'],text=True).strip()==t['tree']
         run('cmake','--build',b,'--parallel','3','--target','wasm_brtable_size','capstone_static','capstone_shared')
         run('ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_wasm_brtable_size$')

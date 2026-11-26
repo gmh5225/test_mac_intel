@@ -1,7 +1,7 @@
-name: Check WASM mnemonic formatting against the original formatter on Windows 32 and 64 bit libraries
+name: Validate dedicated WASM record formatting and custom hooks on Win32 and Win64 with original Git blob bytes
 on:
   push:
-    branches: [codex/wasm-windows-mnemonic-hooks]
+    branches: [codex/wasm-msvc-native-bytes]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-msvc-${{ matrix.arch }}-${{ matrix.profile }}
+          name: wasm-msvc-bytes-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
