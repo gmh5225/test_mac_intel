@@ -1,7 +1,7 @@
-name: Time typed predicate mappings and direct public instruction IDs in real PE and ELF
+name: Run the typed predicate comparison with independently verified driver hashes
 on:
   push:
-    branches: [codex/typed-predicate-mapping-real]
+    branches: [codex/typed-predicate-verified-oracle]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: typed-predicate-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: verified-typed-predicate-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
