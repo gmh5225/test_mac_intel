@@ -1,60 +1,93 @@
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..4aa1c79a 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -4,7 +4,9 @@
- /* Instantiated for the ordinary address writer and the private mode-specific writers. */
- 
- /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
--#ifdef X86_MEMORY_IMMEDIATE
-+#ifdef X86_RIP_INDIRECT64
-+static bool X86_RIP_INDIRECT64(
-+#elif defined(X86_MEMORY_IMMEDIATE)
- #include "X86UnsignedImmediate.h"
- static bool X86_MEMORY_IMMEDIATE(
- #elif defined(X86_SEGMENT_LEA32)
-@@ -22,6 +24,12 @@ bool X86_writeMemoryOutput(
- 	const struct X86SimpleOutput *row,
- 	const struct X86SimpleRegister regs[4][16])
- {
-+#ifdef X86_RIP_INDIRECT64
-+	/* Bare FF /2 and /4 with mod=00 and r/m=101 have a disp32 tail. */
-+	const bool wide = true;
-+	const uint8_t rex = 0, opcode = 0xff, modrm = code[1];
-+	const unsigned lead = 0, mod = 0, rm = 5;
+diff --git a/arch/X86/X86EvexScanPlan.h b/arch/X86/X86EvexScanPlan.h
+index a60fc089..f9e39f82 100644
+--- a/arch/X86/X86EvexScanPlan.h
++++ b/arch/X86/X86EvexScanPlan.h
+@@ -52,7 +52,11 @@ static inline bool X86_readEvexScanPlan(const uint8_t *code, size_t code_len,
+ 		} else {
+ 			if (map != 2 || pp != 1 || code[5] >= 0xc0)
+ 				return false;
++#ifdef X86_EVEX_BATCH_PACKED
++			kind = code[4] == 0x5a ? EVEX_SCAN_INT_BROADCAST_ROW : 0;
 +#else
- #ifdef X86_MEMORY_IMMEDIATE
- 	const bool wide = X86_IMMEDIATE_WIDE;
- #elif defined(X86_EXTEND64_MEMORY)
-@@ -41,6 +49,7 @@ bool X86_writeMemoryOutput(
- #endif
- 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 			kind = 0;
 +#endif
- 	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..44681b27 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -64,6 +64,9 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
- 
- #ifdef CAPSTONE_X86_NEAR_INDIRECT_OUTPUT
- #include "X86GenIndirect64Output.inc"
-+#define X86_RIP_INDIRECT64 writeRipIndirect64
-+#include "X86MemoryOutputImpl.h"
-+#undef X86_RIP_INDIRECT64
- 
- /* FF /2 and /4 have one explicit 64-bit target. The register and memory
-  * forms share their generated access, implicit register and group records. */
-@@ -72,6 +75,9 @@ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- {
- 	const struct X86SimpleOutput *row =
- 		&x86_indirect64[rex != 0][(modrm & 0x20) != 0];
-+	if (!rex && (modrm == 0x15 || modrm == 0x25))
-+		return writeRipIndirect64(code, size, insn, insn_size, row,
-+					  x86_simple_registers);
- 	if (modrm < 0xc0)
- 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
- 					     x86_simple_registers);
+ 		}
+ 		id = evex_transfer_scan_ids[kind][code[2] >> 7][code[3] >> 5];
+ 		length = evex_transfer_lengths[((code[5] >> 3) & 24) |
+diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
+index 31cef345..b68aa8ce 100644
+--- a/arch/X86/X86GenEvexScan.inc
++++ b/arch/X86/X86GenEvexScan.inc
+@@ -2,9 +2,9 @@
+ enum { EVEX_SCAN_RESERVED_SOURCE = 128 };
+ enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };
+ #ifdef X86_EVEX_BATCH_PACKED
+-enum { EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };
++enum { EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131, EVEX_SCAN_INT_BROADCAST = EVEX_SCAN_BROADCAST, EVEX_SCAN_INT_BROADCAST_ROW = 8 };
+ #else
+-enum { EVEX_SCAN_PACKED = 0, EVEX_SCAN_ALIGNED = 0 };
++enum { EVEX_SCAN_PACKED = 0, EVEX_SCAN_ALIGNED = 0, EVEX_SCAN_INT_BROADCAST = 0 };
+ #endif
+ struct EvexScanPlan {
+ 	uint8_t map, length_flags;
+@@ -34,7 +34,7 @@ static const uint8_t evex_scan_index[256]
+ 	0, 0, 0, 0, 0, 10, 0, 0, EVEX_SCAN_ALIGNED, EVEX_SCAN_ALIGNED, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 12, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, EVEX_SCAN_INT_BROADCAST, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -81,6 +81,10 @@ static const uint16_t evex_transfer_scan_ids[][2][3]
+ 		{ 0, 0, 0 },
+ 		{ X86_INS_VMOVAPD, X86_INS_VMOVAPD, X86_INS_VMOVAPD },
+ 	},
++	{
++		{ 0, X86_INS_VBROADCASTI32X4, X86_INS_VBROADCASTI32X4 },
++		{ 0, X86_INS_VBROADCASTI64X2, X86_INS_VBROADCASTI64X2 },
++	},
+ #endif
+ };
+ static const uint8_t evex_transfer_lengths[32]
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index f0312e90..c444880a 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -1251,6 +1251,7 @@ void emit_evex_transfer_scan(Decoder &decoder)
+ 		{ 1, 3, 0x6f, 0x7f },
+ 		{ 1, 0, 0x10, 0x11 }, { 1, 1, 0x10, 0x11 },
+ 		{ 1, 0, 0x28, 0x29 }, { 1, 1, 0x28, 0x29 },
++		{ 2, 1, 0x5a, 0 },       // Integer broadcast from memory only
+ 	};
+ 	std::puts("static const uint16_t evex_transfer_scan_ids[][2][3]\n\tX86_EVEX_SECTION(X86_EVEX_TRANSFER_RODATA) = {");
+ 	for (const auto &form : transfers) {
+@@ -1327,14 +1328,15 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 			throw std::runtime_error("EVEX scan opcode plan collision");
+ 		index[key & 255] = plan;
+ 	}
+-	if (index[0x6f] || index[0x7f] || index[0x1a] || index[0x10] ||
++	if (index[0x6f] || index[0x7f] || index[0x1a] || index[0x5a] || index[0x10] ||
+ 	    index[0x11] || index[0x28] || index[0x29] || plan >= 128)
+ 		throw std::runtime_error("EVEX transfer opcode plan collision");
+ 	index[0x6f] = index[0x7f] = 128;
+ 	index[0x1a] = 129;
++	index[0x5a] = 132;
+ 	index[0x10] = index[0x11] = 130;
+ 	index[0x28] = index[0x29] = 131;
+-	std::puts("enum { EVEX_SCAN_RESERVED_SOURCE = 128 };\nenum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };\n#ifdef X86_EVEX_BATCH_PACKED\nenum { EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131 };\n#else\nenum { EVEX_SCAN_PACKED = 0, EVEX_SCAN_ALIGNED = 0 };\n#endif");
++	std::puts("enum { EVEX_SCAN_RESERVED_SOURCE = 128 };\nenum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };\n#ifdef X86_EVEX_BATCH_PACKED\nenum { EVEX_SCAN_PACKED = 130, EVEX_SCAN_ALIGNED = 131, EVEX_SCAN_INT_BROADCAST = EVEX_SCAN_BROADCAST, EVEX_SCAN_INT_BROADCAST_ROW = 8 };\n#else\nenum { EVEX_SCAN_PACKED = 0, EVEX_SCAN_ALIGNED = 0, EVEX_SCAN_INT_BROADCAST = 0 };\n#endif");
+ 	std::puts("struct EvexScanPlan {\n\tuint8_t map, length_flags;\n\tuint16_t ids[2][3];\n};");
+ 	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\tX86_EVEX_SECTION(X86_EVEX_SCAN_RODATA) = {\n\t{ 0 },");
+ 	for (const auto &[key, widths] : ids) {
+@@ -1356,7 +1358,9 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 	for (unsigned i = 0; i < index.size(); i += 16) {
+ 		std::printf("\t");
+ 		for (unsigned j = 0; j < 16; ++j)
+-			if (index[i+j] == 130 || index[i+j] == 131)
++			if (index[i+j] == 132)
++				std::printf("%sEVEX_SCAN_INT_BROADCAST,", j ? " " : "");
++			else if (index[i+j] == 130 || index[i+j] == 131)
+ 				std::printf("%s%s,", j ? " " : "", index[i+j] == 130 ? "EVEX_SCAN_PACKED" : "EVEX_SCAN_ALIGNED");
+ 			else
+ 				std::printf("%s%u,", j ? " " : "", index[i + j]);

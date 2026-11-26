@@ -1,7 +1,7 @@
-name: Compare the same RIP writer with and without fetch-line alignment against two release controls
+name: Compare AMD64 EVEX integer broadcasts and masked transfers with canonical results, then time real PE and ELF modules
 on:
   push:
-    branches: [codex/scan-alignment-normal-links-repeat]
+    branches: [codex/evex-vector-length-and-broadcast]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: repeated-alignment-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-transfer-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
