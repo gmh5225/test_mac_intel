@@ -50,6 +50,10 @@ try:
     delta=dict(added=sorted(set(symbols['candidate'])-set(symbols['base'])),removed=sorted(set(symbols['base'])-set(symbols['candidate'])))
     save('identities',dict(source=q,images=sources,sizes=sizes,symbols=delta,objects=objects))
     assert not delta['added'] and not delta['removed'] and sources['base']!=sources['candidate']
+    # Generic full decoding and every non-x86 backend must have the original object code.
+    same={k:(objects['base'][k]==objects['candidate'][k]) for k in objects['base'] if k.endswith('cs.c.o') or ('/arch/' in k and '/X86/' not in k)}
+    assert any(k.endswith('/cs.c.o')for k in same) and len(same)>=20 and all(same.values()),same
+    save('generic-objects',same)
     from elftools.elf.elffile import ELFFile
     with (w/'base.so').open('rb')as f:
         elf=ELFFile(f);soname=next(tag.soname for tag in elf.get_section_by_name('.dynamic').iter_tags() if tag.entry.d_tag=='DT_SONAME')
