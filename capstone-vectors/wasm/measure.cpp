@@ -56,9 +56,16 @@ int main(int argc,char **argv) {
 			}
 			if (length) ++short_record; else ++accepted;
 			if (verify) {
-				if (!insn->size || insn->size>range.bytes || address!=uint64_t(range.start)+insn->size ||
-				    ptr!=code.data()+range.start+insn->size || length!=range.bytes-insn->size || insn->address!=range.start)
+				if (length >= range.bytes) return 7;
+				const size_t consumed = range.bytes - length;
+				const size_t copied = consumed < sizeof(insn->bytes) ? consumed : sizeof(insn->bytes);
+				if (insn->size != copied || address != uint64_t(range.start) + consumed ||
+				    ptr != code.data() + range.start + consumed || insn->address != range.start ||
+				    std::memcmp(insn->bytes, ptr - copied, copied) != 0) {
+					std::fprintf(stderr, "operator at %u: span=%u consumed=%zu copied=%zu size=%u\\n",
+					             range.start, range.bytes, consumed, copied, unsigned(insn->size));
 					return 7;
+				}
 				digest(h,&insn->address,sizeof(insn->address));digest(h,&insn->size,sizeof(insn->size));digest(h,&insn->id,sizeof(insn->id));
 				digest(h,insn->bytes,insn->size<sizeof(insn->bytes)?insn->size:sizeof(insn->bytes));
 				digest(h,insn->mnemonic,std::strlen(insn->mnemonic)+1);digest(h,insn->op_str,std::strlen(insn->op_str)+1);
