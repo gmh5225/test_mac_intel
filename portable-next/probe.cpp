@@ -1,3 +1,4 @@
+#include <valgrind/callgrind.h>
 //===- compare.cpp - Compare x86 decoder API workloads -------------------===//
 //
 // NeverD Decompiler
@@ -124,6 +125,7 @@ static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn
   }
   return result;
 }
+extern "C" __attribute__((noinline)) void observed_span() { asm volatile("nop" ::: "memory"); }
 struct Span { size_t offset, size; uint64_t ip; };
 static void add_result(Result &total,const Result &span,const Span &range) {
   total.instructions += span.instructions; total.rejected += span.rejected;
@@ -176,6 +178,7 @@ int main(int argc,char **argv) {
     auto run=[&](unsigned n) {
       Result all;
       for(unsigned i=0;i<n;++i) for(auto f:spans) {
+        observed_span();
         Result row;
         row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
         add_result(all,row,f);
@@ -194,7 +197,9 @@ int main(int argc,char **argv) {
 #else
     double t0=process_cpu_ns();
 #endif
+    CALLGRIND_START_INSTRUMENTATION; CALLGRIND_ZERO_STATS;
     Result timed=run(reps);
+    CALLGRIND_DUMP_STATS_AT("public decoder spans"); CALLGRIND_STOP_INSTRUMENTATION;
 #ifdef _WIN32
     if(!QueryThreadCycleTime(GetCurrentThread(),&t1)) return 7;
 #else
