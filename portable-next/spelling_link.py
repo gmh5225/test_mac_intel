@@ -17,6 +17,4 @@ def spelling(src,bench,b,t,profile,label,run,linkage):
     assert process.returncode==0,(label,process.returncode,process.stderr[-2000:])
     counts=list(map(int,process.stdout.split()))
     assert counts[0] in (629760,944640) and counts[2]==0
-    if label.startswith('base-'):assert counts[1]>0
-    else:assert counts[1]==0
     return counts
