@@ -1,3 +1,4 @@
+#include <valgrind/callgrind.h>
 //===- compare.cpp - Compare x86 decoder API workloads -------------------===//
 //
 // NeverD Decompiler
@@ -167,6 +168,7 @@ static Result batch_span(const uint8_t *bytes, size_t size, csh handle, cs_insn 
 
 extern "C" size_t iced_trace(unsigned, const uint8_t *, size_t, uint64_t, uint8_t *);
 
+extern "C" __attribute__((noinline)) void observed_span() { asm volatile("nop" ::: "memory"); }
 struct Span { size_t offset, size; uint64_t ip; };
 static void add_result(Result &total,const Result &span,const Span &range) {
   total.instructions += span.instructions; total.rejected += span.rejected;
@@ -224,6 +226,7 @@ int main(int argc,char **argv) {
     auto run=[&](unsigned n) {
       Result all;
       for(unsigned i=0;i<n;++i) for(auto f:spans) {
+        observed_span();
         Result row;
         if(engine=="capstone") row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
         else iced_run(iced,bytes.data()+f.offset,f.size,1,f.ip,&row);
@@ -243,7 +246,9 @@ int main(int argc,char **argv) {
 #else
     double t0=process_cpu_ns();
 #endif
+    CALLGRIND_START_INSTRUMENTATION; CALLGRIND_ZERO_STATS;
     Result timed=run(reps);
+    CALLGRIND_DUMP_STATS_AT("measured decoder spans"); CALLGRIND_STOP_INSTRUMENTATION;
 #ifdef _WIN32
     if(!QueryThreadCycleTime(GetCurrentThread(),&t1)) return 7;
 #else

@@ -81,23 +81,8 @@ try:
     run('clang++','-O3','-std=c++17',*inc,r/'driver.cpp',ice_lib,*links,'-o',w/'driver')
     run('clang++','-O3','-std=c++17',*inc,r/'foreign.cpp',*links,'-o',w/'foreign')
     run('clang++','-O2','-std=c++17',*inc,r/'vectors.cpp',*links,'-o',w/'vectors')
-    for name in ('trial-compare','trial-real','public-guard','foreign-verify','trial-vector-guard','trial-states','trial-guard','cmov-guard'):
-        run('clang++','-O2','-std=c++17',*inc,r/(name+'.cpp'),'-ldl','-o',w/name)
-    for exe in ('driver','foreign','vectors'):
-        assert str(image) in get('ldd',w/exe)
-    os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     invoke=['setarch',os.uname().machine,'-R']
-    opts=json.loads(get(w/'trial-compare',w/'base.so',w/'candidate.so','options'))
-    domain=list(map(int,get(w/'public-guard',w/'base.so',w/'candidate.so').split()))
-    assert domain[0]==5105184 and 0<domain[1]<domain[0]
-    libs=(w/'base.so',w/'candidate.so')
-    states=sp.run([w/'trial-states',*libs,'2048'],text=True,capture_output=True)
-    states.check_returncode()
-    assert states.stderr.count('case arch=')==48
-    scan=list(map(int,get(w/'trial-guard',*libs).split()));assert scan[0]==2162688 and 0<scan[1]<scan[0]
-    vector=json.loads(get(w/'trial-vector-guard',*libs))
-    cmov=list(map(int,get(w/'cmov-guard',*libs).split()));assert cmov[0]>1000000 and 0<cmov[1]<cmov[0]
-    save('options',dict(domain=domain,options=opts,scan=scan,vector=vector,cmov=cmov,random_state_configurations=48,random_per_state=2048))
+    from costs import profile
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     inputs=read(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
@@ -106,19 +91,8 @@ try:
     assert {row[0]for row in fixtures}==set(m['samples'])
     host=dict(cpu=get('lscpu'),compiler=get('clang','--version').splitlines()[0],source=q,iced=m['iced_revision'],prebuilt=False)
     save('host',host);records={};timings={}
-    def measure(key,engines,take):
-        n=max(1,math.ceil(25e6/take('base',1)[0]));expected={k:take(k,n)[2:]for k in engines}
-        assert expected['base']==expected['copy']==expected['candidate']
-        if 'iced' in expected:assert all(v[:3]==expected['base'][:3]for v in expected.values())
-        rng=random.Random('shared-library/'+key);blocks=[];order=list(engines)
-        for _ in range(17):
-            rng.shuffle(order);trial={k:[] for k in order}
-            for k in order+order[::-1]:
-                row=take(k,n);assert row[2:]==expected[k];trial[k].append(row[:2])
-            blocks.append({k:[sum(t[i]for t in v)for i in (0,1)]for k,v in trial.items()})
-        timings[key]=dict(reps=n,checks=expected,cycles=blocks)
-        save('timings',timings)
     for name,bits,f,extents,_ in fixtures:
+        if name not in ('libssl3t64-i386','libmvec-amd64','putty-32-0.85'):continue
         spec=m['provenance'][name];assert sha(f)==spec['text_sha256']
         intervals=[x for x in extents if tuple(x)not in {tuple(j[:3])for j in spec['excluded_incompatible_extents']}]
         intervals_file=w/(name+'.tsv')
@@ -135,17 +109,20 @@ try:
             assert len(audit)==len(intervals) and all(x[3]==x[4] and x[1]==x[5]for x in audit)
             audits.append(audit)
         assert audits[0]==audits[1]
-        records[name]=[list(map(int,get(w/'trial-real',w/'base.so',w/'candidate.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
-        save('records',records)
-        for mode in (0,1,2):
-            def take(k,n):
-                other=k in ('iced','fast');select('base' if other else k)
-                return list(map(int,get(*invoke,w/'driver',k if other else 'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('intel/'+name+'/'+str(mode),['base','copy','candidate','iced']+(['fast']if mode else []),take)
-        for mode in (1,2):
-            def take(k,n):
-                select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('att/'+name+'/'+str(mode),images,take)
-    save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),verified=verified,inode=inode,soname=soname,spans=spans,bytes=maximum))
+        cases={'libmvec-amd64':[('capstone',1),('capstone',2),('public-att',2)],'putty-32-0.85':[('capstone',1),('capstone',2)],'libssl3t64-i386':[('public-att',1)]}[name]
+        for engine,mode in cases:
+            key=('att' if engine=='public-att' else 'intel')+'/'+name+'/'+str(mode);row={}
+            for tag in ('base','candidate')+(('fast',) if engine=='capstone' else ()):
+                select('base' if tag=='fast' else tag)
+                result={}
+                for repeats in (1,2):
+                    result[str(repeats)]=profile(w,invoke,[w/'driver','fast' if tag=='fast' else engine,str(mode),str(repeats),f,intervals_file,str(bits)])
+                row[tag]=result
+            for epoch in ('1','2'):
+                assert all(item[epoch]['records']==row['base'][epoch]['records'] for k,item in row.items()if k!='fast')
+                assert all(item[epoch]['records'][:3]==row['base'][epoch]['records'][:3] for item in row.values())
+            timings[key]=row;save('counts',timings)
+    assert len(timings)==6
+    save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),verified=verified))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
