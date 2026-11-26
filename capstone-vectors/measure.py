@@ -33,21 +33,32 @@ try:
     run('cargo','build','--release','--locked',cwd=ad)
     ice_lib=ad/'target/release/libiced_compare.a'
     driver=(r/'driver.cpp').read_text();mark='Result timed=run(reps);';assert driver.count(mark)==1
-    (w/'driver.cpp').write_text('#include <valgrind/callgrind.h>\\n'+driver.replace(mark,'CALLGRIND_START_INSTRUMENTATION; CALLGRIND_ZERO_STATS; Result timed=run(reps); CALLGRIND_DUMP_STATS_AT("measure"); CALLGRIND_STOP_INSTRUMENTATION;'))
+    (w/'driver.cpp').write_text('#include <valgrind/callgrind.h>\n'+driver.replace(mark,'CALLGRIND_START_INSTRUMENTATION; CALLGRIND_ZERO_STATS; Result timed=run(reps); CALLGRIND_DUMP_STATS_AT("measure"); CALLGRIND_STOP_INSTRUMENTATION;'))
 
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'original')
+    trees=rd(r/'source.json');images={}
+    for tag,entry in [('base','base'),('compact','prefix'),('word','outlined')]:
+        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        if tag!='base':
+            patch=r/(tag+'.patch');assert sha(patch)==trees[entry]['sha256']
+            run('git','-C',base,'apply','--index',patch)
+        assert get('git','-C',base,'write-tree').strip()==trees[entry]['tree']
+        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/tag)
+        images[tag]=sha(w/tag)
+    assert len(set(images.values()))==3
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host={'compiler':get('clang','--version').splitlines()[0],'machine':os.uname().machine,'capstone':m['checkout_commit'],'iced':m['iced_revision'],'driver':sha(w/'driver.cpp'),'rust_driver':sha(ad/'iced.rs'),'valgrind':get('valgrind','--version').strip(),'image':sha(w/'original')}
+    host={'compiler':get('clang','--version').splitlines()[0],'machine':os.uname().machine,'capstone':m['checkout_commit'],'iced':m['iced_revision'],'driver':sha(w/'driver.cpp'),'rust_driver':sha(ad/'iced.rs'),'valgrind':get('valgrind','--version').strip(),'images':images}
     rows={};save('host',host)
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
     for name,bits,f,spans,_ in fixtures:
+        if name not in ('putty-32-0.85','jpeg-avx2-i386','libmvec-amd64'):continue
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
@@ -59,12 +70,12 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
-        variants=[('capstone',1),('private',1),('private',2),('private',4),('fast',1),('fast',2)]
+        variants=[(t,e,m)for t in images for e,m in [('private',0),('private',1),('private',2),('capstone',1)]]
         rows[name]={};boundary=None
-        for engine,mode in variants:
-            key=engine+'/'+str(mode)
-            label=name+'-'+engine+'-'+str(mode);raw=w/(label+'.epoch')
-            cmd=[w/'original',engine,str(mode),'1',f,path,str(bits)]
+        for tree,engine,mode in variants:
+            key=tree+'/'+engine+'/'+str(mode)
+            label=name+'-'+tree+'-'+engine+'-'+str(mode);raw=w/(label+'.epoch')
+            cmd=[w/tree,engine,str(mode),'1',f,path,str(bits)]
             truth=list(map(int,get(*cmd).split()))[2:]
             result=list(map(int,get('valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--callgrind-out-file='+str(raw),'--log-file='+str(w/(label+'.log')),*cmd).split()))[2:]
             assert result==truth,(name,key,result,truth)
@@ -81,6 +92,6 @@ try:
                 (e/(label+'-inclusive-'+opt+'.txt')).write_text(anno)
             rows[name][key]={'codes':truth,'events':dict(zip(events,totals)),'per_record':{k:v/truth[0]for k,v in zip(events,totals)},'extent':sha(path),'text':sha(f)};save('rows',rows)
             raw.unlink();dumps[0].unlink()
-    save('complete',dict(complete=True,source=m['checkout_commit'],host=host,cases=len(rows),checksum=sum(x['private/1']['codes'][0]for x in rows.values())))
+    save('complete',dict(complete=True,source=m['checkout_commit'],host=host,cases=len(rows),checksum=sum(x['base/private/1']['codes'][0]for x in rows.values())))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

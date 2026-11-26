@@ -1,0 +1,31 @@
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 450dc468..d8beaa0b 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -40,7 +40,7 @@ struct VectorOutputRow {
+ struct X86SimpleRegister {
+ 	uint16_t reg;
+ 	uint8_t length;
+-	char name[8];
++	char name[5]; /* Four spelling bytes and a terminator. */
+ };
+ 
+ enum X86SimpleForm {
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..f75190f2 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -239,11 +239,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			&regs[form == X86_SIMPLE_REG_RM ? reg : rm];
+ 		const struct X86SimpleRegister *b =
+ 			&regs[form == X86_SIMPLE_REG_RM ? rm : reg];
+-		memcpy(insn->op_str, a->name, sizeof(a->name));
++		memcpy(insn->op_str, a->name, sizeof(a->name) - 1);
+ 		char *separator = insn->op_str + a->length;
+ 		separator[0] = ',';
+ 		separator[1] = ' ';
+-		memcpy(separator + 2, b->name, sizeof(b->name));
++		memcpy(separator + 2, b->name, sizeof(b->name) - 1);
+ 		first = a->reg;
+ 		second = b->reg;
+ 		insn->bytes[1] = code[1];
