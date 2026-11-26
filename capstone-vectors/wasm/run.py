@@ -14,7 +14,7 @@ def disk(p):return sum(x.stat().st_size for x in p.rglob('*')if x.is_file() and 
 d=lambda n:next(r.parent.glob(f'round{n}-*'))
 if ci: baseline=Path(os.environ['GITHUB_WORKSPACE'])/'source';tree=read(r/'tree.json')
 else: baseline=d(579)/'source';tree=read(d(3473)/'tree.json')
-temp=Path(tempfile.mkdtemp(dir=r));receipt={}
+temp=Path(tempfile.mkdtemp(dir=r));receipt={};blocks_by_program={}
 try:
     src=temp/'capstone';build=temp/'build';run('git','clone','--shared','--quiet','--no-checkout',baseline,src)
     run('git','-C',src,'checkout','--quiet','--detach',tree['parent'])
@@ -72,8 +72,8 @@ try:
             if code[start] in (2,3,4):
                 found+=1;empty+=(length==2 and code[start+1]==0x40)
         assert 0<empty<=found<=spec['operators']
-        receipt[name]=dict(operators=spec['operators'],blocks=found,empty=empty)
-        save('block-types',receipt)
+        blocks_by_program[name]=dict(operators=spec['operators'],blocks=found,empty=empty)
+        save('block-types',blocks_by_program)
         for detail in (0,1):
             args=[raw,ranges,str(detail)]
             def invoke(exe,verify,reps,env=None):
