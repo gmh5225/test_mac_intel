@@ -59,6 +59,8 @@ try:
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'vex3.cpp',lib,'-o',w/'check-vex3')
+        if label!='base' and os.uname().machine=='x86_64':
+            run(sys.executable,'-B',base/'suite/synctools/x86_operand_specializations.py','--check')
         check=list(map(int,get(w/'check-vex3').split()))
         assert check[0]==35127296 and 0<check[1]<check[0]
         save('vex3-'+label,check)
