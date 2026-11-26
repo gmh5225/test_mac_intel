@@ -1,7 +1,7 @@
-name: Measure VEX register-mask sources against ordinary and batched x86 decoders on real programs
+name: Measure shared vector operand construction against iced and compare complete private and public ABI records
 on:
   push:
-    branches: [codex/vex-mask-source-terminals]
+    branches: [codex/vector-register-stream-real]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mask-source-plans-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-register-stream-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

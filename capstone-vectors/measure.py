@@ -64,6 +64,13 @@ try:
         check=list(map(int,get(w/'check-clear').split()))
         assert check[0]==1769472 and 0<check[1]<check[0]
         save('clear-'+label,check)
+        verified={}
+        for source in ('operands','records'):
+            run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/('vector-'+source+'.cpp'),lib,'-o',w/('vector-'+source))
+            verified[source]=get(w/('vector-'+source)).strip()
+        assert verified['operands']=='98304'
+        if label!='base':assert verified==rd(e/'vector-base.json')
+        save('vector-'+label,verified)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
