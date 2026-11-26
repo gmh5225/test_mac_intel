@@ -1,7 +1,7 @@
-name: Check WASM length records and stream boundaries with callbacks on Windows 32 and 64 bits
+name: Verify WASM operand boundaries and callback switching on Windows 32 and 64 bits
 on:
   push:
-    branches: [codex/wasm-record-lengths-win32-win64]
+    branches: [codex/wasm-operands-msvc-x86-x64]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 7161cb4d72aad82f89161629790fbe10b7b90d55
+          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-length-records-${{ matrix.arch }}-${{ matrix.profile }}
+          name: wasm-operand-records-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

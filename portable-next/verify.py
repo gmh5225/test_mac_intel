@@ -29,6 +29,8 @@ try:
             run('cl',*options,'/DWASM_printInst=wasm_reference','/c',orig,'/Fo:'+str(w/'reference.obj'))
             run('cl',*options,p/'verify-stream.c',w/'reference.obj',b/'capstone_static.lib','/Fo:'+str(w/'check.obj'),'/Fe:'+str(w/'test.exe'))
             row['streams']=int(sp.check_output([w/'test.exe'],cwd=w,text=True));assert row['streams']==792576
+            run('cl',*options,p/'values.c',w/'reference.obj',b/'capstone_static.lib','/Fo:'+str(w/'values.obj'),'/Fe:'+str(w/'values.exe'))
+            row['boundaries']=int(sp.check_output([w/'values.exe'],cwd=w,text=True));assert row['boundaries']==3*(17+17*17)*9*16*5
         rows[label]=row
     if profile=='diet':
         assert rows['base']['objects']==rows['candidate']['objects']
