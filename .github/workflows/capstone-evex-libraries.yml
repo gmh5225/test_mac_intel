@@ -1,7 +1,7 @@
-name: Attribute the inclusive work of real scalar and SIMD printer paths to the six-architecture decoder
+name: Locate the executed instructions in the shipped fixed-width x86 record readers
 on:
   push:
-    branches: [codex/six-architecture-printer-call-cost]
+    branches: [codex/attribute-x86-record-instructions]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: inclusive-real-printer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-reader-source-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

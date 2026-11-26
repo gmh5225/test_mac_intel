@@ -34,7 +34,7 @@ def profile(work, invoke, command):
     native = list(map(int,sp.check_output([*invoke,*command],text=True).split()))[2:]
     dest = work/'current.profile'
     args = [*invoke,'valgrind','--tool=callgrind','--instr-atstart=no','--cache-sim=yes','--branch-sim=yes',
-            '--compress-strings=no','--callgrind-out-file='+str(dest),*command]
+            '--compress-strings=no','--compress-pos=no','--dump-instr=yes','--dump-line=no','--callgrind-out-file='+str(dest),*command]
     job = sp.run(args, text=True, capture_output=True)
     if job.returncode:
         raise RuntimeError(str(command)+'\n'+job.stderr[-4000:])
@@ -50,6 +50,9 @@ def profile(work, invoke, command):
             if line.startswith('totals:'): values = list(map(int,line.split()[1:]))
     from self_cost import read
     attribution=read(dest,None,None)
+    from sites import counts as count_sites
+    attribution['instruction_sites']=count_sites(dest)
+    assert attribution['instruction_sites']['ir']==attribution['events']['Ir']
     expected=sum(1 for line in Path(command[-2]).read_text().splitlines()if line.strip())*int(command[3])
     actual=attribution['functions'].get('observed_span',{}).get('calls',0)
     if expected!=actual:

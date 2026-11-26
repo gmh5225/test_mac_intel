@@ -37,15 +37,22 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
+    release_sha=sha(lib)
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'program')
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     from costs import profile
+    from sites import map_debug
+    run('cmake','-S',project,'-B',build,'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -gline-tables-only')
+    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'debug-program')
+    save('symbol-map',map_debug(w/'program',w/'debug-program',base))
+
     invoke=['setarch',os.uname().machine,'-R']
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(source=q,neverd=dev,iced=m['iced_revision'],machine=platform.machine(),compiler=get('clang','--version').splitlines()[0],archive=sha(lib),driver=sha(w/'driver.cpp'),executable=sha(w/'program'))
+    host=dict(source=q,neverd=dev,iced=m['iced_revision'],machine=platform.machine(),compiler=get('clang','--version').splitlines()[0],archive=release_sha,driver=sha(w/'driver.cpp'),executable=sha(w/'program'))
     save('host',host);rows={}
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
@@ -64,14 +71,11 @@ try:
         assert sha(path)==spec['extent_sha256']
         for mode in (1,2):
             row={}
-            for engine in ('private','capstone','fast'):
+            for engine in ('private',):
                 row[engine]={}
                 for n in (1,2):
                     res=profile(w,invoke,[w/'program',engine,str(mode),str(n),f,path,str(bits)])
                     row[engine][str(n)]=res
-            for n in ('1','2'):
-                assert row['private'][n]['records']==row['capstone'][n]['records']
-                assert row['private'][n]['records'][:3]==row['fast'][n]['records'][:3]
             rows[name+'/'+str(mode)]=row;save('counts',rows)
     assert len(rows)==4;save('complete',dict(complete=True,source=q,host=host,workloads=len(rows)))
 finally:
