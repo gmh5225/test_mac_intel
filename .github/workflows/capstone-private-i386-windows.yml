@@ -1,7 +1,7 @@
-name: Verify default x86 bitness and MOV address output with fixed 16, 32 and 64 bit API snapshots across nineteen configurations
+name: Verify x86 native modes and syntax choices in nineteen complete and reduced library configurations
 on:
   push:
-    branches: [codex/default-bitness-library-configs]
+    branches: [codex/x86-compact-mode-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 42c169fe6d452d843ddf135cce8b9b18ee6b6995
+          ref: 68be0029b78515fd57eb2ca01540e109037f7760
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: canonical-mode-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: compact-mode-profile-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
