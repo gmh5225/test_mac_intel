@@ -1,0 +1,151 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1c3fc1e2..9101e21a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1103,7 +1103,9 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86" OR
+        (capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+-        AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_C_COMPILER_ID MATCHES "Clang"
++        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
++             (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64|aarch64|arm64)$"))
++        AND CMAKE_C_COMPILER_ID MATCHES "Clang"
+         AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS
+         AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
+         if(capstone_enabled_architectures STREQUAL "X86")
+diff --git a/Makefile b/Makefile
+index fafc61bf..3f343362 100644
+--- a/Makefile
++++ b/Makefile
+@@ -313,8 +313,10 @@ endif
+ 	LIBOBJ_X86_STATIC_OUTPUT = $(OBJDIR)/arch/X86/X86Vex32Output.o $(OBJDIR)/arch/X86/X86Sse64Output.o $(OBJDIR)/arch/X86/X86MemoryFallback32.o $(OBJDIR)/arch/X86/X86BatchScan.o $(OBJDIR)/arch/X86/X86VectorFallback64.o $(OBJDIR)/arch/X86/X86VexRegisterImmediate.o $(OBJDIR)/arch/X86/X86PlainEvexOutput.o $(OBJDIR)/arch/X86/X86RegisterFallback32.o
+ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ 	LIBOBJ_X86_STATIC_OUTPUT += $(OBJDIR)/arch/X86/X86PublicOutput.o
+-else ifeq ($(MIXED_STORAGE_TARGET):$(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),macos:yes:no:no:no)
++else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
++ifneq ($(filter macos linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
+ 	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
++endif
+ endif
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+diff --git a/cs.c b/cs.c
+index d0b8b045..652f251f 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1080,6 +1080,18 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ #endif
+ }
+ 
++#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) && defined(__linux__)
++#define CS_SPLIT_ARCH_RECORDS
++#endif
++
++#ifdef CS_SPLIT_ARCH_RECORDS
++#define CS_RECORD_X86 is_x86
++CS_DECODE_INLINE bool decode_arch_record(
++	cs_struct *handle, const uint8_t *code, size_t size,
++	cs_insn *insn, uint16_t *insn_size, cs_record_request request, bool is_x86)
++{
++	const bool batch = request == true;
++#else
+ /* Keep the full decoder's stack frame off generated-output hits, while
+  * retaining the public iterator's scan code and private calling convention. */
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
+@@ -1112,10 +1124,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
++#endif
++#define CS_RECORD_X86 (handle->arch == CS_ARCH_X86)
+ #endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+-	if (handle->arch == CS_ARCH_X86) {
++	if (CS_RECORD_X86) {
+ #ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
+ 		if (request == CS_RECORD_PUBLIC_ITER && !handle->no_text) {
+ 			if (handle->mode == CS_MODE_32)
+@@ -1183,7 +1197,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 			    insn->address, handle->getinsn_info))
+ 		return false;
+ 	insn->size = *insn_size;
+-	map_insn_id(handle, insn, mci.Opcode);
++	map_insn_id_for_arch(handle, insn, mci.Opcode, CS_RECORD_X86);
+ 	if (handle->no_text) {
+ 		fill_insn_without_text(insn, MCInst_getOpcodePub(&mci), code,
+ 				       false);
+@@ -1195,7 +1209,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	!defined(_WIN32_WCE)
+ 		/* Choose before printing: a custom formatter can restore vsnprintf
+ 		 * while returning a count inconsistent with its first NUL. */
+-		if (handle->arch == CS_ARCH_X86 && cs_vsnprintf == vsnprintf) {
++		if (CS_RECORD_X86 && cs_vsnprintf == vsnprintf) {
+ 			/* Only this private stream can leave the unused tail untouched. */
+ 			ss.buffer[0] = '\0';
+ 			ss.index = 0;
+@@ -1237,10 +1251,30 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				  code, known_length);
+ 		}
+ 	}
+-	if (handle->arch == CS_ARCH_X86 && (!batch || insn->id != X86_INS_VCMP))
++	if (CS_RECORD_X86 && (!batch || insn->id != X86_INS_VCMP))
+ 		insn->id += mci.popcode_adjust;
+ 	return true;
+ }
++#ifdef CS_SPLIT_ARCH_RECORDS
++static __attribute__((noinline)) CS_PRESERVE_MOST bool decode_non_x86_record(
++	cs_struct *handle, const uint8_t *code, size_t size,
++	cs_insn *insn, uint16_t *insn_size, cs_record_request request)
++{
++	return decode_arch_record(handle, code, size, insn, insn_size, request, false);
++}
++
++__attribute__((noinline)) CS_PRESERVE_MOST bool cs_decode_full_insn(
++	cs_struct *handle, const uint8_t *code, size_t size,
++	cs_insn *insn, uint16_t *insn_size, cs_record_request request)
++{
++	if (handle->arch == CS_ARCH_X86)
++		return decode_arch_record(handle, code, size, insn, insn_size, request, true);
++	return decode_non_x86_record(handle, code, size, insn, insn_size, request);
++}
++#undef CS_SPLIT_ARCH_RECORDS
++#endif
++#undef CS_RECORD_X86
++
+ 
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 4c4c34f2..63004992 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -62,19 +62,25 @@ CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
+ #define CS_DECODE_UNLIKELY(x) (x)
+ #endif
+ 
+-static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
+-						cs_insn *insn, unsigned int id)
++static inline CS_PRESERVE_MOST void map_insn_id_for_arch(cs_struct *handle,
++						cs_insn *insn, unsigned int id, bool is_x86)
+ {
+ #ifdef CAPSTONE_HAS_X86
+ 	/* The LUT contains only generated 16-bit opcodes; source-owned
+ 	 * feature opcodes exceed its bound and keep the normal mapper. */
+-	if (CS_DECODE_LIKELY(handle->arch == CS_ARCH_X86 &&
++	if (CS_DECODE_LIKELY(is_x86 &&
+ 			     X86_get_insn_id_no_detail(handle, insn, id)))
+ 		return;
+ #endif
+ 	handle->insn_id(handle, insn, id);
+ }
+ 
++static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
++						cs_insn *insn, unsigned int id)
++{
++	map_insn_id_for_arch(handle, insn, id, handle->arch == CS_ARCH_X86);
++}
++
+ static inline bool use_x86_scan(const cs_struct *handle)
+ {
+ 	return handle->arch == CS_ARCH_X86 && handle->no_text &&

@@ -1,7 +1,7 @@
-name: Compare public and private formatter paths with unchanged real output on macOS and Linux
+name: Count generic decoder entries, stream splits and fixed records on six actual programs
 on:
   push:
-    branches: [codex/untimed-mixed-formatter-census]
+    branches: [codex/count-real-fixed-record-dispatch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 27251d8ac9de6e868dade3d2114379f4f8555c93
+          ref: 96d63971a2801bb17b4ade6a9697c19722e0438d
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c8f0563c28782607794c551737ce106fd25586d6
+          ref: 276a657138f58b0ef97a876288347aaacfde0e74
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-format-coverage-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-record-stage-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
