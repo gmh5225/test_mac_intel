@@ -1,14 +1,14 @@
 name: MIPS native Release CLI comparison
 on:
   push:
-    branches: [codex/mips-r13-native-cli-pairs]
+    branches: [codex/mips-r14-full-cli-pairs]
 permissions:
   contents: read
 env:
-  BASE_PROJECT: 4a8792d7f80da91b1d852859abafe0684416b38a
-  NEW_PROJECT: d96eba9e61ee80084034bf198d760746975e3642
+  BASE_PROJECT: 7b5a5645ede70f8cdbeaed68806ba4fa8b2a689f
+  NEW_PROJECT: 7ab6b4eee24927fb640eff72820d25ae9d9c2dec
   BASE_LLVM: 6947b7db63e913244e0aa6de087d1ad2e791e86f
-  NEW_LLVM: 24ced447e1718432292dc9d54b6eb229323409d1
+  NEW_LLVM: 6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312
 jobs:
   compare:
     strategy:
@@ -80,10 +80,10 @@ jobs:
           suffix=
           if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
           if [[ "$RUNNER_OS" == Linux ]]; then extra+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14'); fi
-          for release in r12 r13; do
+          for release in r12 r14; do
             rev="$BASE_PROJECT"
             fork="$BASE_LLVM"
-            if [[ "$release" == r13 ]]; then rev="$NEW_PROJECT"; fork="$NEW_LLVM"; fi
+            if [[ "$release" == r14 ]]; then rev="$NEW_PROJECT"; fork="$NEW_LLVM"; fi
             git -C project checkout --detach "$rev"
             git -C project submodule update --init --depth 1 third_party/capstone third_party/unicorn signatures
             git -C llvm-src checkout --detach "$fork"
@@ -111,14 +111,25 @@ jobs:
           cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
           cp .github/scripts/neverd_windows_child_cpu.py "$dest/"
           mv pair-installs/r12 "$dest/slot-0"
-          mv pair-installs/r13 "$dest/slot-1"
+          mv pair-installs/r14 "$dest/slot-1"
           python "$dest/bench.py" 24 pairs-0.json "$dest/slot-0" "$dest/slot-1"
           mv "$dest/slot-0" "$dest/staged"
           mv "$dest/slot-1" "$dest/slot-0"
           mv "$dest/staged" "$dest/slot-1"
           python "$dest/bench.py" 24 pairs-1.json "$dest/slot-1" "$dest/slot-0"
+      - name: Compare r13 and r14 MIPS compiler tools on common inputs
+        env:
+          ORIGINAL_LLVM: 24ced447e1718432292dc9d54b6eb229323409d1
+        run: |
+          dest=project/build-neverd-pair/paired
+          git -C llvm-src fetch --no-tags --depth=1 --filter=blob:none origin "$ORIGINAL_LLVM"
+          git -C llvm-src checkout --detach "$ORIGINAL_LLVM"
+          cmake --build build-mips-tools --parallel 4 --target llc llvm-mc lld
+          python .github/scripts/neverd_mips_compiler_pairs.py build-mips-tools/bin "$dest/slot-0" "$dest/compiler.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mips-native-pairs-${{ runner.os }}
-          path: project/build-neverd-pair/paired/pairs-*.json
+          path: |
+            project/build-neverd-pair/paired/pairs-*.json
+            project/build-neverd-pair/paired/compiler.json
           if-no-files-found: error

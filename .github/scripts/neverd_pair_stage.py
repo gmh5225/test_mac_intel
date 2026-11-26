@@ -50,11 +50,20 @@ for item in files:
     shutil.copy2(item, saved)
     with saved.open("rb") as stream:
         digests[item.name] = hashlib.file_digest(stream, "sha256").hexdigest()
+snapshot = json.loads((build / ".neverd-deps/snapshot.json").read_text())
+assert snapshot["schema"] == 1
+dependencies = {name: entry["commit"] for name, entry in snapshot["sources"].items()}
+for submodule in ("third_party/capstone", "third_party/unicorn", "signatures"):
+    actual = subprocess.check_output(["git", "-C", repo / submodule, "rev-parse", "HEAD"], text=True).strip()
+    pinned = subprocess.check_output(["git", "-C", repo, "rev-parse", "HEAD:" + submodule], text=True).strip()
+    assert actual == pinned
+    dependencies[submodule] = actual
 record = {
     "neverd": revision,
     "llvm": fork,
     "sdk": f"neverd-llvm-v23.0.0-{release}",
     "files": digests,
+    "dependencies": dependencies,
 }
 (dest / "source.json").write_text(json.dumps(record, indent=2, sort_keys=True) + "\n")
 print(json.dumps(record, sort_keys=True))

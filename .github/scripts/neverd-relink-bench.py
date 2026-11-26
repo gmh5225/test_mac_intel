@@ -29,8 +29,8 @@ windows = sys.platform == "win32"
 suffix = ".exe" if windows else ""
 locations = [Path(arg).resolve() for arg in sys.argv[3:5]]
 if not locations:
-    locations = [p / "r12-bin", p / "r13-bin"]
-toolchains = dict(zip(("r12", "r13"), locations, strict=True))
+    locations = [p / "r12-bin", p / "r14-bin"]
+toolchains = dict(zip(("r12", "r14"), locations, strict=True))
 full_pair = os.environ.get("NEVERD_PAIR_FULL_INSTALLATIONS") == "1"
 cli = p.parent / "bin" / ("neverd" + suffix)
 clis = {label: folder / ("neverd" + suffix) if full_pair else cli for label, folder in toolchains.items()}
@@ -57,6 +57,8 @@ for label, executable in clis.items():
         assert any(str(folder) in line and "libneverd" in line for line in probe.stderr.splitlines())
     cli_envs[executable] = env
     provenance[label] = record
+if full_pair and "neverd" in provenance["r12"]:
+    assert provenance["r12"]["dependencies"] == provenance["r14"]["dependencies"]
 rng = random.Random(20261126)
 rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 32
 receipt = sys.argv[2] if len(sys.argv) > 2 else "perf.json"
@@ -101,13 +103,13 @@ def measure(commands):
 def report(rows):
     result = {}
     for key in ("cpu", "wall"):
-        ratios = [(r["r13"][key] / r["r12"][key] - 1) * 100 for r in rows]
+        ratios = [(r["r14"][key] / r["r12"][key] - 1) * 100 for r in rows]
         estimates = sorted(
             stats.median(rng.choices(ratios, k=len(ratios))) for _ in range(6000)
         )
         result[key] = {
             "r12_s": stats.median(r["r12"][key] for r in rows),
-            "r13_s": stats.median(r["r13"][key] for r in rows),
+            "r14_s": stats.median(r["r14"][key] for r in rows),
             "paired_pct": stats.median(ratios),
             "median_95_pct": [estimates[149], estimates[5849]],
             "iqr_pct": [stats.quantiles(ratios)[0], stats.quantiles(ratios)[2]],
