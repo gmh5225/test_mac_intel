@@ -1,0 +1,83 @@
+name: NeverSight MIPS relink performance
+on:
+  push:
+    branches: [codex/mips-relink-fork-native]
+permissions:
+  contents: read
+env:
+  LLVM_BASE: 6947b7db63e913244e0aa6de087d1ad2e791e86f
+  LLVM_REVISION: 24ced447e1718432292dc9d54b6eb229323409d1
+  NEVERD_REVISION: f181f3f01cf320107e44febec0bbd0968539586d
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 210
+    env:
+      CC: clang-18
+      CXX: clang++-18
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.NEVERD_REVISION }}
+          path: project
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/llvm-project
+          ref: ${{ env.LLVM_BASE }}
+          path: llvm-src
+          sparse-checkout: |
+            cmake
+            llvm
+            lld
+            libunwind/include
+            third-party
+          persist-credentials: false
+      - name: Build the public CLI once with the pinned r12 SDK
+        working-directory: project
+        run: |
+          test "$(git rev-parse HEAD)" = "$NEVERD_REVISION"
+          test "$(git rev-parse HEAD:third_party/llvm-project)" = "$LLVM_BASE"
+          sudo apt-get update -qq
+          sudo apt-get install --yes ninja-build clang-18 lld-18 g++-14 python3-pyelftools
+          git submodule update --init --depth 1 third_party/capstone signatures third_party/unicorn
+          cmake -S . -B build-check -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14
+          python3 scripts/build.py build-check --config Release --parallel 4 --target neverd
+      - name: Build both MIPS toolchains in the same Release configuration
+        run: |
+          test "$(git -C llvm-src rev-parse HEAD)" = "$LLVM_BASE"
+          git -C llvm-src fetch --depth=1 origin "$LLVM_REVISION"
+          dest="$GITHUB_WORKSPACE/project/build-check/paired"
+          mkdir -p "$dest"
+          for version in r12 r13; do
+            revision="$LLVM_BASE"
+            if [[ "$version" == r13 ]]; then revision="$LLVM_REVISION"; fi
+            git -C llvm-src checkout --detach "$revision"
+            cmake -S llvm-src/llvm -B build-tools -G Ninja -DCMAKE_BUILD_TYPE=Release \
+              -DLLVM_ENABLE_PROJECTS=lld -DLLVM_TARGETS_TO_BUILD=Mips -DLLVM_ENABLE_RTTI=ON \
+              -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_EXAMPLES=OFF \
+              -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_USE_LINKER=lld -DLLVM_ENABLE_LIBXML2=OFF \
+              -DLLVM_ENABLE_ZLIB=OFF -DLLVM_ENABLE_ZSTD=OFF -DLLVM_PARALLEL_LINK_JOBS=1
+            cmake --build build-tools --parallel 4 --target llc llvm-mc lld
+            mkdir "$dest/$version-bin"
+            cp build-tools/bin/{llc,lld,llvm-mc} "$dest/$version-bin/"
+            ln -s lld "$dest/$version-bin/ld.lld"
+            "$dest/$version-bin/ld.lld" --version | grep -F -- "$revision"
+          done
+      - name: Compare CPU and elapsed times on the same runner
+        run: |
+          dest=project/build-check/paired
+          cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
+          /usr/bin/python3 "$dest/bench.py" 48 performance.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mips-paired-release
+          path: project/build-check/paired/performance.json
+          if-no-files-found: error
