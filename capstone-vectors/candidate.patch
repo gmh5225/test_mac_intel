@@ -1,21 +1,94 @@
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index 466543c3..b478b772 100644
+index d7db69c3..72775079 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -49,7 +49,12 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+@@ -4,7 +4,10 @@
+ #include "WASMInstPrinter.h"
+ #include "WASMMapping.h"
+ 
+-#ifdef WASM_LITERAL_NAMES
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define WASM_BUILTIN_HEX
+ static char *prependHex32(char *end, uint32_t value)
+ {
+ 	do {
+@@ -16,6 +19,22 @@ static char *prependHex32(char *end, uint32_t value)
+ 	return end;
+ }
+ 
++/* A nonzero upper word is followed by exactly eight lower hex digits. */
++static char *prependTableAddress(char *end, uint64_t address)
++{
++	uint32_t word = (uint32_t)address;
++	if (address > UINT32_MAX) {
++		for (unsigned i = 0; i < 8; ++i) {
++			*--end = "0123456789abcdef"[word & 15];
++			word >>= 4;
++		}
++		word = (uint32_t)(address >> 32);
++	}
++	return prependHex32(end, word);
++}
++#endif
++
++#ifdef WASM_LITERAL_NAMES
+ static bool printHexOperands32(SStream *out, const uint32_t *values,
+ 			      unsigned count)
+ {
+@@ -39,6 +58,38 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
+ }
+ #endif
+ 
++static void printBranchTable(SStream *out, const cs_wasm_brtable *table)
++{
++#ifdef WASM_BUILTIN_HEX
++	char text[sizeof("\t0xffffffff, [0xffffffffffffffff], 0xffffffff")];
++	if (cs_vsnprintf == cs_default_vsnprintf &&
++	    !(out->markup_stream && out->prefixed_by_markup) &&
++	    out->index <= SSTREAM_BUF_LEN - sizeof(text)) {
++		char *end = text + sizeof(text) - 1;
++		*end = '\0';
++		char *p = prependHex32(end, table->default_target);
++		p -= 3;
++		memcpy(p, "], ", 3);
++		p = prependTableAddress(p, table->address);
++		p -= 3;
++		memcpy(p, ", [", 3);
++		p = prependHex32(p, table->length);
++		*--p = '\t';
++		SStream_concat0_n(out, p, (size_t)(end - p));
++		return;
++	}
++#endif
++	SStream_concat(out, "\t0x%x, [", table->length);
++	if (table->address <= UINT32_MAX)
++		SStream_concat(out, "0x%x",
++			       (unsigned)table->address);
++	else
++		SStream_concat(out, "0x%" PRIx64,
++			       table->address);
++	SStream_concat(out, "], 0x%x",
++		       table->default_target);
++}
++
+ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ {
+ #ifdef WASM_LITERAL_NAMES
+@@ -100,11 +151,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ 		break;
  
  	case WASM_OP_BRTABLE:
- 		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
+-		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
 -		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
-+		if (MI->wasm_data.brtable.address <= UINT32_MAX)
-+			SStream_concat(O, "0x%x",
-+				       (unsigned)MI->wasm_data.brtable.address);
-+		else
-+			SStream_concat(O, "0x%" PRIx64,
-+				       MI->wasm_data.brtable.address);
- 		SStream_concat(O, "], 0x%x",
- 			       MI->wasm_data.brtable.default_target);
- 
+-		SStream_concat(O, "], 0x%x",
+-			       MI->wasm_data.brtable.default_target);
+-
++		printBranchTable(O, &MI->wasm_data.brtable);
+ 		break;
+ 	}
+ }
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
 index 52130880..f1d5ac2f 100644
 --- a/tests/unit/wasm_brtable_size.c
