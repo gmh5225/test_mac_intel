@@ -1,7 +1,7 @@
-name: Verify compact scalar text and operand details in 19 native build configurations
+name: Verify linkage, exported ABI and decoded records for shared scalar metadata in 19 build configurations
 on:
   push:
-    branches: [codex/dense-scalar-row-configurations]
+    branches: [codex/shared-scalar-public-exports]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scalar-row-fields-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: shared-row-abi-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

@@ -17,6 +17,22 @@ def run(label,*args):
     if ret.returncode:
         print((e/(label+'.log')).read_text(errors='replace')[-3200:],flush=True)
         ret.check_returncode()
+def exported_symbols(build):
+    platform_name=platform.system()
+    if platform_name=='Windows':
+        import re
+        library,={f.resolve() for f in build.rglob('*.dll') if 'capstone' in f.name.lower()}
+        text=sp.check_output(['dumpbin','/nologo','/exports',library],text=True,errors='replace')
+        names=re.findall(r'^\s*\d+\s+[0-9a-fA-F]+\s+[0-9a-fA-F]+\s+(\S+)',text,re.M)
+    elif platform_name=='Darwin':
+        names=sp.check_output(['nm','-gjU',build/'libcapstone.dylib'],text=True).split()
+    else:
+        text=sp.check_output(['nm','-D','--defined-only','--format=posix',build/'libcapstone.so'],text=True)
+        names=[line.split()[0] for line in text.splitlines() if line.split()]
+    assert any(name.lstrip('_').split('@')[0]=='cs_open' for name in names),names
+    assert all(not name.lstrip('_').startswith(('x86_simple_','x86_push_rows','x86_shift_rows')) for name in names)
+    return sorted(names)
+
 t=Path(tempfile.mkdtemp())
 b=t/'build'
 try:
@@ -49,6 +65,8 @@ try:
         log=(e/(name+'-units.log')).read_text(errors='replace')
         assert '100% tests passed' in log and all('unit_'+n in log for n in units)
         rows[name]=dict(units=units,skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
+        rows[name]['exports']=exported_symbols(b)
+        assert rows[name]['exports']==rows['base']['exports']
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
