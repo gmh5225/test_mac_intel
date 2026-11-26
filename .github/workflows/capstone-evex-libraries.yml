@@ -1,7 +1,7 @@
-name: Separate linked reader placement from the public Intel formatting dispatch
+name: Measure original and redirected public calls with the identical linked reader set
 on:
   push:
-    branches: [codex/shared-record-link-only-control]
+    branches: [codex/shared-iterator-object-link]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: formatted-link-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: format-original-object-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

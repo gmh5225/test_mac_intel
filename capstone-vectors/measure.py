@@ -1,4 +1,5 @@
 from pathlib import Path
+import shlex
 import hashlib,itertools,json,math,os,random,shutil,subprocess as sp,sys,tempfile
 r=Path(__file__).resolve().parent
 p=r.parent;e=p/'evidence';e.mkdir(exist_ok=True)
@@ -54,9 +55,14 @@ try:
                 return {sec.name:hashlib.sha256(sec.data()).hexdigest() for sec in ELFFile(io.BytesIO(image)).iter_sections() if sec['sh_flags']&4}
             base_text=section_digests(original_public);candidate_text=section_digests(full_public)
             save('public-text',dict(original=base_text,candidate=candidate_text,same=base_text==candidate_text,original_object=hashlib.sha256(original_public).hexdigest(),candidate_object=sha(public)))
+            commands=get('ninja','-C',build,'-t','commands',so.name).splitlines()
+            links=[shlex.split(part.strip()) for line in commands for part in line.split('&&') if ' -shared ' in part]
+            assert len(links)==1,links
+            args=links[0];assert (build/args[args.index('-o')+1]).resolve()==so and str(public.relative_to(build)) in args
+            save('link-arguments',dict(cwd=str(build),command=args))
             for which,blob in [('linked',original_public),('restore',full_public)]:
                 public.write_bytes(blob);so.unlink()
-                run('cmake','--build',build,'--target','capstone_shared','--parallel','4')
+                run(*args,cwd=build)
                 assert public.read_bytes()==blob
                 if which=='restore':assert so.read_bytes()==images['candidate']
                 else:
