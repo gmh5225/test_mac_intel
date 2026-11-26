@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 5a8f1bff..32277419 100644
+index 5a8f1bff..1bdfaf7f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1098,11 +1098,13 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
@@ -14,12 +14,12 @@ index 5a8f1bff..32277419 100644
          if(capstone_enabled_architectures STREQUAL "X86")
              target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
 +        elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-+            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_ELF_ITERATOR)
++            target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_X86_SELECT_ITERATOR)
          else()
              target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
          endif()
 diff --git a/Makefile b/Makefile
-index 95e046b2..2c4dbe3a 100644
+index 95e046b2..97811e30 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -315,6 +315,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
@@ -28,93 +28,273 @@ index 95e046b2..2c4dbe3a 100644
  	CFLAGS += -DCAPSTONE_STATIC_X86_READERS
 +else ifeq ($(CAPSTONE_STATIC):$(CAPSTONE_SHARED):$(CAPSTONE_DIET):$(CAPSTONE_X86_REDUCE),yes:no:no:no)
 +ifneq ($(filter linux-arm64 linux-amd64,$(MIXED_STORAGE_TARGET)),)
-+	CFLAGS += -DCAPSTONE_X86_ELF_ITERATOR
++	CFLAGS += -DCAPSTONE_X86_SELECT_ITERATOR
 +endif
  endif
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..e128ad2d 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -350,4 +350,27 @@ X86ScanBatchResult X86_scanNativeBatch(csh ud, const uint8_t *code, size_t size,
+ #endif
+ 	return X86_scanBatch(ud, code, size, address, output, capacity);
+ }
++#ifdef CS_X86_SELECTED_ITERATOR
++/* The batch tables certify both length and public ID. A miss leaves the
++ * record and all three cursors available to the standard iterator. */
++bool X86_tryPlannedIterator(cs_struct *handle, const uint8_t **code,
++			    size_t *size, uint64_t *address, cs_insn *insn,
++			    bool wide)
++{
++	if (handle->insn_id != X86_get_insn_id || handle->disasm != X86_getInstruction)
++		return false;
++	const uint32_t word = wide ? readFirst64(*code, *size) : readFirst32(*code, *size);
++	if (!word)
++		return false;
++	const X86ScanResult result = { 0, word >> 8, (uint16_t)(word & 255), 0 };
++	handle->errnum = CS_ERR_OK;
++	insn->address = *address;
++	finish_x86_scan(handle, insn, &result, *code, false, true);
++	*code += result.length;
++	*size -= result.length;
++	*address += result.length;
++	return true;
++}
++#endif
++
+ #endif
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 06cc61ae..f0bf918e 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -51,6 +51,12 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+ #define CAPSTONE_X86_PUBLIC_FIXED_RECORD
+ #endif
+ 
++#ifdef CS_X86_SELECTED_ITERATOR
++CAPSTONE_INTERNAL bool X86_tryPlannedIterator(cs_struct *handle,
++	const uint8_t **code, size_t *size, uint64_t *address,
++	cs_insn *insn, bool wide);
++#endif
++
+ bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..5112d8db 100644
+index 197453cb..c51aa6d0 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3795,10 +3795,16 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3800,7 +3800,30 @@ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+ {
++#ifdef CS_X86_SELECTED_ITERATOR
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (!*size || !handle)
++		return false;
++	switch (handle->iterator_kind) {
++	case CS_ITER_TEXT32:
++		return X86_disasmIter32(ud, code, size, address, insn);
++	case CS_ITER_TEXT64:
++		return X86_disasmIterText(ud, code, size, address, insn);
++	case CS_ITER_SCAN32:
++	case CS_ITER_SCAN64:
++		if (X86_tryPlannedIterator(handle, code, size, address, insn,
++					   handle->iterator_kind == CS_ITER_SCAN64))
++			return true;
++		/* An unclassified or truncated instruction uses the canonical scan. */
++		/* fall through */
++	case CS_ITER_SCAN:
++		return cs_disasm_iter_selected(handle, code, size, address, insn, true);
++	default:
++		return cs_disasm_iter_selected(handle, code, size, address, insn, false);
++	}
++#else
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
++#endif
+ }
+ 
+ X86_DECODE_ALIGN
+diff --git a/cs.c b/cs.c
+index d0b8b045..0002902d 100644
+--- a/cs.c
++++ b/cs.c
+@@ -856,6 +856,30 @@ const char *CAPSTONE_API cs_strerror(cs_err code)
+ 	}
+ }
+ 
++#ifdef CS_X86_SELECTED_ITERATOR
++/* Text, detail and bitness are handle options. The callback and syntax checks
++ * inside each reader still observe their current values on every decode. */
++static void select_public_iterator(cs_struct *handle)
++{
++	handle->iterator_kind = CS_ITER_FULL;
++	if (handle->arch != CS_ARCH_X86)
++		return;
++	if (handle->no_text) {
++		if (handle->detail_opt)
++			return;
++		handle->iterator_kind = CS_ITER_SCAN;
++		if (handle->mode == CS_MODE_32)
++			handle->iterator_kind = CS_ITER_SCAN32;
++		else if (handle->mode == CS_MODE_64)
++			handle->iterator_kind = CS_ITER_SCAN64;
++	} else if (handle->mode == CS_MODE_32) {
++		handle->iterator_kind = CS_ITER_TEXT32;
++	} else if (handle->mode == CS_MODE_64) {
++		handle->iterator_kind = CS_ITER_TEXT64;
++	}
++}
++#endif
++
+ CAPSTONE_EXPORT
+ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
+ {
+@@ -902,6 +926,9 @@ cs_err CAPSTONE_API cs_open(cs_arch arch, cs_mode mode, csh *handle)
+ 	if ((err = populate_insn_map_cache(ud)))
+ 		goto fail;
+ 
++#ifdef CS_X86_SELECTED_ITERATOR
++	select_public_iterator(ud);
++#endif
+ 	*handle = (uintptr_t)ud;
+ 	return CS_ERR_OK;
+ 
+@@ -1404,6 +1431,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 
+ 	case CS_OPT_TEXT:
+ 		handle->no_text = value == CS_OPT_OFF;
++#ifdef CS_X86_SELECTED_ITERATOR
++		select_public_iterator(handle);
++#endif
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
+ #endif
+@@ -1419,6 +1449,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 			handle->detail_opt = CS_OPT_OFF;
+ 		else
+ 			handle->detail_opt |= (cs_opt_value)value;
++#ifdef CS_X86_SELECTED_ITERATOR
++		select_public_iterator(handle);
++#endif
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
+ #endif
+@@ -1535,7 +1568,12 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 	if (!arch_configs[handle->arch].arch_option)
+ 		return CS_ERR_ARCH;
+ 
+-	return arch_configs[handle->arch].arch_option(handle, type, value);
++	cs_err err = arch_configs[handle->arch].arch_option(handle, type, value);
++#ifdef CS_X86_SELECTED_ITERATOR
++	if (err == CS_ERR_OK && type == CS_OPT_MODE)
++		select_public_iterator(handle);
++#endif
++	return err;
+ }
+ 
+ // generate @op_str for data instruction of SKIPDATA
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 4c4c34f2..ed2df3a3 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -199,14 +199,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+-					  uint64_t *address, cs_insn *insn)
++					  uint64_t *address, cs_insn *insn,
++					  bool scan)
+ {
+ 	uint16_t insn_size;
+ 	bool r;
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
+-	const bool scan = use_x86_scan(handle);
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+@@ -227,17 +227,14 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
  	return true;
  }
  
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+CAPSTONE_INTERNAL X86_DECODE_ALIGN
-+bool X86_disasmIterGeneric(csh ud, const uint8_t **code, size_t *size,
-+			   uint64_t *address, cs_insn *insn)
-+#else
- CAPSTONE_EXPORT
- X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
- 				 uint64_t *address, cs_insn *insn)
-+#endif
+-CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+-					  size_t *size, uint64_t *address,
+-					  cs_insn *insn)
++CS_DECODE_INLINE bool cs_disasm_iter_selected(struct cs_struct *handle,
++				      const uint8_t **code, size_t *size,
++				      uint64_t *address, cs_insn *insn,
++				      bool scan)
  {
- 	return cs_disasm_iter_core(ud, code, size, address, insn);
- }
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..f79b7407 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -39,6 +39,10 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- 	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
- #endif
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+	return X86_disasmIterGeneric(ud, code, size, address, insn);
-+#else
- 	return cs_disasm_iter(ud, code, size, address, insn);
-+#endif
- }
- #endif
-diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
-index 246ee26c..52c1b56d 100644
---- a/arch/X86/X86ScanAdapter.h
-+++ b/arch/X86/X86ScanAdapter.h
-@@ -10,6 +10,17 @@
- extern "C" {
- #endif
+-	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
+ 	cs_detail *detail;
+ 	bool r;
  
-+#if defined(CAPSTONE_X86_ELF_ITERATOR) && defined(__ELF__) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define X86_SHARED_ITERATOR_ENTRY
-+/* The public symbol starts in the fixed reader. Its fallback must enter
-+ * the generic iterator directly, including for foreign architectures. */
-+bool X86_disasmIterGeneric(csh handle, const uint8_t **code, size_t *size,
-+			   uint64_t *address, cs_insn *insn);
-+#endif
-+
- typedef struct X86ScanBatchResult {
- 	size_t count;
- 	size_t bytes;
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 7afca7e4..3d424404 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -276,10 +276,22 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
- {
- #ifdef CS_DECODE_TRY_OUTPUT
- 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+	if (!handle || handle->arch != CS_ARCH_X86 || handle->no_text)
-+		return X86_disasmIterGeneric(ud, code, size, address, insn);
-+	if (handle->mode == CS_MODE_64)
-+#else
- 	if (handle && handle->arch == CS_ARCH_X86 &&
- 	    handle->mode == CS_MODE_64 && !handle->no_text)
-+#endif
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
- #endif
- 	return X86_disasmIter32(ud, code, size, address, insn);
+-	if (*size == 0 || !handle)
+-		return false;
+-
+ 	// An instruction cs_malloc() allocated while detail was on keeps its
+ 	// detail after detail is turned off.  Much of the decoder tests only
+ 	// whether that pointer is set, so a decode without detail hides it, as
+@@ -245,9 +242,20 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+ 	detail = insn->detail;
+ 	if (CS_DECODE_LIKELY(!handle->detail_opt))
+ 		insn->detail = NULL;
+-	r = cs_disasm_iter_body(handle, code, size, address, insn);
++	r = cs_disasm_iter_body(handle, code, size, address, insn, scan);
+ 	insn->detail = detail;
+ 	return r;
  }
-+#ifdef X86_SHARED_ITERATOR_ENTRY
-+/* These two interfaces share cursor, skipdata and detail-pointer ownership. */
-+extern __typeof__(X86_disasmIterText) cs_disasm_iter
-+	__attribute__((alias("X86_disasmIterText"), visibility("default")));
-+#endif
+ 
++CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
++{
++	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
++	if (*size == 0 || !handle)
++		return false;
++	return cs_disasm_iter_selected(handle, code, size, address, insn,
++				       use_x86_scan(handle));
++}
 +
  #endif
+diff --git a/cs_priv.h b/cs_priv.h
+index 19ecedba..54f18e48 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -108,6 +108,22 @@ typedef struct insn_map {
+ #endif
+ } insn_map;
+ 
++#if defined(CAPSTONE_X86_SELECT_ITERATOR) && defined(__ELF__) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_DIET) && \
++	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_X86_SCAN_ADAPTER) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CS_X86_SELECTED_ITERATOR
++enum {
++	CS_ITER_FULL,
++	CS_ITER_SCAN,
++	CS_ITER_TEXT32,
++	CS_ITER_TEXT64,
++	CS_ITER_SCAN32,
++	CS_ITER_SCAN64,
++};
++#endif
++
+ struct cs_struct {
+ 	cs_arch arch;
+ 	cs_mode mode;
+@@ -142,6 +158,9 @@ struct cs_struct {
+ 	bool no_text; // CS_OPT_TEXT is off: instructions are not printed
+ 	bool skipdata; // set this to True if we skip data when disassembling
+ 	uint8_t skipdata_size; // how many bytes to skip
++#ifdef CS_X86_SELECTED_ITERATOR
++	uint8_t iterator_kind;
++#endif
+ 	cs_opt_skipdata skipdata_setup; // user-defined skipdata setup
+ 	const uint8_t *regsize_map; // map to register size (x86-only for now)
+ 	GetRegisterAccess_t reg_access;
