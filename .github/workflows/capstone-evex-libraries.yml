@@ -1,7 +1,7 @@
-name: Compare i386 accumulator output with equal-image controls and iced on real programs
+name: Measure i386 syntax routing against both iced formatters and the six-ISA release with identical controls
 on:
   push:
-    branches: [codex/scoped-accumulator-real-programs]
+    branches: [codex/i386-syntax-real-fast-formatter]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 2c135ac6040ff6b60075eefb09ebbaef5471773a
+          ref: 1145966d56390a5e3f454ad1b22068a97d484a0a
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-i386-accumulator-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: native-i386-syntax-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
