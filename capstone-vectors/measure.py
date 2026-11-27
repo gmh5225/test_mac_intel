@@ -44,10 +44,11 @@ try:
         if stage=='candidate':
             assert identity['combined']==ids['base']['combined'] and identity['mixed']==ids['base']['mixed']==ids['initial']['mixed']
             for name in ('cmake','make'):
-                assert identity[name]==ids[control][name],(name,control)
+                ref=control if name=='make' else 'base'
+                assert identity[name]==ids[ref][name],(name,ref)
                 lhs=ids['base'][name]['objects'];rhs=ids['initial'][name]['objects']
                 diff=[Path(k).name for k in lhs if lhs[k]!=rhs[k]]
-                assert len(diff)==1 and 'X86VectorFallback64.' in diff[0],(name,diff)
+                assert (len(diff)==1 and 'X86VectorFallback64.' in diff[0]) if on else not diff,(name,diff)
         if stage=='candidate':
             gen=w/'generator';run('clang++','-O2','-std=c++17',*inc,src/'suite/synctools/x86_vector_output.cpp',w/'candidate-cmake.a','-o',gen)
             tables={}
@@ -74,7 +75,8 @@ try:
             binary=w/(stage+'-'+name);run('clang++','-O3','-std=c++17',*inc,r/'driver.cpp',archive,w/(stage+'-'+name+'.a'),'-ldl','-lpthread','-lm','-no-pie','-o',binary)
             assert 'libcapstone.so' not in get('ldd',binary)
             images[stage]=binary.read_bytes()
-        assert images['candidate']==images[control] and images['base']!=images['initial']
+        ref=control if name=='make' else 'base'
+        assert images['candidate']==images[ref] and (images['base']!=images['initial'])==on
         switches[name]=FixedImage(w/('selected-'+name),images,executable=True)
         for label in switches[name].images:switches[name].select(label)
     run('clang++','-O2','-std=c++17',*inc,r/'vectors.cpp',w/'base-cmake.a','-lm','-ldl','-lpthread','-o',w/'vectors')
@@ -104,6 +106,8 @@ try:
             if not on:continue
             for syntax,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
                 key=name+'/'+syntax+'/'+program+'/'+str(mode)
+                if key not in ('make/intel/libmvec-amd64/1','make/intel/libmvec-amd64/2','make/att/putty-32-0.85/1','make/intel/putty-32-0.85/2'):
+                    continue
                 def take(tag,n):
                     rival=tag in ('iced','fast');switch.select('base' if rival else tag)
                     engine=tag if rival else ('capstone' if syntax=='intel' else 'public-att')

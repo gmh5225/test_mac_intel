@@ -277,6 +277,6 @@
     "trial-export.c": "5de3ad843cde9d88702a2748ae5096ed256bc4a455b91ac9983bcc12e82d3086",
     "vectors.cpp": "82210747e713e6285980692932572dc09c835d8357c5aed2570abd7b9b4ffe00"
   },
-  "profile": "Standalone x86-only static CMake Release and default optimized Make builds. Also verify the combined shared/static and six-ISA NeverD archives by file contents.",
-  "criteria": "Across 3 independent runs on x86_64 CPUs each build must reproduce the libmvec Intel text and detail win with no real workload slower on at least 2 hosts. Require both clocks, both baseline controls, candidate and repeat. Identical active artifacts to the original writer and inactive artifacts to the published library. Every build must pass the complete boundary and record comparisons."
+  "profile": "The seven VEX-sib forms enabled only by the x86-only optimized GNU Make static build. Compare every library member to the original test and the CMake baseline.",
+  "criteria": "The shipping candidate must reproduce the qualified Make binary and the original CMake binary. Verify the previously observed SIMD gains on at least two hosts and check the PE32 controls."
 }

@@ -1,18 +1,3 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..2bda7110 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1123,6 +1123,10 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
-         AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE))
-         if(capstone_enabled_architectures STREQUAL "X86")
-             target_sources(capstone_x86_native PRIVATE arch/X86/X86PublicOutput.c)
-+            if(CAPSTONE_BUILD_STATIC_LIBS AND NOT CAPSTONE_BUILD_SHARED_LIBS)
-+                set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
-+                    COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_STATIC_INDEXED_MOVES>")
-+            endif()
-         else()
-             target_compile_definitions(capstone_build_settings INTERFACE CAPSTONE_STATIC_X86_READERS)
-         endif()
 diff --git a/Makefile b/Makefile
 index 74370fdc..9772a084 100644
 --- a/Makefile
