@@ -1,22 +1,23 @@
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index d7db69c3..093cbeab 100644
+index d7db69c3..181726ba 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -39,6 +39,22 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
+@@ -39,6 +39,23 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
  }
  #endif
  
++/* A custom formatter can inspect the format as well as the value. */
 +static void printTableAddress(SStream *out, uint64_t address)
 +{
-+	bool narrow = address <= UINT32_MAX;
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+	/* The system formatter accepts the full-width type for every address.
-+	 * Preserve the original format passed to user callbacks for small values. */
-+	narrow = narrow && cs_vsnprintf != cs_default_vsnprintf;
++	if (cs_vsnprintf == cs_default_vsnprintf && out->index < SSTREAM_BUF_LEN - 1) {
++		SStream_concat_hex64(out, address, false);
++		return;
++	}
 +#endif
-+	if (narrow)
++	if (address <= UINT32_MAX)
 +		SStream_concat(out, "0x%x", (unsigned)address);
 +	else
 +		SStream_concat(out, "0x%" PRIx64, address);
@@ -25,7 +26,7 @@ index d7db69c3..093cbeab 100644
  void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  {
  #ifdef WASM_LITERAL_NAMES
-@@ -101,7 +117,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+@@ -101,7 +118,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  
  	case WASM_OP_BRTABLE:
  		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
@@ -35,7 +36,7 @@ index d7db69c3..093cbeab 100644
  			       MI->wasm_data.brtable.default_target);
  
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
-index 52130880..f1d5ac2f 100644
+index 5ae892b4..00821c17 100644
 --- a/tests/unit/wasm_brtable_size.c
 +++ b/tests/unit/wasm_brtable_size.c
 @@ -120,6 +120,24 @@ static int check_i64_constant(csh handle)
@@ -60,16 +61,15 @@ index 52130880..f1d5ac2f 100644
 +	return !ok;
 +}
 +
- int main(void)
+ static int check_mixed_targets(csh handle)
  {
- 	csh h;
-@@ -127,7 +145,8 @@ int main(void)
- 		return 1;
+ 	/* Start in the middle of an eight-target group, and immediately
+@@ -158,7 +176,7 @@ int main(void)
  
  	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
--	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
-+	    run_count_case(h, 65531, 5) || check_i64_constant(h) ||
-+	    check_table_address(h)) {
+ 	    run_count_case(h, 65531, 5) || check_i64_constant(h) ||
+-	    check_mixed_targets(h)) {
++	    check_mixed_targets(h) || check_table_address(h)) {
  		cs_close(&h);
  		return 1;
  	}
