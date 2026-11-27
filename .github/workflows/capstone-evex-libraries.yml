@@ -1,7 +1,7 @@
-name: Measure the separate WebAssembly table address printer with real modules and formatter callbacks
+name: Check a single default WebAssembly table append on real modules
 on:
   push:
-    branches: [codex/wasm-table-printer-modules]
+    branches: [codex/wasm-table-fields-modules]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-table-printer-modules-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-table-fields-modules-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
