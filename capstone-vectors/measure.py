@@ -78,13 +78,24 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
-        # Compile the natural executable first. Inspect the actual built-in formatter calls.
-        asm=get('objdump','-d','--disassemble=cs_decode_full_insn',w/label)
-        body=asm.split('<cs_decode_full_insn>:',1)[1].split('Disassembly of section',1)[0].strip()
-        assert body
-        calls={symbol:[line.strip() for line in body.splitlines() if '<'+symbol+'>' in line]
-               for symbol in ('SStream_opt_unum','SStream_trimls','SStream_Init')}
-        save('stream-calls-'+label,dict(instructions=sum(':' in l for l in body.splitlines()),calls=calls))
+        run('clang','-O2','-std=c99','-I',base,r/'trim-domain.c',lib,'-o',w/'trim-domain')
+        checked=int(get(w/'trim-domain'))
+        run('clang','-O2','-std=c99','-I',base,'-c',r/'visits.c','-o',w/'visits.o')
+        run('clang++',w/'foreign.o',w/'visits.o',lib,'-no-pie','-Wl,--wrap=SStream_trimls','-o',w/'trim-census')
+        coverage={}
+        for row in foreign_rows:
+            if row['arch'] in ('i386','amd64'):continue
+            for mode in range(3):
+                args=[row['arch'],w/(row['name']+'.text'),str(mode),'1']
+                ref=list(map(int,get(w/('foreign-'+label),*args).split()))[2:]
+                measured=sp.run([w/'trim-census',*args],capture_output=True,text=True,check=True)
+                rec=list(map(int,measured.stdout.split()))[2:]
+                visit=list(map(int,measured.stderr.split()))
+                assert rec==ref and len(visit)==2 and 0<=visit[1]<=visit[0]
+                coverage[row['name']+'/'+str(mode)]=dict(calls=visit[0],indented=visit[1],records=rec)
+        assert len(coverage)==15
+        asm=get('objdump','-d','--disassemble=SStream_trimls',w/label).split('<SStream_trimls>:',1)[1].split('Disassembly of section',1)[0].strip()
+        save('trim-observations-'+label,dict(edge_cases=checked,coverage=coverage,assembly=asm))
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))

@@ -1,7 +1,7 @@
-name: Measure format stream option and whitespace handling on PE, ELF and firmware
+name: Measure the shared whitespace trimmer and count real ARM, MIPS, PowerPC and RISC-V calls
 on:
   push:
-    branches: [codex/printer-stream-formatting-boundaries]
+    branches: [codex/shared-stream-first-character]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: stream-formatting-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: stream-trim-shared-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
