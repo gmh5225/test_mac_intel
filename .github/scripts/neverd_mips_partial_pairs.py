@@ -46,6 +46,7 @@ def main():
         parser.add_argument(name, type=Path)
     parser.add_argument("--rounds", type=int, default=16, help="paired trials per linker location")
     parser.add_argument("--cli", type=Path, help="use a separate CLI for a local diagnostic run")
+    parser.add_argument("--pic", action="store_true", help="use a PIC callee in the partially linked input")
     args = parser.parse_args()
     assert args.rounds > 0 and args.rounds % 4 == 0
     project = args.project.resolve()
@@ -78,7 +79,8 @@ def main():
             d.mkdir()
             inputs = d / "combined"
             inputs.mkdir()
-            assert m.build_upgrade_objects(old, new, d, inputs, profile, True) == ["calc.o"]
+            model = "pic" if args.pic else "static"
+            assert m.build_upgrade_objects(old, new, d, inputs, profile, model) == ["calc.o"]
             obj = {name: m.verify_partial_object(inputs / name, profile) for name in ("calc.o", "updated.o")}
             staged = d / "direct-input"
             staged.mkdir()
@@ -89,6 +91,10 @@ def main():
                      function="calc", layout="base.ld", section=".calc.update", sectionLayout="section.ld"))
             original = d / "original.elf"
             run([old.lld, "-static", "-T", d / "base.ld", "-o", original, d / "calc.o"])
+            if args.pic:
+                from elftools.elf.elffile import ELFFile
+                with original.open("rb") as stream:
+                    m.inspect_elf(ELFFile(stream), profile, require_pic_marker=True)
             signatures = {"original": signature(original)}
             reference[profile.name] = {}
             for mode in m.MODES:
@@ -129,7 +135,8 @@ def main():
                             assert digest(d / "updated.elf") == reference[name][mode][ver], (phase, mode, ver, name)
                     if index:
                         rows[mode].append(row)
-    report = {"sources": REVISIONS, "cli_sha256": digest(cli), "host": platform.platform(), "programs": programs,
+    report = {"sources": REVISIONS, "model": "pic" if args.pic else "static",
+              "cli_sha256": digest(cli), "host": platform.platform(), "programs": programs,
               "raw_oracles": reference, "linkers": {k: digest(v) for k, v in linkers.items()}, "pairs": 2 * args.rounds,
               "samples": rows, "result": {mode: {metric: paired(values, metric) for metric in ("cpu", "wall")}
                                           for mode, values in rows.items()}}

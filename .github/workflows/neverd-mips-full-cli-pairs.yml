@@ -1,12 +1,12 @@
 name: MIPS native Release CLI comparison
 on:
   push:
-    branches: [codex/mips-r15-full-cli-pairs]
+    branches: [codex/mips-pic-cli-pairs]
 permissions:
   contents: read
 env:
-  BASE_PROJECT: 22d8488f6dfc8dab4c3b0d404549fd06c03fb39c
-  NEW_PROJECT: 1bab85d4402a68bdf3c1b789bab37c8b7ea3f502
+  BASE_PROJECT: c8b0efbd3345c20a0a5da9542ca1d1f6e8a6e782
+  NEW_PROJECT: f81e1d7fb33b543dee6a8ad8a7abafccf9e9c4a6
   BASE_LLVM: 6947b7db63e913244e0aa6de087d1ad2e791e86f
   NEW_LLVM: 54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00
 jobs:
@@ -135,6 +135,8 @@ jobs:
           if [[ "$RUNNER_OS" == macOS ]]; then rounds=32; fi
           python .github/scripts/neverd_mips_partial_pairs.py project build-mips-tools/bin \
             "$dest/slot-0" "$dest/partial.json" --rounds "$rounds"
+          python .github/scripts/neverd_mips_partial_pairs.py project build-mips-tools/bin \
+            "$dest/slot-0" "$dest/partial-pic.json" --rounds "$rounds" --pic
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: mips-native-pairs-${{ runner.os }}
@@ -142,4 +144,5 @@ jobs:
             project/build-neverd-pair/paired/pairs-*.json
             project/build-neverd-pair/paired/compiler.json
             project/build-neverd-pair/paired/partial.json
+            project/build-neverd-pair/paired/partial-pic.json
           if-no-files-found: error
