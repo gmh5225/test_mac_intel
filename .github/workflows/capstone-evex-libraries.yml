@@ -1,7 +1,7 @@
-name: Verify the private firmware reader itself on two linkers and all output states
+name: Test ordinary and native public dispatch in executables and shared clients with both ELF linkers
 on:
   push:
-    branches: [codex/native-firmware-guard-pages]
+    branches: [codex/late-x86-iterator-binding-domain]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-firmware-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: archive-iterator-binding-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

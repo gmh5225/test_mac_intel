@@ -1,16 +1,33 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..dacda504 100644
+index cea06480..c9441ba1 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1092,6 +1092,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86Vex32Output.c arch/X86/X86RegisterFallback32.c
++        set(capstone_x86_real_mode_output ON)
++        set_property(SOURCE arch/X86/X86Vex32Output.c arch/X86/X86RealModeOutput.c
 +            APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_REAL_MODE_OUTPUT>")
      endif()
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+@@ -1152,7 +1155,14 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+         else()
+             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+         endif()
+-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
++        set(capstone_static_native $<TARGET_OBJECTS:capstone_x86_native>)
++        if(capstone_x86_real_mode_output)
++            # Keep the optional firmware writer after the alias lookups used by other backends.
++            target_sources(capstone_x86_native PRIVATE "$<$<CONFIG:Release>:arch/X86/X86RealModeOutput.c>")
++            list(APPEND capstone_static_tail "$<FILTER:${capstone_static_native},INCLUDE,/X86RealModeOutput[.]c[.]o$>")
++            set(capstone_static_native "$<FILTER:${capstone_static_native},EXCLUDE,/X86RealModeOutput[.]c[.]o$>")
++        endif()
++        list(APPEND capstone_static_objects ${capstone_static_native} ${capstone_static_tail})
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
 diff --git a/arch/X86/X86GenStack16Output.inc b/arch/X86/X86GenStack16Output.inc
 new file mode 100644
 index 00000000..be506cb3
@@ -42,30 +59,32 @@ index 62d4288a..8b86a665 100644
  /* Called by the static AMD64 iterator with at least one input byte. */
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index 251c6819..411f1c1e 100644
---- a/arch/X86/X86RegisterFallback32.c
-+++ b/arch/X86/X86RegisterFallback32.c
-@@ -19,6 +19,12 @@
- #define X86_GROUP3_REGISTER_OUTPUT
- #include "X86GenGroup3Registers32.inc"
- #endif
-+#ifdef X86_FIXED_REAL_MODE_OUTPUT
+diff --git a/arch/X86/X86RealModeOutput.c b/arch/X86/X86RealModeOutput.c
+new file mode 100644
+index 00000000..ac427601
+--- /dev/null
++++ b/arch/X86/X86RealModeOutput.c
+@@ -0,0 +1,74 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "../../cs_priv.h"
++#if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_real_mode_text" rodata = ".cs_x86_real_mode_rodata"
++#endif
++#include "X86OutputOptions.h"
++#include "X86RegisterImmediateOutput.h"
 +#include "X86ScanAdapter.h"
++#include "X86GenTest32Registers.inc"
++
 +static bool tryRealModeRegister(cs_struct *handle, const uint8_t *code,
 +				size_t size, cs_insn *insn, uint16_t *length);
 +#define CS_DECODE_TRY_OUTPUT tryRealModeRegister
-+#endif
- #include "../../cs_disasm_internal.h"
- 
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-@@ -63,5 +69,62 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 	}
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
++#include "../../cs_disasm_internal.h"
 +
-+#ifdef X86_FIXED_REAL_MODE_OUTPUT
-+#pragma clang section text = ".cs_x86_real_mode_text" rodata = ".cs_x86_real_mode_rodata"
 +#include "X86GenStack16Output.inc"
 +
 +/* A single operand-size prefix selects 32-bit registers in real mode. */
@@ -120,8 +139,6 @@ index 251c6819..411f1c1e 100644
 +	return X86_disasmIter(handle, code, size, address, insn);
 +}
 +#endif
- #endif
- #endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 index d6f533e0..c9d0f55c 100644
 --- a/arch/X86/X86Vex32Output.c

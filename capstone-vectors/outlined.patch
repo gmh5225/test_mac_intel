@@ -1,16 +1,86 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..dacda504 100644
+index cea06480..9ae2979d 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1092,6 +1092,11 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86Vex32Output.c arch/X86/X86RegisterFallback32.c
++        set(capstone_x86_real_mode_output ON)
++        set_property(SOURCE arch/X86/X86DisassemblerDecoder.c arch/X86/X86RealModeOutput.c
++            APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_LINKED_PUBLIC_ITERATOR>")
++        set_property(SOURCE arch/X86/X86Vex32Output.c arch/X86/X86RealModeOutput.c
 +            APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_REAL_MODE_OUTPUT>")
      endif()
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+@@ -1152,7 +1157,14 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+         else()
+             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+         endif()
+-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
++        set(capstone_static_native $<TARGET_OBJECTS:capstone_x86_native>)
++        if(capstone_x86_real_mode_output)
++            # Keep the optional firmware writer after the alias lookups used by other backends.
++            target_sources(capstone_x86_native PRIVATE "$<$<CONFIG:Release>:arch/X86/X86RealModeOutput.c>")
++            list(APPEND capstone_static_tail "$<FILTER:${capstone_static_native},INCLUDE,/X86RealModeOutput[.]c[.]o$>")
++            set(capstone_static_native "$<FILTER:${capstone_static_native},EXCLUDE,/X86RealModeOutput[.]c[.]o$>")
++        endif()
++        list(APPEND capstone_static_objects ${capstone_static_native} ${capstone_static_tail})
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 709e1286..e9693bc5 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -53,6 +53,15 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+ #endif
+ #endif
+ 
++#if defined(X86_LINKED_PUBLIC_ITERATOR) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CAPSTONE_X86_LINKED_PUBLIC_ITERATOR
++CAPSTONE_INTERNAL bool cs_disasm_default_iter(csh ud, const uint8_t **code,
++					     size_t *size, uint64_t *address,
++					     cs_insn *insn);
++#endif
++
+ #if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..01b839be 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3795,14 +3795,26 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
+ 
++#ifdef CAPSTONE_X86_LINKED_PUBLIC_ITERATOR
++CAPSTONE_INTERNAL X86_DECODE_ALIGN
++bool cs_disasm_default_iter(csh ud, const uint8_t **code, size_t *size,
++			    uint64_t *address, cs_insn *insn)
++#else
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
++#endif
+ {
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 
++#ifdef CAPSTONE_X86_LINKED_PUBLIC_ITERATOR
++/* Ordinary static clients need only the decoder and its original iterator. */
++CAPSTONE_EXPORT __typeof__(cs_disasm_default_iter) cs_disasm_iter
++	__attribute__((weak, alias("cs_disasm_default_iter")));
++#endif
++
+ X86_DECODE_ALIGN
+ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 						   size_t size,
 diff --git a/arch/X86/X86GenStack16Output.inc b/arch/X86/X86GenStack16Output.inc
 new file mode 100644
 index 00000000..be506cb3
@@ -42,37 +112,40 @@ index 62d4288a..8b86a665 100644
  /* Called by the static AMD64 iterator with at least one input byte. */
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index 251c6819..411f1c1e 100644
---- a/arch/X86/X86RegisterFallback32.c
-+++ b/arch/X86/X86RegisterFallback32.c
-@@ -19,6 +19,12 @@
- #define X86_GROUP3_REGISTER_OUTPUT
- #include "X86GenGroup3Registers32.inc"
- #endif
-+#ifdef X86_FIXED_REAL_MODE_OUTPUT
+diff --git a/arch/X86/X86RealModeOutput.c b/arch/X86/X86RealModeOutput.c
+new file mode 100644
+index 00000000..002f969b
+--- /dev/null
++++ b/arch/X86/X86RealModeOutput.c
+@@ -0,0 +1,98 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "../../cs_priv.h"
++#if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_real_mode_text" rodata = ".cs_x86_real_mode_rodata"
++#endif
++#include "X86OutputOptions.h"
++#include "X86RegisterImmediateOutput.h"
 +#include "X86ScanAdapter.h"
++#include "X86GenTest32Registers.inc"
++
 +static bool tryRealModeRegister(cs_struct *handle, const uint8_t *code,
 +				size_t size, cs_insn *insn, uint16_t *length);
 +#define CS_DECODE_TRY_OUTPUT tryRealModeRegister
-+#endif
- #include "../../cs_disasm_internal.h"
- 
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-@@ -63,5 +69,62 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 	}
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
++#include "../../cs_disasm_internal.h"
 +
-+#ifdef X86_FIXED_REAL_MODE_OUTPUT
-+#pragma clang section text = ".cs_x86_real_mode_text" rodata = ".cs_x86_real_mode_rodata"
 +#include "X86GenStack16Output.inc"
 +
 +/* A single operand-size prefix selects 32-bit registers in real mode. */
 +static bool tryRealModeRegister(cs_struct *handle, const uint8_t *code,
 +				size_t size, cs_insn *insn, uint16_t *length)
 +{
-+	if (size < 2 || code[0] != X86_PREFIX_OPSIZE)
++	if (handle->arch != CS_ARCH_X86 || size < 2 ||
++	    code[0] != X86_PREFIX_OPSIZE)
 +		return false;
 +	const uint8_t opcode = code[1];
 +	const bool move = (opcode & 0xf8) == 0xb8 && size >= 6;
@@ -119,9 +192,30 @@ index 251c6819..411f1c1e 100644
 +		return cs_disasm_iter_core(handle, code, size, address, insn);
 +	return X86_disasmIter(handle, code, size, address, insn);
 +}
++
++#ifdef CAPSTONE_X86_LINKED_PUBLIC_ITERATOR
++/* This member is extracted by clients using the native x86 iterators. */
++CAPSTONE_EXPORT bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code,
++						size_t *size, uint64_t *address,
++						cs_insn *insn)
++{
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (!*size || !handle)
++		return false;
++	if (handle->arch != CS_ARCH_X86)
++		return cs_disasm_iter_core(ud, code, size, address, insn);
++	if (!handle->no_text && !handle->skipdata &&
++	    (handle->syntax == CS_OPT_SYNTAX_DEFAULT ||
++	     handle->syntax == CS_OPT_SYNTAX_INTEL)) {
++		if (handle->mode == CS_MODE_64 || handle->mode == CS_MODE_32)
++			return X86_disasmIterText(ud, code, size, address, insn);
++		if (handle->mode == CS_MODE_16)
++			return X86_disasmIterOtherMode(ud, code, size, address, insn);
++	}
++	return cs_disasm_default_iter(ud, code, size, address, insn);
++}
 +#endif
- #endif
- #endif
++#endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 index d6f533e0..c9d0f55c 100644
 --- a/arch/X86/X86Vex32Output.c

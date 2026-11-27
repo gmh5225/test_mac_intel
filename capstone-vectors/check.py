@@ -36,6 +36,8 @@ try:
         assert get('git','-C',s,'write-tree')==q[key]['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         lib,=build.rglob('libcapstone.a')
+        members_in_order=get('ar','t',lib).splitlines()
+        if tag!='base':assert members_in_order[-1]=='X86RealModeOutput.c.o',members_in_order[-7:]
         members={str(f.relative_to(build)):digest(f.read_bytes())for f in build.rglob('*.c.o')}
         assert len(members)>=60
         save('archive-'+tag,dict(archive=digest(lib.read_bytes()),objects=members))
@@ -63,11 +65,15 @@ try:
                 syms={}
                 for line in get('readelf','-sW',binary).splitlines():
                     v=line.split()
-                    if len(v)==8 and v[3]=='FUNC' and v[6]!='UND' and v[7] in ('cs_decode_full_insn','X86_disasmIterOtherMode','X86_disasmIterText','cs_disasm_iter'):syms[v[7]]=[int(v[1],16),v[4],v[5]]
+                    if len(v)==8 and v[3]=='FUNC' and v[6]!='UND' and v[7] in ('cs_decode_full_insn','X86_disasmIterOtherMode','X86_disasmIterText','cs_disasm_default_iter','cs_disasm_iter'):syms[v[7]]=[int(v[1],16),v[4],v[5]]
                 assert 'cs_disasm_iter' in syms and 'cs_decode_full_insn' in syms
                 native='X86_disasmIterText' in syms
                 assert native==(route=='linked'),(linker,tag,route,kind,native)
                 assert ('X86_disasmIterOtherMode' in syms)==(native and tag!='base')
+                if tag=='outlined':
+                    ordinary=syms['cs_disasm_default_iter']
+                    public=syms['cs_disasm_iter']
+                    assert (ordinary[0]==public[0])==(not native) and public[1]==('GLOBAL' if native else 'WEAK'),(linker,route,kind,syms)
                 kinds[kind]=dict(native=native,symbols=syms,sha256=digest(binary.read_bytes()))
             elf[tag+'/'+route]=kinds;save('binding',elf)
             if tag=='base':continue
@@ -76,7 +82,7 @@ try:
                 gen=w/'gen';run('clang++','-std=c++17','-O2','-I',s,'-I',s/'include',s/'suite/synctools/x86_simple_output.cpp',lib,'-o',gen)
                 assert sp.check_output([gen,'--stack16-registers'])==(s/'arch/X86/X86GenStack16Output.inc').read_bytes()
                 stack=list(map(int,get(w/'stack',baseline,current).split()))
-                assert stack[0]==4365312 and 0<stack[1]<stack[0],stack
+                assert stack[0]==8730624 and 0<stack[1]<stack[0],stack
                 save(tag+'-stack',dict(cases=stack,generator=True))
             guard=list(map(int,get(w/'guard',baseline,current).split()))
             assert guard==[5105184,2971712],guard
