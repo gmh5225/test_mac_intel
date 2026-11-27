@@ -55,7 +55,7 @@ try:
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
-            if profile not in ('diet','reduced') and name in ('base','search','uniform'):
+            if profile not in ('diet','reduced') and name in ('base','search','uniform','both_bits'):
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
                 assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]
@@ -86,6 +86,16 @@ try:
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result
+        if profile=='clang':
+            objects={str(v.relative_to(solo)):hashlib.sha256(v.read_bytes()).hexdigest() for v in solo.rglob('*.c.o') if str(v.relative_to(solo)).startswith('CMakeFiles/capstone')}
+            lib=next(solo.rglob('libcapstone.a'));members=sp.check_output(['ar','t',lib],text=True).splitlines()
+            assert sorted(Path(v).name for v in objects)==sorted(members)
+            assert all('X86_STATIC_INDEXED_MOVES' not in v['command'] for v in commands)
+            row=dict(archive=hashlib.sha256(lib.read_bytes()).hexdigest(),objects=objects)
+            rows[name]['library']=row
+            changed={Path(v).name for v in objects if rows['base']['library']['objects'][v]!=objects[v]}
+            expected={'base':set(),'search':set(),'uniform':{'X86MemoryFallback32.c.o'},'both_bits':{'X86MemoryFallback32.c.o','X86Sse64Output.c.o'}}[name]
+            assert changed==expected and (row['archive']==rows['base']['library']['archive'])==(not expected)
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:
