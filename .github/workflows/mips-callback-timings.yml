@@ -1,0 +1,42 @@
+name: macOS MIPS callback-table linker timings
+on:
+  push:
+    branches: [codex/mips-macos-callback-table-pairs]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: macos-15
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [27411, 27412]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: b8573d6c5e0066be33bb6e5e0657a25a050420b5
+          path: project
+          persist-credentials: false
+          sparse-checkout: scripts
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --no-deps --require-hashes -r project/scripts/requirements-binary-diff-bench.txt
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: fixed-mac-installations
+          run-id: 45933029071
+          github-token: ${{ github.token }}
+      - run: python .github/scripts/mips_callback_timings.py project mac-native-installations.tar.gz results.json --seed ${{ matrix.seed }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: callback-timings-${{ matrix.seed }}
+          path: results.json
+          if-no-files-found: error
