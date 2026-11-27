@@ -42,7 +42,9 @@ try:
    selected={name:dict(old=original[name],new=funcs[name])for name in sorted(common)if name in ('cs_disasm_iter','SStream_concat','X86_Intel_printInst','X86_ATT_printInst','X86_disasmIterText','X86_disasmIter32','tryOutput32','tryOutput64')}
    layouts[tag]=dict(original=len(original),candidate=len(funcs),common=len(common),moved=len(moved),examples=moved[:20],selected=selected)
    save('layout',layouts)
- assert len({v['exe'] for v in products.values()})==4
+ arm=platform.machine()=='aarch64'
+ assert products['candidate']==products['base' if arm else 'outlined']
+ assert products['base']!=products['outlined'] and len({v['exe'] for v in products.values()})==3
  save('products',products)
  os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
  image=FixedImage(w/'selected',{tag:(w/tag).read_bytes() for tag in stages},True)
@@ -73,7 +75,7 @@ try:
    image.select(stage)
    assert [list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]==trace
   ranges.write_bytes(table_bytes(included));selections[name]=dict(source=metadata,excluded_tables=removed,data_bytes=skipped,revised_count=len(spans),included=len(included),included_bytes=sum(n for _,n,_ in included),excluded=excluded,ranges=sha(ranges));audit[name]=trace;save('selections',selections);save('boundary-audit',audit)
-  if name=='sqlite-win-x64':assert not excluded,excluded
+  assert not excluded and sha(ranges)==q['ranges'][name]['ranges']
   counters={}
   for tag in stages:
    env=dict(os.environ,CAPSTONE_COUNT_FORMATS=str(w/'counts'),CAPSTONE_BENCH_ATT='1')
@@ -82,7 +84,7 @@ try:
    assert len(counts)==2;counters[tag]=dict(check=v[2:],calls=counts)
   assert counters['base']['calls'][0]>0 and all(x['check']==counters['base']['check'] for x in counters.values())
   assert counters['base']['calls']==counters['shipping']['calls']
-  assert counters['candidate']['calls'][0]==counters['outlined']['calls'][0]==0
+  assert counters['outlined']['calls'][0]==0 and counters['candidate']==counters['base' if arm else 'outlined']
   assert len({row['calls'][1] for row in counters.values()})==1
   save('format-calls-'+name,counters)
   for route in ('private','capstone'):

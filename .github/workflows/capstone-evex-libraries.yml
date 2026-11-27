@@ -1,7 +1,7 @@
-name: Compare format-token and format-string stream dispatch with paired real Intel and AT&T workloads
+name: Verify the scoped AT&T stream in complete SQLite and liblzma images on both host ISAs
 on:
   push:
-    branches: [codex/single-stream-register-dispatch]
+    branches: [codex/att-register-token-linux-x64-mixed]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: stream-reg-pe-and-elf-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scoped-att-reg-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
