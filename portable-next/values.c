@@ -27,7 +27,7 @@ int main(void)
 	MCInst mi = {0};
 	const cs_vsnprintf_t saved = cs_vsnprintf;
 	original_hook=saved;
-	const uint32_t values[]={0,1,9,10,15,16,127,128,255,256,4095,4096,65535,65536,0x12345678,0x80000000,0xffffffff};
+	const uint32_t values[]={0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,127,128,255,256,4095,4096,65535,65536,0x12345678,0x80000000,0xffffffff};
 	const size_t indices[] = {0, 1, 7, SSTREAM_BUF_LEN - 24, SSTREAM_BUF_LEN - 5, SSTREAM_BUF_LEN - 2, SSTREAM_BUF_LEN - 1, SSTREAM_BUF_LEN, SSTREAM_BUF_LEN + 8};
 	const wasm_op_type types[] = {WASM_OP_NONE, WASM_OP_VARUINT32, WASM_OP_VARUINT64, WASM_OP_UINT32, WASM_OP_UINT64, WASM_OP_IMM, WASM_OP_INT7, WASM_OP_BRTABLE};
 	unsigned long checks = 0;
