@@ -21,7 +21,7 @@ try:
     assert git('rev-parse','HEAD')==q['base']['commit']
     inputs=list(fixtures(r,w,m));assert len(inputs)==6
     for config in (['product','standalone','shared-mixed']if measured else ['product','standalone']):
-        project=w/config;project.mkdir();build=project/'build';multi=config!='standalone';expect='direct' if measured and config=='product' else 'base'
+        project=w/config;project.mkdir();build=project/'build';multi=config!='standalone';expect='direct' if measured and platform.machine()=='aarch64' and config=='product' else 'base'
         normal=(r/'CMakeLists.txt').read_text()
         prefix=normal[:normal.index('add_subdirectory')]
         targets=normal[normal.index('foreach(linkage static shared)'):].replace('    add_executable','    if(NOT TARGET capstone_\u0024{linkage})\n        continue()\n    endif()\n    add_executable',1)
@@ -53,8 +53,8 @@ try:
                 path=str((Path(z['directory'])/output).resolve())
                 if path in built:rows[built[path]]=z['command']
             assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
-            flags_per={key:'CAPSTONE_X86_COMPACT_SCALAR_ROWS' in cmd for key,cmd in rows.items()}
-            assert all(v==(tag=='candidate' and expect=='direct')for v in flags_per.values()),(config,tag,flags_per)
+            flags_per={key:'X86_FIXED_OUTPUT_PRECHECKED' in cmd for key,cmd in rows.items()}
+            assert all(v==(tag=='candidate' and expect=='direct' and Path(k).name=='X86Sse64Output.c.o') for k,v in flags_per.items()),(config,tag,flags_per)
             cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
             dest=project/tag;dest.mkdir()
             for kind in names:shutil.copy2(build/('probe_'+kind),dest)

@@ -1,7 +1,7 @@
-name: Compare the compiled Capstone objects and loaded scalar release products
+name: Compare the gated reader with both measured libraries across compiler and linkage configurations
 on:
   push:
-    branches: [codex/compiled-scalar-layout-identity]
+    branches: [codex/gated-amd64-reader-images]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/capstone
           fetch-depth: 2
-          ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
+          ref: 0eb3f0239e28e965d432a964d2e7e6b15fdb8b4a
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: compiled-scalar-layout-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: fixed-reader-config-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

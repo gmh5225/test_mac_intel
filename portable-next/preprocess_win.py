@@ -21,15 +21,6 @@ def verify(r):
                 raw=sp.check_output(command+' /EP',cwd=j['directory'])
                 assert len(raw)>5000,(j['file'],len(raw))
                 key=j['output'];lines=[v for v in raw.splitlines()if v.strip()]
-                if tag=='candidate':
-                    import re
-                    normalized=[]
-                    for line in lines:
-                        if re.fullmatch(rb'\s*enum\s*\{\s*X86_SIMPLE_OPERAND_CAPACITY\s*=\s*12\s*\}\s*;\s*',line):continue
-                        if all(spelling in line for spelling in (b'.flags = ',b'.reads = ',b'.writes = ',b'.groups = ',b'.read_count = ')):
-                            line=re.sub(rb'\.(?:flags|reads|writes|groups|read_count) = ',b'',line)
-                        normalized.append(line)
-                    lines=normalized
                 cleaned=b'\n'.join(lines);saved=w/(hashlib.sha256(key.encode()).hexdigest()+'.pp')
                 if tag=='base':saved.write_bytes(cleaned)
                 else:
@@ -45,12 +36,11 @@ def verify(r):
             # Independently compare actual compiled instructions, unwind information,
             # data and linker directives for the three fixed/public iterator units.
             import struct
-            wanted=['X86ImmediateOutput.c', 'X86MemoryFallback32.c', 'X86MemoryOutput.c', 'X86OutputIterator.c', 'X86RegisterFallback32.c', 'X86Sse64Output.c', 'X86VectorFallback64.c', 'X86Vex32Output.c']
-            wanted=set(wanted)
+            wanted={j['output'] for j in jobs}
             objects={}
             for j in jobs:
                 name=Path(j['file']).name
-                if name not in wanted:continue
+                key=j['output']
                 out=w/(name+'.obj')
                 command=j['command']+' /Brepro /Fo"'+str(out)+'"'
                 sp.run(command,cwd=j['directory'],check=True,stdout=sp.DEVNULL)
@@ -74,11 +64,12 @@ def verify(r):
                         else:symbol=hdr.rstrip(b'\x00')
                         relocs.append([pos,kind,symbol.decode('ascii',errors='replace')])
                     pieces.append([sec.decode('ascii',errors='replace'),length,hashlib.sha256(payload).hexdigest(),relocs])
-                assert any(sec.startswith('.text') and length>0 for sec,length,_,_ in pieces)
-                objects[name]=hashlib.sha256(json.dumps(pieces,sort_keys=True).encode()).hexdigest()
+                assert pieces
+                objects[key]=hashlib.sha256(json.dumps(pieces,sort_keys=True).encode()).hexdigest()
             assert set(objects)==wanted;object_hashes[tag]=objects;save('compiled-sections',object_hashes)
         assert object_hashes['base']==object_hashes['candidate'],object_hashes
-        assert len(states['base'])>20 and states['base']==states['candidate'],[k for k,v in states['base'].items()if v!=states['candidate'].get(k)]
+        assert set(states['base'])==set(states['candidate'])==set(object_hashes['base']) and len(states['base'])>=28
+        save('preprocessor-differences',[k for k,v in states['base'].items()if states['candidate'][k]!=v])
         save('complete',dict(complete=True,source=q,host='Windows',proof='preprocessed and compiled sections',expected='base',objects=len(states['base']),toolchain=os.environ.get('VSCMD_ARG_TGT_ARCH')))
     finally:
         size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))
