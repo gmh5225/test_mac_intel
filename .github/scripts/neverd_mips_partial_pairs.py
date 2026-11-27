@@ -47,6 +47,9 @@ def main():
     parser.add_argument("--rounds", type=int, default=16, help="paired trials per linker location")
     parser.add_argument("--cli", type=Path, help="use a separate CLI for a local diagnostic run")
     parser.add_argument("--pic", action="store_true", help="use a PIC callee in the partially linked input")
+    parser.add_argument("--direct", action="store_true", help="measure only the replacement link")
+    parser.add_argument("--identical", choices=("r14", "r15"), help="put identical linker bytes in both locations")
+    parser.add_argument("--seed", type=int, default=2911051)
     args = parser.parse_args()
     assert args.rounds > 0 and args.rounds % 4 == 0
     project = args.project.resolve()
@@ -58,9 +61,11 @@ def main():
         return SimpleNamespace(**{key: folder.resolve() / (name + suffix)
                                   for key, name in [("mc", "llvm-mc"), ("llc", "llc"), ("lld", "ld.lld")]})
     old, new = tools(args.old_dir), tools(args.new_dir)
-    linkers = {"r14": old.lld, "r15": new.lld}
-    for version, linker in linkers.items():
+    sources = {"r14": old.lld, "r15": new.lld}
+    for version, linker in sources.items():
         assert REVISIONS[version] in subprocess.check_output([linker, "--version"], text=True)
+    variants = {tag: args.identical or tag for tag in sources}
+    linkers = {tag: sources[version] for tag, version in variants.items()}
     cli = args.cli.resolve() if args.cli else args.new_dir.resolve() / ("neverd" + suffix)
     env = os.environ.copy()
     env["PATH"] = str(cli.parent) + os.pathsep + env["PATH"]
@@ -71,7 +76,7 @@ def main():
         assert stage["llvm"] == REVISIONS["r15"] and stage["files"][cli.name] == digest(cli)
     records, programs, reference = {}, {}, {}
     rows = {mode: [] for mode in m.MODES}
-    rng = random.Random(2911051)
+    rng = random.Random(args.seed)
     with tempfile.TemporaryDirectory(prefix="mips-partial-pairs-") as temp:
         root = Path(temp)
         for profile in m.profiles(1):
@@ -127,15 +132,21 @@ def main():
                     for ver in order:
                         cpu, wall = child_cpu(), time.perf_counter()
                         for d in records.values():
-                            run([cli, "patch", d / "original.elf", "--relink=" + str(d / "manifest.json"),
-                                 "--mode=" + mode, "--original-linker-path=" + str(old.lld),
-                                 "--linker-path=" + str(slots[ver]), "-o", d / "updated.elf"], env=env)
+                            if args.direct:
+                                layout = d / ("section.ld" if mode == "section" else "base.ld")
+                                run([slots[ver], "-static", "-T", layout, "-o", d / "updated.elf",
+                                     d / "direct-input" / "calc.o"], env=env)
+                            else:
+                                run([cli, "patch", d / "original.elf", "--relink=" + str(d / "manifest.json"),
+                                     "--mode=" + mode, "--original-linker-path=" + str(old.lld),
+                                     "--linker-path=" + str(slots[ver]), "-o", d / "updated.elf"], env=env)
                         row[ver] = {"cpu": child_cpu() - cpu, "wall": time.perf_counter() - wall}
                         for name, d in records.items():
                             assert digest(d / "updated.elf") == reference[name][mode][ver], (phase, mode, ver, name)
                     if index:
                         rows[mode].append(row)
     report = {"sources": REVISIONS, "model": "pic" if args.pic else "static",
+              "command": "direct" if args.direct else "public", "variants": variants, "seed": args.seed,
               "cli_sha256": digest(cli), "host": platform.platform(), "programs": programs,
               "raw_oracles": reference, "linkers": {k: digest(v) for k, v in linkers.items()}, "pairs": 2 * args.rounds,
               "samples": rows, "result": {mode: {metric: paired(values, metric) for metric in ("cpu", "wall")}
