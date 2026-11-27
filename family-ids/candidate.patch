@@ -1,67 +1,18 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3dc297b9..bd513f27 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -187,7 +187,7 @@ if(capstone_enabled_architectures STREQUAL "LOONGARCH")
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "PPC")
--    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS CAPSTONE_PPC_PRIMARY_DISPATCH)
-+    add_compile_definitions(CAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS CAPSTONE_PPC_PRIMARY_DISPATCH CAPSTONE_PPC_DEDICATED_MAPPING)
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "RISCV")
-diff --git a/Makefile b/Makefile
-index 0fe49035..2720955e 100644
---- a/Makefile
-+++ b/Makefile
-@@ -144,7 +144,7 @@ CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),powerpc)
--CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPATCH
-+CFLAGS += -DCAPSTONE_PPC_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_PPC_PRIMARY_DISPATCH -DCAPSTONE_PPC_DEDICATED_MAPPING
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
-diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
-index 6712b300..0fa421fc 100644
---- a/arch/PowerPC/PPCMapping.c
-+++ b/arch/PowerPC/PPCMapping.c
-@@ -297,15 +297,23 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
- void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
- {
- 	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
-+#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
-+	if (!MI->flat_insn->detail)
-+		return;
+diff --git a/arch/PowerPC/PPCInstPrinter.c b/arch/PowerPC/PPCInstPrinter.c
+index c23cb3ef..eaf77308 100644
+--- a/arch/PowerPC/PPCInstPrinter.c
++++ b/arch/PowerPC/PPCInstPrinter.c
+@@ -749,7 +749,12 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
+ 		map_set_fill_detail_ops(MI, true);
+ 		if (isAlias)
+ 			SStream_Close(O);
+-		printInstruction(MI, Address, O);
++#ifndef CAPSTONE_DIET
++		/* A closed stream cannot emit the canonical spelling. Only
++		 * a requested real-instruction detail record needs its operands. */
++		if (!isAlias || map_fill_detail_ops(MI))
 +#endif
- 	map_implicit_reads(MI, ppc_insns);
- 	map_implicit_writes(MI, ppc_insns);
- 	map_groups(MI, ppc_insns);
- 	PPC_add_branch_predicates(MI, Bytes, BytesLen);
- 	PPC_check_updates_cr0(MI);
-+#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
-+	PPC_get_detail(MI)->format = ppc_insns[MI->Opcode].suppl_info.ppc.form;
-+#else
- 	const ppc_suppl_info *suppl_info = map_get_suppl_info(MI, ppc_insns);
- 	if (suppl_info) {
- 		PPC_get_detail(MI)->format = suppl_info->form;
++			printInstruction(MI, Address, O);
+ 		if (isAlias)
+ 			SStream_Open(O);
  	}
-+#endif
- }
- 
- /// Initialize PPCs detail.
-@@ -343,7 +351,12 @@ bool PPC_getInstruction(csh handle, const uint8_t *bytes, size_t bytes_len,
- 	PPC_init_cs_detail(instr);
- 	DecodeStatus result = PPC_LLVM_getInstruction(
- 		handle, bytes, bytes_len, instr, size, address, info);
-+#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && defined(CAPSTONE_DIET)
-+	/* A DIET mapping row contains only its internal and public IDs. */
-+	map_cs_id(instr, ppc_insns, ARR_SIZE(ppc_insns));
-+#else
- 	PPC_set_instr_map_data(instr, bytes, bytes_len);
-+#endif
- 	return result != MCDisassembler_Fail;
- }
- 

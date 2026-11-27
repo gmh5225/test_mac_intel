@@ -1,7 +1,7 @@
-name: Qualify dedicated PowerPC mapping and verify complete mixed archives against their original bytes
+name: Measure the PowerPC canonical operand pass on dedicated and mixed ELF libraries
 on:
   push:
-    branches: [codex/powerpc-dedicated-record-mapping]
+    branches: [codex/qualify-ppc-canonical-alias-pass]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d3fe4c6a0c0fc4b3e41f01e05c904bbb99b83c6c
+          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -41,5 +41,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: ppc-detail-map-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: ppc-alias-pass-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

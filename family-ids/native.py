@@ -38,12 +38,12 @@ try:
     all_images[key]=variants
     before,after=variants['base'],variants['candidate'];assert set(before['objects'])==set(after['objects'])
     changed=[Path(f).name for f,a in before['objects'].items()if after['objects'][f]!=a]
-    if arches!=['PPC']:
+    if 'PPC' not in arches:
         assert before==after;shutil.rmtree(b);continue
-    if before==after:
-        assert diet, key
+    if diet:
+        assert before==after, key
     else:
-        assert changed==['PPCMapping.c.o'] and before['shared']!=after['shared'],(key,changed)
+        assert changed==['PPCInstPrinter.c.o'] and before['shared']!=after['shared'],(key,changed)
     run('c++','-std=c++17','-O2','-I',src/'include',r/'ppc-states.cpp','-ldl','-o',t/'ppc-states')
     state_check=get(t/'ppc-states',libraries['base'],libraries['candidate'],'4096')
     save('state-'+key,dict(result=state_check))
