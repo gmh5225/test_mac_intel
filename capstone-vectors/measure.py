@@ -61,6 +61,10 @@ try:
         run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'clear.cpp',lib,'-o',w/'check-clear')
         if label!='base' and os.uname().machine=='x86_64':
             run(sys.executable,'-B',base/'suite/synctools/x86_operand_specializations.py','--check')
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'sib.cpp',lib,'-o',w/'sib')
+        sib=list(map(int,get(w/'sib').split()))
+        assert sib==[4718592,1292448,9670172460966112773],(label,sib)
+        save('sib-domain-'+label,sib)
         check=list(map(int,get(w/'check-clear').split()))
         assert check[0]==1769472 and 0<check[1]<check[0]
         save('clear-'+label,check)
@@ -142,7 +146,7 @@ try:
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
     for name,bits,f,spans,_ in fixtures:
-        if bits!=32:continue
+        if name not in protocol['samples']:continue
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
@@ -173,7 +177,7 @@ try:
                             times[k].append(got[:2])
                         rows.append({k:[a+b for a,b in zip(*v)]for k,v in times.items()})
                     results[key]=dict(reps=reps,expected=expected,pairs=rows);save('observations',results)
-    assert len(results)==24 and verified['base']==verified['duplicate']!=verified['candidate']==verified['outlined']
+    assert len(results)==len(protocol['samples'])*len(protocol['routes'])*len(protocol['modes'])*len(protocol['formats']) and verified['base']==verified['duplicate']!=verified['candidate']==verified['outlined']
     save('complete',dict(complete=True,protocol=protocol,source=maps,archives=images,verified=verified,cpu=get('lscpu'),node=platform.node(),driver=sha(w/'driver.cpp')))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
