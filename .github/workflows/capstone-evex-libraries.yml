@@ -1,7 +1,7 @@
-name: Check weak public reader extraction and full record semantics on both ELF linkers
+name: Verify guaranteed public record tail calls on GNU ld and LLD
 on:
   push:
-    branches: [codex/public-reader-extraction-proof]
+    branches: [codex/firmware-record-tail-semantics]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: reader-extraction-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: firmware-record-linkers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

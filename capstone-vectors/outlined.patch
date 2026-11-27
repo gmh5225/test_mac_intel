@@ -92,10 +92,10 @@ index a03a42e9..8d606227 100644
  #endif
 diff --git a/arch/X86/X86PublicOutputImpl.h b/arch/X86/X86PublicOutputImpl.h
 new file mode 100644
-index 00000000..27623cdd
+index 00000000..8d3e5699
 --- /dev/null
 +++ b/arch/X86/X86PublicOutputImpl.h
-@@ -0,0 +1,67 @@
+@@ -0,0 +1,70 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -114,8 +114,9 @@ index 00000000..27623cdd
 +					    bool batch)
 +{
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+	if (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
-+	    handle->syntax != CS_OPT_SYNTAX_INTEL)
++	if (handle->arch != CS_ARCH_X86 ||
++	    (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
++	     handle->syntax != CS_OPT_SYNTAX_INTEL))
 +		return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +#endif
 +#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
@@ -132,11 +133,8 @@ index 00000000..27623cdd
 +#else
 +	/* The caller owns skipdata callbacks, bulk boundaries and the public
 +	 * cursors. A fixed iterator can fill this one record using local cursors. */
-+	if (!batch && !handle->skipdata && !handle->no_text
-+#ifndef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+	    && (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)
-+#endif
-+	) {
++	if (!batch && !handle->skipdata && !handle->no_text &&
++	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
 +		uint64_t address = insn->address;
 +		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
 +					     &size, &address, insn);
@@ -149,6 +147,11 @@ index 00000000..27623cdd
 +}
 +
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++#ifdef __clang__
++#define X86_RECORD_TAIL __attribute__((musttail))
++#else
++#define X86_RECORD_TAIL
++#endif
 +/* The outer gate can tail-call the generic reader for 16-bit firmware
 + * without making a stack frame for the native text iterator. */
 +CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
@@ -156,12 +159,12 @@ index 00000000..27623cdd
 +					    cs_insn *insn, uint16_t *length,
 +					    bool batch)
 +{
-+	if ((handle->mode != CS_MODE_32 && handle->mode != CS_MODE_64) ||
-+	    handle->arch != CS_ARCH_X86)
-+		return cs_decode_full_insn(handle, code, size, insn, length,
++	if (handle->mode == CS_MODE_16)
++		X86_RECORD_TAIL return cs_decode_full_insn(handle, code, size, insn, length,
 +					   batch);
-+	return decodePublicTextRecord(handle, code, size, insn, length, batch);
++	X86_RECORD_TAIL return decodePublicTextRecord(handle, code, size, insn, length, batch);
 +}
++#undef X86_RECORD_TAIL
 +#endif
 diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
 index 251c6819..4a764c2d 100644
