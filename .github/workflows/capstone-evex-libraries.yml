@@ -1,7 +1,7 @@
-name: Measure the linked real-mode stack writer on firmware alongside the PE, ELF and five other ISA workloads
+name: Compare public-only and native-linked architecture dispatch on real firmware, PE, ELF and five other ISAs
 on:
   push:
-    branches: [codex/public-real-mode-registers]
+    branches: [codex/foreign-record-bypass-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-mode-stack-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mixed-architecture-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

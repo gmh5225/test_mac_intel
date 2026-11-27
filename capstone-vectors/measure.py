@@ -53,6 +53,10 @@ try:
     from foreign_time import measure as time_foreign
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    marker=w/'native-reference.c'
+    marker.write_text('#include "arch/X86/X86ScanAdapter.h"\n__attribute__((used)) static __typeof__(&X86_disasmIterText) const native_reader = X86_disasmIterText;\n')
+    run('clang','-O2','-I',base,'-I',base/'include','-c',marker,'-o',w/'native-reference.o')
+    assert 'X86_disasmIterText' in get('nm','-u',w/'native-reference.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
@@ -79,22 +83,23 @@ try:
         if label!='base':assert rows==rd(e/'gpr-records-base.json'),(label,rows)
         save('gpr-records-'+label,rows)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-only-'+label))
+        run('clang++',w/'foreign.o',w/'native-reference.o',lib,'-no-pie','-o',w/('foreign-'+label))
         run('clang++',w/'public-only.o',lib,ice_lib,*flags,'-o',w/('ordinary-'+label))
         names=('X86_disasmIterText','cs_decode_full_insn','X86_decodePublicRecord','cs_disasm_iter')
         modes={}
-        for route,exe in [('native',w/label),('public_only',w/('ordinary-'+label)),('foreign',w/('foreign-'+label))]:
+        for route,exe in [('native',w/label),('public_only',w/('ordinary-'+label)),('foreign',w/('foreign-'+label)),('foreign_only',w/('foreign-only-'+label))]:
             with exe.open('rb') as fh:
                 elf=ELFFile(fh);tab=elf.get_section_by_name('.symtab');symbols={}
                 for name in names:
                     sym=next((x for x in (tab.get_symbol_by_name(name) or []) if x['st_shndx']!='SHN_UNDEF' and x['st_size']>0),None)
                     if sym is not None:symbols[name]=[sym['st_value'],sym['st_info']['bind'],sym['st_other']['visibility']]
                 allocated={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()] for v in elf.iter_sections() if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
-            resolved='X86_disasmIterText' in symbols;assert resolved==(route=='native'),(label,route,symbols)
+            resolved='X86_disasmIterText' in symbols;assert resolved==(route in ('native','foreign')),(label,route,symbols)
             active=os.uname().machine=='x86_64' and label!='base'
             assert ('X86_decodePublicRecord' in symbols)==active
             if active:
-                assert (symbols['X86_decodePublicRecord'][0]==symbols['cs_decode_full_insn'][0])==(route!='native'),(label,route,symbols)
+                assert (symbols['X86_decodePublicRecord'][0]==symbols['cs_decode_full_insn'][0])==(route not in ('native','foreign')),(label,route,symbols)
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
         if os.uname().machine=='x86_64' and label!='base':
@@ -293,6 +298,11 @@ try:
         from firmware16 import verify
         save('seabios16',verify(w,imgs,invoke,select))
     time_foreign(foreign_rows,w,save)
+    time_foreign(foreign_rows,w,save,'foreign-only')
+    programs=[dict(name=name,bits=bits,image=path,extents=w/(name+'.tsv')) for name,bits,path,_,_ in fixtures]
+    def ordinary_args(row,mode,n):
+        return ['capstone',str(mode),str(n),row['image'],row['extents'],str(row['bits'])]
+    time_foreign(programs,w,save,'ordinary',ordinary_args,18)
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
