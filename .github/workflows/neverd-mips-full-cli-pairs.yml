@@ -1,7 +1,7 @@
-name: MIPS native Release CLI comparison
+name: Mac MIPS CLI and linker comparisons
 on:
   push:
-    branches: [codex/mips-pic-cli-pairs]
+    branches: [codex/mips-macos-cli-components]
 permissions:
   contents: read
 env:
@@ -10,14 +10,12 @@ env:
   BASE_LLVM: 6947b7db63e913244e0aa6de087d1ad2e791e86f
   NEW_LLVM: 54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00
 jobs:
-  compare:
+  build:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18}
           - {os: macos-15, cc: clang, cxx: clang++}
-          - {os: windows-latest, cc: clang-cl, cxx: clang-cl}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 330
     defaults:
@@ -102,47 +100,115 @@ jobs:
             for tool in llc llvm-mc ld.lld; do cp -L "build-mips-tools/bin/$tool$suffix" "pair-installs/$release/"; done
             cmake -E rm -rf project/build-neverd-pair
           done
-      - name: Compare public commands with the full installations at swapped paths
+      - name: Retain the identical native installations and the r14 compiler control
         env:
-          NEVERD_PAIR_FULL_INSTALLATIONS: '1'
+          PREVIOUS_FORK: 6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312
         run: |
-          dest=project/build-neverd-pair/paired
-          mkdir -p "$dest"
-          rounds=24
-          if [[ "$RUNNER_OS" == macOS ]]; then rounds=96; fi
-          cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
-          cp .github/scripts/neverd_windows_child_cpu.py "$dest/"
-          mv pair-installs/r12 "$dest/slot-0"
-          mv pair-installs/r15 "$dest/slot-1"
-          python "$dest/bench.py" "$rounds" pairs-0.json "$dest/slot-0" "$dest/slot-1"
-          mv "$dest/slot-0" "$dest/staged"
-          mv "$dest/slot-1" "$dest/slot-0"
-          mv "$dest/staged" "$dest/slot-1"
-          python "$dest/bench.py" "$rounds" pairs-1.json "$dest/slot-1" "$dest/slot-0"
-      - name: Compare r14 and r15 MIPS compiler tools on common inputs
-        env:
-          ORIGINAL_LLVM: 6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312
-        run: |
-          dest=project/build-neverd-pair/paired
-          git -C llvm-src fetch --no-tags --depth=1 --filter=blob:none origin "$ORIGINAL_LLVM"
-          git -C llvm-src checkout --detach "$ORIGINAL_LLVM"
-          cmake --build build-mips-tools --parallel 4 --target llc llvm-mc lld
-          python .github/scripts/neverd_mips_compiler_pairs.py build-mips-tools/bin "$dest/slot-0" "$dest/compiler.json"
-      - name: Compare both modes on partially linked r14 programs
-        run: |
-          dest=project/build-neverd-pair/paired
-          rounds=16
-          if [[ "$RUNNER_OS" == macOS ]]; then rounds=32; fi
-          python .github/scripts/neverd_mips_partial_pairs.py project build-mips-tools/bin \
-            "$dest/slot-0" "$dest/partial.json" --rounds "$rounds"
-          python .github/scripts/neverd_mips_partial_pairs.py project build-mips-tools/bin \
-            "$dest/slot-0" "$dest/partial-pic.json" --rounds "$rounds" --pic
+          git -C llvm-src fetch --no-tags --depth=1 --filter=blob:none origin "$PREVIOUS_FORK"
+          git -C llvm-src checkout --detach "$PREVIOUS_FORK"
+          cmake --build build-mips-tools --parallel 4 --target llc lld llvm-mc
+          build-mips-tools/bin/ld.lld --version | grep -F -- "$PREVIOUS_FORK"
+          mkdir pair-installs/r14
+          for tool in llc llvm-mc ld.lld; do cp -L "build-mips-tools/bin/$tool" "pair-installs/r14/$tool"; done
+          find pair-installs -type f | LC_ALL=C sort | while IFS= read -r file; do shasum -a 256 "$file"; done > tools.sha256
+          tar -czf mac-native-installations.tar.gz pair-installs tools.sha256
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: mips-native-pairs-${{ runner.os }}
-          path: |
-            project/build-neverd-pair/paired/pairs-*.json
-            project/build-neverd-pair/paired/compiler.json
-            project/build-neverd-pair/paired/partial.json
-            project/build-neverd-pair/paired/partial-pic.json
+          name: fixed-mac-installations
+          path: mac-native-installations.tar.gz
+          compression-level: 0
+          retention-days: 3
+          if-no-files-found: error
+  compare:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.NEW_PROJECT }}
+          path: project
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: fixed-mac-installations
+      - name: Time both CLI and linker versions together and at fixed revisions
+        shell: bash
+        env:
+          TRIAL: ${{ matrix.host }}
+          NEVERD_PAIR_FULL_INSTALLATIONS: '1'
+        run: |
+          set -eo pipefail
+          echo 'pyelftools==0.33 --hash=sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036' > paired-requirements.txt
+          python -m pip install --require-hashes --no-deps -r paired-requirements.txt
+          tar -xzf mac-native-installations.tar.gz
+          shasum -a 256 -c tools.sha256
+          test "$(git -C project rev-parse HEAD)" = "$NEW_PROJECT"
+          dest=project/build-neverd-pair/paired
+          mkdir -p "$dest" results
+          cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
+          cp tools.sha256 results/
+          sw_vers > results/system.txt
+          sysctl -n machdep.cpu.brand_string >> results/system.txt
+          for release in r12 r15; do
+            ls -ln "pair-installs/$release" > "results/$release-files.txt"
+            size -m "pair-installs/$release/neverd" > "results/$release-cli-segments.txt"
+            size -m "pair-installs/$release/libneverd.dylib" > "results/$release-library-segments.txt"
+            otool -L "pair-installs/$release/neverd" > "results/$release-imports.txt"
+            nm "pair-installs/$release/neverd" | awk '/ELFLoader.*loadBuffer/{print}' > "results/$release-cli-elfloader.txt"
+          done
+          mv pair-installs/r12 "$dest/slot-0"
+          mv pair-installs/r15 "$dest/slot-1"
+          mv pair-installs/r14 "$dest/cc-0"
+          mkdir "$dest/cc-1"
+          for tool in llc llvm-mc ld.lld; do cp "$dest/slot-1/$tool" "$dest/cc-1/$tool"; done
+          for phase in 0 1; do
+            if [[ "$phase" == 1 ]]; then
+              for prefix in slot cc; do
+                mv "$dest/$prefix-0" "$dest/intermediate"
+                mv "$dest/$prefix-1" "$dest/$prefix-0"
+                mv "$dest/intermediate" "$dest/$prefix-1"
+              done
+            fi
+            old="$dest/slot-$phase"
+            new="$dest/slot-$((1-phase))"
+            export NEVERD_BENCH_SEED="$((14837 + 193 * TRIAL + 691 * phase))"
+            case "$TRIAL-$phase" in
+              1-0|2-1) schedule=(complete cli-at-r12 linker-at-r15 cli-at-r15 linker-at-r12 identical);;
+              1-1|3-0) schedule=(identical linker-at-r12 cli-at-r15 linker-at-r15 cli-at-r12 complete);;
+              *) schedule=(linker-at-r15 cli-at-r15 complete identical cli-at-r12 linker-at-r12);;
+            esac
+            for kind in "${schedule[@]}"; do
+              unset NEVERD_BENCH_FIXED_LLD NEVERD_BENCH_FIXED_CLI NEVERD_BENCH_COMPONENTS
+              case "$kind" in
+                complete) export NEVERD_BENCH_COMPONENTS=1;;
+                cli-at-r12) export NEVERD_BENCH_FIXED_LLD=r12;;
+                cli-at-r15) export NEVERD_BENCH_FIXED_LLD=r15;;
+                linker-at-r12) export NEVERD_BENCH_FIXED_CLI=r12;;
+                linker-at-r15) export NEVERD_BENCH_FIXED_CLI=r15;;
+                identical) export NEVERD_BENCH_FIXED_CLI=r15 NEVERD_BENCH_FIXED_LLD=r15;;
+              esac
+              python "$dest/bench.py" 48 "$kind-$phase.json" "$old" "$new"
+              cp "$dest/$kind-$phase.json" results/
+            done
+            python .github/scripts/neverd_mips_compiler_pairs.py "$dest/cc-$phase" "$dest/cc-$((1-phase))" \
+              "results/codegen-$phase.json" --case llc-micromips-n32 --rounds 48 --seed "$NEVERD_BENCH_SEED"
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mac-component-pairs-${{ matrix.host }}
+          path: results/
           if-no-files-found: error

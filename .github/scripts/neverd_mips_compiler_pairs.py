@@ -51,6 +51,8 @@ def main():
     parser.add_argument("new", type=Path)
     parser.add_argument("receipt", type=Path)
     parser.add_argument("--rounds", type=int, default=32)
+    parser.add_argument("--case", choices=("llc-micromips-n32",))
+    parser.add_argument("--seed", type=int, default=7714)
     args = parser.parse_args()
     bins = {"r14": args.old.resolve(), "r15": args.new.resolve()}
     refs = {"r14": "6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312", "r15": "54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00"}
@@ -78,14 +80,22 @@ def main():
             commands["lld-96k-"+abi] = {label:[tool(label,"ld.lld"),"--threads=1","-static","-e","f0",obj] for label in bins}
         output = tmp/"result"
         for case, variants in commands.items():
+            if args.case and case != args.case:
+                continue
             fingerprints = []
             for command in variants.values():
                 measure([*command, "-o", output])
                 fingerprints.append(signature(output))
             assert fingerprints[0] and fingerprints[0] == fingerprints[1], case
             samples = []
-            for round_id in range(args.rounds):
-                order = ("r14","r15") if round_id % 2 == 0 else ("r15","r14")
+            assert args.rounds % 4 == 0
+            rng = random.Random(args.seed)
+            schedule = []
+            for _ in range(args.rounds // 4):
+                balanced = [("r14","r15"), ("r15","r14")] * 2
+                rng.shuffle(balanced)
+                schedule.extend(balanced)
+            for order in schedule:
                 samples.append({label:measure([*variants[label], "-o", output]) for label in order})
             data["cases"][case] = {"cpu":summary(samples,"cpu"), "wall":summary(samples,"wall"), "samples":samples, "output":fingerprints[0]}
             print(case, data["cases"][case]["cpu"], data["cases"][case]["wall"], flush=True)

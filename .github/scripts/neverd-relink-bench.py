@@ -34,6 +34,14 @@ toolchains = dict(zip(("r12", "r15"), locations, strict=True))
 full_pair = os.environ.get("NEVERD_PAIR_FULL_INSTALLATIONS") == "1"
 cli = p.parent / "bin" / ("neverd" + suffix)
 clis = {label: folder / ("neverd" + suffix) if full_pair else cli for label, folder in toolchains.items()}
+fixed_cli = os.environ.get("NEVERD_BENCH_FIXED_CLI")
+fixed_linker = os.environ.get("NEVERD_BENCH_FIXED_LLD")
+components = os.environ.get("NEVERD_BENCH_COMPONENTS") == "1"
+drivers = {label: folder / ("ld.lld" + suffix) for label, folder in toolchains.items()}
+if fixed_cli:
+    clis = {label: clis[fixed_cli] for label in toolchains}
+if fixed_linker:
+    drivers = {label: drivers[fixed_linker] for label in toolchains}
 cli_envs = {}
 provenance = {}
 for label, executable in clis.items():
@@ -59,7 +67,8 @@ for label, executable in clis.items():
     provenance[label] = record
 if full_pair and "neverd" in provenance["r12"]:
     assert provenance["r12"]["dependencies"] == provenance["r15"]["dependencies"]
-rng = random.Random(20261126)
+seed = int(os.environ.get("NEVERD_BENCH_SEED", "20261126"))
+rng = random.Random(seed)
 rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 32
 receipt = sys.argv[2] if len(sys.argv) > 2 else "perf.json"
 
@@ -95,9 +104,15 @@ def cpu():
 
 def measure(commands):
     w, t = perf_counter(), cpu()
+    before = resource.getrusage(resource.RUSAGE_CHILDREN) if not windows else None
     for cmd in commands:
         run(cmd)
-    return dict(wall=perf_counter() - w, cpu=cpu() - t)
+    result = dict(wall=perf_counter() - w, cpu=cpu() - t)
+    if before:
+        after = resource.getrusage(resource.RUSAGE_CHILDREN)
+        for field in ("ru_utime", "ru_stime", "ru_minflt", "ru_majflt", "ru_nvcsw", "ru_nivcsw"):
+            result[field] = getattr(after, field) - getattr(before, field)
+    return result
 
 
 def report(rows):
@@ -131,8 +146,11 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
     ]
     public_kinds = m.MODES if windows or full_pair else ("public",)
     kinds = (*public_kinds, "many-relocations", "codegen")
+    extras = ("startup", "direct-section", "direct-inplace") if components else ()
+    kinds += extras
     commands = {k: {label: [] for label in toolchains} for k in kinds}
     know = {}
+    raw_files = {}
     for pf in matrix:
         folder = base / pf.name
         folder.mkdir()
@@ -157,8 +175,12 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 section=".calc.update",
             ),
         )
+        staged = folder / "direct-input"
+        staged.mkdir()
+        (staged / "calc.o").write_bytes((folder / "updated.o").read_bytes())
+        raw_files[pf.name] = {}
         for label, tools in toolchains.items():
-            driver = tools / ("ld.lld" + suffix)
+            driver = drivers[label]
             original = folder / (label + ".elf")
             run(
                 [
@@ -172,6 +194,9 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 ]
             )
             hashes = [guest_hash(original)]
+            raw_files[pf.name][label] = {"original": m.digest(original)}
+            if components:
+                commands["startup"][label].append([clis[label], "--version"])
             for mode in m.MODES:
                 output = folder / (label + mode + ".elf")
                 cmd = [
@@ -186,6 +211,19 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 ]
                 run(cmd)
                 hashes.append(guest_hash(output))
+                layout = folder / ("section.ld" if mode == "section" else "base.ld")
+                reference = folder / (label + mode + "-direct.elf")
+                replacement = [driver, "-static", "-T", layout, "-o", reference,
+                               *[staged / o if o == "calc.o" else folder / o for o in objects]]
+                run(replacement)
+                assert output.read_bytes() == reference.read_bytes()
+                raw_files[pf.name][label][mode] = m.digest(output)
+                if components:
+                    reproduce = [driver, "-static", "-T", folder / "base.ld", "-o",
+                                 folder / (label + "-reproduced.elf"), *[folder / o for o in objects]]
+                    run(reproduce)
+                    assert original.read_bytes() == (folder / (label + "-reproduced.elf")).read_bytes()
+                    commands["direct-" + mode][label].extend([reproduce, replacement])
                 commands[mode if windows or full_pair else "public"][label].append(cmd)
             if pf.name in know:
                 assert know[pf.name] == hashes, pf.name
@@ -259,7 +297,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 assert know[key] == h
             know[key] = h
     if windows or full_pair:
-        kinds = public_kinds
+        kinds = (*public_kinds, *extras)
     rows = {k: [] for k in kinds}
     for k in kinds:
         for label in toolchains:
@@ -279,8 +317,8 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 row[label] = measure(commands[k][label])
             rows[k].append(row)
     meta = {
-        label: subprocess.check_output([t / ("ld.lld" + suffix), "--version"], text=True).strip()
-        for label, t in toolchains.items()
+        label: subprocess.check_output([driver, "--version"], text=True).strip()
+        for label, driver in drivers.items()
     }
     result = dict(
         revisions=meta,
@@ -288,6 +326,10 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
         cli_sha256={label: m.digest(path) for label, path in clis.items()} if full_pair else m.digest(cli),
         sources=provenance,
         programs=know,
+        raw_files=raw_files,
+        distribution_files={label: json.loads((dir / "source.json").read_bytes()) for label,dir in toolchains.items()},
+        driver_hashes={label:m.digest(driver) for label,driver in drivers.items()},
+        configuration={"cli":fixed_cli, "linker":fixed_linker, "components":components, "seed":seed},
         cli_commands_per_trial=sum(len(commands[k]["r12"]) for k in public_kinds),
         installations={label: folder.name for label, folder in toolchains.items()},
         rounds=rounds,
