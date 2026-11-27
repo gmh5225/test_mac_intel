@@ -67,6 +67,12 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
         source.extend(bytes([opcode+4,0x7f,opcode+5,0x78,0x56,0x34,0x12]))
     for head in (0xf8,0xfc,0xe8,0x78):
         source.extend(bytes([0xc5,head,0x77,0x90]))
+    for prefix in (b'',bytes((0x66,)),bytes((0x67,0x66)),bytes((0x66,0x66)),bytes((0xf3,0x66))):
+        for op in range(0x4f,0x61):
+            source.extend(prefix+bytes((op,0x90)))
+        for op in range(0xb7,0xc1):
+            for imm in (0,9,10,127,128,0x80000000,0xffffffff):
+                source.extend(prefix+bytes((op,))+imm.to_bytes(4,'little'))
     sample=temp/'curated-x86.bin';sample.write_bytes(source)
     modes=[(0,0,0),(0,1,0)]
     if profile!='diet':modes.append((0,1,1))
