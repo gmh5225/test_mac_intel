@@ -99,7 +99,7 @@ try:
     arm=os.uname().machine=='aarch64'
     obj={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'}
     for before,after,expected in [('shipping','base',set() if arm else obj),
-        ('shipping','mask',set() if arm else obj|{'X86Vex32Output.c.o'}),('base','mask',set() if arm else {'X86MemoryFallback32.c.o','X86Vex32Output.c.o'})]:
+        ('shipping','mask',set() if arm else obj),('base','mask',set() if arm else {'X86MemoryFallback32.c.o'})]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
