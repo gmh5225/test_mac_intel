@@ -1,7 +1,7 @@
-name: Check cache-line alignment of the i386 batch scan loop with both text readers on real native CPUs
+name: Measure AMD64 reader-local and i386-loop alignment, recording all linked function positions
 on:
   push:
-    branches: [codex/aligned-i386-reader-real]
+    branches: [codex/amd64-reader-local-fetch-boundary]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: aligned-i386-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-reader-boundary-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

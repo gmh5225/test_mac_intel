@@ -78,6 +78,14 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
+        with (w/label).open('rb') as image:
+            elf=ELFFile(image);sec=elf.get_section_by_name('.symtab')
+            fn=sorted([x.name,x['st_value'],x['st_size']] for x in sec.iter_symbols() if x['st_info']['type']=='STT_FUNC' and x['st_size'])
+            if label=='base':baseline_functions=fn
+            assert len(fn)==len(baseline_functions)
+            shifts=[(x,y)for x,y in zip(baseline_functions,fn) if x!=y]
+            assert all(x[0]==y[0]for x,y in shifts)
+            save('function-extents-'+label,dict(functions=len(fn),changed=shifts,digest=hashlib.sha256(json.dumps(fn).encode()).hexdigest(),indirect=[x for x in fn if x[0]=='writeIndirect64']))
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
