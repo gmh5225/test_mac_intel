@@ -1,7 +1,7 @@
-name: Compare indexed Intel memory formatting with real SIMD and PE consumers
+name: Rebuild both NeverSight iced branch tips and compare release APIs on identical PE and ELF bytes
 on:
   push:
-    branches: [codex/bounded-index-expression]
+    branches: [codex/iced-fork-tip-performance]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1a02e3439e7162e79a9c1b8b8b56c5df7cfd770d
+          ref: ea94839fef3194402e46e262f0fc45dd8ff7982c
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -47,16 +47,23 @@ jobs:
           path: iced-source
           sparse-checkout: src/rust/iced-x86
           persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/iced
+          ref: 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31
+          path: iced-master
+          sparse-checkout: src/rust/iced-x86
+          persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
       - if: always()
-        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
+        run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source" "$GITHUB_WORKSPACE/iced-master"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bounded-index-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: iced-fork-tips-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
