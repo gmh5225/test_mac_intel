@@ -11,7 +11,7 @@ digest=lambda x:hashlib.sha256(x).hexdigest()
 m=rd(r/'experiment.json');q=rd(r/'source.json');linker='bfd' if os.environ['LD_REPLICA']=='1' else 'lld'
 w=Path(tempfile.mkdtemp());proj=w/'project';build=w/'build';elf={};records={}
 try:
-    assert get('git','-C',nd,'rev-parse','HEAD')==m['neverd'] and get('git','-C',s,'rev-parse','HEAD')==q['base']['commit']
+    assert get('git','-C',nd,'rev-parse','HEAD')==m['neverd'] and get('git','-C',s,'rev-parse','HEAD')==q['base']['parent']
     samples=list(fixtures(r,w,m));assert len(samples)==6
     (proj/'third_party').mkdir(parents=True);(proj/'third_party/capstone').symlink_to(s);(proj/'cmake').mkdir()
     cm='cmake/NeverDCapstoneCompilerOptions.inc';shutil.copyfile(nd/cm,proj/cm)
@@ -30,6 +30,8 @@ try:
     firmware=[('seabios16',16,rom,tsv),('scalar16',16,scalar,spans)]
     for tag,key in [('base','base'),('candidate','prefix'),('outlined','outlined')]:
         run('git','-C',s,'restore','--source=HEAD','--staged','--worktree','--','.')
+        pre=r/'base.patch';assert digest(pre.read_bytes())==q['base']['sha256']
+        run('git','-C',s,'apply','--index',pre)
         if tag!='base':
             patch=r/(tag+'.patch');assert digest(patch.read_bytes())==q[key]['sha256']
             run('git','-C',s,'apply','--index',patch)
@@ -78,8 +80,8 @@ try:
                 assert 'cs_disasm_iter' in syms and 'cs_decode_full_insn' in syms
                 native='X86_disasmIterText' in syms
                 assert native==(route=='linked'),(linker,tag,route,kind,native)
-                if tag=='base':assert 'X86_decodePublicRecord' not in syms
-                else:assert (syms['cs_decode_full_insn'][0]!=syms['X86_decodePublicRecord'][0])==native
+                assert 'X86_decodePublicRecord' in syms
+                assert (syms['cs_decode_full_insn'][0]!=syms['X86_decodePublicRecord'][0])==native
                 kinds[kind]=dict(native=native,symbols=syms,sha256=digest(binary.read_bytes()))
             elf[tag+'/'+route]=kinds;save('binding',elf)
             if tag=='base':continue
