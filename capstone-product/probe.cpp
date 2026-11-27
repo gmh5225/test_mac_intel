@@ -41,9 +41,7 @@ int main(int argc, char **argv) {
   decoder.setText(mode == 1 || mode == 2);
   if (att && ((target != "32" && target != "64") ||
               cs_option(decoder.getHandle(), CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) != CS_ERR_OK))
-    if (std::getenv("NEVERD_PROBE_BOTH_CLOCKS"))
-    std::printf("%lld\n", (long long)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count());
-  return 8;
+    return 8;
   struct Span { size_t start, size; uint64_t address; };
   std::vector<Span> spans{{0, bytes.size(), 0x100000}};
   if (argc == 6) {
@@ -122,4 +120,6 @@ int main(int argc, char **argv) {
   std::printf("%lld %llu %llu %llu %llu\n", (long long)cpu,
               (unsigned long long)accepted,(unsigned long long)rejected,
               (unsigned long long)boundary,(unsigned long long)value);
+  if (std::getenv("NEVERD_PROBE_BOTH_CLOCKS"))
+    std::printf("%lld\n", (long long)std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count());
 }

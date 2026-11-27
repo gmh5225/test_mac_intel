@@ -1,136 +1,19 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 72004759..136f8e6b 100644
+index d8f51cb9..81ae7e92 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -182,6 +182,13 @@ endif()
- 
- if(capstone_enabled_architectures STREQUAL "ARM")
-     add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
-+    # These two callers select real or alias operands during each ARM print.
-+    if(NOT CAPSTONE_BUILD_DIET AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-+       AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 18 AND CMAKE_C_COMPILER_VERSION VERSION_LESS 19
-+       AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
-+        set_property(SOURCE arch/ARM/ARMInstPrinter.c arch/ARM/ARMMapping.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_ARM_INLINE_ALIAS_DETAILS>")
-+    endif()
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "MIPS")
-@@ -1090,6 +1097,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1097,6 +1097,11 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
          "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
      # Use cached access IDs and bounded masked-operand copies in the x86-64 static reader.
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-+        # The AT&T printer identifies canonical register names to the stream writer.
-+        set_property(SOURCE SStream.c arch/X86/X86ATTInstPrinter.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CS_SSTREAM_PERCENT_STRING>")
++        if(NOT CAPSTONE_X86_ATT_DISABLE)
++            # The AT&T printer identifies canonical register names to the stream writer.
++            set_property(SOURCE SStream.c arch/X86/X86ATTInstPrinter.c APPEND PROPERTY
++                COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CS_SSTREAM_PERCENT_STRING>")
++        endif()
          set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
-diff --git a/Makefile b/Makefile
-index dcb24737..cd1d5aba 100644
---- a/Makefile
-+++ b/Makefile
-@@ -590,6 +590,7 @@ endif
- endif
- 
- $(LIBOBJ): Makefile config.mk functions.mk
-+$(OBJDIR)/Mapping.o: MappingAliasDetails.inc
- 
- $(LIBOBJ_ARM): $(DEP_ARM)
- $(LIBOBJ_AARCH64): $(DEP_AARCH64)
-diff --git a/Mapping.c b/Mapping.c
-index 996fd61f..11d08ff4 100644
---- a/Mapping.c
-+++ b/Mapping.c
-@@ -430,29 +430,9 @@ DEFINE_get_detail_op_at(bpf, BPF, BPF);
- DEFINE_get_detail_op_at(arc, ARC, ARC);
- DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
- 
--/// Returns true if for this architecture the
--/// alias operands should be filled.
--/// TODO: Replace this with a proper option.
--/// 			So it can be toggled between disas() calls.
--bool map_use_alias_details(const MCInst *MI)
--{
--	assert(MI);
--	return (MI->csh->detail_opt & CS_OPT_ON) &&
--	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
--}
--
--/// Sets the setDetailOps flag to @p Val.
--/// If detail == NULLit refuses to set the flag to true.
--void map_set_fill_detail_ops(MCInst *MI, bool Val)
--{
--	CS_ASSERT_RET(MI);
--	if (!detail_is_set(MI)) {
--		MI->fillDetailOps = false;
--		return;
--	}
--
--	MI->fillDetailOps = Val;
--}
-+#define CS_ALIAS_DETAIL_LINKAGE
-+#include "MappingAliasDetails.inc"
-+#undef CS_ALIAS_DETAIL_LINKAGE
- 
- /// Sets the instruction alias flags and the given alias id.
- void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias)
-diff --git a/Mapping.h b/Mapping.h
-index 277c4ef3..5137d8fc 100644
---- a/Mapping.h
-+++ b/Mapping.h
-@@ -324,7 +324,15 @@ static inline cs_detail *get_detail(const MCInst *MI)
- 			return; \
- 	} while (0)
- 
-+#ifdef CAPSTONE_ARM_INLINE_ALIAS_DETAILS
-+/* The dedicated printer uses both decisions while selecting alias operands. */
-+#define CS_ALIAS_DETAIL_LINKAGE static inline
-+#include "MappingAliasDetails.inc"
-+#undef CS_ALIAS_DETAIL_LINKAGE
-+#else
-+bool map_use_alias_details(const MCInst *MI);
- void map_set_fill_detail_ops(MCInst *MI, bool Val);
-+#endif
- 
- static inline bool map_fill_detail_ops(MCInst *MI)
- {
-@@ -334,8 +342,6 @@ static inline bool map_fill_detail_ops(MCInst *MI)
- 
- void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias);
- 
--bool map_use_alias_details(const MCInst *MI);
--
- void map_set_alias_id(MCInst *MI, const SStream *O,
- 		      const name_map *alias_mnem_id_map, int map_size);
- 
-diff --git a/MappingAliasDetails.inc b/MappingAliasDetails.inc
-new file mode 100644
-index 00000000..eae4a051
---- /dev/null
-+++ b/MappingAliasDetails.inc
-@@ -0,0 +1,21 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+CS_ALIAS_DETAIL_LINKAGE bool map_use_alias_details(const MCInst *MI)
-+{
-+	assert(MI);
-+	return (MI->csh->detail_opt & CS_OPT_ON) &&
-+	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
-+}
-+
-+/* Collect operands only for an instruction with active detail storage. */
-+CS_ALIAS_DETAIL_LINKAGE void map_set_fill_detail_ops(MCInst *MI, bool Val)
-+{
-+	CS_ASSERT_RET(MI);
-+	if (!detail_is_set(MI)) {
-+		MI->fillDetailOps = false;
-+		return;
-+	}
-+
-+	MI->fillDetailOps = Val;
-+}
 diff --git a/SStream.c b/SStream.c
 index 5d387fb0..582598e9 100644
 --- a/SStream.c
