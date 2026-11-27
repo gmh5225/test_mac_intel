@@ -109,7 +109,7 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first=between=second={'X86ATTInstPrinter.c.o'}
+    first={'X86ATTInstPrinter.c.o','SStream.c.o'};arm=os.uname().machine=='aarch64';between=first if arm else set();second=set() if arm else first
     for before,after,expected in [('shipping','base',first),
         ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]
@@ -145,9 +145,9 @@ try:
             checked[k]=sha(image);assert checked[k]==hashlib.sha256(blobs[k]).hexdigest()
         sel=str(c['selector']) if c['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[c['selector']]
         args=['setarch',os.uname().machine,'-R',image,c['path'],sel,str(mode),str(reps),*([c['intervals']] if 'intervals'in c else [])]
-        start=time.perf_counter_ns();values=list(map(int,sp.check_output(args,text=True).split()));wall=time.perf_counter_ns()-start
-        assert len(values)==5 and values[0]>0
-        return values,wall
+        values=list(map(int,sp.check_output(args,text=True,env=dict(os.environ,NEVERD_PROBE_BOTH_CLOCKS='1')).split()))
+        assert len(values)==6 and min(values[0],values[-1])>0
+        return values[:-1],values[-1]
     rng=random.Random(3849);timings={}
     for c in cases:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
@@ -164,7 +164,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and checked['shipping']!=checked['base'] and checked['base']!=checked['mask'] and len({checked[k]for k in ('shipping','base','mask')})==3
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and checked['shipping']!=checked['base'] and (checked['base']!=checked['mask'])==arm and (checked['shipping']==checked['mask'])==arm and len({checked[k]for k in ('shipping','base','mask')})==2
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:

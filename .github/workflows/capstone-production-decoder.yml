@@ -1,7 +1,7 @@
-name: Verify both AT&T formatting paths using the source-built NeverD consumer and all 69 real workloads
+name: Build from LLVM source and compare all 69 real NeverD workloads with scoped register formatting
 on:
   push:
-    branches: [codex/att-register-output-product]
+    branches: [codex/att-register-token-full-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 936bbbb654d0352373cbcdaee54d2988eb72f29f
+          ref: c69543811b5d1799a5cbbb534c098de1edce8177
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-register-format-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: att-token-source-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
