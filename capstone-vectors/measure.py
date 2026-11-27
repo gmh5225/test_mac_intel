@@ -110,6 +110,11 @@ try:
             assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
+        cmds=rd(build/'compile_commands.json');matched={Path(z['file']).name for z in cmds if 'CS_SSTREAM_PERCENT_STRING' in z['command']}
+        enabled=label=='outlined' or (label=='candidate' and os.uname().machine=='x86_64')
+        assert matched==({'SStream.c','X86ATTInstPrinter.c'} if enabled else set())
+        save('stream-flags-'+label,sorted(matched))
+
         run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'memory-test-guard.cpp',lib,'-o',w/'test-guard')
         guarded=list(map(int,get(w/'test-guard').split()))
         assert len(guarded)==3 and 0<guarded[1]<guarded[0] and guarded[0]==6979584
@@ -219,6 +224,21 @@ try:
         assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
     assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
     run('clang++','-O2','-std=c++17','-I',base/'include',r/'rip.cpp','-ldl','-o',w/'rip')
+    # A six-backend product with its AT&T backend disabled must have the same library.
+    alt=w/'without-att'
+    run('cmake','-G','Ninja','-S',project,'-B',alt,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_X86_ATT_DISABLE=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
+    absent={}
+    for label in ('base','candidate'):
+        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        if label=='candidate':run('git','-C',base,'apply','--index',r/'candidate.patch')
+        assert get('git','-C',base,'write-tree').strip()==maps['prefix' if label=='candidate' else 'base']['tree']
+        run('cmake','--build',alt,'--target','capstone_static','--parallel','4')
+        commands=rd(alt/'compile_commands.json')
+        assert all('CS_SSTREAM_PERCENT_STRING' not in entry['command'] for entry in commands)
+        lib_without,=alt.rglob('libcapstone.a')
+        absent[label]={'library':sha(lib_without),'objects':{str(f.relative_to(alt)):sha(f)for f in alt.rglob('*.c.o')}}
+    assert absent['base']==absent['candidate'] and len(absent['base']['objects'])>=55
+    save('without-att',absent)
     outcomes={}
     for label in ('candidate','outlined'):
         z=sp.run([w/'rip',w/'base.so',w/(label+'.so')],capture_output=True,text=True)
