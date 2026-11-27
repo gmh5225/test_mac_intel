@@ -1,41 +1,34 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d305ef98..4f0a7438 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -161,6 +161,7 @@ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-     add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
- elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV")
-+    add_compile_definitions(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
-     # Linux x86-64 retains its inlined initialization for MIPS text throughput.
-     if(CMAKE_C_COMPILER_ID MATCHES "Clang" AND CMAKE_SIZEOF_VOID_P EQUAL 8
-        AND (CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR
-diff --git a/Makefile b/Makefile
-index 99eb30fe..48239585 100644
---- a/Makefile
-+++ b/Makefile
-@@ -122,6 +122,7 @@ CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
- CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
- else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips powerpc riscv x86)
-+CFLAGS += -DCAPSTONE_ARM_FORMAT_PUNCTUATION_X64
- # Use the compiler target, including cross builds.
- MIXED_STORAGE_TARGET := $(shell $(CC) $(CPPFLAGS) $(CFLAGS) -dM -E -x c - < /dev/null | \
- 	awk '$$2 == "__clang__" { clang_cc=1 } $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
-diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
-index d6833e63..c00c3b59 100644
---- a/arch/ARM/ARMMapping.h
-+++ b/arch/ARM/ARMMapping.h
-@@ -27,7 +27,11 @@ const char *ARM_reg_name(csh handle, unsigned int reg);
- #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE) && defined(__linux__) && defined(__clang__) && \
--	(defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__)))
-+	((defined(CAPSTONE_ARM_ONLY) && (defined(__x86_64__) || defined(__aarch64__))) || \
-+	 (defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64) && defined(__x86_64__)))
-+#if defined(CAPSTONE_ARM_FORMAT_PUNCTUATION_X64)
-+__attribute__((noinline))
+diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
+index 5a84376e..1fe38453 100644
+--- a/arch/ARM/ARMInstPrinter.c
++++ b/arch/ARM/ARMInstPrinter.c
+@@ -2034,7 +2034,15 @@ add_real_detail:
+ 		map_set_fill_detail_ops(MI, !(isAlias && useAliasDetails));
+ 		if (isAlias)
+ 			SStream_Close(O);
+-		printInstruction(MI, Address, O);
++#if defined(CAPSTONE_ARM_ONLY) && !defined(CAPSTONE_DIET) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++		/* The alias already supplied the spelling. Its canonical printer
++		 * still owns real operand details and custom formatting calls. */
++		if (!isAlias || map_fill_detail_ops(MI) ||
++		    cs_vsnprintf != cs_default_vsnprintf)
 +#endif
- static inline void ARM_printFormattedChar(SStream *O, const char *literal)
- {
- 	if (cs_vsnprintf == cs_default_vsnprintf) {
++			printInstruction(MI, Address, O);
+ 		if (isAlias)
+ 			SStream_Open(O);
+ 	}
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
+index c9c7b0ec..d43a9123 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
++++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
+@@ -3164,7 +3164,7 @@
+     },
+     "printInst": {
+       "apply_type": "OLD",
+-      "old_hash": "7e3d78fc0453e27fc267c2a0777c754e6813278ddeba2003ca8f1c3e04cfa983",
++      "old_hash": "1b107d65aa4c86683301b4265d75dc2928ba82015b4b1e7f96aef29dece8c0b9",
+       "new_hash": "cdbf12c86ad23e78ca24d68a5ef2e72f098de3fcb9de7fc9f9f57e47e29f5399",
+       "edit": ""
+     },
