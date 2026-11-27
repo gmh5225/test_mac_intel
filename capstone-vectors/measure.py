@@ -78,13 +78,14 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
-        # Compile the natural executable first. Inspect the actual built-in formatter calls.
-        asm=get('objdump','-d','--disassemble=cs_decode_full_insn',w/label)
-        body=asm.split('<cs_decode_full_insn>:',1)[1].split('Disassembly of section',1)[0].strip()
-        assert body
-        calls={symbol:[line.strip() for line in body.splitlines() if '<'+symbol+'>' in line]
-               for symbol in ('SStream_opt_unum','SStream_trimls','SStream_Init')}
-        save('stream-calls-'+label,dict(instructions=sum(':' in l for l in body.splitlines()),calls=calls))
+        run(sys.executable,'-B',base/'suite/synctools/x86_register_name_sizes.py','--check')
+        confirm={'base':[],'candidate':['-DPACKED_NAMES'],'outlined':['-DEXPLICIT_NAMES']}
+        run('clang','-std=c99','-O2','-I',base,*confirm[label],r/'register-domain.c','-o',w/'register-domain')
+        domain=list(map(int,get(w/'register-domain').split()))
+        with (w/label).open('rb') as f:
+            elf=ELFFile(f)
+            tables={s.name:s['st_size'] for s in elf.get_section_by_name('.symtab').iter_symbols()if s.name=='X86PrinterRegisterNames'}
+        save('register-domain-'+label,dict(domain=domain,tables=tables))
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))

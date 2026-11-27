@@ -1,7 +1,7 @@
-name: Measure format stream option and whitespace handling on PE, ELF and firmware
+name: Measure directly indexed register spellings on real programs and verify every stream offset
 on:
   push:
-    branches: [codex/printer-stream-formatting-boundaries]
+    branches: [codex/compact-checked-register-formatting]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: stream-formatting-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: packed-register-spellings-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
