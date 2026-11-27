@@ -319,6 +319,8 @@ try:
     for style,source in [('ppc-linked','foreign'),('ppc-only','foreign-only')]:
         for tag in ('base','candidate','outlined'):os.link(w/(source+'-'+tag),w/(style+'-'+tag))
         time_foreign(all_rows[len(training):],w,save,style,expected_cases=9)
+    from counts import trace
+    save('canonical-calls',trace(base,w,r,samples,rd(r/'source.json')))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
