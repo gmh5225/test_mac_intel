@@ -1,7 +1,7 @@
-name: Measure cached operand mappings and precomputed AT&T access in the source-built NeverD product
+name: Verify the option-time detail fix in the six-architecture source-built NeverD product
 on:
   push:
-    branches: [codex/canonical-access-neverd-real-decode]
+    branches: [codex/detail-views-in-source-built-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-mapping-dev-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: detail-view-dev-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
