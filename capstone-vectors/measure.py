@@ -19,7 +19,6 @@ try:
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
-    run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
     (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(base)
     (project/'cmake').mkdir();cm='cmake/NeverDCapstoneCompilerOptions.inc'
     (project/cm).write_bytes(sp.check_output(['git','-C',root,'show',dev+':'+cm]))
@@ -40,15 +39,14 @@ try:
     release_sha=sha(lib)
     run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'program')
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    from costs import profile
-    from sites import map_debug
-    run('cmake','-S',project,'-B',build,'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -gline-tables-only')
-    run('cmake','--build',build,'--target','capstone_static','--parallel','4')
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'debug-program')
-    from sites import set_owners
-    symbols=map_debug(w/'program',w/'debug-program',base)
-    set_owners(symbols);save('symbol-map',symbols)
-
+    from inline_sites import inspect,profile
+    debug_env=dict(os.environ,CARGO_PROFILE_RELEASE_DEBUG='2',CARGO_TARGET_DIR=str(w/'debug-target'))
+    run('cargo','build','--release','--locked',cwd=ad,env=debug_env)
+    run('clang++',w/'driver.o',lib,w/'debug-target/release/libiced_compare.a',*flags,'-o',w/'debug-program')
+    builds={}
+    for label in ('program','debug-program'):
+        builds[label]=inspect(w/label,label=='debug-program')
+    save('symbol-map',{k:v[0] for k,v in builds.items()})
     invoke=['setarch',os.uname().machine,'-R']
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
@@ -71,14 +69,12 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
-        for mode in (1,2):
+        for engine,mode in [('iced',0),('fast',1),('fast',2),('iced',1),('iced',2)]:
             row={}
-            for engine in ('private','capstone'):
-                row[engine]={}
-                for n in (1,2):
-                    res=profile(w,invoke,[w/'program',engine,str(mode),str(n),f,path,str(bits)])
-                    row[engine][str(n)]=res
-            rows[name+'/'+str(mode)]=row;save('counts',rows)
-    assert len(rows)==4;save('complete',dict(complete=True,source=q,host=host,workloads=len(rows)))
+            for label,(info,frames) in builds.items():
+                row[label]=profile(w,invoke,w/label,[engine,str(mode),'1',f,path,str(bits)],info,frames)
+            assert row['program']['records']==row['debug-program']['records']
+            rows[name+'/'+engine+'/'+str(mode)]=row;save('counts',rows)
+    assert len(rows)==10;save('complete',dict(complete=True,source=q,host=host,workloads=len(rows)))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
