@@ -43,6 +43,13 @@ int main(int argc,char **argv) {
                 op.mem.index=i%8==1?X86_REG_INVALID:reg();
             }
         }
+        if (i%5==3) {
+            xp.op_count=(i/5)%2;
+            xp.operands[0].type=X86_OP_IMM;
+            d.regs_read_count=(i/10)%5;d.regs_write_count=(i/50)%5;
+            for (unsigned j=0;j<d.regs_read_count;++j)d.regs_read[j]=reg();
+            for (unsigned j=0;j<d.regs_write_count;++j)d.regs_write[j]=reg();
+        }
         const bool seed=!d.regs_read_count && !d.regs_write_count && xp.op_count && xp.operands[0].type==X86_OP_REG;
         first+=seed;
         load+=seed && xp.op_count==2 && xp.operands[0].access==CS_AC_WRITE && xp.operands[1].type==X86_OP_MEM && !xp.operands[1].mem.segment && !xp.operands[1].mem.index;
@@ -52,21 +59,5 @@ int main(int argc,char **argv) {
             ++queries;
         }
     }
-
-    uint64_t packed=0;
-    const x86_reg ids[]={X86_REG_INVALID,X86_REG_EAX,X86_REG_XMM8,X86_REG_ZMM31};
-    for(unsigned n:{2u,3u}) for(auto a:ids)for(auto b:ids)for(auto c:ids)for(auto rw:{false,true}){
-        cs_insn x{};cs_detail d{};x.id=X86_INS_MOV;x.detail=&d;auto &xp=d.x86;
-        xp.op_count=n;const x86_reg regs[]={a,b,c};
-        for(unsigned k=0;k<n;++k){
-            xp.operands[k].type=X86_OP_REG;xp.operands[k].reg=regs[k];
-            xp.operands[k].access=(cs_ac_type)(k?CS_AC_READ:rw?CS_AC_READ|CS_AC_WRITE:CS_AC_WRITE);
-        }
-        for(unsigned offset:{0u,1u,2u,64u})for(bool same:{false,true}){
-            Query left=query(base,x,offset,same),right=query(trial,x,offset,same);
-            if(std::memcmp(left.regs,right.regs,sizeof left.regs)||left.nr!=right.nr||left.nw!=right.nw)return 3;
-            ++packed;
-        }
-    }
-    std::cout<<queries<<" "<<first<<" "<<load<<" "<<packed<<"\n";
+    std::cout<<queries<<" "<<first<<" "<<load<<"\n";
 }

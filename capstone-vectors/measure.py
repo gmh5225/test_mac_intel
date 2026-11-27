@@ -86,10 +86,11 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-    run('clang++','-O2','-std=c++17','-I',base/'include',r/'index-guard.cpp','-ldl','-o',w/'index-guard')
-    checks={tag:list(map(int,get(w/'index-guard',w/'base.so',w/(tag+'.so')).split())) for tag in ('candidate','outlined')}
-    assert checks['candidate']==checks['outlined'] and checks['candidate'][0]>100000 and 0<checks['candidate'][1]<checks['candidate'][0]
-    save('index-domain',checks)
+    for driver in ('access','query'):
+        run('clang++','-O2','-std=c++17','-I',base/'include',r/(driver+'.cpp'),'-ldl','-o',w/driver)
+    checks={tag:list(map(int,get(w/'access',w/'base.so',w/(tag+'.so')).split())) for tag in ('candidate','outlined')}
+    assert checks['candidate']==checks['outlined'] and checks['candidate'][0]==1920000
+    save('access-domain',checks)
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
@@ -162,6 +163,20 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        replay=list(map(str.split,get(*invoke[:-1],w/'query',w/'base.so',w/'candidate.so',w/'outlined.so',f,path,str(bits)).splitlines()))
+        grouped={}
+        target=rd(r/'query-cases.json')[name]
+        expected_counts=[target[0],target[1],target[0]-target[1]]
+        for group in range(3):
+            series=[z for z in replay if int(z[0])==group]
+            meta={tuple(int(z[i]) for i in (3,4,5,6,9)) for z in series}
+            assert len(series)==17*4 and len(meta)==1
+            g,=meta
+            assert g[0]==expected_counts[group] and g[1]==min(512,g[0])
+            blocks=[{z[2]:[int(z[7]),int(z[8])] for z in series if int(z[1])==i} for i in range(17)]
+            assert all(set(row)=={'base','duplicate','candidate','outlined'} and all(min(v)>0 for v in row.values()) for row in blocks)
+            grouped[group]=dict(population=g[0],sample=g[1],identity=g[2],repeats=g[3],digest=g[4],pairs=blocks)
+        save('query-'+name,grouped)
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
