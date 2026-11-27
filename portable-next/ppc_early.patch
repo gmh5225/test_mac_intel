@@ -1,0 +1,23 @@
+diff --git a/arch/PowerPC/PPCInstPrinter.c b/arch/PowerPC/PPCInstPrinter.c
+index c23cb3ef..8acc0a5e 100644
+--- a/arch/PowerPC/PPCInstPrinter.c
++++ b/arch/PowerPC/PPCInstPrinter.c
+@@ -747,8 +747,17 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
+ 
+ 	if (!isAlias || !useAliasDetails) {
+ 		map_set_fill_detail_ops(MI, true);
+-		if (isAlias)
++		if (isAlias) {
++#ifndef CAPSTONE_DIET
++			/* The alias is already printed. Only real operand details
++			 * require a second pass with its text suppressed. */
++			if (!map_fill_detail_ops(MI)) {
++				SStream_Open(O);
++				return;
++			}
++#endif
+ 			SStream_Close(O);
++		}
+ 		printInstruction(MI, Address, O);
+ 		if (isAlias)
+ 			SStream_Open(O);
