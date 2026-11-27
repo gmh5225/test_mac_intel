@@ -17,6 +17,8 @@ w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
+    assert sha(r/'base.patch')==rd(r/'source.json')['base']['sha256']
+    run('git','-C',base,'apply','--index',r/'base.patch')
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
     (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(base)
@@ -64,6 +66,7 @@ try:
     assert 'X86_disasmIterText' in get('nm','-u',w/'native-reference.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        run('git','-C',base,'apply','--index',r/'base.patch')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -110,6 +113,11 @@ try:
             assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
+        if label=='outlined':
+            name='map_begin_alias_details'
+            asm=get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label)
+            body=asm[asm.index('<'+name+'>:'):].split('Disassembly of section',1)[0]
+            save('alias-start-code',dict(body=body,sha256=hashlib.sha256(body.encode()).hexdigest()))
         run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'memory-test-guard.cpp',lib,'-o',w/'test-guard')
         guarded=list(map(int,get(w/'test-guard').split()))
         assert len(guarded)==3 and 0<guarded[1]<guarded[0] and guarded[0]==6979584
