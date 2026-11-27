@@ -1,7 +1,7 @@
-name: Verify build selection, public output and object identity for the AMD64 VEX memory writer
+name: Check the i386 accumulator reader and compiler selection on native Linux, macOS and Windows
 on:
   push:
-    branches: [codex/portable-shipping-vex3-memory]
+    branches: [codex/portable-scoped-i386-accumulator]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: vex3-reader-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: i386-accumulator-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
