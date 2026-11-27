@@ -1,7 +1,7 @@
-name: Verify cached x86 flag and permission mapping on full and reduced instruction sets
+name: Verify standalone detail-view options and all existing register, text and allocation tests
 on:
   push:
-    branches: [codex/cached-access-portable-verification]
+    branches: [codex/detail-view-option-compatibility]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: cached-access-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: detail-view-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
