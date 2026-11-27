@@ -1,7 +1,7 @@
-name: Check private firmware and mixed 32/64-bit memory writers across configurations
+name: Verify optional real-mode output and public iterator binding across nineteen builds
 on:
   push:
-    branches: [codex/native-output-fallback-configurations]
+    branches: [codex/linked-real-output-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: native-writer-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: linked-writer-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
