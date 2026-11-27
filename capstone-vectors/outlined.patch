@@ -1,61 +1,37 @@
 diff --git a/SStream.c b/SStream.c
-index 5d387fb0..3646ccbe 100644
+index 5d387fb0..3d6623e9 100644
 --- a/SStream.c
 +++ b/SStream.c
-@@ -135,28 +135,38 @@ void SStream_replc_str(SStream *ss, char chr, const char *rstr)
+@@ -135,10 +135,13 @@ void SStream_replc_str(SStream *ss, char chr, const char *rstr)
  	ss->index = kept_len + repl_len;
  }
  
-+/* Keep the buffer move and cursor recovery off the common return path. */
+-/// Removes the space characters '\t' and ' ' from the beginning of the stream buffer.
+-void SStream_trimls(SStream *ss)
 +#if defined(_MSC_VER)
 +__declspec(noinline)
 +#elif defined(__GNUC__)
 +__attribute__((noinline))
 +#endif
-+static void trimLeadingSpace(SStream *ss)
-+{
-+	size_t offset = 1;
-+	while (ss->buffer[offset] == ' ' || ss->buffer[offset] == '\t')
-+		++offset;
-+	// Keep an overreported cursor, but do not let an underreported
-+	// count move the next write into the visible suffix.
-+	if (ss->index < offset ||
-+	    (ss->index < sizeof(ss->buffer) && ss->buffer[ss->index])) {
-+		size_t written = offset + strlen(ss->buffer + offset);
-+		if (ss->index < written)
-+			ss->index = written;
-+	}
-+	memmove(ss->buffer, ss->buffer + offset,
-+		SSTREAM_BUF_LEN - offset);
-+	ss->index -= offset;
-+}
-+
- /// Removes the space characters '\t' and ' ' from the beginning of the stream buffer.
- void SStream_trimls(SStream *ss)
++static void trimControlPrefix(SStream *ss)
  {
- 	assert(ss);
--	size_t buf_off = 0;
--	/// Remove leading spaces
--	while (ss->buffer[buf_off] == ' ' || ss->buffer[buf_off] == '\t') {
--		buf_off++;
--	}
--	if (buf_off > 0) {
--		// Keep an overreported cursor, but do not let an underreported
--		// count move the next write into the visible suffix.
--		if (ss->index < buf_off ||
--		    (ss->index < sizeof(ss->buffer) && ss->buffer[ss->index])) {
--			size_t written = buf_off + strlen(ss->buffer + buf_off);
--			if (ss->index < written)
--				ss->index = written;
--		}
--		memmove(ss->buffer, ss->buffer + buf_off,
--			SSTREAM_BUF_LEN - buf_off);
--		ss->index -= buf_off;
--	}
-+	char first = ss->buffer[0];
-+	if (first != ' ' && first != '\t')
-+		return;
-+	trimLeadingSpace(ss);
+-	assert(ss);
+ 	size_t buf_off = 0;
+ 	/// Remove leading spaces
+ 	while (ss->buffer[buf_off] == ' ' || ss->buffer[buf_off] == '\t') {
+@@ -159,6 +162,15 @@ void SStream_trimls(SStream *ss)
+ 	}
  }
  
++/// Removes the space characters '\t' and ' ' from the beginning of the stream buffer.
++void SStream_trimls(SStream *ss)
++{
++	assert(ss);
++	/* Only whitespace and control characters need the exact prefix check. */
++	if ((unsigned char)ss->buffer[0] <= ' ')
++		trimControlPrefix(ss);
++}
++
  /// Extract the mnemonic to @mnem_buf and the operand string into @op_str_buf from the stream buffer.
+ /// The mnemonic is everything up until the first ' ' or '\t' character.
+ /// The operand string is everything after the first ' ' or '\t' sequence.
