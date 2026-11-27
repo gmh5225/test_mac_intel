@@ -1,40 +1,22 @@
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..7746cf8f 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -11979,6 +11979,16 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
- 	return NULL;
- }
- 
-+/* Copy just the active registers without a variable-length library call. */
-+static inline void copyImplicitRegisters(uint16_t *dst, const uint16_t *src,
-+					 unsigned count)
-+{
-+	while (count) {
-+		--count;
-+		dst[count] = src[count];
-+	}
-+}
-+
- void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
- 		    uint8_t *regs_read_count, cs_regs regs_write,
- 		    uint8_t *regs_write_count)
-@@ -11991,16 +12001,8 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
- 	write_count = insn->detail->regs_write_count;
- 
- 	// implicit registers
--	if (read_count == 1)
--		regs_read[0] = insn->detail->regs_read[0];
--	else if (read_count != 0)
--		memcpy(regs_read, insn->detail->regs_read,
--		       read_count * sizeof(insn->detail->regs_read[0]));
--	if (write_count == 1)
--		regs_write[0] = insn->detail->regs_write[0];
--	else if (write_count != 0)
--		memcpy(regs_write, insn->detail->regs_write,
--		       write_count * sizeof(insn->detail->regs_write[0]));
-+	copyImplicitRegisters(regs_read, insn->detail->regs_read, read_count);
-+	copyImplicitRegisters(regs_write, insn->detail->regs_write, write_count);
- 
- 	// explicit registers
- 	for (i = 0; i < x86->op_count; i++) {
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..1b90c8dd 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -127,8 +127,15 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+ 	insn->bytes[3] = code[3];
+ 	/* The underlying writer emitted exactly two operands. Their longest
+ 	 * address and vector name leave room for both decorators. */
+-	char *comma = strchr(insn->op_str, ',');
+-	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
++	/* A vector destination is xmm0 through zmm31. Stores put the
++	 * variable-length address first. Both writers clear op_str. */
++	char *comma = store ? strchr(insn->op_str, ',') :
++		insn->op_str + 4 + (insn->op_str[4] != ',');
++	unsigned gap = zero ? 9 : 5;
++	if (memory && !store)
++		memmove(comma + gap, comma, strlen(comma) + 1);
++	else
++		memmove(comma + gap, comma, sizeof(", zmm31"));
+ 	memcpy(comma, " {k0}", 5);
+ 	comma[3] = (char)('0' + mask);
+ 	if (zero)

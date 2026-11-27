@@ -86,6 +86,20 @@ try:
 
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
+        import shlex
+        entry_mask=next(x for x in commands if x['file'].endswith('/X86VectorFallback64.c'))
+        args=shlex.split(entry_mask['command'])
+        pos=args.index('-o'); del args[pos:pos+2]
+        pos=args.index('-c');del args[pos:pos+2]
+        obj=w/('mask-'+label+'.o')
+        run(*args,'-I',base,'-DOBSERVED_MASKED','-c',r/'masked-oracle.c','-o',obj,cwd=entry_mask['directory'])
+        for stem,name in [('masked-oracle','guard'),('masked-census','coverage')]:
+            run('clang++','-O2','-std=c++17','-I',base/'include',r/(stem+'.cpp'),obj,lib,'-o',w/(name+'-'+label))
+        masked=list(map(int,get(w/('guard-'+label)).split()))
+        assert masked[0]>2805764 and masked[1]==0 and masked[2]>500000
+        if label!='base':assert masked==rd(e/'masked-guard-base.json')
+        save('masked-guard-'+label,masked)
+
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
@@ -164,6 +178,10 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
+        mask_counts={label:list(map(int,get(w/('coverage-'+label),f,path,str(bits)).split())) for label in ('base','candidate','outlined')}
+        assert mask_counts['base']==mask_counts['candidate']==mask_counts['outlined']
+        save('masked-real-'+name,mask_counts)
+
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
