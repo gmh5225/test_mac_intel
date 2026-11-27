@@ -1,7 +1,7 @@
-name: Validate PE and foreign consumers of the seven-architecture cold WASM build
+name: Measure real PE and foreign consumers linked with the revised WebAssembly reader
 on:
   push:
-    branches: [codex/wasm-cold-table-consumers]
+    branches: [codex/wasm-table-target-link]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
+          ref: a5c08759df756b179578e97670e148fa7629e88c
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1a02e3439e7162e79a9c1b8b8b56c5df7cfd770d
+          ref: 485ce060a3e040b59611f44079bd4cbc39f9c2ef
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-cold-table-consumers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-table-target-link-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
