@@ -25,17 +25,17 @@ index 61a663b8..74370fdc 100644
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/arch/WASM/WASMDisassembler.c b/arch/WASM/WASMDisassembler.c
-index 063f9d9f..2550b431 100644
+index 063f9d9f..70eb658a 100644
 --- a/arch/WASM/WASMDisassembler.c
 +++ b/arch/WASM/WASMDisassembler.c
 @@ -544,6 +544,13 @@ static bool read_uint64(const uint8_t *code, size_t code_len,
  	return true;
  }
  
-+/* Grouped target reads improve branch tables on Linux x86-64.
++/* Grouped target reads improve branch tables with Clang on Linux x86-64.
 + * Other targets keep the scalar reader used for full modules. */
 +#if defined(CAPSTONE_WASM_DEDICATED_DECODER) && defined(__linux__) && \
-+	defined(__x86_64__)
++	defined(__x86_64__) && defined(__clang__)
 +#define WASM_GROUPED_TARGETS
 +#endif
 +
