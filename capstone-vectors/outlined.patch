@@ -1,113 +1,448 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..94d154ed 100644
+index cea06480..d8f51cb9 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1088,6 +1088,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -182,6 +182,13 @@ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "ARM")
+     add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
++    # These two callers select real or alias operands during each ARM print.
++    if(NOT CAPSTONE_BUILD_DIET AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++       AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 18 AND CMAKE_C_COMPILER_VERSION VERSION_LESS 19
++       AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
++        set_property(SOURCE arch/ARM/ARMInstPrinter.c arch/ARM/ARMMapping.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_ARM_INLINE_ALIAS_DETAILS>")
++    endif()
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "MIPS")
+@@ -1088,8 +1095,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
     AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
      target_compile_definitions(capstone_build_settings INTERFACE
          "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
-+    # A public record enters a fixed text reader only after the scan decision.
-+    set_property(SOURCE cs.c arch/X86/X86DisassemblerDecoder.c
-+        arch/X86/X86Sse64Output.c arch/X86/X86Vex32Output.c APPEND PROPERTY
-+        COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_MIXED_PUBLIC_RECORD>")
-     # Use the bounded masked-operand copies in the measured x86-64 static reader.
+-    # Use the bounded masked-operand copies in the measured x86-64 static reader.
++    # Use cached access IDs and bounded masked-operand copies in the x86-64 static reader.
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
++        set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 709e1286..67bfe234 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -20,6 +20,13 @@
- #include "../../MCRegisterInfo.h"
- #include "X86DisassemblerDecoderCommon.h"
+             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
+     endif()
+diff --git a/Makefile b/Makefile
+index 9772a084..cd1d5aba 100644
+--- a/Makefile
++++ b/Makefile
+@@ -491,7 +491,8 @@ endif
+ API_MAJOR=$(shell echo `grep -e CS_API_MAJOR include/capstone/capstone.h | grep -v = | awk '{print $$3}'` | awk '{print $$1}')
+ VERSION_EXT =
  
-+#if defined(X86_MIXED_PUBLIC_RECORD) && defined(__ELF__) && defined(__clang__) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CAPSTONE_X86_MIXED_PUBLIC_RECORD
+-IS_APPLE := $(shell $(CC) -dM -E - < /dev/null 2> /dev/null | grep __APPLE__ | wc -l | tr -d " ")
++capstone_cc_macros := $(shell $(CC) -dM -E - < /dev/null 2>/dev/null)
++IS_APPLE := $(if $(filter __APPLE__,$(capstone_cc_macros)),1,0)
+ ifeq ($(IS_APPLE),1)
+ # on MacOS, do not build in Universal format by default
+ MACOS_UNIVERSAL ?= no
+@@ -588,7 +589,8 @@ else
+ endif
+ endif
+ 
+-$(LIBOBJ): config.mk
++$(LIBOBJ): Makefile config.mk functions.mk
++$(OBJDIR)/Mapping.o: MappingAliasDetails.inc
+ 
+ $(LIBOBJ_ARM): $(DEP_ARM)
+ $(LIBOBJ_AARCH64): $(DEP_AARCH64)
+@@ -633,8 +635,22 @@ else
+ 	$(generate-pkgcfg)
+ endif
+ 
+-# create a list of auto dependencies
+-AUTODEPS:= $(patsubst %.o,%.d, $(LIBOBJ))
++# Record headers during compilation. Each slice of a universal build can
++# include different target headers and needs its own dependency file.
++AUTODEPS := $(LIBOBJ:.o=.d)
++ifneq ($(filter __GNUC__ __clang__,$(capstone_cc_macros)),)
++ifeq ($(IS_APPLE):$(MACOS_UNIVERSAL),1:yes)
++capstone_dependency_archs := $(LIBARCHS)
++endif
++ifneq ($(strip $(capstone_dependency_archs)),)
++AUTODEPS := $(foreach arch,$(capstone_dependency_archs),$(LIBOBJ:.o=.$(arch).d))
++capstone_depflags = $(foreach arch,$(capstone_dependency_archs), \
++	-Xarch_$(arch) -MMD -Xarch_$(arch) -MP \
++	-Xarch_$(arch) -MF$(@:.o=.$(arch).d) -Xarch_$(arch) -MT$@)
++else
++capstone_depflags = -MMD -MP -MF $(@:.o=.d) -MT $@
++endif
++endif
+ 
+ # include by auto dependencies
+ -include $(AUTODEPS)
+diff --git a/Mapping.c b/Mapping.c
+index 996fd61f..11d08ff4 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -430,29 +430,9 @@ DEFINE_get_detail_op_at(bpf, BPF, BPF);
+ DEFINE_get_detail_op_at(arc, ARC, ARC);
+ DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
+ 
+-/// Returns true if for this architecture the
+-/// alias operands should be filled.
+-/// TODO: Replace this with a proper option.
+-/// 			So it can be toggled between disas() calls.
+-bool map_use_alias_details(const MCInst *MI)
+-{
+-	assert(MI);
+-	return (MI->csh->detail_opt & CS_OPT_ON) &&
+-	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
+-}
+-
+-/// Sets the setDetailOps flag to @p Val.
+-/// If detail == NULLit refuses to set the flag to true.
+-void map_set_fill_detail_ops(MCInst *MI, bool Val)
+-{
+-	CS_ASSERT_RET(MI);
+-	if (!detail_is_set(MI)) {
+-		MI->fillDetailOps = false;
+-		return;
+-	}
+-
+-	MI->fillDetailOps = Val;
+-}
++#define CS_ALIAS_DETAIL_LINKAGE
++#include "MappingAliasDetails.inc"
++#undef CS_ALIAS_DETAIL_LINKAGE
+ 
+ /// Sets the instruction alias flags and the given alias id.
+ void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias)
+diff --git a/Mapping.h b/Mapping.h
+index 277c4ef3..5137d8fc 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -324,7 +324,15 @@ static inline cs_detail *get_detail(const MCInst *MI)
+ 			return; \
+ 	} while (0)
+ 
++#ifdef CAPSTONE_ARM_INLINE_ALIAS_DETAILS
++/* The dedicated printer uses both decisions while selecting alias operands. */
++#define CS_ALIAS_DETAIL_LINKAGE static inline
++#include "MappingAliasDetails.inc"
++#undef CS_ALIAS_DETAIL_LINKAGE
++#else
++bool map_use_alias_details(const MCInst *MI);
+ void map_set_fill_detail_ops(MCInst *MI, bool Val);
 +#endif
+ 
+ static inline bool map_fill_detail_ops(MCInst *MI)
+ {
+@@ -334,8 +342,6 @@ static inline bool map_fill_detail_ops(MCInst *MI)
+ 
+ void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias);
+ 
+-bool map_use_alias_details(const MCInst *MI);
+-
+ void map_set_alias_id(MCInst *MI, const SStream *O,
+ 		      const name_map *alias_mnem_id_map, int map_size);
+ 
+diff --git a/MappingAliasDetails.inc b/MappingAliasDetails.inc
+new file mode 100644
+index 00000000..eae4a051
+--- /dev/null
++++ b/MappingAliasDetails.inc
+@@ -0,0 +1,21 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
 +
- #if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
- 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
- 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..6bee973d 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,7 +3753,9 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch);
- 
--#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
-+#define CS_DECODE_OUTPUT_MISS X86_decodeMixedPublicRecord
-+#elif defined(CAPSTONE_X86_PUBLIC_OUTPUT)
- #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
- #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
- #define CS_PUBLIC_FIXED_RECORD
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 324fc05d..3354e779 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -261,7 +261,8 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
- 
--#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD) || \
-+	defined(CAPSTONE_X86_MIXED_PUBLIC_RECORD)
- bool X86_decodeFixedRecord64(cs_struct *handle, const uint8_t *code, size_t size,
- 			     cs_insn *insn, uint16_t *length)
- {
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index d6f533e0..f6dcaf09 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -202,7 +202,8 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- #include "../../cs_disasm_internal.h"
- #undef CS_DECODE_OUTPUT_MISS
- 
--#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD) || \
-+	defined(CAPSTONE_X86_MIXED_PUBLIC_RECORD)
- bool X86_decodeFixedRecord32(cs_struct *handle, const uint8_t *code, size_t size,
- 			     cs_insn *insn, uint16_t *length)
- {
-diff --git a/cs.c b/cs.c
-index d0b8b045..a5a1af9a 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1242,6 +1242,28 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	return true;
++CS_ALIAS_DETAIL_LINKAGE bool map_use_alias_details(const MCInst *MI)
++{
++	assert(MI);
++	return (MI->csh->detail_opt & CS_OPT_ON) &&
++	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
++}
++
++/* Collect operands only for an instruction with active detail storage. */
++CS_ALIAS_DETAIL_LINKAGE void map_set_fill_detail_ops(MCInst *MI, bool Val)
++{
++	CS_ASSERT_RET(MI);
++	if (!detail_is_set(MI)) {
++		MI->fillDetailOps = false;
++		return;
++	}
++
++	MI->fillDetailOps = Val;
++}
+diff --git a/arch/X86/X86GenIncDec64.inc b/arch/X86/X86GenIncDec64.inc
+new file mode 100644
+index 00000000..a689406b
+--- /dev/null
++++ b/arch/X86/X86GenIncDec64.inc
+@@ -0,0 +1,21 @@
++/* Generated by x86_simple_output.cpp --inc-dec64. */
++static const struct X86SimpleOutput x86_inc_dec64[3][4] = {
++	{
++		{ 230, "inc", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 1, 0, 0, { { 0, 1, 3 }, { 0, 0, 0 } } },
++		{ 147, "dec", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 1, 0, 0, { { 0, 1, 3 }, { 0, 0, 0 } } },
++		{ 230, "inc", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 1, 0, 0, { { 0, 4, 3 }, { 0, 0, 0 } } },
++		{ 147, "dec", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 1, 0, 0, { { 0, 4, 3 }, { 0, 0, 0 } } },
++	},
++	{
++		{ 230, "inc", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 1, 3 }, { 0, 0, 0 } } },
++		{ 147, "dec", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 1, 3 }, { 0, 0, 0 } } },
++		{ 230, "inc", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 4, 3 }, { 0, 0, 0 } } },
++		{ 147, "dec", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 4, 3 }, { 0, 0, 0 } } },
++	},
++	{
++		{ 230, "inc", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 1, 3 }, { 0, 0, 0 } } },
++		{ 147, "dec", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 1, 3 }, { 0, 0, 0 } } },
++		{ 230, "inc", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 0, 0 } } },
++		{ 147, "dec", "", .flags = UINT64_C(61), .reads = { 0, 0, 0, 0 }, .writes = { 25, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 1, 0, 1, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 0, 0 } } },
++	},
++};
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..735660ea 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10286,10 +10286,20 @@ unsigned int find_insn(unsigned int id)
+ 	return -1;
  }
  
-+#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
-+__attribute__((section(".cs_x86_public_output_text")))
-+CS_PRESERVE_MOST bool
-+X86_decodeMixedPublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
-+			    cs_insn *insn, uint16_t *insn_size, bool batch)
++static inline bool cached_insn_mapping(const cs_struct *h, unsigned int id,
++				       uint32_t *mapping)
 +{
-+	if (handle->arch == CS_ARCH_X86) {
-+		if (!batch && !handle->no_text && !handle->skipdata &&
-+		    (handle->syntax == CS_OPT_SYNTAX_DEFAULT ||
-+		     handle->syntax == CS_OPT_SYNTAX_INTEL)) {
-+			if (handle->mode == CS_MODE_32)
-+				return X86_decodeFixedRecord32(handle, code, size,
-+							       insn, insn_size);
-+			if (handle->mode == CS_MODE_64)
-+				return X86_decodeFixedRecord64(handle, code, size,
-+							       insn, insn_size);
-+		}
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	if (!h || !h->x86_insn_lut || id > h->x86_insn_lut_max)
++		return false;
++	*mapping = h->x86_insn_lut[id];
++	return true;
 +}
-+#endif
 +
- #if defined(_MSC_VER)
- __declspec(noinline)
- #elif defined(__GNUC__)
-@@ -1413,12 +1435,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ {
+-	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
+-		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
++	uint32_t mapping;
++	if (cached_insn_mapping(h, id, &mapping))
++		return (unsigned int)(int16_t)(uint16_t)mapping;
+ 
+ 	return find_insn(id);
+ }
+@@ -11951,32 +11961,48 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 		*eflags = 0;
+ 		return ud1_access;
+ 	}
+-	unsigned int i = find_insn_h(h, id);
+-	if (i != -1) {
+-		*eflags = insn_ops[i].flags;
+-		/* Compare-exchange reads and conditionally replaces its destination;
+-		 * memory destinations receive a write cycle even on mismatch. */
+-		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
+-							  CS_AC_READ, 0 };
+-		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
+-		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
+-		switch (insns[i].mapid) {
+-		case X86_INS_BOUND:
+-			/* BOUND compares the index without modifying it or EFLAGS. */
+-			*eflags = 0;
+-			return bound_access;
+-		case X86_INS_CMPXCHG:
+-			return compare_access;
+-		case X86_INS_CMPXCHG8B:
+-		case X86_INS_CMPXCHG16B:
+-			return pair_access;
+-		default:
+-			break;
+-		}
+-		return insn_ops[i].access;
++	unsigned int i, public_id;
++#ifdef X86_CACHED_OPERAND_ACCESS
++	uint32_t mapping;
++	if (cached_insn_mapping(h, id, &mapping)) {
++		if (mapping == UINT32_MAX)
++			return NULL;
++		/* The cache also contains the public ID used by access overrides. */
++		i = (uint16_t)mapping;
++		public_id = mapping >> 16;
++	} else {
++		i = find_insn(id);
++		if (i == (unsigned int)-1)
++			return NULL;
++		public_id = insns[i].mapid;
+ 	}
+-
+-	return NULL;
++#else
++	i = find_insn_h(h, id);
++	if (i == (unsigned int)-1)
++		return NULL;
++	public_id = insns[i].mapid;
++#endif
++	*eflags = insn_ops[i].flags;
++	/* Compare-exchange reads and conditionally replaces its destination;
++	 * memory destinations receive a write cycle even on mismatch. */
++	static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
++						  CS_AC_READ, 0 };
++	static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
++	static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
++	switch (public_id) {
++	case X86_INS_BOUND:
++		/* BOUND compares the index without modifying it or EFLAGS. */
++		*eflags = 0;
++		return bound_access;
++	case X86_INS_CMPXCHG:
++		return compare_access;
++	case X86_INS_CMPXCHG8B:
++	case X86_INS_CMPXCHG16B:
++		return pair_access;
++	default:
++		break;
++	}
++	return insn_ops[i].access;
+ }
+ 
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..e4628bf3 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -20,11 +20,11 @@
+ #include "X86GenSimpleOutput.inc"
+ #include "../../cs_disasm_internal.h"
+ #define X86_MEMORY32_OUTPUT
+-#define X86_MEMORY_IMMEDIATE writeCompare32
++#define X86_MEMORY_IMMEDIATE writeGroup1Memory32
+ #define X86_IMMEDIATE_WIDE 0
+-#define X86_COMPARE_IMMEDIATE
++#define X86_GROUP1_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
+-#undef X86_COMPARE_IMMEDIATE
++#undef X86_GROUP1_IMMEDIATE
+ #undef X86_MEMORY_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
+ 
+@@ -68,12 +68,13 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++		if (size >= 2 && code[1] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+-			const unsigned row =
+-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+-				2;
+-			if (writeCompare32(code, size, insn, insn_size,
++			/* The ModRM group selects the corresponding register ALU
++			 * opcode; its row owns operand access and flag effects. */
++			const unsigned reg_opcode = (code[1] & 0x38) | (opcode & 1);
++			const unsigned row = x86_simple_plans[0][0][reg_opcode] >> 2;
++			if (writeGroup1Memory32(code, size, insn, insn_size,
+ 					   &x86_simple_outputs[row],
+ 					   x86_simple_registers))
+ 				return true;
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 11582041..38add9f0 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -45,7 +45,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-#ifdef X86_COMPARE_IMMEDIATE
++#ifdef X86_GROUP1_IMMEDIATE
+ 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
+ #else
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
+@@ -187,13 +187,15 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-#ifdef X86_COMPARE_IMMEDIATE
+-	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
++#ifdef X86_GROUP1_IMMEDIATE
+ 	int64_t value = encoded;
+-	if (opcode == 0x83)
++	if (opcode == 0x83) {
++		/* The Intel printer renders logical masks at destination width. */
++		const unsigned group = (modrm >> 3) & 7;
+ 		value = (int8_t)encoded;
+-	else if (imm_size == 4 && row->ops[0].size == 8)
+-		value = (int32_t)encoded;
++		if (group == 1 || group == 4 || group == 6)
++			value = (uint32_t)value;
++	}
+ 	memcpy(out, ", ", 2);
+ 	out += 2;
+ 	if (value < 0)
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index bc67e4c3..afe092fc 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -27,6 +27,8 @@
+ #endif
+ 
+ #include "X86GenSimpleOutput.inc"
++#include "X86GenIncDec64.inc"
++#include "X86GenIndirect64Output.inc"
+ #ifdef CAPSTONE_X86_ONLY
+ #include "X86VexBaseMemory.h"
+ #endif
+@@ -168,6 +170,39 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+ }
+ #endif
+ 
++/* Groups 4 and 5 share their INC/DEC register forms. The group selects
++ * the effects row; REX.B and the operand width select the register. */
++static bool writeIncDec64(cs_struct *handle, const uint8_t *code, size_t size,
++			  cs_insn *insn, uint16_t *insn_size)
++{
++	const uint8_t rex = (code[0] & 0xf0) == 0x40 ? code[0] : 0;
++	const unsigned prefix = rex != 0;
++	if (size < 2 + prefix)
++		return false;
++	const uint8_t opcode = code[prefix], mr = code[prefix + 1];
++	if ((opcode & 0xfe) != 0xfe || (mr & 0xf0) != 0xc0 ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++
++	const unsigned bank = prefix + ((rex & 8) != 0);
++	const unsigned width = (opcode & 1) ? (rex & 8 ? 3 : 2) : prefix;
++	const struct X86SimpleOutput *row =
++		&x86_inc_dec64[bank][((opcode & 1) << 1) | ((mr >> 3) & 1)];
++	const struct X86SimpleRegister *reg =
++		&x86_simple_registers[width][((rex & 1) << 3) | (mr & 7)];
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(2 + prefix);
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	if (insn->detail)
++		X86_writeSimpleDetail(insn->detail, row, opcode, rex, mr,
++				      reg->reg, 0);
++	return true;
++}
++
+ /* The fixed-width AMD64 iterator has already tried its common records. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -256,6 +291,14 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return true;
+ 	}
+ #endif
++	/* FF /2 and /4 without a prefix can address a RIP-relative target. */
++	if (code[0] == 0xff && size >= 6 && (code[1] == 0x15 || code[1] == 0x25) &&
++	    !X86_OUTPUT_UNSUPPORTED(handle, false))
++		return X86_writeMemoryOutput(code, size, insn, insn_size,
++					     &x86_indirect64[0][code[1] == 0x25],
++					     x86_simple_registers);
++	if (writeIncDec64(handle, code, size, insn, insn_size))
++		return true;
+ fallback:
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ 	defined(__x86_64__)
+diff --git a/cs.c b/cs.c
+index d0b8b045..0bfa1c8b 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1413,12 +1413,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
  		return CS_ERR_OK;
  
  	case CS_OPT_DETAIL:
@@ -124,25 +459,135 @@ index d0b8b045..a5a1af9a 100644
  #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
  		Mips_selectScanDecoder(handle);
  #endif
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 08677417..658f581f 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -31,7 +31,13 @@ enum { CS_RECORD_PUBLIC_ITER = 2 };
- #else
- typedef bool cs_record_request;
- #endif
--#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD)
-+#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeMixedPublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
-+			    cs_insn *insn, uint16_t *length, bool batch);
-+#endif
-+#if defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD) || defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD) || \
-+	defined(CAPSTONE_X86_MIXED_PUBLIC_RECORD)
- CAPSTONE_INTERNAL bool X86_decodeFixedRecord32(cs_struct *handle,
- 		const uint8_t *code, size_t size, cs_insn *insn, uint16_t *length);
- CAPSTONE_INTERNAL bool X86_decodeFixedRecord64(cs_struct *handle,
+diff --git a/functions.mk b/functions.mk
+index 2a22b8ce..c2ba0d98 100644
+--- a/functions.mk
++++ b/functions.mk
+@@ -2,10 +2,7 @@
+ # Common functions used by Makefile & tests/Makefile
+ 
+ define compile
+-	$(ifeq ($(MACOS_UNIVERSAL),no),
+-		@$(CC) -MM -MP -MT $@ -MT $(@:.o=.d) $(CFLAGS) $< > $(@:.o=.d)
+-	)
+-	${CC} ${CFLAGS} -c $< -o $@
++	$(CC) $(CFLAGS) $(capstone_depflags) -c $< -o $@
+ endef
+ 
+ 
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index 37cb0735..92e5220d 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -1134,6 +1134,52 @@ void emit_indirect_memory(Decoder &decoder, const RegisterTable &regs)
+ 	std::cout << "};\n";
+ }
+ 
++// A group opcode supplies every field except the explicit register.
++void observe_group_register(Decoder &decoder, CheckedRow &row,
++                            uint8_t opcode, uint8_t rex, uint8_t modrm,
++                            unsigned id, const X86SimpleRegister &reg)
++{
++	decode_pair(decoder, rex, opcode, modrm);
++	cs_insn insn = *decoder.insn;
++	cs_detail detail = *insn.detail;
++	insn.detail = &detail;
++	auto &op = detail.x86.operands[0];
++	if (insn.id != id || detail.x86.op_count != 1 || op.type != X86_OP_REG ||
++	    unsigned(op.reg) != reg.reg || std::strcmp(insn.op_str, reg.name))
++		throw std::runtime_error("unexpected group register operand");
++	op.reg = X86_REG_INVALID;
++	insn.op_str[0] = 0;
++	row.observe(describe(insn, opcode, rex, modrm, nullptr, nullptr));
++}
++
++void emit_inc_dec64(Decoder &decoder, const RegisterTable &regs)
++{
++	std::cout << "/* Generated by x86_simple_output.cpp --inc-dec64. */\n"
++		     "static const struct X86SimpleOutput x86_inc_dec64[3][4] = {\n";
++	for (unsigned prefix = 0; prefix < 3; ++prefix) {
++		std::cout << "\t{\n";
++		const unsigned first = prefix == 2 ? 0x48 : prefix == 1 ? 0x40 : 0;
++		const unsigned last = prefix ? first + 7 : 0;
++		for (uint8_t opcode : { 0xfe, 0xff }) {
++			for (unsigned group : { 0u, 1u }) {
++				CheckedRow row;
++				for (unsigned rex = first; rex <= last; ++rex) {
++					const auto &names = regs[register_class(opcode, rex)];
++					for (unsigned rm = 0; rm < 8; ++rm) {
++						const uint8_t mr = uint8_t(0xc0 | group << 3 | rm);
++						observe_group_register(decoder, row, opcode, uint8_t(rex), mr,
++							group ? X86_INS_DEC : X86_INS_INC,
++							names[(rex & 1) << 3 | rm]);
++					}
++				}
++				std::cout << "\t\t" << row.fields << ",\n";
++			}
++		}
++		std::cout << "\t},\n";
++	}
++	std::cout << "};\n";
++}
++
+ // Near indirect register and memory targets have the same access and implicit
+ // effects. Check the whole row for every REX and every register, including
+ // cases where the extension bits do not participate in operand selection.
+@@ -1159,26 +1205,8 @@ void emit_indirect64(Decoder &decoder, const RegisterTable &regs)
+ 				for (unsigned rm = 0; rm < 8; ++rm) {
+ 					const uint8_t mr =
+ 						uint8_t(0xc0 | group << 3 | rm);
+-					decode_pair(decoder, rex, 0xff, mr);
+-					cs_insn projected = *decoder.insn;
+-					cs_detail detail = *projected.detail;
+-					projected.detail = &detail;
+-					auto &op = detail.x86.operands[0];
+-					const auto &reg =
+-						regs[3][(rex & 1) << 3 | rm];
+-					if (projected.id != id ||
+-					    detail.x86.op_count != 1 ||
+-					    op.type != X86_OP_REG ||
+-					    unsigned(op.reg) != reg.reg ||
+-					    std::strcmp(projected.op_str,
+-							reg.name))
+-						throw std::runtime_error(
+-							"unexpected near indirect register target");
+-					op.reg = X86_REG_INVALID;
+-					projected.op_str[0] = 0;
+-					row.observe(describe(projected, 0xff,
+-							     uint8_t(rex), mr,
+-							     nullptr, nullptr));
++					observe_group_register(decoder, row, 0xff, uint8_t(rex), mr, id,
++							       regs[3][(rex & 1) << 3 | rm]);
+ 				}
+ 			}
+ 			std::cout << "\t\t" << row.fields << ",\n";
+@@ -1197,11 +1225,15 @@ int main(int argc, char **argv)
+ 		emit_packed_memory(decoder, false);
+ 		return 0;
+ 	}
+-	if (argc == 2 && std::strcmp(argv[1], "--indirect64") == 0) {
++	const bool inc_dec = argc == 2 && std::strcmp(argv[1], "--inc-dec64") == 0;
++	if (inc_dec || (argc == 2 && std::strcmp(argv[1], "--indirect64") == 0)) {
+ 		Decoder decoder(CS_MODE_64);
+ 		RegisterTable regs{};
+ 		describe_registers(decoder, regs);
+-		emit_indirect64(decoder, regs);
++		if (inc_dec)
++			emit_inc_dec64(decoder, regs);
++		else
++			emit_indirect64(decoder, regs);
+ 		return 0;
+ 	}
+ 	if (argc == 2 && std::strcmp(argv[1], "--legacy-packed-memory") == 0) {
+@@ -1229,7 +1261,7 @@ int main(int argc, char **argv)
+ 	const bool group3 = argc == 2 && std::strcmp(argv[1], "--group3-registers32") == 0;
+ 	if (argc != 1 && !indirect && !extend && !test32 && !group3)
+ 		throw std::runtime_error(
+-			"expected no arguments, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --extend32, --extend64, --test32-registers or --group3-registers32");
++			"expected no arguments, --sse64-registers, --vex64-packed-memory, --legacy-packed-memory, --indirect-memory, --indirect64, --inc-dec64, --extend32, --extend64, --test32-registers or --group3-registers32");
+ 	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
+ 	RegisterTable regs{};
+ 	describe_registers(x64, regs);
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 1d2a80c3..72d7b188 100644
 --- a/tests/unit/CMakeLists.txt
@@ -240,3 +685,107 @@ index 00000000..1adadf31
 +	}
 +	return 0;
 +}
+diff --git a/tests/unit/x86_encoding_accuracy.c b/tests/unit/x86_encoding_accuracy.c
+index 75f57364..fe50e9e9 100644
+--- a/tests/unit/x86_encoding_accuracy.c
++++ b/tests/unit/x86_encoding_accuracy.c
+@@ -14,6 +14,7 @@
+ #include "../../arch/X86/X86DisassemblerDecoder.h"
+ #include "../../arch/X86/X86Disassembler.h"
+ #include "../../arch/X86/X86Mapping.h"
++#include "../../arch/X86/X86InstPrinterCommon.h"
+ #define GET_INSTRINFO_ENUM
+ #ifdef CAPSTONE_X86_REDUCE
+ #include "../../arch/X86/X86GenInstrInfo_reduce.inc"
+@@ -163,6 +164,26 @@ static bool check_internal_scan_mode(void)
+ 	return true;
+ }
+ 
++#ifndef CAPSTONE_DIET
++static bool check_operand_access_cache(cs_struct *arch, unsigned int id)
++{
++	uint64_t cached_flags = UINT64_MAX, fallback_flags = UINT64_MAX;
++	const uint8_t *cached = X86_get_op_access(arch, id, &cached_flags);
++	const uint8_t *fallback = X86_get_op_access(NULL, id, &fallback_flags);
++	if (cached_flags != fallback_flags)
++		return false;
++	if (!cached || !fallback)
++		return cached == fallback && cached_flags == UINT64_MAX;
++	for (unsigned int i = 0; i < CS_X86_MAXIMUM_OPERAND_SIZE; ++i) {
++		if (cached[i] != fallback[i])
++			return false;
++		if (!cached[i])
++			break;
++	}
++	return true;
++}
++#endif
++
+ /* Cache allocation is optional: every ID and hole must agree with the
+  * original binary-search mapping when the cache is unavailable. */
+ static bool check_id_cache(void)
+@@ -174,6 +195,13 @@ static bool check_id_cache(void)
+ 	uint32_t *cache = arch->x86_insn_lut;
+ 	bool ok = cache != NULL;
+ 	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
++#ifndef CAPSTONE_DIET
++		if (!check_operand_access_cache(arch, id)) {
++			fprintf(stderr, "Operand access cache differs at %u\n", id);
++			ok = false;
++			break;
++		}
++#endif
+ 		cs_insn cached = { 0 }, fallback = { 0 };
+ 		cached.id = fallback.id = UINT32_MAX;
+ 		X86_get_insn_id(arch, &cached, id);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index de30cf93..61f09e79 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1654,6 +1654,37 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
+ 	return true;
+ }
+ 
++static bool check_inc_dec_registers(csh handles[2])
++{
++	for (unsigned rex = 0; rex <= 16; ++rex) {
++		for (unsigned mr = 0xc0; mr < 0xd0; ++mr) {
++			for (unsigned opcode = 0xfe; opcode <= 0xff; ++opcode) {
++				uint8_t code[] = { rex ? (uint8_t)(0x3f + rex) : 0,
++						   (uint8_t)opcode, (uint8_t)mr };
++				const unsigned skip = !rex;
++				if (!compare(handles, code + skip, sizeof(code) - skip, 0x8000))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
++static bool check_group1_memory_immediates(csh handles[2])
++{
++	for (unsigned group = 0; group < 8; ++group) {
++		const uint8_t opcodes[] = { 0x80, 0x81, 0x83 };
++		for (unsigned i = 0; i < sizeof(opcodes); ++i) {
++			uint8_t code[] = { opcodes[i], (uint8_t)(0x44 | group << 3),
++					   0x8b, 0xf8, 0x80, 0xff, 0xff, 0xff };
++			for (size_t n = 1; n <= sizeof(code); ++n)
++				if (!compare(handles, code, n, 0x8000u + group))
++					return false;
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1672,6 +1703,8 @@ static bool check_mode(cs_mode mode)
+ 		if (!check_branches(handles) || !check_memory(handles, mode) ||
+ 		    !check_lea(handles, mode) ||
+ 		    !check_mov_disp32(handles, mode) ||
++		    !check_group1_memory_immediates(handles) ||
++		    !check_inc_dec_registers(handles) ||
+ 		    !check_group1(handles, mode) ||
+ 		    !check_push_immediates(handles) ||
+ 		    !check_shift_immediate(handles, mode) ||
