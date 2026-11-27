@@ -56,6 +56,8 @@ try:
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
     assert by['base']==by['candidate']
     changed=[f for f,x in objects['base'].items() if x!=objects['candidate'][f]]
+    added=set(objects['candidate'])-set(objects['base'])
+    assert {Path(f).name for f in added}=={'WASMTablePrinter.c.o'}
     assert {Path(f).name for f in changed}=={'WASMInstPrinter.c.o','wasm_brtable_size.c.o'},changed
     save('build',dict(complete=True,source=tree,streams=by,libraries=libs,changed=changed,compiler=get(cc,'--version').splitlines()[0],host=platform.platform(),machine=platform.machine()))
     inputs=temp/'inputs' if ci else r/'inputs'
