@@ -1,7 +1,7 @@
-name: Check linked public Intel throughput, PE32 placement and the 16-bit record fallback
+name: Measure newly bound public readers against iced, including PE32, firmware and foreign clients
 on:
   push:
-    branches: [codex/late-public-text-admission]
+    branches: [codex/optional-reader-linked-images]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-public-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: optional-reader-images-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -175,15 +175,20 @@ index d0b8b045..1e1f4278 100644
  __declspec(noinline)
  #elif defined(__GNUC__)
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 08677417..97e6157d 100644
+index 08677417..aee2ae08 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -18,7 +18,7 @@
+@@ -18,7 +18,12 @@
   * the compiler can combine scan and output state without an extra boundary.
   * Otherwise cs.c instantiates the same iterator. Input validation, option
   * selection and callbacks keep their original order. */
 -#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
 +#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD)
++#if defined(CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD) && defined(CS_DECODE_SCAN_IMPL)
++/* cs.c supplies the default record reader. Calling the public iterator
++ * alone must not pull a fixed-width reader out of the static archive. */
++__attribute__((weak))
++#endif
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
  		       cs_insn *insn, uint16_t *insn_size, bool batch);
