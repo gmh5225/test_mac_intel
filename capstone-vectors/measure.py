@@ -86,7 +86,17 @@ try:
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-only-'+label))
         run('clang++',w/'foreign.o',w/'native-reference.o',lib,'-no-pie','-o',w/('foreign-'+label))
         run('clang++',w/'public-only.o',lib,ice_lib,*flags,'-o',w/('ordinary-'+label))
-        names=('X86_disasmIterText','cs_decode_full_insn','X86_decodeAbsoluteMiss32','cs_disasm_iter')
+        members=get('ar','t',lib).strip().splitlines()
+        if os.uname().machine=='x86_64' and label!='base':
+            assert members[-1]=='X86VexMemoryFallback64.c.o',members[-8:]
+        boundary={}
+        for stem in ('segment','absolute'):
+            run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/(stem+'.cpp'),lib,'-o',w/stem)
+            boundary[stem]=list(map(int,get(w/stem).split()))
+        assert boundary['segment'][0]==2592000 and boundary['absolute'][0]==1343232
+        if label!='base':assert boundary==rd(e/'width-guard-base.json')
+        save('width-guard-'+label,boundary);save('archive-members-'+label,members)
+        names=('X86_disasmIterText','cs_decode_full_insn','X86_decodeVexMemoryFallback64','cs_disasm_iter')
         modes={}
         for route,exe in [('native',w/label),('public_only',w/('ordinary-'+label)),('foreign',w/('foreign-'+label)),('foreign_only',w/('foreign-only-'+label))]:
             with exe.open('rb') as fh:
@@ -97,11 +107,11 @@ try:
                 allocated={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()] for v in elf.iter_sections() if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
             resolved='X86_disasmIterText' in symbols;assert resolved==(route in ('native','foreign')),(label,route,symbols)
             active=os.uname().machine=='x86_64' and label!='base'
-            assert ('X86_decodeAbsoluteMiss32' in symbols)==(active and resolved)
+            assert ('X86_decodeVexMemoryFallback64' in symbols)==(active and resolved)
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
         if os.uname().machine=='x86_64' and label!='base':
-            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_decodeRegisterFallback32','X86_decodeAbsoluteMiss32')}
+            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_decodeOutputMiss64','X86_decodeVexMemoryFallback64')}
             save('record-assembly-'+label,assembly)
 
         from symbol_layout import symbols
@@ -148,7 +158,7 @@ try:
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
         run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'sib.cpp',lib,'-o',w/'sib-guard')
-        guard=list(map(int,get(w/'sib-guard').split()));assert guard[0]==4718592 and 0<guard[1]<guard[0]
+        guard=list(map(int,get(w/'sib-guard').split()));assert guard[0]==7077888 and 0<guard[1]<guard[0]
         save('sib-'+label,guard)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:

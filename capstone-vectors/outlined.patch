@@ -1,14 +1,14 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..e5d0eae6 100644
+index cea06480..7540aec4 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,11 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86RegisterFallback32.c arch/X86/X86MemoryFallback32.c
-+            APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_ABSOLUTE32>")
 +        set(capstone_x86_vex_memory_reader ON)
++        set_property(SOURCE arch/X86/X86MemoryFallback32.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_ABSOLUTE32>")
 +        set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_VEX_MEMORY_FALLBACK>")
      endif()
@@ -24,6 +24,21 @@ index cea06480..e5d0eae6 100644
      target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
      set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
      if(capstone_enabled_architectures STREQUAL "X86" OR
+@@ -1152,7 +1160,13 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+         else()
+             list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_iter32> $<TARGET_OBJECTS:capstone_x86_iter64>)
+         endif()
+-        list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
++        set(capstone_static_native $<TARGET_OBJECTS:capstone_x86_native>)
++        if(capstone_x86_vex_memory_reader)
++            # Place the optional VEX writer after the shared backends' alias lookups.
++            list(APPEND capstone_static_tail "$<FILTER:${capstone_static_native},INCLUDE,/X86VexMemoryFallback64[.]c[.]o$>")
++            set(capstone_static_native "$<FILTER:${capstone_static_native},EXCLUDE,/X86VexMemoryFallback64[.]c[.]o$>")
++        endif()
++        list(APPEND capstone_static_objects ${capstone_static_native} ${capstone_static_tail})
+     endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
 diff --git a/arch/X86/X86GenVexSibTransfers.inc b/arch/X86/X86GenVexSibTransfers.inc
 new file mode 100644
 index 00000000..382c941e
@@ -41,10 +56,41 @@ index 00000000..382c941e
 +	{ X86_INS_VMOVD, "vmovd", "dword ptr [", 11, 16, 4, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +};
 diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..9c597b7e 100644
+index cffc4e81..b220a4cb 100644
 --- a/arch/X86/X86MemoryFallback32.c
 +++ b/arch/X86/X86MemoryFallback32.c
-@@ -97,5 +97,110 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -33,6 +33,13 @@
+ #undef X86_SEGMENT_LEA32
+ #undef X86_MEMORY32_OUTPUT
+ 
++#ifdef X86_FIXED_ABSOLUTE32
++static CS_PRESERVE_MOST bool decodeAbsolute32(cs_struct *handle,
++					      const uint8_t *code, size_t size,
++					      cs_insn *insn, uint16_t *insn_size,
++					      bool batch);
++#endif
++
+ /* The fixed-width iterator delegates uncommon encodings here. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -93,9 +100,128 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 					      x86_simple_registers))
+ 				return true;
+ 		}
++#ifdef X86_FIXED_ABSOLUTE32
++		if ((opcode & 0xfe) != 0x64)
++			break;
++		/* FS/GS and moffs opcodes can use the same absolute address writer. */
++		/* fall through */
++	case 0xa0:
++	case 0xa1:
++	case 0xa2:
++	case 0xa3:
++		__attribute__((musttail)) return decodeAbsolute32(
++			handle, code, size, insn, insn_size, batch);
++#else
+ 		break;
++#endif
  	}
  	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
  }
@@ -142,9 +188,10 @@ index cffc4e81..9c597b7e 100644
 +	return true;
 +}
 +
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeAbsoluteMiss32(cs_struct *handle, const uint8_t *code, size_t size,
-+			 cs_insn *insn, uint16_t *insn_size, bool batch)
++static __attribute__((noinline)) CS_PRESERVE_MOST bool decodeAbsolute32(cs_struct *handle,
++					      const uint8_t *code, size_t size,
++					      cs_insn *insn, uint16_t *insn_size,
++					      bool batch)
 +{
 +	if (writeAbsolute32(handle, code, size, insn, insn_size))
 +		return true;
@@ -156,10 +203,10 @@ index cffc4e81..9c597b7e 100644
  #endif
  #endif
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..77aa3dcd 100644
+index 62d4288a..12f5c124 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
-@@ -27,6 +27,19 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -27,6 +27,13 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  			cs_insn *insn, uint16_t *insn_size, bool batch);
  
@@ -170,57 +217,42 @@ index 62d4288a..77aa3dcd 100644
 +			      bool batch);
 +#endif
 +
-+#ifdef X86_FIXED_ABSOLUTE32
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeAbsoluteMiss32(cs_struct *handle, const uint8_t *code, size_t size,
-+			 cs_insn *insn, uint16_t *insn_size, bool batch);
-+#endif
-+
  /* Keep the mode, option and callback checks in a single short-circuit chain
   * in both instantiations of the scalar writer. */
  #define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
-diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index 251c6819..2d72e0d5 100644
---- a/arch/X86/X86RegisterFallback32.c
-+++ b/arch/X86/X86RegisterFallback32.c
-@@ -61,7 +61,12 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 		}
- #endif
- 	}
-+#ifdef X86_FIXED_ABSOLUTE32
-+	__attribute__((musttail)) return X86_decodeAbsoluteMiss32(
-+		handle, code, size, insn, insn_size, batch);
-+#else
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+#endif
- }
- #endif
- #endif
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..0b31126e 100644
+index bc67e4c3..ccc263ed 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -267,7 +267,14 @@ fallback:
- 		return cs_decode_full_insn_body(handle, code, size, insn,
- 						insn_size, batch);
- #endif
+@@ -212,10 +212,22 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
 +#ifdef X86_VEX_MEMORY_FALLBACK
-+	{
++	if ((code[0] & 0xfe) == 0xc4) {
++		if (code[0] == 0xc4 &&
++		    X86_writeVexRegisterImmediate(handle, code, size, insn,
++						 insn_size, x86_simple_registers,
++						 true))
++			return true;
 +		__attribute__((musttail)) return X86_decodeVexMemoryFallback64(
-+		handle, code, size, insn, insn_size, batch);
++			handle, code, size, insn, insn_size, batch);
 +	}
 +#else
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ 	if (code[0] == 0xc4 &&
+ 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
+ 		return true;
 +#endif
- }
- #endif
- #endif
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+ 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
+ 		const unsigned offset = 4 + (rex != 0);
 diff --git a/arch/X86/X86VexMemoryFallback64.c b/arch/X86/X86VexMemoryFallback64.c
 new file mode 100644
-index 00000000..5ff12dbe
+index 00000000..d5074cbe
 --- /dev/null
 +++ b/arch/X86/X86VexMemoryFallback64.c
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,161 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +#ifdef CAPSTONE_HAS_X86
@@ -361,24 +393,22 @@ index 00000000..5ff12dbe
 +	return true;
 +}
 +
-+/* This optional reader only sees misses from the fixed AMD64 path. */
++/* The fixed AMD64 reader has identified a VEX2 or VEX3 prefix. */
 +CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 +X86_decodeVexMemoryFallback64(cs_struct *handle, const uint8_t *code,
 +			      size_t size, cs_insn *insn, uint16_t *insn_size,
 +			      bool batch)
 +{
-+	if ((code[0] & 0xfe) == 0xc4) {
-+		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-+		if (size >= prefix + 3 && (prefix == 2 || (code[1] & 31) == 1) &&
-+		    writeVexSibTransfer(handle, code, size, prefix, insn, insn_size,
-+					x86_simple_registers[3]))
-+			return true;
-+		if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		    writeVexBaseMemory(code, size, prefix, insn, insn_size,
-+				       x86_simple_registers[3]))
-+			return true;
-+	}
++	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
++	if (size >= prefix + 3 && (prefix == 2 || (code[1] & 31) == 1) &&
++	    writeVexSibTransfer(handle, code, size, prefix, insn, insn_size,
++				x86_simple_registers[3]))
++		return true;
++	if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
++	    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++	    writeVexBaseMemory(code, size, prefix, insn, insn_size,
++			       x86_simple_registers[3]))
++		return true;
 +	__attribute__((musttail)) return cs_decode_full_insn(
 +		handle, code, size, insn, insn_size, batch);
 +}

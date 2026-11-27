@@ -18,13 +18,13 @@ int main() {
     uint64_t checked=0, decoded=0, hash=0xcbf29ce484222325;
     for (auto detail : {CS_OPT_OFF,CS_OPT_ON}) {
         if(cs_option(fast,CS_OPT_DETAIL,detail)||cs_option(slow,CS_OPT_DETAIL,detail))return 4;
-        for (unsigned prefix : {2u,3u}) for(unsigned op : {0x90u,0x91u,0x92u,0x10u,0x11u,0x12u}) {
+        for (unsigned prefix : {2u,3u}) for(unsigned op : {0x90u,0x91u,0x92u,0x10u,0x11u,0x12u,0x6eu,0x7eu,0x6fu}) {
             for(unsigned mr=0;mr<256;mr+=1)for(unsigned pattern=0;pattern<64;++pattern) {
                 static const uint32_t disp[]={0,9,10,0x7f,0xffffffe0,0x80000000,0x12345678,0xffffffff};
                 const unsigned sib=pattern >= 32 && (pattern % 4 == 0) ? 0x24 : (pattern*97u+(mr>>3)*19u)&255;
                 uint8_t bytes[11]={uint8_t(prefix==3?0xc4:0xc5)};
                 unsigned flags=(pattern&1?0x80:0)|((pattern>>1)&1)|0x78;
-                if(op<0x80)flags=(flags & ~0x80u)|2u;
+                if(op<0x20)flags=(flags & ~0x80u)|2u; else if(op<0x80)flags=(flags & ~3u)|1u;
                 if((pattern&31)>=24)flags^=4u<<(pattern%4);
                 if(prefix==3){bytes[1]=uint8_t((((pattern^(pattern>>3))&7)<<5)|1);bytes[2]=uint8_t(flags);}
                 else bytes[1]=uint8_t((flags&0x7f)|(pattern&4?0x80:0));

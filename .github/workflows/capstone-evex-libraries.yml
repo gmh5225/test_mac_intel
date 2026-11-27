@@ -1,7 +1,7 @@
-name: Compare i386 absolute operands and combined AMD64 vector memory output in both natural link modes
+name: Measure opcode-selected i386 and AMD64 memory output without sending scalar and nonmemory misses through a second decoder
 on:
   push:
-    branches: [codex/x86-native-absolute-and-vector-exits]
+    branches: [codex/select-actual-vector-and-absolute-misses]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: terminal-absolute-vectors-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: selected-memory-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
