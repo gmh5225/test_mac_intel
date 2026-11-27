@@ -1,7 +1,7 @@
-name: Verify ARM release, DIET and debug outputs and all six mappings in the NeverD archive
+name: Verify ARM printer semantics and rebuild the real Mapping object after changing native and macOS universal headers
 on:
   push:
-    branches: [codex/verify-actual-arm-build-inputs]
+    branches: [codex/arm-real-incremental-headers]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: arm-verified-inputs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: arm-make-incremental-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
