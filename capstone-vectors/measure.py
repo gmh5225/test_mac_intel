@@ -22,6 +22,7 @@ try:
  for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
  run('cargo','build','--locked','--release',cwd=ad)
  run('clang++','-O3','-DNDEBUG','-std=c++17','-I',src,'-I',src/'include','-c',r/'driver.cpp','-o',w/'driver.o')
+ run('clang++','-O2','-std=c++17','-c',r/'count.cpp','-o',w/'count.o')
  products={}
  for tag in stages:
   run('git','-C',src,'restore','--source','HEAD','--worktree','--staged','--','.')
@@ -31,6 +32,7 @@ try:
   run('cmake','--build',b,'--target','capstone_static','--parallel','4')
   lib,=b.rglob('libcapstone.a');exe=w/tag
   run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
+  run('clang++',w/'driver.o',w/'count.o',lib,ad/'target/release/libiced_compare.a','-Wl,--wrap=vsnprintf','-lpthread','-lm','-ldl','-no-pie','-o',w/(tag+'-count'))
   products[tag]=dict(library=sha(lib),exe=sha(exe))
  assert len({v['exe'] for v in products.values()})==4
  save('products',products)
@@ -64,6 +66,17 @@ try:
    assert [list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]==trace
   ranges.write_bytes(table_bytes(included));selections[name]=dict(source=metadata,excluded_tables=removed,data_bytes=skipped,revised_count=len(spans),included=len(included),included_bytes=sum(n for _,n,_ in included),excluded=excluded,ranges=sha(ranges));audit[name]=trace;save('selections',selections);save('boundary-audit',audit)
   if name=='sqlite-win-x64':assert not excluded,excluded
+  counters={}
+  for tag in stages:
+   env=dict(os.environ,CAPSTONE_COUNT_FORMATS=str(w/'counts'),CAPSTONE_BENCH_ATT='1')
+   v=list(map(int,get(w/(tag+'-count'),'capstone','1','1',text,ranges,bits,env=env).split()))
+   counts=list(map(int,(w/'counts').read_text().split()));(w/'counts').unlink()
+   assert len(counts)==2;counters[tag]=dict(check=v[2:],calls=counts)
+  assert counters['base']['calls'][0]>0 and all(x['check']==counters['base']['check'] for x in counters.values())
+  assert counters['base']['calls']==counters['shipping']['calls']
+  assert counters['candidate']['calls'][0]==counters['outlined']['calls'][0]==0
+  assert len({row['calls'][1] for row in counters.values()})==1
+  save('format-calls-'+name,counters)
   for route in ('private','capstone'):
    for dialect,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
     engine=['iced']+(['fast'] if dialect=='intel' and mode else [])
