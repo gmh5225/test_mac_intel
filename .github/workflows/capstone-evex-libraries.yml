@@ -1,7 +1,7 @@
-name: Verify scoped cached access against the shipping and original six-backend binaries
+name: Compare Capstone and iced on independently selected SQLite and liblzma releases
 on:
   push:
-    branches: [codex/final-scoped-mapping-images]
+    branches: [codex/sqlite-liblzma-unseen-decoder-workloads]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: cached-access-images-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: sqlite-and-liblzma-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

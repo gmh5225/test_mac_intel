@@ -1,14 +1,118 @@
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index f75c3794..76b35f22 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -70,7 +70,8 @@ bool X86_writeMemoryOutput(
- 		const unsigned index_reg = ((rex & 2) << 2) |
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
--#ifdef X86_SEGMENT_LEA32
-+#if defined(X86_SEGMENT_LEA32) || \
-+	(defined(X86_MEMORY32_OUTPUT) && defined(CAPSTONE_X86_ONLY))
- 		/* A scale-one SIB without an index names only its base. */
- 		if ((!mod && base_reg == 5) ||
- 		    (index_reg == 4 && (encoding >> 6) != 0))
+diff --git a/cs.c b/cs.c
+index d0b8b045..0bfa1c8b 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1413,12 +1413,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_DETAIL:
+-		// CS_OPT_OFF turns detail off.  Any other value adds its flags
+-		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
+-		if (value == CS_OPT_OFF)
+-			handle->detail_opt = CS_OPT_OFF;
+-		else
+-			handle->detail_opt |= (cs_opt_value)value;
++		/* A requested view enables detail and preserves earlier view flags. */
++		if (value != CS_OPT_OFF)
++			value |= handle->detail_opt | CS_OPT_ON;
++		handle->detail_opt = (cs_opt_value)value;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
+ #endif
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 1d2a80c3..72d7b188 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15)
+ 
+ enable_testing()
+ set(UNIT_TEST_SOURCES sstream.c utils.c api.c instruction_bytes.c mcinst.c mapping.c feature_mode.c)
++if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_PPC_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
++    list(APPEND UNIT_TEST_SOURCES detail_views.c)
++endif()
+ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
+    OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_PPC_SUPPORT
+    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+diff --git a/tests/unit/detail_views.c b/tests/unit/detail_views.c
+new file mode 100644
+index 00000000..1adadf31
+--- /dev/null
++++ b/tests/unit/detail_views.c
+@@ -0,0 +1,77 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <string.h>
++
++struct sample {
++	cs_arch arch;
++	cs_mode mode;
++	uint8_t bytes[4];
++	size_t length;
++};
++
++static bool decode_view(csh handle, const struct sample *sample,
++			size_t flags, cs_insn *insn, cs_detail *detail)
++{
++	const uint8_t *code = sample->bytes;
++	size_t size = sample->length;
++	uint64_t address = 0x1000;
++
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) != CS_ERR_OK ||
++	    cs_option(handle, CS_OPT_DETAIL, flags) != CS_ERR_OK)
++		return false;
++	memset(insn, 0, sizeof(*insn));
++	memset(detail, 0, sizeof(*detail));
++	insn->detail = detail;
++	return cs_disasm_iter(handle, &code, &size, &address, insn) &&
++	       size == 0 && address == 0x1000 + sample->length;
++}
++
++int main(void)
++{
++	static const struct sample samples[] = {
++		{ CS_ARCH_ARM, CS_MODE_ARM, { 0x10, 0x40, 0x2d, 0xe9 }, 4 },
++		{ CS_ARCH_ARM, CS_MODE_THUMB, { 0x10, 0xb5 }, 2 },
++		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN,
++		  { 0xe0, 0x03, 0x01, 0xaa }, 4 },
++		{ CS_ARCH_PPC, CS_MODE_32 | CS_MODE_BIG_ENDIAN,
++		  { 0x7c, 0x64, 0x1b, 0x78 }, 4 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C,
++		  { 0x85, 0x00 }, 2 },
++	};
++	static const cs_opt_value views[] = { CS_OPT_DETAIL_REAL,
++					      CS_OPT_DETAIL_UNCOMPRESSED_REAL,
++					      CS_OPT_DETAIL_ALIAS };
++	for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
++		const struct sample *sample = &samples[i];
++		if (!cs_support(sample->arch))
++			continue;
++		csh handle;
++		if (cs_open(sample->arch, sample->mode, &handle) != CS_ERR_OK)
++			return 1;
++		for (size_t j = 0; j < sizeof(views) / sizeof(views[0]); ++j) {
++			cs_insn implicit, explicit_on;
++			cs_detail first, second;
++			bool ok = decode_view(handle, sample, views[j],
++					      &implicit, &first) &&
++				  decode_view(handle, sample, views[j] | CS_OPT_ON,
++					      &explicit_on, &second);
++			if (!ok || implicit.id != explicit_on.id ||
++			    implicit.alias_id != explicit_on.alias_id ||
++			    implicit.usesAliasDetails != explicit_on.usesAliasDetails ||
++			    strcmp(implicit.mnemonic, explicit_on.mnemonic) ||
++			    strcmp(implicit.op_str, explicit_on.op_str) ||
++			    memcmp(&first, &second, sizeof(first))) {
++				fprintf(stderr, "detail view %u differs on architecture %u, mode %u\n",
++					(unsigned)views[j], (unsigned)sample->arch,
++					(unsigned)sample->mode);
++				cs_close(&handle);
++				return 1;
++			}
++		}
++		cs_close(&handle);
++	}
++	return 0;
++}
