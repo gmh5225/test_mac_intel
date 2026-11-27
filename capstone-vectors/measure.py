@@ -47,6 +47,18 @@ try:
     from foreign_time import measure as time_foreign
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    script=w/'masked.ld'
+    script.write_text('SECTIONS { .cs_bench_masked ALIGN(64) : { KEEP(*(.bench_masked_body)) . = 16384; } } INSERT AFTER .text;'+chr(10))
+    link_option='-Wl,-T,'+str(script);controls={}
+    def observe(path):
+        with path.open('rb') as inp:
+            elf=ELFFile(inp);tab=elf.get_section_by_name('.symtab')
+            syms=sorted([x.name,x['st_value'],x['st_size']] for x in tab.iter_symbols() if x['st_info']['type']=='STT_FUNC' and x['st_size'])
+            func,=[v for v in syms if v[0]=='writeMaskedByteMove']
+            peer=[v for v in syms if v!=func]
+            sections={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+            assert func[1]==sections['.cs_bench_masked'][0] and 0<func[2]<16384 and sections['.cs_bench_masked'][1]==16384
+            return dict(masked=func,peer_count=len(peer),peers_sha256=hashlib.sha256(json.dumps(peer).encode()).hexdigest(),sections=sections)
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
@@ -56,6 +68,10 @@ try:
         if label=='candidate':
             assert sha(r/'candidate.patch')==q['sha256']
             run('git','-C',base,'apply','--index',r/'candidate.patch');assert get('git','-C',base,'write-tree').strip()==q['tree']
+        mapping=base/'arch/X86/X86VectorFallback64.c'
+        marker='static bool writeMaskedByteMove(';content=mapping.read_text()
+        assert content.count(marker)==1
+        mapping.write_text(content.replace(marker,'__attribute__((noinline,section(".bench_masked_body")))'+chr(10)+marker))
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'clear.cpp',lib,'-o',w/'check-clear')
@@ -72,8 +88,15 @@ try:
         assert len(rows)==8 and all(int(v.split()[0]) and int(v.split()[1]) for v in rows)
         if label!='base':assert rows==rd(e/'gpr-records-base.json'),(label,rows)
         save('gpr-records-'+label,rows)
-        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
-        run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        run('clang++',w/'driver.o',lib,ice_lib,*flags,link_option,'-o',w/label)
+        run('clang++',w/'foreign.o',lib,'-no-pie',link_option,'-o',w/('foreign-'+label))
+        controls[label]={k:observe(path) for k,path in [('x86',w/label),('foreign',w/('foreign-'+label))]}
+        save('masked-layouts',controls)
+        for k,current in controls[label].items():
+            before=controls['base'][k];assert current['peer_count']==before['peer_count'] and current['peers_sha256']==before['peers_sha256'] and before['masked'][1]==current['masked'][1],(label,k,before['masked'],current['masked'])
+            for section,b in before['sections'].items():
+                if section.startswith(('.text','.cs_x86_','.cs_alias_')) or section in ('.rodata','.plt','.init','.fini'):
+                    assert current['sections'][section]==b,(label,k,section)
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
