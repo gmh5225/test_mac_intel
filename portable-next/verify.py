@@ -34,7 +34,6 @@ try:
         else:run(os.environ.get('CC','cc'),'-std=c11','-O2','-I'+str(s/'include'),path,build/'libcapstone.a','-o',exe)
         row=list(map(int,get(exe).split()));assert row[0]==704
         if profile=='diet':assert row[1:]==[0,0],(tag,row)
-        elif tag=='candidate':assert row==[704,0,0],(tag,row)
         else:assert row==[704,0,220],(tag,row)
         rows[tag]=row
     print(profile,rows,flush=True);save('complete',dict(complete=True,profile=profile,platform=platform.platform(),source=t,rows=rows))

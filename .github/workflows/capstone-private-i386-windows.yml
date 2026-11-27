@@ -1,7 +1,7 @@
-name: Check complete WebAssembly target groups on native Windows x86 and x64
+name: Verify the standalone WebAssembly branch reader on 32-bit and 64-bit MSVC
 on:
   push:
-    branches: [codex/wasm-table-target-windows]
+    branches: [codex/wasm-target-reader-msvc]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-table-target-windows-${{ matrix.arch }}-${{ matrix.profile }}
+          name: wasm-target-reader-msvc-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
