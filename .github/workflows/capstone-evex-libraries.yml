@@ -1,7 +1,7 @@
-name: Compare all Intel and AT&T 32-bit program outputs on four fresh native x86 hosts
+name: Replicate i386 JPEG detail and OpenSSL text with the shared TEST operand writer
 on:
   push:
-    branches: [codex/stable-i386-dialect-replication]
+    branches: [codex/i386-shared-writer-repeat]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-dialect-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-i386-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

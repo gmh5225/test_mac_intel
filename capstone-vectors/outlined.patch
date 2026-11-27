@@ -12,20 +12,10 @@ index a2a27faf..cd981210 100644
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
 diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..a7e5ba5c 100644
+index cffc4e81..2361b0dd 100644
 --- a/arch/X86/X86MemoryFallback32.c
 +++ b/arch/X86/X86MemoryFallback32.c
-@@ -13,6 +13,9 @@
- 	!defined(_WIN32_WCE)
- #include "X86OutputOptions.h"
- #include "X86SimpleOutput.h"
-+#ifdef X86_ACCUMULATOR_OUTPUT32
-+#include "X86RegisterImmediateOutput.h"
-+#endif
- #include "X86VectorRegisterOutput.h"
- #define X86_VEX32_REGISTER_MOVES
- #include "X86GenVex32MemoryOutput.inc"
-@@ -38,6 +41,12 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -38,6 +38,12 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
  		       cs_insn *insn, uint16_t *insn_size, bool batch)
  {
@@ -38,72 +28,80 @@ index cffc4e81..a7e5ba5c 100644
  	const unsigned opcode = code[0];
  	switch (opcode) {
  	case 0xc4:
-@@ -97,5 +106,34 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -97,5 +103,16 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
  	}
  	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
  }
-+
 +#ifdef X86_ACCUMULATOR_OUTPUT32
-+/* A bare ALU accumulator opcode names AL or EAX itself. Its register-pair
-+ * row supplies the effect on the destination, flags and implicit registers. */
-+#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_accumulator32_text"
-+#endif
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeAccumulatorFallback32(cs_struct *handle, const uint8_t *code, size_t size,
-+				cs_insn *insn, uint16_t *insn_size, bool batch)
++/* The register-pair form supplies the accumulator ALU instruction's
++ * destination access, flags and implicit registers. */
++CAPSTONE_INTERNAL CS_PRESERVE_MOST const struct X86SimpleOutput *
++X86_accumulatorRow32(unsigned opcode)
 +{
-+	const unsigned opcode = code[0];
-+	if ((opcode & 0xc6) == 0x04) {
-+		const unsigned wide = opcode & 1;
-+		const unsigned width = wide ? 4 : 1;
-+		if (size >= 1 + width && !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			const unsigned pair = opcode & 0x39;
-+			const unsigned row = x86_simple_plans[0][0][pair] >> 2;
-+			writeUnsignedRegisterImmediate(
-+				insn, &x86_simple_outputs[row],
-+				&x86_simple_registers[wide ? 2 : 0][0], code,
-+				0, 0, 1, width, insn_size);
-+			return true;
-+		}
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	const unsigned pair = opcode & 0x39;
++	return &x86_simple_outputs[x86_simple_plans[0][0][pair] >> 2];
 +}
 +#endif
 +
  #endif
  #endif
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..16d41fad 100644
+index 62d4288a..19c76f1e 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
-@@ -21,6 +21,12 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+@@ -22,6 +22,12 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
  			     size_t size, cs_insn *insn, uint16_t *insn_size,
  			     bool batch);
-+#ifdef X86_ACCUMULATOR_OUTPUT32
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeAccumulatorFallback32(cs_struct *handle, const uint8_t *code,
-+			     size_t size, cs_insn *insn, uint16_t *insn_size,
-+			     bool batch);
-+#endif
  
++#ifdef X86_ACCUMULATOR_OUTPUT32
++struct X86SimpleOutput;
++CAPSTONE_INTERNAL CS_PRESERVE_MOST const struct X86SimpleOutput *
++X86_accumulatorRow32(unsigned opcode);
++#endif
++
  /* Called by the static AMD64 iterator with at least one input byte. */
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
 diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index 251c6819..95fbfb70 100644
+index 251c6819..52ef4390 100644
 --- a/arch/X86/X86RegisterFallback32.c
 +++ b/arch/X86/X86RegisterFallback32.c
-@@ -61,7 +61,12 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 		}
- #endif
- 	}
+@@ -27,20 +27,32 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 			     bool batch)
+ {
+ 	const unsigned opcode = code[0];
+-	if ((opcode & 0xfe) == 0xf6) {
 +#ifdef X86_ACCUMULATOR_OUTPUT32
-+	return X86_decodeAccumulatorFallback32(handle, code, size, insn, insn_size,
-+					       batch);
++	const bool accumulator = (opcode & 0xc6) == 0x04;
 +#else
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	const bool accumulator = false;
 +#endif
- }
- #endif
- #endif
++	if ((opcode & 0xfe) == 0xf6 || accumulator) {
+ 		const unsigned form = opcode & 1;
+ 		const unsigned width = form ? 4 : 1;
+-		if (size >= 2 + width && (code[1] & 0xf8) == 0xc0 &&
++		const unsigned offset = accumulator ? 1 : 2;
++		if (size >= offset + width &&
++		    (accumulator || (code[1] & 0xf8) == 0xc0) &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const uint8_t modrm = accumulator ? 0 : code[1];
++			const struct X86SimpleOutput *row = &test32_rows[form];
++#ifdef X86_ACCUMULATOR_OUTPUT32
++			if (accumulator)
++				row = X86_accumulatorRow32(opcode);
++#endif
+ 			writeUnsignedRegisterImmediate(
+-				insn, &test32_rows[form],
+-				&test32_regs[form][code[1] & 7], code, 0,
+-				code[1], 2, width, insn_size);
++				insn, row, &test32_regs[form][modrm & 7], code,
++				0, modrm, offset, width, insn_size);
+ 			return true;
+ 		}
+ #ifdef X86_GROUP3_REGISTER_OUTPUT
+ 		/* Register forms /2 through /7 have no immediate. */
+-		if (size >= 2 && code[1] >= 0xd0 &&
++		if (!accumulator && size >= 2 && code[1] >= 0xd0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+ 			const unsigned modrm = code[1];
+ 			const struct X86SimpleOutput *row =
