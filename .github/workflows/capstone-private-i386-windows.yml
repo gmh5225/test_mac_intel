@@ -1,7 +1,7 @@
-name: Check ordered x86 access metadata in nineteen Clang, GCC and MSVC profiles
+name: Verify cached x86 flag and permission mapping on full and reduced instruction sets
 on:
   push:
-    branches: [codex/qualify-att-access-byte-order]
+    branches: [codex/cached-access-portable-verification]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: att-ordered-access-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: cached-access-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
