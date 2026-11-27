@@ -99,7 +99,7 @@ try:
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    first=set(['X86MemoryFallback32.c.o', 'X86RegisterFallback32.c.o', 'X86Sse64Output.c.o']);second=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o', 'cs.c.o']);between=set(['X86DisassemblerDecoder.c.o', 'X86MemoryFallback32.c.o', 'X86RegisterFallback32.c.o', 'X86Sse64Output.c.o', 'cs.c.o'])
+    first=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o', 'cs.c.o']);second=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o', 'cs.c.o']);between=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o'])
     for before,after,expected in [('shipping','base',set() if arm else first),
         ('shipping','mask',set() if arm else second),('base','mask',set() if arm else between)]:
         a,b=identities[before],identities[after]
