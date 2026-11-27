@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-assert all(sha(r/(stage+'.patch'))==m[stage]['sha256'] for stage in ('base','mask'))
+assert all(sha(r/(stage+'.patch'))==m[stage]['sha256'] for stage in ('shipping','base','mask'))
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -65,7 +65,7 @@ try:
     identities={};results={}
     for stage in ('shipping','base','mask'):
         git(cs,'restore','--source','HEAD','--worktree','--staged','--','.')
-        patches={'shipping':[],'base':['base'],'mask':['mask']}
+        patches={name:([name] if m[name]['commit']!=m['checkout'] else []) for name in ('shipping','base','mask')}
         for name in patches[stage]:
             command(['git','apply','--index',r/(name+'.patch')],'apply-'+stage+'-'+name,cs)
         assert git(cs,'write-tree')==m[stage]['tree']
@@ -109,7 +109,7 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first={'cs.c.o'};between={'X86Mapping.c.o'} if os.uname().machine=='x86_64' else set();second=first|between
+    first={'X86Mapping.c.o'} if os.uname().machine=='x86_64' else set();between={'X86MemoryFallback32.c.o'};second=first|between
     for before,after,expected in [('shipping','base',first),
         ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]
@@ -152,7 +152,6 @@ try:
     for c in cases:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             key=c['name']+'/'+str(mode)
-            if key not in ('putty-32-0.85/1', 'putty-32-0.85/2', 'putty-32-0.85/5', 'putty-64-0.85/2', 'putty-64-0.85/5', 'libssl3t64-i386/2', 'libssl3t64-i386/5', 'libssl3t64-amd64/2', 'libmvec-amd64/1', 'jpeg-avx2-i386/2', 'arm64-ls/2', 'riscv64-ls/0', 'mips64el-ls/0', 'ppc64el-ls/1'):continue
             first,_=execute('base',c,mode,1)
             reps=max(1,round(30000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
             focus=c['name'].startswith('ppc64el-') or c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
@@ -165,7 +164,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and (checked['base']!=checked['mask'])==(os.uname().machine=='x86_64') and checked['shipping']!=checked['base'] and len({checked[k]for k in ('shipping','base','mask')})==(3 if os.uname().machine=='x86_64' else 2)
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and (checked['shipping']!=checked['base'])==(os.uname().machine=='x86_64') and checked['base']!=checked['mask'] and len({checked[k]for k in ('shipping','base','mask')})==(3 if os.uname().machine=='x86_64' else 2)
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:

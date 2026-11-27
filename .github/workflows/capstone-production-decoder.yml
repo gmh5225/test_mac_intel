@@ -1,7 +1,7 @@
-name: Validate real NeverD with normalized views and compare every linked function
+name: Test all i386 memory-immediate arithmetic rows in the actual NeverD decoder across 69 workloads
 on:
   push:
-    branches: [codex/product-option-boundary-and-scoped-access]
+    branches: [codex/group1-neverd-llvm-source-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: option-boundary-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: group1-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
