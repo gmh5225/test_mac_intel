@@ -296,6 +296,14 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
             if key in know:
                 assert know[key] == h
             know[key] = h
+    if os.environ.get("NEVERD_DIRECT_LINK_COST") == "1":
+        import neverd_mips_direct_cost
+
+        result = neverd_mips_direct_cost.compare(
+            commands, toolchains, drivers, matrix, raw_files, know, guest_hash, rounds, seed
+        )
+        m.encode(p / receipt, result)
+        sys.exit(0)
     if windows or full_pair:
         kinds = (*public_kinds, *extras)
     rows = {k: [] for k in kinds}

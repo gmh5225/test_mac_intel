@@ -1,0 +1,79 @@
+name: Compare native MIPS ELF linker costs on macOS
+on:
+  push:
+    branches: [codex/mips-macos-direct-link-cost]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  measure:
+    runs-on: macos-15
+    timeout-minutes: 65
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: f81e1d7fb33b543dee6a8ad8a7abafccf9e9c4a6
+          persist-credentials: false
+          sparse-checkout: scripts
+          path: project
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: '15175206464'
+          run-id: '45933029071'
+          github-token: ${{ github.token }}
+          merge-multiple: true
+      - name: Compare startup, standard links and repeat links in the same process
+        shell: bash
+        env:
+          TRIAL: ${{ matrix.host }}
+          NEVERD_PAIR_FULL_INSTALLATIONS: '1'
+          NEVERD_BENCH_COMPONENTS: '1'
+          NEVERD_DIRECT_LINK_COST: '1'
+        run: |
+          set -euo pipefail
+          echo '8caf2cf5436037adf15f1d4d6d0c4b51368ffd4e1e2a8a7e90d019a0ab249632  mac-native-installations.tar.gz' | shasum -a 256 -c -
+          tar -xzf mac-native-installations.tar.gz
+          echo 'e8a187db60921b0571ffc083dc8e354f0f91279c8a7a4117057ddff88178f69b  tools.sha256' | shasum -a 256 -c -
+          shasum -a 256 -c tools.sha256
+          echo 'pyelftools==0.33 --hash=sha256:f215ad5f47d3f1373a21496a6c9e0707c622840d0622f23ff7ce08678b020036' > requirements.txt
+          python -m pip install --require-hashes --no-deps -r requirements.txt
+          dest=project/build-neverd-pair/paired
+          mkdir -p "$dest" results
+          cp .github/scripts/neverd-relink-bench.py .github/scripts/neverd_mips_direct_cost.py "$dest"
+          cp tools.sha256 results/
+          sw_vers > results/host.txt
+          sysctl -n machdep.cpu.brand_string >> results/host.txt
+          mv pair-installs/r12 "$dest/slot-0"
+          mv pair-installs/r15 "$dest/slot-1"
+          export NEVERD_MIDDLE_DRIVER="$PWD/pair-installs/r14/ld.lld"
+          mkdir "$dest/copy-0" "$dest/copy-1"
+          cp "$dest/slot-1/ld.lld" "$dest/copy-0/ld.lld"
+          cp "$dest/slot-1/ld.lld" "$dest/copy-1/ld.lld"
+          for phase in 0 1; do
+            if [[ "$phase" == 1 ]]; then
+              mv "$dest/slot-0" "$dest/intermediate"
+              mv "$dest/slot-1" "$dest/slot-0"
+              mv "$dest/intermediate" "$dest/slot-1"
+            fi
+            export NEVERD_COPY_DRIVER="$PWD/$dest/copy-$phase/ld.lld"
+            export NEVERD_BENCH_SEED="$((18419 + 449 * TRIAL + 1021 * phase))"
+            python "$dest/neverd-relink-bench.py" 32 "direct-$phase.json" "$dest/slot-$phase" "$dest/slot-$((1-phase))"
+            cp "$dest/direct-$phase.json" results/
+          done
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mac-direct-pairs-${{ matrix.host }}
+          path: results/
+          if-no-files-found: error
