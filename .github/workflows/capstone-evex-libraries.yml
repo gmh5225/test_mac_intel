@@ -1,7 +1,7 @@
-name: Compare corrected detail views and i386 TEST records with both iced formatters
+name: Measure default decoder output after the detail fix and complementary scoped x86 access
 on:
   push:
-    branches: [codex/measure-detail-views-and-i386-against-iced]
+    branches: [codex/real-option-boundary-and-cached-access]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b0009d26a8c617b2328833c96291ac8264036866
+          ref: 1d0673d2102cb4a31bc1f1d696d7fb7e8c29545f
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
+          ref: 1e662c82ead8be11f8f6ba0917e8f62ca94fa2dc
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-views-and-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: option-boundary-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

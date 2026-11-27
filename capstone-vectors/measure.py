@@ -110,6 +110,19 @@ try:
             assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
+        def function_layout(exe):
+         data={}
+         with exe.open('rb')as f:
+          elf=ELFFile(f);tab=elf.get_section_by_name('.symtab')
+          for sym in tab.iter_symbols():
+           if sym['st_info']['type']!='STT_FUNC' or not sym['st_size'] or not isinstance(sym['st_shndx'],int):continue
+           sec=elf.get_section(sym['st_shndx']);off=sym['st_value']-sec['sh_addr'];f.seek(sec['sh_offset']+off)
+           data.setdefault(sym.name,[]).append([sym['st_value'],sym['st_size'],hashlib.sha256(f.read(sym['st_size'])).hexdigest()])
+         return {k:sorted(v)for k,v in data.items()}
+        save('view-layout-'+label,{kind:function_layout(w/((kind+'-' if kind else '')+label)) for kind in ('','ordinary','foreign','foreign-only')})
+        if label!='base':
+            run('clang','-std=c11','-O2','-I',base/'include',base/'tests/unit/detail_views.c',lib,'-o',w/'views-stage')
+            run(w/'views-stage');save('view-unit-'+label,dict(passed=True))
         run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'memory-test-guard.cpp',lib,'-o',w/'test-guard')
         guarded=list(map(int,get(w/'test-guard').split()))
         assert len(guarded)==3 and 0<guarded[1]<guarded[0] and guarded[0]==6979584
