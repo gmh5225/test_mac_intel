@@ -176,124 +176,35 @@ try:
             verified[k]=sha(current);assert verified[k]==hashlib.sha256(imgs[k]).hexdigest()
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     invoke=['setarch',os.uname().machine,'-R',current]
-    mode_probe={};probe=w/'probe.bin';probe.write_bytes(bytes.fromhex('66 b8 78 56 34 12'))
-    span=w/'probe.tsv';span.write_text('0 6 1048576'+chr(10))
-    for tag in images:
-        select(tag)
-        for engine in ('iced','capstone','private'):
-            counts=[list(map(int,get(*invoke,engine,'0','1',probe,span,str(bits)).split()))[2:4] for bits in (16,32,64)]
-            assert counts==[[1,0],[2,0],[2,0]],(tag,engine,counts)
-            mode_probe[tag+'/'+engine]=counts
-    save('mode-probe',mode_probe)
-    cpu=(get('sysctl','-n','machdep.cpu.brand_string').strip() if sys.platform=='darwin' else get('lscpu'))
-    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
-    run('clang++','-std=c++17','-O2','-I',base/'include',r/'trial-vector-guard.cpp','-ldl','-o',w/'trial-vector-guard')
-    run('clang++','-O2','-std=c++17','-I',base/'include',r/'cmov-guard.cpp','-ldl','-o',w/'cmov-guard')
-    proof={}
-    for label in ('candidate','outlined'):
-        proof[label]=list(map(int,get(w/'cmov-guard',w/'base.so',w/(label+'.so')).split()))
-        assert proof[label][0]>1000000 and 0<proof[label][1]<proof[label][0]
-    assert proof['outlined']==proof['candidate'];save('cmov-guard',proof)
-    run('clang++','-O2','-std=c++17','-I',base/'include',r/'rip.cpp','-ldl','-o',w/'rip')
-    outcomes={}
-    for label in ('candidate','outlined'):
-        z=sp.run([w/'rip',w/'base.so',w/(label+'.so')],capture_output=True,text=True)
-        assert z.returncode==0,(label,z.stderr[-1000:])
-        outcomes[label]=json.loads(z.stdout)
-    assert outcomes['candidate']==outcomes['outlined'] and outcomes['candidate']['cases']==820176
-    save('rip-record',outcomes)
-    guards={};records={}
-    for lbl in ('candidate','outlined'):
-        parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
-        guards[lbl]=dict(states=parts.stderr.count('case arch='),status=parts.returncode,stderr=parts.stderr.splitlines()[-8:])
-        save('extra-states',guards)
-        assert parts.returncode==0 and guards[lbl]['states']==464
-        z=get(w/'trial-guard',w/'base.so',w/(lbl+'.so')).split()
-        assert z==['2162688','999139'];guards[lbl]['scan']=[int(x)for x in z]
-        guards[lbl]['vector_guard']=json.loads(get(w/'trial-vector-guard',w/'base.so',w/(lbl+'.so')))
-        save('extra-states',guards)
-    inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
-    sys.path.insert(0,str(w));import pe_panels,frozen_deb
-    run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
-    save('host',host);observations={};summary={};audits={}
-    fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
-    assert {row[0]for row in fixtures}==set(m["samples"])
-    for name,bits,f,spans,_ in fixtures:
-        spec=m['provenance'][name]
-        assert sha(f)==spec['text_sha256']
-        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
-        path=w/(name+'.tsv')
-        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-        emit(selected)
-        if m['samples'][name]=='simd-functions':
-            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-            assert len(view)==len(selected)
-            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-        assert sha(path)==spec['extent_sha256']
-        mask_counts={label:list(map(int,get(w/('coverage-'+label),f,path,str(bits)).split())) for label in ('base','candidate','outlined')}
-        assert mask_counts['base']==mask_counts['candidate']==mask_counts['outlined']
-        save('masked-real-'+name,mask_counts)
-
-        def audit_engine(exe):
-            rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
-            assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
-            return rows
-        assert audit_engine('base')==audit_engine('outlined')==audit_engine('candidate')
-        audits[name]=dict(functions=len(selected),bytes=spec['bytes'],extent_sha256=sha(path));save('audit',audits)
-        records[name]={}
-        for lbl in ('candidate','outlined'):
-            vals=[]
-            for route_id in range(8):
-                v=list(map(int,get(w/'trial-real',w/'base.so',w/(lbl+'.so'),f,path,str(bits),str(route_id)).split()))
-                assert v[0]>0 and all(x==v[:4] for x in vals);vals.append(v[:4])
-            assert vals[0][2]==spec['bytes']
-            records[name][lbl]=vals[0]
-        save('extra-real',records)
-        ordinary=rd(e/'public-only-records.json') if (e/'public-only-records.json').exists() else {}
-        ordinary[name]={}
-        for stage in images:
-            ordinary[name][stage]=[list(map(int,get('setarch',os.uname().machine,'-R',w/('ordinary-'+stage),'capstone',str(mode),'1',f,path,str(bits)).split()))[2:]for mode in (0,1,2)]
-        assert ordinary[name]['base']==ordinary[name]['outlined']==ordinary[name]['candidate']
-        save('public-only-records',ordinary)
-
-        for route in ('private','capstone'):
-            def take(engine,mode,n):
-                other=engine in ('iced','fast')
-                select('base' if other else engine)
-                return list(map(int,get(*invoke,engine if other else route,str(mode),str(n),f,path,str(bits)).split()))
-            for mode in (0,1,2):
-                labels=[*imgs,'iced'] + (['fast'] if mode else [])
-                repeats=max(1,math.ceil(30e6/take('base',mode,1)[0]))
-                expected={k:take(k,mode,repeats)[2:]for k in labels}
-                assert all(v[:3]==expected['base'][:3] for v in expected.values())
-                assert expected['base']==expected['duplicate']==expected['candidate']
-                assert expected['outlined']==expected['base']
-                rows=[];rng=random.Random(name+'/independent-alignment-repeat/'+str(mode))
-                for _ in range(35 if (name,mode)==('jpeg-avx2-i386',2) else 17):
-                    rng.shuffle(labels);sample={k:[] for k in labels}
-                    for k in labels+labels[::-1]:
-                        row=take(k,mode,repeats);assert row[2:]==expected[k]
-                        sample[k].append(row[:2])
-                    rows.append({k:[sum(a[i]for a in times)for i in (0,1)]for k,times in sample.items()})
-                key=route+'/'+name+'/'+str(mode);observations[key]=dict(repeats=repeats,checks=expected,cycles=rows)
-                summary[key]={label:{k:interval([x[k][i]/x['candidate'][i]for x in rows])for k in labels if k!='candidate'}for i,label in enumerate(('cpu','wall'))}
-                save('effects',summary);save('observations',observations);print(key,summary[key]['cpu']['base'],flush=True)
-    assert len(summary)==36
-    from firmware16 import compare
-    sources=rd(r/'input-sources.json');assert sha(r/'scalar.c')==sources['c_sha']
-    run('clang',*sources['compile'],r/'scalar.c','-o',w/'scalar.o')
-    with (w/'scalar.o').open('rb')as f:
-        elf=ELFFile(f);assert elf['e_machine']=='EM_386';blob=elf.get_section_by_name('.text').data()
-    path=w/'scalar16.bin';path.write_bytes(blob);spans=w/'scalar16.tsv';spans.write_text(f'0 {len(blob)} 1048576'+chr(10))
-    scalar=compare(path,spans,imgs,invoke,select)
-    save('scalar16',dict(sha256=sha(path),bytes=len(blob),source=sources['c_sha'],results=scalar))
-    save('fixed-image',dict(inode=inode,blocks=len(offsets),verified=verified,bytes=length,original_sizes=original_sizes,staged_sha256={k:hashlib.sha256(v).hexdigest()for k,v in imgs.items()}))
-    if platform.machine()=='x86_64':
-        from firmware16 import verify
-        save('seabios16',verify(w,imgs,invoke,select))
-    time_foreign(foreign_rows,w,save)
-    save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
+    import firmware16
+    protocol=rd(r/'protocol.json')
+    assert {k:hashlib.sha256(v).hexdigest()for k,v in imgs.items()}==protocol['images']
+    labels=list(imgs)
+    def measure_firmware(image,spans,ignored,invoke,select):
+        results={}
+        for route,mode in [('capstone',2),('private',2),('capstone',1),('capstone',0)]:
+            def take(k,n):
+                select(k)
+                return list(map(int,get(*invoke,route,str(mode),str(n),image,spans,'16').split()))
+            reps=max(1,math.ceil(protocol['duration_ns']/take('base',1)[0]))
+            expected=take('base',reps)[2:]
+            assert all(take(k,reps)[2:]==expected for k in labels)
+            key=route+'/'+str(mode);rng=random.Random(key+'/'+platform.node()+'/independent-firmware')
+            pairs=[]
+            for rep in range(protocol['pairs']):
+                rng.shuffle(labels);times={k:[]for k in labels}
+                for k in labels+labels[::-1]:
+                    row=take(k,reps);assert row[2:]==expected
+                    times[k].append(row[:2])
+                pairs.append({k:[sum(v[i]for v in values)for i in (0,1)] for k,values in times.items()})
+            results[key]=dict(reps=reps,expected=expected,pairs=pairs)
+            save('observations',results)
+        return results
+    firmware16.compare=measure_firmware
+    validated=firmware16.verify(w,imgs,invoke,select);validated.pop('results')
+    assert {k:validated[k]for k in protocol['program']}==protocol['program']
+    assert verified==protocol['images']
+    save('complete',dict(complete=True,source=maps,protocol=protocol,verified=verified,program=validated,cpu=get('lscpu'),node=platform.node()))
 
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
