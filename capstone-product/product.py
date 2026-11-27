@@ -109,7 +109,7 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first={'X86Mapping.c.o'} if os.uname().machine=='x86_64' else set();between={'X86MemoryFallback32.c.o'};second=first|between
+    first={'X86MemoryFallback32.c.o'};between=set();second=first
     for before,after,expected in [('shipping','base',first),
         ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]
@@ -145,17 +145,18 @@ try:
             checked[k]=sha(image);assert checked[k]==hashlib.sha256(blobs[k]).hexdigest()
         sel=str(c['selector']) if c['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[c['selector']]
         args=['setarch',os.uname().machine,'-R',image,c['path'],sel,str(mode),str(reps),*([c['intervals']] if 'intervals'in c else [])]
-        start=time.perf_counter_ns();values=list(map(int,sp.check_output(args,text=True).split()));wall=time.perf_counter_ns()-start
-        assert len(values)==5 and values[0]>0
-        return values,wall
+        values=list(map(int,sp.check_output(args,text=True,env=dict(os.environ,NEVERD_PROBE_BOTH_CLOCKS='1')).split()))
+        assert len(values)==6 and min(values[0],values[-1])>0
+        return values[:-1],values[-1]
     rng=random.Random(3849);timings={}
     for c in cases:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             key=c['name']+'/'+str(mode)
+            if key not in m['focus']:continue
             first,_=execute('base',c,mode,1)
-            reps=max(1,round(30000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
+            reps=max(1,round(70000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
             focus=c['name'].startswith('ppc64el-') or c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
-            count=35 if focus else 17;cycles=[]
+            count=51;cycles=[]
             for rep in range(count):
                 order=list(blobs);rng.shuffle(order);trial={k:[]for k in order}
                 for stage in order+order[::-1]:
@@ -164,7 +165,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and (checked['shipping']!=checked['base'])==(os.uname().machine=='x86_64') and checked['base']!=checked['mask'] and len({checked[k]for k in ('shipping','base','mask')})==(3 if os.uname().machine=='x86_64' else 2)
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and checked['shipping']!=checked['base'] and checked['base']==checked['mask']
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:

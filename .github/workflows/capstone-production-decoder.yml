@@ -1,7 +1,7 @@
-name: Test all i386 memory-immediate arithmetic rows in the actual NeverD decoder across 69 workloads
+name: Repeat four CPU-only changes and four i386 gains in source-built NeverD with matched in-process clocks
 on:
   push:
-    branches: [codex/group1-neverd-llvm-source-product]
+    branches: [codex/paired-product-clock-and-header-identity]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 1e662c82ead8be11f8f6ba0917e8f62ca94fa2dc
+          ref: 88dd020a8c3682a41d7ea7559e99b2aab3a3413a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: group1-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: source-product-clock-repeat-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
