@@ -100,7 +100,7 @@ try:
     assert sorted(k for names in partitions.values() for k in names)==sorted(b[0] for b,a in movable)
     assert partitions['after_entry/after_i386']==['scanBatch32'] and partitions['after_i386/after_scan']==['scanBatch64']
     save('geometry',dict(partitions=partitions,source=maps,gap=gap,layout=layouts,functions={k:{s:addresses[k][s] for s in scanner} for k in layouts},moved_functions=movable,other_functions=len(nonscan('before_scan')),checksums=checksums,objects=objects,compiler=get('clang','--version'),cpu=get('lscpu')))
-    bins={k:(w/k).read_bytes() for k in layouts};bins['duplicate']=bins['base']
+    bins={k:(w/k).read_bytes() for k in layouts};bins['duplicate']=bins['after_i386']
     length=max(map(len,bins.values()));bins={k:v.ljust(length,b'\0')for k,v in bins.items()}
     active=w/'selected';active.write_bytes(bins['base']);active.chmod(0o755);inode=active.stat().st_ino
     offsets=[i for i in range(0,length,4096) if len({v[i:i+4096]for v in bins.values()})>1]
@@ -121,40 +121,62 @@ try:
     run('clang++','-O2','-std=c++17','-I',base/'include',w/'vectors.cpp',w/'base.a','-o',w/'vectors')
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
-    for name,bits,f,spans,_ in fixtures:
-        if name not in ('libssl3t64-i386','jpeg-avx2-i386','putty-32-0.85','putty-64-0.85','libmvec-amd64'):continue
-        spec=m['provenance'][name]
-        assert sha(f)==spec['text_sha256']
-        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
-        path=w/(name+'.tsv')
-        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
-        emit(selected)
-        if m['samples'][name]=='simd-functions':
-            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
-            assert len(view)==len(selected)
-            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
-        assert sha(path)==spec['extent_sha256']
-        def audit_engine(exe):
-            rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
-            assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
-            return rows
-        expected=audit_engine('base');assert all(audit_engine(k)==expected for k in layouts)
-        audits[name]=dict(extents=len(selected),extent_sha256=sha(path),bytes=sum(q[1]for q in selected))
-        for mode in (0,):
-            def take(k,reps):
-                choose(k)
-                return list(map(int,get(*invoke,'private',str(mode),str(reps),f,path,str(bits)).split()))
-            reps=max(1,math.ceil(25e6/take('base',1)[0]))
-            expected={k:take(k,reps)[2:]for k in bins};assert len({tuple(x)for x in expected.values()})==1
-            labels=list(bins);rng=random.Random(name+str(mode));pairs=[]
-            for _ in range(35):
-                rng.shuffle(labels);times={k:[]for k in labels}
-                for k in labels+labels[::-1]:
-                    ans=take(k,reps);assert ans[2:]==expected[k];times[k].append(ans[:2])
-                pairs.append({k:[sum(col)for col in zip(*v)]for k,v in times.items()})
-            rows[name+'/'+str(mode)]=dict(reps=reps,checks=expected,pairs=pairs)
-            save('paired',rows)
-    assert len(checked)==8 and len(rows)==5 and len(audits)==5
+    from probe import hardware
+    from contextlib import ExitStack
+    with ExitStack() as stack:
+        groups,pmu=stack.enter_context(hardware(r,w,save))
+        for name,bits,f,spans,_ in fixtures:
+            if name not in ('libssl3t64-i386','putty-32-0.85'):continue
+            spec=m['provenance'][name]
+            assert sha(f)==spec['text_sha256']
+            selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
+            path=w/(name+'.tsv')
+            def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
+            emit(selected)
+            if m['samples'][name]=='simd-functions':
+                view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
+                assert len(view)==len(selected)
+                selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
+            assert sha(path)==spec['extent_sha256']
+            def audit_engine(exe):
+                rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
+                assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
+                return rows
+            expected=audit_engine('base');assert all(audit_engine(k)==expected for k in layouts)
+            audits[name]=dict(extents=len(selected),extent_sha256=sha(path),bytes=sum(q[1]for q in selected))
+            for mode in (0,):
+                def take(k,reps):
+                    choose(k)
+                    return list(map(int,get(*invoke,'private',str(mode),str(reps),f,path,str(bits)).split()))
+                reps=max(1,math.ceil(25e6/take('base',1)[0]))
+                expected={k:take(k,reps)[2:]for k in bins};assert len({tuple(x)for x in expected.values()})==1
+                series={}
+                def blocks(label,n,reader):
+                    labels=['after_entry','after_i386','duplicate']
+                    rng=random.Random(name+'/'+label);out=[]
+                    for _ in range(n):
+                        rng.shuffle(labels);pair={}
+                        for tag in labels+labels[::-1]:
+                            got=reader(tag)
+                            if tag in pair:
+                                for k,value in got.items():pair[tag][k]+=value
+                            else:pair[tag]=got
+                        out.append(pair)
+                    series[label]=out
+                def timed(tag):
+                    v=take(tag,reps);assert v[2:]==expected[tag]
+                    return dict(cpu_ns=v[0],wall_ns=v[1])
+                blocks('timing',17,timed)
+                for g,events in groups.items():
+                    def read_counters(tag):
+                        choose(tag)
+                        ok,counts,stdout,diag=pmu(events,[active,'private',str(mode),str(reps),f,path,str(bits)])
+                        assert ok and list(map(int,stdout.split()))[2:]==expected[tag],(g,tag,diag)
+                        return counts
+                    blocks(g,13,read_counters)
+                rows[name]=dict(reps=reps,checks=expected,series=series)
+                save('paired',rows)
+    assert len(checked)==8 and len(rows)==2 and len(audits)==2
     save('complete',dict(complete=True,source=maps,verified=checked,inode=inode,audits=audits))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

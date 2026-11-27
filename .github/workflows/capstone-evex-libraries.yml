@@ -1,7 +1,7 @@
-name: Separate the 32-bit scan loop, 64-bit scan loop, and shared scanner function placement
+name: Count hardware events while only the i386 scan loop moves on PuTTY and OpenSSL
 on:
   push:
-    branches: [codex/isolate-i386-scan-loop-address]
+    branches: [codex/scanner-window-physical-events]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scan-loop-address-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-loop-counters-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
