@@ -1,7 +1,7 @@
-name: Measure the PowerPC canonical operand pass on dedicated and mixed ELF libraries
+name: Replicate dedicated PowerPC alias throughput and prove mixed builds byte-identical
 on:
   push:
-    branches: [codex/qualify-ppc-canonical-alias-pass]
+    branches: [codex/dedicated-ppc-alias-elf-replication]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: clang, flavor: first }
-          - { host: ubuntu-24.04, cc: clang, flavor: second }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
+          - { host: ubuntu-22.04, cc: clang, flavor: first, replica: 1 }
+          - { host: ubuntu-22.04, cc: clang, flavor: second, replica: 1 }
+          - { host: ubuntu-24.04, cc: clang, flavor: first, replica: 1 }
+          - { host: ubuntu-24.04, cc: clang, flavor: second, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, flavor: first, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, flavor: second, replica: 1 }
+          - { host: ubuntu-24.04, cc: gcc, flavor: first, replica: 1 }
+          - { host: ubuntu-22.04, cc: clang, flavor: first, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, flavor: first, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -41,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: ppc-alias-pass-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}-${{ matrix.replica }}
           retention-days: 14

@@ -40,7 +40,8 @@ try:
     changed=[Path(f).name for f,a in before['objects'].items()if after['objects'][f]!=a]
     if 'PPC' not in arches:
         assert before==after;shutil.rmtree(b);continue
-    if diet:
+    active=arches==['PPC'] and not diet and cc=='clang' and platform.machine()=='x86_64'
+    if not active:
         assert before==after, key
     else:
         assert changed==['PPCInstPrinter.c.o'] and before['shared']!=after['shared'],(key,changed)
