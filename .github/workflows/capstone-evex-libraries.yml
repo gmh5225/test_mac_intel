@@ -1,7 +1,7 @@
-name: Compare corrected detail views and i386 TEST records with both iced formatters
+name: Identify moved or changed hot functions after normalizing a detail view at setup
 on:
   push:
-    branches: [codex/measure-detail-views-and-i386-against-iced]
+    branches: [codex/option-setup-linked-layout]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -27,25 +25,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b0009d26a8c617b2328833c96291ac8264036866
+          ref: 1d0673d2102cb4a31bc1f1d696d7fb7e8c29545f
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
+          ref: 2bb8205af8e667122c35fe0a13cf1cc198e4042e
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
             cmake/NeverDCapstoneCompilerOptions.inc
           sparse-checkout-cone-mode: false
-          persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: NeverSight/iced
-          ref: 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31
-          path: iced-source
-          sparse-checkout: src/rust/iced-x86
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
@@ -57,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-views-and-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: option-layout-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
