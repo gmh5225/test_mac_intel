@@ -1,7 +1,7 @@
-name: Count canonical output costs removed by VEX base memory and SIB records on real programs
+name: Count every generic and x86 record entry reached by five foreign executable files
 on:
   push:
-    branches: [codex/vex-memory-fallback-census]
+    branches: [codex/non-x86-record-entry-counts]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: terminal-vex-record-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: foreign-record-call-counts-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
