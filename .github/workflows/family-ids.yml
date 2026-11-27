@@ -1,7 +1,7 @@
-name: Verify ARM-only alias details against real ARM and Thumb records and compare the mixed and other backends byte for byte
+name: Check dedicated ARM release, DIET, Debug, Make and the shipping six-backend product archives
 on:
   push:
-    branches: [codex/arm-printer-verified-library-scope]
+    branches: [codex/dedicated-arm-release-configurations]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -12,11 +12,8 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, flavor: first }
-          - { host: ubuntu-24.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
-          - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
           - { host: macos-15, cc: clang, flavor: first }
-          - { host: macos-15, cc: clang, flavor: second }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -43,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: scoped-arm-printer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-arm-configs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

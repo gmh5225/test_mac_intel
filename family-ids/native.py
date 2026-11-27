@@ -1,79 +1,65 @@
-"""Measure dedicated alias printers and verify the six-architecture consumer is byte identical."""
+"""Verify the shipping and i386-based ARM changes in complete library builds."""
 from pathlib import Path
-import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
-from corpus import deb_binary,elf_text
-from arm_corpus import prepare as arm_extents
-from elftools.elf.elffile import ELFFile
-from fixed_image import FixedImage
-from io import BytesIO
-r=Path(__file__).resolve().parent;src=r.parent/'source';e=r.parent/'evidence';e.mkdir(exist_ok=True)
-read=lambda f:json.loads(f.read_bytes())
-def put(k,v):
- f=e/(k+'.json');p=f.with_suffix('.tmp');p.write_text(json.dumps(v,indent=1)+'\n');p.replace(f)
-def run(*args):sp.run(args,check=True)
-def out(*args):return sp.check_output(args,text=True).strip()
-def sha(data):return hashlib.sha256(data).hexdigest()
-def dig(path):return sha(path.read_bytes())
-q=read(r/'source.json');w=Path(tempfile.mkdtemp());samples=read(r/'samples.json');isa=platform.machine();darwin=platform.system()=='Darwin';os.environ['ZERO_AR_DATE']='1'
+import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
+r=Path(__file__).resolve().parent;src=r.parent/'source';e=r.parent/'evidence';e.mkdir(exist_ok=True);q=json.loads((r/'source.json').read_bytes())
+def put(name,data):(e/(name+'.json')).write_text(json.dumps(data,indent=1)+'\n')
+def run(*args,**kw):sp.run(args,check=True,**kw)
+def out(*args,**kw):return sp.check_output(args,text=True,**kw).strip()
+def dig(f):return hashlib.sha256(f.read_bytes()).hexdigest()
+def switch(stage):
+ run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
+ p=r/(stage+'.patch');assert dig(p)==q[stage]['patch'];run('git','-C',src,'apply','--index',p);assert out('git','-C',src,'write-tree')==q[stage]['tree']
+def verify_unit(lib,b,stage,profile):
+ exe=b/'test-detail-views';run('cc','-std=c11','-I',src/'include',src/'tests/unit/detail_views.c',lib,'-o',exe);run(exe,env=dict(os.environ,LD_LIBRARY_PATH=str(lib.parent),DYLD_LIBRARY_PATH=str(lib.parent)))
+def only(xs):
+ xs=list(xs);assert len(xs)==1,xs;return xs[0]
+w=Path(tempfile.mkdtemp());os.environ['ZERO_AR_DATE']='1';darwin=platform.system()=='Darwin';isa=platform.machine()
 try:
  assert out('git','-C',src,'rev-parse','HEAD')==q['checkout']
- armin=read(r/'arm.json');assert arm_extents(w,armin)==armin
- inputs={'ARM':{k[4:]:(w/(k+'.text'),w/(k+'.ranges'))for k in armin['fixtures']}}
- for arch,meta in samples.items():
-  pkg=w/(arch+'.deb');run('curl','--retry','3','--max-time','120','-fsSL',meta['url'],'-o',pkg)
-  assert dig(pkg)==meta['package_sha256'];inputs[arch]={}
-  for name,spec in meta['programs'].items():
-   elf=deb_binary(pkg,name);section=ELFFile(BytesIO(elf)).get_section_by_name('.text')
-   text=elf_text(elf);assert sha(text)==spec['section_sha256'] and text==section.data()
-   if 'elf_sha256'in spec:assert sha(elf)==spec['elf_sha256']
-   path=w/(arch+name+'.text');path.write_bytes(text);spans=path.with_suffix('.ranges');spans.write_text('0 %d %d\n'%(len(text),section['sh_addr']))
-   inputs[arch][name]=(path,spans)
-  pkg.unlink()
- builds={};observations={};measure={};archs={'ARM':101,'AARCH64':102,'SPARC':106,'LOONGARCH':108,'mixed':0}
- if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
- for arch,sel in archs.items():
-  b=w/'build';images={};builds[arch]={};records={}
-  for tag in (('base','reference','candidate') if arch=='ARM' else ('base','candidate')):
-   run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
-   patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch'];run('git','-C',src,'apply','--index',patch);assert out('git','-C',src,'write-tree')==q[tag]['tree']
-   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed'else [arch]
-   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE=Release',*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
-   run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
-   lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
-   builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
-   if arch!='ARM':continue
-   shutil.copyfile(so,w/(tag+'-arm-library'))
-   texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
-   images[tag]=texe.read_bytes()
-   exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
-   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs[arch].items()for opt in range(5)}
-   assert all(row[0]>0 for row in records[tag].values())
-  put('compilation',builds)
-  if arch!='ARM':
-   assert builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
-  target='base' if darwin else 'reference'
-  assert builds[arch]['base']!=builds[arch]['reference']
-  assert builds[arch][target]==builds[arch]['candidate'] and images[target]==images['candidate']
-  assert records['base']==records['candidate']==records['reference']
-  observations[arch]=records['base'];put('public-records',observations)
-  compare=w/'compare';run('c++','-std=c++17','-O2','-I',src/'include',r/'domain.cpp',*([] if darwin else ['-ldl']),'-o',compare)
-  states=json.loads(out(compare,w/'base-arm-library',w/'candidate-arm-library',w));assert states['cases']>=589824 and states['accepted']>300000 and states['real']>50000 and not states['real_rejected']
-  put('arm-domain',states)
-  del images['reference']
-  exe=w/'timed';image=FixedImage(exe,images,True)
-  for name,(path,ranges) in inputs[arch].items():
-   for mode in range(3):
-    key=f'{arch}/{name}/{mode}'
-    def take(tag,n):
-     image.select(tag);return list(map(int,out(*([]if darwin else ['setarch',isa,'-R']),exe,str(sel),str(mode),path,'0',str(n),ranges).split()))
-    warm=take('base',1);reps=max(1,math.ceil(30e6/warm[0]));rng=random.Random(key);cycles=[];labels=['base','candidate','copy','repeat']
-    for _ in range(17):
-     rng.shuffle(labels);values={k:[]for k in labels}
-     for tag in labels+labels[::-1]:
-      z=take(tag,reps);assert z[2]==warm[2]and min(z[:2])>0;values[tag].append(z[:2])
-     cycles.append({k:[sum(t[i] for t in vs)for i in range(2)]for k,vs in values.items()})
-    measure[key]=dict(cycles=cycles,reps=reps,observed=warm[2],text=dig(path),extents=dig(ranges));put('timings',measure)
-  put('image-'+arch,image.receipt());exe.unlink();shutil.rmtree(b)
- put('complete',dict(complete=True,source=q,isa=isa,system=platform.system(),panels=len(measure),compiler=out('clang','--version').splitlines()[0]))
+ proj=w/'product';(proj/'third_party').mkdir(parents=True);(proj/'third_party/capstone').symlink_to(src);(proj/'cmake').mkdir()
+ for a,b in [('CMakeLists.txt','consumer.cmake'),('cmake/NeverDCapstoneCompilerOptions.inc','consumer-options.inc')]:
+  assert dig(r/b)==q['recipe'][b];shutil.copyfile(r/b,proj/a)
+ results={};stages=('ship','group','arm','combined','reference')
+ profiles=['product','arm-both','arm-static','arm-shared','arm-diet','arm-debug','make']
+ for profile in profiles:
+  results[profile]={};b=w/'build';b.mkdir()
+  for stage in (stages if profile.startswith('arm') and profile not in ('arm-debug','arm-diet') else stages[:-1]):
+   switch(stage)
+   active=profile in ('arm-both','arm-static','arm-shared') and stage in ('arm','combined','reference') and not darwin
+   if profile=='make':
+    run('make','-C',src,'-j4','CC=clang','CAPSTONE_ARCHS=arm','CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_SHARED=no','CAPSTONE_STATIC=yes','BUILDDIR='+str(b))
+    lib=b/'libcapstone.a';verify_unit(lib,b,stage,profile)
+    dep=only(b.rglob('Mapping.d'));assert ('MappingAliasDetails.inc' in dep.read_text())==(stage in ('arm','combined'))
+    results[profile][stage]={'passed':True,'tracked_include':stage in ('arm','combined')}
+    continue
+   product=profile=='product';diet=profile=='arm-diet';debug=profile=='arm-debug'
+   static=profile!='arm-shared';shared=not product and profile!='arm-static';variants=['capstone_'+v for v,yes in [('static',static),('shared',shared)] if yes]
+   flags=['-DCMAKE_BUILD_TYPE='+('Debug' if debug else 'Release'),'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON']
+   if product:flags+=['-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers']
+   else:flags+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS='+('ON'if static else'OFF'),'-DCAPSTONE_BUILD_SHARED_LIBS='+('ON'if shared else'OFF'),'-DCAPSTONE_BUILD_DIET='+('ON'if diet else'OFF')]
+   run('cmake','-G','Ninja','-S',proj if product else src,'-B',b,*flags)
+   run('cmake','--build',b,'--target',*variants,'--parallel','4')
+   commands=json.loads((b/'compile_commands.json').read_bytes())
+   active_units={Path(v['file']).name for v in commands if '-DCAPSTONE_ARM_INLINE_ALIAS_DETAILS' in v['command']}
+   assert active_units==({'ARMInstPrinter.c','ARMMapping.c'} if active else set()),(stage,profile,active_units)
+   libs={}
+   if static:libs['static']=only(b.rglob('libcapstone.a'))
+   if shared:libs['shared']=only(p for p in b.rglob('libcapstone.*.dylib'if darwin else'libcapstone.so.*')if not p.is_symlink())
+   for lib in libs.values():verify_unit(lib,b,stage,profile)
+   picked=next(iter(libs.values()));exe=b/'observe'
+   run('c++','-O3','-std=c++17','-I',src/'include',r/'time.cpp',picked,'-o',exe)
+   objects={str(f.relative_to(b)):dig(f) for f in b.rglob('*.c.o')}
+   result={'libraries':{k:dig(v)for k,v in libs.items()},'linked':dig(exe),'objects':objects,'active':sorted(active_units),'passed':True}
+   if product:assert len(objects)>85 and any('/X86Mapping.c.o' in k for k in objects)
+   results[profile][stage]=result
+  put('stages',results)
+  a=results[profile]
+  if profile=='product' or profile=='arm-diet' or darwin and profile.startswith('arm') and profile!='arm-debug':
+   assert a['ship']==a['arm'] and a['group']==a['combined'],profile
+  elif profile in ('arm-both','arm-static','arm-shared'):
+   assert a['ship']==a['group'] and a['arm']==a['combined']==a['reference'],profile
+   assert a['arm']['linked']!=a['ship']['linked']
+  shutil.rmtree(b)
+ put('complete',dict(complete=True,source=q,system=platform.system(),isa=isa,compiler=out('clang','--version').splitlines()[0],profiles=profiles))
 finally:
- size=sum(p.stat().st_size for p in w.rglob('*')if p.is_file() and not p.is_symlink());shutil.rmtree(w);put('cleanup',dict(removed=not w.exists(),bytes=size))
+ size=sum(p.stat().st_size for p in w.rglob('*') if p.is_file() and not p.is_symlink());shutil.rmtree(w);put('cleanup',dict(removed=not w.exists(),bytes=size))
