@@ -16,6 +16,10 @@ def interval(values):
 w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+    parent=rd(r/'source.json')['base']
+    assert parent['parent']==m['checkout_commit'] and sha(r/'parent.patch')==parent['sha256']
+    run('git','-C',base,'apply','--index',r/'parent.patch')
+    assert get('git','-C',base,'write-tree').strip()==parent['tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
@@ -48,7 +52,7 @@ try:
     foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
-        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        run('git','-C',base,'restore','--source',parent['tree'],'--staged','--worktree','--','.')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -78,7 +82,7 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
-        run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
+        run('clang','-fPIC','-shared','-I',base,'-I',base/'include','-DCAPSTONE_USE_SYS_DYN_MEM','-DCAPSTONE_HAS_X86',*(['-DKNOWN_PREFIX'] if label!='base' else []),r/'known-edge.c',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
@@ -129,6 +133,10 @@ try:
         outcomes[label]=json.loads(z.stdout)
     assert outcomes['candidate']==outcomes['outlined'] and outcomes['candidate']['cases']==820176
     save('rip-record',outcomes)
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'known-edge.cpp','-ldl','-o',w/'known-edge')
+    edge=list(map(int,get(w/'known-edge',w/'base.so',w/'candidate.so').split()))
+    assert edge[0]==15728640 and 0<edge[1]<edge[0]
+    save('known-edge',edge)
     guards={};records={}
     for lbl in ('candidate','outlined'):
         parts=sp.run([w/'trial-states',w/'base.so',w/(lbl+'.so'),'2048'],text=True,capture_output=True)
@@ -142,7 +150,7 @@ try:
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
-    host=dict(capstone=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
+    host=dict(capstone=parent['commit'],checkout=m['checkout_commit'],neverd=dev,iced=m['iced_revision'],cpu=cpu,compiler=get('clang','--version').splitlines()[0],os=platform.platform(),images=images,driver_sha256=sha(w/'driver.cpp'),rust_sha256=sha(ad/'iced.rs'))
     save('host',host);observations={};summary={};audits={}
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])

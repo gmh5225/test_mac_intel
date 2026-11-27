@@ -1,7 +1,7 @@
-name: Compare final AMD64 output with iced and independent matched copies on four native hosts
+name: Compare decoded VEX2 output with the full prefix reader on real PE and ELF programs
 on:
   push:
-    branches: [codex/amd64-reader-production-comparison]
+    branches: [codex/amd64-predecoded-vex2-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: stable-reader-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: known-vex2-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
