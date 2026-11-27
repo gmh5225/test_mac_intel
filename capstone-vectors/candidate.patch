@@ -1,27 +1,22 @@
-diff --git a/cs.c b/cs.c
-index d0b8b045..56ae7ebb 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1010,11 +1010,17 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 		insn->mnemonic[off] = c == '|' ? ' ' : c;
- 		off++;
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..3dedc461 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -1210,8 +1210,15 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 		if (NeedPlus)
+ 			SStream_concat0(O, " + ");
+ 		_printOperand(MI, Op + X86_AddrIndexReg, O);
+-		if (ScaleVal != 1)
+-			X86_printMemoryScale(O, ScaleVal, false);
++		if (ScaleVal != 1) {
++#ifdef CAPSTONE_SSTREAM_PRECHECKED
++			if (ScaleVal < 10) {
++				const char text[] = { '*', (char)('0' + ScaleVal), '\0' };
++				SStream_concat0_n(O, text, 2);
++			} else
++#endif
++				X86_printMemoryScale(O, ScaleVal, false);
++		}
+ 		NeedPlus = true;
  	}
--	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
--	       OS->buffer[off] != '\t')
--		off++;
--	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
--		off++;
-+	/* Only a truncated mnemonic can still have name bytes to skip. */
-+	if (off == sizeof(insn->mnemonic) - 1) {
-+		while (OS->buffer[off] && OS->buffer[off] != ' ' &&
-+		       OS->buffer[off] != '\t')
-+			off++;
-+	}
-+	if (OS->buffer[off]) {
-+		do {
-+			off++;
-+		} while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t');
-+	}
- 	const char *operands = OS->buffer + off;
- 	if (stream_length_valid) {
- #ifdef CS_MIPS_VISIBLE_OPERANDS
+ 

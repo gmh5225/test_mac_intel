@@ -1,37 +1,62 @@
-diff --git a/cs.c b/cs.c
-index d0b8b045..81e16373 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1004,17 +1004,23 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
- 	memset(insn->op_str, '\0', sizeof(insn->op_str));
- 	size_t off = 0;
--	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
--	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
--		char c = OS->buffer[off];
-+	char c = OS->buffer[off];
-+	while (off < sizeof(insn->mnemonic) - 1 && (unsigned char)c > ' ') {
- 		insn->mnemonic[off] = c == '|' ? ' ' : c;
--		off++;
-+		c = OS->buffer[++off];
-+	}
-+	/* Controls other than NUL, space and tab are part of the name.
-+	 * Continue to the delimiter even when the public name is full. */
-+	while (c && c != ' ' && c != '\t') {
-+		if (off < sizeof(insn->mnemonic) - 1)
-+			insn->mnemonic[off] = c == '|' ? ' ' : c;
-+		c = OS->buffer[++off];
-+	}
-+	if (c) {
-+		do {
-+			c = OS->buffer[++off];
-+		} while (c == ' ' || c == '\t');
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..82f95590 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -1144,6 +1144,35 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
  	}
--	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
--	       OS->buffer[off] != '\t')
--		off++;
--	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
--		off++;
- 	const char *operands = OS->buffer + off;
- 	if (stream_length_valid) {
- #ifdef CS_MIPS_VISIBLE_OPERANDS
+ }
+ 
++#ifdef CAPSTONE_SSTREAM_PRECHECKED
++/* A bounded Intel stream can emit the separator, register and scale before
++ * publishing its new cursor. Extension names retain their usual writer. */
++static bool printIndexExpression(SStream *stream, const MCOperand *index,
++				 uint64_t scale, bool has_base)
++{
++	const unsigned reg = MCOperand_getReg(index);
++	if (!MCOperand_isReg(index) || reg >= X86_FEATURE_MC_GPR_BASE || scale >= 10)
++		return false;
++
++	const unsigned length = getRegisterNameLength(reg);
++	const char *name = getRegisterName(reg);
++	char *next = stream->buffer + stream->index;
++	if (has_base) {
++		memcpy(next, " + ", 3);
++		next += 3;
++	}
++	memcpy(next, name, length);
++	next += length;
++	if (scale != 1) {
++		*next++ = '*';
++		*next++ = (char)('0' + scale);
++	}
++	*next = '\0';
++	stream->index = (size_t)(next - stream->buffer);
++	return true;
++}
++#endif
++
+ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ {
+ 	bool NeedPlus = false;
+@@ -1207,11 +1236,16 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
+ 
+ 	if (MCOperand_getReg(IndexReg) &&
+ 	    MCOperand_getReg(IndexReg) != X86_EIZ) {
+-		if (NeedPlus)
+-			SStream_concat0(O, " + ");
+-		_printOperand(MI, Op + X86_AddrIndexReg, O);
+-		if (ScaleVal != 1)
+-			X86_printMemoryScale(O, ScaleVal, false);
++#ifdef CAPSTONE_SSTREAM_PRECHECKED
++		if (!printIndexExpression(O, IndexReg, ScaleVal, NeedPlus))
++#endif
++		{
++			if (NeedPlus)
++				SStream_concat0(O, " + ");
++			_printOperand(MI, Op + X86_AddrIndexReg, O);
++			if (ScaleVal != 1)
++				X86_printMemoryScale(O, ScaleVal, false);
++		}
+ 		NeedPlus = true;
+ 	}
+ 

@@ -79,10 +79,6 @@ try:
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
         run('clang','-O2','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
-        f=(base/'cs.c').read_text()
-        a=f.index('\tsize_t off = 0;',f.index('static inline void fill_insn('))
-        b=f.index('\tconst char *operands = OS->buffer + off;',a)
-        assert f[a:b] in (r/'split-domain.c').read_text()
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
@@ -90,10 +86,10 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-    run('clang','-O2','-std=c99','-I',base/'include',r/'split-domain.c','-o',w/'split-domain')
-    checked=int(get(w/'split-domain'))
-    assert checked==7*512*513//2+256*65
-    save('split-domain',dict(cases=checked,source=sha(r/'split-domain.c')))
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'index-guard.cpp','-ldl','-o',w/'index-guard')
+    checks={tag:list(map(int,get(w/'index-guard',w/'base.so',w/(tag+'.so')).split())) for tag in ('candidate','outlined')}
+    assert checks['candidate']==checks['outlined'] and checks['candidate'][0]>100000 and 0<checks['candidate'][1]<checks['candidate'][0]
+    save('index-domain',checks)
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
