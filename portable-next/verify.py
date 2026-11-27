@@ -100,8 +100,19 @@ try:
             rows[name]['static_identity']=dict(archive=hashlib.sha256(archive).hexdigest(),objects=objects,enabled=name=='search' and eligible)
             if name!='base':
                 stable=rows['base']['static_identity'];expected=['PPCInstPrinter.c.o'] if name=='search' and eligible else []
-                assert sorted(Path(k).name for k,v in objects.items()if stable['objects'][k]!=v)==expected
+                changed={k for k,digest in objects.items() if stable['objects'][k]!=digest}
+                members=sp.check_output(['ar','t',solo/'libcapstone.a'],text=True).splitlines()
+                compiled={k for k in objects if k.startswith('CMakeFiles/capstone')}
+                assert sorted(Path(k).name for k in compiled)==sorted(members)
+                library_changes=sorted(Path(k).name for k in changed & compiled)
+                test_changes=sorted(k for k in changed - compiled)
+                rows[name]['library_changes']=library_changes
+                rows[name]['test_changes']=test_changes
+                save('identity-'+name,dict(expected=expected,library_changes=library_changes,test_changes=test_changes))
+                assert library_changes==expected,(name,library_changes,expected)
                 assert (stable['archive']==rows[name]['static_identity']['archive'])== (not expected)
+                expected_test=['tests/unit/CMakeFiles/x86_simple_output.dir/x86_simple_output.c.o'] if name in ('uniform','shared_displacement') else []
+                assert test_changes==expected_test,(name,test_changes)
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:

@@ -1,7 +1,7 @@
-name: Verify scoped PowerPC alias and compact vector output across nineteen build profiles
+name: Verify Capstone archive members separately from the updated x86 unit on Linux
 on:
   push:
-    branches: [codex/arm64-alias-and-dedicated-vector-configurations]
+    branches: [codex/verify-ppc-and-vec-library-members]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,25 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, arch: x86_64, profile: gcc }
           - { host: ubuntu-24.04, arch: x86_64, profile: clang }
           - { host: ubuntu-24.04-arm, arch: arm64, profile: clang }
-          - { host: windows-2022, arch: amd64, profile: full }
-          - { host: windows-2022, arch: amd64, profile: diet }
-          - { host: windows-2022, arch: amd64, profile: reduced }
-          - { host: windows-2022, arch: amd64, profile: noatt }
-          - { host: windows-2022, arch: amd64_x86, profile: full }
-          - { host: windows-2022, arch: amd64_x86, profile: diet }
-          - { host: windows-2022, arch: amd64_x86, profile: reduced }
-          - { host: windows-2022, arch: amd64_x86, profile: noatt }
-          - { host: macos-15, arch: arm64, profile: full }
-          - { host: macos-15, arch: arm64, profile: diet }
-          - { host: macos-15, arch: arm64, profile: reduced }
-          - { host: macos-15, arch: arm64, profile: noatt }
-          - { host: macos-15-intel, arch: x86_64, profile: full }
-          - { host: macos-15-intel, arch: x86_64, profile: diet }
-          - { host: macos-15-intel, arch: x86_64, profile: reduced }
-          - { host: macos-15-intel, arch: x86_64, profile: noatt }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
@@ -54,6 +37,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scoped-alias-vector-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: library-member-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
