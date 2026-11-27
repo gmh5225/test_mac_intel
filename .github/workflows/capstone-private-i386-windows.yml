@@ -1,7 +1,7 @@
-name: Verify corrected detail views and scoped x86 access across 19 toolchain profiles
+name: Verify all i386 memory immediate arithmetic rows across Linux Windows and macOS
 on:
   push:
-    branches: [codex/current-portable-detail-view-access]
+    branches: [codex/verify-real-i386-group1-memory]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: scoped-view-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: group1-record-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

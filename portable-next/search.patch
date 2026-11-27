@@ -1,3 +1,75 @@
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..e4628bf3 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -20,11 +20,11 @@
+ #include "X86GenSimpleOutput.inc"
+ #include "../../cs_disasm_internal.h"
+ #define X86_MEMORY32_OUTPUT
+-#define X86_MEMORY_IMMEDIATE writeCompare32
++#define X86_MEMORY_IMMEDIATE writeGroup1Memory32
+ #define X86_IMMEDIATE_WIDE 0
+-#define X86_COMPARE_IMMEDIATE
++#define X86_GROUP1_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
+-#undef X86_COMPARE_IMMEDIATE
++#undef X86_GROUP1_IMMEDIATE
+ #undef X86_MEMORY_IMMEDIATE
+ #undef X86_IMMEDIATE_WIDE
+ 
+@@ -68,12 +68,13 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++		if (size >= 2 && code[1] < 0xc0 &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+-			const unsigned row =
+-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+-				2;
+-			if (writeCompare32(code, size, insn, insn_size,
++			/* The ModRM group selects the corresponding register ALU
++			 * opcode; its row owns operand access and flag effects. */
++			const unsigned reg_opcode = (code[1] & 0x38) | (opcode & 1);
++			const unsigned row = x86_simple_plans[0][0][reg_opcode] >> 2;
++			if (writeGroup1Memory32(code, size, insn, insn_size,
+ 					   &x86_simple_outputs[row],
+ 					   x86_simple_registers))
+ 				return true;
+diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
+index 11582041..38add9f0 100644
+--- a/arch/X86/X86MemoryOutputImpl.h
++++ b/arch/X86/X86MemoryOutputImpl.h
+@@ -45,7 +45,7 @@ bool X86_writeMemoryOutput(
+ 	const unsigned offset = lead + 2 + sib;
+ 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ #ifdef X86_MEMORY_IMMEDIATE
+-#ifdef X86_COMPARE_IMMEDIATE
++#ifdef X86_GROUP1_IMMEDIATE
+ 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
+ #else
+ 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
+@@ -187,13 +187,15 @@ bool X86_writeMemoryOutput(
+ 	const uint32_t encoded =
+ 		imm_size == 1 ? code[imm_offset] :
+ 				(uint32_t)X86_readDisp32(code + imm_offset);
+-#ifdef X86_COMPARE_IMMEDIATE
+-	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
++#ifdef X86_GROUP1_IMMEDIATE
+ 	int64_t value = encoded;
+-	if (opcode == 0x83)
++	if (opcode == 0x83) {
++		/* The Intel printer renders logical masks at destination width. */
++		const unsigned group = (modrm >> 3) & 7;
+ 		value = (int8_t)encoded;
+-	else if (imm_size == 4 && row->ops[0].size == 8)
+-		value = (int32_t)encoded;
++		if (group == 1 || group == 4 || group == 6)
++			value = (uint32_t)value;
++	}
+ 	memcpy(out, ", ", 2);
+ 	out += 2;
+ 	if (value < 0)
 diff --git a/cs.c b/cs.c
 index d0b8b045..0bfa1c8b 100644
 --- a/cs.c
@@ -116,3 +188,37 @@ index 00000000..1adadf31
 +	}
 +	return 0;
 +}
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index de30cf93..7a66d1f6 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1654,6 +1654,21 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
+ 	return true;
+ }
+ 
++static bool check_group1_memory_immediates(csh handles[2])
++{
++	for (unsigned group = 0; group < 8; ++group) {
++		const uint8_t opcodes[] = { 0x80, 0x81, 0x83 };
++		for (unsigned i = 0; i < sizeof(opcodes); ++i) {
++			uint8_t code[] = { opcodes[i], (uint8_t)(0x44 | group << 3),
++					   0x8b, 0xf8, 0x80, 0xff, 0xff, 0xff };
++			for (size_t n = 1; n <= sizeof(code); ++n)
++				if (!compare(handles, code, n, 0x8000u + group))
++					return false;
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1672,6 +1687,7 @@ static bool check_mode(cs_mode mode)
+ 		if (!check_branches(handles) || !check_memory(handles, mode) ||
+ 		    !check_lea(handles, mode) ||
+ 		    !check_mov_disp32(handles, mode) ||
++		    !check_group1_memory_immediates(handles) ||
+ 		    !check_group1(handles, mode) ||
+ 		    !check_push_immediates(handles) ||
+ 		    !check_shift_immediate(handles, mode) ||
