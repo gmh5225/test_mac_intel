@@ -1,7 +1,7 @@
-name: Compare the public, generic and fixed-width real-mode readers on both ELF linkers
+name: Verify architecture bypasses on both ELF linkers, persistent records and real programs
 on:
   push:
-    branches: [codex/private-real-mode-record-domain]
+    branches: [codex/public-architecture-bypass-domain]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: private-real-mode-domain-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-bypass-domain-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

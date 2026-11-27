@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..2840aee9 100644
+index cea06480..406c181d 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
@@ -7,7 +7,7 @@ index cea06480..2840aee9 100644
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
 +        set_property(SOURCE cs.c arch/X86/X86DisassemblerDecoder.c
-+            arch/X86/X86RegisterFallback32.c arch/X86/X86OutputIterator.c APPEND PROPERTY
++            arch/X86/X86RegisterFallback32.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_OPTIONAL_PUBLIC_RECORD>")
      endif()
  endif()
@@ -57,23 +57,6 @@ index 00000000..be506cb3
 +};
 +
 +static const struct X86SimpleOutput stack16_mov32 = { 460, "mov", "", .flags = UINT64_C(0), .reads = { 0, 0, 0, 0 }, .writes = { 0, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } };
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 8c6444ab..e391e40f 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -36,6 +36,12 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- {
- #ifdef CS_DECODE_TRY_OUTPUT
- 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+	/* The generic simple writer declines every real-mode instruction.
-+	 * Its public counterpart can use the already-linked real-mode reader. */
-+	if (handle && handle->mode == CS_MODE_16)
-+		return cs_disasm_iter(ud, code, size, address, insn);
-+#endif
- 	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
- 		return cs_disasm_iter_core(ud, code, size, address, insn);
- #endif
 diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
 index a03a42e9..8d606227 100644
 --- a/arch/X86/X86PublicOutput.c
@@ -120,10 +103,10 @@ index a03a42e9..8d606227 100644
  #endif
 diff --git a/arch/X86/X86PublicOutputImpl.h b/arch/X86/X86PublicOutputImpl.h
 new file mode 100644
-index 00000000..ab701ab0
+index 00000000..5898207f
 --- /dev/null
 +++ b/arch/X86/X86PublicOutputImpl.h
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,116 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -140,9 +123,8 @@ index 00000000..ab701ab0
 +	uint16_t *length, bool batch)
 +{
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+	if (handle->arch != CS_ARCH_X86 ||
-+	    (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
-+	     handle->syntax != CS_OPT_SYNTAX_INTEL))
++	if (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
++	    handle->syntax != CS_OPT_SYNTAX_INTEL)
 +		return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +#endif
 +#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
@@ -188,7 +170,7 @@ index 00000000..ab701ab0
 +{
 +	if (size >= 6 && code[0] == X86_PREFIX_OPSIZE &&
 +	    (code[1] & 0xf8) == 0xb8 && !batch && !handle->skipdata &&
-+	    !X86_OUTPUT_UNSUPPORTED(handle, handle->arch != CS_ARCH_X86)) {
++	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
 +		const uint8_t opcode = code[1];
 +		writeUnsignedRegisterImmediate(insn, &stack16_mov32,
 +					       &test32_regs[1][opcode & 7],
@@ -202,7 +184,7 @@ index 00000000..ab701ab0
 +	}
 +	if (size >= 2 && code[0] == X86_PREFIX_OPSIZE &&
 +	    (code[1] & 0xf0) == 0x50 && !batch && !handle->skipdata &&
-+	    !X86_OUTPUT_UNSUPPORTED(handle, handle->arch != CS_ARCH_X86)) {
++	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
 +		const unsigned opcode = code[1];
 +		const struct X86SimpleOutput *row = &stack16_rows[(opcode >> 3) & 1];
 +		const struct X86SimpleRegister *reg = &test32_regs[1][opcode & 7];
@@ -230,6 +212,10 @@ index 00000000..ab701ab0
 +					    cs_insn *insn, uint16_t *length,
 +					    bool batch)
 +{
++	/* Foreign public iterators in the same executable use the core decoder. */
++	if (handle->arch != CS_ARCH_X86)
++		X86_RECORD_TAIL return cs_decode_full_insn(handle, code, size,
++							insn, length, batch);
 +	if (handle->mode == CS_MODE_16)
 +		X86_RECORD_TAIL return decodePublicRecord16(handle, code, size, insn, length,
 +					   batch);
