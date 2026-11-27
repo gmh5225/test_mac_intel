@@ -36,13 +36,15 @@ try:
         run('cmake','--build',b,'--target','capstone_shared','capstone_static','--parallel','4')
         run(*args,r/'driver.cpp',iced,ar,*tail,'-o',w/'static')
         assert 'libcapstone' not in get('ldd',w/'static')
-    layouts={}
+    layouts={};binaries={'shared':{},'static':{}}
     for stage in ('base','candidate','switch'):
         if stage=='candidate':
             run('git','-C',src,'apply','--index',r/'candidate.patch')
             assert get('git','-C',src,'write-tree')==q['candidate']['tree']
         if stage=='switch':write_control(src,False)
         build();layouts[stage]={k:layout(f)for k,f in [('shared',so),('static',w/'static')]}
+        binaries['shared'][stage]=so.read_bytes()
+        binaries['static'][stage]=(w/'static').read_bytes()
     save('layout',layouts)
     run(*args,r/'driver.cpp',iced,so,'-Wl,-rpath,'+str(b),*tail,'-o',w/'shared')
     run(*args,r/'vectors.cpp',so,'-Wl,-rpath,'+str(b),*tail,'-o',w/'vectors')
@@ -70,8 +72,14 @@ try:
                 cases[k]=(w/('static' if link.startswith('static') else 'shared'),'public-att' if 'att'in link else 'capstone',mode,f,path,str(bits))
     assert set(cases)==wanted
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});invoke=['setarch',os.uname().machine,'-R']
+    from fixed_image import FixedImage
+    images={k:FixedImage(so.resolve() if k=='shared' else w/'static',v,executable=k=='static')for k,v in binaries.items()}
+    # Rows are randomized over all four treatments in one and the same job.
+    # Both old/new choose functions in one identical ELF file.
     def call(case,tag,reps,count=False):
         app,engine,mode,f,tsv,bits=case
+        image=images['static' if app.name=='static' else 'shared']
+        image.select('base' if tag.startswith('baseline') else 'candidate' if tag.startswith('production') else 'switch')
         env=dict(os.environ,BENCH_VEX_READER='1' if tag.startswith('new') else '0')
         v=sp.run([*invoke,app,engine,mode,str(reps),f,tsv,bits],env=env,capture_output=True,text=True,check=True)
         row=list(map(int,v.stdout.split()))
@@ -81,7 +89,7 @@ try:
             assert bit==int(env['BENCH_VEX_READER']) and 0<=transfers<=records<=entries
             return row[2:],[entries,records,transfers]
         return row
-    timing={};consumed={};tags=['old','old-copy','new','new-copy']
+    timing={};consumed={};tags=['old','old-copy','new','new-copy','baseline','baseline-copy','production','production-copy']
     for key,case in cases.items():
         n=max(1,math.ceil(25e6/call(case,'old',1)[0]));expect=call(case,'old',n)[2:];blocks=[];rng=random.Random('unchanged-elf/'+key)
         for _ in range(35):
@@ -90,13 +98,8 @@ try:
                 row=call(case,tag,n);assert row[2:]==expect;trial[tag].append(row[:2])
             blocks.append({k:[a+b for a,b in zip(*v)]for k,v in trial.items()})
         timing[key]=dict(reps=n,records=expect,cycles=blocks);save('timing',timing)
-    # The profiling code only enters the binary after timing is finished.
-    assert sha(so)==layouts['switch']['shared']['sha'] and sha(w/'static')==layouts['switch']['static']['sha']
-    write_control(src,True);build()
-    for key,case in cases.items():
-        before=call(case,'old',1,True);after=call(case,'new',1,True)
-        assert before[0]==after[0] and before[1][0]==after[1][0] and before[1][2]==0 and after[1][1]-before[1][1]==after[1][2],(key,before,after)
-        consumed[key]=dict(records=before[0],old=before[1],new=after[1])
-    save('counts',consumed);save('complete',dict(complete=True,source=q,isa=os.uname().machine,workloads=len(cases),compiler=get('clang','--version').splitlines()[0],hardware=get('lscpu'),timed_control_sha={k:v['sha']for k,v in layouts['switch'].items()}))
+    for image in images.values():
+        assert {'base','candidate','switch'}==set(image.verified)
+    save('complete',dict(complete=True,source=q,isa=os.uname().machine,workloads=len(cases),hardware=get('lscpu'),compiler=get('clang','--version').splitlines()[0],images={k:v.receipt()for k,v in images.items()}))
 finally:
     size=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(bytes=size,removed=not w.exists()))

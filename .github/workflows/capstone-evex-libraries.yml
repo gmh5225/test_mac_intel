@@ -1,7 +1,7 @@
-name: Compare VEX operand readers inside one image and count actual writer entries
+name: Pair production layouts and same-image VEX readers on identical physical runners
 on:
   push:
-    branches: [codex/one-image-vex-reader-causal-control]
+    branches: [codex/natural-and-one-image-vex-on-same-host]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-image-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: paired-image-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
