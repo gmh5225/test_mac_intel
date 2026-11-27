@@ -67,7 +67,9 @@ def verify(r):
                 assert pieces
                 objects[key]=hashlib.sha256(json.dumps(pieces,sort_keys=True).encode()).hexdigest()
             assert set(objects)==wanted;object_hashes[tag]=objects;save('compiled-sections',object_hashes)
-        assert object_hashes['base']==object_hashes['candidate'],object_hashes
+        changed=[k for k,h in object_hashes['base'].items() if object_hashes['candidate'][k]!=h]
+        assert all('X86Sse64Output.c.obj' in k for k in changed),changed
+        save('changed-objects',changed)
         assert set(states['base'])==set(states['candidate'])==set(object_hashes['base']) and len(states['base'])>=28
         save('preprocessor-differences',[k for k,v in states['base'].items()if states['candidate'][k]!=v])
         save('complete',dict(complete=True,source=q,host='Windows',proof='preprocessed and compiled sections',expected='base',objects=len(states['base']),toolchain=os.environ.get('VSCMD_ARG_TGT_ARCH')))

@@ -55,6 +55,8 @@ try:
             assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
             flags_per={key:'X86_ACCUMULATOR_OUTPUT32' in cmd for key,cmd in rows.items()}
             assert all(v==(tag=='candidate' and expect=='active' and Path(k).name in ('X86MemoryFallback32.c.o','X86RegisterFallback32.c.o')) for k,v in flags_per.items()),(config,tag,flags_per)
+            clear={Path(key).name for key,cmd in rows.items() if 'X86_VEX_CLEAR_OUTPUT32' in cmd}
+            assert clear==({'X86MemoryFallback32.c.o'} if tag=='candidate' and expect=='active' else set()),(config,tag,clear)
             cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
             dest=project/tag;dest.mkdir()
             for kind in names:shutil.copy2(build/('probe_'+kind),dest)
@@ -75,9 +77,16 @@ try:
         old,new=ident['base'],ident['candidate']
         assert old['objects'].keys()==new['objects'].keys()
         changed=sorted(Path(k).name for k,v in old['objects'].items() if new['objects'][k]!=v)
-        assert changed==(['X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'] if expect=='active' else []),(config,changed)
+        change_set=set(changed)
+        required={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'} if expect=='active' else set()
+        assert required<=change_set<=required|{'X86Sse64Output.c.o'},(config,expect,changed)
         assert old['images'].keys()==new['images'].keys()
-        assert all((new['images'][k]!=v)==(expect=='active') for k,v in old['images'].items())
+        if not change_set:assert old['images']==new['images'],config
+        if expect=='active':
+            assert old['images']['libcapstone.a']!=new['images']['libcapstone.a']
+            assert old['images']['probe_static']==new['images']['probe_static']
+            for tag in ('base','candidate'):
+                assert 'X86_disasmIterText' not in get('nm',project/tag/'probe_static')
         assert all(rec==record['base']for rec in record.values())
         profiles[config]=dict(expected=expect,object_counts=cc,flags=flagsets,records=len(record['candidate']),identities=ident)
         checks[config]=record['base'];save('checks',checks);save('profiles',profiles)

@@ -1,7 +1,7 @@
-name: Check the shipping and inactive configurations of the i386 immediate writer
+name: Verify compiler selection, extracted archive members and normal public disassembly of the i386 clear and immediate writers
 on:
   push:
-    branches: [codex/i386-switch-compiler-selection]
+    branches: [codex/i386-clear-selection-objects]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: i386-switch-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: i386-clear-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
