@@ -1,7 +1,7 @@
-name: Time both public readers at identical ELF addresses by renaming just the benchmark call reference
+name: Time AMD64 fallback admission and natural library layout separately while checking unchanged standalone consumer images
 on:
   push:
-    branches: [codex/fixed-layout-public-reader-relocation]
+    branches: [codex/amd64-late-member-single-relocation]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 7ebcef84a80b8f7feba27b1118b66ff574c488b2
+          ref: e37f14ea3b6eb5f3b52b96a6e78a2923d061a1f3
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: db3b8c00be87d3a49d72aa318079dc74ee273c90
+          ref: a7746e80b32f3b4a5b9954b95309d658f7560954
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-call-relocation-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-tail-relocation-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

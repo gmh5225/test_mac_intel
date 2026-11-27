@@ -65,33 +65,36 @@ try:
     from product_layout import all_functions
     from fixed_image import FixedImage
     arch=os.uname().machine;exe_layout={};symbols={};products={};routes=('native','ordinary','foreign','foreign-only')
-    for label in ('shipping','forward','canonical'):
-        if label=='forward':
+    for label in ('shipping','production','forward','canonical'):
+        if label=='production':
             patch=r/'candidate.patch';assert sha(patch)==q['sha256']
             run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==q['tree']
             run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+            run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'unary-guard.cpp',lib,'-o',w/'unary-guard')
+            guard=list(map(int,get(w/'unary-guard').split()));assert guard[:2]==[14647296,8891200];save('guard',guard)
+        if label=='forward':
             # Rename only the undefined symbol in the archive member which calls it.
-            member='X86DisassemblerDecoder.c.o'
+            member='X86VectorFallback64.c.o'
             assert get('ar','t',lib).splitlines().count(member)==1
             unit=w/member;unit.write_bytes(sp.check_output(['ar','p',lib,member]))
-            symbol='X86_decodeMixedPublicRecord'
+            symbol='X86_decodeGroup64OrFull'
             assert symbol in get('nm','-u',unit).split()
-            run('objcopy','--redefine-sym',symbol+'=X86_benchmarkPublicCall',unit)
-            assert 'X86_benchmarkPublicCall' in get('nm','-u',unit).split()
+            run('objcopy','--redefine-sym',symbol+'=X86_benchmarkGroupCall',unit)
+            assert 'X86_benchmarkGroupCall' in get('nm','-u',unit).split()
             run('ar','rD',lib,unit)
             assert get('ar','t',lib).splitlines().count(member)==1
         link=[]
-        if label!='shipping':
+        if label in ('forward','canonical'):
             # Force the archive member in both links. The two calls use the same internal convention.
-            target='X86_decodeMixedPublicRecord' if label=='forward' else 'cs_decode_full_insn'
-            link=['-Wl,-u,X86_decodeMixedPublicRecord','-Wl,-u,cs_decode_full_insn']
+            target='X86_decodeGroup64OrFull' if label=='forward' else 'cs_decode_full_insn'
+            link=['-Wl,-u,X86_decodeGroup64OrFull','-Wl,-u,cs_decode_full_insn']
         args={'native':([w/'driver.o'],[ice_lib,*flags]),'ordinary':([w/'public-only.o'],[ice_lib,*flags]),'foreign':([w/'foreign.o',w/'native-reference.o'],['-no-pie']),'foreign-only':([w/'foreign.o'],['-no-pie'])}
         exe_layout[label]={};symbols[label]={};products[label]={}
         for route in routes:
             objects,ld=args[route];exe=w/(route+'-'+label)
-            alias=['-Wl,--defsym,X86_benchmarkPublicCall='+target] if label!='shipping' else []
-            run('clang++',*objects,*link,lib,*ld,*alias,'-o',exe)
-            symbols[label][route]=all_functions(exe);symbols[label][route].pop('X86_benchmarkPublicCall',None)
+            alias=['-Wl,--defsym,X86_benchmarkGroupCall='+target] if label in ('forward','canonical') and route in ('native','foreign') else []
+            run('clang++',*objects,*(link if route in ('native','foreign') else []),lib,*ld,*alias,'-o',exe)
+            symbols[label][route]=all_functions(exe);symbols[label][route].pop('X86_benchmarkGroupCall',None)
             with exe.open('rb')as f:
                 elf=ELFFile(f)
                 exe_layout[label][route]={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()]for v in elf.iter_sections()if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
@@ -106,7 +109,20 @@ try:
         vs_original=sorted(k for k in set(a)|set(original)if a.get(k)!=original.get(k))
         diffs[route]=dict(total=len(a),same_addresses=same_addresses,changed=changed,reloc=list(reloc),sections=sections,versus_shipping=len(vs_original),examples=vs_original[:20])
         save('links',dict(diffs=diffs,sections=exe_layout,hashes=products))
-        assert same_addresses and not reloc and changed==['cs_disasm_iter'] and set(sections)<={'.text','.note.gnu.build-id'},(route,diffs[route])
+        if route in ('ordinary','foreign-only'):
+            # Neither consumer has any reference to the AMD64 native member.
+            assert all(products[t][route]==products['shipping'][route] for t in products)
+        else:
+            assert same_addresses and not reloc and changed==['X86_decodeOutputMiss64'],(route,diffs[route])
+            assert set(sections)<={'.cs_x86_vector_fallback64_text','.note.gnu.build-id'}
+        prod=symbols['production'][route]
+        shifts={}
+        for name in ('X86_disasmIterText','X86_disasmIter32','tryOutput32','X86_decodeOutputMiss32','X86_decodeRegisterFallback32','X86_decodeOutputMiss64','cs_decode_full_insn','cs_disasm_iter','Mips_getInstruction'):
+            if name in original:
+                assert name in prod and len(original[name])==len(prod[name])
+                shifts[name]=[[x[0],y[0]-x[0],x[1],y[1],x[2]==y[2]] for x,y in zip(original[name],prod[name])]
+        diffs[route]['shipping_to_production']=shifts
+        save('links',dict(diffs=diffs,sections=exe_layout,hashes=products))
     import pe_panels
     fixtures={}
     for name,bits,f,spans,_ in pe_panels.prepare(w):
@@ -114,10 +130,13 @@ try:
         spec=m['provenance'][name];assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s)not in {tuple(a[:3])for a in spec['excluded_incompatible_extents']}]
         path=w/(name+'.tsv');path.write_text(''.join('%d %d %d\n'%tuple(a)for a in selected));assert sha(path)==spec['extent_sha256'];fixtures[name]=(str(bits),f,path)
-    assert len(fixtures)==2
+    run(sys.executable,'-B',w/'libmvec.py');vec=rd(w/'libmvec.json');name='libmvec-amd64';f=w/'libmvec.text';p=w/(name+'.tsv');p.write_text('0 %d %d\n'%(vec['bytes'],vec['address']));spec=m['provenance'][name]
+    assert sha(f)==spec['text_sha256'] and sha(p)==spec['extent_sha256'];fixtures[name]=('64',f,p)
+    assert len(fixtures)==3
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))});result={};receipts={}
     for route in routes:
-        sources={t:(w/(route+'-'+tag)).read_bytes()for t,tag in [('shipping','shipping'),('base','canonical'),('candidate','forward')]}
+        if route in ('ordinary','foreign-only'):continue
+        sources={t:(w/(route+'-'+tag)).read_bytes() for t,tag in [('shipping','shipping'),('base','canonical'),('candidate','forward'),('production','production')]}
         image=FixedImage(w/('selected-'+route),sources,True);tasks=[]
         if route in ('native','ordinary'):
             for name,(bits,path,ranges) in fixtures.items():
@@ -136,7 +155,7 @@ try:
                 image.select(label)
                 return list(map(int,get('setarch',arch,'-R',image.path,*cmd(n)).split()))
             reps=max(1,math.ceil(22e6/take('base',1)[0]));expected=take('base',reps)[2:];assert expected[0]>0
-            labels=['shipping','base','candidate','copy','repeat'];rng=random.Random(route+key);cycles=[]
+            labels=['shipping','base','candidate','copy','repeat','production'];rng=random.Random(route+key);cycles=[]
             for _ in range(17):
                 rng.shuffle(labels);block={k:[] for k in labels}
                 for label in labels+labels[::-1]:
