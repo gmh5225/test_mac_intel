@@ -28,6 +28,10 @@ try:
    switch(stage)
    active=profile in ('arm-both','arm-static','arm-shared') and stage in ('arm','combined','reference') and not darwin
    if profile=='make':
+    # Clean source revisions need independent objects. GNU Make 3.81 compares
+    # mtimes to whole seconds, and a Git switch can rewrite several trees per tick.
+    # The separate probe below edits headers in an actual incremental build.
+    shutil.rmtree(b);b.mkdir()
     run('make','-C',src,'-j4','CC=clang','CAPSTONE_ARCHS=arm','CAPSTONE_BUILD_CORE_ONLY=yes','CAPSTONE_SHARED=no','CAPSTONE_STATIC=yes','BUILDDIR='+str(b))
     lib=b/'libcapstone.a';verify_unit(lib,b,stage,profile)
     deps=list(b.rglob('Mapping.d'));fixed=stage not in ('ship','group')
