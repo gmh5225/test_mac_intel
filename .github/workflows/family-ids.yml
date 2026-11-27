@@ -1,7 +1,7 @@
-name: Compare PowerPC alias text and operand details in both Mach-O public decode APIs
+name: Replicate the exact PowerPC formatter on four Macs using both public APIs
 on:
   push:
-    branches: [codex/qualify-ppc-alias-pass-darwin]
+    branches: [codex/dedicated-ppc-alias-mach-replication]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,8 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15-intel, cc: clang, flavor: first }
-          - { host: macos-15, cc: clang, flavor: first }
+          - { host: macos-15-intel, cc: clang, flavor: first, replica: 1 }
+          - { host: macos-15-intel, cc: clang, flavor: first, replica: 2 }
+          - { host: macos-15, cc: clang, flavor: first, replica: 1 }
+          - { host: macos-15, cc: clang, flavor: first, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -36,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: ppc-alias-darwin-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-alias-mach-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}-${{ matrix.replica }}
           retention-days: 14
