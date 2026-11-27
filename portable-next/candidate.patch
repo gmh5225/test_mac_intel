@@ -11,36 +11,41 @@ index cea06480..5327be20 100644
      set(HEADERS_WASM
          arch/WASM/WASMDisassembler.h
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index d7db69c3..73771fed 100644
+index d7db69c3..e0ad544a 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -101,7 +101,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+@@ -100,11 +100,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
+ 		break;
  
  	case WASM_OP_BRTABLE:
- 		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
+-		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
 -		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
-+		WASM_printTableAddress(O, MI->wasm_data.brtable.address);
- 		SStream_concat(O, "], 0x%x",
- 			       MI->wasm_data.brtable.default_target);
- 
+-		SStream_concat(O, "], 0x%x",
+-			       MI->wasm_data.brtable.default_target);
+-
++		WASM_printTableOperands(O, &MI->wasm_data.brtable);
+ 		break;
+ 	}
+ }
 diff --git a/arch/WASM/WASMInstPrinter.h b/arch/WASM/WASMInstPrinter.h
-index b0c46ade..043b3a28 100644
+index b0c46ade..610c266b 100644
 --- a/arch/WASM/WASMInstPrinter.h
 +++ b/arch/WASM/WASMInstPrinter.h
-@@ -11,6 +11,7 @@
+@@ -11,6 +11,8 @@
  
  struct SStream;
  
-+CAPSTONE_INTERNAL void WASM_printTableAddress(SStream *out, uint64_t address);
++CAPSTONE_INTERNAL void WASM_printTableOperands(SStream *out,
++			    const cs_wasm_brtable *table);
  void WASM_printInst(MCInst *MI, struct SStream *O, void *Info);
  void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
  
 diff --git a/arch/WASM/WASMTablePrinter.c b/arch/WASM/WASMTablePrinter.c
 new file mode 100644
-index 00000000..659c884b
+index 00000000..c45eabca
 --- /dev/null
 +++ b/arch/WASM/WASMTablePrinter.c
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,34 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -50,13 +55,30 @@ index 00000000..659c884b
 +#pragma clang section text = ".cs_wasm_table_text" rodata = ".cs_wasm_table_rodata"
 +#endif
 +
-+void WASM_printTableAddress(SStream *out, uint64_t address)
++void WASM_printTableOperands(SStream *out,
++			    const cs_wasm_brtable *table)
 +{
-+	/* Keep the registered formatter's existing format for 32-bit addresses. */
-+	if (address <= UINT32_MAX)
-+		SStream_concat(out, "0x%x", (unsigned)address);
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	/* Each original append can close a markup or truncate the stream. */
++	if (cs_vsnprintf == cs_default_vsnprintf && !out->is_closed &&
++	    !(out->markup_stream && out->prefixed_by_markup) &&
++	    out->index <= SSTREAM_BUF_LEN -
++			sizeof("\t0xffffffff, [0xffffffffffffffff], 0xffffffff")) {
++		SStream_concat(out, "\t0x%x, [0x%" PRIx64 "], 0x%x",
++			       (unsigned)table->length, table->address,
++			       (unsigned)table->default_target);
++		return;
++	}
++#endif
++	/* A registered formatter observes these three calls and their formats. */
++	SStream_concat(out, "\t0x%x, [", (unsigned)table->length);
++	if (table->address <= UINT32_MAX)
++		SStream_concat(out, "0x%x", (unsigned)table->address);
 +	else
-+		SStream_concat(out, "0x%" PRIx64, address);
++		SStream_concat(out, "0x%" PRIx64, table->address);
++	SStream_concat(out, "], 0x%x", (unsigned)table->default_target);
 +}
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
 index 5ae892b4..00821c17 100644
