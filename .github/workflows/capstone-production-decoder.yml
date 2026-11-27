@@ -1,7 +1,7 @@
-name: Build the complete NeverD decoder from current LLVM sources with stable AMD64 reader placement
+name: Factor AMD64 text checks and masked operand formatting in the source-built NeverD decoder
 on:
   push:
-    branches: [codex/amd64-linked-reader-product]
+    branches: [codex/reader-and-masked-operands-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -20,6 +20,9 @@ jobs:
           - os: ubuntu-24.04
             cc: clang
             replica: 3
+          - os: ubuntu-24.04-arm
+            cc: clang
+            replica: 4
     runs-on: ${{ matrix.os }}
     timeout-minutes: 235
     steps:
@@ -31,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: b23e8d4c443d9069f03dec2ddbdc8cfa0337d0f6
+          ref: 896ff9e02e09b909d248b0d7222e7af80c960d75
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -73,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: amd64-stable-reader-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: reader-and-mask-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

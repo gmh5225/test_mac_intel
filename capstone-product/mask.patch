@@ -1,22 +1,28 @@
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..8177be82 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -12847,11 +12847,15 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
- 			set_mask_register_operand_size(x86, mask_operand_size);
- 		else
- 			repair_vector_mask_sizes(x86, mnem, insn->id);
-+		/* K-register operations share width and access repair. The
-+		 * vector, x87 and rotate repairs apply to other instruction IDs. */
-+		if (insn->id >= X86_INS_KADDB && insn->id <= X86_INS_KXORW) {
-+			repair_kmask_access(handle, insn);
-+			return;
-+		}
- 		repair_vector_mask_conversion_access(x86, insn->id);
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..cb8fe2f1 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -125,10 +125,19 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+ 		return false;
  	}
- 	repair_vector_narrow_access(x86, insn->id);
--	if (has_mask)
--		repair_kmask_access(handle, insn);
- 	if (memory)
- 		repair_x87_environment_detail(handle, insn);
- 	if (has_mask)
+ 	insn->bytes[3] = code[3];
+-	/* The underlying writer emitted exactly two operands. Their longest
+-	 * address and vector name leave room for both decorators. */
+-	char *comma = strchr(insn->op_str, ',');
+-	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
++	/* The writers clear op_str before emitting two operands. A vector
++	 * destination is four or five characters. Only stores put the
++	 * variable-length address before the comma. */
++	char *comma = store ? strchr(insn->op_str, ',') :
++		insn->op_str + 4 + (insn->op_str[4] != ',');
++	const unsigned gap = zero ? 9 : 5;
++	if (memory && !store) {
++		/* The widest source has a base, a scaled index and a disp32. */
++		memmove(comma + gap, comma,
++			sizeof(", zmmword ptr [r15 + r15*8 - 0x80000000]"));
++	} else {
++		memmove(comma + gap, comma, sizeof(", zmm31"));
++	}
+ 	memcpy(comma, " {k0}", 5);
+ 	comma[3] = (char)('0' + mask);
+ 	if (zero)

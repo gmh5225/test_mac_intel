@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-assert sha(r/'candidate.patch')==m['candidate']['sha256'] and m['base']==m['shipping']
+assert all(sha(r/(stage+'.patch'))==m[stage]['sha256'] for stage in ('base','mask','candidate'))
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -52,9 +52,11 @@ try:
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
     identities={};results={}
-    for stage in ('shipping','base','candidate'):
-        if stage=='candidate':
-            command(['git','apply','--index',r/(stage+'.patch')],'apply-'+stage,cs)
+    for stage in ('shipping','base','mask','candidate'):
+        git(cs,'restore','--source','HEAD','--worktree','--staged','--','.')
+        patches={'shipping':[],'base':['base'],'mask':['mask'],'candidate':['base','candidate']}
+        for name in patches[stage]:
+            command(['git','apply','--index',r/(name+'.patch')],'apply-'+stage+'-'+name,cs)
         assert git(cs,'write-tree')==m[stage]['tree']
         command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','capstone-product',*targets,'--parallel','4'],'build-'+stage,nd)
         assert git(cs,'write-tree')==m[stage]['tree'] and not git(cs,'diff','--name-only') and git(ll,'rev-parse','HEAD')==llvm and not git(ll,'diff','HEAD','--name-only')
@@ -92,24 +94,25 @@ try:
                 rows[c['name']+'/'+str(mode)]=dict(text=c['text_sha256'],counts=values[1:3],boundary=values[3],score=values[4])
         assert len(rows)==60
         results[stage]=rows;save('products',identities);save('records',results)
-    assert results['shipping']==results['base']==results['candidate']
-    assert identities['shipping']==identities['base']
-    base,candidate=identities['base'],identities['candidate']
-    assert base['objects'].keys()==candidate['objects'].keys()
-    changed=[Path(k).name for k,v in base['objects'].items() if v!=candidate['objects'][k]]
-    active=os.uname().machine=='x86_64'
-    assert set(changed)==({'X86Sse64Output.c.o'} if active else set()),changed
-    assert (base['exe']!=candidate['exe'])==active and (base['archive']!=candidate['archive'])==active
-    save('checked-objects',dict(changed=changed,objects=len(base['objects']),active=active))
-    if not active:
-        assert candidate==base
-        save('complete',dict(complete=True,inputs=len(cases),workloads=len(results['base']),llvm=llvm,dev=dev,source=m,active=False))
-        sys.exit(0)
+    assert all(fields==results['shipping'] for fields in results.values())
+    comparisons={}
+    arm=os.uname().machine=='aarch64'
+    for before,after,expected in [('shipping','base',set() if arm else {'X86Sse64Output.c.o'}),
+        ('shipping','mask',{'X86VectorFallback64.c.o'}),('base','candidate',{'X86VectorFallback64.c.o'}),
+        ('mask','candidate',set() if arm else {'X86Sse64Output.c.o'})]:
+        a,b=identities[before],identities[after]
+        assert a['objects'].keys()==b['objects'].keys()
+        delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
+        assert delta==expected,(before,after,delta)
+        assert (a['exe']!=b['exe'])==bool(delta) and (a['archive']!=b['archive'])==bool(delta)
+        comparisons[before+'/'+after]=sorted(delta)
+    save('checked-objects',comparisons)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     image=t/'selected';shutil.copy2(t/'base.exe',image);ino=image.stat().st_ino
-    blobs={k:(t/(k+'.exe')).read_bytes() for k in ('base','candidate')};blobs['copy']=blobs['base']
+    blobs={k:(t/(k+'.exe')).read_bytes() for k in ('shipping','base','mask','candidate')}
+    blobs['shipping_copy']=blobs['shipping'];blobs['mask_copy']=blobs['mask']
     total=max(map(len,blobs.values()));blobs={k:v+bytes(total-len(v)) for k,v in blobs.items()}
-    block=4096;diff=[n for n in range(0,total,block) if blobs['base'][n:n+block]!=blobs['candidate'][n:n+block]]
+    block=4096;diff=[n for n in range(0,total,block) if len({v[n:n+block] for v in blobs.values()})>1]
     assert diff;image.write_bytes(blobs['base']);checked={}
     def execute(k,c,mode,reps):
         with image.open('r+b',buffering=0) as f:
@@ -138,7 +141,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['base']==checked['copy'] and checked['base']!=checked['candidate']
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy']!=checked['mask']==checked['mask_copy']
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:
