@@ -97,10 +97,10 @@ try:
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    first={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'}
-    second={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'}
+    first={'X86Sse64Output.c.o', 'X86MemoryFallback32.c.o'}
+    second={'X86RegisterFallback32.c.o', 'X86Sse64Output.c.o', 'X86MemoryFallback32.c.o'}
     for before,after,expected in [('shipping','base',set() if arm else first),
-        ('shipping','mask',set() if arm else second),('base','mask',set() if arm else first|second)]:
+        ('shipping','mask',set() if arm else second),('base','mask',set() if arm else {'X86RegisterFallback32.c.o', 'X86MemoryFallback32.c.o'})]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}

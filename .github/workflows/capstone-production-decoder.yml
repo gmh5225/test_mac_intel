@@ -1,7 +1,7 @@
-name: Measure shared immediate validation in source-built NeverD on real PE and ELF programs
+name: Validate vector clear and accumulator records in source-built NeverD
 on:
   push:
-    branches: [codex/i386-test-accumulator-product]
+    branches: [codex/i386-clear-accumulator-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-shared-validation-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-clear-accumulator-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
