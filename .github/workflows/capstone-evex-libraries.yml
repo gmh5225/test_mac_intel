@@ -1,7 +1,7 @@
-name: Compare public-only and native-linked architecture dispatch on real firmware, PE, ELF and five other ISAs
+name: Measure native 16-bit formatting in isolation from all public and foreign decoders
 on:
   push:
-    branches: [codex/foreign-record-bypass-programs]
+    branches: [codex/fixed-x86-16bit-native-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-architecture-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: private-firmware-patterns-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

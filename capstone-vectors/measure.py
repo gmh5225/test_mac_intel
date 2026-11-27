@@ -86,7 +86,7 @@ try:
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-only-'+label))
         run('clang++',w/'foreign.o',w/'native-reference.o',lib,'-no-pie','-o',w/('foreign-'+label))
         run('clang++',w/'public-only.o',lib,ice_lib,*flags,'-o',w/('ordinary-'+label))
-        names=('X86_disasmIterText','cs_decode_full_insn','X86_decodePublicRecord','cs_disasm_iter')
+        names=('X86_disasmIterText','cs_decode_full_insn','X86_disasmIterOtherMode','cs_disasm_iter')
         modes={}
         for route,exe in [('native',w/label),('public_only',w/('ordinary-'+label)),('foreign',w/('foreign-'+label)),('foreign_only',w/('foreign-only-'+label))]:
             with exe.open('rb') as fh:
@@ -97,13 +97,11 @@ try:
                 allocated={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()] for v in elf.iter_sections() if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
             resolved='X86_disasmIterText' in symbols;assert resolved==(route in ('native','foreign')),(label,route,symbols)
             active=os.uname().machine=='x86_64' and label!='base'
-            assert ('X86_decodePublicRecord' in symbols)==active
-            if active:
-                assert (symbols['X86_decodePublicRecord'][0]==symbols['cs_decode_full_insn'][0])==(route not in ('native','foreign')),(label,route,symbols)
+            assert ('X86_disasmIterOtherMode' in symbols)==(active and resolved)
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
         if os.uname().machine=='x86_64' and label!='base':
-            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_decodePublicRecord','decodePublicTextRecord','decodePublicRecord16')}
+            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_disasmIter32','X86_disasmIterOtherMode')}
             save('record-assembly-'+label,assembly)
 
         from symbol_layout import symbols
