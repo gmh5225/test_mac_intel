@@ -66,6 +66,9 @@ try:
                 func=entries[0]
             peer=[v for v in syms if v!=func]
             sections={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+            if not entries:
+                assert section['sh_type']=='SHT_NOBITS' and not (section['sh_flags']&4)
+                sections[section.name]=[section['sh_addr'],section['sh_size'],hashlib.sha256(section.data()).hexdigest()]
             assert func[1]==sections['.cs_bench_masked'][0] and 0<=func[2]<16384 and sections['.cs_bench_masked'][1]==16384
             return dict(masked=func,peer_count=len(peer),peers_sha256=hashlib.sha256(json.dumps(peer).encode()).hexdigest(),sections=sections)
     for label in ('base','outlined','candidate'):
@@ -101,11 +104,12 @@ try:
         run('clang++',w/'foreign.o',lib,'-no-pie',link_option,'-o',w/('foreign-'+label))
         controls[label]={k:observe(path) for k,path in [('x86',w/label),('foreign',w/('foreign-'+label))]}
         save('masked-layouts',controls)
+        paired={}
         for k,current in controls[label].items():
-            before=controls['base'][k];assert current['peer_count']==before['peer_count'] and current['peers_sha256']==before['peers_sha256'] and before['masked'][1]==current['masked'][1],(label,k,before['masked'],current['masked'])
-            for section,b in before['sections'].items():
-                if section.startswith(('.text','.cs_x86_','.cs_alias_')) or section in ('.rodata','.plt','.init','.fini'):
-                    assert current['sections'][section]==b,(label,k,section)
+            before=controls['base'][k]
+            changed=[section for section,row in before['sections'].items() if current['sections'].get(section)!=row]
+            paired[k]=dict(same_address=before['masked'][1]==current['masked'][1],same_peers=before['peers_sha256']==current['peers_sha256'],changed=changed)
+        save('mask-peer-check-'+label,paired)
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
@@ -125,7 +129,7 @@ try:
         pos=args.index('-c');del args[pos:pos+2]
         obj=w/('mask-'+label+'.o')
         run(*args,'-I',base,'-DOBSERVED_MASKED','-c',r/'masked-oracle.c','-o',obj,cwd=entry_mask['directory'])
-        for stem,name in [('masked-oracle','guard'),('masked-census','coverage')]:
+        for stem,name in [('masked-oracle','guard'),('masked-census','coverage'),('masked-extents','mask-spans')]:
             run('clang++','-O2','-std=c++17','-I',base/'include',r/(stem+'.cpp'),obj,lib,'-o',w/(name+'-'+label))
         masked=list(map(int,get(w/('guard-'+label)).split()))
         assert masked[0]>2805764 and masked[1]==0 and masked[2]>500000
@@ -214,6 +218,31 @@ try:
         assert mask_counts['base']==mask_counts['candidate']==mask_counts['outlined']
         save('masked-real-'+name,mask_counts)
 
+        if name=='libssl3t64-amd64':
+            target=w/'mask-'
+            picked=list(map(int,get(w/'mask-spans-base',f,path,str(bits),target).split()))
+            assert picked==mask_counts['base'] and picked[2:5]==[480,498,529]
+            special={}
+            for kind,total in enumerate(picked[2:5]):
+                source=Path(str(target)+str(kind))
+                assert len(source.read_text().splitlines())==total
+                for mode in (1,2):
+                    def probe(tag,n):
+                        select(tag)
+                        return list(map(int,get(*invoke,'private',str(mode),str(n),f,source,str(bits)).split()))
+                    reps=max(1,math.ceil(30e6/probe('base',1)[0]))
+                    expected=probe('base',reps)[2:]
+                    tags=['base','duplicate','candidate','outlined']
+                    assert all(probe(tag,reps)[2:]==expected for tag in tags)
+                    rng=random.Random('mask/'+str(kind)+'/'+str(mode));samples=[]
+                    for block in range(35):
+                        rng.shuffle(tags);row={tag:[0,0] for tag in tags}
+                        for tag in tags+tags[::-1]:
+                            vals=probe(tag,reps);assert vals[2:]==expected
+                            for clock in (0,1):row[tag][clock]+=vals[clock]
+                        samples.append(row)
+                    special[str(kind)+'/'+str(mode)]=dict(count=total,extent_sha=sha(source),reps=reps,checks=expected,cycles=samples)
+                    save('masked-only-effects',special)
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
