@@ -35,7 +35,7 @@ try:
         if tag in ('original','entry','outer'):
             f='arch/X86/X86PublicOutputImpl.h'
             instrument(f,'X86_decodePublicRecord(cs_struct *handle,','profile_reader',True)
-            instrument(f,'decodePublicTextRecord(','profile_fixed',True)
+            instrument(f,'CS_PRESERVE_MOST bool decodePublicTextRecord(','profile_fixed',True)
         run('cmake','--build',b,'--target','capstone_static','--parallel','4');lib,=b.rglob('libcapstone.a');results[tag]={};symbols[tag]={}
         for route in ('public','native'):
             exe=w/(tag+route);extra=[w/'native.o'] if route=='native' else []
