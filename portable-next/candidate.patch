@@ -1,40 +1,63 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index cea06480..5327be20 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -779,6 +779,7 @@ if(CAPSTONE_WASM_SUPPORT)
+         arch/WASM/WASMInstPrinter.c
+         arch/WASM/WASMMapping.c
+         arch/WASM/WASMModule.c
++        arch/WASM/WASMTablePrinter.c
+     )
+     set(HEADERS_WASM
+         arch/WASM/WASMDisassembler.h
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index d7db69c3..181726ba 100644
+index d7db69c3..73771fed 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -39,6 +39,23 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
- }
- #endif
+@@ -101,7 +101,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
  
-+/* A custom formatter can inspect the format as well as the value. */
-+static void printTableAddress(SStream *out, uint64_t address)
-+{
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+	if (cs_vsnprintf == cs_default_vsnprintf && out->index < SSTREAM_BUF_LEN - 1) {
-+		SStream_concat_hex64(out, address, false);
-+		return;
-+	}
+ 	case WASM_OP_BRTABLE:
+ 		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
+-		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
++		WASM_printTableAddress(O, MI->wasm_data.brtable.address);
+ 		SStream_concat(O, "], 0x%x",
+ 			       MI->wasm_data.brtable.default_target);
+ 
+diff --git a/arch/WASM/WASMInstPrinter.h b/arch/WASM/WASMInstPrinter.h
+index b0c46ade..043b3a28 100644
+--- a/arch/WASM/WASMInstPrinter.h
++++ b/arch/WASM/WASMInstPrinter.h
+@@ -11,6 +11,7 @@
+ 
+ struct SStream;
+ 
++CAPSTONE_INTERNAL void WASM_printTableAddress(SStream *out, uint64_t address);
+ void WASM_printInst(MCInst *MI, struct SStream *O, void *Info);
+ void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
+ 
+diff --git a/arch/WASM/WASMTablePrinter.c b/arch/WASM/WASMTablePrinter.c
+new file mode 100644
+index 00000000..659c884b
+--- /dev/null
++++ b/arch/WASM/WASMTablePrinter.c
+@@ -0,0 +1,17 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "WASMInstPrinter.h"
++
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_wasm_table_text" rodata = ".cs_wasm_table_rodata"
 +#endif
++
++void WASM_printTableAddress(SStream *out, uint64_t address)
++{
++	/* Keep the registered formatter's existing format for 32-bit addresses. */
 +	if (address <= UINT32_MAX)
 +		SStream_concat(out, "0x%x", (unsigned)address);
 +	else
 +		SStream_concat(out, "0x%" PRIx64, address);
 +}
-+
- void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- {
- #ifdef WASM_LITERAL_NAMES
-@@ -101,7 +118,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- 
- 	case WASM_OP_BRTABLE:
- 		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
--		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
-+		printTableAddress(O, MI->wasm_data.brtable.address);
- 		SStream_concat(O, "], 0x%x",
- 			       MI->wasm_data.brtable.default_target);
- 
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
 index 5ae892b4..00821c17 100644
 --- a/tests/unit/wasm_brtable_size.c
