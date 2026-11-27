@@ -1,3 +1,57 @@
+diff --git a/arch/WASM/WASMDisassembler.c b/arch/WASM/WASMDisassembler.c
+index 063f9d9f..88844dec 100644
+--- a/arch/WASM/WASMDisassembler.c
++++ b/arch/WASM/WASMDisassembler.c
+@@ -553,7 +553,7 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
+ 			 uint16_t *param_size, MCInst *MI)
+ {
+ 	uint32_t length, default_target;
+-	int tmp_len = 0, i;
++	size_t tmp_len = 0;
+ 	size_t var_len;
+ 
+ 	// read length
+@@ -584,17 +584,22 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
+ 			MI->wasm_data.brtable.address;
+ 	}
+ 
+-	// read data
+-	for (i = 0; i < length; i++) {
+-		if (code_len < tmp_len) {
+-			return false;
+-		}
+-
++	/* The table stores depths as unsigned LEB128. Eight bytes with all
++	 * continuation bits clear are eight complete targets on either endian.
++	 * The initial length check guarantees room for every one-byte target. */
++	uint32_t remaining = length;
++	while (remaining >= sizeof(uint64_t)) {
++		uint64_t targets;
++		memcpy(&targets, code + tmp_len, sizeof(targets));
++		if (targets & UINT64_C(0x8080808080808080))
++			break;
++		tmp_len += sizeof(targets);
++		remaining -= sizeof(targets);
++	}
++	for (; remaining; --remaining) {
+ 		get_varuint32(code + tmp_len, code_len - tmp_len, &var_len);
+-		if (var_len == -1) {
++		if (var_len == (size_t)-1)
+ 			return false;
+-		}
+-
+ 		tmp_len += var_len;
+ 	}
+ 
+@@ -607,7 +612,7 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
+ 
+ 	MI->wasm_data.brtable.default_target = default_target;
+ 	MI->wasm_data.type = WASM_OP_BRTABLE;
+-	if ((uint64_t)(tmp_len + var_len) >= UINT16_MAX) {
++	if (tmp_len >= UINT16_MAX - var_len) {
+ 		return false;
+ 	}
+ 	*param_size = tmp_len + var_len;
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
 index d7db69c3..036dc538 100644
 --- a/arch/WASM/WASMInstPrinter.c
@@ -41,10 +95,10 @@ index d7db69c3..036dc538 100644
  	}
  }
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
-index 52130880..f1d5ac2f 100644
+index 52130880..615e71a5 100644
 --- a/tests/unit/wasm_brtable_size.c
 +++ b/tests/unit/wasm_brtable_size.c
-@@ -120,6 +120,24 @@ static int check_i64_constant(csh handle)
+@@ -120,6 +120,52 @@ static int check_i64_constant(csh handle)
  	return !ok;
  }
  
@@ -66,16 +120,44 @@ index 52130880..f1d5ac2f 100644
 +	return !ok;
 +}
 +
++static int check_mixed_targets(csh handle)
++{
++	/* Start in the middle of an eight-target group, and immediately
++	 * after one. A two-byte depth must move the default target by one. */
++	uint8_t code[2 + 16 + 2] = { 0x0e, 16 };
++	for (unsigned pos = 0; pos <= 16; ++pos) {
++		memset(code + 2, 0, sizeof(code) - 2);
++		code[2 + pos] = 0x81;
++		code[3 + pos] = 1;
++		if (pos < 16)
++			code[sizeof(code) - 1] = 7;
++		cs_insn *insn = NULL;
++		size_t count = cs_disasm(handle, code, sizeof(code), 0, 1, &insn);
++		bool valid = count == 1 && insn->id == WASM_INS_BR_TABLE &&
++			     insn->size == sizeof(code) &&
++			     insn->detail->wasm.operands[0].brtable.default_target ==
++				     (pos == 16 ? 129 : 7);
++		cs_free(insn, count);
++		if (!valid)
++			return 1;
++		count = cs_disasm(handle, code, sizeof(code) - 1, 0, 1, &insn);
++		cs_free(insn, count);
++		if (count)
++			return 1;
++	}
++	return 0;
++}
++
  int main(void)
  {
  	csh h;
-@@ -127,7 +145,8 @@ int main(void)
+@@ -127,7 +173,8 @@ int main(void)
  		return 1;
  
  	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
 -	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
 +	    run_count_case(h, 65531, 5) || check_i64_constant(h) ||
-+	    check_table_address(h)) {
++	    check_table_address(h) || check_mixed_targets(h)) {
  		cs_close(&h);
  		return 1;
  	}

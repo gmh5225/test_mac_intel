@@ -1,7 +1,7 @@
-name: Verify branch table text and detail on native Windows x86 and x64
+name: Check complete WebAssembly target groups on native Windows x86 and x64
 on:
   push:
-    branches: [codex/wasm-cold-table-windows]
+    branches: [codex/wasm-table-target-windows]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
+          ref: a5c08759df756b179578e97670e148fa7629e88c
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-cold-table-windows-${{ matrix.arch }}-${{ matrix.profile }}
+          name: wasm-table-target-windows-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
