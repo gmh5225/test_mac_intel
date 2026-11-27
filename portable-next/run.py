@@ -21,7 +21,7 @@ try:
     assert git('rev-parse','HEAD')==q['base']['commit']
     inputs=list(fixtures(r,w,m));assert len(inputs)==6
     for config in (['product','standalone','shared-mixed']if measured else ['product','standalone']):
-        project=w/config;project.mkdir();build=project/'build';multi=config!='standalone';expect='direct' if measured and platform.machine()=='x86_64' and config=='product' else 'base'
+        project=w/config;project.mkdir();build=project/'build';multi=config!='standalone';expect='active' if measured and platform.machine()=='x86_64' and config=='product' else 'base'
         normal=(r/'CMakeLists.txt').read_text()
         prefix=normal[:normal.index('add_subdirectory')]
         targets=normal[normal.index('foreach(linkage static shared)'):].replace('    add_executable','    if(NOT TARGET capstone_\u0024{linkage})\n        continue()\n    endif()\n    add_executable',1)
@@ -34,7 +34,7 @@ try:
         shutil.copyfile(r/'probe.cpp',project/'probe.cpp');ident={};cc={};flagsets={};record={};exported={}
         flags=['-G','Ninja','-S',project,'-B',build,'-DCAPSTONE_SOURCE='+str(src),'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON']
         if multi:flags+=['-DCAPSTONE_'+isa+'_SUPPORT=ON' for isa in ('ARM','AARCH64','MIPS','PPC','RISCV')]
-        for tag in (['base','direct','candidate'] if expect=='direct' else ['base','candidate']):
+        for tag in ('base','candidate'):
             git('restore','--source=HEAD','--staged','--worktree','--','.')
             if tag!='base':
                 buf=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/'+tag+'.patch']);assert sha(buf)==q[tag]['sha256']
@@ -53,8 +53,8 @@ try:
                 path=str((Path(z['directory'])/output).resolve())
                 if path in built:rows[built[path]]=z['command']
             assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
-            flags_per={key:'X86_ACCUMULATOR_OUTPUT32' in cmd for key,cmd in rows.items()}
-            assert all(v==(tag=='candidate' and expect=='direct' and Path(k).name in ('X86RegisterFallback32.c.o','X86MemoryFallback32.c.o')) for k,v in flags_per.items()),(config,tag,flags_per)
+            flags_per={key:'X86_VEX_SIB_TRANSFERS' in cmd for key,cmd in rows.items()}
+            assert all(v==(tag=='candidate' and expect=='active' and Path(k).name=='X86VexRegisterImmediate.c.o') for k,v in flags_per.items()),(config,tag,flags_per)
             cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
             dest=project/tag;dest.mkdir()
             for kind in names:shutil.copy2(build/('probe_'+kind),dest)
@@ -72,8 +72,12 @@ try:
                         rec[key]=list(map(int,get(dest/('probe_'+kind),'public-att' if syntax=='att' else 'capstone',str(mode),'1',file,spans,str(bits)).split()))[2:]
             record[tag]=rec
             save(config+'-identities',ident)
-        assert ident['candidate']==ident[expect],(config,expect,[(k,v,ident[expect]['objects'].get(k))for k,v in ident['candidate']['objects'].items()if v!=ident[expect]['objects'].get(k)],ident['candidate']['images'],ident[expect]['images'])
-        assert expect=='base' or ident['candidate']!=ident['base']
+        old,new=ident['base'],ident['candidate']
+        assert old['objects'].keys()==new['objects'].keys()
+        changed=sorted(Path(k).name for k,v in old['objects'].items() if new['objects'][k]!=v)
+        assert changed==(['X86VexRegisterImmediate.c.o'] if expect=='active' else []),(config,changed)
+        assert old['images'].keys()==new['images'].keys()
+        assert all((new['images'][k]!=v)==(expect=='active') for k,v in old['images'].items())
         assert all(rec==record['base']for rec in record.values())
         profiles[config]=dict(expected=expect,object_counts=cc,flags=flagsets,records=len(record['candidate']),identities=ident)
         checks[config]=record['base'];save('checks',checks);save('profiles',profiles)

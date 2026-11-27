@@ -1,7 +1,7 @@
-name: Check the i386 accumulator reader and compiler selection on native Linux, macOS and Windows
+name: Verify VEX memory formatting on native Linux, macOS and Windows
 on:
   push:
-    branches: [codex/portable-scoped-i386-accumulator]
+    branches: [codex/vex-sib-build-selection]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
         with:
           repository: NeverSight/capstone
           fetch-depth: 2
-          ref: a5c08759df756b179578e97670e148fa7629e88c
+          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: i386-accumulator-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: vex-sib-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
