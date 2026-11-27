@@ -86,7 +86,7 @@ try:
         if label=='candidate':
             run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator')
             generated={}
-            for args,name in [(('--vex-base-memory',),'X86GenVexBaseMemory.inc'),((),'X86GenVectorOutput.inc')]:
+            for args,name in [(('--vex-sib-transfers',),'X86GenVexSibTransfers.inc'),(('--vex-base-memory',),'X86GenVexBaseMemory.inc'),((),'X86GenVectorOutput.inc')]:
                 projection=sp.check_output([w/'vector-generator',*args])
                 assert projection==(base/'arch/X86'/name).read_bytes()
                 generated[name]=dict(bytes=len(projection),sha256=hashlib.sha256(projection).hexdigest())
@@ -117,6 +117,9 @@ try:
 
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'sib.cpp',lib,'-o',w/'sib-guard')
+        guard=list(map(int,get(w/'sib-guard').split()));assert guard[0]==4718592 and 0<guard[1]<guard[0]
+        save('sib-'+label,guard)
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
