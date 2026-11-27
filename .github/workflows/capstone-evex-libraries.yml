@@ -1,7 +1,7 @@
-name: Compare Capstone and iced on independently selected SQLite and liblzma releases
+name: Profile the formatter and detail costs on matched SQLite and liblzma instructions
 on:
   push:
-    branches: [codex/sqlite-liblzma-unseen-decoder-workloads]
+    branches: [codex/attribute-unseen-x86-decoder-work]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -49,6 +47,8 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: sqlite-and-liblzma-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: decoder-work-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

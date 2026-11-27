@@ -22,53 +22,52 @@ try:
  for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
  run('cargo','build','--locked','--release',cwd=ad)
  run('clang++','-O3','-DNDEBUG','-std=c++17','-I',src,'-I',src/'include','-c',r/'driver.cpp','-o',w/'driver.o')
- products={}
- for tag in stages:
-  run('git','-C',src,'restore','--source','HEAD','--worktree','--staged','--','.')
-  if tag!='shipping':
-   patch=r/(tag+'.patch');assert sha(patch)==q[tag]['patch'];run('git','-C',src,'apply','--index',patch)
-  assert get('git','-C',src,'write-tree')==q[tag]['tree']
-  run('cmake','--build',b,'--target','capstone_static','--parallel','4')
-  lib,=b.rglob('libcapstone.a');exe=w/tag
-  run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
-  products[tag]=dict(library=sha(lib),exe=sha(exe))
- arm=platform.machine()=='aarch64';assert (products['base']==products['candidate'])==arm
- save('products',products)
- os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
- image=FixedImage(w/'selected',{tag:(w/tag).read_bytes() for tag in stages},True)
- selections={};observed={};audit={}
+ from self_cost import read as read_cost
+ run('cmake','--build',b,'--target','capstone_static','--parallel','4')
+ lib,=b.rglob('libcapstone.a');exe=w/'profile'
+ run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
+ image=dict(capstone=sha(lib),executable=sha(exe),iced=sha(ad/'target/release/libiced_compare.a'))
+ save('image',image)
+ def measured_set(rows):
+  # Order by a digest of the interval, independent of opcode, output, or timings.
+  # Pick complete audited extents, including at least one if all exceed the target.
+  order=sorted(rows,key=lambda row:hashlib.sha256(table_bytes([row])).digest())
+  target=49152;selected=[];size=0
+  for row in order:
+   if size+row[1]<=target:selected.append(row);size+=row[1]
+  return sorted(selected or [min(order,key=lambda row:row[1])])
+ rows={};selection={}
  for name,spec in samples.items():
-  metadata,spans=materialize(name,spec,w);assert metadata==spec['verified']
-  text=w/(name+'.text');ranges=w/(name+'.ranges');bits=str(spec['bits']);image.select('shipping')
-  trace=[list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]
-  assert [row[:3]for row in trace]==[list(s)for s in spans] and all(v[5]<=v[1] for v in trace)
-  included=[row[:3]for row in trace if row[1]==row[5] and row[3]==row[4]];excluded=[row for row in trace if row[1]!=row[5] or row[3]!=row[4]]
-  assert included and len(included)+len(excluded)==len(spans)
-  for stage in ('base','candidate','group1'):
-   image.select(stage)
-   assert [list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]==trace
-  ranges.write_bytes(table_bytes(included));selections[name]=dict(source=metadata,included=len(included),included_bytes=sum(n for _,n,_ in included),excluded=excluded,ranges=sha(ranges));audit[name]=trace;save('selections',selections);save('boundary-audit',audit)
-  for route in ('private','capstone'):
-   for dialect,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
-    engine=['iced']+(['fast'] if dialect=='intel' and mode else [])
-    labels=[*stages,'copy','repeat',*engine]
-    def take(label,reps):
-     competitor=label in engine;image.select('shipping' if competitor else label);env=dict(os.environ)
-     if dialect=='att':env['CAPSTONE_BENCH_ATT']='1'
-     else:env.pop('CAPSTONE_BENCH_ATT',None)
-     vals=list(map(int,get('setarch',platform.machine(),'-R',w/'selected',label if competitor else route,str(mode),str(reps),text,ranges,bits,env=env).split()))
-     assert len(vals)==6 and min(vals[:2])>0;return vals
-    reps=max(1,math.ceil(25e6/take('base',1)[0]));checks={k:take(k,reps)[2:]for k in labels}
-    assert all(z[:3]==checks['shipping'][:3] for z in checks.values())
-    assert all(checks[k]==checks['shipping'] for k in labels if k not in engine)
-    key='/'.join((name,route,dialect,str(mode)));rng=random.Random(key);blocks=[]
-    for _ in range(17):
-     rng.shuffle(labels);values={k:[] for k in labels}
-     for label in labels+labels[::-1]:
-      sample=take(label,reps);assert sample[2:]==checks[label];values[label].append(sample[:2])
-     blocks.append({k:[sum(x[i] for x in v)for i in (0,1)] for k,v in values.items()})
-    observed[key]=dict(reps=reps,checks=checks,blocks=blocks);save('timings',observed)
- assert len(selections)==4 and len(observed)==40
- save('complete',dict(complete=True,source=q,samples=samples,images=image.receipt(),host=platform.machine(),cpu=get('lscpu'),compiler=get('clang','--version').splitlines()[0],panels=len(observed)))
+  meta,spans=materialize(name,spec,w);assert meta==spec['verified']
+  text=w/(name+'.text');ranges=w/(name+'.ranges');bits=str(spec['bits'])
+  audit=[list(map(int,line.split()))for line in get(exe,'audit','0','1',text,ranges,bits).splitlines()]
+  assert [x[:3]for x in audit]==[list(t)for t in spans]
+  common=[x[:3]for x in audit if x[1]==x[5] and x[3]==x[4]]
+  selected=measured_set(common);ranges.write_bytes(table_bytes(selected))
+  selection[name]=dict(input=meta,same=len(common),excluded=len(audit)-len(common),intervals=selected,bytes=sum(t[1]for t in selected),sha256=sha(ranges))
+  save('selection',selection)
+  rows[name]={};boundary=None
+  for engine in ('capstone','private','iced','fast'):
+   for mode in ((1,2,3) if engine=='fast' else (0,1,2,3)):
+    key=engine+'/'+str(mode);lab=name+'-'+engine+'-'+str(mode)
+    command=[exe,engine,str(mode),'1',text,ranges,bits]
+    expected=list(map(int,get(*command).split()))[2:]
+    if boundary is None:boundary=expected[:3]
+    assert expected[:3]==boundary and expected[0]>0
+    raw=w/(lab+'.cg');log=w/(lab+'.log')
+    values=list(map(int,get('valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--callgrind-out-file='+str(raw),'--log-file='+str(log),*command).split()))[2:]
+    assert values==expected
+    dump,=[f for f in w.glob(raw.name+'.*') if 'Client Request: measured decoder spans' in f.read_text(errors='replace')]
+    cost=read_cost(dump,e,lab);ev=cost['events']
+    assert ev['Ir']==cost['accounted']['Ir'] and ev['Ir']>expected[0]*5 and ev['Bc']>0
+    rows[name][key]=dict(codes=expected,ops=cost,rates={k:v/sum(expected[:2]) for k,v in ev.items()})
+    save('costs',rows)
+    import gzip
+    packed=e/(lab+'.cg.gz')
+    with dump.open('rb')as a,gzip.open(packed,'wb',compresslevel=6)as dest:shutil.copyfileobj(a,dest)
+    with gzip.open(packed,'rb')as a:assert hashlib.sha256(a.read()).hexdigest()==sha(dump)
+    for f in [raw,dump,log]:f.unlink(missing_ok=True)
+ assert len(rows)==4 and all(len(v)==15 for v in rows.values())
+ save('complete',dict(complete=True,source=q,host=platform.machine(),image=image,valgrind=get('valgrind','--version'),selection=selection))
 finally:
  size=sum(x.stat().st_size for x in w.rglob('*')if x.is_file() and not x.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))
