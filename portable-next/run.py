@@ -53,10 +53,9 @@ try:
                 path=str((Path(z['directory'])/output).resolve())
                 if path in built:rows[built[path]]=z['command']
             assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
-            flags_per={key:'X86_ACCUMULATOR_OUTPUT32' in cmd for key,cmd in rows.items()}
-            assert all(v==(tag=='candidate' and expect=='active' and Path(k).name in ('X86MemoryFallback32.c.o','X86RegisterFallback32.c.o')) for k,v in flags_per.items()),(config,tag,flags_per)
-            clear={Path(key).name for key,cmd in rows.items() if 'X86_VEX_CLEAR_OUTPUT32' in cmd}
-            assert clear==({'X86MemoryFallback32.c.o'} if tag=='candidate' and expect=='active' else set()),(config,tag,clear)
+            selected={'cs.c.o','X86DisassemblerDecoder.c.o','X86RegisterFallback32.c.o'}
+            flags_per={key:'X86_OPTIONAL_PUBLIC_RECORD' in cmd for key,cmd in rows.items()}
+            assert all(v==(tag=='candidate' and expect=='active' and Path(k).name in selected)for k,v in flags_per.items()),(tag,config,flags_per)
             cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
             dest=project/tag;dest.mkdir()
             for kind in names:shutil.copy2(build/('probe_'+kind),dest)
@@ -78,15 +77,21 @@ try:
         assert old['objects'].keys()==new['objects'].keys()
         changed=sorted(Path(k).name for k,v in old['objects'].items() if new['objects'][k]!=v)
         change_set=set(changed)
-        required={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'} if expect=='active' else set()
-        assert required<=change_set<=required|{'X86Sse64Output.c.o'},(config,expect,changed)
+        assert change_set==(selected if expect=='active' else set()),(expect,config,change_set)
         assert old['images'].keys()==new['images'].keys()
-        if not change_set:assert old['images']==new['images'],config
-        if expect=='active':
+        if not change_set:
+            assert old['images']==new['images'],config
+        else:
             assert old['images']['libcapstone.a']!=new['images']['libcapstone.a']
-            assert old['images']['probe_static']==new['images']['probe_static']
+            normalized={}
             for tag in ('base','candidate'):
-                assert 'X86_disasmIterText' not in get('nm',project/tag/'probe_static')
+                exe=project/tag/'probe_static'
+                assert 'X86_disasmIterText' not in get('nm',exe)
+                out=project/(tag+'.stripped')
+                run('objcopy','--strip-all','--remove-section=.note.gnu.build-id',exe,out)
+                normalized[tag]=sha(out.read_bytes())
+            save('ordinary-executable',normalized)
+            assert normalized['base']==normalized['candidate'],normalized
         assert all(rec==record['base']for rec in record.values())
         profiles[config]=dict(expected=expect,object_counts=cc,flags=flagsets,records=len(record['candidate']),identities=ident)
         checks[config]=record['base'];save('checks',checks);save('profiles',profiles)
