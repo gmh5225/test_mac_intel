@@ -1,7 +1,7 @@
-name: Measure masked operand output with unchanged addresses for neighboring code and tables
+name: Measure masked output after verifying which real callers pull in the private writer
 on:
   push:
-    branches: [codex/masked-suffix-address-control]
+    branches: [codex/masked-private-format-link-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: masked-operand-fixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: masked-writer-link-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -54,10 +54,19 @@ try:
         with path.open('rb') as inp:
             elf=ELFFile(inp);tab=elf.get_section_by_name('.symtab')
             syms=sorted([x.name,x['st_value'],x['st_size']] for x in tab.iter_symbols() if x['st_info']['type']=='STT_FUNC' and x['st_size'])
-            func,=[v for v in syms if v[0]=='writeMaskedByteMove']
+            entries=[v for v in syms if v[0]=='writeMaskedByteMove']
+            readers=[v for v in syms if v[0]=='X86_decodeOutputMiss64']
+            section=elf.get_section_by_name('.cs_bench_masked')
+            save('mask-links-'+path.name,dict(readers=readers,writers=entries,section_flags=section['sh_flags'],section_size=section['sh_size']))
+            if path.name.startswith('foreign-'):
+                assert not entries and not readers and not any(section.data()),(path.name,entries,readers)
+                func=['',section['sh_addr'],0]
+            else:
+                assert len(entries)==len(readers)==1,(path.name,entries,readers)
+                func=entries[0]
             peer=[v for v in syms if v!=func]
             sections={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-            assert func[1]==sections['.cs_bench_masked'][0] and 0<func[2]<16384 and sections['.cs_bench_masked'][1]==16384
+            assert func[1]==sections['.cs_bench_masked'][0] and 0<=func[2]<16384 and sections['.cs_bench_masked'][1]==16384
             return dict(masked=func,peer_count=len(peer),peers_sha256=hashlib.sha256(json.dumps(peer).encode()).hexdigest(),sections=sections)
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
