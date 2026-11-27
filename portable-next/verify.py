@@ -40,6 +40,8 @@ try:
             assert hashlib.sha256(patch.read_bytes()).hexdigest()==tree['sha256']
             git('apply','--index',patch)
             assert git('write-tree')==tree['tree']
+        if tree and 'x86_vex_ifma' not in units:
+            units.append('x86_vex_ifma')
         run(name+'-typed-register-mappings',os.sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check')
         run(name+'-register-projection',os.sys.executable,'-B',s/'suite/synctools/x86_register_name_sizes.py','--check')
         run(name+'-printer-projection',os.sys.executable,'-B',s/'suite/synctools/x86_printer_dispatch.py','--check')
@@ -48,11 +50,11 @@ try:
         run(name+'-units','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
         log=(e/(name+'-units.log')).read_text(errors='replace')
         assert '100% tests passed' in log and all('unit_'+n in log for n in units)
-        rows[name]=dict(units=units,skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
+        rows[name]=dict(units=list(units),skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
-            if profile not in ('diet','reduced') and name in ('base','search','uniform'):
+            if profile not in ('diet','reduced') and name in ('base','fallback','lookup'):
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
                 assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]

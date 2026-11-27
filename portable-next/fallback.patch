@@ -1,0 +1,394 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..1c7b5925 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2302,8 +2302,10 @@ X86_DECODE_INLINE int fixupRMOperand(struct InternalInstruction *insn,
+ 			return -1;
+ 	}
+ 
+-	// Apply the AVX512 compressed displacement scaling factor.
+-	if (insn->eaDisplacement == EA_DISP_8)
++	/* VEX and EVEX IFMA share an operand descriptor. Only the EVEX
++	 * encoding scales its encoded disp8 by the tuple size. */
++	if (insn->eaDisplacement == EA_DISP_8 &&
++	    insn->vectorExtensionType == TYPE_EVEX)
+ 		insn->displacement *= 1 << (encoding - ENCODING_RM);
+ 	return 0;
+ }
+diff --git a/arch/X86/X86GenDisassemblerTables2.inc b/arch/X86/X86GenDisassemblerTables2.inc
+index 626482ea..e7482278 100644
+--- a/arch/X86/X86GenDisassemblerTables2.inc
++++ b/arch/X86/X86GenDisassemblerTables2.inc
+@@ -59835,8 +59835,8 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
++    { MODRM_SPLITRM, 12063 },
++    { MODRM_SPLITRM, 12065 },
+     { MODRM_SPLITRM, 11351 },
+     { MODRM_SPLITRM, 11353 },
+     { MODRM_SPLITRM, 11355 },
+@@ -60351,8 +60351,8 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
++    { MODRM_SPLITRM, 12501 },
++    { MODRM_SPLITRM, 12503 },
+     { MODRM_SPLITRM, 11599 },
+     { MODRM_SPLITRM, 11601 },
+     { MODRM_SPLITRM, 11603 },
+diff --git a/arch/X86/X86GenDisassemblerTablesPacked.inc b/arch/X86/X86GenDisassemblerTablesPacked.inc
+index b6dbca38..014dd43b 100644
+--- a/arch/X86/X86GenDisassemblerTablesPacked.inc
++++ b/arch/X86/X86GenDisassemblerTablesPacked.inc
+@@ -7329,7 +7329,7 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { 0x49ba9374u }, { 0x49d313a4u }, { 0x4ace959cu }, { 0x4ae715ccu }, { 0x4be297c4u }, { 0x4bfb17f4u }, { 0x4c889910u }, { 0x4ca11940u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4a829504u }, { 0x4b86970cu },
+     { 0x49ec93d8u }, { 0x4a051408u }, { 0x4b009600u }, { 0x4b191630u }, { 0x4c149828u }, { 0x4c2d1858u }, { 0x4cba9974u }, { 0x4cd319a4u },
+-    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4aa49548u }, { 0x4ba89750u },
++    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x54b52964u }, { 0x54a7a949u }, { 0x4aa49548u }, { 0x4ba89750u },
+     { 0x4a1e943cu }, { 0x4a37146cu }, { 0x4b329664u }, { 0x4b4b1694u }, { 0x4c46988cu }, { 0x4c5f18bcu }, { 0x4cec99d8u }, { 0x4d051a08u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
+@@ -7397,7 +7397,7 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { 0x49aa9354u }, { 0x49d313a4u }, { 0x4abe957cu }, { 0x4ae715ccu }, { 0x4bd297a4u }, { 0x4bfb17f4u }, { 0x4c7898f0u }, { 0x4ca11940u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4a7294e4u }, { 0x4b7696ecu },
+     { 0x49dc93b8u }, { 0x4a051408u }, { 0x4af095e0u }, { 0x4b191630u }, { 0x4c049808u }, { 0x4c2d1858u }, { 0x4caa9954u }, { 0x4cd319a4u },
+-    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4a949528u }, { 0x4b989730u },
++    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x54b9a96du }, { 0x54ac2952u }, { 0x4a949528u }, { 0x4b989730u },
+     { 0x4a0e941cu }, { 0x4a37146cu }, { 0x4b229644u }, { 0x4b4b1694u }, { 0x4c36986cu }, { 0x4c5f18bcu }, { 0x4cdc99b8u }, { 0x4d051a08u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 7d3a6e84..09b6a790 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -310,6 +310,8 @@ static const struct VectorOutputRow vex_register_rows[] = {
+ 	{ X86_INS_VFNMSUB213PD, "vfnmsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFNMSUB213SS, "vfnmsub213ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFNMSUB213SD, "vfnmsub213sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADD52LUQ, "vpmadd52luq", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADD52HUQ, "vpmadd52huq", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFMADDSUB231PS, "vfmaddsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFMADDSUB231PD, "vfmaddsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFMSUBADD231PS, "vfmsubadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+@@ -485,36 +487,38 @@ static const uint16_t vex_register_widths[][4] = {
+ 	{ 212, 0, 213, 0 },
+ 	{ 214, 214, 215, 215 },
+ 	{ 216, 0, 217, 0 },
+-	{ 218, 218, 219, 219 },
++	{ 0, 0, 218, 218 },
++	{ 0, 0, 219, 219 },
+ 	{ 220, 220, 221, 221 },
+ 	{ 222, 222, 223, 223 },
+-	{ 224, 0, 225, 0 },
+-	{ 226, 226, 227, 227 },
+-	{ 228, 0, 229, 0 },
+-	{ 230, 230, 231, 231 },
+-	{ 232, 0, 233, 0 },
+-	{ 234, 234, 235, 235 },
+-	{ 236, 0, 237, 0 },
+-	{ 238, 238, 0, 0 },
+-	{ 239, 240, 239, 240 },
++	{ 224, 224, 225, 225 },
++	{ 226, 0, 227, 0 },
++	{ 228, 228, 229, 229 },
++	{ 230, 0, 231, 0 },
++	{ 232, 232, 233, 233 },
++	{ 234, 0, 235, 0 },
++	{ 236, 236, 237, 237 },
++	{ 238, 0, 239, 0 },
++	{ 240, 240, 0, 0 },
+ 	{ 241, 242, 241, 242 },
+ 	{ 243, 244, 243, 244 },
+ 	{ 245, 246, 245, 246 },
+-	{ 247, 247, 0, 0 },
+-	{ 0, 248, 0, 0 },
+-	{ 249, 0, 249, 0 },
+-	{ 250, 0, 250, 0 },
+-	{ 251, 251, 251, 251 },
+-	{ 252, 252, 252, 252 },
+-	{ 253, 254, 253, 254 },
+-	{ 255, 255, 255, 255 },
+-	{ 256, 0, 256, 0 },
++	{ 247, 248, 247, 248 },
++	{ 249, 249, 0, 0 },
++	{ 0, 250, 0, 0 },
++	{ 251, 0, 251, 0 },
++	{ 252, 0, 252, 0 },
++	{ 253, 253, 253, 253 },
++	{ 254, 254, 254, 254 },
++	{ 255, 256, 255, 256 },
+ 	{ 257, 257, 257, 257 },
+ 	{ 258, 0, 258, 0 },
+-	{ 259, 260, 259, 260 },
++	{ 259, 259, 259, 259 },
++	{ 260, 0, 260, 0 },
+ 	{ 261, 262, 261, 262 },
+-	{ 0, 263, 0, 0 },
+-	{ 0, 0, 264, 264 },
++	{ 263, 264, 263, 264 },
++	{ 0, 265, 0, 0 },
++	{ 0, 0, 266, 266 },
+ };
+ static const uint8_t vex_register_plans[3][256] = {
+ 	{
+@@ -547,18 +551,18 @@ static const uint8_t vex_register_plans[3][256] = {
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
+ 		0, 0, 0, 0, 0, 0, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125,
+-		0, 0, 0, 0, 0, 0, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135,
+-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 136,
+-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 137, 138, 139, 140,
++		0, 0, 0, 0, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 138,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 139, 140, 141, 142,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	},
+ 	{
+-		0, 0, 141, 0, 0, 0, 142, 0, 0, 0, 143, 144, 145, 146, 147, 148,
++		0, 0, 143, 0, 0, 0, 144, 0, 0, 0, 145, 146, 147, 148, 149, 150,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-		0, 149, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 151, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-		150, 151, 152, 0, 153, 0, 154, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		152, 153, 154, 0, 155, 0, 156, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -566,7 +570,7 @@ static const uint8_t vex_register_plans[3][256] = {
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 155, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 157, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/arch/X86/X86GenVexBaseMemory.inc b/arch/X86/X86GenVexBaseMemory.inc
+index eedf177c..272bea7a 100644
+--- a/arch/X86/X86GenVexBaseMemory.inc
++++ b/arch/X86/X86GenVexBaseMemory.inc
+@@ -201,6 +201,8 @@ static const struct VectorOutputRow vex_base_rows[] = {
+ 	{ X86_INS_VFNMADD213PD, "vfnmadd213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFNMSUB213PS, "vfnmsub213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFNMSUB213PD, "vfnmsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADD52LUQ, "vpmadd52luq", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADD52HUQ, "vpmadd52huq", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFMADDSUB231PS, "vfmaddsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFMADDSUB231PD, "vfmaddsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VFMSUBADD231PS, "vfmsubadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+@@ -341,17 +343,19 @@ static const uint8_t vex_base_widths[][4] = {
+ 	{ 195, 195, 196, 196 },
+ 	{ 197, 197, 198, 198 },
+ 	{ 199, 199, 200, 200 },
+-	{ 201, 201, 202, 202 },
++	{ 0, 0, 201, 201 },
++	{ 0, 0, 202, 202 },
+ 	{ 203, 203, 204, 204 },
+ 	{ 205, 205, 206, 206 },
+ 	{ 207, 207, 208, 208 },
+ 	{ 209, 209, 210, 210 },
+ 	{ 211, 211, 212, 212 },
+-	{ 213, 213, 0, 0 },
+-	{ 214, 215, 214, 215 },
++	{ 213, 213, 214, 214 },
++	{ 215, 215, 0, 0 },
+ 	{ 216, 217, 216, 217 },
+ 	{ 218, 219, 218, 219 },
+ 	{ 220, 221, 220, 221 },
++	{ 222, 223, 222, 223 },
+ };
+ static const uint8_t vex_base_plans[3][256] = {
+ 	{
+@@ -384,9 +388,9 @@ static const uint8_t vex_base_plans[3][256] = {
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 105, 106, 107, 0, 108, 0, 109, 0, 110, 0,
+ 		0, 0, 0, 0, 0, 0, 111, 112, 113, 0, 114, 0, 115, 0, 116, 0,
+-		0, 0, 0, 0, 0, 0, 117, 118, 119, 0, 120, 0, 121, 0, 122, 0,
+-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 123,
+-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 124, 125, 126, 127,
++		0, 0, 0, 0, 117, 118, 119, 120, 121, 0, 122, 0, 123, 0, 124, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 125,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 126, 127, 128, 129,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	},
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 05b8ea9c..f11b90ab 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -446,6 +446,12 @@ address-size overrides and 16-bit addressing. The handler rejects LOCK,
+ register-only operands, conflicting mandatory prefixes and reserved VEX
+ fields before returning a decoded instruction.
+ 
++The full x86 decoder recognizes the 128- and 256-bit VEX forms of
++VPMADD52LUQ and VPMADD52HUQ (AVX-IFMA). They reuse the unmasked operation's
++printer and access metadata. The original opcode tables select these operations for
++VEX.W1 and both vector lengths. Only EVEX applies tuple scaling to a signed
++disp8.
++
+ The prefix reader shares the selector's byte classification. A first ordinary
+ opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
+ vector escapes reuse the existing payload parser. Other prefix sequences keep
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 1d2a80c3..a761614c 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -91,6 +91,7 @@ endif()
+ if(CAPSTONE_X86_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c x86_call_target.c x86_immediate_size.c)
+     list(APPEND UNIT_TEST_SOURCES x86_mapping_counts.c)
++    list(APPEND UNIT_TEST_SOURCES x86_vex_ifma.c)
+     if(NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE)
+         list(APPEND UNIT_TEST_SOURCES x86_simple_output.c)
+         list(APPEND UNIT_TEST_SOURCES x86_valign_access.c)
+diff --git a/tests/unit/x86_vex_ifma.c b/tests/unit/x86_vex_ifma.c
+new file mode 100644
+index 00000000..d646f463
+--- /dev/null
++++ b/tests/unit/x86_vex_ifma.c
+@@ -0,0 +1,137 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <string.h>
++
++static bool check_form(csh handle, cs_mode mode, bool att, bool high, bool wide,
++		       bool memory, bool scan)
++{
++	/* The memory form has an ordinary negative disp8, even for YMM. */
++	uint8_t bytes[] = { 0xc4, 0xe2, 0xf1, 0xb4, 0xd8, 0xfd };
++	const size_t length = memory ? sizeof(bytes) : sizeof(bytes) - 1;
++	const x86_reg first = wide ? X86_REG_YMM0 : X86_REG_XMM0;
++	const x86_insn id = high ? X86_INS_VPMADD52HUQ : X86_INS_VPMADD52LUQ;
++	const uint8_t *cursor = bytes;
++	size_t left = length;
++	uint64_t address = 0x1000;
++	cs_insn *insn = cs_malloc(handle);
++	if (!insn)
++		return false;
++	if (wide)
++		bytes[2] |= 4;
++	if (high)
++		++bytes[3];
++	if (memory)
++		bytes[4] = 0x5e; // [rsi/esi/bp - 3]
++	bool decoded = cs_disasm_iter(handle, &cursor, &left, &address, insn);
++	bool ok = decoded && insn->id == id && insn->size == length &&
++		  left == 0 && address == 0x1000 + length;
++	if (cs_support(CS_SUPPORT_X86_REDUCE)) {
++		ok = !decoded;
++	} else if (ok && !scan && !cs_support(CS_SUPPORT_DIET)) {
++		const cs_x86 *x = &insn->detail->x86;
++		const cs_x86_op *dst = &x->operands[att ? 2 : 0];
++		const cs_x86_op *src = &x->operands[1];
++		const cs_x86_op *rm = &x->operands[att ? 0 : 2];
++		const unsigned width = wide ? 32 : 16;
++		ok = !strcmp(insn->mnemonic,
++			     high ? "vpmadd52huq" : "vpmadd52luq") &&
++		     x->op_count == 3 && dst->type == X86_OP_REG &&
++		     dst->reg == first + 3 && dst->access == CS_AC_READ_WRITE &&
++		     src->type == X86_OP_REG && src->reg == first + 1 &&
++		     src->access == CS_AC_READ && rm->access == CS_AC_READ &&
++		     dst->size == width && src->size == width &&
++		     rm->size == width && x->encoding.modrm_offset == 4 &&
++		     x->eflags == 0;
++		if (memory) {
++			x86_reg base = mode == CS_MODE_64 ? X86_REG_RSI :
++				       mode == CS_MODE_32 ? X86_REG_ESI :
++							    X86_REG_BP;
++			ok = ok && rm->type == X86_OP_MEM &&
++			     rm->mem.base == base && rm->mem.disp == -3 &&
++			     x->disp == -3 && x->encoding.disp_offset == 5 &&
++			     x->encoding.disp_size == 1;
++		} else {
++			ok = ok && rm->type == X86_OP_REG && rm->reg == first &&
++			     x->encoding.disp_size == 0;
++		}
++		cs_regs read, written;
++		uint8_t nr, nw;
++		ok = ok &&
++		     cs_regs_access(handle, insn, read, &nr, written, &nw) ==
++			     CS_ERR_OK &&
++		     nr == 3 && nw == 1 && written[0] == dst->reg;
++	}
++	if (!ok)
++		fprintf(stderr,
++			"mode=%u att=%d high=%d wide=%d mem=%d scan=%d\n",
++			(unsigned)mode, att, high, wide, memory, scan);
++	cs_free(insn, 1);
++	return ok;
++}
++
++static bool check_invalid(csh handle)
++{
++	static const struct {
++		uint8_t bytes[6], length;
++	} invalid[] = {
++		{ { 0xc4, 0xe2, 0x75, 0xb4, 0x1e }, 5 }, // W=0
++		{ { 0xc4, 0xe2, 0xf6, 0xb5, 0xd8 }, 5 }, // pp=F3
++		{ { 0x66, 0xc4, 0xe2, 0xf5, 0xb4, 0x1e }, 6 },
++		{ { 0xc4, 0xe2, 0xf5, 0xb4 }, 4 }, // missing ModR/M
++		{ { 0xc4, 0xe2, 0xf1, 0xb4, 0x5e }, 5 }, // missing disp8
++	};
++	for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
++		cs_insn *insn;
++		size_t count = cs_disasm(handle, invalid[i].bytes,
++					 invalid[i].length, 0x1000, 1, &insn);
++		if (count) {
++			cs_free(insn, count);
++			fprintf(stderr,
++				"unexpectedly decoded invalid IFMA case %zu\n",
++				i);
++			return false;
++		}
++	}
++	return true;
++}
++
++int main(void)
++{
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
++	for (size_t m = 0; m < 3; ++m) {
++		csh handle;
++		if (cs_open(CS_ARCH_X86, modes[m], &handle) != CS_ERR_OK)
++			return 1;
++		for (unsigned pass = 0; pass < 3; ++pass) {
++			const bool scan = pass == 2, att = pass == 1;
++			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
++					       att ? CS_OPT_SYNTAX_ATT :
++						     CS_OPT_SYNTAX_INTEL);
++			if (att && cs_support(CS_SUPPORT_DIET)) {
++				if (err != CS_ERR_DIET)
++					return 1;
++				continue;
++			}
++			if (att && err == CS_ERR_X86_ATT)
++				continue;
++			if (err ||
++			    cs_option(handle, CS_OPT_DETAIL,
++				      scan ? CS_OPT_OFF : CS_OPT_ON) ||
++			    cs_option(handle, CS_OPT_TEXT,
++				      scan ? CS_OPT_OFF : CS_OPT_ON))
++				return 1;
++			if (!check_invalid(handle))
++				return 1;
++			for (unsigned form = 0; form < 8; ++form) {
++				if (!check_form(handle, modes[m], att, form & 1,
++						form & 2, form & 4, scan))
++					return 1;
++			}
++		}
++		cs_close(&handle);
++	}
++	return 0;
++}
