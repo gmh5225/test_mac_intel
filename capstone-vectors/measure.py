@@ -51,7 +51,12 @@ try:
         run('clang++','-O2','-std=c++17','-I',base/'include',r/('trial-'+stem+'.cpp'),'-ldl','-o',w/('trial-'+stem))
     from training import fetch
     from foreign_time import measure as time_foreign
-    foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
+    samples=rd(r/'ppc-samples.json')['fixtures'];training=rd(r/'training.json');origin,=(z for z in training if z['arch']=='ppc64el')
+    extra=[dict(origin,name=n,command=n.split('-',1)[1],text_sha256=v['sha256'])for n,v in samples.items()if n!=origin['name']]
+    docs=w/'corpus-config';docs.mkdir();(docs/'training.json').write_text(json.dumps(training+extra));all_rows=fetch(docs,w)
+    foreign_rows=all_rows[:len(training)];save('foreign-corpus',all_rows)
+    for row in all_rows:
+        if row['arch']=='ppc64el':assert samples[row['name']]['sha256']==row['text_sha256'] and samples[row['name']]['package']==row['package_sha256']
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     marker=w/'native-reference.c'
     marker.write_text('#include "arch/X86/X86ScanAdapter.h"\n__attribute__((used)) static __typeof__(&X86_disasmIterText) const native_reader = X86_disasmIterText;\n')
@@ -69,6 +74,11 @@ try:
         run(sys.executable,'-B',base/'suite/synctools/x86_printer_dispatch.py','--check')
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'clear.cpp',lib,'-o',w/'check-clear')
+        run(sys.executable,'-B',base/'suite/synctools/alias_mnemonic_trie.py','--check')
+        if os.uname().machine=='x86_64':
+            run('clang','-std=c11','-O2','-DCAPSTONE_HAS_POWERPC','-DCAPSTONE_HAS_AARCH64','-I',base,'-I',base/'include',r/'parser.c',lib,'-o',w/'parser')
+            exact=int(get(w/'parser'));assert exact==275204
+            save('alias-parser-'+label,exact)
         if label!='base' and os.uname().machine=='x86_64':
             run(sys.executable,'-B',base/'suite/synctools/x86_operand_specializations.py','--check')
         check=list(map(int,get(w/'check-clear').split()))
@@ -86,7 +96,7 @@ try:
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-only-'+label))
         run('clang++',w/'foreign.o',w/'native-reference.o',lib,'-no-pie','-o',w/('foreign-'+label))
         run('clang++',w/'public-only.o',lib,ice_lib,*flags,'-o',w/('ordinary-'+label))
-        names=('X86_disasmIterText','cs_decode_full_insn','X86_disasmIterOtherMode','cs_disasm_iter')
+        names=('X86_disasmIterText','cs_decode_full_insn','PPC_setAliasId','cs_disasm_iter')
         modes={}
         for route,exe in [('native',w/label),('public_only',w/('ordinary-'+label)),('foreign',w/('foreign-'+label)),('foreign_only',w/('foreign-only-'+label))]:
             with exe.open('rb') as fh:
@@ -97,11 +107,11 @@ try:
                 allocated={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()] for v in elf.iter_sections() if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
             resolved='X86_disasmIterText' in symbols;assert resolved==(route in ('native','foreign')),(label,route,symbols)
             active=os.uname().machine=='x86_64' and label!='base'
-            assert ('X86_disasmIterOtherMode' in symbols)==(active and resolved)
+            assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
         if os.uname().machine=='x86_64' and label!='base':
-            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_disasmIter32','X86_disasmIterOtherMode')}
+            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('PPC_printer','PPC_setAliasId')}
             save('record-assembly-'+label,assembly)
 
         from symbol_layout import symbols
@@ -154,6 +164,11 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+    for k in ('ppc-states','real-ppc'):run('clang++','-std=c++17','-O2','-I',base/'include',r/(k+'.cpp'),'-ldl','-o',w/k)
+    guardians=get(w/'ppc-states',w/'base.so',w/'candidate.so','2048').strip()
+    assert '733952' in guardians,guardians
+    exact={name:[get(w/'real-ppc',w/'base.so',w/'candidate.so',w/(name+'.text'),str(mode)).splitlines() for mode in range(4)]for name in samples}
+    save('ppc-exact',dict(guard=guardians,records=exact))
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'vex3-domain.cpp','-ldl','-o',w/'vex3-domain')
     general={}
     for tag in ('candidate','outlined'):
@@ -301,6 +316,9 @@ try:
     def ordinary_args(row,mode,n):
         return ['capstone',str(mode),str(n),row['image'],row['extents'],str(row['bits'])]
     time_foreign(programs,w,save,'ordinary',ordinary_args,18)
+    for style,source in [('ppc-linked','foreign'),('ppc-only','foreign-only')]:
+        for tag in ('base','candidate','outlined'):os.link(w/(source+'-'+tag),w/(style+'-'+tag))
+        time_foreign(all_rows[len(training):],w,save,style,expected_cases=9)
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:

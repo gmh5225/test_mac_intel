@@ -1,7 +1,7 @@
-name: Measure native 16-bit formatting in isolation from all public and foreign decoders
+name: Compare short PowerPC alias dispatch against shipping on four real coreutils and mixed x86 clients
 on:
   push:
-    branches: [codex/fixed-x86-16bit-native-records]
+    branches: [codex/ppc-short-alias-keys]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: private-firmware-patterns-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ppc-direct-short-keys-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
