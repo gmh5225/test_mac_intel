@@ -13,7 +13,7 @@ try:
     for group,arches in [('six',['X86','ARM','AARCH64','PPC','MIPS','RISCV']),('seven',['X86','ARM','AARCH64','PPC','MIPS','RISCV','WASM']),('make-wasm',['WASM']),('wasm',['WASM']),('wasm-diet',['WASM'])]:
         b=w/group;rows={};is_make=group.startswith('make')
         dedicated=(arches==['WASM'])
-        active=dedicated and platform.system()=='Linux' and platform.machine()=='x86_64'
+        active=dedicated and platform.system()=='Linux' and platform.machine()=='x86_64' and 'clang' in get(cc,'--version').lower()
         for stage in ('base','candidate'):
             run('git','-C',s,'restore','--source=HEAD','--staged','--worktree','--','.')
             if stage=='candidate':
