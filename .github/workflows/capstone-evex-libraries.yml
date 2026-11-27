@@ -1,7 +1,7 @@
-name: Measure an independent AMD64 transfer writer and inspect the original i386 machine code
+name: Measure VEX memory records after AMD64 fixed output misses
 on:
   push:
-    branches: [codex/vex-transfer-object]
+    branches: [codex/terminal-vector-memory-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-transfer-unit-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: terminal-vex-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

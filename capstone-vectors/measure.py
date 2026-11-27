@@ -88,12 +88,15 @@ try:
                 sections={sec.name:[sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()]
                     for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
                 save(stem+'-object-'+label,sections)
-        if label=='outlined' and os.uname().machine=='x86_64':
+        if os.uname().machine=='x86_64':
             obj,=build.rglob('X86VectorFallback64.c.o')
-            reloc=get('readelf','-rW',obj)
-            assert 'X86_writeVexTransfer ' in reloc and 'X86_writeVexRegisterImmediate ' not in reloc
-            save('new-call-relocation',dict(source=maps['outlined'],target='X86_writeVexTransfer',relocations=reloc.splitlines()))
-        if label=='candidate':
+            reloc=get('readelf','-rW',obj).splitlines()
+            assert any('X86_writeVexRegisterImmediate ' in line for line in reloc)
+            target='cs_decode_full_insn' if label=='base' else 'X86_decodeVexMemoryFallback64'
+            assert any(target+' ' in line for line in reloc)
+            dis=get('objdump','-dr','--disassemble=X86_decodeOutputMiss64',obj)
+            save('terminal-relocation-'+label,dict(target=target,object=sha(obj),caller=dis.splitlines(),relocations=reloc))
+        if label=='outlined':
             run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator')
             generated={}
             for args,name in [(('--vex-sib-transfers',),'X86GenVexSibTransfers.inc'),(('--vex-base-memory',),'X86GenVexBaseMemory.inc'),((),'X86GenVectorOutput.inc')]:
