@@ -9,7 +9,7 @@ def run(*args):sp.run(args,check=True)
 def get(*args):return sp.check_output(args,text=True).strip()
 kind=os.environ['PROBE_CONFIG'];q=read(r/'source.json');meta=read(r/'experiment.json')
 if platform.system()=='Linux':os.environ.update(CC='clang',CXX='clang++')
-w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';sources={};ident={};records={};timings={}
+w=Path(tempfile.mkdtemp()).resolve();project=w/'project';build=w/'build';sources={};ident={};records={};timings={}
 try:
     assert kind in ('standalone','product','mixed') and platform.machine()=='x86_64'
     assert get('git','-C',source,'rev-parse','HEAD')==q['base']['commit']
@@ -42,7 +42,7 @@ try:
         shutil.copytree(w/old,w/name);ident[name]={f.name:sha(f.read_bytes())for f in (w/name).iterdir()};assert ident[name]==ident[old]
     for name in targets:
         for stage in ident:
-            actual=Path(get(w/stage/name,'--library')).resolve();assert actual.parent==w/stage and (actual==w/stage/name)==(name!='probe_shared')
+            actual=Path(get(w/stage/name,'--library')).resolve();assert actual.parent==w/stage and (actual==w/stage/name)==(name!='probe_shared'),(name,actual,w/stage)
     save('images',ident)
     if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     for prog,bits,code,ext in fixtures(r,w,meta):
