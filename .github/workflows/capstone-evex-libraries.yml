@@ -1,7 +1,7 @@
-name: Compare indexed Intel memory formatting with real SIMD and PE consumers
+name: Verify recovered OpenSSL functions and compare AVX-IFMA decoder placement on real programs
 on:
   push:
-    branches: [codex/bounded-index-expression]
+    branches: [codex/vex-ifma-real-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1a02e3439e7162e79a9c1b8b8b56c5df7cfd770d
+          ref: 87e0b7d2303971e350f4ee3cb6923113154ef5cc
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bounded-index-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-ifma-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
