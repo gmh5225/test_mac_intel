@@ -97,7 +97,7 @@ try:
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    first={'X86VectorFallback64.c.o'}
+    first={'X86VexRegisterImmediate.c.o'}
     second={'X86VexRegisterImmediate.c.o'}
     for before,after,expected in [('shipping','base',set() if arm else first),
         ('shipping','mask',set() if arm else second),('base','mask',set() if arm else first|second)]:

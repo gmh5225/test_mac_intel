@@ -27,7 +27,7 @@ index 00000000..3710fb38
 +	{ X86_INS_VMOVSD, "vmovsd", "qword ptr [", 11, 16, 8, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +};
 diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
-index 3fe8460f..3c6fb88c 100644
+index 3fe8460f..4d1cc7d1 100644
 --- a/arch/X86/X86VexRegisterImmediate.c
 +++ b/arch/X86/X86VexRegisterImmediate.c
 @@ -24,6 +24,10 @@ struct VexRegisterImmediateRow {
@@ -41,18 +41,29 @@ index 3fe8460f..3c6fb88c 100644
  /* Both iterators have identified C4 in their fixed address mode. */
  bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
  				   size_t size, cs_insn *insn,
-@@ -31,6 +35,11 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+@@ -31,8 +35,22 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
  				   const struct X86SimpleRegister regs[4][16],
  				   bool wide)
  {
 +#ifdef X86_VEX_SIB_TRANSFERS
-+	if (wide && size >= 6 && code[4] < 0xc0)
-+		return writeVexSibTransfer(handle, code, size, insn, insn_size,
-+					   regs[3]);
-+#endif
++	if (size < 6)
++		return false;
++	const unsigned map = code[1] & 31;
++	if (map != 3) {
++		if (wide && map == 1)
++			return writeVexSibTransfer(handle, code, size, insn,
++						   insn_size, regs[3]);
++		return false;
++	}
++	if (code[4] < 0xc0)
++		return false;
++#else
  	if (size < 6 || (code[1] & 31) != 3 || code[4] < 0xc0)
  		return false;
++#endif
  	const unsigned flags = code[2];
+ 	const unsigned src = (~flags >> 3) & 15;
+ 	if (!wide && (code[1] != 0xe3 || src >= 8))
 diff --git a/arch/X86/X86VexSibTransfer.h b/arch/X86/X86VexSibTransfer.h
 new file mode 100644
 index 00000000..8b0d4c21
