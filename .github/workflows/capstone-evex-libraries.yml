@@ -1,7 +1,7 @@
-name: Compare a VEX map decision and a separate AMD64 entry against the published decoder
+name: Measure public-only and already-linked x86 readers against fork iced and five other architectures
 on:
   push:
-    branches: [codex/vex-amd64-entry-cost]
+    branches: [codex/optional-linked-intel-reader]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-entry-shapes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: linked-public-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

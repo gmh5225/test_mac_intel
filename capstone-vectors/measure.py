@@ -74,6 +74,20 @@ try:
         save('gpr-records-'+label,rows)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        # Preserve the distinction between an executable that requests the fixed reader and one using only cs_disasm_iter.
+        reader='X86_disasmIterText'
+        resolved={}
+        for n,exe in [('native',w/label),('public_only',w/('foreign-'+label))]:
+            with exe.open('rb') as fh:
+                tab=ELFFile(fh).get_section_by_name('.symtab')
+                resolved[n]=any(sym['st_shndx']!='SHN_UNDEF' and sym['st_size']>0 for sym in (tab.get_symbol_by_name(reader) or []))
+        obj,=build.rglob('X86DisassemblerDecoder.c.o')
+        with obj.open('rb') as fh:
+            tab=ELFFile(fh).get_section_by_name('.symtab')
+            symbols=tab.get_symbol_by_name(reader) or []
+            weak=any(sym['st_shndx']=='SHN_UNDEF' and sym['st_info']['bind']=='STB_WEAK' for sym in symbols)
+        assert resolved['native'] and weak==(label!='base' and os.uname().machine=='x86_64'),(label,resolved,weak)
+        save('link-mode-'+label,dict(resolved=resolved,weak=weak))
         from symbol_layout import symbols
         section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         for stem,unit in [('fallback','X86VectorFallback64.c.o'),('vector','X86VectorOutput.c.o'),('immediate','X86VexRegisterImmediate.c.o')]:
@@ -86,7 +100,7 @@ try:
         if label=='candidate':
             run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator')
             generated={}
-            for args,name in [(('--vex-sib-transfers',),'X86GenVexSibTransfers.inc'),(('--vex-base-memory',),'X86GenVexBaseMemory.inc'),((),'X86GenVectorOutput.inc')]:
+            for args,name in [(('--vex-base-memory',),'X86GenVexBaseMemory.inc'),((),'X86GenVectorOutput.inc')]:
                 projection=sp.check_output([w/'vector-generator',*args])
                 assert projection==(base/'arch/X86'/name).read_bytes()
                 generated[name]=dict(bytes=len(projection),sha256=hashlib.sha256(projection).hexdigest())
