@@ -9,7 +9,7 @@ int main(int argc,char **argv){
     std::ifstream f(argv[3],std::ios::binary),ranges(argv[4]);std::vector<uint8_t> data{std::istreambuf_iterator<char>(f),{}};
     check(!data.empty()&&ranges.good(),"corpus");unsigned platform=std::atoi(argv[5]),route=std::atoi(argv[6]);bool att=route==2||route==3||route==6||route==7;bool public_api=route>=4;
     Api refs(argv[1]),tested(argv[2]);
-    Session left(refs,CS_ARCH_X86,platform==64?CS_MODE_64:CS_MODE_32),right(tested,CS_ARCH_X86,platform==64?CS_MODE_64:CS_MODE_32);
+    Session left(refs,CS_ARCH_X86,platform==16?CS_MODE_16:platform==64?CS_MODE_64:CS_MODE_32),right(tested,CS_ARCH_X86,platform==16?CS_MODE_16:platform==64?CS_MODE_64:CS_MODE_32);
     for(auto *s:{&left,&right}){
         s->set(CS_OPT_DETAIL,(route&1)?CS_OPT_ON:CS_OPT_OFF);s->set(CS_OPT_SYNTAX,att?CS_OPT_SYNTAX_ATT:CS_OPT_SYNTAX_INTEL);
     }

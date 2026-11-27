@@ -18,8 +18,16 @@ try:
     project=(nd/'CMakeLists.txt').read_text()
     (proj/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(RecordBindings LANGUAGES C CXX)\n'+project[project.index('# --- Capstone (our fork'):project.index('# --- NeverD CMake helpers')])
     run('cmake','-S',proj,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
-    for kind in ('guard','compare','real'):
+    for kind in ('guard','compare','real','stack'):
         run('clang++','-std=c++17','-O2','-include','cinttypes','-I',s/'include',r/(kind+'.cpp'),'-ldl','-o',w/kind)
+    from firmware import inputs
+    from elftools.elf.elffile import ELFFile
+    expected=rd(r/'record-inputs.json')
+    rom,tsv,bios=inputs(w);assert bios['extents']==expected['bios_extents'] and all(bios[k]==v for k,v in expected['bios'].items())
+    raw=rd(r/'input-sources.json');run('clang',*raw['compile'],r/'scalar.c','-o',w/'scalar.o')
+    with (w/'scalar.o').open('rb') as obj:data=ELFFile(obj).get_section_by_name('.text').data()
+    assert digest(data)==expected['scalar'];scalar=w/'scalar.bin';spans=w/'scalar.tsv';scalar.write_bytes(data);spans.write_text(f'0 {len(data)} 1048576\n')
+    firmware=[('seabios16',16,rom,tsv),('scalar16',16,scalar,spans)]
     for tag,key in [('base','base'),('candidate','prefix'),('outlined','outlined')]:
         run('git','-C',s,'restore','--source=HEAD','--staged','--worktree','--','.')
         if tag!='base':
@@ -63,10 +71,16 @@ try:
             elf[tag+'/'+route]=kinds;save('binding',elf)
             if tag=='base':continue
             baseline=w/('base-'+route+'.so');current=w/(tag+'-'+route+'.so')
+            if route=='linked':
+                gen=w/'gen';run('clang++','-std=c++17','-O2','-I',s,'-I',s/'include',s/'suite/synctools/x86_simple_output.cpp',lib,'-o',gen)
+                assert sp.check_output([gen,'--stack16-registers'])==(s/'arch/X86/X86GenStack16Output.inc').read_bytes()
+                stack=list(map(int,get(w/'stack',baseline,current).split()))
+                assert stack[0]==4365312 and 0<stack[1]<stack[0],stack
+                save(tag+'-stack',dict(cases=stack,generator=True))
             guard=list(map(int,get(w/'guard',baseline,current).split()))
             assert guard==[5105184,2971712],guard
             opts=json.loads(get(w/'compare',baseline,current,'options'))
-            real={name:[list(map(int,get(w/'real',baseline,current,f,spans,str(bits),str(slot)).split()))for slot in range(4,8)]for name,bits,f,spans in samples}
+            real={name:[list(map(int,get(w/'real',baseline,current,f,spans,str(bits),str(slot)).split()))for slot in range(4,8)]for name,bits,f,spans in samples+firmware}
             for name,z in real.items():assert all(x[:4]==z[0][:4] for x in z) and z[0][0]>0
             records[tag+'/'+route]=dict(guard=guard,options=opts,programs=real);save('records',records)
     assert len(records)==6 and len({json.dumps(v,sort_keys=True) for v in records.values()})==1

@@ -1,7 +1,7 @@
-name: Verify guaranteed public record tail calls on GNU ld and LLD
+name: Compare every real-mode register, cutoff and option with the full decoder on two native ELF linkers
 on:
   push:
-    branches: [codex/firmware-record-tail-semantics]
+    branches: [codex/real-mode-stack-semantics]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: firmware-record-linkers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-stack-record-linkers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
