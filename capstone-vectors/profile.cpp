@@ -23,7 +23,13 @@ int main(int argc, char **argv) {
         if (start > bytes.size() || length > bytes.size()-start) return 4;
         const uint8_t *p = bytes.data()+start;
         while (length) {
-            if (!cs_disasm_iter(handle,&p,&length,&ip,record)) return 5;
+            const auto *before=p;
+            const auto before_size=length;
+            const auto before_ip=ip;
+            if (!cs_disasm_iter(handle,&p,&length,&ip,record)) {
+                if (p!=before || length!=before_size || ip!=before_ip) return 5;
+                ++counts["invalid|||"]; ++p; --length; ++ip; continue;
+            }
             const auto &x = record->detail->x86;
             std::string key(record->mnemonic);
             key += '|';

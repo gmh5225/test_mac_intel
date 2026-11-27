@@ -1,7 +1,7 @@
-name: Count actual formatted instruction shapes in SeaBIOS, real-mode scalar, PuTTY and ELF libraries
+name: Count every decoded record and every rejected byte in the real firmware, ELF and PE corpus
 on:
   push:
-    branches: [codex/real-instruction-output-shapes]
+    branches: [codex/output-shapes-with-rejected-bytes]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-output-shapes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-shape-census-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

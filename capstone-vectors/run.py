@@ -25,6 +25,8 @@ try:
     for name,bits,file,ext in samples:
         rows=[x.split('\t') for x in get(w/'profile',str(bits),file,ext).splitlines()]
         freq={k:int(n)for n,k in rows};assert len(freq)==len(rows) and all(x>0 for x in freq.values());counts[name]=dict(bits=bits,total=sum(freq.values()),shapes=freq)
+        save('counts',counts)
+    assert not any('invalid|||'in counts[k]['shapes'] for k in ('seabios16','scalar16'))
     save('complete',dict(complete=True,source=q,bios=bios,programs=counts))
 finally:
     used=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=used))
