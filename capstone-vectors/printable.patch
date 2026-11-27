@@ -1,0 +1,14 @@
+diff --git a/SStream.c b/SStream.c
+index 5d387fb0..eef2fd17 100644
+--- a/SStream.c
++++ b/SStream.c
+@@ -139,6 +139,9 @@ void SStream_replc_str(SStream *ss, char chr, const char *rstr)
+ void SStream_trimls(SStream *ss)
+ {
+ 	assert(ss);
++	/* Assembly mnemonics begin above the two leading whitespace bytes. */
++	if ((unsigned char)ss->buffer[0] > ' ')
++		return;
+ 	size_t buf_off = 0;
+ 	/// Remove leading spaces
+ 	while (ss->buffer[buf_off] == ' ' || ss->buffer[buf_off] == '\t') {

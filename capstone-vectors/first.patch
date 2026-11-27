@@ -1,0 +1,46 @@
+diff --git a/SStream.c b/SStream.c
+index 5d387fb0..6e0a0571 100644
+--- a/SStream.c
++++ b/SStream.c
+@@ -139,24 +139,23 @@ void SStream_replc_str(SStream *ss, char chr, const char *rstr)
+ void SStream_trimls(SStream *ss)
+ {
+ 	assert(ss);
+-	size_t buf_off = 0;
+-	/// Remove leading spaces
+-	while (ss->buffer[buf_off] == ' ' || ss->buffer[buf_off] == '\t') {
+-		buf_off++;
+-	}
+-	if (buf_off > 0) {
+-		// Keep an overreported cursor, but do not let an underreported
+-		// count move the next write into the visible suffix.
+-		if (ss->index < buf_off ||
+-		    (ss->index < sizeof(ss->buffer) && ss->buffer[ss->index])) {
+-			size_t written = buf_off + strlen(ss->buffer + buf_off);
+-			if (ss->index < written)
+-				ss->index = written;
+-		}
+-		memmove(ss->buffer, ss->buffer + buf_off,
+-			SSTREAM_BUF_LEN - buf_off);
+-		ss->index -= buf_off;
+-	}
++	char first = ss->buffer[0];
++	if (first != ' ' && first != '\t')
++		return;
++	size_t offset = 1;
++	while (ss->buffer[offset] == ' ' || ss->buffer[offset] == '\t')
++		++offset;
++	// Keep an overreported cursor, but do not let an underreported
++	// count move the next write into the visible suffix.
++	if (ss->index < offset ||
++	    (ss->index < sizeof(ss->buffer) && ss->buffer[ss->index])) {
++		size_t written = offset + strlen(ss->buffer + offset);
++		if (ss->index < written)
++			ss->index = written;
++	}
++	memmove(ss->buffer, ss->buffer + offset,
++		SSTREAM_BUF_LEN - offset);
++	ss->index -= offset;
+ }
+ 
+ /// Extract the mnemonic to @mnem_buf and the operand string into @op_str_buf from the stream buffer.

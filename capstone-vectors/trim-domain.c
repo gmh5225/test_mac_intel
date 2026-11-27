@@ -44,6 +44,29 @@ int main(void)
             }
         }
     }
+    for (unsigned first = 0; first <= UINT8_MAX; ++first) {
+        for (unsigned flags = 0; flags < 16; ++flags) {
+            SStream actual = { 0 }, expected;
+            memset(actual.buffer, 0x9b, sizeof(actual.buffer));
+            actual.buffer[0] = (char)first;
+            actual.buffer[1] = 'A';
+            actual.buffer[2] = 0;
+            actual.index = flags & 4 ? SIZE_MAX : (flags & 3);
+            actual.is_closed = (flags & 1) != 0;
+            actual.markup_stream = (flags & 2) != 0;
+            actual.prefixed_by_markup = (flags & 4) != 0;
+            actual.unsigned_num = (flags & 8) != 0;
+            memcpy(&expected, &actual, sizeof(actual));
+            if (first == ' ' || first == '\t') {
+                memmove(expected.buffer, expected.buffer + 1, sizeof(expected.buffer) - 1);
+                if (expected.index < 2) expected.index = 2;
+                --expected.index;
+            }
+            SStream_trimls(&actual);
+            if (memcmp(&actual, &expected, sizeof(actual))) return 2;
+            ++count;
+        }
+    }
     printf("%lu\n", count);
     return 0;
 }
