@@ -1,51 +1,49 @@
 diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
-index 940902b4..f0146cc9 100644
+index 940902b4..8a99619c 100644
 --- a/arch/AArch64/AArch64InstPrinter.c
 +++ b/arch/AArch64/AArch64InstPrinter.c
-@@ -164,32 +164,34 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
- 				Opcode == AArch64_UBFMXri);
+@@ -165,26 +165,35 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
  		if (MCOperand_isImm(Op2) && MCOperand_getImm(Op2) == 0 &&
  		    MCOperand_isImm(Op3)) {
--			const char *AsmMnemonic = NULL;
-+			AArch64_AM_ShiftExtendType aliasType =
-+				AArch64_AM_InvalidShiftExtend;
+ 			const char *AsmMnemonic = NULL;
++			aarch64_extender ext = AARCH64_EXT_INVALID;
  
  			switch (MCOperand_getImm(Op3)) {
  			default:
  				break;
  			case 7:
- 				if (IsSigned)
--					AsmMnemonic = "sxtb";
-+					aliasType = AArch64_AM_SXTB;
- 				else if (!Is64Bit)
--					AsmMnemonic = "uxtb";
-+					aliasType = AArch64_AM_UXTB;
+-				if (IsSigned)
++				if (IsSigned) {
+ 					AsmMnemonic = "sxtb";
+-				else if (!Is64Bit)
++					ext = AARCH64_EXT_SXTB;
++				} else if (!Is64Bit) {
+ 					AsmMnemonic = "uxtb";
++					ext = AARCH64_EXT_UXTB;
++				}
  				break;
  			case 15:
- 				if (IsSigned)
--					AsmMnemonic = "sxth";
-+					aliasType = AArch64_AM_SXTH;
- 				else if (!Is64Bit)
--					AsmMnemonic = "uxth";
-+					aliasType = AArch64_AM_UXTH;
+-				if (IsSigned)
++				if (IsSigned) {
+ 					AsmMnemonic = "sxth";
+-				else if (!Is64Bit)
++					ext = AARCH64_EXT_SXTH;
++				} else if (!Is64Bit) {
+ 					AsmMnemonic = "uxth";
++					ext = AARCH64_EXT_UXTH;
++				}
  				break;
  			case 31:
  				// *xtw is only valid for signed 64-bit operations.
- 				if (Is64Bit && IsSigned)
--					AsmMnemonic = "sxtw";
-+					aliasType = AArch64_AM_SXTW;
+-				if (Is64Bit && IsSigned)
++				if (Is64Bit && IsSigned) {
+ 					AsmMnemonic = "sxtw";
++					ext = AARCH64_EXT_SXTW;
++				}
  				break;
  			}
  
--			if (AsmMnemonic) {
--				SStream_concat(O, "%s", AsmMnemonic);
-+			if (aliasType != AArch64_AM_InvalidShiftExtend) {
-+				SStream_concat(O, "%s",
-+					       AArch64_AM_getShiftExtendName(aliasType));
- 				SStream_concat0(O, " ");
- 
- 				printRegName(O, MCOperand_getReg(Op0));
-@@ -203,34 +205,8 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
+@@ -203,34 +212,7 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
  						MI, 1,
  						getWRegFromXReg(
  							MCOperand_getReg(Op1)));
@@ -77,57 +75,47 @@ index 940902b4..f0146cc9 100644
 -						AArch64_get_detail_op(MI, -1)
 -							->ext =
 -							AARCH64_EXT_INVALID;
-+					AArch64_get_detail_op(MI, -1)->ext =
-+						AArch64_mapExt(aliasType);
++					AArch64_get_detail_op(MI, -1)->ext = ext;
  				}
  				isAlias = true;
  				MCInst_setIsAlias(MI, isAlias);
-@@ -245,33 +221,35 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
- 		// instruction. In all cases the immediate shift amount shift must be in
+@@ -246,28 +228,35 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
  		// the range 0 to (reg.size -1).
  		if (MCOperand_isImm(Op2) && MCOperand_isImm(Op3)) {
--			const char *AsmMnemonic = NULL;
-+			AArch64_AM_ShiftExtendType aliasType =
-+				AArch64_AM_InvalidShiftExtend;
+ 			const char *AsmMnemonic = NULL;
++			aarch64_shifter type = AARCH64_SFT_INVALID;
  			int shift = 0;
  			int64_t immr = MCOperand_getImm(Op2);
  			int64_t imms = MCOperand_getImm(Op3);
  			if (Opcode == AArch64_UBFMWri && imms != 0x1F &&
  			    ((imms + 1) == immr)) {
--				AsmMnemonic = "lsl";
-+				aliasType = AArch64_AM_LSL;
+ 				AsmMnemonic = "lsl";
++				type = AARCH64_SFT_LSL;
  				shift = 31 - imms;
  			} else if (Opcode == AArch64_UBFMXri && imms != 0x3f &&
  				   ((imms + 1 == immr))) {
--				AsmMnemonic = "lsl";
-+				aliasType = AArch64_AM_LSL;
+ 				AsmMnemonic = "lsl";
++				type = AARCH64_SFT_LSL;
  				shift = 63 - imms;
  			} else if (Opcode == AArch64_UBFMWri && imms == 0x1f) {
--				AsmMnemonic = "lsr";
-+				aliasType = AArch64_AM_LSR;
+ 				AsmMnemonic = "lsr";
++				type = AARCH64_SFT_LSR;
  				shift = immr;
  			} else if (Opcode == AArch64_UBFMXri && imms == 0x3f) {
--				AsmMnemonic = "lsr";
-+				aliasType = AArch64_AM_LSR;
+ 				AsmMnemonic = "lsr";
++				type = AARCH64_SFT_LSR;
  				shift = immr;
  			} else if (Opcode == AArch64_SBFMWri && imms == 0x1f) {
--				AsmMnemonic = "asr";
-+				aliasType = AArch64_AM_ASR;
+ 				AsmMnemonic = "asr";
++				type = AARCH64_SFT_ASR;
  				shift = immr;
  			} else if (Opcode == AArch64_SBFMXri && imms == 0x3f) {
--				AsmMnemonic = "asr";
-+				aliasType = AArch64_AM_ASR;
+ 				AsmMnemonic = "asr";
++				type = AARCH64_SFT_ASR;
  				shift = immr;
  			}
--			if (AsmMnemonic) {
--				SStream_concat(O, "%s", AsmMnemonic);
-+			if (aliasType != AArch64_AM_InvalidShiftExtend) {
-+				SStream_concat(O, "%s",
-+					       AArch64_AM_getShiftExtendName(aliasType));
- 				SStream_concat0(O, " ");
- 
- 				printRegName(O, MCOperand_getReg(Op0));
-@@ -285,26 +263,10 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
+ 			if (AsmMnemonic) {
+@@ -285,26 +274,10 @@ void printInst(MCInst *MI, uint64_t Address, const char *Annot, SStream *O)
  						MI, 0, MCOperand_getReg(Op0));
  					AArch64_set_detail_op_reg(
  						MI, 1, MCOperand_getReg(Op1));
@@ -153,86 +141,21 @@ index 940902b4..f0146cc9 100644
 -						->shift.value = shift;
 +					cs_aarch64_op *op =
 +						AArch64_get_detail_op(MI, -1);
-+					op->shift.type = AArch64_mapShift(aliasType);
++					op->shift.type = type;
 +					op->shift.value = shift;
  				}
  				isAlias = true;
  				MCInst_setIsAlias(MI, isAlias);
-diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index 08e33cd3..da5c4eaa 100644
---- a/arch/AArch64/AArch64Mapping.c
-+++ b/arch/AArch64/AArch64Mapping.c
-@@ -1464,7 +1464,7 @@ static unsigned getNextVectorRegister(unsigned Reg, unsigned Stride /* = 1 */)
- 	return Reg;
- }
- 
--static aarch64_extender llvm_to_cs_ext(AArch64_AM_ShiftExtendType ExtType)
-+aarch64_extender AArch64_mapExt(AArch64_AM_ShiftExtendType ExtType)
- {
- 	switch (ExtType) {
- 	default:
-@@ -1488,7 +1488,7 @@ static aarch64_extender llvm_to_cs_ext(AArch64_AM_ShiftExtendType ExtType)
- 	}
- }
- 
--static aarch64_shifter llvm_to_cs_shift(AArch64_AM_ShiftExtendType ShiftExtType)
-+aarch64_shifter AArch64_mapShift(AArch64_AM_ShiftExtendType ShiftExtType)
- {
- 	switch (ShiftExtType) {
- 	default:
-@@ -1677,7 +1677,7 @@ void AArch64_add_cs_detail_0(MCInst *MI, aarch64_op_group op_group,
- 			AArch64_AM_getArithExtendType(Val);
- 		unsigned ShiftVal = AArch64_AM_getArithShiftValue(Val);
- 
--		AArch64_get_detail_op(MI, -1)->ext = llvm_to_cs_ext(ExtType);
-+		AArch64_get_detail_op(MI, -1)->ext = AArch64_mapExt(ExtType);
- 		AArch64_get_detail_op(MI, -1)->shift.value = ShiftVal;
- 		AArch64_get_detail_op(MI, -1)->shift.type = AARCH64_SFT_LSL;
- 		break;
-@@ -1896,9 +1896,9 @@ void AArch64_add_cs_detail_0(MCInst *MI, aarch64_op_group op_group,
- 		unsigned Val = MCInst_getOpVal(MI, OpNum);
- 		AArch64_AM_ShiftExtendType ShExtType =
- 			AArch64_AM_getShiftType(Val);
--		AArch64_get_detail_op(MI, -1)->ext = llvm_to_cs_ext(ShExtType);
-+		AArch64_get_detail_op(MI, -1)->ext = AArch64_mapExt(ShExtType);
- 		AArch64_get_detail_op(MI, -1)->shift.type =
--			llvm_to_cs_shift(ShExtType);
-+			AArch64_mapShift(ShExtType);
- 		AArch64_get_detail_op(MI, -1)->shift.value =
- 			AArch64_AM_getShiftValue(Val);
- 		break;
-diff --git a/arch/AArch64/AArch64Mapping.h b/arch/AArch64/AArch64Mapping.h
-index 041f3418..4ec3949d 100644
---- a/arch/AArch64/AArch64Mapping.h
-+++ b/arch/AArch64/AArch64Mapping.h
-@@ -12,6 +12,7 @@
- #include "capstone/capstone.h"
- #include "../../MCInst.h"
- #include "../../SStream.h"
-+#include "AArch64AddressingModes.h"
- 
- typedef enum {
- #include "AArch64GenCSOpGroup.inc"
-@@ -65,6 +66,9 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 
- void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info);
- 
-+aarch64_extender AArch64_mapExt(AArch64_AM_ShiftExtendType ExtType);
-+aarch64_shifter AArch64_mapShift(AArch64_AM_ShiftExtendType ShiftExtType);
-+
- void AArch64_set_detail_op_reg(MCInst *MI, unsigned OpNum, aarch64_reg Reg);
- void AArch64_set_detail_op_imm(MCInst *MI, unsigned OpNum,
- 			       aarch64_op_type ImmType, int64_t Imm);
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index bdafe888..e80b2877 100644
+index c9c7b0ec..726c1cb1 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 @@ -394,7 +394,7 @@
      },
      "printInst": {
        "apply_type": "OLD",
--      "old_hash": "4bbe09edf0ffb2abf534ac3c5572eccbc3baa941cc8047d76dab0fdd1dd72781",
-+      "old_hash": "05da18f712a5560fe87abc13e26140f29188e235abb3c2219b9d0e6c9ebda14e",
+-      "old_hash": "e6b421e6356e2a51809f4b401db42e7e45a71d18d547e3981971613c559e6e02",
++      "old_hash": "2b4f4397c5975b3298163c9ca71d7ac052c6523054d178eb6ac3e56a0bacbd36",
        "new_hash": "",
        "edit": ""
      },

@@ -1,7 +1,7 @@
-name: Measure AArch64 bitfield alias detail and formatting in real coreutils, with PE and MIPS controls
+name: Time native AArch64 bitfield aliases with the public operand type selected beside each spelling
 on:
   push:
-    branches: [codex/aarch64-bitfield-details]
+    branches: [codex/aarch64-direct-alias-type]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
+          ref: a5c08759df756b179578e97670e148fa7629e88c
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: bitfield-alias-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: bitfield-direct-type-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
