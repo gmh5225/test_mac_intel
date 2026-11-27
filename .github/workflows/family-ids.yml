@@ -1,7 +1,7 @@
-name: Verify ARM printer semantics and rebuild the real Mapping object after changing native and macOS universal headers
+name: Verify the release ARM printers, Make dependencies, universal slices and the production six-backend archives
 on:
   push:
-    branches: [codex/arm-real-incremental-headers]
+    branches: [codex/complete-arm-release-header-matrix]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: arm-make-incremental-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: release-arm-and-make-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
