@@ -114,6 +114,14 @@ try:
         general[tag]=result
     assert general['candidate']==general['outlined']
     save('vex2-domain',general)
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'transfer-domain.cpp','-ldl','-o',w/'transfer-domain')
+    general={}
+    for tag in ('candidate','outlined'):
+        result=list(map(int,get(w/'transfer-domain',w/'base.so',w/(tag+'.so')).split()))
+        assert len(result)==3 and result[0]==8*3*64*2*(8*2*6+16*8*7) and 0<result[2]<result[1]<result[0]
+        general[tag]=result
+    assert general['candidate']==general['outlined']
+    save('transfer-domain',general)
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
