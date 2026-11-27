@@ -30,10 +30,59 @@ index 6f5a0e9f..2211fc0c 100644
  
  /* The scalar plans have already declined this instruction. A single opcode
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..d547fc37 100644
+index dceebc42..c73a6af6 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -429,6 +429,26 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -29,11 +29,17 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 			       const struct X86SimpleRegister *regs);
+ #endif
+ 
++/* Keep register and memory record construction outside the prefix dispatcher.
++ * A declined form can then return before allocating a writer's stack frame. */
+ #if defined(_MSC_VER)
+-__declspec(noinline)
++#define X86_VECTOR_NOINLINE __declspec(noinline)
+ #elif defined(__GNUC__)
+-__attribute__((noinline))
++#define X86_VECTOR_NOINLINE __attribute__((noinline))
++#else
++#define X86_VECTOR_NOINLINE
+ #endif
++
++X86_VECTOR_NOINLINE
+ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			    uint16_t *insn_size,
+ 			    const struct X86SimpleRegister *address_regs)
+@@ -76,11 +82,7 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 
+ /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
+  * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
+-#if defined(_MSC_VER)
+-__declspec(noinline)
+-#elif defined(__GNUC__)
+-__attribute__((noinline))
+-#endif
++X86_VECTOR_NOINLINE
+ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+ 				  cs_insn *insn, uint16_t *insn_size,
+ 				  const struct X86SimpleRegister *regs)
+@@ -240,6 +242,7 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+ }
+ 
+ /* The caller has identified a two-byte VEX prefix and RIP-relative ModR/M. */
++X86_VECTOR_NOINLINE
+ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
+ 			    uint16_t *insn_size)
+ {
+@@ -391,6 +394,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 
+ /* The VEX register plan supplies the public fields for vvvv register operands.
+  * Memory forms and unsupported vector widths fall back before any output. */
++X86_VECTOR_NOINLINE
+ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 				   cs_insn *insn, uint16_t *insn_size,
+ 				   unsigned prefix)
+@@ -429,6 +433,26 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  				    0x40 | (w << 3) | rxb, ll, regs, 3);
  }
  
@@ -60,7 +109,7 @@ index dceebc42..d547fc37 100644
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
  			   const struct X86SimpleRegister *regs, bool wide)
-@@ -443,13 +463,8 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -443,21 +467,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  						 wide);
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
@@ -76,3 +125,20 @@ index dceebc42..d547fc37 100644
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
   * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
+-#if defined(_MSC_VER)
+-__declspec(noinline)
+-#elif defined(__GNUC__)
+-__attribute__((noinline))
+-#endif
++X86_VECTOR_NOINLINE
+ #ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
+ bool X86_writeEvexBroadcastPrechecked(const uint8_t *code, size_t size,
+ 				      cs_insn *insn, uint16_t *insn_size,
+@@ -555,5 +570,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
+ 
++#undef X86_VECTOR_NOINLINE
++
+ #endif
+ #endif

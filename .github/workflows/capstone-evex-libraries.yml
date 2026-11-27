@@ -1,7 +1,7 @@
-name: Compare decoded VEX2 output with the full prefix reader on real PE and ELF programs
+name: Measure the VEX2 prefix reader with the register and memory emitters kept out of line
 on:
   push:
-    branches: [codex/amd64-predecoded-vex2-readers]
+    branches: [codex/vex2-prefix-tail-calls]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: known-vex2-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex2-tail-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -78,6 +78,19 @@ try:
         save('gpr-records-'+label,rows)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        import re
+        sizes={}
+        dis=[]
+        for line in get('nm','-S','--defined-only',w/label).splitlines():
+            parts=line.split()
+            if len(parts)==4 and parts[-1].split('.')[0] in ('X86_writeVex2Output','X86_writeVectorOutput','writeVexOutput','writeVexRipLoad','writeVexRegisterOutput','writeVexIndexedOutput'):
+                sizes[parts[-1]]=dict(address=int(parts[0],16),size=int(parts[1],16))
+        if label!='base':
+            assert 'X86_writeVex2Output' in sizes
+            dis=get('objdump','-d','--no-show-raw-insn','--disassemble=X86_writeVex2Output',w/label)
+            dis=[l.strip() for l in dis.splitlines() if re.match(r'^\s*[0-9a-f]+:',l)]
+            assert dis
+        save('vex-code-'+label,dict(functions=sizes,entry=dis))
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
@@ -136,6 +149,7 @@ try:
     run('clang++','-std=c++17','-O2','-I',base/'include',r/'known-edge.cpp','-ldl','-o',w/'known-edge')
     edge=list(map(int,get(w/'known-edge',w/'base.so',w/'candidate.so').split()))
     assert edge[0]==15728640 and 0<edge[1]<edge[0]
+    assert edge==list(map(int,get(w/'known-edge',w/'base.so',w/'outlined.so').split()))
     save('known-edge',edge)
     guards={};records={}
     for lbl in ('candidate','outlined'):
