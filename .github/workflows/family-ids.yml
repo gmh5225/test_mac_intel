@@ -1,7 +1,7 @@
-name: Time native AArch64 bitfield aliases with the public operand type selected beside each spelling
+name: Verify only the AArch64 printer object changes and measure direct bitfield types
 on:
   push:
-    branches: [codex/aarch64-direct-alias-type]
+    branches: [codex/aarch64-direct-type-owner]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: bitfield-direct-type-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: a64-direct-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

@@ -30,7 +30,7 @@ try:
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
-        expected={'mips':{'MipsInstPrinter.c.o'},'a64':{'AArch64InstPrinter.c.o','AArch64Mapping.c.o'},'both':{'MipsInstPrinter.c.o','AArch64InstPrinter.c.o'}}[k]
+        expected={'mips':{'MipsInstPrinter.c.o'},'a64':{'AArch64InstPrinter.c.o'},'both':{'MipsInstPrinter.c.o','AArch64InstPrinter.c.o'}}[k]
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
