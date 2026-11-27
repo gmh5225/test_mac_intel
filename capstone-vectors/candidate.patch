@@ -32,7 +32,7 @@ index 709e1286..67bfe234 100644
  	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
  	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..6bee973d 100644
+index 197453cb..0609f2b3 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3753,7 +3753,9 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
@@ -41,13 +41,13 @@ index 197453cb..6bee973d 100644
  
 -#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
 +#ifdef CAPSTONE_X86_MIXED_PUBLIC_RECORD
-+#define CS_DECODE_OUTPUT_MISS X86_decodeMixedPublicRecord
++#define CS_PUBLIC_X86_RECORD
 +#elif defined(CAPSTONE_X86_PUBLIC_OUTPUT)
  #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
  #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
  #define CS_PUBLIC_FIXED_RECORD
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 324fc05d..0f8f97f8 100644
+index 324fc05d..ce9f707f 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
 @@ -282,4 +282,24 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
@@ -63,7 +63,7 @@ index 324fc05d..0f8f97f8 100644
 +						 cs_insn *insn, uint16_t *length,
 +						 bool batch)
 +{
-+	if (handle->arch == CS_ARCH_X86 && !batch && !handle->no_text &&
++	if (!batch && !handle->no_text &&
 +	    !handle->skipdata && (handle->syntax == CS_OPT_SYNTAX_DEFAULT ||
 +				  handle->syntax == CS_OPT_SYNTAX_INTEL)) {
 +		if (handle->mode == CS_MODE_64)
@@ -94,7 +94,7 @@ index d6f533e0..ffdf5864 100644
 +#endif
  #endif
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 08677417..f279974e 100644
+index 08677417..9cea219d 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -23,6 +23,14 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
@@ -112,3 +112,16 @@ index 08677417..f279974e 100644
  /* The public iterator can enter a fixed x86 reader once. Misses from that
   * reader call the same full decoder with the ordinary iterator request. */
  #ifdef CAPSTONE_X86_PUBLIC_FIXED_RECORD
+@@ -188,6 +196,12 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
+ 		return true;
+ #endif
++#ifdef CS_PUBLIC_X86_RECORD
++	/* Resolve the output route alongside the x86 scan test in this iterator. */
++	if (handle->arch == CS_ARCH_X86)
++		return X86_decodeMixedPublicRecord(handle, code, size, insn,
++						   insn_size, batch);
++#endif
+ #ifdef CS_DECODE_OUTPUT_MISS
+ 	return CS_DECODE_OUTPUT_MISS(handle, code, size, insn, insn_size, batch);
+ #elif defined(CS_PUBLIC_FIXED_RECORD)
