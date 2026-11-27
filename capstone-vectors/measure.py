@@ -52,7 +52,7 @@ try:
         save('static-product',static_images)
     for stage in ('initial','candidate'):
         a=static_images['base']['objects'];b=static_images[stage]['objects']
-        assert {Path(k).name for k in a if a[k]!=b[k]}=={'X86ATTInstPrinter.c.o'}
+        assert {Path(k).name for k in a if a[k]!=b[k]}==({'X86Mapping.c.o'} if stage=='candidate' else {'X86ATTInstPrinter.c.o'})
         assert static_images['base']['archive']!=static_images[stage]['archive']
     delta=dict(added=sorted(set(symbols['candidate'])-set(symbols['base'])),removed=sorted(set(symbols['base'])-set(symbols['candidate'])))
     save('identities',dict(source=q,images=sources,sizes=sizes,symbols=delta,objects=objects))
@@ -66,9 +66,13 @@ try:
     select=shared.select
     inc=['-I',src,'-I',src/'include']
     run('cmake','-S',src,'-B',build,'-DCAPSTONE_BUILD_CSTEST=ON')
-    run('cmake','--build',build,'--target','x86_att_access_generator','--parallel','4')
-    unit=get('ctest','--test-dir',build,'-R','^unit_x86_att_access_generator$','--no-tests=error','--output-on-failure')
+    run('cmake','--build',build,'--target','x86_encoding_accuracy','--parallel','4')
+    unit=get('ctest','--test-dir',build,'-R','^unit_x86_encoding_accuracy$','--no-tests=error','--output-on-failure')
     assert '100% tests passed' in unit
+    helper='X86_get_op_access'
+    obj=['objdump','-d','--disassemble='+helper]
+    for stage in ('base','initial','candidate'):
+        text=get(*obj,w/(stage+'.so'));start=text.index('<'+helper+'>:');(e/('access-'+stage+'.asm')).write_text(text[start:]+'\n')
     save('access-unit',dict(output=unit))
     for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
@@ -150,7 +154,7 @@ try:
                 count=int(res.stderr.strip()[len(tag):]);assert count%2==0
                 counts.append(count//2)
             calls[stage]=counts
-        assert calls['base']==calls['initial'] and all(x[0]==0 for x in calls.values()) and calls['base'][1]>calls['candidate'][1] and calls['base'][2]==calls['candidate'][2]
+        assert calls['base']==calls['candidate'] and all(x[0]==0 for x in calls.values()) and calls['base'][1]>calls['initial'][1] and calls['base'][2]==calls['initial'][2]
         access_calls[name]=calls;save('access-lookups',access_calls)
 
         audits=[]
