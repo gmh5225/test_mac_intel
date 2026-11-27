@@ -108,7 +108,7 @@ try:
                     sym=next((x for x in (tab.get_symbol_by_name(name) or []) if x['st_shndx']!='SHN_UNDEF' and x['st_size']>0),None)
                     if sym is not None:symbols[name]=[sym['st_value'],sym['st_info']['bind'],sym['st_other']['visibility']]
                 allocated={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()] for v in elf.iter_sections() if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
-            resolved='X86_disasmIterText' in symbols;assert resolved==(route in ('native','foreign')),(label,route,symbols)
+            resolved='X86_disasmIterText' in symbols;assert resolved==(label!='base' or route in ('native','foreign')),(label,route,symbols)
             active=os.uname().machine=='x86_64' and label!='base'
             assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)

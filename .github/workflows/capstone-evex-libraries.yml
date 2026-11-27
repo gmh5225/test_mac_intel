@@ -1,7 +1,7 @@
-name: Measure a shared public and native x86 text reader at the existing architecture test
+name: Verify the public reader on its actual public-only and mixed links
 on:
   push:
-    branches: [codex/public-record-existing-isa-test]
+    branches: [codex/public-record-complete-link]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-record-isa-test-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-record-real-links-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
