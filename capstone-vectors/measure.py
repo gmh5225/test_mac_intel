@@ -66,6 +66,8 @@ try:
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
+        table_member='WASMTablePrinter.c.o'
+        assert (table_member in get('ar','t',lib).splitlines())==(label!='base')
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
