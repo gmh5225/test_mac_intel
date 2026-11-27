@@ -16,7 +16,7 @@ index 602ae735..064cd696 100644
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
  target_link_libraries(capstone PUBLIC capstone_build_settings)
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..f0980db1 100644
+index 62d4288a..e6fbb1f5 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
 @@ -27,10 +27,10 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
@@ -27,21 +27,26 @@ index 62d4288a..f0980db1 100644
 - * in both instantiations of the scalar writer. */
 -#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
 -	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
-+/* The fixed-mode text iterators have checked their mode and text state
-+ * before entering the writer. The remaining options and callbacks are live. */
-+#define X86_OUTPUT_OPTIONS_UNSUPPORTED(handle) \
-+	((handle)->imm_unsigned || \
++/* Both wrappers expand the option checks in the original left-to-right
++ * chain. The fixed text reader has already checked its mode and text state. */
++#define X86_OUTPUT_OPTION_TERMS(handle) \
++	(handle)->imm_unsigned || \
  	 (handle)->mnem_list || (handle)->doing_mem || \
  	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
  	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
-@@ -40,4 +40,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -38,6 +38,12 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	 (handle)->insn_id != X86_get_insn_id || \
+ 	 (handle)->printer != X86_Intel_printInst || \
  	 (handle)->post_printer != X86_postprinter || \
- 	 cs_vsnprintf != cs_default_vsnprintf)
- 
+-	 cs_vsnprintf != cs_default_vsnprintf)
++	 cs_vsnprintf != cs_default_vsnprintf
++
++#define X86_OUTPUT_OPTIONS_UNSUPPORTED(handle) (X86_OUTPUT_OPTION_TERMS(handle))
++
 +#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
 +	((mode_mismatch) || (handle)->no_text || \
-+	 X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
-+
++	 X86_OUTPUT_OPTION_TERMS(handle))
+ 
  #endif
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
 index 21414e7a..dc92d198 100644
