@@ -1,7 +1,7 @@
-name: Measure VEX2 and VEX3 output and details on real programs with the canonical IFMA decoder
+name: Measure isolated AMD64 VEX memory writers with the original PE32 handler and object files
 on:
   push:
-    branches: [codex/canonical-vector-memory-output]
+    branches: [codex/amd64-vex-memory-owner]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-vector-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-vex-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
