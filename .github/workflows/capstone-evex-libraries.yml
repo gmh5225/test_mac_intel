@@ -1,7 +1,7 @@
-name: Measure shared condition metadata for i386 byte and move operands
+name: Measure i386 condition records at the escaped opcode dispatch and verify the scalar table projection
 on:
   push:
-    branches: [codex/i386-shared-condition-page-guards]
+    branches: [codex/i386-escaped-condition-row]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 490a48e5540360fbd0fd4590bd68193302bbbd75
+          ref: 3252e9d681e89ecd3cf85e9e79f60f08d466736f
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checked-i386-condition-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: escaped-condition-plan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

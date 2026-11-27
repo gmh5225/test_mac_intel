@@ -1,12 +1,12 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..fd6f121b 100644
+index cea06480..a1f8a171 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86MemoryFallback32.c APPEND PROPERTY
++        set_property(SOURCE arch/X86/X86Vex32Output.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_I386_CONDITION_OUTPUT>")
      endif()
  endif()
@@ -69,13 +69,13 @@ index 79adee8d..7c5da00c 100644
  	static const x86_insn setzu_ids[] = {
  		X86_INS_SETZUO,	 X86_INS_SETZUNO, X86_INS_SETZUB,
  		X86_INS_SETZUAE, X86_INS_SETZUE,  X86_INS_SETZUNE,
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..349f4c5b 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -33,6 +33,50 @@
- #undef X86_SEGMENT_LEA32
- #undef X86_MEMORY32_OUTPUT
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index d6f533e0..94ec1ce7 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -150,15 +150,97 @@ static bool writeExtend32(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
  
 +#ifdef X86_I386_CONDITION_OUTPUT
 +#include "X86ConditionIDs.h"
@@ -86,20 +86,33 @@ index cffc4e81..349f4c5b 100644
 +	const uint8_t *code, cs_insn *insn, uint16_t *insn_size)
 +{
 +	static const uint16_t set_ids[] = X86_CONDITION_IDS(X86_INS_SET);
++	static const uint16_t move_ids[] = X86_CONDITION_IDS(X86_INS_CMOV);
 +	const unsigned opcode = code[1], cc = opcode & 15, mr = code[2];
 +	const unsigned plan = x86_simple_plans[0][0][0x70 + cc];
 +	const struct X86SimpleOutput *condition = &x86_simple_outputs[plan >> 2];
-+	const struct X86SimpleRegister *reg = &x86_simple_registers[0][mr & 7];
++	const bool move = opcode < 0x50;
++	const struct X86SimpleRegister *reg = move ?
++		&x86_simple_registers[2][(mr >> 3) & 7] :
++		&x86_simple_registers[0][mr & 7];
++	const struct X86SimpleRegister *source = &x86_simple_registers[2][mr & 7];
 +
-+	insn->id = set_ids[cc];
++	insn->id = move ? move_ids[cc] : set_ids[cc];
 +	*insn_size = insn->size = 3;
 +	memcpy(insn->bytes, code, 3);
 +	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, "set", 3);
-+	memcpy(insn->mnemonic + 3, condition->mnemonic + 1,
++	if (move)
++		memcpy(insn->mnemonic, "cmov", 4);
++	else
++		memcpy(insn->mnemonic, "set", 3);
++	memcpy(insn->mnemonic + (move ? 4 : 3), condition->mnemonic + 1,
 +	       sizeof(condition->mnemonic) - 1);
 +	memset(insn->op_str, 0, sizeof(insn->op_str));
 +	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	if (move) {
++		char *end = insn->op_str + reg->length;
++		memcpy(end, ", ", 2);
++		memcpy(end + 2, source->name, sizeof(source->name));
++	}
 +	if (insn->detail) {
 +		cs_detail *d = insn->detail;
 +		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
@@ -115,32 +128,49 @@ index cffc4e81..349f4c5b 100644
 +		x->op_count = 1;
 +		x->operands[0].type = X86_OP_REG;
 +		x->operands[0].reg = (x86_reg)reg->reg;
-+		x->operands[0].size = 1;
++		x->operands[0].size = move ? 4 : 1;
 +		x->operands[0].access = CS_AC_WRITE;
++		if (move) {
++			d->groups[0] = X86_GRP_CMOV;
++			d->groups_count = 1;
++			x->op_count = 2;
++			x->operands[1].type = X86_OP_REG;
++			x->operands[1].reg = (x86_reg)source->reg;
++			x->operands[1].size = 4;
++			x->operands[1].access = CS_AC_READ;
++		}
 +	}
 +}
 +#endif
 +
- /* The fixed-width iterator delegates uncommon encodings here. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -40,6 +84,16 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 			       size_t size, cs_insn *insn, uint16_t *insn_size)
  {
- 	const unsigned opcode = code[0];
- 	switch (opcode) {
+ 	/* C4/C5 introduce VEX. The /0 forms of C6/C7 encode MOV r/m, immediate. */
 +#ifdef X86_I386_CONDITION_OUTPUT
-+	case 0x0f:
-+		if (size >= 3 && code[2] >= 0xc0 &&
-+		    (code[1] & 0xf0) == 0x90 &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			writeConditionRegisters32(code, insn, insn_size);
-+			return true;
-+		}
-+		break;
++	if ((code[0] & 0xfc) != 0xc4) {
++		if (code[0] != 0x0f || size < 3)
++			return false;
++		const unsigned op = code[1];
++		if ((op & 0xf6) == 0xb6)
++			return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++			       writeExtend32(code, size, insn, insn_size);
++		if (((op & 0xf0) != 0x40 && (op & 0xf0) != 0x90) ||
++		    code[2] < 0xc0 || X86_OUTPUT_UNSUPPORTED(handle, false))
++			return false;
++		writeConditionRegisters32(code, insn, insn_size);
++		return true;
++	}
++#else
+ 	if ((code[0] & 0xfc) != 0xc4)
+ 		return code[0] == 0x0f && size >= 3 &&
+ 		       (code[1] & 0xf6) == 0xb6 &&
+ 		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
+ 		       writeExtend32(code, size, insn, insn_size);
 +#endif
- 	case 0xc4:
- 		if (X86_writeVexRegisterImmediate(handle, code, size, insn,
- 						  insn_size, x86_simple_registers, false))
+ 	if (X86_OUTPUT_UNSUPPORTED(handle, false))
+ 		return false;
+ 	if (code[0] & 2) {
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index 24af6a88..77f5fda3 100644
 --- a/tests/unit/x86_simple_output.c

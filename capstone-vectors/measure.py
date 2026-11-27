@@ -155,6 +155,12 @@ try:
         assert cc[0]==5971968 and 0<cc[1]<cc[0],cc
         if label!='base':assert cc==rd(e/'conditions-base.json'),cc
         save('conditions-'+label,cc)
+        run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',base/'suite/synctools/x86_simple_output.cpp',lib,'-o',w/'generate-scalar-plans')
+        projection=sp.check_output([w/'generate-scalar-plans'])
+        expected=(base/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
+        assert projection==expected
+        save('scalar-plan-'+label,dict(sha=hashlib.sha256(projection).hexdigest(),slots=projection.count(b'X86_PLAN_CONDITION32')))
+
 
         images[label]=dict(archive=sha(lib),exe=sha(w/label))
         with (w/label).open('rb')as f:

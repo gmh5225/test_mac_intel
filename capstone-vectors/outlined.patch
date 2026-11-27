@@ -1,12 +1,12 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..fd6f121b 100644
+index cea06480..a1f8a171 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86MemoryFallback32.c APPEND PROPERTY
++        set_property(SOURCE arch/X86/X86Vex32Output.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_I386_CONDITION_OUTPUT>")
      endif()
  endif()
@@ -29,6 +29,25 @@ index 00000000..a58ff6a4
 +	  prefix##L, prefix##GE, prefix##LE, prefix##G }
 +
 +#endif
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index 0021e8ce..b3b8c20b 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -61,12 +61,12 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			435, 439, 443, 447, 451, 455, 459, 463, 467, 471, 475, 479, 483, 487, 491, 495,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32, X86_PLAN_CONDITION32,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
 index 79adee8d..7c5da00c 100644
 --- a/arch/X86/X86Mapping.c
@@ -69,13 +88,49 @@ index 79adee8d..7c5da00c 100644
  	static const x86_insn setzu_ids[] = {
  		X86_INS_SETZUO,	 X86_INS_SETZUNO, X86_INS_SETZUB,
  		X86_INS_SETZUAE, X86_INS_SETZUE,  X86_INS_SETZUNE,
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..cf317abe 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -33,6 +33,72 @@
- #undef X86_SEGMENT_LEA32
- #undef X86_MEMORY32_OUTPUT
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 3105a881..da681c4f 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -66,6 +66,12 @@ enum X86SimpleForm {
+ 
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
++/* Low bits select neither of the one-byte ModR/M layouts. */
++#ifdef X86_I386_CONDITION_OUTPUT
++#define X86_PLAN_CONDITION32 (UINT16_MAX - 4u)
++#else
++#define X86_PLAN_CONDITION32 0u
++#endif
+ #define X86_PLAN_VECTOR UINT16_MAX
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
+index 21414e7a..cd6b6a34 100644
+--- a/arch/X86/X86SimpleOutputImpl.h
++++ b/arch/X86/X86SimpleOutputImpl.h
+@@ -115,6 +115,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return false;
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
++#ifdef X86_I386_CONDITION_OUTPUT
++		if (plan == X86_PLAN_CONDITION32) {
++			if (size < 3 || code[2] < 0xc0)
++				return false;
++			writeConditionRegisters32(code, insn, insn_size);
++			return true;
++		}
++#endif
+ 		if (plan == X86_PLAN_VECTOR) {
+ #ifdef X86_FIXED_VEX2
+ 			if (code[0] == 0xc5)
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index d6f533e0..73c29fd5 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -150,6 +150,72 @@ static bool writeExtend32(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
  
 +#ifdef X86_I386_CONDITION_OUTPUT
 +#include "X86ConditionIDs.h"
@@ -143,26 +198,44 @@ index cffc4e81..cf317abe 100644
 +}
 +#endif
 +
- /* The fixed-width iterator delegates uncommon encodings here. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -40,6 +106,16 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 			       size_t size, cs_insn *insn, uint16_t *insn_size)
  {
- 	const unsigned opcode = code[0];
- 	switch (opcode) {
-+#ifdef X86_I386_CONDITION_OUTPUT
-+	case 0x0f:
-+		if (size >= 3 && code[2] >= 0xc0 &&
-+		    ((code[1] & 0xf0) == 0x90 || (code[1] & 0xf0) == 0x40) &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+			writeConditionRegisters32(code, insn, insn_size);
-+			return true;
-+		}
-+		break;
-+#endif
- 	case 0xc4:
- 		if (X86_writeVexRegisterImmediate(handle, code, size, insn,
- 						  insn_size, x86_simple_registers, false))
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index 37cb0735..10191cf4 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -602,15 +602,25 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 	std::cout
+ 		<< "/* Generated by suite/synctools/x86_simple_output.cpp. */\n\n"
+ 		<< "static const uint16_t x86_simple_plans[2][4][256] = {\n";
+-	for (auto &mode : plans) {
++	for (unsigned mode = 0; mode < 2; ++mode) {
+ 		std::cout << "\t{\n";
+-		for (auto &prefix : mode) {
++		for (unsigned bank = 0; bank < 4; ++bank) {
++			const auto &prefix = plans[mode][bank];
+ 			std::cout << "\t\t{\n";
+ 			for (unsigned j = 0; j < 256; j += 16) {
+ 				std::cout << "\t\t\t";
+-				for (unsigned k = 0; k < 16; ++k)
+-					std::cout << (k ? " " : "")
+-						  << prefix[j + k] << ',';
++				for (unsigned k = 0; k < 16; ++k) {
++					std::cout << (k ? " " : "");
++					if (mode == 0 && bank == 3 &&
++					    (j == 0x40 || j == 0x90)) {
++						if (prefix[j + k])
++							throw std::runtime_error("conflicting condition-register plan");
++						std::cout << "X86_PLAN_CONDITION32";
++					} else {
++						std::cout << prefix[j + k];
++					}
++					std::cout << ',';
++				}
+ 				std::cout << '\n';
+ 			}
+ 			std::cout << "\t\t},\n";
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index 24af6a88..77f5fda3 100644
 --- a/tests/unit/x86_simple_output.c
