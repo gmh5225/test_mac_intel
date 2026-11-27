@@ -1,7 +1,7 @@
-name: Verify the scalar WebAssembly reader in 32 and 64 bit Windows builds
+name: Check Windows full and DIET WebAssembly decoding in Win32 and x64
 on:
   push:
-    branches: [codex/wasm-linux-target-msvc]
+    branches: [codex/wasm-clang-msvc]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: wasm-linux-target-msvc-${{ matrix.arch }}-${{ matrix.profile }}
+          name: wasm-clang-msvc-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
