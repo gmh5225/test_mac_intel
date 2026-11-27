@@ -23,10 +23,13 @@ else:
         return usage.ru_utime + usage.ru_stime
 
 
-def measure(command):
+def measure(command, invocations=1):
     cpu, wall = child_cpu(), time.perf_counter()
-    subprocess.run(command, check=True, stdout=subprocess.DEVNULL, timeout=120)
-    return {"wall": time.perf_counter() - wall, "cpu": child_cpu() - cpu}
+    for _ in range(invocations):
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, timeout=120)
+    elapsed, used = time.perf_counter() - wall, child_cpu() - cpu
+    return {"wall": elapsed / invocations, "cpu": used / invocations,
+            "wall_batch": elapsed, "cpu_batch": used}
 
 
 def signature(file):
@@ -78,6 +81,8 @@ def main():
             commands["lld-96k-"+abi] = {label:[tool(label,"ld.lld"),"--threads=1","-static","-e","f0",obj] for label in bins}
         output = tmp/"result"
         for case, variants in commands.items():
+            # A single small LLD process can fall below the Windows job CPU clock tick.
+            invocations = 32 if sys.platform == "win32" and case.startswith("lld-") else 1
             fingerprints = []
             for command in variants.values():
                 measure([*command, "-o", output])
@@ -86,8 +91,10 @@ def main():
             samples = []
             for round_id in range(args.rounds):
                 order = ("r14","r15") if round_id % 2 == 0 else ("r15","r14")
-                samples.append({label:measure([*variants[label], "-o", output]) for label in order})
-            data["cases"][case] = {"cpu":summary(samples,"cpu"), "wall":summary(samples,"wall"), "samples":samples, "output":fingerprints[0]}
+                samples.append({label:measure([*variants[label], "-o", output], invocations) for label in order})
+            assert all(sample[tag]["cpu_batch"] > 0 for sample in samples for tag in bins), case
+            data["cases"][case] = {"cpu":summary(samples,"cpu"), "wall":summary(samples,"wall"),
+                                   "samples":samples, "output":fingerprints[0], "invocations_per_sample":invocations}
             print(case, data["cases"][case]["cpu"], data["cases"][case]["wall"], flush=True)
     args.receipt.write_text(json.dumps(data, indent=2)+"\n")
 

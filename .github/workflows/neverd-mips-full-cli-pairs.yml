@@ -1,7 +1,7 @@
 name: MIPS native Release CLI comparison
 on:
   push:
-    branches: [codex/mips-pic-cli-pairs]
+    branches: [codex/mips-pic-windows-accounting]
 permissions:
   contents: read
 env:
@@ -15,8 +15,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-24.04, cc: clang-18, cxx: clang++-18}
-          - {os: macos-15, cc: clang, cxx: clang++}
           - {os: windows-latest, cc: clang-cl, cxx: clang-cl}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 330
@@ -103,6 +101,7 @@ jobs:
             cmake -E rm -rf project/build-neverd-pair
           done
       - name: Compare public commands with the full installations at swapped paths
+        id: public_pairs
         env:
           NEVERD_PAIR_FULL_INSTALLATIONS: '1'
         run: |
@@ -138,6 +137,7 @@ jobs:
           python .github/scripts/neverd_mips_partial_pairs.py project build-mips-tools/bin \
             "$dest/slot-0" "$dest/partial-pic.json" --rounds "$rounds" --pic
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: ${{ !cancelled() && steps.public_pairs.outcome == 'success' }}
         with:
           name: mips-native-pairs-${{ runner.os }}
           path: |
