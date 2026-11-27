@@ -1,7 +1,7 @@
-name: Compare two opcode-selected VEX operand descriptors with shipping on real PE, ELF and OpenSSL
+name: Check distinct VEX IFMA opcode records against real OpenSSL functions and existing architectures
 on:
   push:
-    branches: [codex/vex-ifma-ordinary-operand-sets]
+    branches: [codex/canonical-vex-ifma-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 71cb846c8439b33d947b5a9e8a0ed30579f9b44c
+          ref: 2c135ac6040ff6b60075eefb09ebbaef5471773a
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-ifma-source-operand-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ifma-table-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
