@@ -1,16 +1,27 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..8f90f9c7 100644
+index cea06480..ae1c8343 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1092,6 +1092,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86VexRegisterImmediate.c arch/X86/X86VectorFallback64.c APPEND PROPERTY
++        set(capstone_x86_sib_reader arch/X86/X86VexSibTransfer.c)
++        set_property(SOURCE arch/X86/X86VectorFallback64.c arch/X86/X86VexSibTransfer.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_VEX_SIB_TRANSFERS>")
      endif()
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+@@ -1114,6 +1117,9 @@ if(CAPSTONE_X86_SUPPORT AND (CAPSTONE_BUILD_STATIC_LIBS OR CAPSTONE_BUILD_CSTEST
+     endif()
+     set_target_properties(capstone_x86_iter64 PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     add_library(capstone_x86_native OBJECT arch/X86/X86MemoryFallback32.c arch/X86/X86BatchScan.c arch/X86/X86VectorFallback64.c arch/X86/X86VexRegisterImmediate.c arch/X86/X86PlainEvexOutput.c arch/X86/X86RegisterFallback32.c)
++    if(capstone_x86_sib_reader)
++        target_sources(capstone_x86_native PRIVATE "$<$<CONFIG:Release>:${capstone_x86_sib_reader}>")
++    endif()
+     target_link_libraries(capstone_x86_native PRIVATE capstone_build_settings)
+     set_target_properties(capstone_x86_native PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
+     if(capstone_enabled_architectures STREQUAL "X86" OR
 diff --git a/arch/X86/X86GenVexSibTransfers.inc b/arch/X86/X86GenVexSibTransfers.inc
 new file mode 100644
 index 00000000..3710fb38
@@ -27,7 +38,7 @@ index 00000000..3710fb38
 +	{ X86_INS_VMOVSD, "vmovsd", "qword ptr [", 11, 16, 8, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +};
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 3105a881..8e41f4c7 100644
+index 3105a881..4c38de98 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
 @@ -91,6 +91,15 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
@@ -35,71 +46,48 @@ index 3105a881..8e41f4c7 100644
  			      bool wide);
  
 +#ifdef X86_VEX_SIB_TRANSFERS
-+CAPSTONE_INTERNAL bool X86_writeVexOutput64(
-+	cs_struct *handle, const uint8_t *code, size_t size, cs_insn *insn,
-+	uint16_t *insn_size, const struct X86SimpleRegister regs[4][16]);
++CAPSTONE_INTERNAL bool
++X86_writeVexTransfer(cs_struct *handle, const uint8_t *code, size_t size,
++		     cs_insn *insn, uint16_t *insn_size,
++		     const struct X86SimpleRegister regs[4][16], bool wide);
 +#else
-+#define X86_writeVexOutput64(handle, code, size, insn, insn_size, regs) \
-+	X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size, regs, true)
++#define X86_writeVexTransfer X86_writeVexRegisterImmediate
 +#endif
 +
  /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
  CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
  						   const uint8_t *code,
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..959c2e15 100644
+index bc67e4c3..51d3bde3 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -213,8 +213,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -213,7 +213,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
  		return true;
  	if (code[0] == 0xc4 &&
 -	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
--					  x86_simple_registers, true))
-+	    X86_writeVexOutput64(handle, code, size, insn, insn_size,
-+				 x86_simple_registers))
++	    X86_writeVexTransfer(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
  		return true;
  	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
- 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
-diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
-index 3fe8460f..85285833 100644
---- a/arch/X86/X86VexRegisterImmediate.c
-+++ b/arch/X86/X86VexRegisterImmediate.c
-@@ -108,5 +108,23 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
- 	writeUnsignedImmediate(out, code[5]);
- 	return true;
- }
-+#ifdef X86_VEX_SIB_TRANSFERS
-+#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_vex_sib_text" rodata = ".cs_x86_vex_sib_rodata"
-+#endif
-+#include "X86VexSibTransfer.h"
-+
-+bool X86_writeVexOutput64(cs_struct *handle, const uint8_t *code, size_t size,
-+			  cs_insn *insn, uint16_t *insn_size,
-+			  const struct X86SimpleRegister regs[4][16])
-+{
-+	if (size >= 6 && code[4] < 0xc0)
-+		return writeVexSibTransfer(handle, code, size, insn, insn_size,
-+					   regs[3]);
-+	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
-+					     regs, true);
-+}
-+#endif
-+
- #endif
- #endif
-diff --git a/arch/X86/X86VexSibTransfer.h b/arch/X86/X86VexSibTransfer.h
+diff --git a/arch/X86/X86VexSibTransfer.c b/arch/X86/X86VexSibTransfer.c
 new file mode 100644
-index 00000000..8b0d4c21
+index 00000000..b762fd52
 --- /dev/null
-+++ b/arch/X86/X86VexSibTransfer.h
-@@ -0,0 +1,124 @@
++++ b/arch/X86/X86VexSibTransfer.c
+@@ -0,0 +1,148 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
-+#ifndef CS_X86_VEX_SIB_TRANSFER_H
-+#define CS_X86_VEX_SIB_TRANSFER_H
-+
++#ifdef CAPSTONE_HAS_X86
++#include "../../cs_priv.h"
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_vex_sib_text" rodata = \
++	".cs_x86_vex_sib_rodata"
++#endif
 +#include "X86OutputOptions.h"
 +#include "X86SimpleOutput.h"
 +#include "X86VectorRegisterWriter.h"
@@ -121,13 +109,13 @@ index 00000000..8b0d4c21
 +	return out;
 +}
 +
-+/* The AMD64 caller has checked C4 and the SIB extent. */
++/* The caller checked the VEX map and the six-byte prefix through SIB. */
 +static bool writeVexSibTransfer(cs_struct *handle, const uint8_t *code,
 +				size_t size, cs_insn *insn, uint16_t *insn_size,
 +				const struct X86SimpleRegister *regs)
 +{
 +	const unsigned flags = code[2], opcode = code[3], mr = code[4];
-+	if ((code[1] & 31) != 1 || (flags & 0x7c) != 0x78 ||
++	if ((flags & 0x7c) != 0x78 ||
 +	    (mr & 7) != 4 || mr >= 0xc0)
 +		return false;
 +	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
@@ -218,6 +206,23 @@ index 00000000..8b0d4c21
 +	}
 +	return true;
 +}
++
++bool X86_writeVexTransfer(cs_struct *handle, const uint8_t *code, size_t size,
++			  cs_insn *insn, uint16_t *insn_size,
++			  const struct X86SimpleRegister regs[4][16], bool wide)
++{
++	if (size < 6)
++		return false;
++	const unsigned map = code[1] & 31;
++	if (wide && map == 1)
++		return writeVexSibTransfer(handle, code, size, insn, insn_size,
++					   regs[3]);
++	if (map != 3)
++		return false;
++	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
++					     regs, wide);
++}
++#endif
 +#endif
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
 index f0312e90..f353edac 100644

@@ -75,7 +75,12 @@ try:
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
-        section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
+        # A reconfigured Ninja directory can still contain a removed member.
+        # Hash only files the archiver actually placed in this static library.
+        names=get('ar','t',lib).splitlines()
+        assert len(set(names))==len(names)
+        section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o') if x.name in names}
+        assert {Path(k).name for k in section_data}==set(names)
         for stem,unit in [('fallback','X86VectorFallback64.c.o'),('vector','X86VectorOutput.c.o'),('immediate','X86VexRegisterImmediate.c.o')]:
             obj,=build.rglob(unit)
             with obj.open('rb') as f:
@@ -83,6 +88,11 @@ try:
                 sections={sec.name:[sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()]
                     for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
                 save(stem+'-object-'+label,sections)
+        if label=='outlined' and os.uname().machine=='x86_64':
+            obj,=build.rglob('X86VectorFallback64.c.o')
+            reloc=get('readelf','-rW',obj)
+            assert 'X86_writeVexTransfer ' in reloc and 'X86_writeVexRegisterImmediate ' not in reloc
+            save('new-call-relocation',dict(source=maps['outlined'],target='X86_writeVexTransfer',relocations=reloc.splitlines()))
         if label=='candidate':
             run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator')
             generated={}
