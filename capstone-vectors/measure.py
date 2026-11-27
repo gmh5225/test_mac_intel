@@ -42,7 +42,7 @@ try:
     text_section='.cs_x86_amd64_text'
     alias_section='.cs_alias_lookup'
     last_section='.cs_x86_batch64_text'
-    sections={k:'ax' for k in (text_section,alias_section,last_section)}
+    sections={k:'ax' for k in (text_section,alias_section,'.cs_x86_native_batch_text','.cs_x86_batch32_text',last_section)}
     layouts={};addresses={};objects={};checksums={}
     def link(tag,libpath,gaps):
         tail=[]
@@ -70,7 +70,7 @@ try:
     gap=base_layout[text_section][1]-candidate[text_section][1]
     scan_sections=('.cs_x86_native_batch_text','.cs_x86_batch32_text',last_section)
     assert gap==16 and all(base_layout[k][0]-candidate[k][0]==gap for k in scan_sections)
-    for name,section in [('matched',text_section),('before_scan',alias_section),('after_scan',last_section)]:
+    for name,section in [('matched',text_section),('before_scan',alias_section),('after_entry',scan_sections[0]),('after_i386',scan_sections[1]),('after_scan',last_section)]:
         link(name,w/'candidate.a',{section:gap})
     scanner=('X86_scanNativeBatch','scanBatch32','scanBatch64')
     for entry in scanner:
@@ -92,7 +92,14 @@ try:
     assert all(layouts['before_scan'][k][0]==layouts['after_scan'][k][0] for k in base_layout if k not in scan_sections)
     for section in ('.cs_x86_vector_fallback64_text','.cs_x86_i386_text','.cs_x86_native_batch_rodata'):
         assert layouts['base'][section][:2]==layouts['matched'][section][:2]
-    save('geometry',dict(source=maps,gap=gap,layout=layouts,functions={k:{s:addresses[k][s] for s in scanner} for k in layouts},moved_functions=movable,other_functions=len(nonscan('before_scan')),checksums=checksums,objects=objects,compiler=get('clang','--version'),cpu=get('lscpu')))
+    partitions={}
+    for earlier,later in [('before_scan','after_entry'),('after_entry','after_i386'),('after_i386','after_scan')]:
+        diffs=[(x,y) for x,y in zip(functions[earlier],functions[later]) if x!=y]
+        assert diffs and all(b[0]==a[0] and b[1]-a[1]==gap and b[2]==a[2] for b,a in diffs)
+        partitions[earlier+'/'+later]=[b[0] for b,a in diffs]
+    assert sorted(k for names in partitions.values() for k in names)==sorted(b[0] for b,a in movable)
+    assert partitions['after_entry/after_i386']==['scanBatch32'] and partitions['after_i386/after_scan']==['scanBatch64']
+    save('geometry',dict(partitions=partitions,source=maps,gap=gap,layout=layouts,functions={k:{s:addresses[k][s] for s in scanner} for k in layouts},moved_functions=movable,other_functions=len(nonscan('before_scan')),checksums=checksums,objects=objects,compiler=get('clang','--version'),cpu=get('lscpu')))
     bins={k:(w/k).read_bytes() for k in layouts};bins['duplicate']=bins['base']
     length=max(map(len,bins.values()));bins={k:v.ljust(length,b'\0')for k,v in bins.items()}
     active=w/'selected';active.write_bytes(bins['base']);active.chmod(0o755);inode=active.stat().st_ino
@@ -115,7 +122,7 @@ try:
     fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
     assert {row[0]for row in fixtures}==set(m["samples"])
     for name,bits,f,spans,_ in fixtures:
-        if name not in ('libssl3t64-i386','jpeg-avx2-i386','putty-32-0.85','libmvec-amd64'):continue
+        if name not in ('libssl3t64-i386','jpeg-avx2-i386','putty-32-0.85','putty-64-0.85','libmvec-amd64'):continue
         spec=m['provenance'][name]
         assert sha(f)==spec['text_sha256']
         selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
@@ -133,7 +140,7 @@ try:
             return rows
         expected=audit_engine('base');assert all(audit_engine(k)==expected for k in layouts)
         audits[name]=dict(extents=len(selected),extent_sha256=sha(path),bytes=sum(q[1]for q in selected))
-        for mode in ({'putty-32-0.85':(0,1,2),'libmvec-amd64':(1,2),'libssl3t64-i386':(0,),'jpeg-avx2-i386':(0,)}[name]):
+        for mode in (0,):
             def take(k,reps):
                 choose(k)
                 return list(map(int,get(*invoke,'private',str(mode),str(reps),f,path,str(bits)).split()))
@@ -147,7 +154,7 @@ try:
                 pairs.append({k:[sum(col)for col in zip(*v)]for k,v in times.items()})
             rows[name+'/'+str(mode)]=dict(reps=reps,checks=expected,pairs=pairs)
             save('paired',rows)
-    assert len(checked)==6 and len(rows)==7 and len(audits)==4
+    assert len(checked)==8 and len(rows)==5 and len(audits)==5
     save('complete',dict(complete=True,source=maps,verified=checked,inode=inode,audits=audits))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
