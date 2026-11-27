@@ -23,7 +23,8 @@ try:
  run('cargo','build','--locked','--release',cwd=ad)
  run('clang++','-O3','-DNDEBUG','-std=c++17','-I',src,'-I',src/'include','-c',r/'driver.cpp','-o',w/'driver.o')
  run('clang++','-O2','-std=c++17','-c',r/'count.cpp','-o',w/'count.o')
- products={}
+ from product_layout import all_functions
+ layouts={};products={}
  for tag in stages:
   run('git','-C',src,'restore','--source','HEAD','--worktree','--staged','--','.')
   if tag!='shipping':
@@ -34,6 +35,13 @@ try:
   run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
   run('clang++',w/'driver.o',w/'count.o',lib,ad/'target/release/libiced_compare.a','-Wl,--wrap=vsnprintf','-lpthread','-lm','-ldl','-no-pie','-o',w/(tag+'-count'))
   products[tag]=dict(library=sha(lib),exe=sha(exe))
+  funcs=all_functions(exe)
+  if tag=='base':original=funcs
+  if tag in ('candidate','outlined'):
+   common=set(original)&set(funcs);moved=[name for name in sorted(common)if [x[:2]for x in original[name]]!=[x[:2]for x in funcs[name]]]
+   selected={name:dict(old=original[name],new=funcs[name])for name in sorted(common)if name in ('cs_disasm_iter','SStream_concat','X86_Intel_printInst','X86_ATT_printInst','X86_disasmIterText','X86_disasmIter32','tryOutput32','tryOutput64')}
+   layouts[tag]=dict(original=len(original),candidate=len(funcs),common=len(common),moved=len(moved),examples=moved[:20],selected=selected)
+   save('layout',layouts)
  assert len({v['exe'] for v in products.values()})==4
  save('products',products)
  os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})

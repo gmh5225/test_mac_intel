@@ -1,7 +1,7 @@
-name: Count variadic register formats and compare bounded register appends against iced on real SQLite and liblzma
+name: Compare format-token and format-string stream dispatch with paired real Intel and AT&T workloads
 on:
   push:
-    branches: [codex/att-registers-actual-mixed-product]
+    branches: [codex/single-stream-register-dispatch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: att-register-pe-and-elf-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: stream-reg-pe-and-elf-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
