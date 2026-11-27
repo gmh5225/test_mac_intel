@@ -1,7 +1,7 @@
-name: Compare two C4 writers that reuse existing register tables and the original AMD64 caller
+name: Measure one vector memory field writer for base, RIP and indexed operands on native real programs
 on:
   push:
-    branches: [codex/shared-vex-memory-at-existing-callers]
+    branches: [codex/real-vex-memory-field-writer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 6df1031b01e33c497c407c6a69ff5e097a387bc6
+          ref: 1145966d56390a5e3f454ad1b22068a97d484a0a
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex3-row-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: operand-memory-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

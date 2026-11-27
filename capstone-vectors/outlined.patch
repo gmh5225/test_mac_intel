@@ -1,12 +1,12 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a2a27faf..b5d7d711 100644
+index a2a27faf..e7ec7085 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86VectorOutput.c arch/X86/X86VexRegisterImmediate.c
++        set_property(SOURCE arch/X86/X86VectorOutput.c arch/X86/X86VectorFallback64.c
 +            APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_SHARED_VEX3_MEMORY>")
      endif()
  endif()
@@ -33,43 +33,78 @@ index eedf177c..221d3c37 100644
  };
 +#endif
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 3105a881..b496673b 100644
+index 3105a881..668de9db 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -91,6 +91,13 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+@@ -90,6 +90,14 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 			      size_t size, cs_insn *insn, uint16_t *insn_size,
  			      const struct X86SimpleRegister regs[4][16],
  			      bool wide);
- 
 +#ifdef X86_SHARED_VEX3_MEMORY
 +CAPSTONE_INTERNAL bool
-+X86_writeVex3BaseMemory64(const uint8_t *code, size_t size, cs_insn *insn,
-+			  uint16_t *insn_size,
-+			  const struct X86SimpleRegister *regs);
++X86_writeVex3MemoryOrImmediate64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size,
++			      const struct X86SimpleRegister regs[4][16],
++			      bool wide);
 +#endif
 +
+ 
  /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
  CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
- 						   const uint8_t *code,
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index bc67e4c3..5c95e91c 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -212,9 +212,15 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
++#ifdef X86_SHARED_VEX3_MEMORY
++	if (code[0] == 0xc4 &&
++	    X86_writeVex3MemoryOrImmediate64(handle, code, size, insn, insn_size,
++					     x86_simple_registers, true))
++#else
+ 	if (code[0] == 0xc4 &&
+ 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
++#endif
+ 		return true;
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+ 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
+@@ -269,5 +275,6 @@ fallback:
+ #endif
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
++
+ #endif
+ #endif
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..228ebe3d 100644
+index dceebc42..60d07bf4 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -555,5 +555,19 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -555,5 +555,26 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  	return true;
  }
  
 +#ifdef X86_SHARED_VEX3_MEMORY
 +#pragma clang section text = ".cs_x86_vex64_memory_text" rodata = ".cs_x86_vex64_memory_rodata"
++#include "X86OutputOptions.h"
 +#include "X86VexBaseMemory.h"
 +
-+/* The fixed AMD64 reader checked the C4 header and a memory ModR/M. */
++/* The fixed AMD64 caller forwards its register table to either writer. */
 +CAPSTONE_INTERNAL bool
-+X86_writeVex3BaseMemory64(const uint8_t *code, size_t size, cs_insn *insn,
-+			  uint16_t *insn_size,
-+			  const struct X86SimpleRegister *regs)
++X86_writeVex3MemoryOrImmediate64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size,
++			      const struct X86SimpleRegister regs[4][16],
++			      bool wide)
 +{
-+	return writeVexBaseMemory(code, size, 3, insn, insn_size, regs);
++	if (size >= 5 && code[4] < 0xc0)
++		return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++		       writeVexBaseMemory(code, size, 3, insn, insn_size, regs[3]);
++	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
++					     regs, wide);
 +}
++
 +#endif
 +
  #endif
@@ -107,27 +142,6 @@ index a8ea43f2..e416db42 100644
  				 prefix, ll, 0x40 | (w << 3) | rxb, dst,
  				 (~flags >> 3) & 15, base, disp_size, disp);
  }
-diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
-index 3fe8460f..222b4fb0 100644
---- a/arch/X86/X86VexRegisterImmediate.c
-+++ b/arch/X86/X86VexRegisterImmediate.c
-@@ -31,8 +31,15 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
- 				   const struct X86SimpleRegister regs[4][16],
- 				   bool wide)
- {
--	if (size < 6 || (code[1] & 31) != 3 || code[4] < 0xc0)
-+	if (size < 6 || (code[1] & 31) != 3 || code[4] < 0xc0) {
-+#ifdef X86_SHARED_VEX3_MEMORY
-+		if (wide && size >= 5 && code[4] < 0xc0 &&
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false))
-+			return X86_writeVex3BaseMemory64(code, size, insn, insn_size,
-+						      regs[3]);
-+#endif
- 		return false;
-+	}
- 	const unsigned flags = code[2];
- 	const unsigned src = (~flags >> 3) & 15;
- 	if (!wide && (code[1] != 0xe3 || src >= 8))
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
 index f0312e90..2a12f2ba 100644
 --- a/suite/synctools/x86_vector_output.cpp
