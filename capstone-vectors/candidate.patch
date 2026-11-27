@@ -1,64 +1,40 @@
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..f0980db1 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -27,10 +27,10 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 			cs_insn *insn, uint16_t *insn_size, bool batch);
- 
--/* Keep the mode, option and callback checks in a single short-circuit chain
-- * in both instantiations of the scalar writer. */
--#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
--	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
-+/* The fixed-mode text iterators have checked their mode and text state
-+ * before entering the writer. The remaining options and callbacks are live. */
-+#define X86_OUTPUT_OPTIONS_UNSUPPORTED(handle) \
-+	((handle)->imm_unsigned || \
- 	 (handle)->mnem_list || (handle)->doing_mem || \
- 	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
- 	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
-@@ -40,4 +40,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	 (handle)->post_printer != X86_postprinter || \
- 	 cs_vsnprintf != cs_default_vsnprintf)
- 
-+#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
-+	((mode_mismatch) || (handle)->no_text || \
-+	 X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
-+
- #endif
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..dc92d198 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -111,7 +111,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			return false;
- 		}
- 	}
-+#ifdef X86_FIXED_OUTPUT_PRECHECKED
-+	if (X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
-+#else
- 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
-+#endif
- 		return false;
- 
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
-diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
-index d6f533e0..da6c4192 100644
---- a/arch/X86/X86Vex32Output.c
-+++ b/arch/X86/X86Vex32Output.c
-@@ -190,6 +190,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- 	return true;
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..7746cf8f 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11979,6 +11979,16 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 	return NULL;
  }
  
-+#define X86_FIXED_OUTPUT_PRECHECKED
- #define X86_FIXED_OUTPUT tryOutput32
- #define X86_FIXED_WIDE false
- #define X86_OUTPUT_MISS writeExtraOutput32
-@@ -197,6 +198,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
- #undef X86_OUTPUT_MISS
- #undef X86_FIXED_WIDE
- #undef X86_FIXED_OUTPUT
-+#undef X86_FIXED_OUTPUT_PRECHECKED
- #define CS_DECODE_TRY_OUTPUT tryOutput32
- #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
- #include "../../cs_disasm_internal.h"
++/* Copy just the active registers without a variable-length library call. */
++static inline void copyImplicitRegisters(uint16_t *dst, const uint16_t *src,
++					 unsigned count)
++{
++	while (count) {
++		--count;
++		dst[count] = src[count];
++	}
++}
++
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+@@ -11991,16 +12001,8 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	write_count = insn->detail->regs_write_count;
+ 
+ 	// implicit registers
+-	if (read_count == 1)
+-		regs_read[0] = insn->detail->regs_read[0];
+-	else if (read_count != 0)
+-		memcpy(regs_read, insn->detail->regs_read,
+-		       read_count * sizeof(insn->detail->regs_read[0]));
+-	if (write_count == 1)
+-		regs_write[0] = insn->detail->regs_write[0];
+-	else if (write_count != 0)
+-		memcpy(regs_write, insn->detail->regs_write,
+-		       write_count * sizeof(insn->detail->regs_write[0]));
++	copyImplicitRegisters(regs_read, insn->detail->regs_read, read_count);
++	copyImplicitRegisters(regs_write, insn->detail->regs_write, write_count);
+ 
+ 	// explicit registers
+ 	for (i = 0; i < x86->op_count; i++) {

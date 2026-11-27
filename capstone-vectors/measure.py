@@ -78,6 +78,12 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
+        from subprocess import check_output
+        disassembly=check_output(['objdump','-d','--disassemble=X86_reg_access',w/label],text=True)
+        body=disassembly.split('<X86_reg_access>:',1)[1].split('Disassembly of section',1)[0].strip()
+        assert body
+        save('access-body-'+label,dict(disassembly=body,sha256=hashlib.sha256(body.encode()).hexdigest()))
+
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
