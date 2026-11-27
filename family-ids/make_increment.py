@@ -1,6 +1,6 @@
 """Rebuild the actual Mapping.o after editing a native or per-slice header."""
 from pathlib import Path
-import hashlib,json,os,platform,subprocess as sp
+import hashlib,json,os,platform,subprocess as sp,time
 def verify(src,build,cc,universal):
     digest=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
     args=['make','-C',src,'CC='+cc,'CAPSTONE_ARCHS=arm','CAPSTONE_STATIC=yes','CAPSTONE_SHARED=no','CAPSTONE_BUILD_CORE_ONLY=yes','BUILDDIR='+str(build),'MACOS_UNIVERSAL='+('yes'if universal else'no')]
@@ -17,6 +17,8 @@ def verify(src,build,cc,universal):
             chosen=[headers[0]if platform.machine().lower() in ('arm64','aarch64') else headers[1]]
             assert len(deps)==1 and chosen[0].name in deps['Mapping.d']
         for p in chosen:
+            # GNU Make 3.81 compares whole-second timestamps on the macOS runner.
+            time.sleep(max(0, int(obj.stat().st_mtime) + 1.1 - time.time()))
             before=digest(obj);p.write_text('#define CAPSTONE_DEPENDENCY_PROBE 29\n');probe=sp.run([*args,'--question',obj]);assert probe.returncode==1,(probe.returncode,p)
             sp.run([*args,obj],check=True);after=digest(obj);assert after!=before
             obj.unlink();sp.run([*args,obj],check=True);assert digest(obj)==after

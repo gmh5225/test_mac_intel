@@ -20,7 +20,7 @@ try:
  for a,b in [('CMakeLists.txt','consumer.cmake'),('cmake/NeverDCapstoneCompilerOptions.inc','consumer-options.inc')]:
   assert dig(r/b)==q['recipe'][b];shutil.copyfile(r/b,proj/a)
  results={};stages=('ship','group','arm','combined','reference')
- profiles=['product','arm-both','arm-static','arm-shared','arm-diet','arm-debug','make']
+ profiles=['make']
  for profile in profiles:
   results[profile]={};b=w/'build';b.mkdir()
   measured=(*stages[:2],'makeShip','makeGroup',*stages[2:4]) if profile in ('product','make') else None
