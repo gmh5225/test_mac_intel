@@ -1,7 +1,7 @@
-name: Check linked public Intel throughput, PE32 placement and the 16-bit record fallback
+name: Compare GNU ld and LLD x86 public disassembly on real programs and protected page boundaries
 on:
   push:
-    branches: [codex/late-public-text-admission]
+    branches: [codex/public-record-linker-semantics]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,12 +12,11 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
+      LD_REPLICA: ${{ matrix.replica }}
       CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -51,12 +50,12 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/check.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: late-public-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-record-elf-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
