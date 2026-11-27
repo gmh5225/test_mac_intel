@@ -1,7 +1,7 @@
-name: Measure existing i386 operand rows for real-mode register operations on four hosts and six architectures
+name: Measure shared condition metadata for i386 byte and move operands
 on:
   push:
-    branches: [codex/shared-scalar-register-real-firmware]
+    branches: [codex/i386-shared-condition-page-guards]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 11a3c5a17d18214b1902318ca4d70fa9ebe8740b
+          ref: 490a48e5540360fbd0fd4590bd68193302bbbd75
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-scalar-real-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: checked-i386-condition-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
