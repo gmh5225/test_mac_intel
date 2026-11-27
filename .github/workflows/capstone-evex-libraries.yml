@@ -1,7 +1,7 @@
-name: Compare generated VEX register transfer records with full-size program and PE32 controls
+name: Partition VEX transfer records against the independently measured canonical population
 on:
   push:
-    branches: [codex/amd64-generated-vex-transfers]
+    branches: [codex/vex-transfer-population]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: amd64-transfer-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-transfer-population-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
