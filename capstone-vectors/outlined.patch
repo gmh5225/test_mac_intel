@@ -1,42 +1,14 @@
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..08f50498 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -11979,6 +11979,18 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
- 	return NULL;
- }
- 
-+/* Copy just the active registers without a variable-length library call. */
-+static inline void copyImplicitRegisters(uint16_t *dst, const uint16_t *src,
-+					 unsigned count)
-+{
-+	while (count >= 2) {
-+		count -= 2;
-+		memcpy(dst + count, src + count, 2 * sizeof(*src));
-+	}
-+	if (count)
-+		dst[0] = src[0];
-+}
-+
- void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
- 		    uint8_t *regs_read_count, cs_regs regs_write,
- 		    uint8_t *regs_write_count)
-@@ -11991,16 +12003,8 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
- 	write_count = insn->detail->regs_write_count;
- 
- 	// implicit registers
--	if (read_count == 1)
--		regs_read[0] = insn->detail->regs_read[0];
--	else if (read_count != 0)
--		memcpy(regs_read, insn->detail->regs_read,
--		       read_count * sizeof(insn->detail->regs_read[0]));
--	if (write_count == 1)
--		regs_write[0] = insn->detail->regs_write[0];
--	else if (write_count != 0)
--		memcpy(regs_write, insn->detail->regs_write,
--		       write_count * sizeof(insn->detail->regs_write[0]));
-+	copyImplicitRegisters(regs_read, insn->detail->regs_read, read_count);
-+	copyImplicitRegisters(regs_write, insn->detail->regs_write, write_count);
- 
- 	// explicit registers
- 	for (i = 0; i < x86->op_count; i++) {
+diff --git a/cs.c b/cs.c
+index d0b8b045..b1864375 100644
+--- a/cs.c
++++ b/cs.c
+@@ -986,7 +986,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 			     PostPrinter_t postprinter, const uint8_t *code,
+ 			     bool stream_length_valid)
+ {
+-	SStream_trimls(OS);
++	if (OS->buffer[0] == ' ' || OS->buffer[0] == '\t')
++		SStream_trimls(OS);
+ 	// Copy only decoded instruction bytes before the postprinter observes them.
+ 	uint16_t copy_size = copy_insn_bytes(insn, code, false);
+ 	insn->op_str[0] = '\0';
