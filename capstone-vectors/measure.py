@@ -55,6 +55,8 @@ try:
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        assert sha(r/'base.patch')==maps['base']['sha256']
+        run('git','-C',base,'apply','--index',r/'base.patch')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -91,7 +93,7 @@ try:
                     if sym is not None:symbols[name]=[sym['st_value'],sym['st_info']['bind'],sym['st_other']['visibility']]
                 allocated={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()] for v in elf.iter_sections() if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
             resolved='X86_disasmIterText' in symbols;assert resolved==(route=='native'),(label,route,symbols)
-            active=os.uname().machine=='x86_64' and label!='base'
+            active=os.uname().machine=='x86_64'
             assert ('X86_decodePublicRecord' in symbols)==active
             if active:
                 assert (symbols['X86_decodePublicRecord'][0]==symbols['cs_decode_full_insn'][0])==(route!='native'),(label,route,symbols)
@@ -119,6 +121,15 @@ try:
                 generated[name]=dict(bytes=len(projection),sha256=hashlib.sha256(projection).hexdigest())
             save('generated-vector-rows',generated)
         assert len(section_data)>=45
+        if os.uname().machine=='x86_64':
+            obj,=build.rglob('X86Vex32Output.c.o')
+            with obj.open('rb')as handle:
+                module=ELFFile(handle);sec=module.get_section_by_name('.cs_x86_i386_text')
+                assert sec is not None
+                data=sec.data();relocs=get('readelf','-rW',obj).splitlines()
+            target={'base':'X86_disasmIter','candidate':'cs_disasm_iter','outlined':'X86_disasmIterOtherMode'}[label]
+            assert any(target+' ' in line for line in relocs)
+            save('fixed-mode-caller-'+label,dict(bytes=len(data),sha256=hashlib.sha256(data).hexdigest(),target=target))
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
         from subprocess import check_output
         disassembly=check_output(['objdump','-d','--disassemble=X86_reg_access',w/label],text=True)
