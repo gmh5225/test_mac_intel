@@ -25,7 +25,7 @@ index 61a663b8..74370fdc 100644
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/arch/WASM/WASMDisassembler.c b/arch/WASM/WASMDisassembler.c
-index 063f9d9f..2550b431 100644
+index 063f9d9f..ea4e6817 100644
 --- a/arch/WASM/WASMDisassembler.c
 +++ b/arch/WASM/WASMDisassembler.c
 @@ -544,6 +544,13 @@ static bool read_uint64(const uint8_t *code, size_t code_len,
@@ -55,7 +55,7 @@ index 063f9d9f..2550b431 100644
  	size_t var_len;
  
  	// read length
-@@ -584,7 +596,19 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
+@@ -584,11 +596,32 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
  			MI->wasm_data.brtable.address;
  	}
  
@@ -74,8 +74,21 @@ index 063f9d9f..2550b431 100644
 +#endif
 +	// read the remaining targets
  	for (i = 0; i < length; i++) {
++#ifdef WASM_GROUPED_TARGETS
++		if (tmp_len >= code_len)
++			return false;
++		if ((code[tmp_len] & 0x80) == 0) {
++			++tmp_len;
++			continue;
++		}
++#else
  		if (code_len < tmp_len) {
  			return false;
+ 		}
++#endif
+ 
+ 		get_varuint32(code + tmp_len, code_len - tmp_len, &var_len);
+ 		if (var_len == -1) {
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
 index 52130880..5ae892b4 100644
 --- a/tests/unit/wasm_brtable_size.c

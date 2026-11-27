@@ -1,7 +1,7 @@
-name: Measure the Linux AMD64 WASM target reader on three real modules with independent GCC and Clang builds
+name: Check WebAssembly short and long branch tables with GCC and Clang
 on:
   push:
-    branches: [codex/linux-wasm-target-real-modules]
+    branches: [codex/wasm-tail-targets]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: linux-wasm-targets-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-tail-targets-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
