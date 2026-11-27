@@ -1,7 +1,7 @@
-name: Verify NeverD mixed libraries with and without the WASM target
+name: Verify mixed architecture consumers of the single-digit operand printer
 on:
   push:
-    branches: [codex/empty-block-mixed-libraries]
+    branches: [codex/wasm-small-operand-mixed-archives]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: eb7fdeaaeb4f89cbcc5ab24edf41e0a03073884c
+          ref: 0eb3f0239e28e965d432a964d2e7e6b15fdb8b4a
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1c62a50d7b0deb4596eeac3d63ebbb78001754f5
+          ref: 1b876a4f983d62bf0db2e8ea7020f9792e78d9aa
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -47,6 +47,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: empty-block-consumers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: small-operand-consumers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -1,20 +1,18 @@
 diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index d2fdea81..d7db69c3 100644
+index d7db69c3..117790c1 100644
 --- a/arch/WASM/WASMInstPrinter.c
 +++ b/arch/WASM/WASMInstPrinter.c
-@@ -87,6 +87,15 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- 		break;
+@@ -23,6 +23,13 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
+ 	    out->index >= SSTREAM_BUF_LEN - 1)
+ 		return false;
  
- 	case WASM_OP_INT7:
-+#ifdef WASM_LITERAL_NAMES
-+		/* Empty block types have the decoder's established -1 spelling. */
-+		if (MI->wasm_data.int7 == -1 &&
-+		    cs_vsnprintf == cs_default_vsnprintf &&
-+		    O->index < SSTREAM_BUF_LEN - 1) {
-+			SStream_concat0_n(O, "\t-1", sizeof("\t-1") - 1);
-+			break;
-+		}
-+#endif
- 		SStream_concat(O, "\t%d", MI->wasm_data.int7);
- 		break;
- 
++	if (count == 1 && values[0] < 16) {
++		char token[] = "\t0x0";
++		token[3] = "0123456789abcdef"[values[0]];
++		SStream_concat0_n(out, token, sizeof(token) - 1);
++		return true;
++	}
++
+ 	char text[sizeof("\t0xffffffff, 0xffffffff")];
+ 	char *end = text + sizeof(text) - 1;
+ 	char *p = end;
