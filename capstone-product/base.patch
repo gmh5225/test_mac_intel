@@ -1,12 +1,15 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..72004759 100644
+index cea06480..4f65f1fd 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1088,8 +1088,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1088,8 +1088,13 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
     AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
      target_compile_definitions(capstone_build_settings INTERFACE
          "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
 -    # Use the bounded masked-operand copies in the measured x86-64 static reader.
++    # The default AT&T formatter writes '%' and the register name into one stream.
++    set_property(SOURCE arch/X86/X86ATTInstPrinter.c APPEND PROPERTY
++        COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_ATT_DEFAULT_REGISTER>")
 +    # Use cached access IDs and bounded masked-operand copies in the x86-64 static reader.
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
 +        set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
@@ -14,6 +17,28 @@ index cea06480..72004759 100644
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
      endif()
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 4fda2efd..b62e6f79 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -1034,11 +1034,12 @@ static void printRegName(SStream *OS, unsigned RegNo)
+ 			X86_featureExtensionMCRegisterName(RegNo) :
+ 			NULL;
+ 
+-#if defined(CAPSTONE_X86_ONLY) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+-	!defined(_KERNEL_MODE) && defined(__apple_build_version__) && \
+-	defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && \
+-	(defined(__x86_64__) || defined(__aarch64__))
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_X86_REDUCE) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE) && (defined(X86_ATT_DEFAULT_REGISTER) || \
++	(defined(CAPSTONE_X86_ONLY) && defined(__apple_build_version__) && \
++	 defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && \
++	 (defined(__x86_64__) || defined(__aarch64__))))
+ 	/* Custom formatters and truncated writes keep the original format
+ 	 * string and capacity through SStream_concat. */
+ 	if (cs_vsnprintf == cs_default_vsnprintf && !OS->is_closed &&
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
 index 79adee8d..735660ea 100644
 --- a/arch/X86/X86Mapping.c

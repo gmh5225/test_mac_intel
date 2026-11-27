@@ -1,7 +1,7 @@
-name: Test all i386 memory-immediate arithmetic rows in the actual NeverD decoder across 69 workloads
+name: Verify both AT&T formatting paths using the source-built NeverD consumer and all 69 real workloads
 on:
   push:
-    branches: [codex/group1-neverd-llvm-source-product]
+    branches: [codex/att-register-output-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 1e662c82ead8be11f8f6ba0917e8f62ca94fa2dc
+          ref: 936bbbb654d0352373cbcdaee54d2988eb72f29f
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: group1-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: att-register-format-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
