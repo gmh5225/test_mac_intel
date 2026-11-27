@@ -1,7 +1,7 @@
-name: Measure native 16-bit formatting in isolation from all public and foreign decoders
+name: Measure existing i386 operand rows for real-mode register operations on four hosts and six architectures
 on:
   push:
-    branches: [codex/fixed-x86-16bit-native-records]
+    branches: [codex/shared-scalar-register-real-firmware]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: private-firmware-patterns-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: shared-scalar-real-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
