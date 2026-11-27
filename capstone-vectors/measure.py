@@ -110,9 +110,11 @@ try:
             assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
-        cmd,=[v['command'] for v in rd(build/'compile_commands.json') if Path(v['file']).name=='PPCInstPrinter.c']
-        assert ('CAPSTONE_PPC_SKIP_UNUSED_CANONICAL' in cmd)==(label=='candidate' and os.uname().machine=='aarch64')
-        save('ppc-compiler-'+label,cmd)
+        run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'memory-test-guard.cpp',lib,'-o',w/'test-guard')
+        guarded=list(map(int,get(w/'test-guard').split()))
+        assert len(guarded)==3 and 0<guarded[1]<guarded[0] and guarded[0]==6979584
+        if label!='base':assert guarded==rd(e/'memory-boundary-base.json')
+        save('memory-boundary-'+label,guarded)
         save('program-hashes-'+label,{key:sha(w/((key+'-' if key else '')+label)) for key in ('','ordinary','foreign','foreign-only')})
         if os.uname().machine=='x86_64' and label!='base':
             assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('PPC_printer','PPC_setAliasId')}

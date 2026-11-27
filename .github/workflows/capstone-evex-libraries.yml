@@ -1,7 +1,7 @@
-name: Verify exact Arm64 PowerPC alias output with native, public and foreign static consumers
+name: Compare byte-memory TEST across native and public x86 and five other backends
 on:
   push:
-    branches: [codex/arm64-ppc-alias-and-mixed-consumers]
+    branches: [codex/x86-memory-test-mixed-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 26d0b9fb4c24c30bc42f1dd436eb04681efb99e8
+          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm64-ppc-linked-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: byte-test-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

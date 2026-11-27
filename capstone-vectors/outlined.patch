@@ -1,35 +1,102 @@
-diff --git a/arch/PowerPC/PPCInstPrinter.c b/arch/PowerPC/PPCInstPrinter.c
-index 93a4f6ab..8acc0a5e 100644
---- a/arch/PowerPC/PPCInstPrinter.c
-+++ b/arch/PowerPC/PPCInstPrinter.c
-@@ -747,19 +747,18 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
- 
- 	if (!isAlias || !useAliasDetails) {
- 		map_set_fill_detail_ops(MI, true);
--		if (isAlias)
--			SStream_Close(O);
--#if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET) && \
--	defined(__clang__) && \
--	((defined(__linux__) && defined(__x86_64__)) || \
--	 (defined(__apple_build_version__) && \
--	  defined(__ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__) && \
--	  (defined(__x86_64__) || defined(__aarch64__))))
--		/* A closed stream cannot emit the canonical spelling. Only
--		 * a requested real-instruction detail record needs its operands. */
--		if (!isAlias || map_fill_detail_ops(MI))
-+		if (isAlias) {
-+#ifndef CAPSTONE_DIET
-+			/* The alias is already printed. Only real operand details
-+			 * require a second pass with its text suppressed. */
-+			if (!map_fill_detail_ops(MI)) {
-+				SStream_Open(O);
-+				return;
-+			}
- #endif
--			printInstruction(MI, Address, O);
-+			SStream_Close(O);
-+		}
-+		printInstruction(MI, Address, O);
- 		if (isAlias)
- 			SStream_Open(O);
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..9868a00a 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -20,7 +20,7 @@
+ #include "X86GenSimpleOutput.inc"
+ #include "../../cs_disasm_internal.h"
+ #define X86_MEMORY32_OUTPUT
+-#define X86_MEMORY_IMMEDIATE writeCompare32
++#define X86_MEMORY_IMMEDIATE writeMemoryCompareOrTest32
+ #define X86_IMMEDIATE_WIDE 0
+ #define X86_COMPARE_IMMEDIATE
+ #include "X86MemoryOutputImpl.h"
+@@ -68,12 +68,15 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	case 0x80:
+ 	case 0x81:
+ 	case 0x83:
+-		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
++	case 0xf6:
++		if (size >= 2 && code[1] < 0xc0 &&
++		    (code[1] & 0x38) == (opcode == 0xf6 ? 0 : 0x38) &&
+ 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
+-			const unsigned row =
+-				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
+-				2;
+-			if (writeCompare32(code, size, insn, insn_size,
++			/* TEST /0 and CMP /7 both read their memory operand. */
++			const unsigned reg_op =
++				opcode == 0xf6 ? 0x84 : (0x38 | (opcode & 1));
++			const unsigned row = x86_simple_plans[0][0][reg_op] >> 2;
++			if (writeMemoryCompareOrTest32(code, size, insn, insn_size,
+ 					   &x86_simple_outputs[row],
+ 					   x86_simple_registers))
+ 				return true;
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 324fc05d..53ce52e5 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -159,15 +159,17 @@ static bool writeExtraOutput64(cs_struct *handle, const uint8_t *code,
  	}
+ 	if (primary != 0x0f) {
+ 		const uint8_t mr = code[has_rex + 1];
+-		if ((primary & 0xfe) != 0xc6 || mr >= 0xc0 || (mr & 0x38) ||
++		if (((primary & 0xfe) != 0xc6 && primary != 0xf6) ||
++		    mr >= 0xc0 || (mr & 0x38) ||
+ 		    X86_OUTPUT_UNSUPPORTED(handle, false))
+ 			return false;
+ 		const unsigned prefix_class =
+ 			has_rex ? ((code[0] & 8) ? 2 : 1) : 0;
+-		/* The MOV store row carries its operand width and access. */
+-		const unsigned row = x86_simple_plans[1][prefix_class]
+-						     [0x88 | (primary & 1)] >>
+-				     2;
++		/* MOV and TEST /0 each use their register row for the memory
++		 * width, permissions and implicit effects. */
++		const unsigned reg_op = primary == 0xf6 ? 0x84 :
++							 (0x88 | (primary & 1));
++		const unsigned row = x86_simple_plans[1][prefix_class][reg_op] >> 2;
+ 		return writeMemoryImmediate64(code, size, insn, insn_size,
+ 					      &x86_simple_outputs[row],
+ 					      x86_simple_registers);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 24af6a88..1788c32f 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1624,6 +1624,28 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
+ 	return true;
+ }
+ 
++static bool check_byte_memory_test(csh handles[2], cs_mode mode)
++{
++	/* Include no-base SIB, relative/absolute disp32, and /1 as controls. */
++	static const uint8_t tails[][7] = {
++		{ 0x00, 0xff }, { 0x40, 0x80, 0x80 },
++		{ 0x44, 0xb3, 0xf8, 0xfe }, { 0x08, 0xaa },
++		{ 0x05, 0xf0, 0xff, 0xff, 0xff, 0x80 },
++		{ 0x04, 0x25, 0x01, 0x00, 0x00, 0x80, 0xff },
++	};
++	for (unsigned i = 0; i < sizeof(tails) / sizeof(tails[0]); ++i) {
++		uint8_t code[9] = { 0x4f, 0xf6 };
++		memcpy(code + 2, tails[i], sizeof(tails[i]));
++		for (unsigned offset = mode == CS_MODE_64 ? 0 : 1; offset <= 1;
++		     ++offset) {
++			for (size_t n = 1; n <= sizeof(code) - offset; ++n)
++				if (!compare(handles, code + offset, n, i))
++					return false;
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1643,6 +1665,7 @@ static bool check_mode(cs_mode mode)
+ 		    !check_lea(handles, mode) ||
+ 		    !check_mov_disp32(handles, mode) ||
+ 		    !check_group1(handles, mode) ||
++		    !check_byte_memory_test(handles, mode) ||
+ 		    !check_push_immediates(handles) ||
+ 		    !check_shift_immediate(handles, mode) ||
+ 		    !check_mov_imm32(handles, mode) ||
