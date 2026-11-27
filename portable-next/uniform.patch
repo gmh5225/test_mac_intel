@@ -1,0 +1,22 @@
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..cc5adae9 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -125,10 +125,13 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+ 		return false;
+ 	}
+ 	insn->bytes[3] = code[3];
+-	/* The underlying writer emitted exactly two operands. Their longest
+-	 * address and vector name leave room for both decorators. */
+-	char *comma = strchr(insn->op_str, ',');
+-	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
++	/* Both writers clear op_str. Move the largest possible source and
++	 * its terminator, including zero padding for shorter operands. Even
++	 * a memory destination leaves room for this span and the decorators. */
++	char *comma = store ? strchr(insn->op_str, ',') :
++		insn->op_str + 4 + (insn->op_str[4] != ',');
++	memmove(comma + (zero ? 9 : 5), comma,
++		sizeof(", zmmword ptr [r15 + r15*8 - 0x80000000]"));
+ 	memcpy(comma, " {k0}", 5);
+ 	comma[3] = (char)('0' + mask);
+ 	if (zero)
