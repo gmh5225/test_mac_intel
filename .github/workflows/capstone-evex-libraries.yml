@@ -1,7 +1,7 @@
-name: Measure standalone WebAssembly branch target decoding on three complete real modules
+name: Replicate complete SQL.js detail and esbuild branch table throughput on six native hosts
 on:
   push:
-    branches: [codex/wasm-grouped-target-reader]
+    branches: [codex/wasm-module-detailed-repeat]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,11 +11,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, cxx: clang++ }
-          - { host: ubuntu-24.04, cc: gcc, cxx: g++ }
-          - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++ }
-          - { host: macos-15, cc: clang, cxx: clang++ }
-          - { host: macos-15-intel, cc: clang, cxx: clang++ }
+          - { host: macos-15-intel, cc: clang, cxx: clang++, replica: 1 }
+          - { host: macos-15-intel, cc: clang, cxx: clang++, replica: 2 }
+          - { host: macos-15-intel, cc: clang, cxx: clang++, replica: 3 }
+          - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++, replica: 2 }
+          - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++, replica: 3 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -36,13 +37,12 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
-          python3 -B capstone-vectors/wasm/configs.py
           python3 -B capstone-vectors/wasm/run.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-grouped-target-reader-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-target-repeat-${{ matrix.host }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

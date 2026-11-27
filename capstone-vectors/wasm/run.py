@@ -62,11 +62,11 @@ try:
     if ci:run(sys.executable,'-B',r/'corpus.py',inputs)
     cover=read(inputs/'manifest.json');save('corpus',cover);results={}
     path=temp/'active';shutil.copyfile(temp/'base',path);path.chmod(0o755);inode=path.stat().st_ino
-    bins={t:(temp/t).read_bytes() for t in ('base','candidate')};bins['duplicate']=bins['base']
+    bins={t:(temp/t).read_bytes() for t in ('base','candidate')};bins['duplicate']=bins['base'];bins['treatment_copy']=bins['candidate']
     current=None
     immutable=sys.platform=='darwin'
     if immutable:
-        shutil.copy2(temp/'base',temp/'duplicate')
+        shutil.copy2(temp/'base',temp/'duplicate');shutil.copy2(temp/'candidate',temp/'treatment_copy')
     selections={tag:0 for tag in bins}
     def select(tag):
         global current
@@ -96,6 +96,9 @@ try:
     save('table-corpus',tables)
     for name,spec,raw,ranges in datasets:
         for detail in (0,1):
+            key=name+'/'+str(detail)
+            protocol=read(r/'protocol.json')
+            if key not in protocol['keys']:continue
             args=[raw,ranges,str(detail)]
             def invoke(exe,verify,reps,env=None):
                 return list(map(int,sp.check_output([exe,*args,str(verify),str(reps)],env=env,text=True).split()))
@@ -108,22 +111,18 @@ try:
                 if gold is not None:assert g==gold
                 gold=g
             assert sum(gold[:3])==spec['operators'] and gold[0]>0
-            reps=max(1,math.ceil(120e6/invoke(path,0,1)[0]));expected=invoke(path,0,reps)[2:];pairs=[];rng=random.Random(name+'/'+str(detail))
-            for _ in range(35 if ci else 7):
-                order=list(bins);rng.shuffle(order);row={}
-                for label in order:
-                    select(label);v=invoke(path,0,reps);assert v[2:]==expected;row[label]=v[:2]
-                pairs.append(row)
-            result={}
-            for ctrl in ('base','duplicate'):
-                result[ctrl]=[]
-                for j in (0,1):
-                    ratios=sorted(v[ctrl][j]/v['candidate'][j]for v in pairs)
-                    result[ctrl].append([statistics.median(ratios),ratios[11 if ci else 1],ratios[-12 if ci else -2]])
-            results[name+'/'+str(detail)]=dict(oracle=gold,ratios=result,pairs=pairs,repeats=reps)
-            save('observations',results);print(name,detail,gold,result,flush=True)
+            assert gold==protocol['oracle'][key]
+            reps=max(1,math.ceil(protocol['sample_ns']/invoke(path,0,1)[0]))
+            expected=invoke(path,0,reps)[2:];pairs=[];rng=random.Random(key+'/'+platform.node())
+            for rep in range(protocol['iterations']):
+                order=list(bins);rng.shuffle(order);samples={k:[] for k in order}
+                for label in order+order[::-1]:
+                    select(label);v=invoke(path,0,reps);assert v[2:]==expected;samples[label].append(v[:2])
+                pairs.append({k:[a+b for a,b in zip(*v)]for k,v in samples.items()})
+            results[key]=dict(oracle=gold,pairs=pairs,repeats=reps)
+            save('observations',results);print(name,detail,gold,flush=True)
     checks={t:hashlib.sha256(buf).hexdigest()for t,buf in bins.items()}
-    assert checks['base']==checks['duplicate']!=checks['candidate']
+    assert checks['base']==checks['duplicate']!=checks['candidate']==checks['treatment_copy']
     if immutable:
         assert all(sha(temp/t)==v for t,v in checks.items())
     save('selection',dict(complete=True,immutable=immutable,source=tree,selections=selections,sha256=checks))
