@@ -27,7 +27,7 @@ try:
     flags+=['-DCMAKE_C_FLAGS=/Brepro','-DCMAKE_CXX_FLAGS=/Brepro','-DCMAKE_EXE_LINKER_FLAGS=/Brepro /INCREMENTAL:NO','-DCMAKE_SHARED_LINKER_FLAGS=/Brepro /INCREMENTAL:NO']
     for stage in ('base','candidate'):
         if stage=='candidate':
-            patch=r/'candidate.patch';assert sha(patch.read_bytes())==q[stage]['sha256'];run('git','-C',source,'apply','--index',patch)
+            data=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/candidate.patch']);assert sha(data)==q[stage]['sha256'];patch=w/'candidate.patch';patch.write_bytes(data);run('git','-C',source,'apply','--index',patch)
         assert get('git','-C',source,'write-tree')==q[stage]['tree']
         run('cmake',*flags);run('cmake','--build',build,'--parallel','4','--target',*targets)
         assert all('X86_VEX_CLEAR_OUTPUT32' not in v['command'] and 'X86_ACCUMULATOR_OUTPUT32' not in v['command'] for v in read(build/'compile_commands.json'))

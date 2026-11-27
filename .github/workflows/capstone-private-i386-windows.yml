@@ -1,7 +1,7 @@
-name: Time native 32-bit and 64-bit MSVC consumers of the shared VZERO record writer
+name: Measure native MSVC consumers using the canonical checked Git patch bytes
 on:
   push:
-    branches: [codex/windows-clear-linked-programs]
+    branches: [codex/msvc-clear-record-consumers]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: clear-msvc-${{ matrix.kind }}-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: msvc-clear-measure-${{ matrix.kind }}-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
