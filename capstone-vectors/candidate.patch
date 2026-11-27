@@ -1,20 +1,45 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..1c7b5925 100644
+index 197453cb..8f1b7b62 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -2302,8 +2302,10 @@ X86_DECODE_INLINE int fixupRMOperand(struct InternalInstruction *insn,
- 			return -1;
- 	}
- 
--	// Apply the AVX512 compressed displacement scaling factor.
--	if (insn->eaDisplacement == EA_DISP_8)
-+	/* VEX and EVEX IFMA share an operand descriptor. Only the EVEX
-+	 * encoding scales its encoded disp8 by the tuple size. */
-+	if (insn->eaDisplacement == EA_DISP_8 &&
-+	    insn->vectorExtensionType == TYPE_EVEX)
- 		insn->displacement *= 1 << (encoding - ENCODING_RM);
+@@ -1598,7 +1598,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
  	return 0;
  }
+ 
+-X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
++X86_DECODE_INLINE int getIDForCurrentMode(struct InternalInstruction *insn, cs_mode mode)
+ {
+ 	switch (insn->mode) {
+ 	case MODE_16BIT:
+@@ -1610,6 +1610,28 @@ X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+ 	}
+ }
+ 
++/* Unmasked VEX IFMA uses the tied FMA memory layout with an unscaled disp8.
++ * Keep the opcode selected by the table for instruction mapping and printing. */
++X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
++{
++	int status = getIDForCurrentMode(insn, mode);
++#ifndef CAPSTONE_X86_REDUCE
++	if (status == 0 && insn->vectorExtensionType == TYPE_VEX_3B) {
++		switch (insn->instructionID) {
++		case X86_VPMADD52LUQZ128m:
++		case X86_VPMADD52HUQZ128m:
++			insn->spec = specifierForUID(X86_VFMADD132PDm);
++			break;
++		case X86_VPMADD52LUQZ256m:
++		case X86_VPMADD52HUQZ256m:
++			insn->spec = specifierForUID(X86_VFMADD132PDYm);
++			break;
++		}
++	}
++#endif
++	return status;
++}
++
+ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
+ {
+ 	uint16_t attrMask;
 diff --git a/arch/X86/X86GenDisassemblerTables2.inc b/arch/X86/X86GenDisassemblerTables2.inc
 index 626482ea..e7482278 100644
 --- a/arch/X86/X86GenDisassemblerTables2.inc

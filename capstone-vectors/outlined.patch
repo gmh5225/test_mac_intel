@@ -1,30 +1,33 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..b5c92ef7 100644
+index 197453cb..3832c7bd 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -2290,6 +2290,13 @@ X86_DECODE_INLINE int fixupRegisterOperand(struct InternalInstruction *insn,
- 	return 0;
- }
+@@ -1303,6 +1303,25 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
  
-+/* VEX can share an EVEX operand descriptor, but always uses unscaled disp8. */
-+X86_DECODE_INLINE OperandEncoding
-+rmEncodingForPrefix(const struct InternalInstruction *insn, OperandEncoding encoding)
-+{
-+	return insn->vectorExtensionType == TYPE_EVEX ? encoding : ENCODING_RM;
-+}
-+
- X86_DECODE_INLINE int fixupRMOperand(struct InternalInstruction *insn,
- 				      OperandType type,
- 				      OperandEncoding encoding)
-@@ -2450,7 +2457,7 @@ CASE_ENCODING_VSIB:
- CASE_ENCODING_RM:
- 			if (readModRM(insn) ||
- 			    fixupRMOperand(insn, (OperandType)op->type,
--					   (OperandEncoding)op->encoding))
-+					   rmEncodingForPrefix(insn, (OperandEncoding)op->encoding)))
- 				return -1;
- 			break;
- 
+ 			if (lFromVEX3of3(insn->vectorExtensionPrefix[2]))
+ 				attrMask |= ATTR_VEXL;
++#ifndef CAPSTONE_X86_REDUCE
++			/* The VEX.W1.66 map selects IFMA through the normal opcode
++			 * table in each code mode, without EVEX tuple scaling. */
++			if (insn->opcodeType == THREEBYTE_38 &&
++			    (insn->opcode & 0xfe) == 0xb4 &&
++			    (attrMask & ATTR_OPSIZE) &&
++			    wFromVEX3of3(insn->vectorExtensionPrefix[2])) {
++				if (getIDWithAttrMask(&instructionID, insn,
++						      attrMask | ATTR_REXW))
++					return -1;
++				insn->instructionID = instructionID;
++				if (modFromModRM(insn->modRM) != 3)
++					instructionID = (attrMask & ATTR_VEXL) ?
++								X86_VFMADD132PDYm :
++								X86_VFMADD132PDm;
++				insn->spec = specifierForUID(instructionID);
++				return 0;
++			}
++#endif
+ 		} else if (insn->vectorExtensionType == TYPE_VEX_2B) {
+ 			attrMask |= mandatoryPrefixAttributes(
+ 				ppFromVEX2of2(insn->vectorExtensionPrefix[1]));
 diff --git a/arch/X86/X86GenDisassemblerTables2.inc b/arch/X86/X86GenDisassemblerTables2.inc
 index 626482ea..e7482278 100644
 --- a/arch/X86/X86GenDisassemblerTables2.inc
@@ -73,46 +76,6 @@ index b6dbca38..014dd43b 100644
      { 0x4a0e941cu }, { 0x4a37146cu }, { 0x4b229644u }, { 0x4b4b1694u }, { 0x4c36986cu }, { 0x4c5f18bcu }, { 0x4cdc99b8u }, { 0x4d051a08u },
      { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
      { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
-diff --git a/arch/X86/X86GenOperandRead.inc b/arch/X86/X86GenOperandRead.inc
-index 45018f74..459de0f8 100644
---- a/arch/X86/X86GenOperandRead.inc
-+++ b/arch/X86/X86GenOperandRead.inc
-@@ -1271,7 +1271,7 @@ case 206:
- 	if ((!insn->consumedModRM && readModRM(insn)) ||
- 	    fixupRegisterOperand(insn, TYPE_XMM) ||
- 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
--	    fixupRMOperand(insn, TYPE_M, ENCODING_RM_CD16))
-+	    fixupRMOperand(insn, TYPE_M, rmEncodingForPrefix(insn, ENCODING_RM_CD16)))
- 		return -1;
- 	return needVVVV ? -1 : 0;
- case 203:
-@@ -1321,7 +1321,7 @@ case 530:
- 	if ((!insn->consumedModRM && readModRM(insn)) ||
- 	    fixupRegisterOperand(insn, TYPE_XMM) ||
- 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
--	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
-+	    fixupRMOperand(insn, TYPE_XMM, rmEncodingForPrefix(insn, ENCODING_RM_CD16)))
- 		return -1;
- 	return needVVVV ? -1 : 0;
- case 212:
-@@ -1338,7 +1338,7 @@ case 531:
- 	if ((!insn->consumedModRM && readModRM(insn)) ||
- 	    fixupRegisterOperand(insn, TYPE_YMM) ||
- 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
--	    fixupRMOperand(insn, TYPE_M, ENCODING_RM_CD32))
-+	    fixupRMOperand(insn, TYPE_M, rmEncodingForPrefix(insn, ENCODING_RM_CD32)))
- 		return -1;
- 	return needVVVV ? -1 : 0;
- case 215:
-@@ -1372,7 +1372,7 @@ case 533:
- 	if ((!insn->consumedModRM && readModRM(insn)) ||
- 	    fixupRegisterOperand(insn, TYPE_YMM) ||
- 	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
--	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32))
-+	    fixupRMOperand(insn, TYPE_YMM, rmEncodingForPrefix(insn, ENCODING_RM_CD32)))
- 		return -1;
- 	return needVVVV ? -1 : 0;
- case 221:
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
 index 7d3a6e84..09b6a790 100644
 --- a/arch/X86/X86GenVectorOutput.inc
@@ -380,7 +343,7 @@ index 05b8ea9c..f11b90ab 100644
  opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
  vector escapes reuse the existing payload parser. Other prefix sequences keep
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index 529fb90a..88d34d07 100644
+index 529fb90a..e8e90fb9 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
 @@ -5,6 +5,7 @@
@@ -391,11 +354,10 @@ index 529fb90a..88d34d07 100644
  from pathlib import Path
  import re
  
-@@ -132,7 +133,33 @@ def read_specializations(suffix, *, scalar_limit=2):
+@@ -132,6 +133,32 @@ def read_specializations(suffix, *, scalar_limit=2):
              yield index, operands
  
  
--def read_operand_calls(operands, *, materialize=True):
 +@lru_cache(maxsize=None)
 +def vex_tuple_uids(suffix):
 +    """Find operations whose EVEX tuple descriptors are also selected by VEX."""
@@ -422,38 +384,10 @@ index 529fb90a..88d34d07 100644
 +    )}
 +
 +
-+def read_operand_calls(operands, *, materialize=True, shared_tuple=False):
+ def read_operand_calls(operands, *, materialize=True):
      calls = []
      has_modrm = False
-     for encoding, operand_type in operands:
-@@ -151,6 +178,8 @@ def read_operand_calls(operands, *, materialize=True):
-                 calls.append(f"fixupRegisterOperand(insn, {operand_type})")
-         elif encoding in RM_ENCODINGS:
-             if materialize:
-+                if shared_tuple and encoding != "ENCODING_RM":
-+                    encoding = f"rmEncodingForPrefix(insn, {encoding})"
-                 calls.append(f"fixupRMOperand(insn, {operand_type}, {encoding})")
-         elif encoding in VSIB_ENCODINGS:
-             calls.append(
-@@ -179,13 +208,16 @@ def read_operand_calls(operands, *, materialize=True):
- 
- def emit_switch(suffix):
-     groups = defaultdict(list)
-+    source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
-+    specifiers = instruction_specifiers(source)
-+    tuple_sets = {specifiers[uid] for uid in vex_tuple_uids(suffix)}
-     for index, operands in read_specializations(suffix):
-         groups[operands].append(index)
- 
-     lines = ["switch (insn->spec->operands) {"]
-     for operands, indices in groups.items():
-         lines.extend(f"case {index}:" for index in indices)
--        calls = read_operand_calls(operands)
-+        calls = read_operand_calls(operands, shared_tuple=not tuple_sets.isdisjoint(indices))
-         if calls:
-             lines.append("\tif (" + " ||\n\t    ".join(calls) + ")")
-             lines.append("\t\treturn -1;")
-@@ -1557,11 +1589,18 @@ def emit_vex_scan(suffix, public_plans=False):
+@@ -1557,11 +1584,18 @@ def emit_vex_scan(suffix, public_plans=False):
      specifiers = instruction_specifiers(source)
      patterns = {(): 0}
      flags = []
