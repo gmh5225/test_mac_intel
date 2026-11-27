@@ -1,12 +1,12 @@
 name: MIPS native Release CLI comparison
 on:
   push:
-    branches: [codex/mips-r15-repaired-release-pairs]
+    branches: [codex/mips-r15-current-release-pairs]
 permissions:
   contents: read
 env:
-  BASE_PROJECT: 47f3d24503e462641debc53c8963c2b4951214a7
-  NEW_PROJECT: 916625eaa68552d0bded37bd466f9261f4484d3b
+  BASE_PROJECT: 7cbc695ca3ce3c318f82806118e4505883386241
+  NEW_PROJECT: d8f44fe4a682793c2bc947ce7187cb417784f0a4
   BASE_LLVM: 6947b7db63e913244e0aa6de087d1ad2e791e86f
   NEW_LLVM: 54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00
 jobs:
@@ -120,31 +120,10 @@ jobs:
           mv "$dest/slot-1" "$dest/slot-0"
           mv "$dest/staged" "$dest/slot-1"
           python "$dest/bench.py" "$rounds" pairs-1.json "$dest/slot-1" "$dest/slot-0"
-      - name: Compare r14 and r15 MIPS compiler tools on common inputs
-        env:
-          ORIGINAL_LLVM: 6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312
-        run: |
-          dest=project/build-neverd-pair/paired
-          git -C llvm-src fetch --no-tags --depth=1 --filter=blob:none origin "$ORIGINAL_LLVM"
-          git -C llvm-src checkout --detach "$ORIGINAL_LLVM"
-          cmake --build build-mips-tools --parallel 4 --target llc llvm-mc lld
-          python .github/scripts/neverd_mips_compiler_pairs.py build-mips-tools/bin "$dest/slot-0" "$dest/compiler.json"
-      - name: Compare both modes on partially linked r14 programs
-        run: |
-          dest=project/build-neverd-pair/paired
-          rounds=16
-          if [[ "$RUNNER_OS" == macOS ]]; then rounds=32; fi
-          python .github/scripts/neverd_mips_partial_pairs.py project build-mips-tools/bin \
-            "$dest/slot-0" "$dest/partial.json" --rounds "$rounds"
-          python .github/scripts/neverd_mips_partial_pairs.py project build-mips-tools/bin \
-            "$dest/slot-0" "$dest/partial-pic.json" --rounds "$rounds" --pic
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: ${{ !cancelled() && steps.public_pairs.outcome == 'success' }}
         with:
           name: mips-native-pairs-${{ runner.os }}
           path: |
             project/build-neverd-pair/paired/pairs-*.json
-            project/build-neverd-pair/paired/compiler.json
-            project/build-neverd-pair/paired/partial.json
-            project/build-neverd-pair/paired/partial-pic.json
           if-no-files-found: error
