@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import random
+import shutil
 import statistics as stats
 import subprocess
 import sys
@@ -71,7 +72,6 @@ def run(argv):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         check=True,
-        timeout=60,
     )
 
 
@@ -129,10 +129,19 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
         m.Profile("o32", True, "classic", 2, linkage="pic-hard"),
         m.Profile("n64", True, "classic", 5, linkage="msa"),
     ]
-    public_kinds = m.MODES if windows or full_pair else ("public",)
+    assert full_pair
+    shapes = {"large-segments": "large", "callback-table": "callbacks"}
+    matrix.extend([
+        m.Profile("n32", True, linkage="large-segments"),
+        m.Profile("n64", False, linkage="large-segments"),
+        m.Profile("o32", False, linkage="callback-table"),
+        m.Profile("n64", True, linkage="callback-table"),
+    ])
+    public_kinds = (*m.MODES, *(f"{shape}-{mode}" for shape in shapes.values() for mode in m.MODES))
     kinds = (*public_kinds, "many-relocations", "codegen")
     commands = {k: {label: [] for label in toolchains} for k in kinds}
     know = {}
+    references = {}
     for pf in matrix:
         folder = base / pf.name
         folder.mkdir()
@@ -157,6 +166,10 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 section=".calc.update",
             ),
         )
+        staged = folder / "updated" / "calc.o"
+        staged.parent.mkdir()
+        shutil.copyfile(folder / "updated.o", staged)
+        replacement_inputs = [staged if name == "calc.o" else folder / name for name in objects]
         for label, tools in toolchains.items():
             driver = tools / ("ld.lld" + suffix)
             original = folder / (label + ".elf")
@@ -186,7 +199,14 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
                 ]
                 run(cmd)
                 hashes.append(guest_hash(output))
-                commands[mode if windows or full_pair else "public"][label].append(cmd)
+                layout = folder / ("section.ld" if mode == "section" else "base.ld")
+                reference = folder / "expected.elf"
+                run([driver, "-static", "-T", layout, "-o", reference, *replacement_inputs])
+                wanted = m.digest(reference)
+                assert m.digest(output) == wanted, (pf.name, mode, label)
+                references[str(output)] = wanted
+                kind = f"{shapes[pf.linkage]}-{mode}" if pf.linkage in shapes else mode
+                commands[kind][label].append(cmd)
             if pf.name in know:
                 assert know[pf.name] == hashes, pf.name
             know[pf.name] = hashes
@@ -261,6 +281,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
     if windows or full_pair:
         kinds = public_kinds
     rows = {k: [] for k in kinds}
+    same_rows = {k: [] for k in kinds}
     for k in kinds:
         for label in toolchains:
             measure(commands[k][label])
@@ -274,10 +295,13 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
             order = list(toolchains)
             if reverse_versions:
                 order.reverse()
-            row = {"order": order, "reverse_modes": reverse_modes}
-            for label in order:
-                row[label] = measure(commands[k][label])
-            rows[k].append(row)
+            for control in ((True, False) if reverse_modes else (False, True)):
+                row = {"order": order, "reverse_modes": reverse_modes}
+                for label in order:
+                    row[label] = measure(commands[k]["r15" if control else label])
+                (same_rows if control else rows)[k].append(row)
+    for path, wanted in references.items():
+        assert m.digest(Path(path)) == wanted, path
     meta = {
         label: subprocess.check_output([t / ("ld.lld" + suffix), "--version"], text=True).strip()
         for label, t in toolchains.items()
@@ -293,6 +317,9 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
         rounds=rounds,
         summary={k: report(v) for k, v in rows.items()},
         samples=rows,
+        same_installation_samples=same_rows,
+        same_installation_summary={k: report(values) for k, values in same_rows.items()},
+        commands_per_shape={k: len(commands[k]["r12"]) for k in public_kinds},
     )
     m.encode(p / receipt, result)
     print(json.dumps(result["summary"], indent=2))
