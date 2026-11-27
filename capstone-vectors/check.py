@@ -36,6 +36,19 @@ try:
         assert get('git','-C',s,'write-tree')==q[key]['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         lib,=build.rglob('libcapstone.a')
+        members={str(f.relative_to(build)):digest(f.read_bytes())for f in build.rglob('*.c.o')}
+        assert len(members)>=60
+        save('archive-'+tag,dict(archive=digest(lib.read_bytes()),objects=members))
+        if tag!='base':
+            import shlex
+            cmd=next(z for z in rd(build/'compile_commands.json')if Path(z['file']).name=='cs.c')
+            args=shlex.split(cmd['command'])
+            args[args.index('-o')+1]=str(w/'unit.o')
+            args[args.index('-c')+1]=str(s/'tests/unit/x86_simple_output.c')
+            sp.run(args,cwd=cmd['directory'],check=True)
+            run('clang',w/'unit.o',lib,'-fuse-ld='+linker,'-o',w/'unit')
+            run(w/'unit')
+
         if tag!='base':
             # The public caller has a weak reference and a strong dependency on cs.c.
             def symbols(member):
