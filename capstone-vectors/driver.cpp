@@ -78,7 +78,7 @@ static void text_value(Result &r, const char *s) {
   r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
 }
 
-template<auto Next>
+template<auto Next, bool consume_text=true>
 static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn,uint64_t start_ip,unsigned mode) {
   Result result;
   {
@@ -99,8 +99,12 @@ static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn
         throw std::runtime_error("zero instruction length");
       result.values += insn->id;
       if (mode) {
+        // Keep the two public arrays live in both versions of this diagnostic.
+        asm volatile("" : : "r"(insn->mnemonic), "r"(insn->op_str) : "memory");
+        if constexpr (consume_text) {
         text_value(result, insn->mnemonic);
         text_value(result, insn->op_str);
+        }
       }
       if (mode == 2 || mode == 4) {
         if (mode==2) {
@@ -179,6 +183,8 @@ int main(int argc,char **argv) {
   if(argc!=7) return 2;
   std::string engine=argv[1];
   unsigned mode=std::stoul(argv[2]), reps=std::stoul(argv[3]);
+  const bool create_only = (mode & 32) != 0;
+  mode &= ~32u;
   if (mode>4 || !reps) return 2;
   std::ifstream file(argv[4],std::ios::binary), table(argv[5]);
   std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(file), {}};
@@ -197,7 +203,7 @@ int main(int argc,char **argv) {
   bool att=std::getenv("CAPSTONE_BENCH_ATT")!=nullptr;
   if(att && cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT)!=CS_ERR_OK) return 4;
   cs_insn *insn=cs_malloc(handle);
-  void *iced=iced_create(bits,mode | (engine=="fast" ? 8 : 0) | (att ? 16 : 0));
+  void *iced=iced_create(bits,mode | (create_only ? 32 : 0) | (engine=="fast" ? 8 : 0) | (att ? 16 : 0));
   if(!insn || !iced) return 5;
   if(engine=="audit") {
     for(auto f : spans) {
@@ -226,9 +232,9 @@ int main(int argc,char **argv) {
       Result all;
       for(unsigned i=0;i<n;++i) for(auto f:spans) {
         Result row;
-        if(engine=="capstone") row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
+        if(engine=="capstone") row=create_only ? cs_span<cs_disasm_iter,false>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode) : cs_span<cs_disasm_iter,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
         else if(engine=="private" && !mode) row=batch_span<false,X86_scanNativeBatch>(bytes.data()+f.offset,f.size,handle,insn,f.ip);
-        else if(engine=="private") row=cs_span<X86_disasmIterText>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
+        else if(engine=="private") row=create_only ? cs_span<X86_disasmIterText,false>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode) : cs_span<X86_disasmIterText,true>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
         else iced_run(iced,bytes.data()+f.offset,f.size,1,f.ip,&row);
         add_result(all,row,f);
       }

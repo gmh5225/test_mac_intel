@@ -1,7 +1,7 @@
-name: Measure formatting and detail costs on the released Capstone and iced across the six verified PE and ELF workloads
+name: Separate rendered data consumption from actual text and detail construction on six replayed programs
 on:
   push:
-    branches: [codex/attribute-vector-scalar-format-on-next]
+    branches: [codex/isolate-text-consumption-on-next]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: released-vector-scalar-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: create-versus-consume-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

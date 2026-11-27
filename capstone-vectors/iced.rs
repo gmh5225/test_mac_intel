@@ -50,6 +50,14 @@ pub unsafe extern "C" fn iced_run(
     output: *mut Result,
 ) {
     let state = &mut *state.cast::<State>();
+    if state.mode & 32 == 0 {
+        run_text_work::<true>(state,input,length,repeats,ip,output);
+    } else {
+        run_text_work::<false>(state,input,length,repeats,ip,output);
+    }
+}
+
+unsafe fn run_text_work<const CONSUME:bool>(state:&mut State,input:*const u8,length:usize,repeats:u32,ip:u64,output:*mut Result) {
     let bytes = std::slice::from_raw_parts(input, length);
     let mut result = Result {
         instructions: 0,
@@ -79,10 +87,14 @@ pub unsafe extern "C" fn iced_run(
             if state.mode != 0 {
                 state.text.clear();
                 if state.mode & 8 != 0 { state.fast.format(&instruction, &mut state.text); } else if state.mode & 16 != 0 { state.gas.format(&instruction, &mut state.text); } else { state.formatter.format(&instruction, &mut state.text); }
+                // Keep the produced string observable with either consumer.
+                std::hint::black_box(&state.text);
+                if CONSUME {
                 result.values = result.values.wrapping_add(
                     state.text.len() as u64
                         + state.text.as_bytes().last().copied().unwrap_or(0) as u64,
                 );
+                }
             }
             if (state.mode & 7) >= 2 {
                 let info = state.factory.info(&instruction);

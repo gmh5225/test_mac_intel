@@ -47,8 +47,8 @@ try:
   selection[name]=dict(input=spec['source'],same=len(spans),bytes=spec['covered_bytes'],sha256=sha(ranges),largest=max(row[1] for row in spans),original_ranges=len(original))
   save('selection',selection)
   rows[name]={};boundary=None
-  for engine in ('capstone','private','fast'):
-   for mode in (1,2,3):
+  for engine in ('private','fast'):
+   for mode in (1,33,3,35):
     key=engine+'/'+str(mode);lab=name+'-'+engine+'-'+str(mode)
     command=[exe,engine,str(mode),'1',text,ranges,bits]
     expected=list(map(int,get(*command).split()))[2:]
@@ -68,7 +68,15 @@ try:
     with dump.open('rb')as a,gzip.open(packed,'wb',compresslevel=6)as dest:shutil.copyfileobj(a,dest)
     with gzip.open(packed,'rb')as a:assert hashlib.sha256(a.read()).hexdigest()==sha(dump)
     for f in [raw,dump,log]:f.unlink(missing_ok=True)
- assert len(rows)==6 and all(len(v)==9 for v in rows.values())
+ for name,program in rows.items():
+  for engine in ('private','fast'):
+   for ordinary,create in [(1,33),(3,35)]:
+    first=program[f'{engine}/{ordinary}'];second=program[f'{engine}/{create}']
+    assert first['codes'][:3]==second['codes'][:3] and first['codes'][3]!=second['codes'][3]
+    # In both modes the same output is built; enabling detail only constructs the record.
+   assert program[engine+'/1']['codes']==program[engine+'/3']['codes']
+   assert program[engine+'/33']['codes']==program[engine+'/35']['codes']
+ assert len(rows)==6 and all(len(v)==8 for v in rows.values())
  save('complete',dict(complete=True,source=q,host=platform.machine(),image=image,valgrind=get('valgrind','--version'),selection=selection))
 finally:
  size=sum(x.stat().st_size for x in w.rglob('*')if x.is_file() and not x.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))
