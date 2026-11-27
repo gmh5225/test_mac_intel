@@ -48,7 +48,7 @@ try:
             run('clang++',driver,*libs,'-o',exe)
             if reader:
                 lines=get('nm','-an',exe).splitlines()
-                fn={z.split()[-1]:int(z.split()[0],16) for z in lines if z.split() and z.split()[-1].startswith('benchReader_')}
+                fn={z.split()[-1]:int(z.split()[0],16) for z in lines if len(z.split())==3 and z.split()[1].lower()=='t' and z.split()[-1] in {'benchReader_'+k for k in maps}}
                 assert len(fn)==5 and len(set(fn.values()))==5 and all(x%64==0 for x in fn.values()),fn
                 images[exe.name]=dict(binary=sha(exe),inode=exe.stat().st_ino,code=fn,archive=sha(lib))
         run('clang','-O2','-I',base,'-I',base/'include',r/'raw-timing.c',lib,'-no-pie','-o',w/('raw-'+label))
