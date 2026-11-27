@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..39b1f91e 100644
+index cea06480..406c181d 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
@@ -7,7 +7,7 @@ index cea06480..39b1f91e 100644
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
 +        set_property(SOURCE cs.c arch/X86/X86DisassemblerDecoder.c
-+            arch/X86/X86Sse64Output.c APPEND PROPERTY
++            arch/X86/X86RegisterFallback32.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_OPTIONAL_PUBLIC_RECORD>")
      endif()
  endif()
@@ -140,18 +140,21 @@ index 00000000..14caac52
 +#endif
 +	return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +}
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 324fc05d..5f74f9ab 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -282,4 +282,8 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
- #endif
- 	return X86_disasmIter32(ud, code, size, address, insn);
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index 251c6819..4a764c2d 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -63,5 +63,11 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 	}
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
 +
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++/* Both fixed-width text iterators link this final i386 fallback. */
++#include "X86ScanAdapter.h"
 +#include "X86PublicOutputImpl.h"
 +#endif
+ #endif
  #endif
 diff --git a/cs.c b/cs.c
 index d0b8b045..1e1f4278 100644

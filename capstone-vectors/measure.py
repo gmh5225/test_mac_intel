@@ -97,6 +97,10 @@ try:
                 assert (symbols['X86_decodePublicRecord'][0]==symbols['cs_decode_full_insn'][0])==(route!='native'),(label,route,symbols)
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
+        if os.uname().machine=='x86_64' and label!='base':
+            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_decodePublicRecord','decodePublicTextRecord')}
+            save('record-assembly-'+label,assembly)
+
         from symbol_layout import symbols
         section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         for stem,unit in [('fallback','X86VectorFallback64.c.o'),('vector','X86VectorOutput.c.o'),('immediate','X86VexRegisterImmediate.c.o')]:

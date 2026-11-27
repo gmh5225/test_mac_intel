@@ -1,7 +1,7 @@
-name: Compare link-selected x86 output with public-only programs, existing native readers and iced
+name: Check linked public Intel throughput, PE32 placement and the 16-bit record fallback
 on:
   push:
-    branches: [codex/linked-public-record-fallback]
+    branches: [codex/late-public-text-admission]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: archive-public-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: late-public-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

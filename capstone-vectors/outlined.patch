@@ -1,17 +1,14 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..208ec1e5 100644
+index cea06480..406c181d 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1092,6 +1092,12 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1092,6 +1092,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
 +        set_property(SOURCE cs.c arch/X86/X86DisassemblerDecoder.c
-+            arch/X86/X86Sse64Output.c APPEND PROPERTY
++            arch/X86/X86RegisterFallback32.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_OPTIONAL_PUBLIC_RECORD>")
-+        set_property(SOURCE arch/X86/X86Sse64Output.c arch/X86/X86Vex32Output.c
-+            APPEND PROPERTY COMPILE_DEFINITIONS
-+            "$<$<CONFIG:Release>:X86_ARCHIVE_FIXED_RECORD;X86_OPTIONAL_PUBLIC_RECORD>")
      endif()
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
@@ -95,10 +92,10 @@ index a03a42e9..8d606227 100644
  #endif
 diff --git a/arch/X86/X86PublicOutputImpl.h b/arch/X86/X86PublicOutputImpl.h
 new file mode 100644
-index 00000000..14caac52
+index 00000000..27623cdd
 --- /dev/null
 +++ b/arch/X86/X86PublicOutputImpl.h
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,67 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -106,15 +103,19 @@ index 00000000..14caac52
 +#if defined(__ELF__) && defined(__clang__)
 +#pragma clang section text = ".cs_x86_public_output_text"
 +#endif
++#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++static __attribute__((noinline)) CS_PRESERVE_MOST bool
++decodePublicTextRecord(cs_struct *handle,
++#else
 +CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
++#endif
 +					    const uint8_t *code, size_t size,
 +					    cs_insn *insn, uint16_t *length,
 +					    bool batch)
 +{
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+	if (handle->arch != CS_ARCH_X86 ||
-+	    (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
-+	     handle->syntax != CS_OPT_SYNTAX_INTEL))
++	if (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
++	    handle->syntax != CS_OPT_SYNTAX_INTEL)
 +		return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +#endif
 +#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
@@ -131,8 +132,11 @@ index 00000000..14caac52
 +#else
 +	/* The caller owns skipdata callbacks, bulk boundaries and the public
 +	 * cursors. A fixed iterator can fill this one record using local cursors. */
-+	if (!batch && !handle->skipdata && !handle->no_text &&
-+	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
++	if (!batch && !handle->skipdata && !handle->no_text
++#ifndef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++	    && (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)
++#endif
++	) {
 +		uint64_t address = insn->address;
 +		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
 +					     &size, &address, insn);
@@ -143,18 +147,37 @@ index 00000000..14caac52
 +#endif
 +	return cs_decode_full_insn(handle, code, size, insn, length, batch);
 +}
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 324fc05d..5f74f9ab 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -282,4 +282,8 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
- #endif
- 	return X86_disasmIter32(ud, code, size, address, insn);
++
++#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++/* The outer gate can tail-call the generic reader for 16-bit firmware
++ * without making a stack frame for the native text iterator. */
++CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
++					    const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *length,
++					    bool batch)
++{
++	if ((handle->mode != CS_MODE_32 && handle->mode != CS_MODE_64) ||
++	    handle->arch != CS_ARCH_X86)
++		return cs_decode_full_insn(handle, code, size, insn, length,
++					   batch);
++	return decodePublicTextRecord(handle, code, size, insn, length, batch);
++}
++#endif
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index 251c6819..4a764c2d 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -63,5 +63,11 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 	}
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
 +
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++/* Both fixed-width text iterators link this final i386 fallback. */
++#include "X86ScanAdapter.h"
 +#include "X86PublicOutputImpl.h"
 +#endif
+ #endif
  #endif
 diff --git a/cs.c b/cs.c
 index d0b8b045..1e1f4278 100644
