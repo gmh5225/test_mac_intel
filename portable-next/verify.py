@@ -89,7 +89,7 @@ try:
             access=next(c['command']for c in commands if Path(c['file']).name=='X86Mapping.c')
             import re
             clang_ver=sp.check_output(['clang','--version'],text=True)
-            active=(name=='uniform' and platform.machine().lower() in ('amd64','x86_64') and re.search(r'clang version 18[.]',clang_ver) is not None)
+            active=(name in ('search','uniform') and platform.machine().lower() in ('amd64','x86_64') and re.search(r'clang version 18[.]',clang_ver) is not None)
             assert ('-DX86_CACHED_OPERAND_ACCESS' in access)==active
             rows[name]['cached_access']=active
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')

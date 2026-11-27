@@ -1,7 +1,7 @@
-name: Verify all i386 memory immediate arithmetic rows across Linux Windows and macOS
+name: Verify ARM alias headers and the final mixed tree across Windows, Linux, Intel Mac and Apple Silicon
 on:
   push:
-    branches: [codex/verify-real-i386-group1-memory]
+    branches: [codex/portable-arm-alias-headers]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: group1-record-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: portable-arm-header-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
