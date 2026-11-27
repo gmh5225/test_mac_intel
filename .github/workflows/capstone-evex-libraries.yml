@@ -1,7 +1,7 @@
-name: Compare two public formatter entry points with iced on SQLite and liblzma after separating verified jump tables
+name: Verify both placements of complete AMD64 group-one memory arithmetic on SQLite and liblzma PE and ELF images
 on:
   push:
-    branches: [codex/pe-tables-public-formatter-comparison]
+    branches: [codex/whole-sqlite-group1-memory-dispatch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: sqlite-public-with-verified-tables-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: sqlite-group1-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

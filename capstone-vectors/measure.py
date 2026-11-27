@@ -63,7 +63,10 @@ try:
    image.select(stage)
    assert [list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]==trace
   ranges.write_bytes(table_bytes(included));selections[name]=dict(source=metadata,excluded_tables=removed,data_bytes=skipped,revised_count=len(spans),included=len(included),included_bytes=sum(n for _,n,_ in included),excluded=excluded,ranges=sha(ranges));audit[name]=trace;save('selections',selections);save('boundary-audit',audit)
-  if name=='sqlite-win-x64':assert not excluded,excluded
+  checked=q['ranges'][name]
+  assert not excluded and len(included)==checked['included']
+  assert sha(ranges)==checked['ranges'] and sum(n for _,n,_ in included)==checked['included_bytes']
+
   for route in ('private','capstone'):
    for dialect,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
     engine=['iced']+(['fast'] if dialect=='intel' and mode else [])
