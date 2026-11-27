@@ -52,6 +52,12 @@ try:
         target=temp/(label+'-dynamic');target.mkdir();shutil.copy2(shared[0],target/shared[0].name)
         for link in shared[0].parent.glob('libcapstone*'):
             if link.is_symlink() and link.resolve()==shared[0]:(target/link.name).symlink_to(shared[0].name)
+        if label=='base':shutil.copy2(shared[0],temp/'base-domain.so')
+        else:
+            run(cxx,'-O2','-std=c++17','-I',src/'include',r/'domain.cpp','-ldl','-o',temp/'domain')
+            counts=list(map(int,get(temp/'domain',temp/'base-domain.so',shared[0]).split()))
+            assert counts==[165224,5676,159548]
+            save('domain',dict(cases=counts,source=tree))
         libs[label]={'static':sha(lib),'shared':sha(shared[0]),'driver':sha(temp/label)}
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
     assert by['base']==by['candidate']
