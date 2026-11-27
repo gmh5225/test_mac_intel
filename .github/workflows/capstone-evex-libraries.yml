@@ -1,7 +1,7 @@
-name: Check PE32 and other architectures in the linked seven-architecture library after writing bounded WASM branch table fields
+name: Validate PE and foreign consumers of the seven-architecture typed WASM build
 on:
   push:
-    branches: [codex/wasm-table-digits-linked]
+    branches: [codex/wasm-system-width-consumers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
+          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: c9772143c11e10fb199de017eb1c0fcaef115c53
+          ref: 49eed13da02b9854924fca2d40d343c423672e85
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-digits-linked-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: wasm-system-width-consumers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
