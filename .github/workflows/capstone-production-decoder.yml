@@ -1,7 +1,7 @@
-name: Measure foreign architecture bypass in current NeverD with LLVM built from fork source
+name: Verify PowerPC alias handling in the real NeverD decoder on seventeen programs
 on:
   push:
-    branches: [codex/full-product-foreign-record-bypass]
+    branches: [codex/full-product-alias-canonical-pass]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: b09f0adc37be8752c05426d4191701891deb42d2
+          ref: 3252e9d681e89ecd3cf85e9e79f60f08d466736f
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: foreign-bypass-current-dev-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: ppc-canonical-pass-dev-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

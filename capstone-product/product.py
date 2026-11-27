@@ -34,6 +34,17 @@ try:
         case=dict(name=name,path=str(dest),selector=4,text_sha256=spec['sha256']);cases.append(case)
         if not any(x['name']==name for x in foreign):foreign.append(case)
     save('mips-inputs',specs)
+    ppc=json.loads((r/'ppc-samples.json').read_bytes())['fixtures']
+    pkg=t/'corpus'/ppc['ppc64el-ls']['package'];assert sha(pkg)==ppc['ppc64el-ls']['package']
+    for name,spec in ppc.items():
+        if name=='ppc64el-ls':
+            assert next(c for c in cases if c['name']==name)['text_sha256']==spec['sha256']
+            continue
+        data=corpus.elf_text(corpus.deb_binary(pkg,name.split('-')[1]))
+        assert len(data)==spec['bytes'] and corpus.digest(data)==spec['sha256']
+        dest=t/(name+'.text');dest.write_bytes(data)
+        cases.append(dict(name=name,path=str(dest),selector=3,text_sha256=spec['sha256']))
+    save('ppc-inputs',ppc)
     rv=next(c for c in cases if c['name']=='riscv64-ls')
     elf=corpus.deb_binary(t/'corpus'/rv['package_sha256'],'ls')
     assert corpus.digest(elf)==rv['binary_sha256'] and corpus.digest(corpus.elf_text(elf))==rv['text_sha256']
@@ -83,8 +94,8 @@ try:
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
             save('openssl64-input',dict(extents=len(chosen),bytes=sum(n for _,n,_ in chosen),input=q))
 
-        assert len(cases)==14 and len({v['name'] for v in cases})==14
-        assert sum(6 if c['selector'] in (32,64) else 3 for c in cases)==60
+        assert len(cases)==17 and len({v['name'] for v in cases})==17
+        assert sum(6 if c['selector'] in (32,64) else 3 for c in cases)==69
         shutil.copyfile(binary,t/(stage+'.exe'));(t/(stage+'.exe')).chmod(0o755)
         rows={}
         for c in cases:
@@ -94,14 +105,13 @@ try:
                 values=list(map(int,sp.check_output(args,text=True).split()))
                 assert len(values)==5 and values[0]>0 and values[1]>0,(c['name'],mode,values)
                 rows[c['name']+'/'+str(mode)]=dict(text=c['text_sha256'],counts=values[1:3],boundary=values[3],score=values[4])
-        assert len(rows)==60
+        assert len(rows)==69
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    arm=os.uname().machine=='aarch64'
-    first=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o', 'cs.c.o']);second=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o', 'cs.c.o']);between=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o'])
-    for before,after,expected in [('shipping','base',set() if arm else first),
-        ('shipping','mask',set() if arm else second),('base','mask',set() if arm else between)]:
+    first={'PPCInstPrinter.c.o'};second=set(first);between=set(first)
+    for before,after,expected in [('shipping','base',first),
+        ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
@@ -115,7 +125,7 @@ try:
     blobs['shipping_copy']=blobs['shipping'];blobs['mask_copy']=blobs['mask']
     total=max(map(len,blobs.values()));blobs={k:v+bytes(total-len(v)) for k,v in blobs.items()}
     block=4096;diff=[n for n in range(0,total,block) if len({v[n:n+block] for v in blobs.values()})>1]
-    assert bool(diff)==(not arm);image.write_bytes(blobs['base']);checked={}
+    assert diff;image.write_bytes(blobs['base']);checked={}
     def execute(k,c,mode,reps):
         with image.open('r+b',buffering=0) as f:
             for at in diff:
@@ -133,7 +143,7 @@ try:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             key=c['name']+'/'+str(mode);first,_=execute('base',c,mode,1)
             reps=max(1,round(30000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
-            focus=c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
+            focus=c['name'].startswith('ppc64el-') or c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
             count=35 if focus else 17;cycles=[]
             for rep in range(count):
                 order=list(blobs);rng.shuffle(order);trial={k:[]for k in order}
@@ -143,7 +153,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and (checked['shipping']==checked['mask'])==arm
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and len({checked[k]for k in ('shipping','base','mask')})==3
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:
