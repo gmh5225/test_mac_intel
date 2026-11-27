@@ -1,0 +1,289 @@
+{
+  "cases": {
+    "explicit": {
+      "test": "AArch64PAuthLRSemantics.BothCProjectionsCompileWithTheTwoModifierOracle",
+      "defines": []
+    },
+    "prefix": {
+      "test": "AArch64PACMSemantics.BothCProjectionsCompileWithThePrefixOracle",
+      "defines": [
+        "-DRETURN_MODEL_PREFIX"
+      ]
+    }
+  },
+  "routes": [
+    "high",
+    "llvm",
+    "llvm-opt"
+  ],
+  "return_profile": "c-and-direct-backend",
+  "previous_return_profile": "c-projections",
+  "backend_objects": {
+    "backend": "backend.o",
+    "backend-opt": "backend-opt.o"
+  },
+  "caller_directory": "caller",
+  "caller_hash_field": "caller_sha256",
+  "optimizations": [
+    "O0",
+    "O2"
+  ],
+  "artifact_environment": "NEVERD_ARM64E_RETURN_OBJECTS",
+  "artifact_property": "arm64e_return_object_directory",
+  "guest_directory": "diagnostics",
+  "guest_entry": "Arm64eReturnModel.S",
+  "guest_driver": "Arm64eReturnModel.c",
+  "guest_constants": "Arm64eReturnModel.def",
+  "native_policy": "verify_arm64e_native.def",
+  "optimization_option": "-{optimization}",
+  "target": "arm64e-apple-macos15",
+  "march": "-march=armv8.3-a+pauth",
+  "driver_flags": [
+    "-O2",
+    "-ffreestanding",
+    "-fno-stack-protector"
+  ],
+  "link_flags": [
+    "-static",
+    "-pagezero_size",
+    "0",
+    "-arch",
+    "arm64e",
+    "-e",
+    "_start",
+    "-platform_version",
+    "macos",
+    "15.0",
+    "15.0",
+    "-no_uuid"
+  ],
+  "text_segment": "__TEXT",
+  "reset_symbol": "_start",
+  "image_base": "0x80000000",
+  "object_kind": 1,
+  "executable_kind": 2,
+  "macho_header": "<4I",
+  "macho_magic": 4277009103,
+  "arm64_cpu": 16777228,
+  "arm64e_subtype": 2,
+  "subtype_mask": 16777215,
+  "report": "report.json",
+  "manifest": "guests.json",
+  "model_version": "11.32+19",
+  "parameters": {
+    "cluster0.NUM_CORES": 1,
+    "cluster1.NUM_CORES": 0,
+    "cluster0.has_arm_v9-5": 1,
+    "cluster0.has_el2": 0,
+    "cluster0.has_el3": 0,
+    "cluster0.has_sctlr2": 1,
+    "cluster0.enhanced_pac2_level": 4,
+    "cluster0.pacm_support_level": 2,
+    "cluster0.cpu0.CONFIG64": 1,
+    "semihosting-enable": 1,
+    "bp.secure_memory": 0,
+    "bp.vis.disable_visualisation": 1,
+    "bp.terminal_0.start_telnet": 0,
+    "bp.terminal_1.start_telnet": 0,
+    "bp.terminal_2.start_telnet": 0,
+    "bp.terminal_3.start_telnet": 0
+  },
+  "reset_parameter": "cluster0.cpu0.RVBAR",
+  "negative_parameters": {
+    "cluster0.has_arm_v9-5": 0,
+    "cluster0.has_arm_v9-4": 1,
+    "cluster0.enhanced_pac2_level": 3,
+    "cluster0.pacm_support_level": 0
+  },
+  "negative_case": "prefix-high-O0",
+  "model_timeout": 30,
+  "process_timeout": 60,
+  "record_prefix": "RETURN-MODEL ",
+  "passed": "RETURN-MODEL passed EL1 and EL0 at all four EnPACM settings",
+  "feature_mismatch": "RETURN-MODEL feature mismatch",
+  "control_records": [
+    "RETURN-MODEL compared EL1 and EL0 EnPACM/EnPACM0=00",
+    "RETURN-MODEL compared EL1 and EL0 EnPACM/EnPACM0=10",
+    "RETURN-MODEL compared EL1 and EL0 EnPACM/EnPACM0=01",
+    "RETURN-MODEL compared EL1 and EL0 EnPACM/EnPACM0=11"
+  ],
+  "unsupported_exit": 1,
+  "size_pattern": "^Segment (\\S+): \\d+ \\(vmaddr (0x[0-9a-fA-F]+) fileoff (\\d+)\\)$",
+  "test_filter_flag": "--gtest_filter=",
+  "test_report_flag": "--gtest_output=json:",
+  "bad_header": "Unexpected Mach-O header in {path} ({header})",
+  "test_failed": "Oracle did not complete exactly once: {name}",
+  "bad_export": "Unexpected object directory: {path}",
+  "bad_tests": "Incomplete oracle test inventory: {names}",
+  "bad_map": "Static guest has a non-flat segment map: {path}",
+  "bad_version": "Unexpected model version: {version}",
+  "bad_inventory": "Incomplete model guest inventory",
+  "bad_hash": "Guest identity changed: {name}",
+  "bad_observation": "{label} returned {status}: {records}",
+  "compiler": [
+    "xcrun",
+    "clang",
+    "-target"
+  ],
+  "linker": [
+    "xcrun",
+    "ld"
+  ],
+  "symbols": [
+    "xcrun",
+    "nm",
+    "-n"
+  ],
+  "segments": [
+    "xcrun",
+    "size",
+    "-m",
+    "-l"
+  ],
+  "version_flags": [
+    "--version"
+  ],
+  "model_data": "--data",
+  "model_timelimit": "--timelimit",
+  "model_parameter": "-C",
+  "segment_prefix": "Segment ",
+  "test_object_extension": ".o",
+  "test_object_directory": "objects",
+  "entry_object": "entry.o",
+  "negative_suffix": "-unsupported",
+  "model_log_extension": ".log",
+  "fixture_directory": "unittests/lift/fixtures/arm64e",
+  "fixture_environment": "NEVERD_ARM64E_PAUTH_FIXTURES",
+  "fixture_files": [
+    "pauth_lr_oracle.c",
+    "pauth_pc_oracle.def",
+    "pauth_prefix_probe.def",
+    "pauth_register_oracle.def",
+    "string.h"
+  ],
+  "version_pattern": "Fast Models \\[([^ ]+) ",
+  "staging_directory": "guests",
+  "signing_address": {
+    "profile": "observable-signing-address",
+    "test": "AArch64LiftedImage.ObservableSigningAddressesKeepBothIdentities",
+    "environment": "NEVERD_ARM64E_SIGNING_ADDRESS_FIXTURES",
+    "artifact_property": "signing_address_model_assembly",
+    "count_property": "exported_signing_address_bodies",
+    "bodies": 30
+  },
+  "commands": {
+    "build_signing_address": "build-signing-address",
+    "build": "build",
+    "run": "run",
+    "tests": "--tests",
+    "guests": "--guests",
+    "model": "--model",
+    "output": "--output",
+    "build_cursor": "build-cursor",
+    "run_cursor": "run-cursor",
+    "build_writeback": "build-writeback",
+    "run_writeback": "run-writeback",
+    "build_ordered": "build-ordered",
+    "run_ordered": "run-ordered",
+    "build_native_ordered": "build-native-ordered",
+    "run_native_ordered": "run-native-ordered"
+  },
+  "compile_only": "-c",
+  "output_option": "-o",
+  "segment_address": "-segaddr",
+  "test_completed": "COMPLETED",
+  "cursor": {
+    "driver": "Arm64eCursorModel.c",
+    "native_probe": "cursor_probe",
+    "flags": [
+      "-std=c11",
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-fno-stack-protector"
+    ],
+    "define": "-DRETURN_MODEL_CURSOR",
+    "name": "cursor-{optimization}",
+    "include_option": "-I"
+  },
+  "writeback": {
+    "driver": "Arm64eWritebackModel.c",
+    "native_probe": "cpta_probe",
+    "define": "-DRETURN_MODEL_WRITEBACK",
+    "name": "writeback-{optimization}",
+    "parameters": {"cluster0.checked_pointer_arithmetic_support_level": 2},
+    "negative_parameters": {"cluster0.checked_pointer_arithmetic_support_level": 1},
+    "record_prefix": "WRITEBACK-MODEL ",
+    "feature_mismatch": "WRITEBACK-MODEL CPA2 unavailable",
+    "control_count": 16,
+    "control_record": "WRITEBACK-MODEL controls={:x}",
+    "passed": "WRITEBACK-MODEL passed EL1 and EL0 writeback"
+  },
+  "ordered": {
+    "define": "-DRETURN_MODEL_ORDERED",
+    "driver": "Arm64eOrderedModel.c",
+    "constants": "Arm64eOrderedModel.def",
+    "test": "AArch64OrderedMemory.BothCProjectionsAndLLVMRetainOrderedInstructions",
+    "artifact_environment": "NEVERD_ARM64E_CPTA_ARTIFACT_DIR",
+    "artifact_property": "arm64e_ordered_memory_artifact_directory",
+    "sources": {
+      "high": "high.c",
+      "llvm-c": "llvm.c"
+    },
+    "object_route": "llvm-object",
+    "object_file": "llvm-arm64e.o",
+    "raw_object_route": "llvm-object-raw",
+    "raw_object_file": "llvm-arm64e-raw.o",
+    "dispatch": "ordered-dispatch.c",
+    "interface": "Arm64eOrderedAccess.h",
+    "fixture_directory": "unittests/lift/aarch64",
+    "fixture": "AArch64OrderedMemoryFixtures.def",
+    "include_option": "-I",
+    "profile": "independent-inputs-gpr-simd",
+    "fixed_input_profile": "signed-offset-gpr-simd-raw-and-optimized",
+    "previous_profile": "signed-offset-gpr-simd",
+    "quadword_profile": "quadword",
+    "legacy_passed": "ORDERED-MODEL passed quadword comparisons",
+    "march": "-march=armv8.3-a+rcpc3",
+    "parameters": {
+      "cluster0.has_lrcpc3": 1
+    },
+    "negative_parameters": {
+      "cluster0.has_lrcpc3": 0
+    },
+    "record_prefix": "ORDERED-MODEL ",
+    "feature_mismatch": "ORDERED-MODEL LRCPC3 unavailable",
+    "control_records": [
+      "ORDERED-MODEL compared EL1 and EL0 A=0 nAA=0",
+      "ORDERED-MODEL compared EL1 and EL0 A=0 nAA=1",
+      "ORDERED-MODEL compared EL1 and EL0 A=1 nAA=0",
+      "ORDERED-MODEL compared EL1 and EL0 A=1 nAA=1"
+    ],
+    "passed": "ORDERED-MODEL passed independent register and memory inputs",
+    "fixed_input_passed": "ORDERED-MODEL passed GPR and SIMD comparisons",
+    "alignment_flag": "-mstrict-align",
+    "native": {
+      "target": "arm64-apple-macos15",
+      "subtype": 0,
+      "driver": "Arm64eOrderedNative.c",
+      "probe": "Arm64eOrderedQ.c",
+      "object_file": "llvm-macho.o",
+      "raw_object_file": "llvm-macho-raw.o",
+      "profile": "darwin-independent-inputs-gpr-simd",
+      "fixed_input_profile": "darwin-signed-offset-gpr-simd-raw-and-optimized",
+      "previous_profile": "darwin-signed-offset-gpr-simd",
+      "skip_exit": 77,
+      "gpr_key": "gpr_executed",
+      "simd_key": "simd_executed",
+      "unavailable": "ORDERED-NATIVE LSE2 or LRCPC2 unavailable",
+      "gpr": "ORDERED-NATIVE GPR, aligned Q instructions unavailable",
+      "simd": "ORDERED-NATIVE GPR and SIMD",
+      "rules": [
+        "ORDERED-NATIVE within one granule",
+        "ORDERED-NATIVE unrestricted Normal-memory alignment",
+        "ORDERED-NATIVE natural alignment"
+      ],
+      "inconsistent": "Darwin ordered-memory routes reported different outcomes"
+    }
+  }
+}
