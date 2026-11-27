@@ -97,8 +97,14 @@ try:
     base,candidate=identities['base'],identities['candidate']
     assert base['objects'].keys()==candidate['objects'].keys()
     changed=[Path(k).name for k,v in base['objects'].items() if v!=candidate['objects'][k]]
-    assert {'X86Sse64Output.c.o','X86Vex32Output.c.o'}<=set(changed) and all(name.startswith('X86') for name in changed) and base['exe']!=candidate['exe'],changed
-    save('checked-objects',dict(changed=changed,mixed_identical=True,objects=len(base['objects'])))
+    active=os.uname().machine=='aarch64'
+    assert set(changed)==({'X86Sse64Output.c.o'} if active else set()),changed
+    assert (base['exe']!=candidate['exe'])==active and (base['archive']!=candidate['archive'])==active
+    save('checked-objects',dict(changed=changed,objects=len(base['objects']),active=active))
+    if not active:
+        assert candidate==base
+        save('complete',dict(complete=True,inputs=len(cases),workloads=len(results['base']),llvm=llvm,dev=dev,source=m,active=False))
+        sys.exit(0)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     image=t/'selected';shutil.copy2(t/'base.exe',image);ino=image.stat().st_ino
     blobs={k:(t/(k+'.exe')).read_bytes() for k in ('base','candidate')};blobs['copy']=blobs['base']
@@ -122,7 +128,7 @@ try:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             key=c['name']+'/'+str(mode);first,_=execute('base',c,mode,1)
             reps=max(1,round(30000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
-            focus=c['name'] in ('putty-32-0.85','libssl3t64-i386','jpeg-avx2-i386')
+            focus=c['name'] in ('putty-64-0.85','libssl3t64-amd64','libmvec-amd64')
             count=35 if focus else 17;cycles=[]
             for rep in range(count):
                 order=list(blobs);rng.shuffle(order);trial={k:[]for k in order}
@@ -134,6 +140,6 @@ try:
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
     assert set(checked)==set(blobs) and checked['base']==checked['copy'] and checked['base']!=checked['candidate']
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
-    save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m))
+    save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:
     size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(bytes=size,removed=not t.exists()))
