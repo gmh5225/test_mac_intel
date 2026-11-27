@@ -1,7 +1,7 @@
-name: Replicate i386 JPEG detail and OpenSSL text with the shared TEST operand writer
+name: Replicate PE32, i386 ELF, and AMD64 programs after sharing the VEX opcode map check
 on:
   push:
-    branches: [codex/i386-shared-writer-repeat]
+    branches: [codex/vex-map-pe32-repeat]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a5c08759df756b179578e97670e148fa7629e88c
+          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1145966d56390a5e3f454ad1b22068a97d484a0a
+          ref: 11a3c5a17d18214b1902318ca4d70fa9ebe8740b
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-i386-writer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-map-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
