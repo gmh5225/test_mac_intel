@@ -15,11 +15,11 @@ def capture(file):
             out[name]=(group,sect['sh_addralign'],sect['sh_size'])
         return out
 
-def plan(versions,archives,work,ar,objcopy,members):
+def plan(versions,archives,work,ar,objcopy,members,groups):
     slots={}; mergeable=set()
     for variant in versions:
         for member in members:
-            rows=capture(versions[variant]/member)
+            rows={k:v for k,v in capture(versions[variant]/member).items() if v[0] in groups}
             with (versions[variant]/member).open('rb') as stream:
                 elf=ELFFile(stream)
                 for sect in elf.iter_sections():
@@ -49,7 +49,7 @@ def plan(versions,archives,work,ar,objcopy,members):
         dest=work/('padded-'+version);dest.mkdir()
         lib=dest/'libcapstone.a';shutil.copy2(archives[version],lib)
         for member in members:
-            rows=capture(dirpath/member);opts=[]
+            rows={k:v for k,v in capture(dirpath/member).items() if v[0] in groups};opts=[]
             for sect in rows:
                 flags=',alloc,load,readonly,data,contents' if (member,sect) in mergeable else ''
                 opts+=['--rename-section',sect+'=.probe_'+identifiers[(member,sect)]+flags]

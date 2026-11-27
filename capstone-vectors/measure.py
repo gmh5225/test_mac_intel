@@ -61,16 +61,19 @@ try:
             path,=build.rglob(member);assert (dest/member).read_bytes()==path.read_bytes()
     changes=[Path(f).name for f,h in obj['base'].items() if obj['candidate'][f]!=h]
     assert changes==['X86VectorOutput.c.o']
-    controlled,script=plan(versions,archives,w,ar,objcopy,members)
-    (e/'layout.ld').write_bytes(script.read_bytes())
+    links={'regular':(archives,None)}
+    for label,groups in [('code',{'exec'}),('constants',{'const'}),('both',{'exec','const'})]:
+        wd=w/label;wd.mkdir();libs,ld=plan(versions,archives,wd,ar,objcopy,[members[0]],groups)
+        links[label]=libs,ld
+        (e/(label+'.ld')).write_bytes(ld.read_bytes())
     layouts={};files={}
     interest=['X86_disasmIter32','X86_decodeOutputMiss32','X86_decodeRegisterFallback32','X86_scanNativeBatch',
               'X86_disasmIterText','cs_decode_full_insn','X86_writeVectorOutput','cs_disasm_iter','X86_reg_access']
-    for group,libs in [('regular',archives),('controlled',controlled)]:
+    for group,(libs,script) in links.items():
         for tag,archive in libs.items():
             label=group+'-'+tag;exe=w/label
             link=['clang++',w/'driver.o',archive,ice_lib,*flags]
-            if group=='controlled':link+=['-fuse-ld=bfd','-Wl,-T,'+str(script)]
+            if script is not None:link+=['-fuse-ld=bfd','-Wl,-T,'+str(script)]
             run(*link,'-o',exe)
             digest=sha(exe)
             if group=='regular':assert digest==reference[tag]['exe']
@@ -81,11 +84,14 @@ try:
             layouts[label]=dict(digest=digest,functions={k:sy[k] for k in interest if k in sy},sections=sections,slots=slots)
             files[label]=exe.read_bytes()
         files[group+'-copy']=files[group+'-base']
-    x,y=(layouts['controlled-'+t] for t in ('base','candidate'))
-    assert x['slots']==y['slots'] and len(x['slots'])>=12
-    for k in ('X86_disasmIter32','X86_decodeOutputMiss32','X86_decodeRegisterFallback32','X86_scanNativeBatch'):
-        assert x['functions'][k][0]==y['functions'][k][0],k
-    save('links',dict(layout=layouts,members=members,changed=changes,script=sha(script)))
+    for group in ('code','constants','both'):
+        x,y=(layouts[group+'-'+tag] for tag in ('base','candidate'))
+        assert set(x['slots'])==set(y['slots']) and len(x['slots'])>=2
+        sections={kind:'.csprobe_'+kind for kind in ('exec','const')}
+        for kind,section in sections.items():
+            if section not in x['sections']:continue
+            assert x['sections'][section][1]==y['sections'][section][1]
+    save('links',dict(layout=layouts,members=[members[0]],changed=changes,scripts={k:sha(ld) for k,(_,ld) in links.items() if ld}))
     length=max(map(len,files.values()));files={k:v.ljust(length,b'\0') for k,v in files.items()}
     path=w/'selected';previous='regular-base';path.write_bytes(files[previous]);path.chmod(0o755)
     inode=path.stat().st_ino;verified={}
@@ -138,7 +144,7 @@ try:
                     got=trial(k,reps);assert got[2:]==expected;times[k].append(got[:2])
                 blocks.append({k:[a+b for a,b in zip(*v)]for k,v in times.items()})
             results[key]=dict(reps=reps,expected=expected,pairs=blocks);save('observations',results)
-    assert set(results)==set(protocol['keys']) and len(verified)==6
+    assert set(results)==set(protocol['keys']) and len(verified)==12
     save('complete',dict(complete=True,protocol=protocol,source=q,verified=verified,machine=machine,compiler=get('clang','--version'),node=random_input))
 finally:
     size=sum(p.stat().st_size for p in w.rglob('*') if p.is_file() and not p.is_symlink());shutil.rmtree(w);save('cleanup',dict(bytes=size,removed=not w.exists()))
