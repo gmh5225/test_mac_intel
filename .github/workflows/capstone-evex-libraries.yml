@@ -1,7 +1,7 @@
-name: Measure the complete WASM branch table token on real programs and both callback paths
+name: Verify the cold WASM table printer on real modules and custom callbacks
 on:
   push:
-    branches: [codex/wasm-branch-table-digits-programs]
+    branches: [codex/wasm-cold-table-corpus]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8519aa66bc2c2af381d5df735204d1e7fdd7cd27
+          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
           path: source
           persist-credentials: false
       - name: Verify formatter hooks and time real WASM operators
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: table-digits-programs-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-cold-table-corpus-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
