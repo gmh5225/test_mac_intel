@@ -39,7 +39,7 @@ try:
         so=(build/'libcapstone.so').resolve()
         lib,=build.rglob('libcapstone.a')
         shutil.copyfile(lib,w/(stage+'.a'))
-        if stage=='candidate':
+        if stage!='base':
             gen=w/'vector-generator'
             inc=['-I',src,'-I',src/'include']
             run('clang++','-std=c++17','-O2',*inc,src/'suite/synctools/x86_vector_output.cpp',lib,'-o',gen)
@@ -53,7 +53,10 @@ try:
                 run('clang++','-O2','-std=c++17',*inc,*(['-DUSE_PUBLIC'] if dispatch=='public' else []),r/'sib.cpp',library,'-Wl,-rpath,'+str(build),'-o',exe)
                 checks[dispatch]=list(map(int,get(exe).split()))
             assert checks['public']==checks['static'] and checks['public'][0]==7077888
-            save('sib-checks',dict(generated=generated,boundaries=checks))
+            evidence=dict(generated=generated,boundaries=checks)
+            if stage=='initial':save('sib-initial',evidence)
+            else:assert read(e/'sib-initial.json')==evidence
+            save('sib-checks',evidence)
 
         assert all('CAPSTONE_X86_ONLY' in x['command'] for x in read(build/'compile_commands.json'))
         dll=w/(stage+'.so');shutil.copyfile(so,dll);images[stage]=dll.read_bytes();sources[stage]=sha(dll);sizes[stage]=len(images[stage])
@@ -93,6 +96,8 @@ try:
         assert 'libcapstone.so' not in get('ldd',w/(stage+'-static'))
     static=FixedImage(w/'measured-static',{k:(w/(k+'-static')).read_bytes() for k in ('base','initial','candidate')},executable=True)
     save('dedicated-static',{tag:dict(executable=sha(w/(tag+'-static')),archive=sha(w/(tag+'.a')))for tag in ('base','initial','candidate')})
+    from layout import layout
+    save('layout',{k:{link:layout(img)for link,img in [('shared',w/(k+'.so')),('static',w/(k+'-static'))]}for k in ('base','initial','candidate')})
     for exe in ('driver','foreign','vectors'):
         assert str(image) in get('ldd',w/exe)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -116,9 +121,7 @@ try:
     assert {row[0]for row in fixtures}==set(m['samples'])
     host=dict(cpu=get('lscpu'),compiler=get('clang','--version').splitlines()[0],source=q,iced=m['iced_revision'],prebuilt=False)
     save('host',host);records={};timings={}
-    focus=set(read(r/'focus.json'))
     def measure(key,engines,take):
-        if key not in focus:return
         n=max(1,math.ceil(25e6/take('base',1)[0]));expected={k:take(k,n)[2:]for k in engines}
         assert all(expected[k]==expected['base'] for k in ('copy','initial','candidate','repeat'))
         if 'iced' in expected:assert all(v[:3]==expected['base'][:3]for v in expected.values())
@@ -168,7 +171,6 @@ try:
                 static.select(k)
                 return list(map(int,get(*invoke,static.path,'public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
             measure('static-att/'+name+'/'+str(mode),list(static.images),take_att_static)
-    assert set(timings)==focus
     save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),shared=shared.receipt(),static=static.receipt(),soname=soname))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))

@@ -14,6 +14,40 @@ index 00000000..382c941e
 +	{ X86_INS_VMOVSD, "vmovsd", "qword ptr [", 11, 16, 8, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +	{ X86_INS_VMOVD, "vmovd", "dword ptr [", 11, 16, 4, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +};
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 3105a881..d0a82415 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -165,7 +165,12 @@ static inline int32_t X86_readDisp32(const uint8_t *p)
+ 			 (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24);
+ }
+ 
+-static inline char *X86_writeDisplacement(char *out, int32_t displacement)
++#ifdef X86_VECTOR_SHARED_DISPLACEMENT
++static __attribute__((noinline))
++#else
++static inline
++#endif
++char *X86_writeDisplacement(char *out, int32_t displacement)
+ {
+ 	if (displacement >= -128 && displacement <= 127)
+ 		return X86_writeDisp8(out, displacement);
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index bc67e4c3..e3ba5a47 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -13,6 +13,11 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
++#if defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD) && defined(__linux__)
++/* The packed, arithmetic, and indexed memory writers use one signed
++ * displacement formatter in this translation unit. */
++#define X86_VECTOR_SHARED_DISPLACEMENT
++#endif
+ #include "X86EvexAdmission.h"
+ #include "X86SimpleOutput.h"
+ #include "X86VectorRegisterOutput.h"
 diff --git a/arch/X86/X86VexBaseMemory.h b/arch/X86/X86VexBaseMemory.h
 index a8ea43f2..1db04785 100644
 --- a/arch/X86/X86VexBaseMemory.h
@@ -61,10 +95,10 @@ index a8ea43f2..1db04785 100644
  	const unsigned mod = code[prefix + 1] >> 6;
 diff --git a/arch/X86/X86VexSibTransfer.h b/arch/X86/X86VexSibTransfer.h
 new file mode 100644
-index 00000000..d0d68916
+index 00000000..b33944a9
 --- /dev/null
 +++ b/arch/X86/X86VexSibTransfer.h
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,131 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +#ifndef CS_X86_VEX_SIB_TRANSFER_H
@@ -90,7 +124,9 @@ index 00000000..d0d68916
 +}
 +
 +/* The caller checked map 0F, a memory ModR/M with a SIB, and the SIB byte. */
-+static bool writeVexSibTransfer(const uint8_t *code, size_t size,
++/* Only indexed misses use this writer. Keep its text and detail construction
++ * out of the ordinary vector reader. */
++static __attribute__((noinline, minsize)) bool writeVexSibTransfer(const uint8_t *code, size_t size,
 +				unsigned prefix, cs_insn *insn,
 +				uint16_t *insn_size,
 +				const struct X86SimpleRegister *regs)

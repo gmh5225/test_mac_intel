@@ -14,52 +14,57 @@ index 00000000..382c941e
 +	{ X86_INS_VMOVSD, "vmovsd", "qword ptr [", 11, 16, 8, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +	{ X86_INS_VMOVD, "vmovd", "dword ptr [", 11, 16, 4, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +};
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..4a0655d0 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -29,6 +29,9 @@
- #include "X86GenSimpleOutput.inc"
- #ifdef CAPSTONE_X86_ONLY
- #include "X86VexBaseMemory.h"
+diff --git a/arch/X86/X86VexBaseMemory.h b/arch/X86/X86VexBaseMemory.h
+index a8ea43f2..1db04785 100644
+--- a/arch/X86/X86VexBaseMemory.h
++++ b/arch/X86/X86VexBaseMemory.h
+@@ -5,6 +5,9 @@
+ #include "X86SimpleOutput.h"
+ #include "X86VectorRegisterWriter.h"
+ #include "X86GenVexBaseMemory.inc"
 +#if defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD) && defined(__linux__)
 +#include "X86VexSibTransfer.h"
 +#endif
- #endif
- #define X86_LEGACY_PACKED_MEMORY
- #include "X86PackedMemoryOutput.h"
-@@ -250,10 +253,21 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	if ((code[0] & 0xfe) == 0xc4) {
- 		const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
- 		if (size >= prefix + 2 && code[prefix + 1] < 0xc0 &&
--		    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
--		    writeVexBaseMemory(code, size, prefix, insn, insn_size,
--				       x86_simple_registers[3]))
--			return true;
-+		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+#if defined(CAPSTONE_X86_DIRECT_PUBLIC_RECORD) && defined(__linux__)
-+			if ((code[prefix + 1] & 7) == 4) {
-+				if (size >= prefix + 3 &&
-+				    (prefix == 2 || (code[1] & 31) == 1) &&
-+				    writeVexSibTransfer(code, size, prefix, insn,
-+							insn_size, x86_simple_registers[3]))
-+					return true;
-+				goto fallback;
-+			}
+ 
+ static const struct X86SimpleRegister vector_rip = { X86_REG_RIP, 3, "rip" };
+ 
+@@ -78,15 +81,30 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
+ 	const bool short_prefix = prefix == 2;
+ 	const unsigned flags = code[prefix - 1];
+ 	const unsigned map = short_prefix ? 1 : code[1] & 31;
++#ifdef CS_X86_VEX_SIB_TRANSFER_H
++	if (map < 1 || map > 3)
++#else
+ 	if (map < 1 || map > 3 || (flags & 3) != 1)
 +#endif
-+			if (writeVexBaseMemory(code, size, prefix, insn, insn_size,
-+					       x86_simple_registers[3]))
-+				return true;
-+		}
- 	}
- #endif
- fallback:
+ 		return false;
+ 	const unsigned w = short_prefix ? 0 : flags >> 7;
+ 	const unsigned ll = (flags >> 2) & 1, wl = w * 2 + ll,
+ 		       opcode = code[prefix];
+ 	const unsigned plan = vex_base_plans[map - 1][opcode];
++#ifdef CS_X86_VEX_SIB_TRANSFER_H
++	/* Transfer opcodes lack the three-operand base-memory row. Keep
++	 * admitted arithmetic on its original writer. */
++	const unsigned index = (flags & 3) == 1 ? vex_base_widths[plan][wl] : 0;
++	if (!index) {
++		return map == 1 && (code[prefix + 1] & 7) == 4 &&
++		       size >= prefix + 3 &&
++		       writeVexSibTransfer(code, size, prefix, insn, insn_size, regs);
++	}
++#else
+ 	const unsigned index = vex_base_widths[plan][wl];
+ 	if (!index)
+ 		return false;
++#endif
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & (short_prefix ? 4 : 7);
+ 	const unsigned dst = ((code[prefix + 1] >> 3) & 7) | ((rxb & 4) << 1);
+ 	const unsigned mod = code[prefix + 1] >> 6;
 diff --git a/arch/X86/X86VexSibTransfer.h b/arch/X86/X86VexSibTransfer.h
 new file mode 100644
-index 00000000..d0d68916
+index 00000000..b33944a9
 --- /dev/null
 +++ b/arch/X86/X86VexSibTransfer.h
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,131 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +#ifndef CS_X86_VEX_SIB_TRANSFER_H
@@ -85,7 +90,9 @@ index 00000000..d0d68916
 +}
 +
 +/* The caller checked map 0F, a memory ModR/M with a SIB, and the SIB byte. */
-+static bool writeVexSibTransfer(const uint8_t *code, size_t size,
++/* Only indexed misses use this writer. Keep its text and detail construction
++ * out of the ordinary vector reader. */
++static __attribute__((noinline, minsize)) bool writeVexSibTransfer(const uint8_t *code, size_t size,
 +				unsigned prefix, cs_insn *insn,
 +				uint16_t *insn_size,
 +				const struct X86SimpleRegister *regs)

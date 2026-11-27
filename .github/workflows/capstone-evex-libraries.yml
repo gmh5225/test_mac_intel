@@ -1,7 +1,7 @@
-name: Repeat PE32, PE64 and vector formatting with two image controls on six hosts
+name: Compare compact indexed formatters with matching real ELF and PE layouts
 on:
   push:
-    branches: [codex/repeat-vex-pe32-pe64-and-vector-formats]
+    branches: [codex/vector-footprint-on-current-next]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,13 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
+          ref: b0009d26a8c617b2328833c96291ac8264036866
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 490a48e5540360fbd0fd4590bd68193302bbbd75
+          ref: 26d0b9fb4c24c30bc42f1dd436eb04681efb99e8
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-file-plan-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-footprint-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
