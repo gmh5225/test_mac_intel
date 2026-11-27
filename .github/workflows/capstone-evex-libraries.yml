@@ -1,7 +1,7 @@
-name: Measure reuse of the text and width checks in verified x86 record readers
+name: Replicate the final gated AMD64 reader against the original and independent reader on four Linux hosts
 on:
   push:
-    branches: [codex/fixed-reader-live-option-cost]
+    branches: [codex/verified-amd64-reader-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 72ecbcc4c30f111315196886249b8242444ca695
+          ref: 9136d1b1f28d776bf55e6746bf605bf22d42b107
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: proven-mode-live-options-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: released-reader-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
