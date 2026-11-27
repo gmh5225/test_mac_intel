@@ -1,44 +1,45 @@
 {
   "source": {
-    "source_parent": "a9d153f4cae6c71eb02309621bbce3c9508312dc",
-    "baseline_commit": "a9d153f4cae6c71eb02309621bbce3c9508312dc",
-    "baseline_tree": "4e0b7e3c1b6470a5975d18f661d38af5671a987b",
-    "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
-    "iced_ref": "codex/neverd-capstone-compat",
-    "variants": {
-      "route": {
-        "parent": "a9d153f4cae6c71eb02309621bbce3c9508312dc",
-        "tree": "0c472739f8587409e68a8773000fd325c405d02b",
-        "sha256": "46f839bc6e672dc987e19d65e42e767627f15cd427b6cc820bed4e9a7018851e"
+    "parent": "a5c08759df756b179578e97670e148fa7629e88c",
+    "commit": "677202e6cf95dd45bd84178ccb5c8115e40b36cc",
+    "tree": "8bd0265caa6a8d9a3e025220204f712b1641b5d0",
+    "sha256": "41720060a5e0fa401a173dd1b25c34ca64738430eb03871358462e6d890c8518"
+  },
+  "images": {
+    "aarch64": {
+      "base": {
+        "archive": "cc391045cbdbe7745c8839ac121c3f5494497778aa7d63975c460dc5061d8158",
+        "exe": "fed8fa870c50eb0df6c42cc27dd8400687367eaff2db9515ca7577aeff965c14"
       },
-      "vector": {
-        "parent": "a9d153f4cae6c71eb02309621bbce3c9508312dc",
-        "tree": "7d19865d638ba8e7487712ca4aed98b8c66ec097",
-        "sha256": "944f7014cd6095e7ac78190f12ac61147c63eb3d3145989dcd6e4723fa6f3346"
+      "candidate": {
+        "archive": "7126a13130787d5757afdb0a05f43ac8a499311e298ef321a1dee2176f45a870",
+        "exe": "6caff89968637ff31606783d4c8a16fe2531ea4c79ef5d155b5564bfcaaa68c9"
+      }
+    },
+    "x86_64": {
+      "base": {
+        "archive": "28002be8a5fd58581d15d3b14e565b0a822d99467586809da8b3de7c236e592b",
+        "exe": "cc5d4d897e86e6eeb409fda7d3530e11beaa3e19f240b26b4a9f0f6092854214"
+      },
+      "candidate": {
+        "archive": "59577c7d56f5d73de9e49dfacf67702cdab133cbfde76e10d35e5a9e8df10b23",
+        "exe": "d274e8deffacdd20c69043633a7ffa1a1c31e5bbb4347dbfd47b390f073eb6d3"
       }
     }
   },
-  "cycles": 18,
-  "target_ms": 30,
-  "profiles": 4,
-  "rows": 216,
-  "samples": [
-    "libjpeg62-turbo-amd64/all-functions",
-    "libjpeg62-turbo-amd64/simd-functions",
-    "libzstd1-amd64/all-functions",
-    "libzstd1-amd64/simd-functions",
-    "libssl3t64-amd64/simd-functions",
-    "jpeg-avx2-i386/simd-functions",
-    "libssl3t64-i386/all-functions",
-    "putty-32-0.85/whole-text",
-    "putty-64-0.85/runtime-functions"
+  "keys": [
+    "private/putty-32-0.85/2",
+    "private/jpeg-avx2-i386/2",
+    "private/libssl3t64-i386/2",
+    "private/libssl3t64-i386/0",
+    "private/libmvec-amd64/1",
+    "private/libmvec-amd64/2",
+    "private/libssl3t64-amd64/1",
+    "private/putty-64-0.85/1",
+    "capstone/libssl3t64-amd64/0"
   ],
-  "launches": [
-    "images",
-    "same-file-fixed"
-  ],
-  "consumer_unchanged": true,
-  "purpose": "Compare a source build of the NeverSight compatibility branch to the current Capstone next and two verified public decoder routes.",
-  "publication_qualified": false,
-  "controls": "Balanced ABBA rotations, identical A/A image, complete Capstone result checks, common instruction boundaries. Preserve every panel and smaller stable losses. Native benchmark is not current NeverD product qualification."
+  "primary": "private/putty-32-0.85/2",
+  "iterations": 35,
+  "duration_ns": 55000000,
+  "reference": "https://github.com/gmh5225/test_mac_intel/actions/runs/45975409024"
 }
