@@ -93,7 +93,7 @@ try:
         pos=args.index('-c');del args[pos:pos+2]
         obj=w/('mask-'+label+'.o')
         run(*args,'-I',base,'-DOBSERVED_MASKED','-c',r/'masked-oracle.c','-o',obj,cwd=entry_mask['directory'])
-        for stem,name in [('masked-oracle','guard'),('masked-census','coverage')]:
+        for stem,name in [('masked-oracle','guard'),('masked-census','coverage'),('masked-extents','mask-spans')]:
             run('clang++','-O2','-std=c++17','-I',base/'include',r/(stem+'.cpp'),obj,lib,'-o',w/(name+'-'+label))
         masked=list(map(int,get(w/('guard-'+label)).split()))
         assert masked[0]>2805764 and masked[1]==0 and masked[2]>500000
@@ -182,6 +182,31 @@ try:
         assert mask_counts['base']==mask_counts['candidate']==mask_counts['outlined']
         save('masked-real-'+name,mask_counts)
 
+        if name=='libssl3t64-amd64':
+            target=w/'mask-'
+            picked=list(map(int,get(w/'mask-spans-base',f,path,str(bits),target).split()))
+            assert picked==mask_counts['base'] and picked[2:5]==[480,498,529]
+            special={}
+            for kind,total in enumerate(picked[2:5]):
+                source=Path(str(target)+str(kind))
+                assert len(source.read_text().splitlines())==total
+                for mode in (1,2):
+                    def probe(tag,n):
+                        select(tag)
+                        return list(map(int,get(*invoke,'private',str(mode),str(n),f,source,str(bits)).split()))
+                    reps=max(1,math.ceil(30e6/probe('base',1)[0]))
+                    expected=probe('base',reps)[2:]
+                    tags=['base','duplicate','candidate','outlined']
+                    assert all(probe(tag,reps)[2:]==expected for tag in tags)
+                    rng=random.Random('mask/'+str(kind)+'/'+str(mode));samples=[]
+                    for block in range(35):
+                        rng.shuffle(tags);row={tag:[0,0] for tag in tags}
+                        for tag in tags+tags[::-1]:
+                            vals=probe(tag,reps);assert vals[2:]==expected
+                            for clock in (0,1):row[tag][clock]+=vals[clock]
+                        samples.append(row)
+                    special[str(kind)+'/'+str(mode)]=dict(count=total,extent_sha=sha(source),reps=reps,checks=expected,cycles=samples)
+                    save('masked-only-effects',special)
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
             assert len(rows)==len(selected) and all(a[3]==a[4] and a[1]==a[5] for a in rows)
