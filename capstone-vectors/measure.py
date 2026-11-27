@@ -20,7 +20,7 @@ assert all(sha(r/f)==h for f,h in m['drivers'].items())
 w=Path(tempfile.mkdtemp());build=w/'build';ad=w/'adapter';selected=w/'lib';selected.mkdir();ad.mkdir()
 try:
     flags=['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('X86',)]
-    flags+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON']
+    flags+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON']
     images={};sources={};copies={};sizes={};symbols={};objects={}
     project=w/'static-project';static_build=w/'static-build';(project/'third_party').mkdir(parents=True)
     (project/'third_party/capstone').symlink_to(src);(project/'cmake').mkdir()
@@ -33,8 +33,26 @@ try:
         if stage=='candidate':run('git','-C',src,'apply','--index',r/'candidate.patch')
         assert get('git','-C',src,'write-tree').strip()==q[stage]['tree']
         run('cmake','-G','Ninja','-S',src,'-B',build,*flags)
-        run('cmake','--build',build,'--target','capstone_shared','--parallel','4')
+        run('cmake','--build',build,'--target','capstone_shared','capstone_static','--parallel','4')
         so=(build/'libcapstone.so').resolve()
+        lib,=build.rglob('libcapstone.a')
+        shutil.copyfile(lib,w/(stage+'.a'))
+        if stage=='candidate':
+            gen=w/'vector-generator'
+            inc=['-I',src,'-I',src/'include']
+            run('clang++','-std=c++17','-O2',*inc,src/'suite/synctools/x86_vector_output.cpp',lib,'-o',gen)
+            generated={}
+            for arg,name in [('--vex-sib-transfers','X86GenVexSibTransfers.inc'),('--vex-base-memory','X86GenVexBaseMemory.inc'),('','X86GenVectorOutput.inc')]:
+                data=sp.check_output([gen]+([arg] if arg else []));assert data==(src/'arch/X86'/name).read_bytes()
+                generated[name]=hashlib.sha256(data).hexdigest()
+            checks={}
+            for dispatch,library in [('static',lib),('public',so)]:
+                exe=w/('sib-'+dispatch)
+                run('clang++','-O2','-std=c++17',*inc,*(['-DUSE_PUBLIC'] if dispatch=='public' else []),r/'sib.cpp',library,'-Wl,-rpath,'+str(build),'-o',exe)
+                checks[dispatch]=list(map(int,get(exe).split()))
+            assert checks['public']==checks['static'] and checks['public'][0]==7077888
+            save('sib-checks',dict(generated=generated,boundaries=checks))
+
         assert all('CAPSTONE_X86_ONLY' in x['command'] for x in read(build/'compile_commands.json'))
         dll=w/(stage+'.so');shutil.copyfile(so,dll);images[stage]=dll.read_bytes();sources[stage]=sha(dll);sizes[stage]=len(images[stage])
         syms=get('nm','-D','--defined-only','--format=posix',dll).splitlines()
@@ -83,6 +101,11 @@ try:
     run('clang++','-O2','-std=c++17',*inc,r/'vectors.cpp',*links,'-o',w/'vectors')
     for name in ('trial-compare','trial-real','public-guard','foreign-verify','trial-vector-guard','trial-states','trial-guard','cmov-guard'):
         run('clang++','-O2','-std=c++17',*inc,r/(name+'.cpp'),'-ldl','-o',w/name)
+    for stage in ('base','candidate'):
+        run('clang++','-O3','-std=c++17',*inc,r/'driver.cpp',ice_lib,w/(stage+'.a'),'-ldl','-lpthread','-lm','-no-pie','-o',w/(stage+'-static'))
+        assert 'libcapstone.so' not in get('ldd',w/(stage+'-static'))
+    shutil.copy2(w/'base-static',w/'copy-static')
+    save('dedicated-static',{tag:dict(executable=sha(w/(tag+'-static')),archive=sha(w/(('base' if tag=='copy' else tag)+'.a'))) for tag in ('base','copy','candidate')})
     for exe in ('driver','foreign','vectors'):
         assert str(image) in get('ldd',w/exe)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -146,6 +169,14 @@ try:
             def take(k,n):
                 select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
             measure('att/'+name+'/'+str(mode),images,take)
+        for mode in (0,1,2):
+            def take_static(k,n):
+                return list(map(int,get(*invoke,w/(k+'-static'),'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
+            measure('static-intel/'+name+'/'+str(mode),['base','copy','candidate'],take_static)
+        for mode in (1,2):
+            def take_att_static(k,n):
+                return list(map(int,get(*invoke,w/(k+'-static'),'public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
+            measure('static-att/'+name+'/'+str(mode),['base','copy','candidate'],take_att_static)
     save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),verified=verified,inode=inode,soname=soname,spans=spans,bytes=maximum))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
