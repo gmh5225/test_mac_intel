@@ -28,7 +28,7 @@ try:
         images[label]=dict(sha256=sha(so),objects={str(f.relative_to(b)):sha(f) for f in b.rglob('*.c.o')})
     assert images['base']['sha256']!=images['candidate']['sha256']
     before=images['base']['objects'];after=images['candidate']['objects']
-    assert set(before)==set(after) and [Path(f).name for f in before if before[f]!=after[f]]==['PPCMapping.c.o']
+    assert set(before)==set(after) and [Path(f).name for f in before if before[f]!=after[f]]==['PPCInstPrinter.c.o']
     save('images',images)
     shutil.rmtree(b)
     driver=t/'measure';check=t/'states'
