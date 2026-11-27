@@ -109,7 +109,7 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first={'PPCInstPrinter.c.o'};second=set(first);between=set(first)
+    first={'X86ATTInstPrinter.c.o'};second=set(first);between=set(first)
     for before,after,expected in [('shipping','base',first),
         ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]
