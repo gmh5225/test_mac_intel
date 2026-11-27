@@ -97,7 +97,7 @@ try:
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    obj={'X86VectorFallback64.c.o'}
+    obj={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'}
     for before,after,expected in [('shipping','base',set() if arm else obj),
         ('shipping','mask',obj),('base','mask',obj if arm else set())]:
         a,b=identities[before],identities[after]
@@ -131,7 +131,7 @@ try:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             key=c['name']+'/'+str(mode);first,_=execute('base',c,mode,1)
             reps=max(1,round(30000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
-            focus=c['name'] in ('putty-64-0.85','libssl3t64-amd64','libmvec-amd64')
+            focus=c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
             count=35 if focus else 17;cycles=[]
             for rep in range(count):
                 order=list(blobs);rng.shuffle(order);trial={k:[]for k in order}

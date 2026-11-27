@@ -1,7 +1,7 @@
-name: Compare AMD64 VEX memory decoding inside the source-built NeverD product
+name: Verify i386 accumulator reads in the source-built NeverD product on four hosts
 on:
   push:
-    branches: [codex/shipping-amd64-vex-neverd]
+    branches: [codex/scoped-accumulator-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 71cb846c8439b33d947b5a9e8a0ed30579f9b44c
+          ref: 2c135ac6040ff6b60075eefb09ebbaef5471773a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-vex3-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-accumulator-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
