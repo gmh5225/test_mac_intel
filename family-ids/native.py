@@ -33,7 +33,7 @@ try:
  if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
  for arch,sel in archs.items():
   b=w/'build';images={};builds[arch]={};records={}
-  for tag in ('base','candidate'):
+  for tag in (('base','reference','candidate') if arch=='ARM' else ('base','candidate')):
    run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
    patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch'];run('git','-C',src,'apply','--index',patch);assert out('git','-C',src,'write-tree')==q[tag]['tree']
    aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed'else [arch]
@@ -41,16 +41,25 @@ try:
    run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
    lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
    builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
-   if arch not in ('ARM','AARCH64'):continue
+   if arch!='ARM':continue
+   shutil.copyfile(so,w/(tag+'-arm-library'))
    texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
    images[tag]=texe.read_bytes()
    exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
    records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs[arch].items()for opt in range(5)}
    assert all(row[0]>0 for row in records[tag].values())
   put('compilation',builds)
-  if arch not in ('ARM','AARCH64'):
+  if arch!='ARM':
    assert builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
-  assert records['base']==records['candidate'];observations[arch]=records['base'];put('public-records',observations)
+  target='base' if darwin else 'reference'
+  assert builds[arch]['base']!=builds[arch]['reference']
+  assert builds[arch][target]==builds[arch]['candidate'] and images[target]==images['candidate']
+  assert records['base']==records['candidate']==records['reference']
+  observations[arch]=records['base'];put('public-records',observations)
+  compare=w/'compare';run('c++','-std=c++17','-O2','-I',src/'include',r/'domain.cpp',*([] if darwin else ['-ldl']),'-o',compare)
+  states=json.loads(out(compare,w/'base-arm-library',w/'candidate-arm-library',w));assert states['cases']>=589824 and states['accepted']>300000 and states['real']>50000 and not states['real_rejected']
+  put('arm-domain',states)
+  del images['reference']
   exe=w/'timed';image=FixedImage(exe,images,True)
   for name,(path,ranges) in inputs[arch].items():
    for mode in range(3):

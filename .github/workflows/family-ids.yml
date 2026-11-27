@@ -1,7 +1,7 @@
-name: Test ARM and AArch64 detail setup in statically linked ELF and Mach-O consumers plus three unmodified configurations
+name: Verify ARM-only alias details against real ARM and Thumb records and compare the mixed and other backends byte for byte
 on:
   push:
-    branches: [codex/arm-alias-dedicated-static]
+    branches: [codex/arm-printer-verified-library-scope]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: arm-alias-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: scoped-arm-printer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

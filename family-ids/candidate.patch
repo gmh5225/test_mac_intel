@@ -1,8 +1,22 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..72004759 100644
+index cea06480..2857edc3 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1088,8 +1088,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -182,6 +182,13 @@ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "ARM")
+     add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
++    # These two callers select real or alias operands during each ARM print.
++    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
++       AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 18 AND CMAKE_C_COMPILER_VERSION VERSION_LESS 19
++       AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
++        set_property(SOURCE arch/ARM/ARMInstPrinter.c arch/ARM/ARMMapping.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_ARM_INLINE_ALIAS_DETAILS>")
++    endif()
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "MIPS")
+@@ -1088,8 +1095,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
     AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
      target_compile_definitions(capstone_build_settings INTERFACE
          "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
@@ -15,18 +29,10 @@ index cea06480..72004759 100644
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
      endif()
 diff --git a/Mapping.c b/Mapping.c
-index 996fd61f..acd450e2 100644
+index 996fd61f..11d08ff4 100644
 --- a/Mapping.c
 +++ b/Mapping.c
-@@ -2,6 +2,7 @@
- /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2019 */
- /*    Rot127 <unisono@quyllur.org>, 2022-2023 */
- 
-+#define CS_MAPPING_IMPLEMENTATION
- #include "Mapping.h"
- #include "MappingAlias.h"
- #include "capstone/capstone.h"
-@@ -430,29 +431,9 @@ DEFINE_get_detail_op_at(bpf, BPF, BPF);
+@@ -430,29 +430,9 @@ DEFINE_get_detail_op_at(bpf, BPF, BPF);
  DEFINE_get_detail_op_at(arc, ARC, ARC);
  DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
  
@@ -60,15 +66,14 @@ index 996fd61f..acd450e2 100644
  /// Sets the instruction alias flags and the given alias id.
  void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias)
 diff --git a/Mapping.h b/Mapping.h
-index 277c4ef3..3df9e80b 100644
+index 277c4ef3..5137d8fc 100644
 --- a/Mapping.h
 +++ b/Mapping.h
-@@ -324,7 +324,16 @@ static inline cs_detail *get_detail(const MCInst *MI)
+@@ -324,7 +324,15 @@ static inline cs_detail *get_detail(const MCInst *MI)
  			return; \
  	} while (0)
  
-+#if !defined(CS_MAPPING_IMPLEMENTATION) && \
-+	(defined(CAPSTONE_ARM_ONLY) || defined(CAPSTONE_AARCH64_DEDICATED_SCAN))
++#ifdef CAPSTONE_ARM_INLINE_ALIAS_DETAILS
 +/* The dedicated printer uses both decisions while selecting alias operands. */
 +#define CS_ALIAS_DETAIL_LINKAGE static inline
 +#include "MappingAliasDetails.inc"
@@ -80,7 +85,7 @@ index 277c4ef3..3df9e80b 100644
  
  static inline bool map_fill_detail_ops(MCInst *MI)
  {
-@@ -334,8 +343,6 @@ static inline bool map_fill_detail_ops(MCInst *MI)
+@@ -334,8 +342,6 @@ static inline bool map_fill_detail_ops(MCInst *MI)
  
  void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias);
  
