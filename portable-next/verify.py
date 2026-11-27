@@ -52,7 +52,7 @@ try:
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
-            if profile not in ('diet','reduced') and name in ('base','segment','digits'):
+            if profile not in ('diet','reduced') and name in ('base','verified'):
                 from spelling_link import spelling
                 rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
                 assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]
