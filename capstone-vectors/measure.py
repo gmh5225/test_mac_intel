@@ -29,8 +29,10 @@ try:
     top=get('git','-C',nd,'show',m['neverd']+':CMakeLists.txt')
     (project/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(StaticDecode LANGUAGES C CXX)\n'+top[top.index('# --- Capstone (our fork'):top.index('# --- NeverD CMake helpers')])
     static_images={}
-    for stage in ('base','candidate'):
-        if stage=='candidate':run('git','-C',src,'apply','--index',r/'candidate.patch')
+    for stage in ('base','initial','candidate'):
+        if stage!='base':
+            run('git','-C',src,'restore','--source=HEAD','--staged','--worktree','--','.')
+            patch=r/(stage+'.patch');assert sha(patch)==q[stage]['sha256'];run('git','-C',src,'apply','--index',patch)
         assert get('git','-C',src,'write-tree').strip()==q[stage]['tree']
         run('cmake','-G','Ninja','-S',src,'-B',build,*flags)
         run('cmake','--build',build,'--target','capstone_shared','capstone_static','--parallel','4')
@@ -64,32 +66,17 @@ try:
         static_images[stage]=dict(archive=sha(static_lib),objects={str(f.relative_to(static_build)):sha(f)for f in static_build.rglob('*.c.o')})
         assert len(static_images[stage]['objects'])>=60
         save('static-product',static_images)
-    assert static_images['base']==static_images['candidate']
+    assert static_images['base']==static_images['initial']==static_images['candidate']
     delta=dict(added=sorted(set(symbols['candidate'])-set(symbols['base'])),removed=sorted(set(symbols['base'])-set(symbols['candidate'])))
     save('identities',dict(source=q,images=sources,sizes=sizes,symbols=delta,objects=objects))
-    assert not delta['added'] and not delta['removed'] and sources['base']!=sources['candidate']
+    assert symbols['base']==symbols['initial']==symbols['candidate'] and len(set(sources.values()))==3
     from elftools.elf.elffile import ELFFile
     with (w/'base.so').open('rb')as f:
         elf=ELFFile(f);soname=next(tag.soname for tag in elf.get_section_by_name('.dynamic').iter_tags() if tag.entry.d_tag=='DT_SONAME')
-    maximum=max(sizes.values());images={k:v.ljust(maximum,b'\x00')for k,v in images.items()}
-    images['copy']=images['base'];image=selected/soname;image.write_bytes(images['base']);inode=image.stat().st_ino
-    spans=[]
-    for i in range(0,maximum,4096):
-        if images['base'][i:i+4096]!=images['candidate'][i:i+4096]:
-            if spans and spans[-1][1]==i:spans[-1][1]=min(i+4096,maximum)
-            else:spans.append([i,min(i+4096,maximum)])
-    previous=None;verified={}
-    def select(stage):
-        global previous
-        if previous!=stage:
-            with image.open('r+b',buffering=0)as f:
-                for a,b in spans:
-                    f.seek(a);assert f.write(memoryview(images[stage])[a:b])==b-a
-            previous=stage
-        assert image.stat().st_ino==inode
-        if stage not in verified:
-            verified[stage]=sha(image);assert verified[stage]==hashlib.sha256(images[stage]).hexdigest()
-    select('base')
+    from fixed_image import FixedImage
+    image=selected/soname
+    shared=FixedImage(image,images)
+    select=shared.select
     inc=['-I',src,'-I',src/'include']
     for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
@@ -101,11 +88,11 @@ try:
     run('clang++','-O2','-std=c++17',*inc,r/'vectors.cpp',*links,'-o',w/'vectors')
     for name in ('trial-compare','trial-real','public-guard','foreign-verify','trial-vector-guard','trial-states','trial-guard','cmov-guard'):
         run('clang++','-O2','-std=c++17',*inc,r/(name+'.cpp'),'-ldl','-o',w/name)
-    for stage in ('base','candidate'):
+    for stage in ('base','initial','candidate'):
         run('clang++','-O3','-std=c++17',*inc,r/'driver.cpp',ice_lib,w/(stage+'.a'),'-ldl','-lpthread','-lm','-no-pie','-o',w/(stage+'-static'))
         assert 'libcapstone.so' not in get('ldd',w/(stage+'-static'))
-    shutil.copy2(w/'base-static',w/'copy-static')
-    save('dedicated-static',{tag:dict(executable=sha(w/(tag+'-static')),archive=sha(w/(('base' if tag=='copy' else tag)+'.a'))) for tag in ('base','copy','candidate')})
+    static=FixedImage(w/'measured-static',{k:(w/(k+'-static')).read_bytes() for k in ('base','initial','candidate')},executable=True)
+    save('dedicated-static',{tag:dict(executable=sha(w/(tag+'-static')),archive=sha(w/(tag+'.a')))for tag in ('base','initial','candidate')})
     for exe in ('driver','foreign','vectors'):
         assert str(image) in get('ldd',w/exe)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -131,7 +118,7 @@ try:
     save('host',host);records={};timings={}
     def measure(key,engines,take):
         n=max(1,math.ceil(25e6/take('base',1)[0]));expected={k:take(k,n)[2:]for k in engines}
-        assert expected['base']==expected['copy']==expected['candidate']
+        assert all(expected[k]==expected['base'] for k in ('copy','initial','candidate','repeat'))
         if 'iced' in expected:assert all(v[:3]==expected['base'][:3]for v in expected.values())
         rng=random.Random('shared-library/'+key);blocks=[];order=list(engines)
         for _ in range(17):
@@ -152,31 +139,33 @@ try:
             assert len(view)==len(intervals);intervals=[x for x,j in zip(intervals,view)if j[1]>=8 and j[1]>=.15*j[0]];emit()
         assert sha(intervals_file)==spec['extent_sha256']
         audits=[]
-        for stage in ('base','candidate'):
+        for stage in ('base','initial','candidate'):
             select(stage)
             audit=[list(map(int,x.split()))for x in get(*invoke,w/'driver','audit','0','1',f,intervals_file,str(bits)).splitlines()]
             assert len(audit)==len(intervals) and all(x[3]==x[4] and x[1]==x[5]for x in audit)
             audits.append(audit)
-        assert audits[0]==audits[1]
+        assert audits[0]==audits[1]==audits[2]
         records[name]=[list(map(int,get(w/'trial-real',w/'base.so',w/'candidate.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
         save('records',records)
         for mode in (0,1,2):
             def take(k,n):
                 other=k in ('iced','fast');select('base' if other else k)
                 return list(map(int,get(*invoke,w/'driver',k if other else 'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('intel/'+name+'/'+str(mode),['base','copy','candidate','iced']+(['fast']if mode else []),take)
+            measure('intel/'+name+'/'+str(mode),['base','copy','initial','candidate','repeat','iced']+(['fast']if mode else []),take)
         for mode in (1,2):
             def take(k,n):
                 select(k);return list(map(int,get(*invoke,w/'driver','public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('att/'+name+'/'+str(mode),images,take)
+            measure('att/'+name+'/'+str(mode),list(shared.images),take)
         for mode in (0,1,2):
             def take_static(k,n):
-                return list(map(int,get(*invoke,w/(k+'-static'),'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('static-intel/'+name+'/'+str(mode),['base','copy','candidate'],take_static)
+                static.select(k)
+                return list(map(int,get(*invoke,static.path,'capstone',str(mode),str(n),f,intervals_file,str(bits)).split()))
+            measure('static-intel/'+name+'/'+str(mode),list(static.images),take_static)
         for mode in (1,2):
             def take_att_static(k,n):
-                return list(map(int,get(*invoke,w/(k+'-static'),'public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
-            measure('static-att/'+name+'/'+str(mode),['base','copy','candidate'],take_att_static)
-    save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),verified=verified,inode=inode,soname=soname,spans=spans,bytes=maximum))
+                static.select(k)
+                return list(map(int,get(*invoke,static.path,'public-att',str(mode),str(n),f,intervals_file,str(bits)).split()))
+            measure('static-att/'+name+'/'+str(mode),list(static.images),take_att_static)
+    save('complete',dict(complete=True,source=q,host=host,workloads=len(timings),shared=shared.receipt(),static=static.receipt(),soname=soname))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
