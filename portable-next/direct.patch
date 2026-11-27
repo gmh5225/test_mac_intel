@@ -1,76 +1,28 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 602ae735..ee7f3a6b 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1088,6 +1088,11 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
-    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
-     target_compile_definitions(capstone_build_settings INTERFACE
-         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
-+    # Reuse the AMD64 text iterator checks with the measured ELF reader alignment.
-+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-+        set_property(SOURCE arch/X86/X86Sse64Output.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_OUTPUT_PRECHECKED>")
-+    endif()
- endif()
- add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
- target_link_libraries(capstone PUBLIC capstone_build_settings)
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..f0980db1 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -27,10 +27,10 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 			cs_insn *insn, uint16_t *insn_size, bool batch);
- 
--/* Keep the mode, option and callback checks in a single short-circuit chain
-- * in both instantiations of the scalar writer. */
--#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
--	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
-+/* The fixed-mode text iterators have checked their mode and text state
-+ * before entering the writer. The remaining options and callbacks are live. */
-+#define X86_OUTPUT_OPTIONS_UNSUPPORTED(handle) \
-+	((handle)->imm_unsigned || \
- 	 (handle)->mnem_list || (handle)->doing_mem || \
- 	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
- 	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
-@@ -40,4 +40,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	 (handle)->post_printer != X86_postprinter || \
- 	 cs_vsnprintf != cs_default_vsnprintf)
- 
-+#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
-+	((mode_mismatch) || (handle)->no_text || \
-+	 X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
-+
- #endif
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..dc92d198 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -111,7 +111,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			return false;
- 		}
- 	}
-+#ifdef X86_FIXED_OUTPUT_PRECHECKED
-+	if (X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
-+#else
- 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
-+#endif
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index 504682a4..cb8fe2f1 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -125,10 +125,19 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
  		return false;
- 
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
-diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 324fc05d..6f5a0e9f 100644
---- a/arch/X86/X86Sse64Output.c
-+++ b/arch/X86/X86Sse64Output.c
-@@ -67,6 +67,11 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
- 
- /* FF /2 and /4 have one explicit 64-bit target. The register and memory
-  * forms share their generated access, implicit register and group records. */
-+/* Align the indirect branch writer independently of the scalar reader that
-+ * precedes it in the AMD64 text section. */
-+#if defined(X86_FIXED_OUTPUT_PRECHECKED) && defined(__x86_64__)
-+__attribute__((aligned(32)))
-+#endif
- static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
- 			    uint16_t *insn_size, uint8_t rex, uint8_t modrm)
- {
+ 	}
+ 	insn->bytes[3] = code[3];
+-	/* The underlying writer emitted exactly two operands. Their longest
+-	 * address and vector name leave room for both decorators. */
+-	char *comma = strchr(insn->op_str, ',');
+-	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
++	/* The writers clear op_str before emitting two operands. A vector
++	 * destination is four or five characters. Only stores put the
++	 * variable-length address before the comma. */
++	char *comma = store ? strchr(insn->op_str, ',') :
++		insn->op_str + 4 + (insn->op_str[4] != ',');
++	const unsigned gap = zero ? 9 : 5;
++	if (memory && !store) {
++		/* The widest source has a base, a scaled index and a disp32. */
++		memmove(comma + gap, comma,
++			sizeof(", zmmword ptr [r15 + r15*8 - 0x80000000]"));
++	} else {
++		memmove(comma + gap, comma, sizeof(", zmm31"));
++	}
+ 	memcpy(comma, " {k0}", 5);
+ 	comma[3] = (char)('0' + mask);
+ 	if (zero)

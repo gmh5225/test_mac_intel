@@ -1,7 +1,7 @@
-name: Verify compiled images of the stable AMD64 reader across nine native toolchains
+name: Verify masked operand object selection against shipping and measured implementations
 on:
   push:
-    branches: [codex/amd64-stable-reader-configurations]
+    branches: [codex/masked-operand-image-selection]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: stable-reader-config-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: masked-reader-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
