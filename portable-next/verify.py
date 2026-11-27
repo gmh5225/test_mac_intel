@@ -49,6 +49,12 @@ try:
         log=(e/(name+'-units.log')).read_text(errors='replace')
         assert '100% tests passed' in log and all('unit_'+n in log for n in units)
         rows[name]=dict(units=units,skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
+        if platform.system()=='Linux':
+            archive=b/'libcapstone.a'
+            objects={str(f.relative_to(b)):hashlib.sha256(f.read_bytes()).hexdigest()for f in b.rglob('*.c.o') if any(part in ('capstone.dir','capstone_x86_native.dir','capstone_x86_iter32.dir','capstone_x86_iter64.dir')for part in f.parts)}
+            assert len(objects)>10 and any('PPCInstPrinter.c.o' in n for n in objects)
+            rows[name]['mixed_build']=dict(archive=hashlib.sha256(archive.read_bytes()).hexdigest(),objects=objects)
+            if name!='base':assert rows[name]['mixed_build']==rows['base']['mixed_build'],name
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
