@@ -67,6 +67,8 @@ try:
         objs={str(f.relative_to(build)):sha(f) for f in build.rglob('*.c.o') if '/capstone' in str(f.relative_to(build)) or f.name=='RISCVMapping.c.o'}
         assert len(objs)>=60 and any(k.endswith('RISCVMapping.c.o') for k in objs),list(objs)
         identities[stage]=dict(archive=sha(lib),exe=sha(binary),objects=objs,llvm=llvm,decoder=sha(nd/'lib/decode/Decoder.cpp'))
+        from product_layout import record_layout
+        save('elf-'+stage,record_layout(binary))
         if stage=='shipping':
             import frozen_ssl64
             name,bits,path,spans,metadata=next(iter(frozen_ssl64.prepare(t)));q=json.loads((r/'ssl64-extents.json').read_text())
@@ -97,10 +99,9 @@ try:
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    first={'X86Sse64Output.c.o', 'X86MemoryFallback32.c.o'}
-    second={'X86RegisterFallback32.c.o', 'X86Sse64Output.c.o', 'X86MemoryFallback32.c.o'}
+    first=set(['X86MemoryFallback32.c.o', 'X86RegisterFallback32.c.o', 'X86Sse64Output.c.o']);second=set(['X86DisassemblerDecoder.c.o', 'X86RegisterFallback32.c.o', 'cs.c.o']);between=set(['X86DisassemblerDecoder.c.o', 'X86MemoryFallback32.c.o', 'X86RegisterFallback32.c.o', 'X86Sse64Output.c.o', 'cs.c.o'])
     for before,after,expected in [('shipping','base',set() if arm else first),
-        ('shipping','mask',set() if arm else second),('base','mask',set() if arm else {'X86RegisterFallback32.c.o', 'X86MemoryFallback32.c.o'})]:
+        ('shipping','mask',set() if arm else second),('base','mask',set() if arm else between)]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
