@@ -1,7 +1,7 @@
-name: Test public formatting through the original archive owner and inspect private scan and foreign consumers
+name: Separate archive placement from public decoding cost with the same function addresses and one changed call target
 on:
   push:
-    branches: [codex/public-x86-original-member-order]
+    branches: [codex/public-reader-one-call-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-record-original-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: one-public-call-target-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
