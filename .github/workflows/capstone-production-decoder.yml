@@ -1,7 +1,7 @@
-name: Measure i386 TEST records in the source-built NeverD consumer
+name: Verify i386 TEST and detail initialization on dev after RISC-V D ABI support
 on:
   push:
-    branches: [codex/verify-i386-memory-test-in-neverd]
+    branches: [codex/current-dev-i386-and-detail-views]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
+          ref: 2bb8205af8e667122c35fe0a13cf1cc198e4042e
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-test-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: current-dev-memory-and-views-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
