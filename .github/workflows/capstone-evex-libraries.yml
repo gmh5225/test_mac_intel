@@ -1,7 +1,7 @@
-name: Measure reuse of the text and width checks in verified x86 record readers
+name: Check cache-line alignment of the i386 batch scan loop with both text readers on real native CPUs
 on:
   push:
-    branches: [codex/fixed-reader-live-option-cost]
+    branches: [codex/aligned-i386-reader-real]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,9 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04, cc: clang, replica: 3 }
           - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, replica: 4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: proven-mode-live-options-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: aligned-i386-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

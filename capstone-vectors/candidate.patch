@@ -1,3 +1,20 @@
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..1c0ff891 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -299,7 +299,11 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 	return batch;
+ }
+ 
+-/* The width is constant throughout this loop. */
++/* Keep the i386 scan loop aligned when its preceding text readers change. */
++#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
++	__clang_major__ == 18
++__attribute__((aligned(64)))
++#endif
+ #if defined(__ELF__) && defined(__clang__)
+ __attribute__((noinline, section(".cs_x86_batch32_text")))
+ #elif defined(_MSC_VER)
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
 index 62d4288a..f0980db1 100644
 --- a/arch/X86/X86OutputOptions.h

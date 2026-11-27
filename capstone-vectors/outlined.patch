@@ -1,44 +1,17 @@
-diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..f0980db1 100644
---- a/arch/X86/X86OutputOptions.h
-+++ b/arch/X86/X86OutputOptions.h
-@@ -27,10 +27,10 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 			cs_insn *insn, uint16_t *insn_size, bool batch);
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..1c0ff891 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -299,7 +299,11 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 	return batch;
+ }
  
--/* Keep the mode, option and callback checks in a single short-circuit chain
-- * in both instantiations of the scalar writer. */
--#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
--	((mode_mismatch) || (handle)->no_text || (handle)->imm_unsigned || \
-+/* The fixed-mode text iterators have checked their mode and text state
-+ * before entering the writer. The remaining options and callbacks are live. */
-+#define X86_OUTPUT_OPTIONS_UNSUPPORTED(handle) \
-+	((handle)->imm_unsigned || \
- 	 (handle)->mnem_list || (handle)->doing_mem || \
- 	 ((handle)->syntax != CS_OPT_SYNTAX_INTEL && \
- 	  (handle)->syntax != CS_OPT_SYNTAX_DEFAULT) || \
-@@ -40,4 +40,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	 (handle)->post_printer != X86_postprinter || \
- 	 cs_vsnprintf != cs_default_vsnprintf)
- 
-+#define X86_OUTPUT_UNSUPPORTED(handle, mode_mismatch) \
-+	((mode_mismatch) || (handle)->no_text || \
-+	 X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
-+
- #endif
-diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..4d77aa20 100644
---- a/arch/X86/X86SimpleOutputImpl.h
-+++ b/arch/X86/X86SimpleOutputImpl.h
-@@ -111,7 +111,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			return false;
- 		}
- 	}
-+#ifdef X86_FIXED_OUTPUT
-+	if (X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
-+#else
- 	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
+-/* The width is constant throughout this loop. */
++/* Keep the i386 scan loop aligned when its preceding text readers change. */
++#if defined(__linux__) && defined(__x86_64__) && defined(__clang__) && \
++	__clang_major__ == 18
++__attribute__((aligned(64)))
 +#endif
- 		return false;
- 
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ #if defined(__ELF__) && defined(__clang__)
+ __attribute__((noinline, section(".cs_x86_batch32_text")))
+ #elif defined(_MSC_VER)
