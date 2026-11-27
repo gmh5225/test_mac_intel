@@ -5,7 +5,11 @@ typedef bool (*iterator)(csh,const uint8_t **,size_t *,uint64_t *,cs_insn *);
 iterator const requested_native = X86_disasmIterText;
 #endif
 bool measure_fixed_iterator(csh h,const uint8_t **p,size_t *n,uint64_t *ip,cs_insn *i) {
+#ifdef REQUEST_NATIVE
+    return X86_disasmIterText(h,p,n,ip,i);
+#else
     return cs_disasm_iter(h,p,n,ip,i);
+#endif
 }
 #ifdef TEST_MAIN
 int main(void) {

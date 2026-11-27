@@ -18,7 +18,7 @@ int main(int argc,char **argv) {
                 h->set(CS_OPT_DETAIL,(cfg&1)?CS_OPT_ON:CS_OPT_OFF);h->set(CS_OPT_UNSIGNED,(cfg&2)?CS_OPT_ON:CS_OPT_OFF);
                 h->set(CS_OPT_TEXT,(cfg&4)?CS_OPT_OFF:CS_OPT_ON);h->set(CS_OPT_SYNTAX,(cfg&8)?CS_OPT_SYNTAX_ATT:CS_OPT_SYNTAX_INTEL);
             }
-            for(unsigned pub=1;pub<2;++pub){
+            for(unsigned pub=0;pub<1;++pub){
                 auto left=pub?ref.sym<decltype(ref.next)>("cs_disasm_iter"):ref.next;
                 auto right=pub?trial.sym<decltype(trial.next)>("cs_disasm_iter"):trial.next;
                 std::vector<unsigned> opcodes;
