@@ -1,7 +1,7 @@
-name: Check AT&T formatting and PE32 on sixteen independent native machines
+name: Measure direct AT&T operand access in Mac and Windows static and shared libraries
 on:
   push:
-    branches: [codex/native-register-token-append]
+    branches: [codex/att-fields-native-pe-mach]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -19,14 +19,6 @@ jobs:
           - { host: windows-2022, arch: amd64, profile: full, replica: 2 }
           - { host: windows-2022, arch: amd64_x86, profile: full, replica: 1 }
           - { host: windows-2022, arch: amd64_x86, profile: full, replica: 2 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: gcc, replica: 1 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: gcc, replica: 2 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 2 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 1 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
@@ -37,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: eb7fdeaaeb4f89cbcc5ab24edf41e0a03073884c
+          ref: b0009d26a8c617b2328833c96291ac8264036866
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -51,6 +43,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: token-native-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: att-fields-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
