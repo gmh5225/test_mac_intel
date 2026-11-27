@@ -1,14 +1,108 @@
-diff --git a/SStream.c b/SStream.c
-index 5d387fb0..eef2fd17 100644
---- a/SStream.c
-+++ b/SStream.c
-@@ -139,6 +139,9 @@ void SStream_replc_str(SStream *ss, char chr, const char *rstr)
- void SStream_trimls(SStream *ss)
- {
- 	assert(ss);
-+	/* Assembly mnemonics begin above the two leading whitespace bytes. */
-+	if ((unsigned char)ss->buffer[0] > ' ')
-+		return;
- 	size_t buf_off = 0;
- 	/// Remove leading spaces
- 	while (ss->buffer[buf_off] == ' ' || ss->buffer[buf_off] == '\t') {
+diff --git a/arch/X86/X86GenOperandRead.inc b/arch/X86/X86GenOperandRead.inc
+index 45018f74..5a135f5f 100644
+--- a/arch/X86/X86GenOperandRead.inc
++++ b/arch/X86/X86GenOperandRead.inc
+@@ -460,6 +460,34 @@ case 122:
+ 	    readImmediate(insn, 1))
+ 		return -1;
+ 	return needVVVV ? -1 : 0;
++case 128:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_Rv) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
++case 129:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_Rv) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
++case 130:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_R64) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
++case 131:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_R64) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
+ case 132:
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+@@ -1249,6 +1277,34 @@ case 190:
+ 	    readImmediate(insn, 1))
+ 		return -1;
+ 	return needVVVV ? -1 : 0;
++case 196:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_Rv) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
++case 197:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_Rv, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_Rv) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
++case 198:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_R64) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
++case 199:
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_R64) ||
++	    readImmediate(insn, 1))
++		return -1;
++	return needVVVV ? -1 : 0;
+ case 200:
+ case 911:
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 529fb90a..13aaf28d 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -114,13 +114,18 @@ VECTOR_ENCODINGS = (
+ )
+ 
+ 
+-def read_specializations(suffix, *, scalar_limit=2):
++def read_specializations(suffix, *, scalar_limit=2, double_shift=False):
+     for index, operands in enumerate(
+         read_sets(X86 / f"X86GenDisassemblerTables{suffix}.inc")
+     ):
+         vector = any(t in VECTOR_TYPES or e in VECTOR_ENCODINGS for e, t in operands)
++        limit = 4 if vector else scalar_limit
++        if double_shift and tuple(e for e, _ in operands) == (
++            "ENCODING_RM", "ENCODING_REG", "ENCODING_IB"
++        ):
++            limit = 3
+         if (
+-            len(operands) <= (4 if vector else scalar_limit)
++            len(operands) <= limit
+             and sum(e in IMMEDIATES for e, _ in operands) <= 2
+             and all(
+                 encoding in (ENCODINGS | VECTOR_ENCODINGS)
+@@ -179,7 +184,7 @@ def read_operand_calls(operands, *, materialize=True):
+ 
+ def emit_switch(suffix):
+     groups = defaultdict(list)
+-    for index, operands in read_specializations(suffix):
++    for index, operands in read_specializations(suffix, double_shift=True):
+         groups[operands].append(index)
+ 
+     lines = ["switch (insn->spec->operands) {"]

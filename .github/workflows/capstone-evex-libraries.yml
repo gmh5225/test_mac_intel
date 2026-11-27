@@ -1,7 +1,7 @@
-name: Measure printable stream returns on naturally linked PE, ELF and firmware readers
+name: Compare generated three-operand scalar readers on PE ELF and firmware
 on:
   push:
-    branches: [codex/printable-stream-release-layout]
+    branches: [codex/scalar-three-operand-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0eb3f0239e28e965d432a964d2e7e6b15fdb8b4a
+          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 47d0a2f33b15c11295c9b80e50c238a92ac0f965
+          ref: 49eed13da02b9854924fca2d40d343c423672e85
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: printable-stream-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-reader-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

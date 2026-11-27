@@ -78,25 +78,7 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
-        run('clang','-O2','-std=c99','-I',base,r/'trim-domain.c',lib,'-o',w/'trim-domain')
-        checked=int(get(w/'trim-domain'))
-        run('clang','-O2','-std=c99','-I',base,'-c',r/'visits.c','-o',w/'visits.o')
-        run('clang++',w/'foreign.o',w/'visits.o',lib,'-no-pie','-Wl,--wrap=SStream_trimls','-o',w/'trim-census')
-        coverage={}
-        for row in foreign_rows:
-            if row['arch'] in ('i386','amd64'):continue
-            for mode in range(3):
-                args=[row['arch'],w/(row['name']+'.text'),str(mode),'1']
-                ref=list(map(int,get(w/('foreign-'+label),*args).split()))[2:]
-                measured=sp.run([w/'trim-census',*args],capture_output=True,text=True,check=True)
-                rec=list(map(int,measured.stdout.split()))[2:]
-                visit=list(map(int,measured.stderr.split()))
-                assert rec==ref and len(visit)==2 and 0<=visit[1]<=visit[0]
-                coverage[row['name']+'/'+str(mode)]=dict(calls=visit[0],indented=visit[1],records=rec)
-        assert len(coverage)==15
-        asm=get('objdump','-d','--disassemble=SStream_trimls',w/label).split('<SStream_trimls>:',1)[1].split('Disassembly of section',1)[0].strip()
-        save('trim-observations-'+label,dict(edge_cases=checked,coverage=coverage,assembly=asm))
-        run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
+        run('clang','-O2','-fPIC','-shared','-I',base,'-I',base/'include',r/'raw-export.c',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
@@ -104,6 +86,16 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+    run('clang','-O2','-std=gnu99','-I',base,'-I',base/'include',r/'guard.c','-ldl','-o',w/'operand-guard')
+    states={}
+    for label in ('candidate','outlined'):
+        lines=get(w/'operand-guard',w/'base.so',w/(label+'.so')).splitlines()
+        calls,invalid=map(int,lines.pop(0).split())
+        rows={k:int(v) for k,v in (line.split() for line in lines)}
+        assert calls>1000000 and 0<invalid<calls and all(str(i) in rows for i in [44,45,46,47,101,102,103,104,105,106,192,193,194,195,196,197,198,199]),(calls,invalid,rows)
+        states[label]=dict(calls=calls,rejections=invalid,accepted_sets=rows)
+    assert states['candidate']==states['outlined']
+    save('operand-guard',states)
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
