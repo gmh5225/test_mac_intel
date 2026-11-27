@@ -52,6 +52,11 @@ try:
         log=(e/(name+'-units.log')).read_text(errors='replace')
         assert '100% tests passed' in log and all('unit_'+n in log for n in units)
         rows[name]=dict(units=units,skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
+        if platform.system()=='Linux':
+            cmd,=[v['command'] for v in json.loads((b/'compile_commands.json').read_text())if Path(v['file']).name=='PPCInstPrinter.c']
+            assert 'CAPSTONE_PPC_SKIP_UNUSED_CANONICAL' not in cmd
+            rows[name]['mixed_identity']=hashlib.sha256((b/'libcapstone.a').read_bytes()).hexdigest()
+            assert rows[name]['mixed_identity']==rows['base']['mixed_identity']
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
             rows[name][linkage]=result
@@ -86,6 +91,17 @@ try:
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result
+            command,=[v['command']for v in json.loads((solo/'compile_commands.json').read_text())if Path(v['file']).name=='PPCInstPrinter.c']
+            compiler,=solo.glob('CMakeFiles/*/CMakeCCompiler.cmake')
+            eligible=platform.machine()=='aarch64' and 'set(CMAKE_C_COMPILER_VERSION "18.' in compiler.read_text()
+            assert ('CAPSTONE_PPC_SKIP_UNUSED_CANONICAL' in command)==(name=='search' and eligible)
+            objects={str(f.relative_to(solo)):hashlib.sha256(f.read_bytes()).hexdigest()for f in solo.rglob('*.c.o')}
+            archive=(solo/'libcapstone.a').read_bytes()
+            rows[name]['static_identity']=dict(archive=hashlib.sha256(archive).hexdigest(),objects=objects,enabled=name=='search' and eligible)
+            if name!='base':
+                stable=rows['base']['static_identity'];expected=['PPCInstPrinter.c.o'] if name=='search' and eligible else []
+                assert sorted(Path(k).name for k,v in objects.items()if stable['objects'][k]!=v)==expected
+                assert (stable['archive']==rows[name]['static_identity']['archive'])== (not expected)
         save('results',rows)
     save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
 finally:

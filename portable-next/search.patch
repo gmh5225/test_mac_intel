@@ -1,58 +1,38 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 4fda2efd..9167862c 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -284,35 +284,28 @@ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 	}
- }
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index cea06480..8c56bf6c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1092,6 +1092,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
+             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
++    else()
++        # The Arm64 six-backend static printer can omit unused canonical alias operands.
++        set_property(SOURCE arch/PowerPC/PPCInstPrinter.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_PPC_SKIP_UNUSED_CANONICAL>")
+     endif()
+ endif()
+ add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+diff --git a/arch/PowerPC/PPCInstPrinter.c b/arch/PowerPC/PPCInstPrinter.c
+index 93a4f6ab..dab7bfc5 100644
+--- a/arch/PowerPC/PPCInstPrinter.c
++++ b/arch/PowerPC/PPCInstPrinter.c
+@@ -747,8 +747,17 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
  
--// convert Intel access info to AT&T access info
--static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
--			  uint64_t *eflags)
-+/* Intel metadata lists the destination first. Each shift puts the
-+ * newest source in the low byte, which is the first AT&T operand. */
-+static uint64_t get_att_access(cs_struct *h, unsigned int id, uint64_t *eflags)
- {
--	uint8_t count, i;
- 	const uint8_t *arr = X86_get_op_access(h, id, eflags);
--
--	// initialize access
--	memset(access, 0, CS_X86_MAXIMUM_OPERAND_SIZE * sizeof(access[0]));
--	if (!arr) {
--		return;
-+	uint64_t access = 0;
-+	if (arr) {
-+		for (; *arr; ++arr) {
-+			const uint8_t value = *arr;
-+			access = (access << 8) | (value == CS_AC_IGNORE ? 0 : value);
+ 	if (!isAlias || !useAliasDetails) {
+ 		map_set_fill_detail_ops(MI, true);
+-		if (isAlias)
++		if (isAlias) {
++#ifdef CAPSTONE_PPC_SKIP_UNUSED_CANONICAL
++			/* The alias text is complete. Only original-instruction
++			 * details require the canonical operand printer. */
++			if (!map_fill_detail_ops(MI)) {
++				SStream_Open(O);
++				return;
++			}
++#endif
+ 			SStream_Close(O);
 +		}
- 	}
-+	return access;
-+}
- 
--	// find the non-zero last entry
--	for (count = 0; arr[count]; count++)
--		;
--
--	if (count == 0)
--		return;
--
--	// copy in reverse order this access array from Intel syntax -> AT&T syntax
--	count--;
--	for (i = 0; i <= count && ((count - i) < CS_X86_MAXIMUM_OPERAND_SIZE) &&
--		    i < CS_X86_MAXIMUM_OPERAND_SIZE;
--	     i++) {
--		if (arr[count - i] != CS_AC_IGNORE)
--			access[i] = arr[count - i];
--		else
--			access[i] = 0;
-+static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
-+			  uint64_t *eflags)
-+{
-+	uint64_t ordered = get_att_access(h, id, eflags);
-+	for (unsigned i = 0; i < CS_X86_MAXIMUM_OPERAND_SIZE; ++i) {
-+		access[i] = (uint8_t)ordered;
-+		ordered >>= 8;
- 	}
- }
- 
+ #if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET) && \
+ 	defined(__clang__) && \
+ 	((defined(__linux__) && defined(__x86_64__)) || \
