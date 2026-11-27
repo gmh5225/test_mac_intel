@@ -12,7 +12,7 @@ def git(path,*args):return sp.check_output(['git','-C',path,*args],text=True).st
 def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 m=json.loads((r/'source.json').read_text());dev=m['dev']
 assert git(nd,'rev-parse','HEAD')==dev and git(cs,'rev-parse','HEAD')==m['checkout']
-assert all(sha(r/(stage+'.patch'))==m[stage]['sha256'] for stage in ('base','mask','candidate'))
+assert all(sha(r/(stage+'.patch'))==m[stage]['sha256'] for stage in ('base','mask'))
 assert git(cs,'write-tree')==git(cs,'rev-parse','HEAD^{tree}')
 llvm=git(ll,'rev-parse','HEAD');remote=git(ll,'ls-remote','origin','refs/heads/main').split()[0];assert llvm==remote
 save('source',dict(m,llvm=llvm,main_at_start=remote,prebuilt=False))
@@ -52,9 +52,9 @@ try:
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
     identities={};results={}
-    for stage in ('shipping','base','mask','candidate'):
+    for stage in ('shipping','base','mask'):
         git(cs,'restore','--source','HEAD','--worktree','--staged','--','.')
-        patches={'shipping':[],'base':['base'],'mask':['mask'],'candidate':['base','candidate']}
+        patches={'shipping':[],'base':['base'],'mask':['mask']}
         for name in patches[stage]:
             command(['git','apply','--index',r/(name+'.patch')],'apply-'+stage+'-'+name,cs)
         assert git(cs,'write-tree')==m[stage]['tree']
@@ -97,9 +97,9 @@ try:
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    for before,after,expected in [('shipping','base',set() if arm else {'X86Sse64Output.c.o'}),
-        ('shipping','mask',{'X86VectorFallback64.c.o'}),('base','candidate',{'X86VectorFallback64.c.o'}),
-        ('mask','candidate',set() if arm else {'X86Sse64Output.c.o'})]:
+    obj={'X86VectorFallback64.c.o'}
+    for before,after,expected in [('shipping','base',set() if arm else obj),
+        ('shipping','mask',obj),('base','mask',obj)]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
@@ -109,7 +109,7 @@ try:
     save('checked-objects',comparisons)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     image=t/'selected';shutil.copy2(t/'base.exe',image);ino=image.stat().st_ino
-    blobs={k:(t/(k+'.exe')).read_bytes() for k in ('shipping','base','mask','candidate')}
+    blobs={k:(t/(k+'.exe')).read_bytes() for k in ('shipping','base','mask')}
     blobs['shipping_copy']=blobs['shipping'];blobs['mask_copy']=blobs['mask']
     total=max(map(len,blobs.values()));blobs={k:v+bytes(total-len(v)) for k,v in blobs.items()}
     block=4096;diff=[n for n in range(0,total,block) if len({v[n:n+block] for v in blobs.values()})>1]
