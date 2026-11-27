@@ -98,7 +98,7 @@ try:
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
         if os.uname().machine=='x86_64' and label!='base':
-            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_decodePublicRecord','decodePublicTextRecord')}
+            assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_decodePublicRecord','decodePublicTextRecord','decodePublicRecord16')}
             save('record-assembly-'+label,assembly)
 
         from symbol_layout import symbols

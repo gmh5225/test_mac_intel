@@ -1,7 +1,7 @@
-name: Compare the observed 16-bit tail jump with full PE, ELF and other architecture output
+name: Measure the linked real-mode stack writer on firmware alongside the PE, ELF and five other ISA workloads
 on:
   push:
-    branches: [codex/public-firmware-tail-throughput]
+    branches: [codex/public-real-mode-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: firmware-tail-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-mode-stack-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
