@@ -31,6 +31,19 @@ try:
  run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
  image=dict(capstone=sha(lib),executable=sha(exe),iced=sha(ad/'target/release/libiced_compare.a'))
  save('image',image)
+ def instrument(file,marker,counter,body=False):
+     path=src/file
+     text=path.read_text()
+     assert text.count(marker)==1,(file,marker)
+     i=text.index(marker)
+     if body:i=text.index('{',i)+1
+     text=text[:i]+'\n\textern uint64_t '+counter+'; ++'+counter+';\n\t'+text[i:]
+     path.write_text(text)
+ instrument('cs.c','MCInst_InitX86(&mci);','profile_full_decodes')
+ instrument('arch/X86/X86Disassembler.c','const int ret = decodeInstruction(insn, decode_code, decode_size, mode);','profile_decodes')
+ instrument('arch/X86/X86IntelInstPrinter.c','void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)','profile_prints',True)
+ run('cmake','--build',b,'--target','capstone_static','--parallel','4')
+ profile=w/'record-profile';run('clang++','-std=c++17','-O2','-I',src,'-I',src/'include',r/'profile.cpp',lib,'-o',profile)
  rows={};selection={}
  for name,spec in samples.items():
   meta,spans=materialize(name,spec,w);assert meta==spec['verified']
@@ -59,29 +72,20 @@ try:
   assert sha(ranges)==q['ranges'][name]['ranges'] and size==q['ranges'][name]['included_bytes']
   selection[name]=dict(input=meta,same=len(included),bytes=size,sha256=sha(ranges),largest=max(row[1]for row in included),data_bytes=skipped)
   save('selection',selection)
-  rows[name]={};boundary=None
-  for engine in ('capstone','private','fast'):
-   for mode in (1,2,3):
-    key=engine+'/'+str(mode);lab=name+'-'+engine+'-'+str(mode)
-    command=[exe,engine,str(mode),'1',text,ranges,bits]
-    expected=list(map(int,get(*command).split()))[2:]
-    if boundary is None:boundary=expected[:3]
-    assert expected[:3]==boundary and expected[0]>0
-    raw=w/(lab+'.cg');log=w/(lab+'.log')
-    values=list(map(int,get('valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--cache-sim=yes','--I1=32768,8,64','--D1=32768,8,64','--LL=8388608,16,64','--callgrind-out-file='+str(raw),'--log-file='+str(log),*command).split()))[2:]
-    assert values==expected
-    dump,=[f for f in w.glob(raw.name+'.*') if 'Client Request: measured decoder spans' in f.read_text(errors='replace')]
-    cost=read_cost(dump,e,lab);ev=cost['events']
-    assert ev['Ir']==cost['accounted']['Ir'] and ev['Ir']>expected[0]*5 and ev['Bc']>0
-    rows[name][key]=dict(codes=expected,ops=cost,rates={k:v/sum(expected[:2]) for k,v in ev.items()})
-    save('costs',rows)
-    assert all(ev[k]==cost['accounted'][k] for k in ('Ir','Dr','Dw','I1mr','D1mr','D1mw','Bcm','Bim'))
-    import gzip
-    packed=e/(lab+'.cg.gz')
-    with dump.open('rb')as a,gzip.open(packed,'wb',compresslevel=6)as dest:shutil.copyfileobj(a,dest)
-    with gzip.open(packed,'rb')as a:assert hashlib.sha256(a.read()).hexdigest()==sha(dump)
-    for f in [raw,dump,log]:f.unlink(missing_ok=True)
- assert len(rows)==4 and all(len(v)==9 for v in rows.values())
- save('complete',dict(complete=True,source=q,host=platform.machine(),image=image,valgrind=get('valgrind','--version'),selection=selection))
+  lines=get(profile,text,ranges,bits).splitlines()
+  head=lines.pop(0).split('\t');assert head.pop(0)=='total';head=list(map(int,head))
+  expected=q['expected'][platform.machine()][name]
+  assert head[:2]==expected['boundary'] and head[2]==size and len(head)==12
+  families={}
+  for line in lines:
+   fields=line.split('\t');assert len(fields) in (15,17)
+   key='/'.join(fields[:2]);assert key not in families
+   values=list(map(int,fields[2:15]));families[key]=dict(count=values[0],full=values[1:5],decoder=values[5:9],printed=values[9:13],example=fields[15:])
+  assert sum(v['count'] for v in families.values())==head[0]
+  totals=[head[4+i]+sum(v['full'][i]for v in families.values())for i in range(4)]
+  assert totals[2:]==expected['full'],(name,totals,expected)
+  rows[name]=dict(header=head,totals=totals,families=families);save('family-counts',rows)
+ assert len(rows)==4
+ save('complete',dict(complete=True,source=q,host=platform.machine(),selection=selection))
 finally:
  size=sum(x.stat().st_size for x in w.rglob('*')if x.is_file() and not x.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))
