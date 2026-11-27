@@ -1,12 +1,12 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a2a27faf..0337e7c8 100644
+index cea06480..78b56d93 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
++        set_property(SOURCE arch/X86/X86VexRegisterImmediate.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_VEX_SIB_TRANSFERS>")
      endif()
  endif()
@@ -26,34 +26,44 @@ index 00000000..3710fb38
 +	{ X86_INS_VMOVSS, "vmovss", "dword ptr [", 11, 16, 4, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +	{ X86_INS_VMOVSD, "vmovsd", "qword ptr [", 11, 16, 8, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +};
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..a00466f6 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -168,6 +168,10 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
- }
- #endif
+diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
+index 3fe8460f..4d1cc7d1 100644
+--- a/arch/X86/X86VexRegisterImmediate.c
++++ b/arch/X86/X86VexRegisterImmediate.c
+@@ -24,6 +24,10 @@ struct VexRegisterImmediateRow {
+ };
+ #include "X86GenVexRegisterImmediates.inc"
  
 +#ifdef X86_VEX_SIB_TRANSFERS
 +#include "X86VexSibTransfer.h"
 +#endif
 +
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -212,6 +216,12 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
- 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
- 		return true;
+ /* Both iterators have identified C4 in their fixed address mode. */
+ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 				   size_t size, cs_insn *insn,
+@@ -31,8 +35,22 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 				   const struct X86SimpleRegister regs[4][16],
+ 				   bool wide)
+ {
 +#ifdef X86_VEX_SIB_TRANSFERS
-+	if (size >= 6 && code[0] == 0xc4 && code[4] < 0xc0 &&
-+	    writeVexSibTransfer(handle, code, size, insn, insn_size,
-+				x86_simple_registers[3]))
-+		return true;
++	if (size < 6)
++		return false;
++	const unsigned map = code[1] & 31;
++	if (map != 3) {
++		if (wide && map == 1)
++			return writeVexSibTransfer(handle, code, size, insn,
++						   insn_size, regs[3]);
++		return false;
++	}
++	if (code[4] < 0xc0)
++		return false;
++#else
+ 	if (size < 6 || (code[1] & 31) != 3 || code[4] < 0xc0)
+ 		return false;
 +#endif
- 	if (code[0] == 0xc4 &&
- 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
- 					  x86_simple_registers, true))
+ 	const unsigned flags = code[2];
+ 	const unsigned src = (~flags >> 3) & 15;
+ 	if (!wide && (code[1] != 0xe3 || src >= 8))
 diff --git a/arch/X86/X86VexSibTransfer.h b/arch/X86/X86VexSibTransfer.h
 new file mode 100644
 index 00000000..8b0d4c21

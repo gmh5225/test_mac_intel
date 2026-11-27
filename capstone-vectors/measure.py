@@ -76,7 +76,7 @@ try:
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
         section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
-        for stem,unit in [('fallback','X86VectorFallback64.c.o'),('vector','X86VectorOutput.c.o')]:
+        for stem,unit in [('fallback','X86VectorFallback64.c.o'),('vector','X86VectorOutput.c.o'),('immediate','X86VexRegisterImmediate.c.o')]:
             obj,=build.rglob(unit)
             with obj.open('rb') as f:
                 elf=ELFFile(f)

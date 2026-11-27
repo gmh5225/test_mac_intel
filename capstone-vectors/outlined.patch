@@ -1,12 +1,12 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a2a27faf..96334887 100644
+index cea06480..8f90f9c7 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86VexRegisterImmediate.c APPEND PROPERTY
++        set_property(SOURCE arch/X86/X86VexRegisterImmediate.c arch/X86/X86VectorFallback64.c APPEND PROPERTY
 +            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_VEX_SIB_TRANSFERS>")
      endif()
  endif()
@@ -26,33 +26,69 @@ index 00000000..3710fb38
 +	{ X86_INS_VMOVSS, "vmovss", "dword ptr [", 11, 16, 4, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +	{ X86_INS_VMOVSD, "vmovsd", "qword ptr [", 11, 16, 8, 1, { 132, 0, 0, 0 }, { { 2, 1 }, { 2, 1 } } },
 +};
-diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
-index 3fe8460f..3c6fb88c 100644
---- a/arch/X86/X86VexRegisterImmediate.c
-+++ b/arch/X86/X86VexRegisterImmediate.c
-@@ -24,6 +24,10 @@ struct VexRegisterImmediateRow {
- };
- #include "X86GenVexRegisterImmediates.inc"
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 3105a881..8e41f4c7 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -91,6 +91,15 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 			      const struct X86SimpleRegister regs[4][16],
+ 			      bool wide);
  
 +#ifdef X86_VEX_SIB_TRANSFERS
-+#include "X86VexSibTransfer.h"
++CAPSTONE_INTERNAL bool X86_writeVexOutput64(
++	cs_struct *handle, const uint8_t *code, size_t size, cs_insn *insn,
++	uint16_t *insn_size, const struct X86SimpleRegister regs[4][16]);
++#else
++#define X86_writeVexOutput64(handle, code, size, insn, insn_size, regs) \
++	X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size, regs, true)
 +#endif
 +
- /* Both iterators have identified C4 in their fixed address mode. */
- bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
- 				   size_t size, cs_insn *insn,
-@@ -31,6 +35,11 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
- 				   const struct X86SimpleRegister regs[4][16],
- 				   bool wide)
- {
+ /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
+ CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
+ 						   const uint8_t *code,
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index bc67e4c3..959c2e15 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -213,8 +213,8 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
+ 	if (code[0] == 0xc4 &&
+-	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+-					  x86_simple_registers, true))
++	    X86_writeVexOutput64(handle, code, size, insn, insn_size,
++				 x86_simple_registers))
+ 		return true;
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+ 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
+diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
+index 3fe8460f..85285833 100644
+--- a/arch/X86/X86VexRegisterImmediate.c
++++ b/arch/X86/X86VexRegisterImmediate.c
+@@ -108,5 +108,23 @@ bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 	writeUnsignedImmediate(out, code[5]);
+ 	return true;
+ }
 +#ifdef X86_VEX_SIB_TRANSFERS
-+	if (wide && size >= 6 && code[4] < 0xc0)
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_vex_sib_text" rodata = ".cs_x86_vex_sib_rodata"
++#endif
++#include "X86VexSibTransfer.h"
++
++bool X86_writeVexOutput64(cs_struct *handle, const uint8_t *code, size_t size,
++			  cs_insn *insn, uint16_t *insn_size,
++			  const struct X86SimpleRegister regs[4][16])
++{
++	if (size >= 6 && code[4] < 0xc0)
 +		return writeVexSibTransfer(handle, code, size, insn, insn_size,
 +					   regs[3]);
++	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
++					     regs, true);
++}
 +#endif
- 	if (size < 6 || (code[1] & 31) != 3 || code[4] < 0xc0)
- 		return false;
- 	const unsigned flags = code[2];
++
+ #endif
+ #endif
 diff --git a/arch/X86/X86VexSibTransfer.h b/arch/X86/X86VexSibTransfer.h
 new file mode 100644
 index 00000000..8b0d4c21
