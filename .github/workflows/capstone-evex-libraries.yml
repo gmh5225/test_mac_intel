@@ -1,7 +1,7 @@
-name: Measure decode formatting and info inside the optimized iced adapter on real x86 programs
+name: Locate formatter and detail work by executable instruction address
 on:
   push:
-    branches: [codex/iced-physical-inline-cost]
+    branches: [codex/iced-physical-formatter-pcs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: iced-inline-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: iced-physical-pcs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

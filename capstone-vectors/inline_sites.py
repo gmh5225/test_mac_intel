@@ -52,11 +52,14 @@ def profile(work,invoke,program,arguments,info,frames):
     assert native==list(map(int,job.stdout.split()))[2:]
     dest.unlink();profile=dest.with_name(dest.name+'.1')
     whole=0;spans=0;name='';target='';edge=False;total=None;ex=Counter();sources=Counter();funcs=Counter();owners=Counter()
+    obj='';physical=0;producer=Counter();outside=Counter()
+    low=info['address'];high=low+info['size']
     with profile.open() as inp:
         for raw in inp:
             line=raw.rstrip()
             if line.startswith('positions:'):positions=line.split()[1:]
             elif line.startswith('events:'):events=line.split()[1:]
+            elif line.startswith('ob='):obj=line[3:]
             elif line.startswith('fn='):name=line[3:].split("'")[0]
             elif line.startswith('cfn='):target=line[4:].split("'")[0]
             elif line.startswith('calls='):
@@ -69,12 +72,18 @@ def profile(work,invoke,program,arguments,info,frames):
                 fields=line.split();idx=len(positions)+events.index('Ir');ir=int(fields[idx]) if idx<len(fields) else 0
                 if ir:
                     whole+=ir;ex[name]+=ir
-                    if name=='iced_run' and frames:
-                        pc=int(fields[positions.index('instr')],0)
-                        if pc not in frames:pc+=info['load_bias']
-                        stage,site,func=frames[pc]
-                        owners[stage]+=ir;sources[site]+=ir;funcs[func]+=ir
+                    rawpc=int(fields[positions.index('instr')],0)
+                    # Callgrind may name an inlined frame from another physical address.
+                    # Attribute by the actual executable section and address instead.
+                    if obj==str(program) or Path(obj).name==program.name:
+                        pc=rawpc if low<=rawpc<high else rawpc+info['load_bias']
+                        if low<=pc<high:
+                            physical+=ir;producer[name]+=ir
+                            if frames:
+                                stage,site,func=frames[pc]
+                                owners[stage]+=ir;sources[site]+=ir;funcs[func]+=ir
+                        elif name=='iced_run':outside[hex(rawpc)]+=ir
     profile.unlink()
-    assert total==whole>0 and ex['iced_run']>0 and (not frames or sum(owners.values())==ex['iced_run'])
+    assert total==whole>0 and physical>0 and sum(producer.values())==physical and (not frames or sum(owners.values())==physical),(whole,physical,ex.most_common(6),low,high,obj)
     assert spans==sum(bool(x.strip())for x in Path(arguments[-2]).read_text().splitlines()),(spans,arguments)
-    return dict(records=native,spans=spans,ir=whole,inside=ex['iced_run'],owners=owners,lines=sources.most_common(32),functions=funcs.most_common(14),top=ex.most_common(15))
+    return dict(records=native,spans=spans,ir=whole,inside=physical,callgrind_named=ex['iced_run'],physical_names=producer.most_common(15),named_outside=outside.most_common(12),owners=owners,lines=sources.most_common(32),functions=funcs.most_common(14),top=ex.most_common(15))
