@@ -1,7 +1,7 @@
-name: Compare corrected detail views and i386 TEST records with both iced formatters
+name: Measure early and fallback AMD64 memory immediates on six x86 inputs and foreign readers
 on:
   push:
-    branches: [codex/measure-detail-views-and-i386-against-iced]
+    branches: [codex/real-amd64-group1-memory-dispatch]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b0009d26a8c617b2328833c96291ac8264036866
+          ref: e37f14ea3b6eb5f3b52b96a6e78a2923d061a1f3
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
+          ref: a7746e80b32f3b4a5b9954b95309d658f7560954
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-views-and-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: amd64-group1-mixed-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

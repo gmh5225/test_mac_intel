@@ -110,6 +110,10 @@ try:
             assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
+        run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'group64-guard.cpp',lib,'-o',w/'group64-guard')
+        rec=list(map(int,get(w/'group64-guard').split()));assert len(rec)==3 and rec[:2]==[21970944,15388960]
+        save('group64-guard-'+label,rec)
+
         run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'memory-test-guard.cpp',lib,'-o',w/'test-guard')
         guarded=list(map(int,get(w/'test-guard').split()))
         assert len(guarded)==3 and 0<guarded[1]<guarded[0] and guarded[0]==6979584
