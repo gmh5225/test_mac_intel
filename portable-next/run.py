@@ -53,8 +53,8 @@ try:
                 path=str((Path(z['directory'])/output).resolve())
                 if path in built:rows[built[path]]=z['command']
             assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
-            flags_per={key:'X86_VEX_SIB_TRANSFERS' in cmd for key,cmd in rows.items()}
-            assert all(v==(tag=='candidate' and expect=='active' and Path(k).name=='X86VexRegisterImmediate.c.o') for k,v in flags_per.items()),(config,tag,flags_per)
+            flags_per={key:'X86_ACCUMULATOR_OUTPUT32' in cmd for key,cmd in rows.items()}
+            assert all(v==(tag=='candidate' and expect=='active' and Path(k).name in ('X86MemoryFallback32.c.o','X86RegisterFallback32.c.o')) for k,v in flags_per.items()),(config,tag,flags_per)
             cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
             dest=project/tag;dest.mkdir()
             for kind in names:shutil.copy2(build/('probe_'+kind),dest)
@@ -75,7 +75,7 @@ try:
         old,new=ident['base'],ident['candidate']
         assert old['objects'].keys()==new['objects'].keys()
         changed=sorted(Path(k).name for k,v in old['objects'].items() if new['objects'][k]!=v)
-        assert changed==(['X86VexRegisterImmediate.c.o'] if expect=='active' else []),(config,changed)
+        assert changed==(['X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'] if expect=='active' else []),(config,changed)
         assert old['images'].keys()==new['images'].keys()
         assert all((new['images'][k]!=v)==(expect=='active') for k,v in old['images'].items())
         assert all(rec==record['base']for rec in record.values())
