@@ -25,52 +25,63 @@ try:
  from self_cost import read as read_cost
  patch=r/'profiled.patch';assert sha(patch)==q['profiled']['patch']
  run('git','-C',src,'apply','--index',patch);assert get('git','-C',src,'write-tree')==q['profiled']['tree']
- os.environ['CAPSTONE_BENCH_ATT']='1'
+ os.environ.pop('CAPSTONE_BENCH_ATT',None)
  run('cmake','--build',b,'--target','capstone_static','--parallel','4')
  lib,=b.rglob('libcapstone.a');exe=w/'profile'
  run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
  image=dict(capstone=sha(lib),executable=sha(exe),iced=sha(ad/'target/release/libiced_compare.a'))
  save('image',image)
- def measured_set(rows):
-  # Order by a digest of the interval, independent of opcode, output, or timings.
-  # Pick complete audited extents, including at least one if all exceed the target.
-  order=sorted(rows,key=lambda row:hashlib.sha256(table_bytes([row])).digest())
-  target=49152;selected=[];size=0
-  for row in order:
-   if size+row[1]<=target:selected.append(row);size+=row[1]
-  return sorted(selected or [min(order,key=lambda row:row[1])])
  rows={};selection={}
  for name,spec in samples.items():
   meta,spans=materialize(name,spec,w);assert meta==spec['verified']
   text=w/(name+'.text');ranges=w/(name+'.ranges');bits=str(spec['bits'])
-  audit=[list(map(int,line.split()))for line in get(exe,'audit','0','1',text,ranges,bits).splitlines()]
-  assert [x[:3]for x in audit]==[list(t)for t in spans]
-  common=[x[:3]for x in audit if x[1]==x[5] and x[3]==x[4]]
-  selected=measured_set(common);ranges.write_bytes(table_bytes(selected))
-  selection[name]=dict(input=meta,same=len(common),excluded=len(audit)-len(common),intervals=selected,bytes=sum(t[1]for t in selected),sha256=sha(ranges))
+  original=list(spans);skipped=0;removed=[]
+  if name=='sqlite-win-x64':
+   data=text.read_bytes();initial=[list(map(int,v.split()))for v in get(exe,'audit','0','1',text,ranges,bits).splitlines()]
+   excluded_starts={v[2] for v in initial if v[1]!=v[5] or v[3]!=v[4]}
+   tables={v['start']:v for v in q['sqlite_tables']};assert set(tables)==excluded_starts
+   spans=[]
+   for off,length,start in original:
+    if start not in tables:spans.append((off,length,start));continue
+    v=tables[start];assert off==v['offset'] and length==v['length'] and hashlib.sha256(data[off:off+length]).hexdigest()==v['sha256']
+    a,b=v['first']-start,v['end']-start;assert 0<=a<b<=length and b-a==v['words']*4
+    if a:spans.append((off,a,start))
+    if b<length:spans.append((off+b,length-b,start+b))
+    skipped+=b-a;removed.append([off+a,b-a,start+a])
+   assert skipped==2272 and len(spans)==9004
+   ranges.write_bytes(table_bytes(spans))
+  trace=[list(map(int,v.split()))for v in get(exe,'audit','0','1',text,ranges,bits).splitlines()]
+  assert [row[:3]for row in trace]==[list(s)for s in spans] and all(v[5]<=v[1] for v in trace)
+  included=[row[:3]for row in trace if row[1]==row[5] and row[3]==row[4]];excluded=[row for row in trace if row[1]!=row[5] or row[3]!=row[4]]
+  assert included and len(included)+len(excluded)==len(spans)
+  assert not excluded and len(included)==q['ranges'][name]['included']
+  ranges.write_bytes(table_bytes(included));size=sum(row[1]for row in included)
+  assert sha(ranges)==q['ranges'][name]['ranges'] and size==q['ranges'][name]['included_bytes']
+  selection[name]=dict(input=meta,same=len(included),bytes=size,sha256=sha(ranges),largest=max(row[1]for row in included),data_bytes=skipped)
   save('selection',selection)
   rows[name]={};boundary=None
-  for engine in ('capstone','private','iced'):
-   for mode in ((1,2,3) if engine=='fast' else (0,1,2,3)):
+  for engine in ('capstone','private','fast'):
+   for mode in (1,2,3):
     key=engine+'/'+str(mode);lab=name+'-'+engine+'-'+str(mode)
     command=[exe,engine,str(mode),'1',text,ranges,bits]
     expected=list(map(int,get(*command).split()))[2:]
     if boundary is None:boundary=expected[:3]
     assert expected[:3]==boundary and expected[0]>0
     raw=w/(lab+'.cg');log=w/(lab+'.log')
-    values=list(map(int,get('valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--callgrind-out-file='+str(raw),'--log-file='+str(log),*command).split()))[2:]
+    values=list(map(int,get('valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--cache-sim=yes','--I1=32768,8,64','--D1=32768,8,64','--LL=8388608,16,64','--callgrind-out-file='+str(raw),'--log-file='+str(log),*command).split()))[2:]
     assert values==expected
     dump,=[f for f in w.glob(raw.name+'.*') if 'Client Request: measured decoder spans' in f.read_text(errors='replace')]
     cost=read_cost(dump,e,lab);ev=cost['events']
     assert ev['Ir']==cost['accounted']['Ir'] and ev['Ir']>expected[0]*5 and ev['Bc']>0
     rows[name][key]=dict(codes=expected,ops=cost,rates={k:v/sum(expected[:2]) for k,v in ev.items()})
     save('costs',rows)
+    assert all(ev[k]==cost['accounted'][k] for k in ('Ir','Dr','Dw','I1mr','D1mr','D1mw','Bcm','Bim'))
     import gzip
     packed=e/(lab+'.cg.gz')
     with dump.open('rb')as a,gzip.open(packed,'wb',compresslevel=6)as dest:shutil.copyfileobj(a,dest)
     with gzip.open(packed,'rb')as a:assert hashlib.sha256(a.read()).hexdigest()==sha(dump)
     for f in [raw,dump,log]:f.unlink(missing_ok=True)
- assert len(rows)==4 and all(len(v)==12 for v in rows.values())
+ assert len(rows)==4 and all(len(v)==9 for v in rows.values())
  save('complete',dict(complete=True,source=q,host=platform.machine(),image=image,valgrind=get('valgrind','--version'),selection=selection))
 finally:
  size=sum(x.stat().st_size for x in w.rglob('*')if x.is_file() and not x.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))

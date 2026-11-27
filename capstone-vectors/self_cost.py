@@ -40,4 +40,5 @@ def read(path,out,prefix):
     focus=lambda n:n and (n.startswith(('X86_decode','X86_disasm','X86_reg_access','X86_register_map','X86_get_op_access','get_op_access','printMem','printPCRel','printOperand','printReg','SStream_','__vsnprintf','__printf','strlen','X86_Intel_printInst','X86_ATT_printInst','cs_decode_full','tryOutput','writeVex2','cs_disasm_iter','cs_regs_access')) or ('::formatter::' in n and ('format_' in n or 'write_' in n)) or n in ('decodeInstructionFull','readModRM','observed_span','SStream_concat','vsnprintf','__printf_buffer'))
     ir=Counter()
     for (_,name),counts in by_symbol.items():ir[name]+=counts['Ir']
-    return dict(events=whole,accounted=accounted,functions={name:dict(self_ir=ir[name],calls=calls[name])for name in set(ir)|set(calls)if focus(name)},top=[dict(function=k[1],ir=v['Ir'])for k,v in order[:40]])
+    leaders={ev:[(name,k[ev])for (_,name),k in sorted(by_symbol.items(),key=lambda pair:-pair[1][ev])[:10]] for ev in ('Ir','Dr','Dw','I1mr','D1mr','D1mw','Bcm','Bim')}
+    return dict(events=whole,accounted=accounted,leaders=leaders,functions={name:dict(self_ir=ir[name],calls=calls[name])for name in set(ir)|set(calls)if focus(name)},top=[dict(function=k[1],ir=v['Ir'])for k,v in order[:40]])
