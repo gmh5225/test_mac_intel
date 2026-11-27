@@ -1,0 +1,259 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..b01aac41 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1633,6 +1633,54 @@ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
+ 	return getIDSlow(insn, mode);
+ }
+ 
++static bool isVexIFMA(const struct InternalInstruction *insn)
++{
++#ifndef CAPSTONE_X86_REDUCE
++	if (insn->vectorExtensionType != TYPE_VEX_3B ||
++	    insn->opcodeType != THREEBYTE_38 || (insn->opcode & 0xfe) != 0xb4)
++		return false;
++	const uint8_t vex = insn->vectorExtensionPrefix[2];
++	return ppFromVEX3of3(vex) == VEX_PREFIX_66 && wFromVEX3of3(vex);
++#else
++	return false;
++#endif
++}
++
++/* The generated tables predate AVX-IFMA. Its unmasked VEX and EVEX
++ * forms share the operation, printer and access metadata. Only VEX uses
++ * an ordinary disp8, as in the tied three-operand VEX FMA layout. */
++static bool readVexIFMA(struct InternalInstruction *insn)
++{
++#ifndef CAPSTONE_X86_REDUCE
++	static const struct {
++		uint16_t operation[2];
++		uint16_t vexOperands;
++	} forms[2][2] = {
++		{
++			{ { X86_VPMADD52LUQZ128m, X86_VPMADD52HUQZ128m },
++			  X86_VFMADD132PDm },
++			{ { X86_VPMADD52LUQZ128r, X86_VPMADD52HUQZ128r },
++			  X86_VFMADD132PDr },
++		},
++		{
++			{ { X86_VPMADD52LUQZ256m, X86_VPMADD52HUQZ256m },
++			  X86_VFMADD132PDYm },
++			{ { X86_VPMADD52LUQZ256r, X86_VPMADD52HUQZ256r },
++			  X86_VFMADD132PDYr },
++		},
++	};
++	if (!isVexIFMA(insn) || readModRM(insn))
++		return false;
++	const unsigned width = lFromVEX3of3(insn->vectorExtensionPrefix[2]);
++	const bool reg = modFromModRM(insn->modRM) == 3;
++	insn->instructionID = forms[width][reg].operation[insn->opcode & 1];
++	insn->spec = specifierForUID(forms[width][reg].vexOperands);
++	return true;
++#else
++	return false;
++#endif
++}
++
+ /* Readers share byte consumption and error ordering. Ordinary scalar scan
+  * terminals use a constant false materialization policy after the generator
+  * proves their operand classes and ModR/M forms. Other callers retain every
+@@ -3070,7 +3118,9 @@ decodeInstructionImpl(struct InternalInstruction *insn, const uint8_t *code,
+ 				       result;
+ 		}
+ 	}
+-	if (getID(insn, mode) || insn->instructionID == 0 || checkPrefix(insn))
++	if (getID(insn, mode) ||
++	    (insn->instructionID == 0 && !readVexIFMA(insn)) ||
++	    checkPrefix(insn))
+ 		return X86_SCAN_INVALID;
+ 	if (mcInst)
+ 		return readOperandsScan(insn, mcInst, size);
+@@ -3462,7 +3512,9 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 	const struct ModRMDecision *decisions =
+ 		x86VexScanRows[insn.opcodeType - TWOBYTE][row];
+ 	if (!decisions)
+-		return X86_SCAN_INVALID;
++		return (prefix == 0xc4 && isVexIFMA(&insn)) ?
++			       X86_SCAN_NOT_HANDLED :
++			       X86_SCAN_INVALID;
+ 	const struct ModRMDecision *decision = &decisions[insn.opcode];
+ 	const uint32_t packed = decision->packed;
+ 	const bool decisionModRM =
+@@ -3472,7 +3524,9 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 		return X86_SCAN_INVALID;
+ 	insn.instructionID = decode(packed, modrm);
+ 	if (!insn.instructionID)
+-		return X86_SCAN_INVALID;
++		return (prefix == 0xc4 && isVexIFMA(&insn)) ?
++			       X86_SCAN_NOT_HANDLED :
++			       X86_SCAN_INVALID;
+ 	if (insn.instructionID >= ARR_SIZE(x86VexScanMetadata))
+ 		return X86_SCAN_NOT_HANDLED;
+ 	const uint32_t metadata = x86VexScanMetadata[insn.instructionID];
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 05b8ea9c..6131dfc9 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -446,6 +446,12 @@ address-size overrides and 16-bit addressing. The handler rejects LOCK,
+ register-only operands, conflicting mandatory prefixes and reserved VEX
+ fields before returning a decoded instruction.
+ 
++The full x86 decoder recognizes the 128- and 256-bit VEX forms of
++VPMADD52LUQ and VPMADD52HUQ (AVX-IFMA). They reuse the unmasked operation's
++printer and access metadata. Their tied VEX operand layout reads an ordinary
++signed disp8 in all three code modes. The EVEX memory forms retain their
++tuple-scaled displacement.
++
+ The prefix reader shares the selector's byte classification. A first ordinary
+ opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
+ vector escapes reuse the existing payload parser. Other prefix sequences keep
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 1d2a80c3..a761614c 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -91,6 +91,7 @@ endif()
+ if(CAPSTONE_X86_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c x86_call_target.c x86_immediate_size.c)
+     list(APPEND UNIT_TEST_SOURCES x86_mapping_counts.c)
++    list(APPEND UNIT_TEST_SOURCES x86_vex_ifma.c)
+     if(NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE)
+         list(APPEND UNIT_TEST_SOURCES x86_simple_output.c)
+         list(APPEND UNIT_TEST_SOURCES x86_valign_access.c)
+diff --git a/tests/unit/x86_vex_ifma.c b/tests/unit/x86_vex_ifma.c
+new file mode 100644
+index 00000000..84703dae
+--- /dev/null
++++ b/tests/unit/x86_vex_ifma.c
+@@ -0,0 +1,132 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <string.h>
++
++static bool check_form(csh handle, cs_mode mode, bool att, bool high, bool wide,
++		       bool memory, bool scan)
++{
++	/* The memory form has an ordinary negative disp8, even for YMM. */
++	uint8_t bytes[] = { 0xc4, 0xe2, 0xf1, 0xb4, 0xd8, 0xfd };
++	const size_t length = memory ? sizeof(bytes) : sizeof(bytes) - 1;
++	const x86_reg first = wide ? X86_REG_YMM0 : X86_REG_XMM0;
++	const x86_insn id = high ? X86_INS_VPMADD52HUQ : X86_INS_VPMADD52LUQ;
++	const uint8_t *cursor = bytes;
++	size_t left = length;
++	uint64_t address = 0x1000;
++	cs_insn *insn = cs_malloc(handle);
++	if (!insn)
++		return false;
++	if (wide)
++		bytes[2] |= 4;
++	if (high)
++		++bytes[3];
++	if (memory)
++		bytes[4] = 0x5e; // [rsi/esi/bp - 3]
++	bool decoded = cs_disasm_iter(handle, &cursor, &left, &address, insn);
++	bool ok = decoded && insn->id == id && insn->size == length &&
++		  left == 0 && address == 0x1000 + length;
++	if (cs_support(CS_SUPPORT_X86_REDUCE)) {
++		ok = !decoded;
++	} else if (ok && !scan && !cs_support(CS_SUPPORT_DIET)) {
++		const cs_x86 *x = &insn->detail->x86;
++		const cs_x86_op *dst = &x->operands[att ? 2 : 0];
++		const cs_x86_op *src = &x->operands[1];
++		const cs_x86_op *rm = &x->operands[att ? 0 : 2];
++		const unsigned width = wide ? 32 : 16;
++		ok = !strcmp(insn->mnemonic,
++			     high ? "vpmadd52huq" : "vpmadd52luq") &&
++		     x->op_count == 3 && dst->type == X86_OP_REG &&
++		     dst->reg == first + 3 && dst->access == CS_AC_READ_WRITE &&
++		     src->type == X86_OP_REG && src->reg == first + 1 &&
++		     src->access == CS_AC_READ && rm->access == CS_AC_READ &&
++		     dst->size == width && src->size == width &&
++		     rm->size == width && x->encoding.modrm_offset == 4 &&
++		     x->eflags == 0;
++		if (memory) {
++			x86_reg base = mode == CS_MODE_64 ? X86_REG_RSI :
++				       mode == CS_MODE_32 ? X86_REG_ESI :
++							    X86_REG_BP;
++			ok = ok && rm->type == X86_OP_MEM &&
++			     rm->mem.base == base && rm->mem.disp == -3 &&
++			     x->disp == -3 && x->encoding.disp_offset == 5 &&
++			     x->encoding.disp_size == 1;
++		} else {
++			ok = ok && rm->type == X86_OP_REG && rm->reg == first &&
++			     x->encoding.disp_size == 0;
++		}
++		cs_regs read, written;
++		uint8_t nr, nw;
++		ok = ok &&
++		     cs_regs_access(handle, insn, read, &nr, written, &nw) ==
++			     CS_ERR_OK &&
++		     nr == 3 && nw == 1 && written[0] == dst->reg;
++	}
++	if (!ok)
++		fprintf(stderr,
++			"mode=%u att=%d high=%d wide=%d mem=%d scan=%d\n",
++			(unsigned)mode, att, high, wide, memory, scan);
++	cs_free(insn, 1);
++	return ok;
++}
++
++static bool check_invalid(csh handle)
++{
++	static const struct {
++		uint8_t bytes[6], length;
++	} invalid[] = {
++		{ { 0xc4, 0xe2, 0x75, 0xb4, 0x1e }, 5 }, // W=0
++		{ { 0xc4, 0xe2, 0xf6, 0xb5, 0xd8 }, 5 }, // pp=F3
++		{ { 0x66, 0xc4, 0xe2, 0xf5, 0xb4, 0x1e }, 6 },
++		{ { 0xc4, 0xe2, 0xf5, 0xb4 }, 4 }, // missing ModR/M
++		{ { 0xc4, 0xe2, 0xf1, 0xb4, 0x5e }, 5 }, // missing disp8
++	};
++	for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
++		cs_insn *insn;
++		size_t count = cs_disasm(handle, invalid[i].bytes,
++					 invalid[i].length, 0x1000, 1, &insn);
++		if (count) {
++			cs_free(insn, count);
++			fprintf(stderr,
++				"unexpectedly decoded invalid IFMA case %zu\n",
++				i);
++			return false;
++		}
++	}
++	return true;
++}
++
++int main(void)
++{
++	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
++	for (size_t m = 0; m < 3; ++m) {
++		csh handle;
++		if (cs_open(CS_ARCH_X86, modes[m], &handle) != CS_ERR_OK)
++			return 1;
++		for (unsigned pass = 0; pass < 3; ++pass) {
++			const bool scan = pass == 2, att = pass == 1;
++			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
++					       att ? CS_OPT_SYNTAX_ATT :
++						     CS_OPT_SYNTAX_INTEL);
++			if (att && err == CS_ERR_X86_ATT)
++				continue;
++			if (err ||
++			    cs_option(handle, CS_OPT_DETAIL,
++				      scan ? CS_OPT_OFF : CS_OPT_ON) ||
++			    cs_option(handle, CS_OPT_TEXT,
++				      scan ? CS_OPT_OFF : CS_OPT_ON))
++				return 1;
++			if (!check_invalid(handle))
++				return 1;
++			for (unsigned form = 0; form < 8; ++form) {
++				if (!check_form(handle, modes[m], att, form & 1,
++						form & 2, form & 4, scan))
++					return 1;
++			}
++		}
++		cs_close(&handle);
++	}
++	return 0;
++}
