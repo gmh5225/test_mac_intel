@@ -1,7 +1,7 @@
-name: Verify uniform masked operand copies on all supported build profiles
+name: Verify VEX memory records with full, reduced and DIET Capstone builds
 on:
   push:
-    branches: [codex/uniform-copy-configuration-records]
+    branches: [codex/vex-sib-semantic-profiles]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0eb3f0239e28e965d432a964d2e7e6b15fdb8b4a
+          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: uniform-masked-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: vex-sib-semantics-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

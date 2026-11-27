@@ -48,6 +48,12 @@ try:
         run(name+'-units','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
         log=(e/(name+'-units.log')).read_text(errors='replace')
         assert '100% tests passed' in log and all('unit_'+n in log for n in units)
+        if tree and profile not in ('diet','reduced') and os.name!='nt':
+            compiler='g++' if profile=='gcc' else 'clang++'
+            run(name+'-generator-link',compiler,'-O2','-std=c++17','-I',s/'include',s/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',t/'generator')
+            actual=sp.check_output([t/'generator','--vex-sib-transfers'])
+            assert actual==(s/'arch/X86/X86GenVexSibTransfers.inc').read_bytes()
+            save(name+'-generated-records',dict(bytes=len(actual),sha256=hashlib.sha256(actual).hexdigest()))
         rows[name]=dict(units=units,skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
         for linkage in ('static','shared'):
             result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
