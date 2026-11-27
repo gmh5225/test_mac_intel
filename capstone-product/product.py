@@ -99,7 +99,7 @@ try:
     arm=os.uname().machine=='aarch64'
     obj={'X86VectorFallback64.c.o'}
     for before,after,expected in [('shipping','base',set() if arm else obj),
-        ('shipping','mask',obj),('base','mask',obj)]:
+        ('shipping','mask',obj),('base','mask',obj if arm else set())]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}

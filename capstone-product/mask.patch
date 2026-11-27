@@ -1,22 +1,54 @@
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..cc5adae9 100644
+index bc67e4c3..f92024ba 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -125,10 +125,13 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
- 		return false;
- 	}
- 	insn->bytes[3] = code[3];
--	/* The underlying writer emitted exactly two operands. Their longest
--	 * address and vector name leave room for both decorators. */
--	char *comma = strchr(insn->op_str, ',');
--	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
-+	/* Both writers clear op_str. Move the largest possible source and
-+	 * its terminator, including zero padding for shorter operands. Even
-+	 * a memory destination leaves room for this span and the decorators. */
-+	char *comma = store ? strchr(insn->op_str, ',') :
-+		insn->op_str + 4 + (insn->op_str[4] != ',');
-+	memmove(comma + (zero ? 9 : 5), comma,
-+		sizeof(", zmmword ptr [r15 + r15*8 - 0x80000000]"));
- 	memcpy(comma, " {k0}", 5);
- 	comma[3] = (char)('0' + mask);
- 	if (zero)
+@@ -168,6 +168,9 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+ }
+ #endif
+ 
++static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size);
++
+ /* The fixed-width AMD64 iterator has already tried its common records. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -213,8 +216,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
+ 	if (code[0] == 0xc4 &&
+-	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+-					  x86_simple_registers, true))
++	    writeVex3Output64(handle, code, size, insn, insn_size))
+ 		return true;
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+ 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
+@@ -269,5 +271,29 @@ fallback:
+ #endif
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
++
++/* Keep the memory tables in the fixed AMD64 fallback, outside the shared
++ * register-immediate handler used by the 32-bit iterator. */
++#ifndef CAPSTONE_X86_ONLY
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_vex64_memory_text" rodata = \
++	".cs_x86_vex64_memory_rodata"
++#endif
++#include "X86VexBaseMemory.h"
++#endif
++
++static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size)
++{
++#ifndef CAPSTONE_X86_ONLY
++	if (size >= 5 && code[4] < 0xc0)
++		return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++		       writeVexBaseMemory(code, size, 3, insn, insn_size,
++					  x86_simple_registers[3]);
++#endif
++	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
++					     x86_simple_registers, true);
++}
++
+ #endif
+ #endif
