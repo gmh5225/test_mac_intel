@@ -1,7 +1,7 @@
-name: Verify the typed WASM table printer on real modules and custom callbacks
+name: Verify full branch table addresses in real WASM modules and formatter callbacks
 on:
   push:
-    branches: [codex/wasm-system-width-corpus]
+    branches: [codex/wasm-integer-stream-modules]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
+          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
           path: source
           persist-credentials: false
       - name: Verify formatter hooks and time real WASM operators
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-system-width-corpus-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-integer-stream-modules-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
