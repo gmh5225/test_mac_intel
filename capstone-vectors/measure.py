@@ -106,14 +106,14 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-    run('clang++','-std=c++17','-O2','-I',base/'include',r/'vex3-domain.cpp','-ldl','-o',w/'vex3-domain')
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'accumulator-domain.cpp','-ldl','-o',w/'accumulator-domain')
     general={}
     for tag in ('candidate','outlined'):
-        result=list(map(int,get(w/'vex3-domain',w/'base.so',w/(tag+'.so')).split()))
-        assert len(result)==3 and result[0]==8*256*3*10*16*12 and 0<result[2]<result[1]<result[0]
+        result=list(map(int,get(w/'accumulator-domain',w/'base.so',w/(tag+'.so')).split()))
+        assert len(result)==2 and result[0]==11069184 and 0<result[1]<result[0]
         general[tag]=result
     assert general['candidate']==general['outlined']
-    save('vex3-domain',general)
+    save('accumulator-domain',general)
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}

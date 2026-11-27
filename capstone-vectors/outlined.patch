@@ -1,54 +1,74 @@
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..f92024ba 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -168,6 +168,9 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
- }
- #endif
- 
-+static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size);
-+
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -213,8 +216,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
- 		return true;
- 	if (code[0] == 0xc4 &&
--	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
--					  x86_simple_registers, true))
-+	    writeVex3Output64(handle, code, size, insn, insn_size))
- 		return true;
- 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
- 		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
-@@ -269,5 +271,29 @@ fallback:
- #endif
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..196815a4 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -13,6 +13,7 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86OutputOptions.h"
+ #include "X86SimpleOutput.h"
++#include "X86RegisterImmediateOutput.h"
+ #include "X86VectorRegisterOutput.h"
+ #define X86_VEX32_REGISTER_MOVES
+ #include "X86GenVex32MemoryOutput.inc"
+@@ -97,5 +98,32 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	}
+ 	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
  }
 +
-+/* Keep the memory tables in the fixed AMD64 fallback, outside the shared
-+ * register-immediate handler used by the 32-bit iterator. */
-+#ifndef CAPSTONE_X86_ONLY
++/* A bare ALU accumulator opcode names AL or EAX itself. Its register-pair
++ * row supplies the effect on the destination, flags and implicit registers. */
 +#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_vex64_memory_text" rodata = \
-+	".cs_x86_vex64_memory_rodata"
++#pragma clang section text = ".cs_x86_accumulator32_text"
 +#endif
-+#include "X86VexBaseMemory.h"
-+#endif
-+
-+static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size)
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeAccumulatorFallback32(cs_struct *handle, const uint8_t *code, size_t size,
++				cs_insn *insn, uint16_t *insn_size, bool batch)
 +{
-+#ifndef CAPSTONE_X86_ONLY
-+	if (size >= 5 && code[4] < 0xc0)
-+		return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		       writeVexBaseMemory(code, size, 3, insn, insn_size,
-+					  x86_simple_registers[3]);
-+#endif
-+	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
-+					     x86_simple_registers, true);
++	const unsigned opcode = code[0];
++	if ((opcode & 0xc6) == 0x04) {
++		const unsigned wide = opcode & 1;
++		const unsigned width = wide ? 4 : 1;
++		if (size >= 1 + width && !X86_OUTPUT_UNSUPPORTED(handle, false)) {
++			const unsigned pair = opcode & 0x39;
++			const unsigned row = x86_simple_plans[0][0][pair] >> 2;
++			writeUnsignedRegisterImmediate(
++				insn, &x86_simple_outputs[row],
++				&x86_simple_registers[wide ? 2 : 0][0], code,
++				0, 0, 1, width, insn_size);
++			return true;
++		}
++	}
++	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 +}
 +
+ #endif
+ #endif
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..c8e82194 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -21,6 +21,10 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size,
+ 			     bool batch);
++CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++X86_decodeAccumulatorFallback32(cs_struct *handle, const uint8_t *code,
++			     size_t size, cs_insn *insn, uint16_t *insn_size,
++			     bool batch);
+ 
+ /* Called by the static AMD64 iterator with at least one input byte. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index 251c6819..715b767a 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -61,7 +61,8 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 		}
+ #endif
+ 	}
+-	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	return X86_decodeAccumulatorFallback32(handle, code, size, insn, insn_size,
++					       batch);
+ }
  #endif
  #endif
