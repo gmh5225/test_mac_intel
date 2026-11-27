@@ -27,7 +27,7 @@ try:
     hi=temp/'reference-high.c';original_code=original.read_text()
     call='SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);'
     assert original_code.count(call)==1
-    hi.write_text(original_code.replace(call,'SStream_concat(O, "0x%" PRIx64, MI->wasm_data.brtable.address);'))
+    hi.write_text(original_code)
     run(cc,'-O2',*inc,'-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM','-DWASM_printInst=wasm_reference','-c',hi,'-o',temp/'high-ref.o')
     run(cxx,'-O2','-std=c++17',*inc,'-c',r/'measure.cpp','-o',temp/'driver.o')
     by={};libs={};objects={}
@@ -45,7 +45,7 @@ try:
         run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'verify-stream.c',temp/'ref.o',lib,'-o',temp/'stream')
         if label=='candidate':
             run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'high.c',temp/'high-ref.o',lib,'-o',temp/'high')
-            high=int(get(temp/'high'));assert high==172*9*16*4;save('high-stream',dict(cases=high,source=tree))
+            high=int(get(temp/'high'));assert high==172*9*16*4;save('high-callback-equivalence',dict(cases=high,source=tree))
         by[label]=int(get(temp/'stream'));assert by[label]==172*8*9*16*4,by
         run(cxx,temp/'driver.o',lib,'-o',temp/label)
         exe=temp/(label+'-shared');run(cxx,temp/'driver.o',shared[0],'-Wl,-rpath,'+str(shared[0].parent),'-o',exe)
@@ -56,7 +56,7 @@ try:
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
     assert by['base']==by['candidate']
     changed=[f for f,x in objects['base'].items() if x!=objects['candidate'][f]]
-    assert {Path(f).name for f in changed}=={'WASMInstPrinter.c.o','WASMDisassembler.c.o','wasm_brtable_size.c.o'},changed
+    assert {Path(f).name for f in changed}=={'WASMDisassembler.c.o','wasm_brtable_size.c.o'},changed
     save('build',dict(complete=True,source=tree,streams=by,libraries=libs,changed=changed,compiler=get(cc,'--version').splitlines()[0],host=platform.platform(),machine=platform.machine()))
     inputs=temp/'inputs' if ci else r/'inputs'
     if ci:run(sys.executable,'-B',r/'corpus.py',inputs)
