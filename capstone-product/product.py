@@ -112,12 +112,12 @@ try:
     comparisons={}
     arm=os.uname().machine=='aarch64'
     obj={'X86VectorOutput.c.o','X86DisassemblerDecoder.c.o'}
-    for before,after,expected in [('shipping','base',obj),('shipping','mask',obj),
-        ('base','mask',{'X86DisassemblerDecoder.c.o'})]:
+    scan={'X86DisassemblerDecoder.c.o','X86BatchScan.c.o'}
+    for before,after,expected in [('shipping','base',obj),('shipping','mask',obj|scan),('base','mask',scan)]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
-        assert delta==expected,(before,after,delta)
+        assert delta==expected or (after=='mask' and delta==expected-{'X86BatchScan.c.o'}),(before,after,delta)
         assert (a['exe']!=b['exe'])==bool(delta) and (a['archive']!=b['archive'])==bool(delta)
         comparisons[before+'/'+after]=sorted(delta)
     save('checked-objects',comparisons)

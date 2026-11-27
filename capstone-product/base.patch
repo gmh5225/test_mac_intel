@@ -1,95 +1,68 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..b01aac41 100644
+index 197453cb..1c7b5925 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1633,6 +1633,54 @@ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
- 	return getIDSlow(insn, mode);
- }
- 
-+static bool isVexIFMA(const struct InternalInstruction *insn)
-+{
-+#ifndef CAPSTONE_X86_REDUCE
-+	if (insn->vectorExtensionType != TYPE_VEX_3B ||
-+	    insn->opcodeType != THREEBYTE_38 || (insn->opcode & 0xfe) != 0xb4)
-+		return false;
-+	const uint8_t vex = insn->vectorExtensionPrefix[2];
-+	return ppFromVEX3of3(vex) == VEX_PREFIX_66 && wFromVEX3of3(vex);
-+#else
-+	return false;
-+#endif
-+}
-+
-+/* The generated tables predate AVX-IFMA. Its unmasked VEX and EVEX
-+ * forms share the operation, printer and access metadata. Only VEX uses
-+ * an ordinary disp8, as in the tied three-operand VEX FMA layout. */
-+static bool readVexIFMA(struct InternalInstruction *insn)
-+{
-+#ifndef CAPSTONE_X86_REDUCE
-+	static const struct {
-+		uint16_t operation[2];
-+		uint16_t vexOperands;
-+	} forms[2][2] = {
-+		{
-+			{ { X86_VPMADD52LUQZ128m, X86_VPMADD52HUQZ128m },
-+			  X86_VFMADD132PDm },
-+			{ { X86_VPMADD52LUQZ128r, X86_VPMADD52HUQZ128r },
-+			  X86_VFMADD132PDr },
-+		},
-+		{
-+			{ { X86_VPMADD52LUQZ256m, X86_VPMADD52HUQZ256m },
-+			  X86_VFMADD132PDYm },
-+			{ { X86_VPMADD52LUQZ256r, X86_VPMADD52HUQZ256r },
-+			  X86_VFMADD132PDYr },
-+		},
-+	};
-+	if (!isVexIFMA(insn) || readModRM(insn))
-+		return false;
-+	const unsigned width = lFromVEX3of3(insn->vectorExtensionPrefix[2]);
-+	const bool reg = modFromModRM(insn->modRM) == 3;
-+	insn->instructionID = forms[width][reg].operation[insn->opcode & 1];
-+	insn->spec = specifierForUID(forms[width][reg].vexOperands);
-+	return true;
-+#else
-+	return false;
-+#endif
-+}
-+
- /* Readers share byte consumption and error ordering. Ordinary scalar scan
-  * terminals use a constant false materialization policy after the generator
-  * proves their operand classes and ModR/M forms. Other callers retain every
-@@ -3070,7 +3118,9 @@ decodeInstructionImpl(struct InternalInstruction *insn, const uint8_t *code,
- 				       result;
- 		}
+@@ -2302,8 +2302,10 @@ X86_DECODE_INLINE int fixupRMOperand(struct InternalInstruction *insn,
+ 			return -1;
  	}
--	if (getID(insn, mode) || insn->instructionID == 0 || checkPrefix(insn))
-+	if (getID(insn, mode) ||
-+	    (insn->instructionID == 0 && !readVexIFMA(insn)) ||
-+	    checkPrefix(insn))
- 		return X86_SCAN_INVALID;
- 	if (mcInst)
- 		return readOperandsScan(insn, mcInst, size);
-@@ -3462,7 +3512,9 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 	const struct ModRMDecision *decisions =
- 		x86VexScanRows[insn.opcodeType - TWOBYTE][row];
- 	if (!decisions)
--		return X86_SCAN_INVALID;
-+		return (prefix == 0xc4 && isVexIFMA(&insn)) ?
-+			       X86_SCAN_NOT_HANDLED :
-+			       X86_SCAN_INVALID;
- 	const struct ModRMDecision *decision = &decisions[insn.opcode];
- 	const uint32_t packed = decision->packed;
- 	const bool decisionModRM =
-@@ -3472,7 +3524,9 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 		return X86_SCAN_INVALID;
- 	insn.instructionID = decode(packed, modrm);
- 	if (!insn.instructionID)
--		return X86_SCAN_INVALID;
-+		return (prefix == 0xc4 && isVexIFMA(&insn)) ?
-+			       X86_SCAN_NOT_HANDLED :
-+			       X86_SCAN_INVALID;
- 	if (insn.instructionID >= ARR_SIZE(x86VexScanMetadata))
- 		return X86_SCAN_NOT_HANDLED;
- 	const uint32_t metadata = x86VexScanMetadata[insn.instructionID];
+ 
+-	// Apply the AVX512 compressed displacement scaling factor.
+-	if (insn->eaDisplacement == EA_DISP_8)
++	/* VEX and EVEX IFMA share an operand descriptor. Only the EVEX
++	 * encoding scales its encoded disp8 by the tuple size. */
++	if (insn->eaDisplacement == EA_DISP_8 &&
++	    insn->vectorExtensionType == TYPE_EVEX)
+ 		insn->displacement *= 1 << (encoding - ENCODING_RM);
+ 	return 0;
+ }
+diff --git a/arch/X86/X86GenDisassemblerTables2.inc b/arch/X86/X86GenDisassemblerTables2.inc
+index 626482ea..e7482278 100644
+--- a/arch/X86/X86GenDisassemblerTables2.inc
++++ b/arch/X86/X86GenDisassemblerTables2.inc
+@@ -59835,8 +59835,8 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
++    { MODRM_SPLITRM, 12063 },
++    { MODRM_SPLITRM, 12065 },
+     { MODRM_SPLITRM, 11351 },
+     { MODRM_SPLITRM, 11353 },
+     { MODRM_SPLITRM, 11355 },
+@@ -60351,8 +60351,8 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+     { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
+-    { MODRM_ONEENTRY, 0 },
++    { MODRM_SPLITRM, 12501 },
++    { MODRM_SPLITRM, 12503 },
+     { MODRM_SPLITRM, 11599 },
+     { MODRM_SPLITRM, 11601 },
+     { MODRM_SPLITRM, 11603 },
+diff --git a/arch/X86/X86GenDisassemblerTablesPacked.inc b/arch/X86/X86GenDisassemblerTablesPacked.inc
+index b6dbca38..014dd43b 100644
+--- a/arch/X86/X86GenDisassemblerTablesPacked.inc
++++ b/arch/X86/X86GenDisassemblerTablesPacked.inc
+@@ -7329,7 +7329,7 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { 0x49ba9374u }, { 0x49d313a4u }, { 0x4ace959cu }, { 0x4ae715ccu }, { 0x4be297c4u }, { 0x4bfb17f4u }, { 0x4c889910u }, { 0x4ca11940u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4a829504u }, { 0x4b86970cu },
+     { 0x49ec93d8u }, { 0x4a051408u }, { 0x4b009600u }, { 0x4b191630u }, { 0x4c149828u }, { 0x4c2d1858u }, { 0x4cba9974u }, { 0x4cd319a4u },
+-    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4aa49548u }, { 0x4ba89750u },
++    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x54b52964u }, { 0x54a7a949u }, { 0x4aa49548u }, { 0x4ba89750u },
+     { 0x4a1e943cu }, { 0x4a37146cu }, { 0x4b329664u }, { 0x4b4b1694u }, { 0x4c46988cu }, { 0x4c5f18bcu }, { 0x4cec99d8u }, { 0x4d051a08u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
+@@ -7397,7 +7397,7 @@ static const struct OpcodeDecision x86DisassemblerThreeByte38Opcodes[] = {
+     { 0x49aa9354u }, { 0x49d313a4u }, { 0x4abe957cu }, { 0x4ae715ccu }, { 0x4bd297a4u }, { 0x4bfb17f4u }, { 0x4c7898f0u }, { 0x4ca11940u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4a7294e4u }, { 0x4b7696ecu },
+     { 0x49dc93b8u }, { 0x4a051408u }, { 0x4af095e0u }, { 0x4b191630u }, { 0x4c049808u }, { 0x4c2d1858u }, { 0x4caa9954u }, { 0x4cd319a4u },
+-    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x4a949528u }, { 0x4b989730u },
++    { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x54b9a96du }, { 0x54ac2952u }, { 0x4a949528u }, { 0x4b989730u },
+     { 0x4a0e941cu }, { 0x4a37146cu }, { 0x4b229644u }, { 0x4b4b1694u }, { 0x4c36986cu }, { 0x4c5f18bcu }, { 0x4cdc99b8u }, { 0x4d051a08u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
+     { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
 index 7d3a6e84..09b6a790 100644
 --- a/arch/X86/X86GenVectorOutput.inc
@@ -248,7 +221,7 @@ index eedf177c..272bea7a 100644
  		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  	},
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index 05b8ea9c..6131dfc9 100644
+index 05b8ea9c..f11b90ab 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
 @@ -446,6 +446,12 @@ address-size overrides and 16-bit addressing. The handler rejects LOCK,
@@ -257,9 +230,9 @@ index 05b8ea9c..6131dfc9 100644
  
 +The full x86 decoder recognizes the 128- and 256-bit VEX forms of
 +VPMADD52LUQ and VPMADD52HUQ (AVX-IFMA). They reuse the unmasked operation's
-+printer and access metadata. Their tied VEX operand layout reads an ordinary
-+signed disp8 in all three code modes. The EVEX memory forms retain their
-+tuple-scaled displacement.
++printer and access metadata. The original opcode tables select these operations for
++VEX.W1 and both vector lengths. Only EVEX applies tuple scaling to a signed
++disp8.
 +
  The prefix reader shares the selector's byte classification. A first ordinary
  opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
@@ -278,10 +251,10 @@ index 1d2a80c3..a761614c 100644
          list(APPEND UNIT_TEST_SOURCES x86_valign_access.c)
 diff --git a/tests/unit/x86_vex_ifma.c b/tests/unit/x86_vex_ifma.c
 new file mode 100644
-index 00000000..84703dae
+index 00000000..d646f463
 --- /dev/null
 +++ b/tests/unit/x86_vex_ifma.c
-@@ -0,0 +1,132 @@
+@@ -0,0 +1,137 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -394,6 +367,11 @@ index 00000000..84703dae
 +			cs_err err = cs_option(handle, CS_OPT_SYNTAX,
 +					       att ? CS_OPT_SYNTAX_ATT :
 +						     CS_OPT_SYNTAX_INTEL);
++			if (att && cs_support(CS_SUPPORT_DIET)) {
++				if (err != CS_ERR_DIET)
++					return 1;
++				continue;
++			}
 +			if (att && err == CS_ERR_X86_ATT)
 +				continue;
 +			if (err ||

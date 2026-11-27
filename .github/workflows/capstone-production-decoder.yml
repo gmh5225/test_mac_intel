@@ -1,7 +1,7 @@
-name: Validate VEX IFMA semantics and performance in the source-built NeverD product
+name: Validate AVX-IFMA table decoders in NeverD built against current fork LLVM sources
 on:
   push:
-    branches: [codex/vex-ifma-product]
+    branches: [codex/ifma-opcode-table-neverd]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 87e0b7d2303971e350f4ee3cb6923113154ef5cc
+          ref: cde65f0e4bf3344408847839283e4e48f39024ee
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-ifma-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: canonical-ifma-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
