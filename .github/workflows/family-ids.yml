@@ -1,7 +1,7 @@
-name: Measure AArch64 and MIPS canonical operand printing with observable formatter callbacks
+name: Measure AArch64 bitfield alias detail and formatting in real coreutils, with PE and MIPS controls
 on:
   push:
-    branches: [codex/mips-aarch64-alias-formatting]
+    branches: [codex/aarch64-bitfield-details]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 3a67e7f8ff2fc6265dc86c115c7989e47c8a7ee2
+          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
           path: source
           persist-credentials: false
       - run: python3 -B family-ids/native.py
@@ -38,5 +38,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: mips-aarch64-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: bitfield-alias-detail-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

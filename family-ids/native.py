@@ -14,25 +14,23 @@ def apply(k):
         assert sha(r/(k+'.patch'))==q[k]['sha256'];get('git','-C',s,'apply','--index',r/(k+'.patch'));assert get('git','-C',s,'write-tree')==q[k]['tree']
 try:
     assert get('git','-C',s,'rev-parse','HEAD')==m['checkout'] and all(v['parent']==m['checkout']for v in q.values())
-    arch=['X86','ARM','AARCH64','MIPS']
+    arch=['X86','ARM','AARCH64','MIPS','PPC','RISCV']
     flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arch]]
     libs={};images={}
     for k in ('base',*q):
         apply(k);b=t/'build'
         run('cmake-'+k,'cmake','-G','Ninja','-S',s,'-B',b,*flags)
-        units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_x87_environment','x86_scan_batch','sstream','instruction_bytes','mcinst','arm_private_stream','text_option','mips_scan','mips_register_names','mips16_memory_calls']
-        units+=['mips16_frames','mips16_word_order','mips16_shifts_hilo','mips16_immediates','mips_msa_control','mips_reglist_offset']
-        units+=['aarch64_scan','aarch64_postprocess']
+        units=['aarch64_scan','aarch64_postprocess','mapping','mcinst','sstream','text_option']
         run('build-'+k,'cmake','--build',b,'--parallel','4','--target','capstone_shared',*units)
         run('unit-'+k,'ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$')
         lib=next(f for f in b.glob('libcapstone*')if f.is_file()and not f.is_symlink()and ('.dylib' in f.name or '.so.'in f.name))
         path=t/(k+lib.suffix);shutil.copy2(lib,path);libs[k]=path
         images[k]=dict(shared=sha(path),static=(b/'libcapstone.a').is_file(),bytes=path.stat().st_size,
-                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','MipsInstPrinter.c.o','AArch64InstPrinter.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','MipsMapping.c.o','AArch64Disassembler.c.o')})
+                       object={a:sha(next(b.rglob(a)))for a in('cs.c.o','MipsInstPrinter.c.o','AArch64InstPrinter.c.o','X86OutputIterator.c.o','X86DisassemblerDecoder.c.o','MipsDisassembler.c.o','MipsMapping.c.o','AArch64Disassembler.c.o','AArch64Mapping.c.o')})
     for k in q:
         changes={n for n,v in images['base']['object'].items()if images[k]['object'][n]!=v}
         assert not images[k]['static'] and not images['base']['static']
-        expected={'mips':{'MipsInstPrinter.c.o'},'a64':{'AArch64InstPrinter.c.o'},'both':{'MipsInstPrinter.c.o','AArch64InstPrinter.c.o'}}[k]
+        expected={'mips':{'MipsInstPrinter.c.o'},'a64':{'AArch64InstPrinter.c.o','AArch64Mapping.c.o'},'both':{'MipsInstPrinter.c.o','AArch64InstPrinter.c.o'}}[k]
         assert changes==expected,(k,changes,expected)
     assert all(images[k]['shared']!=images['base']['shared']for k in q);put('images',images)
     shutil.rmtree(b);driver=t/'measure';run('driver','clang++','-O3','-std=c++17','-I',s/'include',r/'compare.cpp','-ldl','-o',driver)
@@ -45,9 +43,35 @@ try:
     manifest=rd(r/'corpus-manifest.json')
     for n,arch in [(arch+'-'+cmd,arch)for arch in ('mips64el','arm64')for cmd in ('ls','cp','sort')]:
         v,=[e for e in manifest['inputs']if e['name']==n];deb=t/(n+'.deb');run('download-'+n,'curl','-fsSL','--retry','3','--max-time','100',v['url'],'-o',deb);assert sha(deb)==v['package_sha256']
+        if n=='arm64-ls':
+            raw_cat=corpus.deb_binary(deb,'cat');cat=t/'arm64-cat.text';cat.write_bytes(corpus.elf_text(raw_cat))
+            assert sha(cat)==rd(r/'coverage.json')['arm64-cat']['text']
+            hdr=struct.unpack_from('<16sHHIQQQIHHHHHH',raw_cat);ss=[struct.unpack_from('<IIQQQQIIQQ',raw_cat,hdr[6]+j*hdr[11])for j in range(hdr[12])]
+            sc,=[v for v in ss if v[5]==cat.stat().st_size and raw_cat[v[4]:v[4]+v[5]]==cat.read_bytes()]
+            cases['arm64-cat']=(cat,arch,sc[3])
         raw=corpus.deb_binary(deb,v['command'],v.get('member'));body=corpus.elf_text(raw);f=t/(n+'.text');f.write_bytes(body);assert sha(f)==v['text_sha256'];deb.unlink()
         hdr=struct.unpack_from('<16sHHIQQQIHHHHHH',raw);secs=[struct.unpack_from('<IIQQQQIIQQ',raw,hdr[6]+i*hdr[11])for i in range(hdr[12])];sect,=[v for v in secs if v[5]==len(body)and raw[v[4]:v[4]+v[5]]==body]
         cases[n]=(f,arch,sect[3])
+    from collections import Counter
+    alias_bytes=bytearray()
+    for name,v in rd(r/'coverage.json').items():
+        text=cases[name][0].read_bytes();kinds=Counter()
+        for (op,) in struct.iter_unpack('<I',text):
+            prefix=op&0xffc00000
+            if prefix not in (0x13000000,0x93400000,0x53000000,0xd3400000):continue
+            wide=bool(op>>31);signed=not bool(op&(1<<30));limit=63 if wide else 31
+            immr=(op>>16)&63;imms=(op>>10)&63
+            if immr>limit or imms>limit:continue
+            if immr==0 and imms in (7,15) and (signed or not wide):
+                alias=('s' if signed else 'u')+'xt'+('b' if imms==7 else 'h')
+            elif not immr and imms==31 and wide and signed:alias='sxtw'
+            elif not signed and imms!=limit and imms+1==immr:alias='lsl'
+            elif imms==limit:alias='asr' if signed else 'lsr'
+            else:continue
+            kinds[alias]+=1;alias_bytes.extend(struct.pack('<I',op))
+        assert dict(kinds)==v['forms']
+    assert len(alias_bytes)==382*4
+    alias_path=t/'aliases.text';alias_path.write_bytes(alias_bytes);cases['arm64-alias-records']=(alias_path,'arm64',4096)
     put('inputs',{n:dict(hash=sha(f),arch=arch,ip=ip,bytes=f.stat().st_size)for n,(f,arch,ip) in cases.items()})
     verify={}
     for k in q:
