@@ -1,28 +1,73 @@
+diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
+index cffc4e81..e3d2f8d0 100644
+--- a/arch/X86/X86MemoryFallback32.c
++++ b/arch/X86/X86MemoryFallback32.c
+@@ -41,7 +41,7 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 	const unsigned opcode = code[0];
+ 	switch (opcode) {
+ 	case 0xc4:
+-		if (X86_writeVexRegisterImmediate(handle, code, size, insn,
++		if (X86_writeVex3FallbackOutput(handle, code, size, insn,
+ 						  insn_size, x86_simple_registers, false))
+ 			return true;
+ 		break;
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 3105a881..a80a486d 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -86,7 +86,7 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 
+ /* The caller has identified a three-byte VEX prefix in the fixed-mode iterator. */
+ CAPSTONE_INTERNAL bool
+-X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
++X86_writeVex3FallbackOutput(cs_struct *handle, const uint8_t *code,
+ 			      size_t size, cs_insn *insn, uint16_t *insn_size,
+ 			      const struct X86SimpleRegister regs[4][16],
+ 			      bool wide);
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..0eb58c27 100644
+index bc67e4c3..a33c8289 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -27,9 +27,7 @@
- #endif
+@@ -213,7 +213,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
+ 	if (code[0] == 0xc4 &&
+-	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
++	    X86_writeVex3FallbackOutput(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
+ 		return true;
+ 	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
+diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
+index 3fe8460f..4d7fa92a 100644
+--- a/arch/X86/X86VexRegisterImmediate.c
++++ b/arch/X86/X86VexRegisterImmediate.c
+@@ -13,6 +13,9 @@
+ #include "X86OutputOptions.h"
+ #include "X86SimpleOutput.h"
+ #include "X86UnsignedImmediate.h"
++#ifndef CAPSTONE_X86_ONLY
++#include "X86VexBaseMemory.h"
++#endif
+ #include "X86VectorRegisterWriter.h"
  
- #include "X86GenSimpleOutput.inc"
--#ifdef CAPSTONE_X86_ONLY
- #include "X86VexBaseMemory.h"
--#endif
- #define X86_LEGACY_PACKED_MEMORY
- #include "X86PackedMemoryOutput.h"
- #undef X86_LEGACY_PACKED_MEMORY
-@@ -255,6 +253,13 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 				       x86_simple_registers[3]))
- 			return true;
- 	}
-+#else
-+	if (size >= 5 && code[0] == 0xc4 && (code[3] & 0xfe) == 0xb4 &&
-+	    (code[1] & 31) == 2 && (code[2] & 0x83) == 0x81 &&
-+	    code[4] < 0xc0 && !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+	    writeVexBaseMemory(code, size, 3, insn, insn_size,
-+			       x86_simple_registers[3]))
-+		return true;
- #endif
- fallback:
- #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+ struct VexRegisterImmediateRow {
+@@ -25,12 +28,18 @@ struct VexRegisterImmediateRow {
+ #include "X86GenVexRegisterImmediates.inc"
+ 
+ /* Both iterators have identified C4 in their fixed address mode. */
+-bool X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
++bool X86_writeVex3FallbackOutput(cs_struct *handle, const uint8_t *code,
+ 				   size_t size, cs_insn *insn,
+ 				   uint16_t *insn_size,
+ 				   const struct X86SimpleRegister regs[4][16],
+ 				   bool wide)
+ {
++#ifndef CAPSTONE_X86_ONLY
++	/* The AMD64 caller has already identified a three-byte VEX prefix. */
++	if (wide && size >= 5 && code[4] < 0xc0)
++		return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++		       writeVexBaseMemory(code, size, 3, insn, insn_size, regs[3]);
++#endif
+ 	if (size < 6 || (code[1] & 31) != 3 || code[4] < 0xc0)
+ 		return false;
+ 	const unsigned flags = code[2];

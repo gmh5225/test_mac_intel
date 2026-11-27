@@ -98,6 +98,14 @@ try:
         guard[tag]=values
     assert guard['candidate']==guard['outlined']
     save('ifma-memory-guard',guard)
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'vex3-domain.cpp','-ldl','-o',w/'vex3-domain')
+    general={}
+    for tag in ('candidate','outlined'):
+        result=list(map(int,get(w/'vex3-domain',w/'base.so',w/(tag+'.so')).split()))
+        assert len(result)==3 and result[0]==8*256*3*10*16*12 and 0<result[2]<result[1]<result[0]
+        general[tag]=result
+    assert general['candidate']==general['outlined']
+    save('vex3-domain',general)
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
