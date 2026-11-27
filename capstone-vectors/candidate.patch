@@ -1,15 +1,28 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 602ae735..a2a27faf 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1088,6 +1088,11 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
+     target_compile_definitions(capstone_build_settings INTERFACE
+         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
++    # Use the bounded masked-operand copies in the measured x86-64 static reader.
++    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
++        set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
++    endif()
+ endif()
+ add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+ target_link_libraries(capstone PUBLIC capstone_build_settings)
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index 504682a4..cb8fe2f1 100644
+index 504682a4..bc67e4c3 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -125,10 +125,19 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
+@@ -125,10 +125,26 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
  		return false;
  	}
  	insn->bytes[3] = code[3];
--	/* The underlying writer emitted exactly two operands. Their longest
--	 * address and vector name leave room for both decorators. */
--	char *comma = strchr(insn->op_str, ',');
--	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
++#ifdef X86_FIXED_MASKED_SUFFIX
 +	/* The writers clear op_str before emitting two operands. A vector
 +	 * destination is four or five characters. Only stores put the
 +	 * variable-length address before the comma. */
@@ -23,6 +36,12 @@ index 504682a4..cb8fe2f1 100644
 +	} else {
 +		memmove(comma + gap, comma, sizeof(", zmm31"));
 +	}
++#else
+ 	/* The underlying writer emitted exactly two operands. Their longest
+ 	 * address and vector name leave room for both decorators. */
+ 	char *comma = strchr(insn->op_str, ',');
+ 	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
++#endif
  	memcpy(comma, " {k0}", 5);
  	comma[3] = (char)('0' + mask);
  	if (zero)
