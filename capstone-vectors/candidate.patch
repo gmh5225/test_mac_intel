@@ -1,20 +1,36 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a2a27faf..cd981210 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
+             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
++        set_property(SOURCE arch/X86/X86MemoryFallback32.c arch/X86/X86RegisterFallback32.c
++            APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_ACCUMULATOR_OUTPUT32>")
+     endif()
+ endif()
+ add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
 diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..05b7fb5d 100644
+index cffc4e81..a57468ad 100644
 --- a/arch/X86/X86MemoryFallback32.c
 +++ b/arch/X86/X86MemoryFallback32.c
-@@ -13,6 +13,7 @@
+@@ -13,6 +13,9 @@
  	!defined(_WIN32_WCE)
  #include "X86OutputOptions.h"
  #include "X86SimpleOutput.h"
++#ifdef X86_ACCUMULATOR_OUTPUT32
 +#include "X86RegisterImmediateOutput.h"
++#endif
  #include "X86VectorRegisterOutput.h"
  #define X86_VEX32_REGISTER_MOVES
  #include "X86GenVex32MemoryOutput.inc"
-@@ -97,5 +98,32 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -97,5 +100,34 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
  	}
  	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
  }
 +
++#ifdef X86_ACCUMULATOR_OUTPUT32
 +/* A bare ALU accumulator opcode names AL or EAX itself. Its register-pair
 + * row supplies the effect on the destination, flags and implicit registers. */
 +#if defined(__ELF__) && defined(__clang__)
@@ -25,7 +41,7 @@ index cffc4e81..05b7fb5d 100644
 +				cs_insn *insn, uint16_t *insn_size, bool batch)
 +{
 +	const unsigned opcode = code[0];
-+	if (opcode == 0x05 || opcode == 0x25 || (opcode & 0xfe) == 0x3c) {
++	if ((opcode & 0xc6) == 0x04) {
 +		const unsigned wide = opcode & 1;
 +		const unsigned width = wide ? 4 : 1;
 +		if (size >= 1 + width && !X86_OUTPUT_UNSUPPORTED(handle, false)) {
@@ -40,35 +56,41 @@ index cffc4e81..05b7fb5d 100644
 +	}
 +	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
 +}
++#endif
 +
  #endif
  #endif
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
-index 62d4288a..c8e82194 100644
+index 62d4288a..16d41fad 100644
 --- a/arch/X86/X86OutputOptions.h
 +++ b/arch/X86/X86OutputOptions.h
-@@ -21,6 +21,10 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -21,6 +21,12 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
  X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
  			     size_t size, cs_insn *insn, uint16_t *insn_size,
  			     bool batch);
++#ifdef X86_ACCUMULATOR_OUTPUT32
 +CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 +X86_decodeAccumulatorFallback32(cs_struct *handle, const uint8_t *code,
 +			     size_t size, cs_insn *insn, uint16_t *insn_size,
 +			     bool batch);
++#endif
  
  /* Called by the static AMD64 iterator with at least one input byte. */
  CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
 diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index 251c6819..715b767a 100644
+index 251c6819..95fbfb70 100644
 --- a/arch/X86/X86RegisterFallback32.c
 +++ b/arch/X86/X86RegisterFallback32.c
-@@ -61,7 +61,8 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+@@ -61,7 +61,12 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
  		}
  #endif
  	}
--	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++#ifdef X86_ACCUMULATOR_OUTPUT32
 +	return X86_decodeAccumulatorFallback32(handle, code, size, insn, insn_size,
 +					       batch);
++#else
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++#endif
  }
  #endif
  #endif
