@@ -1,7 +1,7 @@
-name: Verify optional real-mode output and public iterator binding across nineteen builds
+name: Verify public and private VEX and i386 condition records across nineteen configurations
 on:
   push:
-    branches: [codex/linked-real-output-configurations]
+    branches: [codex/dedicated-and-shared-operand-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: linked-writer-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: typed-record-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
