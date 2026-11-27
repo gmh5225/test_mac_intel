@@ -1,7 +1,7 @@
-name: Qualify NeverD joined signing PCs on hosted macOS
+name: Qualify scratch-free arm64e images on hosted macOS
 on:
   push:
-    branches: [codex/neverd-signing-joins-macos]
+    branches: [codex/neverd-noscratch-release]
 permissions:
   contents: read
 jobs:
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: NeverSight/NeverD
-          ref: 37f9ce7d830a766eeccfff0487ca87aea1befcb5
+          ref: 1e77badabc0ff540ae1f976e19c5046f552199a9
           path: project
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
