@@ -1,7 +1,7 @@
-name: Verify the public reader on its actual public-only and mixed links
+name: Test public formatting through the original archive owner and inspect private scan and foreign consumers
 on:
   push:
-    branches: [codex/public-record-complete-link]
+    branches: [codex/public-x86-original-member-order]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 1d0673d2102cb4a31bc1f1d696d7fb7e8c29545f
+          ref: 7ebcef84a80b8f7feba27b1118b66ff574c488b2
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1e662c82ead8be11f8f6ba0917e8f62ca94fa2dc
+          ref: db3b8c00be87d3a49d72aa318079dc74ee273c90
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-record-real-links-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-record-original-order-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -17,8 +17,6 @@ w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
-    assert sha(r/'base.patch')==rd(r/'source.json')['base']['sha256']
-    run('git','-C',base,'apply','--index',r/'base.patch')
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
     (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(base)
@@ -66,7 +64,6 @@ try:
     assert 'X86_disasmIterText' in get('nm','-u',w/'native-reference.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        run('git','-C',base,'apply','--index',r/'base.patch')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -118,7 +115,7 @@ try:
         assert len(guarded)==3 and 0<guarded[1]<guarded[0] and guarded[0]==6979584
         if label!='base':assert guarded==rd(e/'memory-boundary-base.json')
         save('memory-boundary-'+label,guarded)
-        functions=['cs_decode_full_insn','X86_decodeMixedPublicRecord','cs_disasm_iter','X86_disasmIterText','X86_decodeFixedRecord32','X86_decodeFixedRecord64']
+        functions=['cs_decode_full_insn','X86_decodeMixedPublicRecord','cs_disasm_iter','X86_disasmIterText','X86_decodeMixedRecord32','X86_decodeFixedRecord64']
         data={}
         for link in ('','ordinary','foreign','foreign-only'):
             path=w/((link+'-' if link else '')+label)
