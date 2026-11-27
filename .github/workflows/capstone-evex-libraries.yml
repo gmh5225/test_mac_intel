@@ -1,7 +1,7 @@
-name: Verify native application timing and identity for the scoped masked operand reader
+name: Compare VEX3 base memory output against shipping Capstone and fork iced master on real binaries
 on:
   push:
-    branches: [codex/qualified-x86-host-masked-copies]
+    branches: [codex/shipping-vex3-private-memory]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 0eb3f0239e28e965d432a964d2e7e6b15fdb8b4a
+          ref: a5c08759df756b179578e97670e148fa7629e88c
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 896ff9e02e09b909d248b0d7222e7af80c960d75
+          ref: 71cb846c8439b33d947b5a9e8a0ed30579f9b44c
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/iced
-          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
+          ref: 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31
           path: iced-source
           sparse-checkout: src/rust/iced-x86
           persist-credentials: false
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scoped-masked-suffix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: native-vex3-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
