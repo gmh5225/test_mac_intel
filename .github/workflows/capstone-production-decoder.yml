@@ -1,7 +1,7 @@
-name: Repeat four CPU-only changes and four i386 gains in source-built NeverD with matched in-process clocks
+name: Retest PE32 and foreign workloads with in-process CPU and elapsed clocks
 on:
   push:
-    branches: [codex/paired-product-clock-and-header-identity]
+    branches: [codex/neverd-pe32-matched-clock-repeat]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: source-product-clock-repeat-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: matched-pe32-clock-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
