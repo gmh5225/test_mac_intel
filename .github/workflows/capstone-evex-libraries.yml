@@ -1,7 +1,7 @@
-name: Measure newly bound public readers against iced, including PE32, firmware and foreign clients
+name: Count actual formatted instruction shapes in SeaBIOS, real-mode scalar, PuTTY and ELF libraries
 on:
   push:
-    branches: [codex/optional-reader-linked-images]
+    branches: [codex/real-instruction-output-shapes]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -51,12 +48,12 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32 zstandard==0.23.0
-          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
+          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/run.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/neverd-config" "$GITHUB_WORKSPACE/iced-source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: optional-reader-images-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-output-shapes-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
