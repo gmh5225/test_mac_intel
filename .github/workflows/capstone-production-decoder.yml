@@ -1,7 +1,7 @@
-name: Compare x86 cached access and i386 memory TEST on the live six-backend NeverD decoder
+name: Validate real NeverD with normalized views and compare every linked function
 on:
   push:
-    branches: [codex/product-scoped-access-and-byte-test]
+    branches: [codex/product-option-boundary-and-scoped-access]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scoped-access-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: option-boundary-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

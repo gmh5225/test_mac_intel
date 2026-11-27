@@ -24,3 +24,18 @@ def record_layout(exe):
         if span:symbols[name]=[at,size,hashlib.sha256(image[span[0]:span[0]+size]).hexdigest()]
     assert len(symbols)>80
     return dict(sections=mapped,symbols=symbols)
+
+def all_functions(path):
+    from elftools.elf.elffile import ELFFile
+    result={}
+    with path.open('rb')as f:
+        elf=ELFFile(f);sections={}
+        for symbol in elf.get_section_by_name('.symtab').iter_symbols():
+            idx=symbol['st_shndx'];length=symbol['st_size']
+            if symbol['st_info']['type']!='STT_FUNC' or not isinstance(idx,int) or not length:continue
+            if idx not in sections:
+                section=elf.get_section(idx);sections[idx]=(section['sh_addr'],section.data())
+            start,data=sections[idx];address=symbol['st_value'];offset=address-start;body=data[offset:offset+length]
+            assert offset>=0 and len(body)==length
+            result.setdefault(symbol.name,[]).append([address,length,hashlib.sha256(body).hexdigest()])
+    return {name:sorted(entries) for name,entries in result.items()}

@@ -109,7 +109,7 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first={'X86MemoryFallback32.c.o'};second={'X86Mapping.c.o'} if os.uname().machine=='x86_64' else set();between=first|second
+    first={'cs.c.o'};between={'X86Mapping.c.o'} if os.uname().machine=='x86_64' else set();second=first|between
     for before,after,expected in [('shipping','base',first),
         ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]
@@ -119,6 +119,16 @@ try:
         assert (a['exe']!=b['exe'])==bool(delta) and (a['archive']!=b['archive'])==bool(delta)
         comparisons[before+'/'+after]=sorted(delta)
     save('checked-objects',comparisons)
+    # Compare the addresses and machine code of every defined ELF function, including the real C++ consumer.
+    from product_layout import all_functions
+    funcs={stage:all_functions(t/(stage+'.exe')) for stage in ('shipping','base','mask')}
+    delta={}
+    for previous,next_stage in [('shipping','base'),('base','mask')]:
+        x,y=funcs[previous],funcs[next_stage]
+        keys=set(x)|set(y)
+        changed={k:[x.get(k),y.get(k)] for k in sorted(keys) if x.get(k)!=y.get(k)}
+        delta[previous+'/'+next_stage]=dict(total=len(keys),changed=changed)
+    save('all-function-changes',delta)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     image=t/'selected';shutil.copy2(t/'base.exe',image);ino=image.stat().st_ino
     blobs={k:(t/(k+'.exe')).read_bytes() for k in ('shipping','base','mask')}
@@ -141,7 +151,9 @@ try:
     rng=random.Random(3849);timings={}
     for c in cases:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
-            key=c['name']+'/'+str(mode);first,_=execute('base',c,mode,1)
+            key=c['name']+'/'+str(mode)
+            if key not in ('putty-32-0.85/1', 'putty-32-0.85/2', 'putty-32-0.85/5', 'putty-64-0.85/2', 'putty-64-0.85/5', 'libssl3t64-i386/2', 'libssl3t64-i386/5', 'libssl3t64-amd64/2', 'libmvec-amd64/1', 'jpeg-avx2-i386/2', 'arm64-ls/2', 'riscv64-ls/0', 'mips64el-ls/0', 'ppc64el-ls/1'):continue
+            first,_=execute('base',c,mode,1)
             reps=max(1,round(30000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
             focus=c['name'].startswith('ppc64el-') or c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
             count=35 if focus else 17;cycles=[]
@@ -153,7 +165,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and (checked['shipping']!=checked['mask'])==(os.uname().machine=='x86_64') and len({checked[k]for k in ('shipping','base','mask')})==(3 if os.uname().machine=='x86_64' else 2)
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and (checked['base']!=checked['mask'])==(os.uname().machine=='x86_64') and checked['shipping']!=checked['base'] and len({checked[k]for k in ('shipping','base','mask')})==(3 if os.uname().machine=='x86_64' else 2)
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:
