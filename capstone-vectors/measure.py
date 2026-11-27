@@ -86,7 +86,7 @@ try:
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-only-'+label))
         run('clang++',w/'foreign.o',w/'native-reference.o',lib,'-no-pie','-o',w/('foreign-'+label))
         run('clang++',w/'public-only.o',lib,ice_lib,*flags,'-o',w/('ordinary-'+label))
-        names=('X86_disasmIterText','cs_decode_full_insn','X86_disasmIterOtherMode','cs_disasm_iter')
+        names=('X86_disasmIterText','cs_decode_full_insn','X86_disasmIterOtherMode','cs_disasm_default_iter','cs_disasm_iter')
         modes={}
         for route,exe in [('native',w/label),('public_only',w/('ordinary-'+label)),('foreign',w/('foreign-'+label)),('foreign_only',w/('foreign-only-'+label))]:
             with exe.open('rb') as fh:
@@ -98,6 +98,10 @@ try:
             resolved='X86_disasmIterText' in symbols;assert resolved==(route in ('native','foreign')),(label,route,symbols)
             active=os.uname().machine=='x86_64' and label!='base'
             assert ('X86_disasmIterOtherMode' in symbols)==(active and resolved)
+            if active and label=='outlined':
+                default=symbols['cs_disasm_default_iter'];public=symbols['cs_disasm_iter']
+                assert (public[0]==default[0]) != resolved
+                assert public[1]==('STB_GLOBAL' if resolved else 'STB_WEAK'),(label,route,symbols)
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
         if os.uname().machine=='x86_64' and label!='base':
