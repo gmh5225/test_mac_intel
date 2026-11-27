@@ -38,7 +38,7 @@ index bc67e4c3..a33c8289 100644
  		return true;
  	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
 diff --git a/arch/X86/X86VexRegisterImmediate.c b/arch/X86/X86VexRegisterImmediate.c
-index 3fe8460f..b185066f 100644
+index 3fe8460f..4d7fa92a 100644
 --- a/arch/X86/X86VexRegisterImmediate.c
 +++ b/arch/X86/X86VexRegisterImmediate.c
 @@ -13,6 +13,9 @@
@@ -51,7 +51,7 @@ index 3fe8460f..b185066f 100644
  #include "X86VectorRegisterWriter.h"
  
  struct VexRegisterImmediateRow {
-@@ -25,12 +28,20 @@ struct VexRegisterImmediateRow {
+@@ -25,12 +28,18 @@ struct VexRegisterImmediateRow {
  #include "X86GenVexRegisterImmediates.inc"
  
  /* Both iterators have identified C4 in their fixed address mode. */
@@ -65,9 +65,7 @@ index 3fe8460f..b185066f 100644
 +#ifndef CAPSTONE_X86_ONLY
 +	/* The AMD64 caller has already identified a three-byte VEX prefix. */
 +	if (wide && size >= 5 && code[4] < 0xc0)
-+		return (code[1] & 31) == 2 &&
-+		       (code[3] & 0xfe) == 0xb4 && (code[2] & 0x83) == 0x81 &&
-+		       !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++		return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
 +		       writeVexBaseMemory(code, size, 3, insn, insn_size, regs[3]);
 +#endif
  	if (size < 6 || (code[1] & 31) != 3 || code[4] < 0xc0)
