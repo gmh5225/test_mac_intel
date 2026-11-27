@@ -1,7 +1,7 @@
-name: Check dedicated ARM release, DIET, Debug, Make and the shipping six-backend product archives
+name: Verify ARM release, DIET and debug outputs and all six mappings in the NeverD archive
 on:
   push:
-    branches: [codex/dedicated-arm-release-configurations]
+    branches: [codex/verify-actual-arm-build-inputs]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -40,5 +40,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-arm-configs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: arm-verified-inputs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

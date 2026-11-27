@@ -50,7 +50,7 @@ try:
    run('c++','-O3','-std=c++17','-I',src/'include',r/'time.cpp',picked,'-o',exe)
    objects={str(f.relative_to(b)):dig(f) for f in b.rglob('*.c.o')}
    result={'libraries':{k:dig(v)for k,v in libs.items()},'linked':dig(exe),'objects':objects,'active':sorted(active_units),'passed':True}
-   if product:assert len(objects)>85 and any('/X86Mapping.c.o' in k for k in objects)
+   if product:assert {'ARMMapping.c.o','AArch64Mapping.c.o','MipsMapping.c.o','PPCMapping.c.o','X86Mapping.c.o','RISCVMapping.c.o'} <= {Path(k).name for k in objects}
    results[profile][stage]=result
   put('stages',results)
   a=results[profile]
