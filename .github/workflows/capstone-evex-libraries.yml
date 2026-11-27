@@ -1,7 +1,7 @@
-name: Compare GNU ld and LLD x86 public disassembly on real programs and protected page boundaries
+name: Verify public records with GNU ld and the linker resolved by the Clang driver
 on:
   push:
-    branches: [codex/public-record-linker-semantics]
+    branches: [codex/native-public-linker-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-record-elf-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: native-record-linker-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

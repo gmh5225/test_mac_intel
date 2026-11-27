@@ -59,6 +59,6 @@ try:
             for name,z in real.items():assert all(x[:4]==z[0][:4] for x in z) and z[0][0]>0
             records[tag+'/'+route]=dict(guard=guard,options=opts,programs=real);save('records',records)
     assert len(records)==6 and len({json.dumps(v,sort_keys=True) for v in records.values()})==1
-    save('complete',dict(complete=True,source=q,linker=linker,compiler=get('clang','--version').splitlines()[0],link_version=get('ld.'+linker,'--version').splitlines()[0]))
+    save('complete',dict(complete=True,source=q,linker=linker,compiler=get('clang','--version').splitlines()[0],link_version=get('clang','-fuse-ld='+linker,'-Wl,--version','-x','c','/dev/null','-o',w/'link-version').splitlines()[0]))
 finally:
     used=sum(x.stat().st_size for x in w.rglob('*')if x.is_file() and not x.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=used))
