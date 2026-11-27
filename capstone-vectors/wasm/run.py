@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,math,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
+import struct,hashlib,json,math,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
 r=Path(__file__).resolve().parent
 ci=bool(os.environ.get('GITHUB_ACTIONS'))
 out=Path(os.environ['GITHUB_WORKSPACE'])/'evidence' if ci else r
@@ -56,7 +56,7 @@ try:
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
     assert by['base']==by['candidate']
     changed=[f for f,x in objects['base'].items() if x!=objects['candidate'][f]]
-    assert {Path(f).name for f in changed}=={'WASMInstPrinter.c.o','wasm_brtable_size.c.o'},changed
+    assert {Path(f).name for f in changed}=={'WASMInstPrinter.c.o','WASMDisassembler.c.o','wasm_brtable_size.c.o'},changed
     save('build',dict(complete=True,source=tree,streams=by,libraries=libs,changed=changed,compiler=get(cc,'--version').splitlines()[0],host=platform.platform(),machine=platform.machine()))
     inputs=temp/'inputs' if ci else r/'inputs'
     if ci:run(sys.executable,'-B',r/'corpus.py',inputs)
@@ -82,9 +82,19 @@ try:
             current=tag
         assert path.stat().st_ino==((temp/tag).stat().st_ino if immutable else inode)
         selections[tag]+=1
+    datasets=[];tables={}
     for name,spec in cover.items():
         if name=='wabt':continue
-        raw=inputs/(name+'.wasm');ranges=inputs/(name+'.ranges');assert sha(raw)==spec['sha256'] and sha(ranges)==spec['ranges_sha256']
+        raw=inputs/(name+'.wasm');ranges=inputs/(name+'.ranges')
+        assert sha(raw)==spec['sha256'] and sha(ranges)==spec['ranges_sha256']
+        data=raw.read_bytes()
+        selected=b''.join(struct.pack('<II',a,b) for a,b in struct.iter_unpack('<II',ranges.read_bytes()) if data[a]==0x0e)
+        count=len(selected)//8;assert count>0
+        sub=temp/(name+'.tables');sub.write_bytes(selected)
+        tables[name]=dict(count=count,wasm=sha(raw),ranges=sha(sub))
+        datasets.extend([(name,spec,raw,ranges),(name+'/br_table',dict(operators=count),raw,sub)])
+    save('table-corpus',tables)
+    for name,spec,raw,ranges in datasets:
         for detail in (0,1):
             args=[raw,ranges,str(detail)]
             def invoke(exe,verify,reps,env=None):

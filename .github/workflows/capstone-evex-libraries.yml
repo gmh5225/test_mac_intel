@@ -1,7 +1,7 @@
-name: Verify the cold WASM table printer on real modules and custom callbacks
+name: Measure validated branch target runs in three real WebAssembly modules
 on:
   push:
-    branches: [codex/wasm-cold-table-corpus]
+    branches: [codex/wasm-table-target-programs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 79e1e09233d2978f4fdad23e3ed252175e6dfcd0
+          ref: a5c08759df756b179578e97670e148fa7629e88c
           path: source
           persist-credentials: false
       - name: Verify formatter hooks and time real WASM operators
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-cold-table-corpus-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-table-target-programs-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
