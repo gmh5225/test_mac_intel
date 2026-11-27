@@ -1,7 +1,7 @@
-name: Verify public records with GNU ld and the linker resolved by the Clang driver
+name: Check weak public reader extraction and full record semantics on both ELF linkers
 on:
   push:
-    branches: [codex/native-public-linker-records]
+    branches: [codex/public-reader-extraction-proof]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -56,6 +56,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-record-linker-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: reader-extraction-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

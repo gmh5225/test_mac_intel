@@ -28,6 +28,17 @@ try:
         assert get('git','-C',s,'write-tree')==q[key]['tree']
         run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         lib,=build.rglob('libcapstone.a')
+        if tag!='base':
+            # The public caller has a weak reference and a strong dependency on cs.c.
+            def symbols(member):
+                obj=w/member;obj.write_bytes(sp.check_output(['ar','p',lib,member]))
+                lines=[line.split()for line in get('readelf','-sW',obj).splitlines()]
+                return {z[7]:z[4:7] for z in lines if len(z)==8}
+            caller=symbols('X86DisassemblerDecoder.c.o');fallback=symbols('cs.c.o');native=symbols('X86RegisterFallback32.c.o')
+            name='X86_decodePublicRecord'
+            assert caller[name]==['WEAK','HIDDEN','UND'] and caller['cs_disasm_iter_skipdata']==['GLOBAL','HIDDEN','UND'],caller.get(name)
+            assert fallback[name][:2]==['WEAK','HIDDEN'] and native[name][:2]==['GLOBAL','HIDDEN']
+            save('objects-'+tag,{'caller':caller[name],'default':fallback[name],'optional':native[name]})
         for route in ('ordinary','linked','core_first'):
             extra=['-DREQUEST_NATIVE']if route=='linked' else []
             objs=[]
@@ -45,7 +56,7 @@ try:
                     if len(v)==8 and v[3]=='FUNC' and v[6]!='UND' and v[7] in ('cs_decode_full_insn','X86_decodePublicRecord','X86_disasmIterText','cs_disasm_iter'):syms[v[7]]=[int(v[1],16),v[4],v[5]]
                 assert 'cs_disasm_iter' in syms and 'cs_decode_full_insn' in syms
                 native='X86_disasmIterText' in syms
-                if route=='linked':assert native
+                assert native==(route=='linked'),(linker,tag,route,kind,native)
                 if tag=='base':assert 'X86_decodePublicRecord' not in syms
                 else:assert (syms['cs_decode_full_insn'][0]!=syms['X86_decodePublicRecord'][0])==native
                 kinds[kind]=dict(native=native,symbols=syms,sha256=digest(binary.read_bytes()))
