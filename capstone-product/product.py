@@ -97,7 +97,7 @@ try:
     base,candidate=identities['base'],identities['candidate']
     assert base['objects'].keys()==candidate['objects'].keys()
     changed=[Path(k).name for k,v in base['objects'].items() if v!=candidate['objects'][k]]
-    active=os.uname().machine=='aarch64'
+    active=os.uname().machine=='x86_64'
     assert set(changed)==({'X86Sse64Output.c.o'} if active else set()),changed
     assert (base['exe']!=candidate['exe'])==active and (base['archive']!=candidate['archive'])==active
     save('checked-objects',dict(changed=changed,objects=len(base['objects']),active=active))
