@@ -1,7 +1,7 @@
-name: Measure the shared whitespace trimmer and count real ARM, MIPS, PowerPC and RISC-V calls
+name: Count generated and interpreted operand readers on real x86 inputs with full per-instruction comparison
 on:
   push:
-    branches: [codex/shared-stream-first-character]
+    branches: [codex/actual-operand-sets]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -33,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 896ff9e02e09b909d248b0d7222e7af80c960d75
+          ref: 47d0a2f33b15c11295c9b80e50c238a92ac0f965
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: stream-trim-shared-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: actual-operand-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
