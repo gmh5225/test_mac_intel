@@ -1,7 +1,7 @@
-name: Check SPARC operand construction and printer extents with real V9 coreutils
+name: Time alias detail selection for four real instruction sets and verify mixed-link identity
 on:
   push:
-    branches: [codex/sparc-private-operands]
+    branches: [codex/dedicated-alias-real-coreutils]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -11,13 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, flavor: first }
-          - { host: ubuntu-22.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04, cc: clang, flavor: first }
           - { host: ubuntu-24.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
-          - { host: ubuntu-24.04, cc: gcc, flavor: first }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -31,15 +28,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: 1d0673d2102cb4a31bc1f1d696d7fb7e8c29545f
           path: source
           persist-credentials: false
-      - run: python3 -B family-ids/native.py
+      - run: |
+          if ! /usr/bin/python3 -c "import elftools"; then sudo apt-get update -qq && sudo apt-get install -y python3-pyelftools; fi
+          /usr/bin/python3 -B family-ids/native.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: sparc-private-operands-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-alias-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

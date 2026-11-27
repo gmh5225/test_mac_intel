@@ -1,49 +1,220 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6f3ff5f..d36460a3 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -174,6 +174,10 @@ if(capstone_enabled_architectures STREQUAL "SYSTEMZ")
-     add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING)
- endif()
+diff --git a/Mapping.c b/Mapping.c
+index 996fd61f..acd450e2 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -2,6 +2,7 @@
+ /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2019 */
+ /*    Rot127 <unisono@quyllur.org>, 2022-2023 */
  
-+if(capstone_enabled_architectures STREQUAL "SPARC")
-+    add_compile_definitions(CAPSTONE_SPARC_ONLY)
-+endif()
-+
- if(capstone_enabled_architectures STREQUAL "LOONGARCH")
-     add_compile_definitions(CAPSTONE_LOONGARCH_DEDICATED_MAPPING)
- endif()
-diff --git a/Makefile b/Makefile
-index 8118f71d..f225ca2c 100644
---- a/Makefile
-+++ b/Makefile
-@@ -135,6 +135,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),systemz)
- CFLAGS += -DCAPSTONE_SYSTEMZ_DEDICATED_MAPPING
- endif
++#define CS_MAPPING_IMPLEMENTATION
+ #include "Mapping.h"
+ #include "MappingAlias.h"
+ #include "capstone/capstone.h"
+@@ -430,29 +431,9 @@ DEFINE_get_detail_op_at(bpf, BPF, BPF);
+ DEFINE_get_detail_op_at(arc, ARC, ARC);
+ DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
  
-+ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
-+CFLAGS += -DCAPSTONE_SPARC_ONLY
-+endif
+-/// Returns true if for this architecture the
+-/// alias operands should be filled.
+-/// TODO: Replace this with a proper option.
+-/// 			So it can be toggled between disas() calls.
+-bool map_use_alias_details(const MCInst *MI)
+-{
+-	assert(MI);
+-	return (MI->csh->detail_opt & CS_OPT_ON) &&
+-	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
+-}
+-
+-/// Sets the setDetailOps flag to @p Val.
+-/// If detail == NULLit refuses to set the flag to true.
+-void map_set_fill_detail_ops(MCInst *MI, bool Val)
+-{
+-	CS_ASSERT_RET(MI);
+-	if (!detail_is_set(MI)) {
+-		MI->fillDetailOps = false;
+-		return;
+-	}
+-
+-	MI->fillDetailOps = Val;
+-}
++#define CS_ALIAS_DETAIL_LINKAGE
++#include "MappingAliasDetails.inc"
++#undef CS_ALIAS_DETAIL_LINKAGE
+ 
+ /// Sets the instruction alias flags and the given alias id.
+ void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias)
+diff --git a/Mapping.h b/Mapping.h
+index 277c4ef3..56079427 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -324,7 +324,17 @@ static inline cs_detail *get_detail(const MCInst *MI)
+ 			return; \
+ 	} while (0)
+ 
++#if !defined(CS_MAPPING_IMPLEMENTATION) && \
++	(defined(CAPSTONE_ARM_ONLY) || defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || \
++	 defined(CAPSTONE_SPARC_ONLY) || defined(CAPSTONE_LOONGARCH_DEDICATED_MAPPING))
++/* The dedicated printer uses both decisions while selecting alias operands. */
++#define CS_ALIAS_DETAIL_LINKAGE static inline
++#include "MappingAliasDetails.inc"
++#undef CS_ALIAS_DETAIL_LINKAGE
++#else
++bool map_use_alias_details(const MCInst *MI);
+ void map_set_fill_detail_ops(MCInst *MI, bool Val);
++#endif
+ 
+ static inline bool map_fill_detail_ops(MCInst *MI)
+ {
+@@ -334,7 +344,6 @@ static inline bool map_fill_detail_ops(MCInst *MI)
+ 
+ void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias);
+ 
+-bool map_use_alias_details(const MCInst *MI);
+ 
+ void map_set_alias_id(MCInst *MI, const SStream *O,
+ 		      const name_map *alias_mnem_id_map, int map_size);
+diff --git a/MappingAliasDetails.inc b/MappingAliasDetails.inc
+new file mode 100644
+index 00000000..eae4a051
+--- /dev/null
++++ b/MappingAliasDetails.inc
+@@ -0,0 +1,21 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
 +
- ifeq ($(sort $(CAPSTONE_ARCHS)),loongarch)
- CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
- endif
++CS_ALIAS_DETAIL_LINKAGE bool map_use_alias_details(const MCInst *MI)
++{
++	assert(MI);
++	return (MI->csh->detail_opt & CS_OPT_ON) &&
++	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
++}
++
++/* Collect operands only for an instruction with active detail storage. */
++CS_ALIAS_DETAIL_LINKAGE void map_set_fill_detail_ops(MCInst *MI, bool Val)
++{
++	CS_ASSERT_RET(MI);
++	if (!detail_is_set(MI)) {
++		MI->fillDetailOps = false;
++		return;
++	}
++
++	MI->fillDetailOps = Val;
++}
 diff --git a/cs.c b/cs.c
-index b84486e0..65ae1a9d 100644
+index d0b8b045..0bfa1c8b 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -93,6 +93,14 @@
- #define CS_PRIVATE_DECODER LoongArch_getInstruction
- #define CS_PRIVATE_PRINTER LoongArch_printer
- #define CS_KNOWN_PRINTER_EXTENT
-+#elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#include "arch/Sparc/SparcMapping.h"
-+#define CS_PRIVATE_ARCH CS_ARCH_SPARC
-+#define CS_PRIVATE_DECODER Sparc_getInstruction
-+#define CS_PRIVATE_PRINTER Sparc_printer
-+#define CS_KNOWN_PRINTER_EXTENT
+@@ -1413,12 +1413,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_DETAIL:
+-		// CS_OPT_OFF turns detail off.  Any other value adds its flags
+-		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
+-		if (value == CS_OPT_OFF)
+-			handle->detail_opt = CS_OPT_OFF;
+-		else
+-			handle->detail_opt |= (cs_opt_value)value;
++		/* A requested view enables detail and preserves earlier view flags. */
++		if (value != CS_OPT_OFF)
++			value |= handle->detail_opt | CS_OPT_ON;
++		handle->detail_opt = (cs_opt_value)value;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
  #endif
- #include "arch/TMS320C64x/TMS320C64xModule.h"
- #include "arch/TriCore/TriCoreModule.h"
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 1d2a80c3..72d7b188 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15)
+ 
+ enable_testing()
+ set(UNIT_TEST_SOURCES sstream.c utils.c api.c instruction_bytes.c mcinst.c mapping.c feature_mode.c)
++if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_PPC_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
++    list(APPEND UNIT_TEST_SOURCES detail_views.c)
++endif()
+ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
+    OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_PPC_SUPPORT
+    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+diff --git a/tests/unit/detail_views.c b/tests/unit/detail_views.c
+new file mode 100644
+index 00000000..1adadf31
+--- /dev/null
++++ b/tests/unit/detail_views.c
+@@ -0,0 +1,77 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <string.h>
++
++struct sample {
++	cs_arch arch;
++	cs_mode mode;
++	uint8_t bytes[4];
++	size_t length;
++};
++
++static bool decode_view(csh handle, const struct sample *sample,
++			size_t flags, cs_insn *insn, cs_detail *detail)
++{
++	const uint8_t *code = sample->bytes;
++	size_t size = sample->length;
++	uint64_t address = 0x1000;
++
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) != CS_ERR_OK ||
++	    cs_option(handle, CS_OPT_DETAIL, flags) != CS_ERR_OK)
++		return false;
++	memset(insn, 0, sizeof(*insn));
++	memset(detail, 0, sizeof(*detail));
++	insn->detail = detail;
++	return cs_disasm_iter(handle, &code, &size, &address, insn) &&
++	       size == 0 && address == 0x1000 + sample->length;
++}
++
++int main(void)
++{
++	static const struct sample samples[] = {
++		{ CS_ARCH_ARM, CS_MODE_ARM, { 0x10, 0x40, 0x2d, 0xe9 }, 4 },
++		{ CS_ARCH_ARM, CS_MODE_THUMB, { 0x10, 0xb5 }, 2 },
++		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN,
++		  { 0xe0, 0x03, 0x01, 0xaa }, 4 },
++		{ CS_ARCH_PPC, CS_MODE_32 | CS_MODE_BIG_ENDIAN,
++		  { 0x7c, 0x64, 0x1b, 0x78 }, 4 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C,
++		  { 0x85, 0x00 }, 2 },
++	};
++	static const cs_opt_value views[] = { CS_OPT_DETAIL_REAL,
++					      CS_OPT_DETAIL_UNCOMPRESSED_REAL,
++					      CS_OPT_DETAIL_ALIAS };
++	for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
++		const struct sample *sample = &samples[i];
++		if (!cs_support(sample->arch))
++			continue;
++		csh handle;
++		if (cs_open(sample->arch, sample->mode, &handle) != CS_ERR_OK)
++			return 1;
++		for (size_t j = 0; j < sizeof(views) / sizeof(views[0]); ++j) {
++			cs_insn implicit, explicit_on;
++			cs_detail first, second;
++			bool ok = decode_view(handle, sample, views[j],
++					      &implicit, &first) &&
++				  decode_view(handle, sample, views[j] | CS_OPT_ON,
++					      &explicit_on, &second);
++			if (!ok || implicit.id != explicit_on.id ||
++			    implicit.alias_id != explicit_on.alias_id ||
++			    implicit.usesAliasDetails != explicit_on.usesAliasDetails ||
++			    strcmp(implicit.mnemonic, explicit_on.mnemonic) ||
++			    strcmp(implicit.op_str, explicit_on.op_str) ||
++			    memcmp(&first, &second, sizeof(first))) {
++				fprintf(stderr, "detail view %u differs on architecture %u, mode %u\n",
++					(unsigned)views[j], (unsigned)sample->arch,
++					(unsigned)sample->mode);
++				cs_close(&handle);
++				return 1;
++			}
++		}
++		cs_close(&handle);
++	}
++	return 0;
++}

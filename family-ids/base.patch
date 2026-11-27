@@ -1,121 +1,118 @@
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index f417cdc9..60ec4b72 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -86,6 +86,69 @@ static bool writeLegacyRegisterImmediate(const uint8_t *code, cs_insn *insn,
- 	return true;
- }
+diff --git a/cs.c b/cs.c
+index d0b8b045..0bfa1c8b 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1413,12 +1413,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		return CS_ERR_OK;
  
-+/* This writer belongs to the private mixed-library reader. In dedicated
-+ * builds the public iterator shares the same fallback object. */
-+#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
-+/* VMOVDQU8 keeps the unmasked transfer's address, length and operands.
-+ * Insert the writemask after its destination. Only a register destination
-+ * can request zeroing or read through the mask. */
-+static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
-+				size_t size, cs_insn *insn, uint16_t *insn_size)
-+{
-+	const unsigned mask = code[3] & 7, ll = (code[3] >> 5) & 3;
-+	const bool zero = (code[3] & 0x80) != 0;
-+	const bool memory = code[5] < 0xc0, store = code[4] == 0x7f;
-+	if (!mask || ll == 3 || (code[1] & 15) != 1 || code[2] != 0x7f ||
-+	    (code[3] & 0x18) != 8 || (store && (!memory || zero)) ||
-+	    X86_OUTPUT_UNSUPPORTED(handle, false))
-+		return false;
-+	/* The longest transfer uses a SIB and a four-byte displacement. */
-+	uint8_t plain[11];
-+	const size_t available = memory ? MIN(size, sizeof(plain)) : 6;
-+	memcpy(plain, code, available);
-+	plain[3] &= 0x78;
-+	if (memory) {
-+#ifdef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
-+		if (!X86_writeEvexMemoryOutput(plain, available, insn, insn_size,
-+					       x86_simple_registers[3]) &&
-+		    !writeIndexedEvexMemory(plain, available, insn, insn_size,
-+					    x86_simple_registers[3]))
-+			return false;
-+#else
-+		return false;
-+#endif
-+	} else if (!X86_writePlainEvexRegisters(handle, plain, available, insn,
-+						insn_size)) {
-+		return false;
-+	}
-+	insn->bytes[3] = code[3];
-+	/* The underlying writer emitted exactly two operands. Their longest
-+	 * address and vector name leave room for both decorators. */
-+	char *comma = strchr(insn->op_str, ',');
-+	memmove(comma + (zero ? 9 : 5), comma, strlen(comma) + 1);
-+	memcpy(comma, " {k0}", 5);
-+	comma[3] = (char)('0' + mask);
-+	if (zero)
-+		memcpy(comma + 5, " {z}", 4);
-+	if (insn->detail) {
-+		cs_x86 *x = &insn->detail->x86;
-+		x->opcode[3] = code[3];
-+		x->operands[2] = x->operands[1];
-+		cs_x86_op *k = &x->operands[1];
-+		memset(k, 0, sizeof(*k));
-+		k->type = X86_OP_REG;
-+		k->reg = (x86_reg)(X86_REG_K0 + mask);
-+		k->size = (uint8_t)(2u << ll);
-+		k->access = CS_AC_READ;
-+		k->avx_zero_opmask = zero;
-+		x->op_count = 3;
-+		if (!store && !zero)
-+			x->operands[0].access = (cs_ac_type)(CS_AC_READ | CS_AC_WRITE);
-+	}
-+	return true;
-+}
-+#endif
+ 	case CS_OPT_DETAIL:
+-		// CS_OPT_OFF turns detail off.  Any other value adds its flags
+-		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
+-		if (value == CS_OPT_OFF)
+-			handle->detail_opt = CS_OPT_OFF;
+-		else
+-			handle->detail_opt |= (cs_opt_value)value;
++		/* A requested view enables detail and preserves earlier view flags. */
++		if (value != CS_OPT_OFF)
++			value |= handle->detail_opt | CS_OPT_ON;
++		handle->detail_opt = (cs_opt_value)value;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
+ #endif
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 1d2a80c3..72d7b188 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15)
+ 
+ enable_testing()
+ set(UNIT_TEST_SOURCES sstream.c utils.c api.c instruction_bytes.c mcinst.c mapping.c feature_mode.c)
++if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_PPC_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
++    list(APPEND UNIT_TEST_SOURCES detail_views.c)
++endif()
+ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
+    OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_PPC_SUPPORT
+    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+diff --git a/tests/unit/detail_views.c b/tests/unit/detail_views.c
+new file mode 100644
+index 00000000..1adadf31
+--- /dev/null
++++ b/tests/unit/detail_views.c
+@@ -0,0 +1,77 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
 +
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -121,6 +184,12 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size >= 6 && code[0] == 0x62 && code[5] >= 0xc0 &&
- 	    X86_writePlainEvexRegisters(handle, code, size, insn, insn_size))
- 		return true;
-+#ifndef CAPSTONE_X86_PUBLIC_OUTPUT
-+	if (size >= 6 && code[0] == 0x62 && (code[3] & 7) &&
-+	    (code[4] | 0x10) == 0x7f &&
-+	    writeMaskedByteMove(handle, code, size, insn, insn_size))
-+		return true;
-+#endif
- 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
- 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
- 		return true;
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 586b3c09..1c7944f4 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -705,6 +705,21 @@ static bool check_push_memory(csh handles[2], cs_mode mode)
- 	return true;
- }
- 
-+static bool check_masked_byte_moves(csh handles[2])
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <string.h>
++
++struct sample {
++	cs_arch arch;
++	cs_mode mode;
++	uint8_t bytes[4];
++	size_t length;
++};
++
++static bool decode_view(csh handle, const struct sample *sample,
++			size_t flags, cs_insn *insn, cs_detail *detail)
 +{
-+	static const uint8_t forms[][11] = {
-+		{ 0x62, 0xf1, 0x7f, 0xc9, 0x6f, 0xc0 },
-+		{ 0x62, 0xd1, 0x7f, 0x49, 0x6f, 0x57, 1 },
-+		{ 0x62, 0xa1, 0x7f, 0xa9, 0x6f, 0x5c, 0x19, 2 },
-+		{ 0x62, 0x91, 0x7f, 0x0f, 0x7f, 0x5c, 0x1a, 4 },
++	const uint8_t *code = sample->bytes;
++	size_t size = sample->length;
++	uint64_t address = 0x1000;
++
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) != CS_ERR_OK ||
++	    cs_option(handle, CS_OPT_DETAIL, flags) != CS_ERR_OK)
++		return false;
++	memset(insn, 0, sizeof(*insn));
++	memset(detail, 0, sizeof(*detail));
++	insn->detail = detail;
++	return cs_disasm_iter(handle, &code, &size, &address, insn) &&
++	       size == 0 && address == 0x1000 + sample->length;
++}
++
++int main(void)
++{
++	static const struct sample samples[] = {
++		{ CS_ARCH_ARM, CS_MODE_ARM, { 0x10, 0x40, 0x2d, 0xe9 }, 4 },
++		{ CS_ARCH_ARM, CS_MODE_THUMB, { 0x10, 0xb5 }, 2 },
++		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN,
++		  { 0xe0, 0x03, 0x01, 0xaa }, 4 },
++		{ CS_ARCH_PPC, CS_MODE_32 | CS_MODE_BIG_ENDIAN,
++		  { 0x7c, 0x64, 0x1b, 0x78 }, 4 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C,
++		  { 0x85, 0x00 }, 2 },
 +	};
-+	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
-+		for (size_t n = 0; n <= sizeof(forms[i]); ++n)
-+			if (!compare(handles, forms[i], n, i))
-+				return false;
-+	return true;
++	static const cs_opt_value views[] = { CS_OPT_DETAIL_REAL,
++					      CS_OPT_DETAIL_UNCOMPRESSED_REAL,
++					      CS_OPT_DETAIL_ALIAS };
++	for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
++		const struct sample *sample = &samples[i];
++		if (!cs_support(sample->arch))
++			continue;
++		csh handle;
++		if (cs_open(sample->arch, sample->mode, &handle) != CS_ERR_OK)
++			return 1;
++		for (size_t j = 0; j < sizeof(views) / sizeof(views[0]); ++j) {
++			cs_insn implicit, explicit_on;
++			cs_detail first, second;
++			bool ok = decode_view(handle, sample, views[j],
++					      &implicit, &first) &&
++				  decode_view(handle, sample, views[j] | CS_OPT_ON,
++					      &explicit_on, &second);
++			if (!ok || implicit.id != explicit_on.id ||
++			    implicit.alias_id != explicit_on.alias_id ||
++			    implicit.usesAliasDetails != explicit_on.usesAliasDetails ||
++			    strcmp(implicit.mnemonic, explicit_on.mnemonic) ||
++			    strcmp(implicit.op_str, explicit_on.op_str) ||
++			    memcmp(&first, &second, sizeof(first))) {
++				fprintf(stderr, "detail view %u differs on architecture %u, mode %u\n",
++					(unsigned)views[j], (unsigned)sample->arch,
++					(unsigned)sample->mode);
++				cs_close(&handle);
++				return 1;
++			}
++		}
++		cs_close(&handle);
++	}
++	return 0;
 +}
-+
- static bool check_vex_clear(csh handles[2])
- {
- 	for (unsigned flags = 0; flags < 256; ++flags) {
-@@ -1610,6 +1625,7 @@ static bool check_mode(cs_mode mode)
- 		      (private_iter == X86_disasmIterText &&
- 		       (!check_plain_evex_registers(handles) ||
- 			!check_evex_immediate_shifts(handles) ||
-+			!check_masked_byte_moves(handles) ||
- 			!check_vex_clear(handles) ||
- 			!check_sse_base_memory(handles) ||
- 			!check_legacy_register_immediates(handles) ||

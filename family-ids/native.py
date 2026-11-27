@@ -1,105 +1,70 @@
+"""Measure dedicated alias printers and verify the six-architecture consumer is byte identical."""
 from pathlib import Path
-import hashlib,json,os,platform,random,shutil,statistics,subprocess as sp,tempfile
-import corpus
-d=Path(__file__).resolve().parent;s=d.parent/'source';out=d.parent/'evidence';out.mkdir(exist_ok=True)
-meta=json.loads((d/'tree.json').read_text());cc=os.environ['CC'];t=Path(tempfile.mkdtemp());mixed=('ARM','AARCH64','MIPS','RISCV','PPC','SYSTEMZ','LOONGARCH','SPARC','XTENSA','X86')
-def save(k,data):(out/(k+'.json')).write_text(json.dumps(data,indent=2)+'\n')
-def cmd(n,args):
-    with (out/(n+'.log')).open('w')as f:z=sp.run(args,stdout=f,stderr=sp.STDOUT)
-    if z.returncode:print((out/(n+'.log')).read_text(errors='replace')[-2000:]);z.check_returncode()
-def g(*args):return sp.check_output(['git','-C',s,*args],text=True).strip()
-def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-assert g('rev-parse','HEAD')==meta['parent'];baseline=g('rev-parse','HEAD^{tree}')
-
+import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
+from corpus import deb_binary,elf_text
+from arm_corpus import prepare as arm_extents
+from elftools.elf.elffile import ELFFile
+from fixed_image import FixedImage
+from io import BytesIO
+r=Path(__file__).resolve().parent;src=r.parent/'source';e=r.parent/'evidence';e.mkdir(exist_ok=True)
+read=lambda f:json.loads(f.read_bytes())
+def put(k,v):
+ f=e/(k+'.json');p=f.with_suffix('.tmp');p.write_text(json.dumps(v,indent=1)+'\n');p.replace(f)
+def run(*args):sp.run(args,check=True)
+def out(*args):return sp.check_output(args,text=True).strip()
+def sha(data):return hashlib.sha256(data).hexdigest()
+def dig(path):return sha(path.read_bytes())
+q=read(r/'source.json');w=Path(tempfile.mkdtemp());samples=read(r/'samples.json');isa=platform.machine()
 try:
-    images={};profiles={}
-    cmd('guard-link',['c++','-O2','-std=c++17','-I',s/'include',d/'guard.cpp','-ldl','-o',t/'guard'])
-    for profile,architectures in [('mixed',mixed),('diet',['SPARC']),('systemz',['SYSTEMZ']),('loongarch',['LOONGARCH']),('pure',['SPARC'])]:
-        b=t/profile;variants={}
-        for k in ('base','storage','candidate'):
-            g('restore','--source',baseline,'--staged','--worktree','--','.')
-            if k!='base':
-                target=meta if k=='candidate' else json.loads((d/'active-tree.json').read_text())
-                patch=d/(k+'.patch');assert sha(patch)==target['sha256'];g('apply','--index',str(patch));assert g('write-tree')==target['tree']
-            config=['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in architectures]]
-            if profile=='diet':config.append('-DCAPSTONE_BUILD_DIET=ON')
-            cmd(profile+'-config-'+k,config)
-            cmd(profile+'-build-'+k,['cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*(['register_descriptors','mcinst']if profile!='diet'else [])])
-            if profile!='diet':cmd(profile+'-test-'+k,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
-            so,=[f for f in b.glob('libcapstone.so.*')if not f.is_symlink()]
-            variants[k]=dict(shared=sha(so),objects={str(f.relative_to(b/'CMakeFiles/capstone.dir')):sha(f)for f in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')},archive=sha(b/'libcapstone.a'))
-            target=t/(profile+'-'+k+'.so');shutil.copy2(so,target)
-            if k!='base' and profile not in ('systemz','loongarch'):
-                cmd('boundary-'+profile+'-'+k,[t/'guard',t/(profile+'-base.so'),target])
-                modes,trials,accepted=map(int,(out/('boundary-'+profile+'-'+k+'.log')).read_text().split())
-                assert modes==6 and trials==57344*modes and accepted>0
-            if profile=='pure':
-                images[k]=so.read_bytes()
-                cmd('symbols-'+k,['nm','-S','-n','--defined-only',so])
-                for sym in ('cs_decode_full_insn','cs_disasm_iter','Sparc_printer'):
-                    cmd('code-'+k+'-'+sym,['objdump','-d','--disassemble='+sym,so])
-                cmd('callback-build-'+k,['c++','-std=c++17','-O2','-I',s/'include',d/'callback.cpp','-ldl','-o',t/'callbacks'])
-                if k!='base':cmd('callbacks-'+k,[t/'callbacks',t/'pure-base.so',target])
-                if k=='candidate':
-                    original=(s/'cs.c').read_text();line='MCInst_InitStorage(&mci, CS_PRIVATE_ARCH, false);';assert original.count(line)==1
-                    for pattern in (0xa5,0x5a):
-                        # Change only the private operand slots the decoder is allowed to leave unused.
-                        start='offsetof(MCInst, Operands) + sizeof(mci.Operands[0])'
-                        length='sizeof(mci.Operands) - sizeof(mci.Operands[0])'
-                        test='{ '+line+' memset((char *)&mci + '+start+', '+str(pattern)+', '+length+'); }'
-                        (s/'cs.c').write_text(original.replace(line,test))
-                        cmd('poison-build-'+str(pattern),['cmake','--build',b,'--parallel','4','--target','capstone_shared'])
-                        cmd('poison-boundary-'+str(pattern),[t/'guard',t/'pure-base.so',so])
-                        cmd('poison-callbacks-'+str(pattern),[t/'callbacks',t/'pure-base.so',so])
-                        shutil.copy2(so,t/('poison-'+str(pattern)+'.so'))
-                    (s/'cs.c').write_text(original)
-        a,bv=variants['storage'],variants['candidate'];assert a['objects'].keys()==bv['objects'].keys()
-        changed=[p for p in a['objects']if a['objects'][p]!=bv['objects'][p]]
-        if profile=='pure':
-            for name in ('storage','candidate'):
-                diff=[f for f,v in variants['base']['objects'].items() if variants[name]['objects'][f]!=v]
-                assert diff==['cs.c.o'],(profile,name,diff)
-        else:
-            assert variants['base']==variants['storage']==variants['candidate'],profile
-
-        profiles[profile]=dict(changed=changed,variants=variants)
-    save('profiles',profiles)
-    # The package digest binds every extracted member. Check the established ls digest as well.
-    manifest=json.loads((d/'manifest.json').read_text());ls,=[x for x in manifest['inputs']if x['name']=='sparc64-ls']
-    pkg=t/'coreutils.deb';cmd('download',['curl','--retry','2','-fsSL',ls['url'],'-o',pkg]);assert sha(pkg)==ls['package_sha256']
-    samples={}
-    for name in ('ls','cat','sort','cp'):
-        binary=corpus.deb_binary(pkg,name);data=corpus.elf_text(binary);f=t/(name+'.text');f.write_bytes(data)
-        samples[name]=dict(package_sha256=sha(pkg),elf_sha256=hashlib.sha256(binary).hexdigest(),section_sha256=sha(f),bytes=len(data));assert len(data)>1024 and len(data)%4==0
-    assert samples['ls']['section_sha256']==ls['text_sha256'];save('samples',samples)
-    sz=max(map(len,images.values()));images={k:v+bytes(sz-len(v))for k,v in images.items()};images['aa']=images['base']
-    slot=t/'fixed';slot.mkdir();target=slot/'libcapstone.so.6';target.write_bytes(images['base']);(slot/'libcapstone.so').symlink_to(target.name)
-    for name,src in [('time','time.cpp'),('raw','raw.cpp')]:cmd('compile-'+name,['c++','-std=c++17','-O3','-I',s/'include',d/src,'-L',slot,'-Wl,-rpath,'+str(slot),'-lcapstone','-o',t/name])
-    signatures={}
-    for name in samples:
-        for opt in range(5):
-            observed=[]
-            for k in ('base','storage','candidate'):
-                target.write_bytes(images[k]);observed.append(list(map(int,sp.check_output([t/'raw','106',t/(name+'.text'),str(opt)]).split())))
-            assert observed[0]==observed[1]==observed[2] and observed[0][0]>0
-            for pattern in (0xa5,0x5a):
-                img=(t/('poison-'+str(pattern)+'.so')).read_bytes()
-                target.write_bytes(img)
-                result=list(map(int,sp.check_output([t/'raw','106',t/(name+'.text'),str(opt)]).split()))
-                assert result==observed[0]
-            signatures[name+'/'+str(opt)]=observed[0]
-    save('raw',signatures);rng=random.Random(2044);rows=[];os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    def sample(k,name,mode,n):
-        target.write_bytes(images[k]);return list(map(int,sp.check_output(['setarch',platform.machine(),'-R',t/'time','106',str(mode),t/(name+'.text'),'1048576',str(n)]).split()))
-    for name in samples:
-        for mode in range(3):
-            one=sample('base',name,mode,1);n=max(1,round(65e6/one[0]));cycles=[]
-            for _ in range(17):
-                keys=list(images);rng.shuffle(keys);observed={k:[]for k in keys}
-                for k in keys+keys[::-1]:
-                    v=sample(k,name,mode,n);assert v[2]==one[2];observed[k].append(v[0])
-                cycles.append(observed)
-            rows.append(dict(case=name,mode=mode,pairs=cycles))
-    save('timings',rows);save('complete',dict(done=True,source=meta,cc=cc,host=platform.machine(),platform=platform.platform(),tests=20,poison_patterns=[165,90],callbacks=192,panels=len(rows)))
+ assert out('git','-C',src,'rev-parse','HEAD')==q['checkout']
+ armin=read(r/'arm.json');assert arm_extents(w,armin)==armin
+ inputs={'ARM':{k[4:]:(w/(k+'.text'),w/(k+'.ranges'))for k in armin['fixtures']}}
+ for arch,meta in samples.items():
+  pkg=w/(arch+'.deb');run('curl','--retry','3','--max-time','120','-fsSL',meta['url'],'-o',pkg)
+  assert dig(pkg)==meta['package_sha256'];inputs[arch]={}
+  for name,spec in meta['programs'].items():
+   elf=deb_binary(pkg,name);section=ELFFile(BytesIO(elf)).get_section_by_name('.text')
+   text=elf_text(elf);assert sha(text)==spec['section_sha256'] and text==section.data()
+   if 'elf_sha256'in spec:assert sha(elf)==spec['elf_sha256']
+   path=w/(arch+name+'.text');path.write_bytes(text);spans=path.with_suffix('.ranges');spans.write_text('0 %d %d\n'%(len(text),section['sh_addr']))
+   inputs[arch][name]=(path,spans)
+  pkg.unlink()
+ builds={};observations={};measure={};archs={'ARM':101,'AARCH64':102,'SPARC':106,'LOONGARCH':108,'mixed':0}
+ os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+ for arch,sel in archs.items():
+  b=w/'build';images={};builds[arch]={};records={}
+  for tag in ('base','candidate'):
+   run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
+   patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch'];run('git','-C',src,'apply','--index',patch);assert out('git','-C',src,'write-tree')==q[tag]['tree']
+   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed'else [arch]
+   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
+   run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
+   lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.so.*')if not f.is_symlink())
+   builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
+   if arch=='mixed':continue
+   images[tag]=so.read_bytes()
+   exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
+   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs[arch].items()for opt in range(5)}
+   assert all(row[0]>0 for row in records[tag].values())
+  put('compilation',builds)
+  if arch=='mixed':
+   assert builds[arch]['base']==builds[arch]['candidate'];shutil.rmtree(b);continue
+  assert records['base']==records['candidate'];observations[arch]=records['base'];put('public-records',observations)
+  slot=w/'libcapstone.so.6';image=FixedImage(slot,images)
+  exe=w/'timed';run('c++','-std=c++17','-O3','-no-pie','-I',src/'include',r/'time.cpp',slot,'-Wl,-rpath,'+str(w),'-o',exe)
+  for name,(path,ranges) in inputs[arch].items():
+   for mode in range(3):
+    key=f'{arch}/{name}/{mode}'
+    def take(tag,n):
+     image.select(tag);return list(map(int,out('setarch',isa,'-R',exe,str(sel),str(mode),path,'0',str(n),ranges).split()))
+    warm=take('base',1);reps=max(1,math.ceil(30e6/warm[0]));rng=random.Random(key);cycles=[];labels=['base','candidate','copy','repeat']
+    for _ in range(17):
+     rng.shuffle(labels);values={k:[]for k in labels}
+     for tag in labels+labels[::-1]:
+      z=take(tag,reps);assert z[2]==warm[2]and min(z[:2])>0;values[tag].append(z[:2])
+     cycles.append({k:[sum(t[i] for t in vs)for i in range(2)]for k,vs in values.items()})
+    measure[key]=dict(cycles=cycles,reps=reps,observed=warm[2],text=dig(path),extents=dig(ranges));put('timings',measure)
+  put('image-'+arch,image.receipt());slot.unlink();shutil.rmtree(b)
+ put('complete',dict(complete=True,source=q,isa=isa,panels=len(measure),compiler=out('clang','--version').splitlines()[0]))
 finally:
-    amount=sum(f.stat().st_size for f in t.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(t);save('cleanup',dict(removed=not t.exists(),bytes=amount))
+ size=sum(p.stat().st_size for p in w.rglob('*')if p.is_file() and not p.is_symlink());shutil.rmtree(w);put('cleanup',dict(removed=not w.exists(),bytes=size))

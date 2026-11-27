@@ -14,7 +14,7 @@ static void mix(uint64_t &value,const void *data,size_t size){
  while(size--){value=(value^*p++)*1099511628211ull;}
 }
 int main(int argc,char **argv){
- if(argc!=4)return 1;const unsigned selector=std::atoi(argv[1]);const unsigned opt=std::atoi(argv[3]);
+ if(argc!=5)return 1;const unsigned selector=std::atoi(argv[1]);const unsigned opt=std::atoi(argv[3]);
  std::ifstream in(argv[2],std::ios::binary);if(!in)return 2;std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in),{}};
  cs_arch arch;cs_mode mode;size_t record_size,alignment;
  switch (selector) {
@@ -35,12 +35,21 @@ int main(int argc,char **argv){
  if(cs_option(h,CS_OPT_DETAIL,det)!=CS_ERR_OK)return 4;
  if(opt==4&&cs_option(h,CS_OPT_TEXT,CS_OPT_OFF)!=CS_ERR_OK)return 5;
  cs_insn i;cs_detail detail;std::memset(&i,0xa5,sizeof(i));std::memset(&detail,0xa5,sizeof(detail));i.detail=with_detail?&detail:nullptr;
- const uint8_t *p=bytes.data();size_t left=bytes.size();uint64_t ip=0x10000000,ok=0,bad=0,v=14695981039346656037ull,alias=0;
+ struct Extent { size_t offset, length; uint64_t address; };
+ std::ifstream ranges(argv[4]);std::vector<Extent> spans;Extent extent;
+ while (ranges >> extent.offset >> extent.length >> extent.address) {
+  if(!extent.length || extent.offset>bytes.size() || extent.length>bytes.size()-extent.offset)return 4;
+  spans.push_back(extent);
+ }
+ if(!ranges.eof() || spans.empty())return 4;
+ uint64_t ok=0,bad=0,v=14695981039346656037ull,alias=0;
+ for(const auto &span:spans){const uint8_t *p=bytes.data()+span.offset;size_t left=span.length;uint64_t ip=span.address;
  while(left){
   if(cs_disasm_iter(h,&p,&left,&ip,&i)){
    ++ok;alias+=i.is_alias;mix(v,&i,offsetof(cs_insn,detail));if(with_detail)mix(v,&detail,offsetof(cs_detail,aarch64)+record_size);
   }else{auto n=std::min(alignment,left);left-=n;p+=n;ip+=n;++bad;}
   mix(v,&ip,sizeof(ip));
+ }
  }
  cs_close(&h);std::printf("%llu %llu %llu %llu\n",(unsigned long long)ok,(unsigned long long)bad,(unsigned long long)alias,(unsigned long long)v);
 }

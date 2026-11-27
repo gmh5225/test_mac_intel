@@ -9,7 +9,7 @@
 #include <vector>
 uint64_t ns(clockid_t id){timespec t{};clock_gettime(id,&t);return uint64_t(t.tv_sec)*1000000000+t.tv_nsec;}
 int main(int argc,char **argv){
- if(argc!=6)return 2;
+ if(argc!=7)return 2;
  auto bits=std::atoi(argv[1]),mode=std::atoi(argv[2]),reps=std::atoi(argv[5]);
  auto ip=std::strtoull(argv[4],nullptr,0);
  std::ifstream in(argv[3],std::ios::binary); if(!in)return 2;
@@ -30,9 +30,16 @@ int main(int argc,char **argv){
  cs_option(handle,CS_OPT_TEXT,mode==0?CS_OPT_OFF:CS_OPT_ON)||
  cs_option(handle,CS_OPT_DETAIL,mode>=2?CS_OPT_ON:CS_OPT_OFF))return 3;
  cs_insn *i=cs_malloc(handle);if(!i)return 4;
+ struct Extent { size_t offset, length; uint64_t address; };
+ std::ifstream ranges(argv[6]);std::vector<Extent> spans;Extent extent;
+ while (ranges >> extent.offset >> extent.length >> extent.address) {
+  if(!extent.length || extent.offset>bytes.size() || extent.length>bytes.size()-extent.offset)return 4;
+  spans.push_back(extent);
+ }
+ if(!ranges.eof() || spans.empty())return 4;
  auto go=[&]{
    uint64_t count=0,values=0;
-   const uint8_t *ptr=bytes.data();size_t left=bytes.size();uint64_t va=ip;
+   for(const auto &span:spans){const uint8_t *ptr=bytes.data()+span.offset;size_t left=span.length;uint64_t va=span.address;
    while(left){
      if(cs_disasm_iter(handle,&ptr,&left,&va,i)){
        ++count;values+=i->size;
@@ -59,6 +66,7 @@ int main(int argc,char **argv){
          }
        }
      }else{size_t step=left<align?left:align;ptr+=step;left-=step;va+=step;}
+   }
    }
    return count*0x10001+values;
  };
