@@ -1,7 +1,7 @@
-name: Verify i386 TEST and detail initialization on dev after RISC-V D ABI support
+name: Compare x86 cached access and i386 memory TEST on the live six-backend NeverD decoder
 on:
   push:
-    branches: [codex/current-dev-i386-and-detail-views]
+    branches: [codex/product-scoped-access-and-byte-test]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 2bb8205af8e667122c35fe0a13cf1cc198e4042e
+          ref: 1e662c82ead8be11f8f6ba0917e8f62ca94fa2dc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-dev-memory-and-views-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: scoped-access-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
