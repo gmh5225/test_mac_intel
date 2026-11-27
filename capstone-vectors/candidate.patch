@@ -12,7 +12,7 @@ index a2a27faf..cd981210 100644
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
 diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..a57468ad 100644
+index cffc4e81..a7e5ba5c 100644
 --- a/arch/X86/X86MemoryFallback32.c
 +++ b/arch/X86/X86MemoryFallback32.c
 @@ -13,6 +13,9 @@
@@ -25,7 +25,20 @@ index cffc4e81..a57468ad 100644
  #include "X86VectorRegisterOutput.h"
  #define X86_VEX32_REGISTER_MOVES
  #include "X86GenVex32MemoryOutput.inc"
-@@ -97,5 +100,34 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -38,6 +41,12 @@ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
++#ifdef X86_ACCUMULATOR_OUTPUT32
++	/* The fixed output rows use Intel syntax. AT&T uses the full printer. */
++	if (handle->syntax == CS_OPT_SYNTAX_ATT)
++		return cs_decode_full_insn(handle, code, size, insn, insn_size,
++					   batch);
++#endif
+ 	const unsigned opcode = code[0];
+ 	switch (opcode) {
+ 	case 0xc4:
+@@ -97,5 +106,34 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
  	}
  	return X86_decodeRegisterFallback32(handle, code, size, insn, insn_size, batch);
  }

@@ -131,35 +131,49 @@ try:
             verified[k]=sha(current);assert verified[k]==hashlib.sha256(imgs[k]).hexdigest()
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     invoke=['setarch',os.uname().machine,'-R',current]
-    import firmware16
+    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
+    inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
+    sys.path.insert(0,str(w));import pe_panels,frozen_deb
+    run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
     protocol=rd(r/'protocol.json')
-    assert {k:hashlib.sha256(v).hexdigest()for k,v in imgs.items()}==protocol['images']
-    labels=list(imgs)
-    def measure_firmware(image,spans,ignored,invoke,select):
-        results={}
-        for route,mode in [('capstone',2),('private',2),('capstone',1),('capstone',0)]:
-            def take(k,n):
-                select(k)
-                return list(map(int,get(*invoke,route,str(mode),str(n),image,spans,'16').split()))
-            reps=max(1,math.ceil(protocol['duration_ns']/take('base',1)[0]))
-            expected=take('base',reps)[2:]
-            assert all(take(k,reps)[2:]==expected for k in labels)
-            key=route+'/'+str(mode);rng=random.Random(key+'/'+platform.node()+'/independent-firmware')
-            pairs=[]
-            for rep in range(protocol['pairs']):
-                rng.shuffle(labels);times={k:[]for k in labels}
-                for k in labels+labels[::-1]:
-                    row=take(k,reps);assert row[2:]==expected
-                    times[k].append(row[:2])
-                pairs.append({k:[sum(v[i]for v in values)for i in (0,1)] for k,values in times.items()})
-            results[key]=dict(reps=reps,expected=expected,pairs=pairs)
-            save('observations',results)
-        return results
-    firmware16.compare=measure_firmware
-    validated=firmware16.verify(w,imgs,invoke,select);validated.pop('results')
-    assert {k:validated[k]for k in protocol['program']}==protocol['program']
-    assert verified==protocol['images']
-    save('complete',dict(complete=True,source=maps,protocol=protocol,verified=verified,program=validated,cpu=get('lscpu'),node=platform.node()))
-
+    assert {k:images[k]['archive'] for k in ('base','candidate')}==protocol['archives']
+    assert images['candidate']==images['outlined'] and images['candidate']!=images['base']
+    results={};random_input=platform.node()
+    fixtures=list(itertools.chain([('libmvec-amd64',64,w/'libmvec.text',[(0,raw['bytes'],raw['address'])],raw)],pe_panels.prepare(w),frozen_deb.prepare(w)))
+    assert {row[0]for row in fixtures}==set(m["samples"])
+    for name,bits,f,spans,_ in fixtures:
+        if bits!=32:continue
+        spec=m['provenance'][name]
+        assert sha(f)==spec['text_sha256']
+        selected=[s for s in spans if tuple(s) not in {tuple(a[:3]) for a in spec['excluded_incompatible_extents']}]
+        path=w/(name+'.tsv')
+        def emit(v):path.write_text(''.join('%d %d %d\n'%tuple(a) for a in v))
+        emit(selected)
+        if m['samples'][name]=='simd-functions':
+            view=[list(map(int,z.split())) for z in get(w/'vectors',str(bits),f,path).splitlines()]
+            assert len(view)==len(selected)
+            selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
+        assert sha(path)==spec['extent_sha256']
+        assert name in protocol['samples']
+        for syntax in protocol['formats']:
+            for route in protocol['routes']:
+                for mode in protocol['modes']:
+                    engine=route+'-att' if syntax=='att' else route
+                    def measure(tag,n):
+                        select(tag)
+                        return list(map(int,get(*invoke,engine,str(mode),str(n),f,path,str(bits)).split()))
+                    reps=max(1,math.ceil(protocol['duration_ns']/measure('base',1)[0]))
+                    expected=measure('base',reps)[2:];assert all(measure(k,reps)[2:]==expected for k in imgs)
+                    key='/'.join((route,syntax,name,str(mode)));rng=random.Random(key+random_input)
+                    rows=[];order=list(imgs)
+                    for _ in range(protocol['pairs']):
+                        rng.shuffle(order);times={k:[]for k in order}
+                        for k in order+order[::-1]:
+                            got=measure(k,reps);assert got[2:]==expected
+                            times[k].append(got[:2])
+                        rows.append({k:[a+b for a,b in zip(*v)]for k,v in times.items()})
+                    results[key]=dict(reps=reps,expected=expected,pairs=rows);save('observations',results)
+    assert len(results)==24 and verified['base']==verified['duplicate']!=verified['candidate']==verified['outlined']
+    save('complete',dict(complete=True,protocol=protocol,source=maps,archives=images,verified=verified,cpu=get('lscpu'),node=platform.node(),driver=sha(w/'driver.cpp')))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
