@@ -1,7 +1,7 @@
-name: Repeat PE32, PE64 and vector formatting with two image controls on six hosts
+name: Compare VEX operand readers inside one image and count actual writer entries
 on:
   push:
-    branches: [codex/repeat-vex-pe32-pe64-and-vector-formats]
+    branches: [codex/one-image-vex-reader-causal-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-file-plan-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-image-reader-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
