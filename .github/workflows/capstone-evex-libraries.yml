@@ -1,7 +1,7 @@
-name: Compare generated three-operand scalar readers on PE ELF and firmware
+name: Reuse delimited mnemonic positions in complete multiarchitecture records
 on:
   push:
-    branches: [codex/scalar-three-operand-readers]
+    branches: [codex/shared-mnemonic-end-position]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-reader-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mnemonic-boundary-native-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

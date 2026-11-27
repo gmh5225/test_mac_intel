@@ -78,7 +78,11 @@ try:
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
-        run('clang','-O2','-fPIC','-shared','-I',base,'-I',base/'include',r/'raw-export.c',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
+        run('clang','-O2','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
+        f=(base/'cs.c').read_text()
+        a=f.index('\tsize_t off = 0;',f.index('static inline void fill_insn('))
+        b=f.index('\tconst char *operands = OS->buffer + off;',a)
+        assert f[a:b] in (r/'split-domain.c').read_text()
         commands=rd(build/'compile_commands.json')
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
         assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
@@ -86,16 +90,10 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
-    run('clang','-O2','-std=gnu99','-I',base,'-I',base/'include',r/'guard.c','-ldl','-o',w/'operand-guard')
-    states={}
-    for label in ('candidate','outlined'):
-        lines=get(w/'operand-guard',w/'base.so',w/(label+'.so')).splitlines()
-        calls,invalid=map(int,lines.pop(0).split())
-        rows={k:int(v) for k,v in (line.split() for line in lines)}
-        assert calls>1000000 and 0<invalid<calls and all(str(i) in rows for i in [44,45,46,47,101,102,103,104,105,106,192,193,194,195,196,197,198,199]),(calls,invalid,rows)
-        states[label]=dict(calls=calls,rejections=invalid,accepted_sets=rows)
-    assert states['candidate']==states['outlined']
-    save('operand-guard',states)
+    run('clang','-O2','-std=c99','-I',base/'include',r/'split-domain.c','-o',w/'split-domain')
+    checked=int(get(w/'split-domain'))
+    assert checked==7*512*513//2+256*65
+    save('split-domain',dict(cases=checked,source=sha(r/'split-domain.c')))
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
