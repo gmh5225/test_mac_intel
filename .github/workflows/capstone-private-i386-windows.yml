@@ -1,7 +1,7 @@
-name: Verify both foreign-architecture bypasses across native compilers and reduced, DIET and full builds
+name: Check private firmware and mixed 32/64-bit memory writers across configurations
 on:
   push:
-    branches: [codex/public-architecture-bypass-configurations]
+    branches: [codex/native-output-fallback-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: arch-bypass-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: native-writer-config-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

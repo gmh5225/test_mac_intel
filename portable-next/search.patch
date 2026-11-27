@@ -1,48 +1,16 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..406c181d 100644
+index cea06480..dacda504 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1092,6 +1092,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE cs.c arch/X86/X86DisassemblerDecoder.c
-+            arch/X86/X86RegisterFallback32.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_OPTIONAL_PUBLIC_RECORD>")
++        set_property(SOURCE arch/X86/X86Vex32Output.c arch/X86/X86RegisterFallback32.c
++            APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_REAL_MODE_OUTPUT>")
      endif()
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
-diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 709e1286..437f2c51 100644
---- a/arch/X86/X86Disassembler.h
-+++ b/arch/X86/X86Disassembler.h
-@@ -53,6 +53,13 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
- #endif
- #endif
- 
-+#if defined(X86_OPTIONAL_PUBLIC_RECORD) && defined(__ELF__) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+#endif
-+
- #if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..945e5724 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch);
- 
--#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD)
- #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
- #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
- #define CS_PUBLIC_FIXED_RECORD
 diff --git a/arch/X86/X86GenStack16Output.inc b/arch/X86/X86GenStack16Output.inc
 new file mode 100644
 index 00000000..be506cb3
@@ -57,121 +25,61 @@ index 00000000..be506cb3
 +};
 +
 +static const struct X86SimpleOutput stack16_mov32 = { 460, "mov", "", .flags = UINT64_C(0), .reads = { 0, 0, 0, 0 }, .writes = { 0, 0, 0, 0 }, .groups = { 0, 0, 0, 0 }, .read_count = 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } };
-diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
-index a03a42e9..8d606227 100644
---- a/arch/X86/X86PublicOutput.c
-+++ b/arch/X86/X86PublicOutput.c
-@@ -5,38 +5,5 @@
- #include "X86ScanAdapter.h"
+diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
+index 62d4288a..8b86a665 100644
+--- a/arch/X86/X86OutputOptions.h
++++ b/arch/X86/X86OutputOptions.h
+@@ -22,6 +22,12 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 			     size_t size, cs_insn *insn, uint16_t *insn_size,
+ 			     bool batch);
  
- #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
--#if defined(__ELF__) && defined(__clang__)
--#pragma clang section text = ".cs_x86_public_output_text"
--#endif
--CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
--					    const uint8_t *code, size_t size,
--					    cs_insn *insn, uint16_t *length,
--					    bool batch)
--{
--#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
--	/* The outer iterator owns detail visibility, skipdata and cursor updates.
--	 * Its fixed text path only needs the decoded record and its length. */
--	if (!batch && !handle->skipdata && !handle->no_text) {
--		if (handle->mode == CS_MODE_32)
--			return X86_decodeFixedRecord32(handle, code, size, insn,
--						       length);
--		if (handle->mode == CS_MODE_64)
--			return X86_decodeFixedRecord64(handle, code, size, insn,
--						       length);
--	}
--#else
--	/* The caller owns skipdata callbacks, bulk boundaries and the public
--	 * cursors. A fixed iterator can fill this one record using local cursors. */
--	if (!batch && !handle->skipdata && !handle->no_text &&
--	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
--		uint64_t address = insn->address;
--		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
--					     &size, &address, insn);
--		if (ok)
--			*length = insn->size;
--		return ok;
--	}
--#endif
--	return cs_decode_full_insn(handle, code, size, insn, length, batch);
--}
-+#include "X86PublicOutputImpl.h"
++#ifdef X86_FIXED_REAL_MODE_OUTPUT
++CAPSTONE_INTERNAL bool X86_disasmIterOtherMode(csh handle, const uint8_t **code,
++					       size_t *size, uint64_t *address,
++					       cs_insn *insn);
++#endif
++
+ /* Called by the static AMD64 iterator with at least one input byte. */
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
+index 251c6819..411f1c1e 100644
+--- a/arch/X86/X86RegisterFallback32.c
++++ b/arch/X86/X86RegisterFallback32.c
+@@ -19,6 +19,12 @@
+ #define X86_GROUP3_REGISTER_OUTPUT
+ #include "X86GenGroup3Registers32.inc"
  #endif
-diff --git a/arch/X86/X86PublicOutputImpl.h b/arch/X86/X86PublicOutputImpl.h
-new file mode 100644
-index 00000000..5898207f
---- /dev/null
-+++ b/arch/X86/X86PublicOutputImpl.h
-@@ -0,0 +1,116 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
++#ifdef X86_FIXED_REAL_MODE_OUTPUT
++#include "X86ScanAdapter.h"
++static bool tryRealModeRegister(cs_struct *handle, const uint8_t *code,
++				size_t size, cs_insn *insn, uint16_t *length);
++#define CS_DECODE_TRY_OUTPUT tryRealModeRegister
++#endif
+ #include "../../cs_disasm_internal.h"
+ 
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+@@ -63,5 +69,62 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
+ 	}
+ 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
+ }
 +
-+/* The outer public iterator owns cursor updates and skipdata handling. */
-+#if defined(__ELF__) && defined(__clang__)
-+#pragma clang section text = ".cs_x86_public_output_text"
-+#endif
-+#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+static __attribute__((noinline)) CS_PRESERVE_MOST bool decodePublicTextRecord(
-+#else
-+CS_PRESERVE_MOST bool X86_decodePublicRecord(
-+#endif
-+	cs_struct *handle, const uint8_t *code, size_t size, cs_insn *insn,
-+	uint16_t *length, bool batch)
-+{
-+#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+	if (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
-+	    handle->syntax != CS_OPT_SYNTAX_INTEL)
-+		return cs_decode_full_insn(handle, code, size, insn, length, batch);
-+#endif
-+#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
-+	/* The outer iterator owns detail visibility, skipdata and cursor updates.
-+	 * Its fixed text path only needs the decoded record and its length. */
-+	if (!batch && !handle->skipdata && !handle->no_text) {
-+		if (handle->mode == CS_MODE_32)
-+			return X86_decodeFixedRecord32(handle, code, size, insn,
-+						       length);
-+		if (handle->mode == CS_MODE_64)
-+			return X86_decodeFixedRecord64(handle, code, size, insn,
-+						       length);
-+	}
-+#else
-+	/* The caller owns skipdata callbacks, bulk boundaries and the public
-+	 * cursors. A fixed iterator can fill this one record using local cursors. */
-+	if (!batch && !handle->skipdata && !handle->no_text &&
-+	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
-+		uint64_t address = insn->address;
-+		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
-+					     &size, &address, insn);
-+		if (ok)
-+			*length = insn->size;
-+		return ok;
-+	}
-+#endif
-+	return cs_decode_full_insn(handle, code, size, insn, length, batch);
-+}
-+
-+#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+#ifdef __clang__
-+#define X86_RECORD_TAIL __attribute__((musttail))
-+#else
-+#define X86_RECORD_TAIL
-+#endif
++#ifdef X86_FIXED_REAL_MODE_OUTPUT
++#pragma clang section text = ".cs_x86_real_mode_text" rodata = ".cs_x86_real_mode_rodata"
 +#include "X86GenStack16Output.inc"
 +
-+/* The mode gate selected a 16-bit request. One 66 prefix chooses the
-+ * 32-bit register bank, while stack effects and address size stay in the row. */
-+static __attribute__((noinline)) CS_PRESERVE_MOST bool
-+decodePublicRecord16(cs_struct *handle, const uint8_t *code, size_t size,
-+		     cs_insn *insn, uint16_t *length, bool batch)
++/* A single operand-size prefix selects 32-bit registers in real mode. */
++static bool tryRealModeRegister(cs_struct *handle, const uint8_t *code,
++				size_t size, cs_insn *insn, uint16_t *length)
 +{
-+	if (size >= 6 && code[0] == X86_PREFIX_OPSIZE &&
-+	    (code[1] & 0xf8) == 0xb8 && !batch && !handle->skipdata &&
-+	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+		const uint8_t opcode = code[1];
++	if (size < 2 || code[0] != X86_PREFIX_OPSIZE)
++		return false;
++	const uint8_t opcode = code[1];
++	const bool move = (opcode & 0xf8) == 0xb8 && size >= 6;
++	if ((!move && (opcode & 0xf0) != 0x50) || handle->skipdata ||
++	    X86_OUTPUT_UNSUPPORTED(handle, false))
++		return false;
++	if (move) {
 +		writeUnsignedRegisterImmediate(insn, &stack16_mov32,
 +					       &test32_regs[1][opcode & 7],
 +					       code, 0, 0, 2, 4, length);
@@ -182,99 +90,53 @@ index 00000000..5898207f
 +		}
 +		return true;
 +	}
-+	if (size >= 2 && code[0] == X86_PREFIX_OPSIZE &&
-+	    (code[1] & 0xf0) == 0x50 && !batch && !handle->skipdata &&
-+	    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
-+		const unsigned opcode = code[1];
-+		const struct X86SimpleOutput *row = &stack16_rows[(opcode >> 3) & 1];
-+		const struct X86SimpleRegister *reg = &test32_regs[1][opcode & 7];
-+		insn->id = row->id;
-+		insn->size = *length = 2;
-+		insn->bytes[0] = X86_PREFIX_OPSIZE;
-+		insn->bytes[1] = (uint8_t)opcode;
-+		memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+		memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+		memset(insn->op_str, 0, sizeof(insn->op_str));
-+		memcpy(insn->op_str, reg->name, sizeof(reg->name));
-+		if (insn->detail) {
-+			X86_writeSimpleDetail(insn->detail, row, (uint8_t)opcode,
-+					      0, 0, reg->reg, 0);
-+			insn->detail->x86.prefix[2] = X86_PREFIX_OPSIZE;
-+		}
-+		return true;
++	const struct X86SimpleOutput *row = &stack16_rows[(opcode >> 3) & 1];
++	const struct X86SimpleRegister *reg = &test32_regs[1][opcode & 7];
++	insn->id = row->id;
++	insn->size = *length = 2;
++	insn->bytes[0] = X86_PREFIX_OPSIZE;
++	insn->bytes[1] = (uint8_t)opcode;
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, (uint8_t)opcode,
++				      0, 0, reg->reg, 0);
++		insn->detail->x86.prefix[2] = X86_PREFIX_OPSIZE;
 +	}
-+	X86_RECORD_TAIL return cs_decode_full_insn(handle, code, size, insn, length, batch);
++	return true;
 +}
 +
-+/* Forward the six arguments without an additional return frame. */
-+CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch)
++/* The fixed i386 iterator has already declined the requested mode. */
++CAPSTONE_INTERNAL bool X86_disasmIterOtherMode(csh handle, const uint8_t **code,
++					       size_t *size, uint64_t *address,
++					       cs_insn *insn)
 +{
-+	/* Foreign public iterators in the same executable use the core decoder. */
-+	if (handle->arch != CS_ARCH_X86)
-+		X86_RECORD_TAIL return cs_decode_full_insn(handle, code, size,
-+							insn, length, batch);
-+	if (handle->mode == CS_MODE_16)
-+		X86_RECORD_TAIL return decodePublicRecord16(handle, code, size, insn, length,
-+					   batch);
-+	X86_RECORD_TAIL return decodePublicTextRecord(handle, code, size, insn, length, batch);
++	cs_struct *state = (cs_struct *)(uintptr_t)handle;
++	if (state && state->arch == CS_ARCH_X86 && state->mode == CS_MODE_16 &&
++	    !state->no_text)
++		return cs_disasm_iter_core(handle, code, size, address, insn);
++	return X86_disasmIter(handle, code, size, address, insn);
 +}
-+#undef X86_RECORD_TAIL
-+#endif
-diff --git a/arch/X86/X86RegisterFallback32.c b/arch/X86/X86RegisterFallback32.c
-index 251c6819..4a764c2d 100644
---- a/arch/X86/X86RegisterFallback32.c
-+++ b/arch/X86/X86RegisterFallback32.c
-@@ -63,5 +63,11 @@ X86_decodeRegisterFallback32(cs_struct *handle, const uint8_t *code,
- 	}
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
-+
-+#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+/* Both fixed-width text iterators link this final i386 fallback. */
-+#include "X86ScanAdapter.h"
-+#include "X86PublicOutputImpl.h"
 +#endif
  #endif
  #endif
-diff --git a/cs.c b/cs.c
-index d0b8b045..1e1f4278 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1242,6 +1242,13 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	return true;
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index d6f533e0..c9d0f55c 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -221,6 +221,10 @@ CAPSTONE_INTERNAL bool X86_disasmIter32(csh ud, const uint8_t **code,
+ 	    handle->mode == CS_MODE_32 && !handle->no_text)
+ 		return cs_disasm_iter_core(ud, code, size, address, insn);
+ #endif
++#if defined(X86_FIXED_REAL_MODE_OUTPUT) && defined(CS_DECODE_TRY_OUTPUT)
++	return X86_disasmIterOtherMode(ud, code, size, address, insn);
++#else
+ 	return X86_disasmIter(ud, code, size, address, insn);
++#endif
  }
- 
-+#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+/* A public-only static link uses the generic decoder at the same address.
-+ * Extracting the native reader supplies its strong internal implementation. */
-+CAPSTONE_INTERNAL __typeof__(cs_decode_full_insn) X86_decodePublicRecord
-+	__attribute__((weak, alias("cs_decode_full_insn")));
-+#endif
-+
- #if defined(_MSC_VER)
- __declspec(noinline)
- #elif defined(__GNUC__)
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 08677417..aee2ae08 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -18,7 +18,12 @@
-  * the compiler can combine scan and output state without an extra boundary.
-  * Otherwise cs.c instantiates the same iterator. Input validation, option
-  * selection and callbacks keep their original order. */
--#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
-+#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD)
-+#if defined(CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD) && defined(CS_DECODE_SCAN_IMPL)
-+/* cs.c supplies the default record reader. Calling the public iterator
-+ * alone must not pull a fixed-width reader out of the static archive. */
-+__attribute__((weak))
-+#endif
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
- 		       cs_insn *insn, uint16_t *insn_size, bool batch);
+ #endif
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 index 37cb0735..f1c8bdc8 100644
 --- a/suite/synctools/x86_simple_output.cpp
@@ -342,7 +204,7 @@ index 37cb0735..f1c8bdc8 100644
  		Decoder decoder(CS_MODE_64);
  		emit_packed_memory(decoder, false);
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 24af6a88..c6223ac9 100644
+index 24af6a88..9c3c3aaf 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -1624,6 +1624,25 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
@@ -393,13 +255,12 @@ index 24af6a88..c6223ac9 100644
  done:
  	for (unsigned i = 0; i < 2; ++i)
  		if (handles[i])
-@@ -1724,6 +1749,9 @@ done:
- 
+@@ -1725,6 +1750,8 @@ done:
  int main(void)
  {
-+	private_iter = cs_disasm_iter;
+ 	private_iter = X86_disasmIter32;
 +	if (!check_mode(CS_MODE_16))
 +		return 1;
- 	private_iter = X86_disasmIter32;
  	if (!check_mode(CS_MODE_32))
  		return 1;
+ 	private_iter = X86_disasmIterText;
