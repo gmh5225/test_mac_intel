@@ -1,7 +1,7 @@
-name: Compare complete six-ISA and seven-ISA libraries and the standalone WASM Make build
+name: Verify mixed libraries and dedicated Linux WASM target support across build profiles
 on:
   push:
-    branches: [codex/wasm-reader-mixed-object-identity]
+    branches: [codex/wasm-linux-scope-archive-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-reader-identity-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-target-identity-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
