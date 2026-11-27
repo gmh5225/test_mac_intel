@@ -97,9 +97,10 @@ try:
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    obj={'X86VectorOutput.c.o'}
-    for before,after,expected in [('shipping','base',set() if arm else obj),
-        ('shipping','mask',set() if arm else obj),('base','mask',set() if arm else {'X86VectorOutput.c.o'})]:
+    first={'X86VectorFallback64.c.o'}
+    second={'X86VexRegisterImmediate.c.o'}
+    for before,after,expected in [('shipping','base',set() if arm else first),
+        ('shipping','mask',set() if arm else second),('base','mask',set() if arm else first|second)]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
