@@ -18,7 +18,7 @@ try:
     project=(nd/'CMakeLists.txt').read_text()
     (proj/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(RecordBindings LANGUAGES C CXX)\n'+project[project.index('# --- Capstone (our fork'):project.index('# --- NeverD CMake helpers')])
     run('cmake','-S',proj,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
-    for kind in ('guard','compare','real','stack'):
+    for kind in ('guard','compare','real','stack','pairs'):
         run('clang++','-std=c++17','-O2','-include','cinttypes','-I',s/'include',r/(kind+'.cpp'),'-ldl','-o',w/kind)
     from firmware import inputs
     from elftools.elf.elffile import ELFFile
@@ -63,21 +63,22 @@ try:
                 syms={}
                 for line in get('readelf','-sW',binary).splitlines():
                     v=line.split()
-                    if len(v)==8 and v[3]=='FUNC' and v[6]!='UND' and v[7] in ('cs_decode_full_insn','X86_disasmIterOtherMode','X86_disasmIterText','cs_disasm_iter'):syms[v[7]]=[int(v[1],16),v[4],v[5]]
+                    if len(v)==8 and v[3]=='FUNC' and v[6]!='UND' and v[7] in ('cs_decode_full_insn','writePrefixedRegisters16','X86_disasmIterText','cs_disasm_iter'):syms[v[7]]=[int(v[1],16),v[4],v[5]]
                 assert 'cs_disasm_iter' in syms and 'cs_decode_full_insn' in syms
                 native='X86_disasmIterText' in syms
                 assert native==(route=='linked'),(linker,tag,route,kind,native)
-                assert ('X86_disasmIterOtherMode' in syms)==(native and tag!='base')
+                assert ('writePrefixedRegisters16' in syms)==(native and tag!='base')
                 kinds[kind]=dict(native=native,symbols=syms,sha256=digest(binary.read_bytes()))
             elf[tag+'/'+route]=kinds;save('binding',elf)
             if tag=='base':continue
             baseline=w/('base-'+route+'.so');current=w/(tag+'-'+route+'.so')
             if route=='linked':
-                gen=w/'gen';run('clang++','-std=c++17','-O2','-I',s,'-I',s/'include',s/'suite/synctools/x86_simple_output.cpp',lib,'-o',gen)
-                assert sp.check_output([gen,'--stack16-registers'])==(s/'arch/X86/X86GenStack16Output.inc').read_bytes()
+                pairs=list(map(int,get(w/'pairs',baseline,current).split()))
+                assert pairs[0]>20000000 and 0<pairs[1]<pairs[0]
+                save(tag+'-pairs',pairs)
                 stack=list(map(int,get(w/'stack',baseline,current).split()))
-                assert stack[0]==4365312 and 0<stack[1]<stack[0],stack
-                save(tag+'-stack',dict(cases=stack,generator=True))
+                assert stack[0]==8730624 and 0<stack[1]<stack[0],stack
+                save(tag+'-stack',dict(cases=stack,pairs=pairs))
             guard=list(map(int,get(w/'guard',baseline,current).split()))
             assert guard==[5105184,2971712],guard
             opts=json.loads(get(w/'compare',baseline,current,'options'))
