@@ -73,7 +73,7 @@ try:
         assert sha(path)==spec['extent_sha256']
         for mode in (1,2):
             row={}
-            for engine in ('private',):
+            for engine in ('private','capstone'):
                 row[engine]={}
                 for n in (1,2):
                     res=profile(w,invoke,[w/'program',engine,str(mode),str(n),f,path,str(bits)])
