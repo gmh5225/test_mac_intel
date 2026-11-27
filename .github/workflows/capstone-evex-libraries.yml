@@ -1,7 +1,7 @@
-name: Separate archive placement from public decoding cost with the same function addresses and one changed call target
+name: Time both public readers at identical ELF addresses by renaming just the benchmark call reference
 on:
   push:
-    branches: [codex/public-reader-one-call-control]
+    branches: [codex/fixed-layout-public-reader-relocation]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: one-public-call-target-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-call-relocation-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

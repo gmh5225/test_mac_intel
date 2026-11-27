@@ -70,17 +70,28 @@ try:
             patch=r/'candidate.patch';assert sha(patch)==q['sha256']
             run('git','-C',base,'apply','--index',patch);assert get('git','-C',base,'write-tree').strip()==q['tree']
             run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+            # Rename only the undefined symbol in the archive member which calls it.
+            member='X86DisassemblerDecoder.c.o'
+            assert get('ar','t',lib).splitlines().count(member)==1
+            unit=w/member;unit.write_bytes(sp.check_output(['ar','p',lib,member]))
+            symbol='X86_decodeMixedPublicRecord'
+            assert symbol in get('nm','-u',unit).split()
+            run('objcopy','--redefine-sym',symbol+'=X86_benchmarkPublicCall',unit)
+            assert 'X86_benchmarkPublicCall' in get('nm','-u',unit).split()
+            run('ar','rD',lib,unit)
+            assert get('ar','t',lib).splitlines().count(member)==1
         link=[]
         if label!='shipping':
             # Force the archive member in both links. The two calls use the same internal convention.
             target='X86_decodeMixedPublicRecord' if label=='forward' else 'cs_decode_full_insn'
-            link=['-Wl,-u,X86_decodeMixedPublicRecord','-Wl,--wrap=X86_decodeMixedPublicRecord','-Wl,--defsym,__wrap_X86_decodeMixedPublicRecord='+target]
+            link=['-Wl,-u,X86_decodeMixedPublicRecord','-Wl,-u,cs_decode_full_insn']
         args={'native':([w/'driver.o'],[ice_lib,*flags]),'ordinary':([w/'public-only.o'],[ice_lib,*flags]),'foreign':([w/'foreign.o',w/'native-reference.o'],['-no-pie']),'foreign-only':([w/'foreign.o'],['-no-pie'])}
         exe_layout[label]={};symbols[label]={};products[label]={}
         for route in routes:
             objects,ld=args[route];exe=w/(route+'-'+label)
-            run('clang++',*objects,*link,lib,*ld,'-o',exe)
-            symbols[label][route]=all_functions(exe);symbols[label][route].pop('__wrap_X86_decodeMixedPublicRecord',None)
+            alias=['-Wl,--defsym,X86_benchmarkPublicCall='+target] if label!='shipping' else []
+            run('clang++',*objects,*link,lib,*ld,*alias,'-o',exe)
+            symbols[label][route]=all_functions(exe);symbols[label][route].pop('X86_benchmarkPublicCall',None)
             with exe.open('rb')as f:
                 elf=ELFFile(f)
                 exe_layout[label][route]={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()]for v in elf.iter_sections()if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
