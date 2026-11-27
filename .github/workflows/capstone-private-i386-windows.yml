@@ -1,7 +1,7 @@
-name: Time every affected standalone and mixed Clang build on real PE32 and AMD64 programs
+name: Time native 32-bit and 64-bit MSVC consumers of the shared VZERO record writer
 on:
   push:
-    branches: [codex/clear-record-portable-programs]
+    branches: [codex/windows-clear-linked-programs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,18 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, arch: x86_64, profile: clang14, kind: standalone, replica: 1 }
-          - { host: ubuntu-22.04, arch: x86_64, profile: clang14, kind: standalone, replica: 2 }
-          - { host: ubuntu-22.04, arch: x86_64, profile: clang14, kind: product, replica: 1 }
-          - { host: ubuntu-22.04, arch: x86_64, profile: clang14, kind: product, replica: 2 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, kind: standalone, replica: 1 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, kind: standalone, replica: 2 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, kind: mixed, replica: 1 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, kind: mixed, replica: 2 }
-          - { host: macos-15-intel, arch: x86_64, profile: full, kind: standalone, replica: 1 }
-          - { host: macos-15-intel, arch: x86_64, profile: full, kind: standalone, replica: 2 }
-          - { host: macos-15-intel, arch: x86_64, profile: full, kind: product, replica: 1 }
-          - { host: macos-15-intel, arch: x86_64, profile: full, kind: product, replica: 2 }
+          - { host: windows-2022, arch: amd64, profile: full, kind: standalone, replica: 1 }
+          - { host: windows-2022, arch: amd64, profile: full, kind: standalone, replica: 2 }
+          - { host: windows-2022, arch: amd64, profile: full, kind: product, replica: 1 }
+          - { host: windows-2022, arch: amd64, profile: full, kind: product, replica: 2 }
+          - { host: windows-2022, arch: amd64_x86, profile: full, kind: standalone, replica: 1 }
+          - { host: windows-2022, arch: amd64_x86, profile: full, kind: standalone, replica: 2 }
+          - { host: windows-2022, arch: amd64_x86, profile: full, kind: product, replica: 1 }
+          - { host: windows-2022, arch: amd64_x86, profile: full, kind: product, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
@@ -49,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: clear-portable-${{ matrix.kind }}-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: clear-msvc-${{ matrix.kind }}-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
