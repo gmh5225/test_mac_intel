@@ -1,7 +1,7 @@
-name: Compare adjacent ModRM field readers without growing the opcode switch
+name: Measure tied shift operand handling outside the primary descriptor switch
 on:
   push:
-    branches: [codex/interpreted-modrm-pairs]
+    branches: [codex/tied-shift-fallback-reader]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 49eed13da02b9854924fca2d40d343c423672e85
+          ref: 1a02e3439e7162e79a9c1b8b8b56c5df7cfd770d
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: paired-field-readers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: tied-shift-fallback-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

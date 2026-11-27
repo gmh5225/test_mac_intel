@@ -74,6 +74,13 @@ try:
         save('gpr-records-'+label,rows)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        decoder_symbols={}
+        for line in get('nm','-S','-an',w/label).splitlines():
+            p=line.split()
+            if len(p)==4 and p[2].lower()=='t' and p[3] in ('readOperands','readTiedShiftImmediate','decodeInstructionFull','readOperandsScan','cs_disasm_iter','X86_disasmIterText','X86_disasmIter32','X86_reg_access'):
+                decoder_symbols[p[3]]=[int(p[0],16),int(p[1],16)]
+        assert 'readOperands' in decoder_symbols and (('readTiedShiftImmediate' in decoder_symbols)==(label=='outlined')),decoder_symbols
+        save('reader-symbols-'+label,decoder_symbols)
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
