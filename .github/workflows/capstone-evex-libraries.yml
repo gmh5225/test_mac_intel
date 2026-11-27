@@ -1,7 +1,7 @@
-name: Compare compact indexed formatters with matching real ELF and PE layouts
+name: Verify static indexed VEX moves with both native build systems
 on:
   push:
-    branches: [codex/vector-footprint-on-current-next]
+    branches: [codex/static-x86-indexed-move-qualification]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -35,7 +35,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 26d0b9fb4c24c30bc42f1dd436eb04681efb99e8
+          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -59,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-footprint-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: static-indexed-moves-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

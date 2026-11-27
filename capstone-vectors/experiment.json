@@ -1,6 +1,6 @@
 {
-  "checkout_commit": "3af4f18baa8c88ed070a71f48c53e28bb38f8fc7",
-  "checkout_tree": "e2ccbe5fba0e8ff92976525e4cdac002248ec955",
+  "checkout_commit": "b0009d26a8c617b2328833c96291ac8264036866",
+  "checkout_tree": "a519df26a5d4222ffc45022673604360e1a356ce",
   "iced_revision": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31",
   "samples": {
     "putty-32-0.85": "whole-text",
@@ -261,7 +261,7 @@
       "excluded_incompatible_extents": []
     }
   },
-  "neverd": "26d0b9fb4c24c30bc42f1dd436eb04681efb99e8",
+  "neverd": "4fb4a2035432ad494b49259eb76d04e3f3faba59",
   "drivers": {
     "driver.cpp": "79f0ccc59f2a797a7990c0733cf77102df7d2ae81da65654022d5b83c693e196",
     "iced.rs": "c74329e037ae50648b3619f6c64b8fc0d5fd2ed1a855762afe3d189ae83a4586",
@@ -270,7 +270,13 @@
     "trial-real.cpp": "5652f41d2afd407bdf4f331817342e396d72a6aca287ff2ad936f2b7b8ebbaea",
     "public-guard.cpp": "b38263dba42a2094a4eb8e459bd76403047914be845009c366957b3287e55b12",
     "foreign-verify.cpp": "d1a0f93157d131e1bdfb6c2d8ec31dffe2061c9d7c72b8fe68911375d679bd76",
-    "trial-states.cpp": "10603620951d1f81e55a9216f5f3934253cdb64e0359150843e8966b74345b6b"
+    "trial-states.cpp": "10603620951d1f81e55a9216f5f3934253cdb64e0359150843e8966b74345b6b",
+    "static-real.cpp": "0601d255086f0a7829db7e6f731ed83f27213337edfb492f75b2bfb039c74573",
+    "sib.cpp": "64d870321a59dd6d902e5287412276118afe6e84ad451c4a67ac4c06599578ee",
+    "fixed_image.py": "a2919ce69bac938e609755d5239b541d70e51926dd132d2c30dabc2794789d2b",
+    "trial-export.c": "5de3ad843cde9d88702a2748ae5096ed256bc4a455b91ac9983bcc12e82d3086",
+    "vectors.cpp": "82210747e713e6285980692932572dc09c835d8357c5aed2570abd7b9b4ffe00"
   },
-  "profile": "Standalone shared and static x86; complete archive and object-file equivalence for the six-architecture NeverD Release build."
+  "profile": "Standalone x86-only static CMake Release and default optimized Make builds. Also verify the combined shared/static and six-ISA NeverD archives by file contents.",
+  "criteria": "Across 3 independent runs on x86_64 CPUs each build must reproduce the libmvec Intel text and detail win with no real workload slower on at least 2 hosts. Require both clocks, both baseline controls, candidate and repeat. Identical active artifacts to the original writer and inactive artifacts to the published library. Every build must pass the complete boundary and record comparisons."
 }
