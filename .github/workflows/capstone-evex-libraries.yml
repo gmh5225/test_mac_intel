@@ -1,7 +1,7 @@
-name: Check distinct VEX IFMA opcode records against real OpenSSL functions and existing architectures
+name: Validate VEX IFMA decoding without changing the Intel or AT&T printer tables
 on:
   push:
-    branches: [codex/canonical-vex-ifma-records]
+    branches: [codex/vex-ifma-decoder-aliases]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 2c135ac6040ff6b60075eefb09ebbaef5471773a
+          ref: 061f0f78ec080fa7861f43b17bccf8e2204005cd
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ifma-table-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ifma-decode-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

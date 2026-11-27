@@ -1,68 +1,38 @@
-diff --git a/arch/X86/X86GenAsmWriter.inc b/arch/X86/X86GenAsmWriter.inc
-index 3df20da6..dcb77a51 100644
---- a/arch/X86/X86GenAsmWriter.inc
-+++ b/arch/X86/X86GenAsmWriter.inc
-@@ -16998,6 +16998,10 @@ static void printInstruction(MCInst *MI, SStream *O)
-     551836916U,	// MOVSX32rr32
-     551902452U,	// MOVSX16rm32
-     551836916U,	// MOVSX16rr32
-+    890576902U,	// VPMADD52LUQrm
-+    890576889U,	// VPMADD52HUQrm
-+    890609670U,	// VPMADD52LUQYrm
-+    890609657U,	// VPMADD52HUQYrm
-   };
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 197453cb..0033e1c4 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1610,6 +1610,16 @@ X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+ 	}
+ }
  
-   static const uint16_t OpInfo1[] = {
-@@ -32290,6 +32294,10 @@ static void printInstruction(MCInst *MI, SStream *O)
-     0U,	// MOVSX32rr32
-     0U,	// MOVSX16rm32
-     0U,	// MOVSX16rr32
-+    4U,	// VPMADD52LUQrm
-+    4U,	// VPMADD52HUQrm
-+    4U,	// VPMADD52LUQYrm
-+    4U,	// VPMADD52HUQYrm
-   };
- 
-   static const uint8_t OpInfo2[] = {
-@@ -47582,6 +47590,10 @@ static void printInstruction(MCInst *MI, SStream *O)
-     28U,	// MOVSX32rr32
-     28U,	// MOVSX16rm32
-     28U,	// MOVSX16rr32
-+    48U,	// VPMADD52LUQrm
-+    48U,	// VPMADD52HUQrm
-+    48U,	// VPMADD52LUQYrm
-+    48U,	// VPMADD52HUQYrm
-   };
- 
-   unsigned int opcode = MCInst_getOpcode(MI);
-diff --git a/arch/X86/X86GenAsmWriter1.inc b/arch/X86/X86GenAsmWriter1.inc
-index 58e91b39..d81b46c1 100644
---- a/arch/X86/X86GenAsmWriter1.inc
-+++ b/arch/X86/X86GenAsmWriter1.inc
-@@ -16632,6 +16632,10 @@ static void printInstruction(MCInst *MI, SStream *O)
-     370168085U,	// MOVSX32rr32
-     403722517U,	// MOVSX16rm32
-     370168085U,	// MOVSX16rr32
-+    2182109633U,	// VPMADD52LUQrm
-+    2182109620U,	// VPMADD52HUQrm
-+    2182109633U,	// VPMADD52LUQYrm
-+    2182109620U,	// VPMADD52HUQYrm
-   };
- 
-   static const uint32_t OpInfo1[] = {
-@@ -31924,6 +31928,10 @@ static void printInstruction(MCInst *MI, SStream *O)
-     939524096U,	// MOVSX32rr32
-     939524096U,	// MOVSX16rm32
-     939524096U,	// MOVSX16rr32
-+    1610613408U,	// VPMADD52LUQrm
-+    1610613408U,	// VPMADD52HUQrm
-+    1610613440U,	// VPMADD52LUQYrm
-+    1610613440U,	// VPMADD52HUQYrm
-   };
- 
-   unsigned int opcode = MCInst_getOpcode(MI);
++/* The specifier still selects the actual encoding's operand widths. */
++X86_DECODE_INLINE InstrUID operationForEncoding(InstrUID encoding)
++{
++#ifndef CAPSTONE_X86_REDUCE
++	if (encoding >= X86_INSTRUCTION_LIST_END)
++		return x86DecodeOnlyOpcodes[encoding - X86_INSTRUCTION_LIST_END];
++#endif
++	return encoding;
++}
++
+ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
+ {
+ 	uint16_t attrMask;
+@@ -3070,7 +3080,10 @@ decodeInstructionImpl(struct InternalInstruction *insn, const uint8_t *code,
+ 				       result;
+ 		}
+ 	}
+-	if (getID(insn, mode) || insn->instructionID == 0 || checkPrefix(insn))
++	if (getID(insn, mode) || insn->instructionID == 0)
++		return X86_SCAN_INVALID;
++	insn->instructionID = operationForEncoding(insn->instructionID);
++	if (checkPrefix(insn))
+ 		return X86_SCAN_INVALID;
+ 	if (mcInst)
+ 		return readOperandsScan(insn, mcInst, size);
 diff --git a/arch/X86/X86GenDisassemblerTables.inc b/arch/X86/X86GenDisassemblerTables.inc
-index 5b8fd49c..76e982de 100644
+index 5b8fd49c..49b34e82 100644
 --- a/arch/X86/X86GenDisassemblerTables.inc
 +++ b/arch/X86/X86GenDisassemblerTables.inc
 @@ -7428,7 +7428,7 @@ static const struct OperandSpecifier x86OperandSets[][6] = {
@@ -74,7 +44,7 @@ index 5b8fd49c..76e982de 100644
    { /* 0 */
      0,
      /*  */
-@@ -68585,6 +68585,22 @@ static const struct InstructionSpecifier x86DisassemblerInstrSpecifiers[15289] =
+@@ -68585,6 +68585,31 @@ static const struct InstructionSpecifier x86DisassemblerInstrSpecifiers[15289] =
      926,
      /* MOVSX16rr32 */
    },
@@ -94,10 +64,19 @@ index 5b8fd49c..76e982de 100644
 +    527,
 +    /* VPMADD52HUQYrm */
 +  },
++};
++
++/* Decode-only records have VEX displacement rules. Their operation,
++ * printer, and architectural access metadata are shared with EVEX. */
++static const InstrUID x86DecodeOnlyOpcodes[] = {
++	X86_VPMADD52LUQZ128m, /* VPMADD52LUQrm */
++	X86_VPMADD52HUQZ128m, /* VPMADD52HUQrm */
++	X86_VPMADD52LUQZ256m, /* VPMADD52LUQYrm */
++	X86_VPMADD52HUQZ256m, /* VPMADD52HUQYrm */
  };
  
  static const uint8_t x86DisassemblerContexts[16384] = {
-@@ -113045,5 +113061,17 @@ static const InstrUID modRMTableDirect[] = {
+@@ -113045,5 +113070,17 @@ static const InstrUID modRMTableDirect[] = {
  /* Table20031 */
    0x139, /* AND8mr */
    0x13d, /* AND8rr */
@@ -163,75 +142,6 @@ index b6dbca38..f9cadb34 100644
      { 0x4a0e941cu }, { 0x4a37146cu }, { 0x4b229644u }, { 0x4b4b1694u }, { 0x4c36986cu }, { 0x4c5f18bcu }, { 0x4cdc99b8u }, { 0x4d051a08u },
      { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
      { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u }, { 0x00000000u },
-diff --git a/arch/X86/X86GenImmSize.inc b/arch/X86/X86GenImmSize.inc
-index be4573aa..d574d023 100644
---- a/arch/X86/X86GenImmSize.inc
-+++ b/arch/X86/X86GenImmSize.inc
-@@ -712,6 +712,6 @@ static const uint8_t x86_imm_sizes[] = {
- 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 34, 34, 18, 0, 34, 18, 0, 0, 0, 68, 68, 20, 0,
- 	68, 20, 0, 0, 0, 72, 72, 24, 0, 72, 24, 0, 0, 0, 17, 17, 17, 0, 17, 17, 0, 0, 0, 0,
- 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--	0,
-+	0, 0, 0, 0, 0,
- };
- #endif
-diff --git a/arch/X86/X86GenInstrInfo.inc b/arch/X86/X86GenInstrInfo.inc
-index 87550f49..52d349ef 100644
---- a/arch/X86/X86GenInstrInfo.inc
-+++ b/arch/X86/X86GenInstrInfo.inc
-@@ -15156,7 +15156,11 @@ enum {
- 	X86_MOVSX32rr32	= 15286,
- 	X86_MOVSX16rm32	= 15287,
- 	X86_MOVSX16rr32	= 15288,
--	X86_INSTRUCTION_LIST_END = 15289
-+	X86_VPMADD52LUQrm	= 15289,
-+	X86_VPMADD52HUQrm	= 15290,
-+	X86_VPMADD52LUQYrm	= 15291,
-+	X86_VPMADD52HUQYrm	= 15292,
-+	X86_INSTRUCTION_LIST_END = 15293
- };
- 
- #endif // GET_INSTRINFO_ENUM
-diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
-index bc315806..4065a06c 100644
---- a/arch/X86/X86GenMappingCounts.inc
-+++ b/arch/X86/X86GenMappingCounts.inc
-@@ -16700,5 +16700,9 @@ static const uint16_t x86_mapping_counts[] = {
- 	1024, // X86_MOVSX32rr32
- 	1024, // X86_MOVSX16rm32
- 	1024, // X86_MOVSX16rr32
-+	0, // X86_VPMADD52LUQrm
-+	0, // X86_VPMADD52HUQrm
-+	0, // X86_VPMADD52LUQYrm
-+	0, // X86_VPMADD52HUQYrm
- };
- #endif
-diff --git a/arch/X86/X86GenPrinterQuick.inc b/arch/X86/X86GenPrinterQuick.inc
-index 7fe5bf9a..d552d931 100644
---- a/arch/X86/X86GenPrinterQuick.inc
-+++ b/arch/X86/X86GenPrinterQuick.inc
-@@ -15529,6 +15529,10 @@ static const x86_avx_bcast x86_diet_broadcast_kinds[] = {
-     18, // MOVSX32rr32
-     24, // MOVSX16rm32
-     18, // MOVSX16rr32
-+    78, // VPMADD52LUQrm
-+    78, // VPMADD52HUQrm
-+    79, // VPMADD52LUQYrm
-+    79, // VPMADD52HUQYrm
-   };
- #elif defined(CAPSTONE_X86_PRECHECKED_PRINT)
- /* Capstone Disassembly Engine, http://www.capstone-engine.org */
-@@ -32995,6 +32999,10 @@ static const uint32_t X86RecipeRecords[] = {
-   9556245U, // MOVSX32rr32
-   12701973U, // MOVSX16rm32
-   9556245U, // MOVSX16rr32
-+  41097665U, // VPMADD52LUQrm
-+  41097652U, // VPMADD52HUQrm
-+  41621953U, // VPMADD52LUQYrm
-+  41621940U, // VPMADD52HUQYrm
- };
- 
- static void printInstruction(MCInst *MI, SStream *O)
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
 index 7d3a6e84..09b6a790 100644
 --- a/arch/X86/X86GenVectorOutput.inc
@@ -389,172 +299,8 @@ index eedf177c..272bea7a 100644
  		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  	},
-diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
-index 4e15216d..f34770c6 100644
---- a/arch/X86/X86GenVexPublicPlans.inc
-+++ b/arch/X86/X86GenVexPublicPlans.inc
-@@ -170,32 +170,32 @@ static const uint8_t x86Vex3OpcodeRows[3][256] = {
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 166, 0, 166, 0,
- 		0, 0, 0, 0, 0, 0, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176,
- 		0, 0, 0, 0, 0, 0, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186,
--		0, 0, 0, 0, 0, 0, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196,
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 197,
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 198, 199, 200, 201, 202,
-+		0, 0, 0, 0, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 199,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 200, 201, 202, 203, 204,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 203, 0, 0, 204, 205, 206, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 205, 0, 0, 206, 207, 208, 0, 0, 0, 0, 0, 0, 0, 0,
- 	},
- 	{
--		207, 208, 209, 0, 210, 211, 212, 0, 213, 214, 215, 216, 217, 218, 219, 220,
--		0, 0, 0, 0, 221, 222, 223, 224, 225, 226, 0, 0, 0, 227, 0, 0,
--		228, 229, 230, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0, 231, 232, 0, 0, 0, 0, 0, 0,
--		233, 234, 235, 0, 236, 0, 237, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		209, 210, 211, 0, 212, 213, 214, 0, 215, 216, 217, 218, 219, 220, 221, 222,
-+		0, 0, 0, 0, 223, 224, 225, 226, 227, 228, 0, 0, 0, 229, 0, 0,
-+		230, 231, 232, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		0, 0, 0, 0, 0, 0, 0, 0, 233, 234, 0, 0, 0, 0, 0, 0,
-+		235, 236, 237, 0, 238, 0, 239, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		238, 239, 240, 241, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		240, 241, 242, 243, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 242, 243,
--		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 244,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 244, 245,
-+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 246,
- 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--		245, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+		247, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 	},
- };
--static const uint16_t x86Vex3PublicRows[246][16] = {
-+static const uint16_t x86Vex3PublicRows[248][16] = {
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 8414, 8406, 32768, 32769, 8414, 8406, 32768, 32769 },
- 	{ 0, 0, 0, 0, 0, 0, 0, 0, 32770, 32771, 8390, 8198, 0, 0, 8390, 8198 },
-@@ -383,6 +383,8 @@ static const uint16_t x86Vex3PublicRows[246][16] = {
- 	{ 0, 7452, 0, 0, 0, 7452, 0, 0, 0, 7444, 0, 0, 0, 7444, 0, 0 },
- 	{ 0, 7564, 0, 0, 0, 7564, 0, 0, 0, 7556, 0, 0, 0, 7556, 0, 0 },
- 	{ 0, 7580, 0, 0, 0, 7580, 0, 0, 0, 7572, 0, 0, 0, 7572, 0, 0 },
-+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 32794, 0, 0, 0, 32794, 0, 0 },
-+	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 32795, 0, 0, 0, 32795, 0, 0 },
- 	{ 0, 7180, 0, 0, 0, 7180, 0, 0, 0, 7172, 0, 0, 0, 7172, 0, 0 },
- 	{ 0, 7340, 0, 0, 0, 7340, 0, 0, 0, 7332, 0, 0, 0, 7332, 0, 0 },
- 	{ 0, 7084, 0, 0, 0, 7084, 0, 0, 0, 7076, 0, 0, 0, 7076, 0, 0 },
-@@ -443,7 +445,7 @@ static const uint16_t x86Vex3PublicRows[246][16] = {
- 	{ 0, 6167, 0, 0, 0, 0, 0, 0, 0, 6167, 0, 0, 0, 0, 0, 0 },
- 	{ 0, 0, 0, 5103, 0, 0, 0, 0, 0, 0, 0, 5103, 0, 0, 0, 0 },
- };
--static const uint16_t x86Vex3FormPlans[26][2] = {
-+static const uint16_t x86Vex3FormPlans[28][2] = {
- 	{ 8398, 8396 },
- 	{ 8374, 8372 },
- 	{ 8316, 8276 },
-@@ -470,6 +472,8 @@ static const uint16_t x86Vex3FormPlans[26][2] = {
- 	{ 6318, 0 },
- 	{ 9844, 0 },
- 	{ 9852, 0 },
-+	{ 9820, 0 },
-+	{ 9812, 0 },
- };
- #endif
- 
-diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
-index 2087d365..865c5e97 100644
---- a/arch/X86/X86GenVexScan.inc
-+++ b/arch/X86/X86GenVexScan.inc
-@@ -381,7 +381,7 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
- 	},
- };
- 
--/* 4542 admitted UIDs, 10 immediate patterns. */
-+/* 4546 admitted UIDs, 10 immediate patterns. */
- enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
-        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
-        X86_VEX_SCAN_PATTERN_SHIFT = 4, X86_VEX_SCAN_PUBLIC_SHIFT = 8 };
-@@ -2297,7 +2297,7 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x0005e006u, 0x0005e105u, 0x0005e106u, 0x0005e203u, 0x0005e305u, 0x0005e405u, 0x0005e505u, 0x0005e605u,
- 	0x0005e705u, 0x0005e805u, 0x0005e905u, 0x0005ea05u, 0x0005eb05u, 0x0005ec05u, 0x0005ed05u, 0x0005ee05u,
- 	0x0005ef03u, 0x0005f003u, 0x0005f103u, 0x0005f203u, 0x0005f303u, 0x0001ed05u, 0x0001ed06u, 0x0001ed05u,
--	0x0001ed06u,
-+	0x0001ed06u, 0x0004cb0du, 0x0004ca0du, 0x0004cb0du, 0x0004ca0du,
- };
- 
- X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)
-diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
-index 42c2a56c..e2e82273 100644
---- a/arch/X86/X86MappingInsn.inc
-+++ b/arch/X86/X86MappingInsn.inc
-@@ -106003,3 +106003,31 @@
- 	{ 0 }, { 0 }, { X86_GRP_MODE64, 0 }, 0, 0
- #endif
- },
-+
-+{
-+	X86_VPMADD52LUQrm, X86_INS_VPMADD52LUQ, 0,
-+#ifndef CAPSTONE_DIET
-+	{ 0 }, { 0 }, { 0 }, 0, 0
-+#endif
-+},
-+
-+{
-+	X86_VPMADD52HUQrm, X86_INS_VPMADD52HUQ, 0,
-+#ifndef CAPSTONE_DIET
-+	{ 0 }, { 0 }, { 0 }, 0, 0
-+#endif
-+},
-+
-+{
-+	X86_VPMADD52LUQYrm, X86_INS_VPMADD52LUQ, 0,
-+#ifndef CAPSTONE_DIET
-+	{ 0 }, { 0 }, { 0 }, 0, 0
-+#endif
-+},
-+
-+{
-+	X86_VPMADD52HUQYrm, X86_INS_VPMADD52HUQ, 0,
-+#ifndef CAPSTONE_DIET
-+	{ 0 }, { 0 }, { 0 }, 0, 0
-+#endif
-+},
-diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
-index ea7be346..2542a987 100644
---- a/arch/X86/X86MappingInsnOp.inc
-+++ b/arch/X86/X86MappingInsnOp.inc
-@@ -75717,3 +75717,23 @@
- 	0,
- 	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
-+
-+{	/* X86_VPMADD52LUQrm, X86_INS_VPMADD52LUQ: vpmadd52luq */
-+	0,
-+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+},
-+
-+{	/* X86_VPMADD52HUQrm, X86_INS_VPMADD52HUQ: vpmadd52huq */
-+	0,
-+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+},
-+
-+{	/* X86_VPMADD52LUQYrm, X86_INS_VPMADD52LUQ: vpmadd52luq */
-+	0,
-+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+},
-+
-+{	/* X86_VPMADD52HUQYrm, X86_INS_VPMADD52HUQ: vpmadd52huq */
-+	0,
-+	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, CS_AC_READ, 0 }
-+},
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index 05b8ea9c..19e7f59b 100644
+index 05b8ea9c..5345ccc6 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
 @@ -446,6 +446,11 @@ address-size overrides and 16-bit addressing. The handler rejects LOCK,
@@ -562,13 +308,36 @@ index 05b8ea9c..19e7f59b 100644
  fields before returning a decoded instruction.
  
 +The full x86 decoder recognizes the 128- and 256-bit VEX forms of
-+VPMADD52LUQ and VPMADD52HUQ (AVX-IFMA). The memory forms have their own internal opcodes and use
++VPMADD52LUQ and VPMADD52HUQ (AVX-IFMA). The memory forms have their own decoder operand records and use
 +the ordinary signed VEX disp8. Their printer and operand access records
 +match the existing unmasked operations. EVEX retains tuple-scaled disp8.
 +
  The prefix reader shares the selector's byte classification. A first ordinary
  opcode, optionally after one REX in 64-bit mode, skips the legacy prefix loop;
  vector escapes reuse the existing payload parser. Other prefix sequences keep
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 529fb90a..9e4b350d 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1555,6 +1555,18 @@ def emit_vex_scan(suffix, public_plans=False):
+     translations = dict(translation_specializations(suffix))
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+     specifiers = instruction_specifiers(source)
++    # A terminal scan returns an operation ID. Decode-only operand records
++    # must go through the full reader that resolves their operation.
++    info = (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
++    operation_count = int(re.search(r"X86_INSTRUCTION_LIST_END\s*=\s*(\d+)", info)[1])
++    extra = len(specifiers) - operation_count
++    if extra:
++        aliases = re.search(r"x86DecodeOnlyOpcodes\[\] = \{(.*?)\};", source, re.S)
++        tables.require(aliases is not None, "Decode-only operand records lack operation IDs")
++        targets = re.findall(r"\b(X86_\w+)\s*,", tables.uncomment(aliases[1]))
++        tables.require(len(targets) == extra and all(re.search(r"\b" + name + r"\s*=", info) for name in targets),
++                       "Decode-only operation mapping does not match its operand records")
++    specifiers = specifiers[:operation_count]
+     patterns = {(): 0}
+     flags = []
+     for operands in specifiers:
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 1d2a80c3..a761614c 100644
 --- a/tests/unit/CMakeLists.txt
