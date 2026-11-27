@@ -1,7 +1,7 @@
-name: Verify VEX memory formatting on native Linux, macOS and Windows
+name: Check the archive and the program which links only the public disassembler on Linux
 on:
   push:
-    branches: [codex/vex-sib-build-selection]
+    branches: [codex/decoder-archive-consumer-proof]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,15 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 1 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang, replica: 1 }
-          - { host: ubuntu-22.04, arch: x86_64, profile: clang14, replica: 1 }
-          - { host: ubuntu-24.04, arch: x86_64, profile: gcc, replica: 1 }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: gcc, replica: 1 }
-          - { host: macos-15, arch: arm64, profile: full, replica: 1 }
-          - { host: macos-15-intel, arch: x86_64, profile: full, replica: 1 }
-          - { host: windows-2022, arch: amd64, profile: full, replica: 1 }
-          - { host: windows-2022, arch: amd64_x86, profile: full, replica: 1 }
+          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 4274 }
+          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 4276 }
+          - { host: ubuntu-24.04, arch: x86_64, profile: clang, replica: 4280 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
@@ -40,11 +34,12 @@ jobs:
           arch: ${{ matrix.arch }}
       - name: Time both library forms with the same executable names and frozen function ranges
         env:
+          CHECK_DECODER: ${{ matrix.replica }}
           SCAN_PROFILE: ${{ matrix.profile }}
         run: python -B portable-next/bootstrap.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: vex-sib-selection-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: verified-native-link-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
