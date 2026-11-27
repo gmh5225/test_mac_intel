@@ -1,125 +1,75 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a2a27faf..789eca28 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -214,7 +214,7 @@ if(capstone_enabled_architectures STREQUAL "RISCV")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "WASM")
+-    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS)
++    add_compile_definitions(CAPSTONE_WASM_LITERAL_MNEMONICS CAPSTONE_WASM_GROUPED_TARGETS)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "SPARC")
+diff --git a/Makefile b/Makefile
+index 61a663b8..d269b4f5 100644
+--- a/Makefile
++++ b/Makefile
+@@ -168,7 +168,7 @@ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_RISCV_ONLY
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),wasm)
+-CFLAGS += -DCAPSTONE_WASM_LITERAL_MNEMONICS
++CFLAGS += -DCAPSTONE_WASM_LITERAL_MNEMONICS -DCAPSTONE_WASM_GROUPED_TARGETS
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
 diff --git a/arch/WASM/WASMDisassembler.c b/arch/WASM/WASMDisassembler.c
-index 063f9d9f..88844dec 100644
+index 063f9d9f..3ebb0b17 100644
 --- a/arch/WASM/WASMDisassembler.c
 +++ b/arch/WASM/WASMDisassembler.c
-@@ -553,7 +553,7 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
+@@ -553,7 +553,12 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
  			 uint16_t *param_size, MCInst *MI)
  {
  	uint32_t length, default_target;
--	int tmp_len = 0, i;
++#ifdef CAPSTONE_WASM_GROUPED_TARGETS
 +	size_t tmp_len = 0;
++	uint32_t i;
++#else
+ 	int tmp_len = 0, i;
++#endif
  	size_t var_len;
  
  	// read length
-@@ -584,17 +584,22 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
+@@ -584,7 +589,19 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
  			MI->wasm_data.brtable.address;
  	}
  
 -	// read data
--	for (i = 0; i < length; i++) {
--		if (code_len < tmp_len) {
--			return false;
--		}
--
-+	/* The table stores depths as unsigned LEB128. Eight bytes with all
-+	 * continuation bits clear are eight complete targets on either endian.
-+	 * The initial length check guarantees room for every one-byte target. */
-+	uint32_t remaining = length;
-+	while (remaining >= sizeof(uint64_t)) {
++#ifdef CAPSTONE_WASM_GROUPED_TARGETS
++	/* The length check above guarantees room for one byte per target.
++	 * Eight bytes with no continuation bits encode eight complete depths. */
++	while (length >= sizeof(uint64_t)) {
 +		uint64_t targets;
 +		memcpy(&targets, code + tmp_len, sizeof(targets));
 +		if (targets & UINT64_C(0x8080808080808080))
 +			break;
 +		tmp_len += sizeof(targets);
-+		remaining -= sizeof(targets);
++		length -= sizeof(targets);
 +	}
-+	for (; remaining; --remaining) {
- 		get_varuint32(code + tmp_len, code_len - tmp_len, &var_len);
--		if (var_len == -1) {
-+		if (var_len == (size_t)-1)
- 			return false;
--		}
--
- 		tmp_len += var_len;
- 	}
- 
-@@ -607,7 +612,7 @@ static bool read_brtable(const uint8_t *code, size_t code_len,
- 
- 	MI->wasm_data.brtable.default_target = default_target;
- 	MI->wasm_data.type = WASM_OP_BRTABLE;
--	if ((uint64_t)(tmp_len + var_len) >= UINT16_MAX) {
-+	if (tmp_len >= UINT16_MAX - var_len) {
- 		return false;
- 	}
- 	*param_size = tmp_len + var_len;
-diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
-index d7db69c3..036dc538 100644
---- a/arch/WASM/WASMInstPrinter.c
-+++ b/arch/WASM/WASMInstPrinter.c
-@@ -39,6 +39,24 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
- }
- #endif
- 
-+/* Branch tables are uncommon in compiled modules. Keep their formatting
-+ * and 64-bit address handling together outside the usual operand cases. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((cold, noinline))
 +#endif
-+static void printBranchTable(SStream *out, const cs_wasm_brtable *table)
-+{
-+	SStream_concat(out, "\t0x%x, [", table->length);
-+	/* Preserve the format and argument type seen by existing callbacks. */
-+	if (table->address <= UINT32_MAX)
-+		SStream_concat(out, "0x%x", (unsigned)table->address);
-+	else
-+		SStream_concat(out, "0x%" PRIx64, table->address);
-+	SStream_concat(out, "], 0x%x", table->default_target);
-+}
-+
- void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- {
- #ifdef WASM_LITERAL_NAMES
-@@ -100,11 +118,7 @@ void WASM_printInst(MCInst *MI, struct SStream *O, void *PrinterInfo)
- 		break;
- 
- 	case WASM_OP_BRTABLE:
--		SStream_concat(O, "\t0x%x, [", MI->wasm_data.brtable.length);
--		SStream_concat(O, "0x%x", MI->wasm_data.brtable.address);
--		SStream_concat(O, "], 0x%x",
--			       MI->wasm_data.brtable.default_target);
--
-+		printBranchTable(O, &MI->wasm_data.brtable);
- 		break;
- 	}
- }
++	// read the remaining targets
+ 	for (i = 0; i < length; i++) {
+ 		if (code_len < tmp_len) {
+ 			return false;
 diff --git a/tests/unit/wasm_brtable_size.c b/tests/unit/wasm_brtable_size.c
-index 52130880..615e71a5 100644
+index 52130880..e5df0640 100644
 --- a/tests/unit/wasm_brtable_size.c
 +++ b/tests/unit/wasm_brtable_size.c
-@@ -120,6 +120,52 @@ static int check_i64_constant(csh handle)
+@@ -120,6 +120,34 @@ static int check_i64_constant(csh handle)
  	return !ok;
  }
  
-+static int check_table_address(csh handle)
-+{
-+	const uint8_t code[] = { 0x0e, 0x02, 0x00, 0x01, 0x02 };
-+	const uint64_t address = UINT64_C(0xfffffffe);
-+	cs_insn *insn = NULL;
-+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
-+		return 1;
-+	size_t count = cs_disasm(handle, code, sizeof(code), address, 1, &insn);
-+	bool ok = count == 1 && insn->id == WASM_INS_BR_TABLE &&
-+		  insn->detail->wasm.operands[0].brtable.address == address + 2;
-+	if (ok && !cs_support(CS_SUPPORT_DIET))
-+		ok = strcmp(insn->op_str, "0x2, [0x100000000], 0x2") == 0;
-+	cs_free(insn, count);
-+	if (!ok)
-+		fprintf(stderr, "WASM br_table target list address lost high bits\n");
-+	return !ok;
-+}
-+
 +static int check_mixed_targets(csh handle)
 +{
 +	/* Start in the middle of an eight-target group, and immediately
@@ -151,13 +101,13 @@ index 52130880..615e71a5 100644
  int main(void)
  {
  	csh h;
-@@ -127,7 +173,8 @@ int main(void)
+@@ -127,7 +155,8 @@ int main(void)
  		return 1;
  
  	if (check_copy_sizes(h) || run_count_case(h, 10, 5) ||
 -	    run_count_case(h, 65531, 5) || check_i64_constant(h)) {
 +	    run_count_case(h, 65531, 5) || check_i64_constant(h) ||
-+	    check_table_address(h) || check_mixed_targets(h)) {
++	    check_mixed_targets(h)) {
  		cs_close(&h);
  		return 1;
  	}

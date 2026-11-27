@@ -1,7 +1,7 @@
-name: Measure validated branch target runs in three real WebAssembly modules
+name: Compare complete six-ISA and seven-ISA libraries and the standalone WASM Make build
 on:
   push:
-    branches: [codex/wasm-table-target-programs]
+    branches: [codex/wasm-reader-mixed-object-identity]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -36,13 +36,12 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
-          python3 -B capstone-vectors/wasm/configs.py
-          python3 -B capstone-vectors/wasm/run.py
+          python3 -B capstone-vectors/wasm/check_configs.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-table-target-programs-${{ matrix.host }}-${{ matrix.cc }}
+          name: wasm-reader-identity-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
