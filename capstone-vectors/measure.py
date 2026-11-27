@@ -17,6 +17,8 @@ w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';ad=w/'adapter'
 try:
     assert get('git','-C',base,'rev-parse','HEAD').strip()==m['checkout_commit'] and get('git','-C',base,'write-tree').strip()==m['checkout_tree']
     assert get('git','-C',root,'rev-parse','HEAD').strip()==dev
+    assert sha(r/'base.patch')==rd(r/'source.json')['base']['sha256']
+    run('git','-C',base,'apply','--index',r/'base.patch')
     assert get('git','-C',ice,'rev-parse','HEAD').strip()==m['iced_revision']
     assert all(sha(r/f)==v for f,v in m['drivers'].items())
     (project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(base)
@@ -64,6 +66,7 @@ try:
     assert 'X86_disasmIterText' in get('nm','-u',w/'native-reference.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        run('git','-C',base,'apply','--index',r/'base.patch')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -115,7 +118,7 @@ try:
         assert len(guarded)==3 and 0<guarded[1]<guarded[0] and guarded[0]==6979584
         if label!='base':assert guarded==rd(e/'memory-boundary-base.json')
         save('memory-boundary-'+label,guarded)
-        functions=['cs_decode_full_insn','X86_decodeMixedPublicRecord','cs_disasm_iter','X86_disasmIterText','X86_decodeMixedRecord32','X86_decodeFixedRecord64']
+        functions=['cs_decode_full_insn','X86_decodeFixedRecord32','cs_disasm_iter','X86_disasmIterText','X86_decodeMixedRecord32','X86_decodeFixedRecord64']
         data={}
         for link in ('','ordinary','foreign','foreign-only'):
             path=w/((link+'-' if link else '')+label)
@@ -176,7 +179,21 @@ try:
         save('masked-guard-'+label,masked)
 
         entry=next(x['command']for x in commands if x['file'].endswith('/X86DisassemblerDecoder.c'))
-        assert not any(x in entry for x in ('CAPSTONE_STATIC_X86_READERS','CAPSTONE_X86_ITERATOR_READERS'))
+        assert ('-DCAPSTONE_STATIC_X86_READERS' in entry)==(label!='base')
+        assert ('-DCAPSTONE_X86_DEFAULT_PUBLIC_REQUEST' in entry)==(label=='outlined')
+        obj,=build.rglob('X86DisassemblerDecoder.c.o')
+        from elftools.elf.relocation import RelocationSection
+        with obj.open('rb') as stream:
+            objfile=ELFFile(stream);symtab=objfile.get_section_by_name('.symtab');symbol,=symtab.get_symbol_by_name('cs_disasm_iter')
+            ix=symbol['st_shndx'];start=symbol['st_value'];length=symbol['st_size']
+            code_bytes=objfile.get_section(ix).data()[start:start+length];rel=[]
+            for sect in objfile.iter_sections():
+                if isinstance(sect,RelocationSection) and sect['sh_info']==ix:
+                    for reloc in sect.iter_relocations():
+                        offset=reloc['r_offset']-start
+                        if 0<=offset<length:rel.append((offset,reloc['r_info_type'],symtab.get_symbol(reloc['r_info_sym']).name,reloc.entry.get('r_addend',0)))
+        save('public-object-'+label,dict(length=length,bytes=code_bytes.hex(),relocations=rel))
+
         run('clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'sib.cpp',lib,'-o',w/'sib-guard')
         guard=list(map(int,get(w/'sib-guard').split()));assert guard[0]==4718592 and 0<guard[1]<guard[0]
         save('sib-'+label,guard)

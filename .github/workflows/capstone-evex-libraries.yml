@@ -1,7 +1,7 @@
-name: Select public formatting in the existing x86 scan predicate and test all four native and foreign links
+name: Compare public and private request encodings in the core dispatch across every native and foreign link
 on:
   push:
-    branches: [codex/ordinary-iterator-arch-owned-public-dispatch]
+    branches: [codex/compare-public-core-request-encodings]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 7ebcef84a80b8f7feba27b1118b66ff574c488b2
+          ref: ebf5eeee286dc7b7e0691ec52cdfa826c7de5227
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: db3b8c00be87d3a49d72aa318079dc74ee273c90
+          ref: c69543811b5d1799a5cbbb534c098de1edce8177
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-dispatch-arch-owner-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: public-core-requests-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
