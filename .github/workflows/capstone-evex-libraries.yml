@@ -1,7 +1,7 @@
-name: Measure standalone operand dispatch in one fixed executable and shared library image
+name: Repeat PE32, PE64 and vector formatting with two image controls on six hosts
 on:
   push:
-    branches: [codex/standalone-memory-plan-fix-file]
+    branches: [codex/repeat-vex-pe32-pe64-and-vector-formats]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -15,6 +15,8 @@ jobs:
           - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 2 }
           - { host: ubuntu-24.04-arm, cc: clang, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, replica: 3 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 3 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -57,6 +59,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-file-memory-plan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-file-plan-repeat-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
