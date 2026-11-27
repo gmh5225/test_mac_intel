@@ -1,30 +1,36 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 602ae735..32bc9589 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1088,6 +1088,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
+     target_compile_definitions(capstone_build_settings INTERFACE
+         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
++    set_property(SOURCE arch/X86/X86Mapping.c arch/X86/X86Module.c APPEND PROPERTY
++        COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_X86_SHORT_REG_LISTS>")
+ endif()
+ add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+ target_link_libraries(capstone PUBLIC capstone_build_settings)
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..08f50498 100644
+index 79adee8d..90bc3b14 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -11979,6 +11979,18 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+@@ -11979,72 +11979,17 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
  	return NULL;
  }
  
-+/* Copy just the active registers without a variable-length library call. */
-+static inline void copyImplicitRegisters(uint16_t *dst, const uint16_t *src,
-+					 unsigned count)
-+{
-+	while (count >= 2) {
-+		count -= 2;
-+		memcpy(dst + count, src + count, 2 * sizeof(*src));
-+	}
-+	if (count)
-+		dst[0] = src[0];
-+}
-+
- void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
- 		    uint8_t *regs_read_count, cs_regs regs_write,
- 		    uint8_t *regs_write_count)
-@@ -11991,16 +12003,8 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
- 	write_count = insn->detail->regs_write_count;
- 
- 	// implicit registers
+-void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+-		    uint8_t *regs_read_count, cs_regs regs_write,
+-		    uint8_t *regs_write_count)
+-{
+-	uint8_t i;
+-	uint8_t read_count, write_count;
+-	cs_x86 *x86 = &(insn->detail->x86);
+-
+-	read_count = insn->detail->regs_read_count;
+-	write_count = insn->detail->regs_write_count;
+-
+-	// implicit registers
 -	if (read_count == 1)
 -		regs_read[0] = insn->detail->regs_read[0];
 -	else if (read_count != 0)
@@ -35,8 +41,185 @@ index 79adee8d..08f50498 100644
 -	else if (write_count != 0)
 -		memcpy(regs_write, insn->detail->regs_write,
 -		       write_count * sizeof(insn->detail->regs_write[0]));
-+	copyImplicitRegisters(regs_read, insn->detail->regs_read, read_count);
-+	copyImplicitRegisters(regs_write, insn->detail->regs_write, write_count);
+-
+-	// explicit registers
+-	for (i = 0; i < x86->op_count; i++) {
+-		cs_x86_op *op = &(x86->operands[i]);
+-		switch ((int)op->type) {
+-		case X86_OP_REG:
+-			if ((op->access & CS_AC_READ) &&
+-			    !arr_exist_inline(regs_read, read_count, op->reg)) {
+-				regs_read[read_count] = op->reg;
+-				read_count++;
+-			}
+-			if ((op->access & CS_AC_WRITE) &&
+-			    !arr_exist_inline(regs_write, write_count,
+-					      op->reg)) {
+-				regs_write[write_count] = op->reg;
+-				write_count++;
+-			}
+-			break;
+-		case X86_OP_MEM:
+-			// registers appeared in memory references always being read
+-			if ((op->mem.segment != X86_REG_INVALID)) {
+-				regs_read[read_count] = op->mem.segment;
+-				read_count++;
+-			}
+-			if ((op->mem.base != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
+-					      op->mem.base)) {
+-				regs_read[read_count] = op->mem.base;
+-				read_count++;
+-			}
+-			if ((op->mem.index != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
+-					      op->mem.index)) {
+-				regs_read[read_count] = op->mem.index;
+-				read_count++;
+-			}
+-		default:
+-			break;
+-		}
+-	}
+-
+-	*regs_read_count = read_count;
+-	*regs_write_count = write_count;
+-}
++#define X86_REG_ACCESS_NAME X86_reg_access
++#include "X86RegisterAccessImpl.h"
++#undef X86_REG_ACCESS_NAME
++
++#ifdef CAPSTONE_X86_SHORT_REG_LISTS
++#define X86_REG_ACCESS_NAME X86_reg_access_short
++#define X86_SHORT_REG_ACCESS
++#include "X86RegisterAccessImpl.h"
++#undef X86_SHORT_REG_ACCESS
++#undef X86_REG_ACCESS_NAME
++#endif
+ #endif
  
- 	// explicit registers
- 	for (i = 0; i < x86->op_count; i++) {
+ // Generated from X86ImmSize.inc for the full and reduced instruction enums.
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index 380faa79..19f2ccb3 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -110,6 +110,11 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count);
++#ifdef CAPSTONE_X86_SHORT_REG_LISTS
++CAPSTONE_INTERNAL void X86_reg_access_short(const cs_insn *insn, cs_regs regs_read,
++		    uint8_t *regs_read_count, cs_regs regs_write,
++		    uint8_t *regs_write_count);
++#endif
+ 
+ // given the instruction id, return the size of its immediate operand (or 0)
+ uint8_t X86_immediate_size(unsigned int id, uint8_t *enc_size);
+diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
+index 6fcbe3f4..30a92e91 100644
+--- a/arch/X86/X86Module.c
++++ b/arch/X86/X86Module.c
+@@ -34,7 +34,11 @@ cs_err X86_global_init(cs_struct *ud)
+ 	ud->group_name = X86_group_name;
+ 	ud->post_printer = X86_postprinter;
+ #ifndef CAPSTONE_DIET
++#ifdef CAPSTONE_X86_SHORT_REG_LISTS
++	ud->reg_access = X86_reg_access_short;
++#else
+ 	ud->reg_access = X86_reg_access;
++#endif
+ #endif
+ 
+ 	if (x86_has_feature(ud->mode, CS_MODE_64))
+diff --git a/arch/X86/X86RegisterAccessImpl.h b/arch/X86/X86RegisterAccessImpl.h
+new file mode 100644
+index 00000000..29da6d65
+--- /dev/null
++++ b/arch/X86/X86RegisterAccessImpl.h
+@@ -0,0 +1,86 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++/* Instantiated twice in X86Mapping.c when the short-list callback is enabled.
++ * Both entries use the same operand walk and update the public counts last. */
++#if defined(X86_SHORT_REG_ACCESS) && defined(__ELF__) && defined(__clang__)
++__attribute__((section(".cs_x86_short_reg_access")))
++#endif
++void X86_REG_ACCESS_NAME(const cs_insn *insn, cs_regs regs_read,
++		    uint8_t *regs_read_count, cs_regs regs_write,
++		    uint8_t *regs_write_count)
++{
++	uint8_t i;
++	uint8_t read_count, write_count;
++	cs_x86 *x86 = &(insn->detail->x86);
++
++	read_count = insn->detail->regs_read_count;
++	write_count = insn->detail->regs_write_count;
++
++#ifdef X86_SHORT_REG_ACCESS
++	if (read_count > 1 || write_count > 1) {
++		X86_reg_access(insn, regs_read, regs_read_count, regs_write,
++			       regs_write_count);
++		return;
++	}
++	if (read_count)
++		regs_read[0] = insn->detail->regs_read[0];
++	if (write_count)
++		regs_write[0] = insn->detail->regs_write[0];
++#else
++	// implicit registers
++	if (read_count == 1)
++		regs_read[0] = insn->detail->regs_read[0];
++	else if (read_count != 0)
++		memcpy(regs_read, insn->detail->regs_read,
++		       read_count * sizeof(insn->detail->regs_read[0]));
++	if (write_count == 1)
++		regs_write[0] = insn->detail->regs_write[0];
++	else if (write_count != 0)
++		memcpy(regs_write, insn->detail->regs_write,
++		       write_count * sizeof(insn->detail->regs_write[0]));
++#endif
++
++	// explicit registers
++	for (i = 0; i < x86->op_count; i++) {
++		cs_x86_op *op = &(x86->operands[i]);
++		switch ((int)op->type) {
++		case X86_OP_REG:
++			if ((op->access & CS_AC_READ) &&
++			    !arr_exist_inline(regs_read, read_count, op->reg)) {
++				regs_read[read_count] = op->reg;
++				read_count++;
++			}
++			if ((op->access & CS_AC_WRITE) &&
++			    !arr_exist_inline(regs_write, write_count,
++					      op->reg)) {
++				regs_write[write_count] = op->reg;
++				write_count++;
++			}
++			break;
++		case X86_OP_MEM:
++			// registers appeared in memory references always being read
++			if ((op->mem.segment != X86_REG_INVALID)) {
++				regs_read[read_count] = op->mem.segment;
++				read_count++;
++			}
++			if ((op->mem.base != X86_REG_INVALID) &&
++			    !arr_exist_inline(regs_read, read_count,
++					      op->mem.base)) {
++				regs_read[read_count] = op->mem.base;
++				read_count++;
++			}
++			if ((op->mem.index != X86_REG_INVALID) &&
++			    !arr_exist_inline(regs_read, read_count,
++					      op->mem.index)) {
++				regs_read[read_count] = op->mem.index;
++				read_count++;
++			}
++		default:
++			break;
++		}
++	}
++
++	*regs_read_count = read_count;
++	*regs_write_count = write_count;
++}

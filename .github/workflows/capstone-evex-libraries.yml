@@ -1,7 +1,7 @@
-name: Measure register access construction without variable-length copy calls on PE and ELF
+name: Compare two implicit-register callbacks and the original register walk on the same PE and ELF boundaries
 on:
   push:
-    branches: [codex/access-register-list-copies]
+    branches: [codex/short-implicit-register-callback]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 72ecbcc4c30f111315196886249b8242444ca695
+          ref: b23e8d4c443d9069f03dec2ddbdc8cfa0337d0f6
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: access-register-copy-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: short-list-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

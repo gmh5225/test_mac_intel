@@ -83,6 +83,12 @@ try:
         body=disassembly.split('<X86_reg_access>:',1)[1].split('Disassembly of section',1)[0].strip()
         assert body
         save('access-body-'+label,dict(disassembly=body,sha256=hashlib.sha256(body.encode()).hexdigest()))
+        if label!='base':
+            new=check_output(['objdump','-d','--disassemble=X86_reg_access_short',w/label],text=True)
+            scope=new.split('<X86_reg_access_short>:',1)[1].split('Disassembly of section',1)[0].strip()
+            assert scope
+            save('short-body-'+label,dict(disassembly=scope,direct_copy_call='memcpy' in scope,fallback='X86_reg_access>' in scope,sha256=hashlib.sha256(scope.encode()).hexdigest()))
+
 
         run('clang','-fPIC','-shared','-I',base/'include',r/'trial-export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(label+'.so'))
         commands=rd(build/'compile_commands.json')
@@ -93,6 +99,13 @@ try:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
     save('linked-sections',layout)
+    run('clang++','-O2','-std=c++17','-I',base/'include',r/'access-check.cpp','-ldl','-o',w/'access-check')
+    queries={}
+    for tag in ('candidate','outlined'):
+        counts=list(map(int,get(w/'access-check',w/'base.so',w/(tag+'.so')).split()))
+        assert counts[0]==1920000;queries[tag]=counts
+    assert queries['candidate']==queries['outlined'];save('access-queries',queries)
+
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
     imgs={k:v+bytes(length-len(v)) for k,v in imgs.items()};imgs['duplicate']=imgs['base']
