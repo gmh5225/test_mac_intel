@@ -1,7 +1,7 @@
-name: Measure reuse of the text and width checks in verified x86 record readers
+name: Isolate the two x86 reader changes and their effect on 32-bit scans
 on:
   push:
-    branches: [codex/fixed-reader-live-option-cost]
+    branches: [codex/separate-fixed-reader-preconditions]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: proven-mode-live-options-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: fixed-options-by-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

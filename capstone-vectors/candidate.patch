@@ -27,14 +27,14 @@ index 62d4288a..f0980db1 100644
 +
  #endif
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..4d77aa20 100644
+index 21414e7a..dc92d198 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
 @@ -111,7 +111,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
  		}
  	}
-+#ifdef X86_FIXED_OUTPUT
++#ifdef X86_FIXED_OUTPUT_PRECHECKED
 +	if (X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
 +#else
  	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
@@ -42,3 +42,23 @@ index 21414e7a..4d77aa20 100644
  		return false;
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index d6f533e0..da6c4192 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -190,6 +190,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ 	return true;
+ }
+ 
++#define X86_FIXED_OUTPUT_PRECHECKED
+ #define X86_FIXED_OUTPUT tryOutput32
+ #define X86_FIXED_WIDE false
+ #define X86_OUTPUT_MISS writeExtraOutput32
+@@ -197,6 +198,7 @@ static bool writeExtraOutput32(cs_struct *handle, const uint8_t *code,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#undef X86_FIXED_OUTPUT_PRECHECKED
+ #define CS_DECODE_TRY_OUTPUT tryOutput32
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss32
+ #include "../../cs_disasm_internal.h"

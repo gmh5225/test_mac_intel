@@ -27,14 +27,14 @@ index 62d4288a..f0980db1 100644
 +
  #endif
 diff --git a/arch/X86/X86SimpleOutputImpl.h b/arch/X86/X86SimpleOutputImpl.h
-index 21414e7a..4d77aa20 100644
+index 21414e7a..dc92d198 100644
 --- a/arch/X86/X86SimpleOutputImpl.h
 +++ b/arch/X86/X86SimpleOutputImpl.h
 @@ -111,7 +111,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
  		}
  	}
-+#ifdef X86_FIXED_OUTPUT
++#ifdef X86_FIXED_OUTPUT_PRECHECKED
 +	if (X86_OUTPUT_OPTIONS_UNSUPPORTED(handle))
 +#else
  	if (X86_OUTPUT_UNSUPPORTED(handle, !wide && handle->mode != CS_MODE_32))
@@ -42,3 +42,23 @@ index 21414e7a..4d77aa20 100644
  		return false;
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 324fc05d..b47b2ad7 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -249,6 +249,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ }
+ 
+ #define X86_FIXED_ROUNDED writeRoundedRegisters
++#define X86_FIXED_OUTPUT_PRECHECKED
+ #define X86_FIXED_OUTPUT tryOutput64
+ #define X86_FIXED_WIDE true
+ #define X86_OUTPUT_MISS writeExtraOutput64
+@@ -256,6 +257,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
+ #undef X86_OUTPUT_MISS
+ #undef X86_FIXED_WIDE
+ #undef X86_FIXED_OUTPUT
++#undef X86_FIXED_OUTPUT_PRECHECKED
+ #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
+ #define CS_DECODE_TRY_OUTPUT tryOutput64
+ #include "../../cs_disasm_internal.h"
