@@ -113,6 +113,15 @@ try:
         if os.uname().machine=='x86_64' and label!='base':
             assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('X86_decodeOutputMiss64','X86_decodeVexMemoryFallback64')}
             save('record-assembly-'+label,assembly)
+            with (w/label).open('rb') as f:
+                el=ELFFile(f);tab=el.get_section_by_name('.symtab')
+                banks={sym.name:[sym['st_value'],sym['st_size']] for sym in tab.iter_symbols()
+                       if sym.name.startswith(('vex_base_','vex_memory_widths','vex_register_')) and sym['st_size']}
+                assert not any(k.startswith('vex_base_')for k in banks),banks
+                assert banks['vex_memory_widths'][1]==156
+                assert all(k in banks for k in ('vex_register_rows','vex_register_widths','vex_register_plans'))
+                save('shared-rows-'+label,banks)
+
 
         from symbol_layout import symbols
         section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
@@ -126,7 +135,7 @@ try:
         if label=='candidate':
             run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',base/'suite/synctools/x86_vector_output.cpp',lib,'-o',w/'vector-generator')
             generated={}
-            for args,name in [(('--vex-base-memory',),'X86GenVexBaseMemory.inc'),((),'X86GenVectorOutput.inc')]:
+            for args,name in [(('--vex-base-memory',),'X86GenVexBaseMemory.inc'),((),'X86GenVectorOutput.inc'),(('--vex-memory-admission',),'X86GenVexMemoryAdmission.inc'),(('--vex-sib-transfers',),'X86GenVexSibTransfers.inc')]:
                 projection=sp.check_output([w/'vector-generator',*args])
                 assert projection==(base/'arch/X86'/name).read_bytes()
                 generated[name]=dict(bytes=len(projection),sha256=hashlib.sha256(projection).hexdigest())
