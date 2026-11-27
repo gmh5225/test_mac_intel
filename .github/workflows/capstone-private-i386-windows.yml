@@ -1,7 +1,7 @@
-name: Compare the gated reader with both measured libraries across compiler and linkage configurations
+name: Verify compiled images of the stable AMD64 reader across nine native toolchains
 on:
   push:
-    branches: [codex/gated-amd64-reader-images]
+    branches: [codex/amd64-stable-reader-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: fixed-reader-config-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: stable-reader-config-${{ matrix.replica }}-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
