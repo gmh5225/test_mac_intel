@@ -35,7 +35,9 @@ try:
     flags+=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON']
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
+    ordinary_units=tuple(units)
     for name,tree in [('base',None),*q['variants'].items()]:
+        units=list(ordinary_units)
         if tree:
             git('restore','--staged','--worktree','--source=HEAD','--','.')
             patch=t/(name+'.patch')
@@ -84,6 +86,12 @@ try:
             commands=json.loads((solo/'compile_commands.json').read_text())
             amd=next(c['command']for c in commands if Path(c['file']).name=='X86Sse64Output.c')
             assert 'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in amd
+            access=next(c['command']for c in commands if Path(c['file']).name=='X86Mapping.c')
+            import re
+            clang_ver=sp.check_output(['clang','--version'],text=True)
+            active=(name=='uniform' and platform.machine().lower() in ('amd64','x86_64') and re.search(r'clang version 18[.]',clang_ver) is not None)
+            assert ('-DX86_CACHED_OPERAND_ACCESS' in access)==active
+            rows[name]['cached_access']=active
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result

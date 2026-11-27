@@ -1,205 +1,288 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 4fda2efd..dd8789c7 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -284,36 +284,27 @@ static void _printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 	}
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index cea06480..72004759 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1088,8 +1088,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
+     target_compile_definitions(capstone_build_settings INTERFACE
+         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
+-    # Use the bounded masked-operand copies in the measured x86-64 static reader.
++    # Use cached access IDs and bounded masked-operand copies in the x86-64 static reader.
+     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
++        set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
+         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
+             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
+     endif()
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 79adee8d..735660ea 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10286,10 +10286,20 @@ unsigned int find_insn(unsigned int id)
+ 	return -1;
  }
  
--// convert Intel access info to AT&T access info
--static void get_op_access(cs_struct *h, unsigned int id, uint8_t *access,
--			  uint64_t *eflags)
-+/* Intel metadata lists the destination first. Each shift puts the
-+ * newest source in the low byte, which is the first AT&T operand. */
-+static uint64_t get_att_access(cs_struct *h, unsigned int id, uint64_t *eflags)
- {
--	uint8_t count, i;
- 	const uint8_t *arr = X86_get_op_access(h, id, eflags);
--
--	// initialize access
--	memset(access, 0, CS_X86_MAXIMUM_OPERAND_SIZE * sizeof(access[0]));
--	if (!arr) {
--		return;
-+	uint64_t access = 0;
-+	if (arr) {
-+		for (; *arr; ++arr) {
-+			const uint8_t value = *arr;
-+			access = (access << 8) | (value == CS_AC_IGNORE ? 0 : value);
-+		}
- 	}
-+	return access;
-+}
- 
--	// find the non-zero last entry
--	for (count = 0; arr[count]; count++)
--		;
--
--	if (count == 0)
--		return;
--
--	// copy in reverse order this access array from Intel syntax -> AT&T syntax
--	count--;
--	for (i = 0; i <= count && ((count - i) < CS_X86_MAXIMUM_OPERAND_SIZE) &&
--		    i < CS_X86_MAXIMUM_OPERAND_SIZE;
--	     i++) {
--		if (arr[count - i] != CS_AC_IGNORE)
--			access[i] = arr[count - i];
--		else
--			access[i] = 0;
--	}
-+static uint8_t current_op_access(MCInst *MI)
++static inline bool cached_insn_mapping(const cs_struct *h, unsigned int id,
++				       uint32_t *mapping)
 +{
-+	cs_x86 *x86 = &MI->flat_insn->detail->x86;
-+	const uint64_t access = get_att_access(MI->csh, MCInst_getOpcode(MI),
-+					       &x86->eflags);
-+	return (uint8_t)(access >> (8 * x86->op_count));
++	if (!h || !h->x86_insn_lut || id > h->x86_insn_lut_max)
++		return false;
++	*mapping = h->x86_insn_lut[id];
++	return true;
++}
++
+ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ {
+-	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
+-		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
++	uint32_t mapping;
++	if (cached_insn_mapping(h, id, &mapping))
++		return (unsigned int)(int16_t)(uint16_t)mapping;
+ 
+ 	return find_insn(id);
+ }
+@@ -11951,32 +11961,48 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 		*eflags = 0;
+ 		return ud1_access;
+ 	}
+-	unsigned int i = find_insn_h(h, id);
+-	if (i != -1) {
+-		*eflags = insn_ops[i].flags;
+-		/* Compare-exchange reads and conditionally replaces its destination;
+-		 * memory destinations receive a write cycle even on mismatch. */
+-		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
+-							  CS_AC_READ, 0 };
+-		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
+-		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
+-		switch (insns[i].mapid) {
+-		case X86_INS_BOUND:
+-			/* BOUND compares the index without modifying it or EFLAGS. */
+-			*eflags = 0;
+-			return bound_access;
+-		case X86_INS_CMPXCHG:
+-			return compare_access;
+-		case X86_INS_CMPXCHG8B:
+-		case X86_INS_CMPXCHG16B:
+-			return pair_access;
+-		default:
+-			break;
+-		}
+-		return insn_ops[i].access;
++	unsigned int i, public_id;
++#ifdef X86_CACHED_OPERAND_ACCESS
++	uint32_t mapping;
++	if (cached_insn_mapping(h, id, &mapping)) {
++		if (mapping == UINT32_MAX)
++			return NULL;
++		/* The cache also contains the public ID used by access overrides. */
++		i = (uint16_t)mapping;
++		public_id = mapping >> 16;
++	} else {
++		i = find_insn(id);
++		if (i == (unsigned int)-1)
++			return NULL;
++		public_id = insns[i].mapid;
+ 	}
+-
+-	return NULL;
++#else
++	i = find_insn_h(h, id);
++	if (i == (unsigned int)-1)
++		return NULL;
++	public_id = insns[i].mapid;
++#endif
++	*eflags = insn_ops[i].flags;
++	/* Compare-exchange reads and conditionally replaces its destination;
++	 * memory destinations receive a write cycle even on mismatch. */
++	static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
++						  CS_AC_READ, 0 };
++	static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
++	static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
++	switch (public_id) {
++	case X86_INS_BOUND:
++		/* BOUND compares the index without modifying it or EFLAGS. */
++		*eflags = 0;
++		return bound_access;
++	case X86_INS_CMPXCHG:
++		return compare_access;
++	case X86_INS_CMPXCHG8B:
++	case X86_INS_CMPXCHG16B:
++		return pair_access;
++	default:
++		break;
++	}
++	return insn_ops[i].access;
  }
  
- static void fixup_evex_opmask_access(MCInst *MI)
-@@ -350,8 +341,6 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
- 	int reg;
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+diff --git a/cs.c b/cs.c
+index d0b8b045..0bfa1c8b 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1413,12 +1413,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 		return CS_ERR_OK;
  
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
--
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.type = X86_OP_MEM;
-@@ -374,11 +363,10 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
-+		const uint8_t access = current_op_access(MI);
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+			.access = access;
- 	}
- 
- 	SegReg = MCInst_getOperand(MI, Op + 1);
-@@ -407,8 +395,6 @@ static void printSrcIdx(MCInst *MI, unsigned Op, SStream *O)
- static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
- {
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
--
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.type = X86_OP_MEM;
-@@ -431,11 +417,10 @@ static void printDstIdx(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
-+		const uint8_t access = current_op_access(MI);
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+			.access = access;
- 	}
- 
- 	// DI accesses are always ES-based on non-64bit mode
-@@ -512,8 +497,6 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 	int reg;
- 
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
--
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.type = X86_OP_MEM;
-@@ -536,11 +519,10 @@ static void printMemOffset(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
-+		const uint8_t access = current_op_access(MI);
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+			.access = access;
- 	}
- 
- 	// If this has a segment register, print it.
-@@ -672,8 +654,6 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 							  .op_count]
- 					.mem.base = X86_register_map(reg);
- 			} else {
--				uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
--
- 				MI->flat_insn->detail->x86
- 					.operands[MI->flat_insn->detail->x86
- 							  .op_count]
-@@ -689,15 +669,12 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 					MI->csh->regsize_map[X86_register_map(
- 						reg)];
- 
--				get_op_access(
--					MI->csh, MCInst_getOpcode(MI), access,
--					&MI->flat_insn->detail->x86.eflags);
-+				const uint8_t access = current_op_access(MI);
- 				MI->flat_insn->detail->x86
- 					.operands[MI->flat_insn->detail->x86
- 							  .op_count]
- 					.access =
--					access[MI->flat_insn->detail->x86
--						       .op_count];
-+					access;
- 
- 				MI->flat_insn->detail->x86.op_count++;
- 			}
-@@ -876,8 +853,6 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 	int64_t DispVal = 1;
- 
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
--
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.type = X86_OP_MEM;
-@@ -903,11 +878,10 @@ static void printMemReference(MCInst *MI, unsigned Op, SStream *O)
- 			.operands[MI->flat_insn->detail->x86.op_count]
- 			.mem.disp = 0;
- 
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
-+		const uint8_t access = current_op_access(MI);
- 		MI->flat_insn->detail->x86
- 			.operands[MI->flat_insn->detail->x86.op_count]
--			.access = access[MI->flat_insn->detail->x86.op_count];
-+			.access = access;
- 	}
- 
- 	// If this has a segment register, print it.
-@@ -1139,8 +1113,6 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
- 	}
- 
- 	if (MI->csh->detail_opt) {
--		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE] = { 0 };
--
- 		// some instructions need to supply immediate 1 in the first op
- 		switch (MCInst_getOpcode(MI)) {
- 		default:
-@@ -1275,13 +1247,14 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
- 		}
- 
- #ifndef CAPSTONE_DIET
--		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
--			      &MI->flat_insn->detail->x86.eflags);
-+		uint64_t access = get_att_access(MI->csh, MCInst_getOpcode(MI),
-+						 &MI->flat_insn->detail->x86.eflags);
- 		for (i = 0; i < MI->flat_insn->detail->x86.op_count &&
--			    i < ARR_SIZE(access);
-+			    i < CS_X86_MAXIMUM_OPERAND_SIZE;
- 		     i++) {
- 			MI->flat_insn->detail->x86.operands[i].access =
--				access[i];
-+				(uint8_t)access;
-+			access >>= 8;
- 		}
- 		fixup_evex_opmask_access(MI);
+ 	case CS_OPT_DETAIL:
+-		// CS_OPT_OFF turns detail off.  Any other value adds its flags
+-		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
+-		if (value == CS_OPT_OFF)
+-			handle->detail_opt = CS_OPT_OFF;
+-		else
+-			handle->detail_opt |= (cs_opt_value)value;
++		/* A requested view enables detail and preserves earlier view flags. */
++		if (value != CS_OPT_OFF)
++			value |= handle->detail_opt | CS_OPT_ON;
++		handle->detail_opt = (cs_opt_value)value;
+ #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
+ 		Mips_selectScanDecoder(handle);
  #endif
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 1d2a80c3..72d7b188 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15)
+ 
+ enable_testing()
+ set(UNIT_TEST_SOURCES sstream.c utils.c api.c instruction_bytes.c mcinst.c mapping.c feature_mode.c)
++if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_PPC_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
++    list(APPEND UNIT_TEST_SOURCES detail_views.c)
++endif()
+ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
+    OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_PPC_SUPPORT
+    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+diff --git a/tests/unit/detail_views.c b/tests/unit/detail_views.c
+new file mode 100644
+index 00000000..1adadf31
+--- /dev/null
++++ b/tests/unit/detail_views.c
+@@ -0,0 +1,77 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <string.h>
++
++struct sample {
++	cs_arch arch;
++	cs_mode mode;
++	uint8_t bytes[4];
++	size_t length;
++};
++
++static bool decode_view(csh handle, const struct sample *sample,
++			size_t flags, cs_insn *insn, cs_detail *detail)
++{
++	const uint8_t *code = sample->bytes;
++	size_t size = sample->length;
++	uint64_t address = 0x1000;
++
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) != CS_ERR_OK ||
++	    cs_option(handle, CS_OPT_DETAIL, flags) != CS_ERR_OK)
++		return false;
++	memset(insn, 0, sizeof(*insn));
++	memset(detail, 0, sizeof(*detail));
++	insn->detail = detail;
++	return cs_disasm_iter(handle, &code, &size, &address, insn) &&
++	       size == 0 && address == 0x1000 + sample->length;
++}
++
++int main(void)
++{
++	static const struct sample samples[] = {
++		{ CS_ARCH_ARM, CS_MODE_ARM, { 0x10, 0x40, 0x2d, 0xe9 }, 4 },
++		{ CS_ARCH_ARM, CS_MODE_THUMB, { 0x10, 0xb5 }, 2 },
++		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN,
++		  { 0xe0, 0x03, 0x01, 0xaa }, 4 },
++		{ CS_ARCH_PPC, CS_MODE_32 | CS_MODE_BIG_ENDIAN,
++		  { 0x7c, 0x64, 0x1b, 0x78 }, 4 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C,
++		  { 0x85, 0x00 }, 2 },
++	};
++	static const cs_opt_value views[] = { CS_OPT_DETAIL_REAL,
++					      CS_OPT_DETAIL_UNCOMPRESSED_REAL,
++					      CS_OPT_DETAIL_ALIAS };
++	for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
++		const struct sample *sample = &samples[i];
++		if (!cs_support(sample->arch))
++			continue;
++		csh handle;
++		if (cs_open(sample->arch, sample->mode, &handle) != CS_ERR_OK)
++			return 1;
++		for (size_t j = 0; j < sizeof(views) / sizeof(views[0]); ++j) {
++			cs_insn implicit, explicit_on;
++			cs_detail first, second;
++			bool ok = decode_view(handle, sample, views[j],
++					      &implicit, &first) &&
++				  decode_view(handle, sample, views[j] | CS_OPT_ON,
++					      &explicit_on, &second);
++			if (!ok || implicit.id != explicit_on.id ||
++			    implicit.alias_id != explicit_on.alias_id ||
++			    implicit.usesAliasDetails != explicit_on.usesAliasDetails ||
++			    strcmp(implicit.mnemonic, explicit_on.mnemonic) ||
++			    strcmp(implicit.op_str, explicit_on.op_str) ||
++			    memcmp(&first, &second, sizeof(first))) {
++				fprintf(stderr, "detail view %u differs on architecture %u, mode %u\n",
++					(unsigned)views[j], (unsigned)sample->arch,
++					(unsigned)sample->mode);
++				cs_close(&handle);
++				return 1;
++			}
++		}
++		cs_close(&handle);
++	}
++	return 0;
++}
+diff --git a/tests/unit/x86_encoding_accuracy.c b/tests/unit/x86_encoding_accuracy.c
+index 75f57364..fe50e9e9 100644
+--- a/tests/unit/x86_encoding_accuracy.c
++++ b/tests/unit/x86_encoding_accuracy.c
+@@ -14,6 +14,7 @@
+ #include "../../arch/X86/X86DisassemblerDecoder.h"
+ #include "../../arch/X86/X86Disassembler.h"
+ #include "../../arch/X86/X86Mapping.h"
++#include "../../arch/X86/X86InstPrinterCommon.h"
+ #define GET_INSTRINFO_ENUM
+ #ifdef CAPSTONE_X86_REDUCE
+ #include "../../arch/X86/X86GenInstrInfo_reduce.inc"
+@@ -163,6 +164,26 @@ static bool check_internal_scan_mode(void)
+ 	return true;
+ }
+ 
++#ifndef CAPSTONE_DIET
++static bool check_operand_access_cache(cs_struct *arch, unsigned int id)
++{
++	uint64_t cached_flags = UINT64_MAX, fallback_flags = UINT64_MAX;
++	const uint8_t *cached = X86_get_op_access(arch, id, &cached_flags);
++	const uint8_t *fallback = X86_get_op_access(NULL, id, &fallback_flags);
++	if (cached_flags != fallback_flags)
++		return false;
++	if (!cached || !fallback)
++		return cached == fallback && cached_flags == UINT64_MAX;
++	for (unsigned int i = 0; i < CS_X86_MAXIMUM_OPERAND_SIZE; ++i) {
++		if (cached[i] != fallback[i])
++			return false;
++		if (!cached[i])
++			break;
++	}
++	return true;
++}
++#endif
++
+ /* Cache allocation is optional: every ID and hole must agree with the
+  * original binary-search mapping when the cache is unavailable. */
+ static bool check_id_cache(void)
+@@ -174,6 +195,13 @@ static bool check_id_cache(void)
+ 	uint32_t *cache = arch->x86_insn_lut;
+ 	bool ok = cache != NULL;
+ 	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
++#ifndef CAPSTONE_DIET
++		if (!check_operand_access_cache(arch, id)) {
++			fprintf(stderr, "Operand access cache differs at %u\n", id);
++			ok = false;
++			break;
++		}
++#endif
+ 		cs_insn cached = { 0 }, fallback = { 0 };
+ 		cached.id = fallback.id = UINT32_MAX;
+ 		X86_get_insn_id(arch, &cached, id);
