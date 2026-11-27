@@ -1,7 +1,7 @@
-name: Compare VEX3 base memory output against shipping Capstone and fork iced master on real binaries
+name: Count scalar and vector general printer calls under both native NeverD configurations
 on:
   push:
-    branches: [codex/shipping-vex3-private-memory]
+    branches: [codex/native-formatter-fallback-counts]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-vex3-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: native-fallback-census-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
