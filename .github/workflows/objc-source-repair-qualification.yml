@@ -1,0 +1,114 @@
+name: Verify the Objective-C source recovery repair on macOS
+on:
+  push:
+    branches: [codex/objc-source-repair-qualification]
+permissions:
+  contents: read
+jobs:
+  source-tests:
+    runs-on: macos-15
+    timeout-minutes: 170
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: dev
+            project: eb264426e6dd99a09828bfc4aca943a4950f80f1
+            fork: 6947b7db63e913244e0aa6de087d1ad2e791e86f
+            sdk: r12
+          - label: repair
+            project: 5df11aed5e531e963ddd75b02d7af64fd1af9611
+            fork: 6947b7db63e913244e0aa6de087d1ad2e791e86f
+            sdk: r12
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ matrix.project }}
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Build the native macOS source tests with the pinned release SDK
+        env:
+          PROJECT: ${{ matrix.project }}
+          FORK: ${{ matrix.fork }}
+          SDK: ${{ matrix.sdk }}
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+        run: |
+          test "$(git rev-parse HEAD)" = "$PROJECT"
+          test "$(git rev-parse HEAD:third_party/llvm-project)" = "$FORK"
+          git submodule update --init --depth 1 third_party/capstone third_party/unicorn signatures
+          brew install ninja
+          mkdir diagnostic
+          cmake -S . -B build-replay -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF \
+            -DNEVERD_BUILD_GUI=OFF -DNEVERD_BUILD_PLUGINS=OFF -DNEVERD_BUILD_WORKER=OFF \
+            -DPython3_EXECUTABLE="$(python -c 'import sys;print(sys.executable)')"
+          python scripts/build.py build-replay --config Release --target NeverDObjCRuntimeSourceTests NeverDSourceEntryBindingTests --parallel 4
+          python - <<'PY'
+          import hashlib,json,os,shlex,subprocess
+          from pathlib import Path
+          dest=Path('diagnostic'); build=Path('build-replay')
+          cfg=dict(row.split('=',1) for row in (build/'CMakeCache.txt').read_text().splitlines() if '=' in row and not row.startswith(('#','//')))
+          sha=lambda file:hashlib.file_digest(file,'sha256').hexdigest()
+          assert cfg['NEVERD_LLVM_PREBUILT_TAG:STRING']=='neverd-llvm-v23.0.0-'+os.environ['SDK']
+          info=(Path(cfg['LLVM_DIR:PATH']).parents[2]/'BUILDINFO.txt').read_text()
+          assert 'llvm_commit: '+os.environ['FORK'] in info
+          receipt=json.loads((build/'neverd-build-receipt.json').read_bytes())
+          modules={}
+          for name in ('third_party/capstone','third_party/unicorn','signatures'):
+              actual=subprocess.check_output(['git','-C',name,'rev-parse','HEAD'],text=True).strip()
+              assert actual==subprocess.check_output(['git','rev-parse','HEAD:'+name],text=True).strip()
+              modules[name]=actual
+          binary=build/'bin/NeverDObjCRuntimeSourceTests'
+          with binary.open('rb') as f:binary_digest=sha(f)
+          with (build/'bin/libneverd.dylib').open('rb') as f:lib_digest=sha(f)
+          command,=[row for row in json.loads((build/'compile_commands.json').read_bytes())
+                    if Path(row['file']).name=='ObjCRuntimeSourceTests.cpp']
+          clang,=[arg.split('=',1)[1].strip('"') for arg in shlex.split(command['command'])
+                  if arg.startswith('-DNEVERD_TEST_CLANG=')]
+          meta=dict(project=os.environ['PROJECT'],fork=os.environ['FORK'],sdk=os.environ['SDK'],
+                    dependencies=modules,build_sources=receipt['snapshot']['sources'],
+                    compiler=subprocess.check_output([clang,'--version'],text=True),native_test=binary_digest,
+                    native_library=lib_digest,platform=subprocess.check_output(['sw_vers'],text=True))
+          (dest/'source.json').write_text(json.dumps(meta,indent=2)+'\n')
+          (dest/'SDK-BUILDINFO.txt').write_text(info)
+          PY
+      - name: Execute the complete native Objective-C runtime suite
+        run: |
+          set +e
+          ctest --test-dir build-replay -C Release -L '^NeverDObjCRuntimeSourceTests$' \
+            --no-tests=error --parallel 3 --output-junit "$GITHUB_WORKSPACE/diagnostic/outcomes.xml" \
+            --output-log "$GITHUB_WORKSPACE/diagnostic/runtime.log" --output-on-failure
+          result=$?
+          set -e
+          echo "$result" > diagnostic/ctest-exit.txt
+          exit "$result"
+      - name: Check saved return lanes and original caller widths
+        if: success() || failure()
+        env:
+          PRODUCT: ${{ matrix.label }}
+        run: |
+          selected='SourceABI.NarrowDarwinReturnsPreserveWordReadsWithoutInventingHighBits:SourceABI.NarrowParametersPreserveKnownBytesThroughWideCopies'
+          if [[ "$PRODUCT" == repair ]]; then
+            selected="$selected:SourceABI.NarrowReturnKeepsEarlierWholeRegisterCopiesIntact"
+          fi
+          build-replay/bin/NeverDSourceEntryBindingTests --gtest_filter="$selected" \
+            --gtest_output="xml:diagnostic/source-abi.xml"
+          python - <<'PYTEST'
+          from pathlib import Path
+          import os, xml.etree.ElementTree as ET
+          names=[t.get('name') for t in ET.parse('diagnostic/source-abi.xml').iter('testcase')]
+          assert len(names)==(3 if os.environ['PRODUCT']=='repair' else 2), names
+          PYTEST
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: macos-source-${{ matrix.label }}
+          path: diagnostic/
+          if-no-files-found: error
