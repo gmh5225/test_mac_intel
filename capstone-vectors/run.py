@@ -29,11 +29,11 @@ try:
         if body:i=text.index('{',i)+1
         text=text[:i]+'\n\textern uint64_t '+counter+'; ++'+counter+';\n\t'+text[i:]
         path.write_text(text)
-    for stage in ('base','candidate'):
-        if stage=='candidate':
+    for stage in ('base','candidate','outlined'):
+        if stage!='base':
             run('git','-C',s,'restore','--source=HEAD','--staged','--worktree','--','.')
             assert get('git','-C',s,'status','--porcelain')==''
-            patch=r/'candidate.patch';assert hashlib.sha256(patch.read_bytes()).hexdigest()==q[stage]['sha256']
+            patch=r/(stage+'.patch');assert hashlib.sha256(patch.read_bytes()).hexdigest()==q[stage]['sha256']
             run('git','-C',s,'apply','--index',patch)
         assert get('git','-C',s,'write-tree')==q[stage]['tree']
         instrument('cs.c','MCInst_InitX86(&mci);','profile_full_decodes')
@@ -54,7 +54,7 @@ try:
                 families[k]=dict(count=v[0],full=v[1:5],canonical=v[5:9],printer=v[9:13],example=z[15:])
             assert sum(v['count'] for v in families.values())==head[0]
             counts[name]=dict(header=head,families=families)
-            if stage=='candidate':
+            if stage!='base':
                 prev=reports['base'][name]
                 assert head[:4]==prev['header'][:4] and {k:v['count']for k,v in families.items()}=={k:v['count']for k,v in prev['families'].items()}
             save('counts',reports)
