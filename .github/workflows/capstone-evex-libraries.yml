@@ -1,7 +1,7 @@
-name: Measure AVX-IFMA decode and generated register and memory output on real programs
+name: Compare AVX-IFMA memory formatting with two corrected controls and iced
 on:
   push:
-    branches: [codex/vex-ifma-generated-programs]
+    branches: [codex/ifma-memory-readers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: generated-ifma-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: ifma-memory-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

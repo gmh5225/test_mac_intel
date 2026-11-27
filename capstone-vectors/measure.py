@@ -49,6 +49,9 @@ try:
     run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
     for label in ('base','outlined','candidate'):
         run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
+        assert get('git','-C',base,'write-tree').strip()==m['checkout_tree']
+        assert sha(r/'reference.patch')==maps['base']['sha256']
+        run('git','-C',base,'apply','--index',r/'reference.patch')
         assert get('git','-C',base,'write-tree').strip()==maps['base']['tree']
         if label=='outlined':
             assert sha(r/'outlined.patch')==maps['outlined']['sha256']
@@ -87,6 +90,14 @@ try:
         with (w/label).open('rb')as f:
             elf=ELFFile(f)
             layout[label]={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest(),sec['sh_flags']] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+    run('clang++','-std=c++17','-O2','-I',base/'include',r/'ifma-guard.cpp','-ldl','-o',w/'ifma-guard')
+    guard={}
+    for tag in ('candidate','outlined'):
+        values=list(map(int,get(w/'ifma-guard',w/'base.so',w/(tag+'.so')).split()))
+        assert len(values)==3 and values[0]==2359296 and 0<values[2]<values[1]<values[0]
+        guard[tag]=values
+    assert guard['candidate']==guard['outlined']
+    save('ifma-memory-guard',guard)
     save('linked-sections',layout)
     imgs={k:(w/k).read_bytes() for k in images};length=max(map(len,imgs.values()))
     original_sizes={k:len(v) for k,v in imgs.items()}
@@ -171,8 +182,7 @@ try:
             tests={};fixed=None
             for version in ('base','candidate','outlined'):
                 records_intel=get(w/('trace-'+version),'all','intel',input=feed).splitlines()
-                if version=='base':
-                    oldrows=records_intel;continue
+                if version=='base':oldrows=records_intel
                 assert records_intel==get(w/('trace-'+version),'all','att',input=feed).splitlines()
                 assert all(hashrow(row)==expected_rows[hex(ip)]['normalized_sha256']for (_,_,ip),row in zip(targets,records_intel))
                 lengths=[';'.join(z.split(',')[0]for z in row.split(';'))for row in records_intel]
@@ -183,13 +193,14 @@ try:
                 else:assert fixed==rows
             queried={}
             for route_id in range(8):
-                entry=list(map(int,get(w/'trial-real',w/'candidate.so',w/'outlined.so',f,recovered,'64',str(route_id)).split()))
-                assert entry[:3]==[3277,0,19594],entry
-                if route_id:assert entry[:4]==queried[0]
-                queried[route_id]=entry[:4]
+                for tag in ('candidate','outlined'):
+                    entry=list(map(int,get(w/'trial-real',w/'base.so',w/(tag+'.so'),f,recovered,'64',str(route_id)).split()))
+                    assert entry[:3]==[3277,0,19594] and (not route_id or entry[:4]==queried[0])
+                    if tag=='candidate':queried[route_id]=entry[:4]
+                    else:assert queried[route_id]==entry[:4]
             # Timings on the recovered functions use only engines which decode every byte.
             for mode in range(3):
-                choices={tag+'/'+route:(tag,route)for tag in ('candidate','outlined') for route in ('private','capstone')}
+                choices={tag+'/'+route:(tag,route)for tag in imgs for route in ('private','capstone')}
                 choices['iced']=('candidate','iced')
                 if mode:choices['fast']=('candidate','fast')
                 def sample(key,n):
@@ -198,7 +209,7 @@ try:
                 n=max(1,math.ceil(12e6/min(sample(k,1)[0]for k in choices)))
                 checks={k:sample(k,n)[2:]for k in choices}
                 assert all(v[:3]==checks['iced'][:3]for v in checks.values())
-                for route in ('private','capstone'):assert checks['candidate/'+route]==checks['outlined/'+route]
+                for route in ('private','capstone'):assert all(checks[tag+'/'+route]==checks['base/'+route] for tag in imgs)
                 order=list(choices);rng=random.Random('recovered-ifma/'+str(mode));blocks=[]
                 for _ in range(17):
                     rng.shuffle(order);row={k:[]for k in order}
@@ -206,7 +217,7 @@ try:
                         v=sample(k,n);assert v[2:]==checks[k];row[k].append(v[:2])
                     blocks.append({k:[a+b for a,b in zip(*z)]for k,z in row.items()})
                 tests[mode]=dict(repeats=n,checks=checks,pairs=blocks)
-            assert all(z.endswith(';0') and sum(map(int,z.split(';')))==expected_rows[hex(ip)]['baseline_stop'] for (_,_,ip),z in zip(targets,oldrows))
+            assert oldrows==records_intel
             save('ifma-recovered',dict(bytes=sum(n for _,n,_ in targets),instructions=sum(row['instructions']for row in expected_rows.values()),target=sum(sum(row['accepted'].values()) for row in expected_rows.values()),queries=fixed,baseline=oldrows,records=queried,guard_hash=hashrow('\n'.join(records_intel)),timings=tests))
         def audit_engine(exe):
             rows=[list(map(int,z.split())) for z in get(w/exe,'audit','0','1',f,path,str(bits)).splitlines()]
