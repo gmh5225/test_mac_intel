@@ -1,18 +1,38 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index cea06480..8c56bf6c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1092,6 +1092,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
+             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
++    else()
++        # The Arm64 six-backend static printer can omit unused canonical alias operands.
++        set_property(SOURCE arch/PowerPC/PPCInstPrinter.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_PPC_SKIP_UNUSED_CANONICAL>")
+     endif()
+ endif()
+ add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
 diff --git a/arch/PowerPC/PPCInstPrinter.c b/arch/PowerPC/PPCInstPrinter.c
-index c23cb3ef..eaf77308 100644
+index 93a4f6ab..dab7bfc5 100644
 --- a/arch/PowerPC/PPCInstPrinter.c
 +++ b/arch/PowerPC/PPCInstPrinter.c
-@@ -749,7 +749,12 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
+@@ -747,8 +747,17 @@ static void printInst(MCInst *MI, uint64_t Address, const char *Annot,
+ 
+ 	if (!isAlias || !useAliasDetails) {
  		map_set_fill_detail_ops(MI, true);
- 		if (isAlias)
- 			SStream_Close(O);
--		printInstruction(MI, Address, O);
-+#ifndef CAPSTONE_DIET
-+		/* A closed stream cannot emit the canonical spelling. Only
-+		 * a requested real-instruction detail record needs its operands. */
-+		if (!isAlias || map_fill_detail_ops(MI))
+-		if (isAlias)
++		if (isAlias) {
++#ifdef CAPSTONE_PPC_SKIP_UNUSED_CANONICAL
++			/* The alias text is complete. Only original-instruction
++			 * details require the canonical operand printer. */
++			if (!map_fill_detail_ops(MI)) {
++				SStream_Open(O);
++				return;
++			}
 +#endif
-+			printInstruction(MI, Address, O);
- 		if (isAlias)
- 			SStream_Open(O);
- 	}
+ 			SStream_Close(O);
++		}
+ #if defined(CAPSTONE_PPC_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET) && \
+ 	defined(__clang__) && \
+ 	((defined(__linux__) && defined(__x86_64__)) || \

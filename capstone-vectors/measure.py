@@ -110,6 +110,10 @@ try:
             assert ('PPC_setAliasId' in symbols)==(os.uname().machine=='x86_64')
             modes[route]=dict(symbols=symbols,allocated=allocated)
         save('link-mode-'+label,modes)
+        cmd,=[v['command'] for v in rd(build/'compile_commands.json') if Path(v['file']).name=='PPCInstPrinter.c']
+        assert ('CAPSTONE_PPC_SKIP_UNUSED_CANONICAL' in cmd)==(label=='candidate' and os.uname().machine=='aarch64')
+        save('ppc-compiler-'+label,cmd)
+        save('program-hashes-'+label,{key:sha(w/((key+'-' if key else '')+label)) for key in ('','ordinary','foreign','foreign-only')})
         if os.uname().machine=='x86_64' and label!='base':
             assembly={name:get('objdump','-d','--no-show-raw-insn','--disassemble='+name,w/label) for name in ('PPC_printer','PPC_setAliasId')}
             save('record-assembly-'+label,assembly)
@@ -319,8 +323,6 @@ try:
     for style,source in [('ppc-linked','foreign'),('ppc-only','foreign-only')]:
         for tag in ('base','candidate','outlined'):os.link(w/(source+'-'+tag),w/(style+'-'+tag))
         time_foreign(all_rows[len(training):],w,save,style,expected_cases=9)
-    from counts import trace
-    save('canonical-calls',trace(base,w,r,samples,rd(r/'source.json')))
     save('complete',dict(complete=True,source=q,host=host,images=images,pairs=17,samples=audits,unit='Paired throughput, Public cs_disasm_iter and the native batch / text routes. One same-inode fixed-address executable on one logical CPU, both baseline controls and all three library trees, exact output equality.'))
 
 finally:
