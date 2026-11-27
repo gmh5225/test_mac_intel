@@ -1,7 +1,7 @@
-name: Attribute text and detail cost across all audited PE32 PE64 and ELF bytes with identical cache geometry
+name: Measure formatting and detail costs on the released Capstone and iced across the six verified PE and ELF workloads
 on:
   push:
-    branches: [codex/profile-complete-pe32-elf32-formatter]
+    branches: [codex/attribute-vector-scalar-format-on-next]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,13 +25,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 1d0673d2102cb4a31bc1f1d696d7fb7e8c29545f
+          ref: e37f14ea3b6eb5f3b52b96a6e78a2923d061a1f3
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1e662c82ead8be11f8f6ba0917e8f62ca94fa2dc
+          ref: a7746e80b32f3b4a5b9954b95309d658f7560954
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: full-extent-formatter-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: released-vector-scalar-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -1,6 +1,6 @@
 """Measure new PE and ELF inputs after checking every candidate instruction boundary."""
 from pathlib import Path
-import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
+import hashlib,json,math,os,platform,random,shutil,subprocess as sp,sys,tempfile
 from fixtures import materialize,table_bytes
 from fixed_image import FixedImage
 r=Path(__file__).resolve().parent;p=r.parent;src=p/'source';nd=p/'neverd-config';ice=p/'iced-source';e=p/'evidence';e.mkdir(exist_ok=True)
@@ -23,8 +23,7 @@ try:
  run('cargo','build','--locked','--release',cwd=ad)
  run('clang++','-O3','-DNDEBUG','-std=c++17','-I',src,'-I',src/'include','-c',r/'driver.cpp','-o',w/'driver.o')
  from self_cost import read as read_cost
- patch=r/'profiled.patch';assert sha(patch)==q['profiled']['patch']
- run('git','-C',src,'apply','--index',patch);assert get('git','-C',src,'write-tree')==q['profiled']['tree']
+ assert get('git','-C',src,'write-tree')==q['shipping']['tree']
  os.environ.pop('CAPSTONE_BENCH_ATT',None)
  run('cmake','--build',b,'--target','capstone_static','--parallel','4')
  lib,=b.rglob('libcapstone.a');exe=w/'profile'
@@ -32,32 +31,20 @@ try:
  image=dict(capstone=sha(lib),executable=sha(exe),iced=sha(ad/'target/release/libiced_compare.a'))
  save('image',image)
  rows={};selection={}
- for name,spec in samples.items():
-  meta,spans=materialize(name,spec,w);assert meta==spec['verified']
-  text=w/(name+'.text');ranges=w/(name+'.ranges');bits=str(spec['bits'])
-  original=list(spans);skipped=0;removed=[]
-  if name=='sqlite-win-x64':
-   data=text.read_bytes();initial=[list(map(int,v.split()))for v in get(exe,'audit','0','1',text,ranges,bits).splitlines()]
-   excluded_starts={v[2] for v in initial if v[1]!=v[5] or v[3]!=v[4]}
-   tables={v['start']:v for v in q['sqlite_tables']};assert set(tables)==excluded_starts
-   spans=[]
-   for off,length,start in original:
-    if start not in tables:spans.append((off,length,start));continue
-    v=tables[start];assert off==v['offset'] and length==v['length'] and hashlib.sha256(data[off:off+length]).hexdigest()==v['sha256']
-    a,b=v['first']-start,v['end']-start;assert 0<=a<b<=length and b-a==v['words']*4
-    if a:spans.append((off,a,start))
-    if b<length:spans.append((off+b,length-b,start+b))
-    skipped+=b-a;removed.append([off+a,b-a,start+a])
-   assert skipped==2272 and len(spans)==9004
-   ranges.write_bytes(table_bytes(spans))
-  trace=[list(map(int,v.split()))for v in get(exe,'audit','0','1',text,ranges,bits).splitlines()]
-  assert [row[:3]for row in trace]==[list(s)for s in spans] and all(v[5]<=v[1] for v in trace)
-  included=[row[:3]for row in trace if row[1]==row[5] and row[3]==row[4]];excluded=[row for row in trace if row[1]!=row[5] or row[3]!=row[4]]
-  assert included and len(included)+len(excluded)==len(spans)
-  assert not excluded and len(included)==q['ranges'][name]['included']
-  ranges.write_bytes(table_bytes(included));size=sum(row[1]for row in included)
-  assert sha(ranges)==q['ranges'][name]['ranges'] and size==q['ranges'][name]['included_bytes']
-  selection[name]=dict(input=meta,same=len(included),bytes=size,sha256=sha(ranges),largest=max(row[1]for row in included),data_bytes=skipped)
+ for tool in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','libmvec.py','libmvec.json'):shutil.copyfile(r/tool,w/tool)
+ sys.path.insert(0,str(w));import pe_panels,frozen_deb
+ run(sys.executable,'-B',w/'libmvec.py');mv=rd(w/'libmvec.json')
+ fixtures=[('libmvec-amd64',64,w/'libmvec.text',[(0,mv['bytes'],mv['address'])],mv),*pe_panels.prepare(w),*frozen_deb.prepare(w)]
+ assert {z[0] for z in fixtures}==set(samples) and len(fixtures)==len(samples)
+ for name,bitness,text,original,meta in fixtures:
+  spec=samples[name];bits=str(bitness);assert sha(text)==spec['text_sha256']
+  ranges=r/(name+'.tsv');assert sha(ranges)==spec['extent_sha256']
+  spans=[list(map(int,line.split())) for line in ranges.read_text().splitlines()]
+  available={tuple(v) for v in original};assert all(tuple(v) in available for v in spans)
+  assert len(spans)==spec['functions'] and sum(v[1] for v in spans)==spec['covered_bytes']
+  trace=[list(map(int,line.split()))for line in get(exe,'audit','0','1',text,ranges,bits).splitlines()]
+  assert [v[:3]for v in trace]==spans and all(v[3]==v[4] and v[1]==v[5] for v in trace)
+  selection[name]=dict(input=spec['source'],same=len(spans),bytes=spec['covered_bytes'],sha256=sha(ranges),largest=max(row[1] for row in spans),original_ranges=len(original))
   save('selection',selection)
   rows[name]={};boundary=None
   for engine in ('capstone','private','fast'):
@@ -81,7 +68,7 @@ try:
     with dump.open('rb')as a,gzip.open(packed,'wb',compresslevel=6)as dest:shutil.copyfileobj(a,dest)
     with gzip.open(packed,'rb')as a:assert hashlib.sha256(a.read()).hexdigest()==sha(dump)
     for f in [raw,dump,log]:f.unlink(missing_ok=True)
- assert len(rows)==4 and all(len(v)==9 for v in rows.values())
+ assert len(rows)==6 and all(len(v)==9 for v in rows.values())
  save('complete',dict(complete=True,source=q,host=platform.machine(),image=image,valgrind=get('valgrind','--version'),selection=selection))
 finally:
  size=sum(x.stat().st_size for x in w.rglob('*')if x.is_file() and not x.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))
