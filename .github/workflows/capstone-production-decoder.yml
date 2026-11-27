@@ -1,7 +1,7 @@
-name: Verify i386 accumulator reads in the source-built NeverD product on four hosts
+name: Test i386 AT&T and Intel routing in 60 source-built NeverD workloads
 on:
   push:
-    branches: [codex/scoped-accumulator-neverd]
+    branches: [codex/i386-att-product-readers]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 2c135ac6040ff6b60075eefb09ebbaef5471773a
+          ref: 1145966d56390a5e3f454ad1b22068a97d484a0a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-accumulator-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-syntax-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

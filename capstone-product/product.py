@@ -99,7 +99,7 @@ try:
     arm=os.uname().machine=='aarch64'
     obj={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'}
     for before,after,expected in [('shipping','base',set() if arm else obj),
-        ('shipping','mask',obj),('base','mask',obj if arm else set())]:
+        ('shipping','mask',set() if arm else obj|{'X86Vex32Output.c.o'}),('base','mask',set() if arm else {'X86MemoryFallback32.c.o','X86Vex32Output.c.o'})]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
@@ -113,7 +113,7 @@ try:
     blobs['shipping_copy']=blobs['shipping'];blobs['mask_copy']=blobs['mask']
     total=max(map(len,blobs.values()));blobs={k:v+bytes(total-len(v)) for k,v in blobs.items()}
     block=4096;diff=[n for n in range(0,total,block) if len({v[n:n+block] for v in blobs.values()})>1]
-    assert diff;image.write_bytes(blobs['base']);checked={}
+    assert bool(diff)==(not arm);image.write_bytes(blobs['base']);checked={}
     def execute(k,c,mode,reps):
         with image.open('r+b',buffering=0) as f:
             for at in diff:
@@ -141,7 +141,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy']!=checked['mask']==checked['mask_copy']
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and (checked['shipping']==checked['mask'])==arm
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:
