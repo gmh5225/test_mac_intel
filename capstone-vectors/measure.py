@@ -10,7 +10,7 @@ def save(k,v):
 def get(*cmd,**kw):return sp.check_output(cmd,text=True,**kw).strip()
 def run(*cmd,**kw):sp.run(cmd,check=True,**kw)
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
-q=rd(r/'source.json');samples=rd(r/'samples.json');w=Path(tempfile.mkdtemp());stages=('shipping','base','candidate','group1')
+q=rd(r/'source.json');samples=rd(r/'samples.json');w=Path(tempfile.mkdtemp());stages=('shipping','base','candidate','outlined')
 try:
  for path,revision in [(src,q['shipping']['commit']),(nd,q['dev']),(ice,q['iced'])]:assert get('git','-C',path,'rev-parse','HEAD')==revision
  for name,dig in q['drivers'].items():assert sha(r/name)==dig
@@ -32,7 +32,7 @@ try:
   lib,=b.rglob('libcapstone.a');exe=w/tag
   run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
   products[tag]=dict(library=sha(lib),exe=sha(exe))
- arm=platform.machine()=='aarch64';assert (products['base']==products['candidate'])==arm
+ assert len({v['exe'] for v in products.values()})==4
  save('products',products)
  os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
  image=FixedImage(w/'selected',{tag:(w/tag).read_bytes() for tag in stages},True)
@@ -40,14 +40,30 @@ try:
  for name,spec in samples.items():
   metadata,spans=materialize(name,spec,w);assert metadata==spec['verified']
   text=w/(name+'.text');ranges=w/(name+'.ranges');bits=str(spec['bits']);image.select('shipping')
+  original=list(spans);skipped=0;removed=[]
+  if name=='sqlite-win-x64':
+   data=text.read_bytes();initial=[list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]
+   excluded_starts={v[2] for v in initial if v[1]!=v[5] or v[3]!=v[4]}
+   tables={v['start']:v for v in q['sqlite_tables']};assert set(tables)==excluded_starts
+   spans=[]
+   for off,length,start in original:
+    if start not in tables:spans.append((off,length,start));continue
+    v=tables[start];assert off==v['offset'] and length==v['length'] and hashlib.sha256(data[off:off+length]).hexdigest()==v['sha256']
+    a,b=v['first']-start,v['end']-start;assert 0<=a<b<=length and b-a==v['words']*4
+    if a:spans.append((off,a,start))
+    if b<length:spans.append((off+b,length-b,start+b))
+    skipped+=b-a;removed.append([off+a,b-a,start+a])
+   assert skipped==2272 and len(spans)==9004
+   ranges.write_bytes(table_bytes(spans))
   trace=[list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]
   assert [row[:3]for row in trace]==[list(s)for s in spans] and all(v[5]<=v[1] for v in trace)
   included=[row[:3]for row in trace if row[1]==row[5] and row[3]==row[4]];excluded=[row for row in trace if row[1]!=row[5] or row[3]!=row[4]]
   assert included and len(included)+len(excluded)==len(spans)
-  for stage in ('base','candidate','group1'):
+  for stage in ('base','candidate','outlined'):
    image.select(stage)
    assert [list(map(int,v.split()))for v in get(w/'selected','audit','0','1',text,ranges,bits).splitlines()]==trace
-  ranges.write_bytes(table_bytes(included));selections[name]=dict(source=metadata,included=len(included),included_bytes=sum(n for _,n,_ in included),excluded=excluded,ranges=sha(ranges));audit[name]=trace;save('selections',selections);save('boundary-audit',audit)
+  ranges.write_bytes(table_bytes(included));selections[name]=dict(source=metadata,excluded_tables=removed,data_bytes=skipped,revised_count=len(spans),included=len(included),included_bytes=sum(n for _,n,_ in included),excluded=excluded,ranges=sha(ranges));audit[name]=trace;save('selections',selections);save('boundary-audit',audit)
+  if name=='sqlite-win-x64':assert not excluded,excluded
   for route in ('private','capstone'):
    for dialect,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
     engine=['iced']+(['fast'] if dialect=='intel' and mode else [])
