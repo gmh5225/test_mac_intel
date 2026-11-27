@@ -1,25 +1,15 @@
-from pathlib import Path
-
-
-def linked_layout(before, after, label):
-    from collections import defaultdict
-    import re
-    assert label == 'memory'
-
-    def symbols(path, kinds):
-        result = defaultdict(list)
-        for line in Path(path).read_text().splitlines():
-            match = re.match(r'([0-9a-fA-F]+) ([0-9a-fA-F]+) (\S) (.+)$', line)
-            if match and match[3] in kinds:
-                result[match[4]].append((match[3], int(match[1], 16), int(match[2], 16)))
-        return dict(result)
-
-    result = dict(captured=True, criterion='Report every linked symbol position independently of object identity; iterator code intentionally changes.')
-    for category, kinds in (('text', 'tTwW'), ('readonly', 'rR'), ('writable', 'bBdDgGsSvV')):
-        left, right = symbols(before, kinds), symbols(after, kinds)
-        common = left.keys() & right.keys()
-        result[category] = dict(original_symbols=len(left), unchanged=sum(left[k] == right[k] for k in common),
-            changed=[dict(symbol=k, before=left[k], after=right[k]) for k in sorted(common) if left[k] != right[k]],
-            added=[dict(symbol=k, positions=right[k]) for k in sorted(right.keys() - left.keys())],
-            removed=[dict(symbol=k, positions=left[k]) for k in sorted(left.keys() - right.keys())])
-    return result
+from elftools.elf.elffile import ELFFile
+import hashlib
+def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
+def layout(binary):
+    with binary.open('rb')as f:
+        elf=ELFFile(f);sec={x.name:[x['sh_addr'],x['sh_size']]for x in elf.iter_sections()if x['sh_flags']&2}
+        syms={}
+        for s in elf.get_section_by_name('.symtab').iter_symbols():
+            index=s['st_shndx'];name=s.name
+            if not isinstance(index,int) or s['st_info']['type']!='STT_FUNC' or not s['st_size']:continue
+            if not any(v in name for v in ('cs_disasm_iter','cs_decode_full','X86_ATT_printInst','X86_Intel_printInst','X86_getInstruction','decodeInstruction','writeVexBaseMemory','writeVexSibTransfer','X86_decodeOutputMiss64','X86_decodeVector','VexReader','X86_writeDisplacement')):continue
+            segment=elf.get_section(index);off=s['st_value']-segment['sh_addr'];f.seek(segment['sh_offset']+off)
+            syms[name]=[s['st_value'],s['st_size'],hashlib.sha256(f.read(s['st_size'])).hexdigest()]
+        assert {'cs_disasm_iter','cs_decode_full_insn','X86_ATT_printInst'}<=syms.keys()
+        return dict(sections=sec,symbols=syms,sha=sha(binary))

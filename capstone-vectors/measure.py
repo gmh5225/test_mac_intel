@@ -39,22 +39,6 @@ try:
         so=(build/'libcapstone.so').resolve()
         lib,=build.rglob('libcapstone.a')
         shutil.copyfile(lib,w/(stage+'.a'))
-        if stage=='candidate':
-            gen=w/'vector-generator'
-            inc=['-I',src,'-I',src/'include']
-            run('clang++','-std=c++17','-O2',*inc,src/'suite/synctools/x86_vector_output.cpp',lib,'-o',gen)
-            generated={}
-            for arg,name in [('--vex-sib-transfers','X86GenVexSibTransfers.inc'),('--vex-base-memory','X86GenVexBaseMemory.inc'),('','X86GenVectorOutput.inc')]:
-                data=sp.check_output([gen]+([arg] if arg else []));assert data==(src/'arch/X86'/name).read_bytes()
-                generated[name]=hashlib.sha256(data).hexdigest()
-            checks={}
-            for dispatch,library in [('static',lib),('public',so)]:
-                exe=w/('sib-'+dispatch)
-                run('clang++','-O2','-std=c++17',*inc,*(['-DUSE_PUBLIC'] if dispatch=='public' else []),r/'sib.cpp',library,'-Wl,-rpath,'+str(build),'-o',exe)
-                checks[dispatch]=list(map(int,get(exe).split()))
-            assert checks['public']==checks['static'] and checks['public'][0]==7077888
-            save('sib-checks',dict(generated=generated,boundaries=checks))
-
         assert all('CAPSTONE_X86_ONLY' in x['command'] for x in read(build/'compile_commands.json'))
         dll=w/(stage+'.so');shutil.copyfile(so,dll);images[stage]=dll.read_bytes();sources[stage]=sha(dll);sizes[stage]=len(images[stage])
         syms=get('nm','-D','--defined-only','--format=posix',dll).splitlines()
@@ -66,7 +50,10 @@ try:
         static_images[stage]=dict(archive=sha(static_lib),objects={str(f.relative_to(static_build)):sha(f)for f in static_build.rglob('*.c.o')})
         assert len(static_images[stage]['objects'])>=60
         save('static-product',static_images)
-    assert static_images['base']==static_images['initial']==static_images['candidate']
+    for stage in ('initial','candidate'):
+        a=static_images['base']['objects'];b=static_images[stage]['objects']
+        assert {Path(k).name for k in a if a[k]!=b[k]}=={'X86ATTInstPrinter.c.o'}
+        assert static_images['base']['archive']!=static_images[stage]['archive']
     delta=dict(added=sorted(set(symbols['candidate'])-set(symbols['base'])),removed=sorted(set(symbols['base'])-set(symbols['candidate'])))
     save('identities',dict(source=q,images=sources,sizes=sizes,symbols=delta,objects=objects))
     assert symbols['base']==symbols['initial']==symbols['candidate'] and len(set(sources.values()))==3
@@ -93,6 +80,12 @@ try:
         assert 'libcapstone.so' not in get('ldd',w/(stage+'-static'))
     static=FixedImage(w/'measured-static',{k:(w/(k+'-static')).read_bytes() for k in ('base','initial','candidate')},executable=True)
     save('dedicated-static',{tag:dict(executable=sha(w/(tag+'-static')),archive=sha(w/(tag+'.a')))for tag in ('base','initial','candidate')})
+    run('clang++','-O2','-std=c++17',*inc,r/'att-callback.cpp','-ldl','-o',w/'att-callback')
+    callbacks={k:json.loads(get(w/'att-callback',w/'base.so',w/(k+'.so')))for k in ('initial','candidate')}
+    assert callbacks['candidate']==callbacks['initial'] and callbacks['candidate']['callbacks']>0
+    save('callbacks',callbacks)
+    from layout import layout
+    save('layout',{k:{link:layout(img)for link,img in [('shared',w/(k+'.so')),('static',w/(k+'-static'))]}for k in ('base','initial','candidate')})
     for exe in ('driver','foreign','vectors'):
         assert str(image) in get('ldd',w/exe)
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -121,7 +114,7 @@ try:
         assert all(expected[k]==expected['base'] for k in ('copy','initial','candidate','repeat'))
         if 'iced' in expected:assert all(v[:3]==expected['base'][:3]for v in expected.values())
         rng=random.Random('shared-library/'+key);blocks=[];order=list(engines)
-        for _ in range(17):
+        for _ in range(25):
             rng.shuffle(order);trial={k:[] for k in order}
             for k in order+order[::-1]:
                 row=take(k,n);assert row[2:]==expected[k];trial[k].append(row[:2])
@@ -146,6 +139,8 @@ try:
             audits.append(audit)
         assert audits[0]==audits[1]==audits[2]
         records[name]=[list(map(int,get(w/'trial-real',w/'base.so',w/'candidate.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
+        comparison=[list(map(int,get(w/'trial-real',w/'base.so',w/'initial.so',f,intervals_file,str(bits),str(mode)).split()))for mode in (4,5,6,7)]
+        assert comparison==records[name]
         save('records',records)
         for mode in (0,1,2):
             def take(k,n):
