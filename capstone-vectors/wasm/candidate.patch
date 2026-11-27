@@ -42,10 +42,10 @@ index b0c46ade..610c266b 100644
  
 diff --git a/arch/WASM/WASMTablePrinter.c b/arch/WASM/WASMTablePrinter.c
 new file mode 100644
-index 00000000..c45eabca
+index 00000000..4f8e46d7
 --- /dev/null
 +++ b/arch/WASM/WASMTablePrinter.c
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,56 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -55,20 +55,42 @@ index 00000000..c45eabca
 +#pragma clang section text = ".cs_wasm_table_text" rodata = ".cs_wasm_table_rodata"
 +#endif
 +
-+void WASM_printTableOperands(SStream *out,
-+			    const cs_wasm_brtable *table)
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++static char *prependTableHex(char *end, uint64_t value)
++{
++	do {
++		*--end = "0123456789abcdef"[value & 15];
++		value >>= 4;
++	} while (value);
++	*--end = 'x';
++	*--end = '0';
++	return end;
++}
++#endif
++
++void WASM_printTableOperands(SStream *out, const cs_wasm_brtable *table)
 +{
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+	/* Each original append can close a markup or truncate the stream. */
++	char text[sizeof("\t0xffffffff, [0xffffffffffffffff], 0xffffffff")];
++	/* A registered formatter and markup can observe each individual append. */
 +	if (cs_vsnprintf == cs_default_vsnprintf && !out->is_closed &&
 +	    !(out->markup_stream && out->prefixed_by_markup) &&
-+	    out->index <= SSTREAM_BUF_LEN -
-+			sizeof("\t0xffffffff, [0xffffffffffffffff], 0xffffffff")) {
-+		SStream_concat(out, "\t0x%x, [0x%" PRIx64 "], 0x%x",
-+			       (unsigned)table->length, table->address,
-+			       (unsigned)table->default_target);
++	    out->index <= SSTREAM_BUF_LEN - sizeof(text)) {
++		char *end = text + sizeof(text) - 1;
++		*end = '\0';
++		char *p = prependTableHex(end, table->default_target);
++		p -= 3;
++		memcpy(p, "], ", 3);
++		p = prependTableHex(p, table->address);
++		p -= 3;
++		memcpy(p, ", [", 3);
++		p = prependTableHex(p, table->length);
++		*--p = '\t';
++		SStream_concat0_n(out, p, (size_t)(end - p));
 +		return;
 +	}
 +#endif
