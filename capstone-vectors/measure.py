@@ -23,6 +23,9 @@ try:
  run('cargo','build','--locked','--release',cwd=ad)
  run('clang++','-O3','-DNDEBUG','-std=c++17','-I',src,'-I',src/'include','-c',r/'driver.cpp','-o',w/'driver.o')
  from self_cost import read as read_cost
+ patch=r/'profiled.patch';assert sha(patch)==q['profiled']['patch']
+ run('git','-C',src,'apply','--index',patch);assert get('git','-C',src,'write-tree')==q['profiled']['tree']
+ os.environ['CAPSTONE_BENCH_ATT']='1'
  run('cmake','--build',b,'--target','capstone_static','--parallel','4')
  lib,=b.rglob('libcapstone.a');exe=w/'profile'
  run('clang++',w/'driver.o',lib,ad/'target/release/libiced_compare.a','-lpthread','-lm','-ldl','-no-pie','-o',exe)
@@ -47,7 +50,7 @@ try:
   selection[name]=dict(input=meta,same=len(common),excluded=len(audit)-len(common),intervals=selected,bytes=sum(t[1]for t in selected),sha256=sha(ranges))
   save('selection',selection)
   rows[name]={};boundary=None
-  for engine in ('capstone','private','iced','fast'):
+  for engine in ('capstone','private','iced'):
    for mode in ((1,2,3) if engine=='fast' else (0,1,2,3)):
     key=engine+'/'+str(mode);lab=name+'-'+engine+'-'+str(mode)
     command=[exe,engine,str(mode),'1',text,ranges,bits]
@@ -67,7 +70,7 @@ try:
     with dump.open('rb')as a,gzip.open(packed,'wb',compresslevel=6)as dest:shutil.copyfileobj(a,dest)
     with gzip.open(packed,'rb')as a:assert hashlib.sha256(a.read()).hexdigest()==sha(dump)
     for f in [raw,dump,log]:f.unlink(missing_ok=True)
- assert len(rows)==4 and all(len(v)==15 for v in rows.values())
+ assert len(rows)==4 and all(len(v)==12 for v in rows.values())
  save('complete',dict(complete=True,source=q,host=platform.machine(),image=image,valgrind=get('valgrind','--version'),selection=selection))
 finally:
  size=sum(x.stat().st_size for x in w.rglob('*')if x.is_file() and not x.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))

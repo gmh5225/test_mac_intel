@@ -37,7 +37,7 @@ def read(path,out,prefix):
     whole=dict(zip(events,totals));accounted={e:sum(v[e]for v in by_symbol.values())for e in events}
     order=sorted(by_symbol.items(),key=lambda v:-v[1]['Ir'])
     names=[v[0][1]for v in order if v[1]['Ir']]
-    focus=lambda n:n and (n.startswith(('X86_decode','X86_disasm','X86_reg_access','X86_Intel_printInst','X86_ATT_printInst','cs_decode_full','tryOutput','writeVex2','cs_disasm_iter','cs_regs_access')) or n in ('decodeInstructionFull','readModRM','observed_span','SStream_concat','vsnprintf','__printf_buffer'))
+    focus=lambda n:n and (n.startswith(('X86_decode','X86_disasm','X86_reg_access','X86_register_map','X86_get_op_access','get_op_access','printMem','printPCRel','printOperand','printReg','SStream_','__vsnprintf','__printf','strlen','X86_Intel_printInst','X86_ATT_printInst','cs_decode_full','tryOutput','writeVex2','cs_disasm_iter','cs_regs_access')) or ('::formatter::' in n and ('format_' in n or 'write_' in n)) or n in ('decodeInstructionFull','readModRM','observed_span','SStream_concat','vsnprintf','__printf_buffer'))
     ir=Counter()
     for (_,name),counts in by_symbol.items():ir[name]+=counts['Ir']
-    return dict(events=whole,accounted=accounted,functions={name:dict(self_ir=ir[name],calls=calls[name])for name in set(ir)|set(calls)if focus(name)},top=[dict(function=k[1],ir=v['Ir'])for k,v in order[:20]])
+    return dict(events=whole,accounted=accounted,functions={name:dict(self_ir=ir[name],calls=calls[name])for name in set(ir)|set(calls)if focus(name)},top=[dict(function=k[1],ir=v['Ir'])for k,v in order[:40]])

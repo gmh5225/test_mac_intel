@@ -1,7 +1,7 @@
-name: Profile the formatter and detail costs on matched SQLite and liblzma instructions
+name: Count the actual AT&T decoder and formatter work against iced GasFormatter on real PE and ELF
 on:
   push:
-    branches: [codex/attribute-unseen-x86-decoder-work]
+    branches: [codex/att-gas-instruction-counts]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: decoder-work-costs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: att-gas-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
