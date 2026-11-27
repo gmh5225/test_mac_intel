@@ -9,9 +9,10 @@ def verify(r):
         b=w/'build';assert git('rev-parse','HEAD')==q['base']['commit']
         flags=['-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON']
         states={};raw_hashes={};object_hashes={}
-        for tag in ('base','candidate'):
-            if tag=='candidate':
-                patch=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/candidate.patch']);assert hashlib.sha256(patch).hexdigest()==q[tag]['sha256']
+        for tag in ('base','direct','candidate'):
+            git('restore','--source=HEAD','--staged','--worktree','--','.')
+            if tag!='base':
+                patch=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/'+tag+'.patch']);assert hashlib.sha256(patch).hexdigest()==q[tag]['sha256']
                 f=w/'delta.patch';f.write_bytes(patch);git('apply','--index',f)
             assert git('write-tree')==q[tag]['tree']
             sp.run(['cmake','-G','Ninja','-S',src,'-B',b,*flags],check=True)
@@ -67,9 +68,10 @@ def verify(r):
                 assert pieces
                 objects[key]=hashlib.sha256(json.dumps(pieces,sort_keys=True).encode()).hexdigest()
             assert set(objects)==wanted;object_hashes[tag]=objects;save('compiled-sections',object_hashes)
-        assert object_hashes['base']==object_hashes['candidate'],object_hashes
-        assert set(states['base'])==set(states['candidate'])==set(object_hashes['base']) and len(states['base'])>=28
-        save('preprocessor-differences',[k for k,v in states['base'].items()if states['candidate'][k]!=v])
+        assert object_hashes['base']==object_hashes['direct']==object_hashes['candidate'],object_hashes
+        assert all(set(v)==set(object_hashes['base'])for v in states.values()) and len(states['base'])>=28
+        differences={t:[k for k,v in states['base'].items()if states[t][k]!=v]for t in ('direct','candidate')}
+        save('preprocessor-differences',differences)
         save('complete',dict(complete=True,source=q,host='Windows',proof='preprocessed and compiled sections',expected='base',objects=len(states['base']),toolchain=os.environ.get('VSCMD_ARG_TGT_ARCH')))
     finally:
         size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))

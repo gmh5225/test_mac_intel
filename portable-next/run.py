@@ -34,7 +34,7 @@ try:
         shutil.copyfile(r/'probe.cpp',project/'probe.cpp');ident={};cc={};flagsets={};record={};exported={}
         flags=['-G','Ninja','-S',project,'-B',build,'-DCAPSTONE_SOURCE='+str(src),'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON']
         if multi:flags+=['-DCAPSTONE_'+isa+'_SUPPORT=ON' for isa in ('ARM','AARCH64','MIPS','PPC','RISCV')]
-        for tag in (['base','direct','candidate'] if expect=='direct' else ['base','candidate']):
+        for tag in ('base','direct','candidate'):
             git('restore','--source=HEAD','--staged','--worktree','--','.')
             if tag!='base':
                 buf=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/'+tag+'.patch']);assert sha(buf)==q[tag]['sha256']
@@ -54,7 +54,10 @@ try:
                 if path in built:rows[built[path]]=z['command']
             assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
             flags_per={key:'X86_ACCUMULATOR_OUTPUT32' in cmd for key,cmd in rows.items()}
-            assert all(v==(tag=='candidate' and expect=='direct' and Path(k).name in ('X86RegisterFallback32.c.o','X86MemoryFallback32.c.o')) for k,v in flags_per.items()),(config,tag,flags_per)
+            enabled={'X86RegisterFallback32.c.o','X86MemoryFallback32.c.o'}
+            if tag=='candidate':enabled.add('X86Vex32Output.c.o')
+            if tag=='base' or expect=='base':enabled.clear()
+            assert {Path(key).name for key,on in flags_per.items() if on}==enabled,(config,tag,flags_per)
             cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
             dest=project/tag;dest.mkdir()
             for kind in names:shutil.copy2(build/('probe_'+kind),dest)
@@ -72,8 +75,12 @@ try:
                         rec[key]=list(map(int,get(dest/('probe_'+kind),'public-att' if syntax=='att' else 'capstone',str(mode),'1',file,spans,str(bits)).split()))[2:]
             record[tag]=rec
             save(config+'-identities',ident)
-        assert ident['candidate']==ident[expect],(config,expect,[(k,v,ident[expect]['objects'].get(k))for k,v in ident['candidate']['objects'].items()if v!=ident[expect]['objects'].get(k)],ident['candidate']['images'],ident[expect]['images'])
-        assert expect=='base' or ident['candidate']!=ident['base']
+        for tag in ('direct','candidate'):
+            left=ident['base'];right=ident[tag];assert set(left['objects'])==set(right['objects'])
+            changed={Path(f).name for f,v in left['objects'].items()if v!=right['objects'][f]}
+            expected={Path(k).name for k in flagsets[tag]}
+            assert changed==expected and (left['images']==right['images'])==(not expected),(config,tag,changed,expected)
+        assert (ident['direct']==ident['candidate'])==(expect=='base')
         assert all(rec==record['base']for rec in record.values())
         profiles[config]=dict(expected=expect,object_counts=cc,flags=flagsets,records=len(record['candidate']),identities=ident)
         checks[config]=record['base'];save('checks',checks);save('profiles',profiles)
