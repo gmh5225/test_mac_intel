@@ -31,7 +31,8 @@ try:
         path.write_text(text)
     for stage in ('base','candidate'):
         if stage=='candidate':
-            run('git','-C',s,'restore','--worktree','--source=HEAD','--','.')
+            run('git','-C',s,'restore','--source=HEAD','--staged','--worktree','--','.')
+            assert get('git','-C',s,'status','--porcelain')==''
             patch=r/'candidate.patch';assert hashlib.sha256(patch.read_bytes()).hexdigest()==q[stage]['sha256']
             run('git','-C',s,'apply','--index',patch)
         assert get('git','-C',s,'write-tree')==q[stage]['tree']

@@ -1,7 +1,7 @@
-name: Trace decoding, public-record construction and the Intel printer per encoding on eight real inputs
+name: Measure both verified source trees with per-record decoder and formatter counters
 on:
   push:
-    branches: [codex/census-real-canonical-printer]
+    branches: [codex/census-verified-clean-source]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: actual-record-fallbacks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: record-trace-clean-index-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
