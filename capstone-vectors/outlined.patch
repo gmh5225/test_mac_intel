@@ -13,10 +13,10 @@ index cea06480..406c181d 100644
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 709e1286..4784e330 100644
+index 709e1286..437f2c51 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -53,6 +53,16 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+@@ -53,6 +53,13 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
  #endif
  #endif
  
@@ -25,9 +25,6 @@ index 709e1286..4784e330 100644
 +	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 +#define CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+#ifdef X86_ARCHIVE_FIXED_RECORD
-+#define CAPSTONE_X86_DIRECT_PUBLIC_RECORD
-+#endif
 +#endif
 +
  #if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
@@ -106,10 +103,10 @@ index a03a42e9..8d606227 100644
  #endif
 diff --git a/arch/X86/X86PublicOutputImpl.h b/arch/X86/X86PublicOutputImpl.h
 new file mode 100644
-index 00000000..f2510463
+index 00000000..ab701ab0
 --- /dev/null
 +++ b/arch/X86/X86PublicOutputImpl.h
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,113 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -118,14 +115,12 @@ index 00000000..f2510463
 +#pragma clang section text = ".cs_x86_public_output_text"
 +#endif
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
-+static __attribute__((noinline)) CS_PRESERVE_MOST bool
-+decodePublicTextRecord(cs_struct *handle,
++static __attribute__((noinline)) CS_PRESERVE_MOST bool decodePublicTextRecord(
 +#else
-+CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
++CS_PRESERVE_MOST bool X86_decodePublicRecord(
 +#endif
-+					    const uint8_t *code, size_t size,
-+					    cs_insn *insn, uint16_t *length,
-+					    bool batch)
++	cs_struct *handle, const uint8_t *code, size_t size, cs_insn *insn,
++	uint16_t *length, bool batch)
 +{
 +#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
 +	if (handle->arch != CS_ARCH_X86 ||
@@ -278,7 +273,7 @@ index 08677417..aee2ae08 100644
  X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
  		       cs_insn *insn, uint16_t *insn_size, bool batch);
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index 37cb0735..aa62ca83 100644
+index 37cb0735..f1c8bdc8 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
 @@ -577,6 +577,36 @@ void emit_register(const X86SimpleRegister &v)
@@ -318,7 +313,7 @@ index 37cb0735..aa62ca83 100644
  void emit_test32(const PlanTable &plans, const RegisterTable &regs,
  		 const std::vector<std::string> &rows)
  {
-@@ -1192,6 +1222,22 @@ void emit_indirect64(Decoder &decoder, const RegisterTable &regs)
+@@ -1192,6 +1222,24 @@ void emit_indirect64(Decoder &decoder, const RegisterTable &regs)
  
  int main(int argc, char **argv)
  {
@@ -327,6 +322,8 @@ index 37cb0735..aa62ca83 100644
 +		RegisterTable regs{};
 +		describe_registers(x64, regs);
 +		emit_stack16(real, regs);
++		// The shared unsigned-immediate writer takes a two-register template.
++		// It fills the immediate operand and encoding offsets from the input.
 +		Decoder x32(CS_MODE_32);
 +		const uint8_t move[] = { 0x8b, 0xc1 };
 +		x32.decode(move, 2, 2, 0);
@@ -341,3 +338,65 @@ index 37cb0735..aa62ca83 100644
  	if (argc == 2 && std::strcmp(argv[1], "--vex64-packed-memory") == 0) {
  		Decoder decoder(CS_MODE_64);
  		emit_packed_memory(decoder, false);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 24af6a88..c6223ac9 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1624,6 +1624,25 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
+ 	return true;
+ }
+ 
++static bool check_real_mode_registers(csh handles[2])
++{
++	for (unsigned reg = 0; reg < 8; ++reg) {
++		for (unsigned opcode = 0x50; opcode <= 0x58; opcode += 8) {
++			const uint8_t bytes[] = { 0x66, (uint8_t)(opcode + reg) };
++			for (size_t length = 1; length <= sizeof(bytes); ++length)
++				if (!compare(handles, bytes, length, 0xa5))
++					return false;
++		}
++		const uint8_t move[] = {
++			0x66, (uint8_t)(0xb8 + reg), 0xff, 0xff, 0xff, 0xff
++		};
++		for (size_t length = 1; length <= sizeof(move); ++length)
++			if (!compare(handles, move, length, 0x5a))
++				return false;
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -1639,6 +1658,11 @@ static bool check_mode(cs_mode mode)
+ 			if (cs_option(handles[side], CS_OPT_DETAIL,
+ 				      detail ? CS_OPT_ON : CS_OPT_OFF))
+ 				goto done;
++		if (mode == CS_MODE_16) {
++			if (!check_real_mode_registers(handles))
++				goto done;
++			continue;
++		}
+ 		if (!check_branches(handles) || !check_memory(handles, mode) ||
+ 		    !check_lea(handles, mode) ||
+ 		    !check_mov_disp32(handles, mode) ||
+@@ -1714,7 +1738,8 @@ static bool check_mode(cs_mode mode)
+ 			}
+ 		}
+ 	}
+-	ok = check_callbacks(handles) && check_primary_batches(handles[0]);
++	ok = mode == CS_MODE_16 ||
++	     (check_callbacks(handles) && check_primary_batches(handles[0]));
+ done:
+ 	for (unsigned i = 0; i < 2; ++i)
+ 		if (handles[i])
+@@ -1724,6 +1749,9 @@ done:
+ 
+ int main(void)
+ {
++	private_iter = cs_disasm_iter;
++	if (!check_mode(CS_MODE_16))
++		return 1;
+ 	private_iter = X86_disasmIter32;
+ 	if (!check_mode(CS_MODE_32))
+ 		return 1;
