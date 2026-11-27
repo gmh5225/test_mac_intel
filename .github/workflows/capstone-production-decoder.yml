@@ -1,7 +1,7 @@
-name: Measure VEX SIB dispatch in the NeverD decoder built with source LLVM
+name: Measure shared immediate validation in source-built NeverD on real PE and ELF programs
 on:
   push:
-    branches: [codex/vex-sib-product]
+    branches: [codex/i386-test-accumulator-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-sib-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: i386-shared-validation-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
