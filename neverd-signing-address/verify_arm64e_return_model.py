@@ -160,7 +160,7 @@ def build_signing_address(binary, output):
         name = profile["profile"]
         guest = link_guest(staged / name, entry, driver, obj)
         write_json(staged / CONFIG["manifest"], {"return_profile": name, "guests": {name: guest},
-                   "test_binary_sha256": digest(binary), "assembly_sha256": digest(assembly),
+                   "test_binary_sha256": digest(binary), profile["assembly_hash_property"]: digest(assembly),
                    profile["count_property"]: profile["bodies"]})
         staged.rename(output)
 
@@ -337,7 +337,8 @@ def run(model, guests, output, cursor=False, ordered=False, *, writeback=False):
     passed = policy["passed"]
     records_required = ([policy["control_record"].format(mode) for mode in range(policy["control_count"])]
                         if writeback else policy["control_records"])
-    publication = manifest.get("return_profile") == CONFIG["signing_address"]["profile"]
+    publication = (not (cursor or ordered or writeback) and
+                   manifest.get("return_profile") == CONFIG["signing_address"]["profile"])
     if publication:
         names = [CONFIG["signing_address"]["profile"]]
         if manifest.get(CONFIG["signing_address"]["count_property"]) != CONFIG["signing_address"]["bodies"]:
