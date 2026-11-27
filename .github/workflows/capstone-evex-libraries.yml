@@ -1,7 +1,7 @@
-name: Validate VEX IFMA decoding without changing the Intel or AT&T printer tables
+name: Compare EVEX tuple application on real PE and ELF programs with complete VEX IFMA records
 on:
   push:
-    branches: [codex/vex-ifma-decoder-aliases]
+    branches: [codex/evex-displacement-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a5c08759df756b179578e97670e148fa7629e88c
+          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 061f0f78ec080fa7861f43b17bccf8e2204005cd
+          ref: 11a3c5a17d18214b1902318ca4d70fa9ebe8740b
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ifma-decode-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: tuple-displacement-record-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
