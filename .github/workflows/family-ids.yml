@@ -1,7 +1,7 @@
-name: Time alias detail selection for four real instruction sets and verify mixed-link identity
+name: Test ARM and AArch64 detail setup in statically linked ELF and Mach-O consumers plus three unmodified configurations
 on:
   push:
-    branches: [codex/dedicated-alias-real-coreutils]
+    branches: [codex/arm-alias-dedicated-static]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -15,6 +15,8 @@ jobs:
           - { host: ubuntu-24.04, cc: clang, flavor: second }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: first }
           - { host: ubuntu-24.04-arm, cc: clang, flavor: second }
+          - { host: macos-15, cc: clang, flavor: first }
+          - { host: macos-15, cc: clang, flavor: second }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     env:
@@ -32,13 +34,14 @@ jobs:
           path: source
           persist-credentials: false
       - run: |
-          if ! /usr/bin/python3 -c "import elftools"; then sudo apt-get update -qq && sudo apt-get install -y python3-pyelftools; fi
-          /usr/bin/python3 -B family-ids/native.py
+          python3 -m venv "$RUNNER_TEMP/alias-venv"
+          "$RUNNER_TEMP/alias-venv/bin/pip" -q install pyelftools==0.32
+          "$RUNNER_TEMP/alias-venv/bin/python" -B family-ids/native.py
       - if: always()
-        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+        run: rm -rf -- "$GITHUB_WORKSPACE/source" "$RUNNER_TEMP/alias-venv"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-alias-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: arm-alias-static-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
