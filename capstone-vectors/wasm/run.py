@@ -13,7 +13,7 @@ def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 def disk(p):return sum(x.stat().st_size for x in p.rglob('*')if x.is_file() and not x.is_symlink())
 d=lambda n:next(r.parent.glob(f'round{n}-*'))
 if ci: baseline=Path(os.environ['GITHUB_WORKSPACE'])/'source';tree=read(r/'tree.json')
-else: baseline=d(579)/'source';tree=read(d(3473)/'tree.json')
+else: baseline=d(579)/'source';tree=read(r/'tree.json')
 temp=Path(tempfile.mkdtemp(dir=r));receipt={}
 try:
     src=temp/'capstone';build=temp/'build';run('git','clone','--shared','--quiet','--no-checkout',baseline,src)
@@ -24,8 +24,7 @@ try:
     run('cmake','-G','Ninja','-S',src,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_WASM_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON')
     inc=['-I',src,'-I',src/'include','-I',src/'arch/WASM']
     run(cc,'-O2',*inc,'-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM','-DWASM_printInst=wasm_reference','-c',original,'-o',temp/'ref.o')
-    decoder=temp/'reference-decoder.c';shutil.copyfile(src/'arch/WASM/WASMDisassembler.c',decoder)
-    run(cc,'-O2',*inc,'-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM','-DWASM_getInstruction=reference_instruction','-c',decoder,'-o',temp/'reference-decoder.o')
+    run(cc,'-O2',*inc,'-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM','-DCAPSTONE_WASM_LITERAL_MNEMONICS','-DWASM_printInst=wasm_reference','-c',original,'-o',temp/'values-reference.o')
     run(cxx,'-O2','-std=c++17',*inc,'-c',r/'measure.cpp','-o',temp/'driver.o')
     by={};libs={};objects={}
     for label in ('base','candidate'):
@@ -40,10 +39,9 @@ try:
         shared=[f for f in build.rglob('libcapstone*') if f.is_file() and not f.is_symlink() and ('.so' in f.suffixes or '.dylib' in f.suffixes)]
         assert len(shared)==1,shared
         run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'verify-stream.c',temp/'ref.o',lib,'-o',temp/'stream')
-        if label=='candidate':
-            run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'states.c',temp/'reference-decoder.o',lib,'-o',temp/'states')
-            cases,accepted=map(int,get(temp/'states').split());assert cases==2*(1+23*(1+256+65536+4096*10))and 0<accepted<cases
-            save('memory-states',dict(cases=cases,accepted=accepted,source=tree))
+        run(cc,'-O2','-DCAPSTONE_HAS_WASM','-DCAPSTONE_USE_SYS_DYN_MEM',*inc,r/'values.c',temp/'values-reference.o',lib,'-o',temp/'values')
+        cases=int(get(temp/'values'));assert cases==3*(28+28*28)*9*16*5
+        save('values-'+label,dict(cases=cases,source=tree))
         by[label]=int(get(temp/'stream'));assert by[label]==172*8*9*16*4,by
         run(cxx,temp/'driver.o',lib,'-o',temp/label)
         exe=temp/(label+'-shared');run(cxx,temp/'driver.o',shared[0],'-Wl,-rpath,'+str(shared[0].parent),'-o',exe)
@@ -54,11 +52,29 @@ try:
         objects[label]={str(f.relative_to(build)):sha(f)for f in build.rglob('*.c.o')}
     assert by['base']==by['candidate']
     changed=[f for f,x in objects['base'].items() if x!=objects['candidate'][f]]
-    assert {Path(f).name for f in changed}=={'WASMDisassembler.c.o'},changed
+    assert {Path(f).name for f in changed}=={'WASMInstPrinter.c.o'},changed
     save('build',dict(complete=True,source=tree,streams=by,libraries=libs,changed=changed,compiler=get(cc,'--version').splitlines()[0],host=platform.platform(),machine=platform.machine()))
     inputs=temp/'inputs' if ci else r/'inputs'
     if ci:run(sys.executable,'-B',r/'corpus.py',inputs)
     cover=read(inputs/'manifest.json');save('corpus',cover);results={}
+    import struct
+    from collections import Counter
+    sites={}
+    kinds={0x41,0x20,0x21,0x22,0x23,0x24,0x0c,0x0d,0x10,0x11}
+    for name,m in cover.items():
+        if name=='wabt':continue
+        data=(inputs/(name+'.wasm')).read_bytes()
+        indices=(inputs/(name+'.ranges')).read_bytes()
+        assert hashlib.sha256(data).hexdigest()==m['sha256'] and hashlib.sha256(indices).hexdigest()==m['ranges_sha256']
+        seen=Counter();digits=Counter()
+        for start,extent in struct.iter_unpack('<II',indices):
+            opcode=data[start]
+            if opcode in kinds and extent>1:
+                seen[opcode]+=1
+                if data[start+1]<16:digits[opcode]+=1
+        sites[name]=dict(operators=m['operators'],single_operand_sites=sum(seen.values()),one_hex_digit_sites=sum(digits.values()),opcodes=seen,one_hex_digit_opcodes=digits)
+    save('coverage',dict(complete=True,corpus=cover,programs=sites))
+
     path=temp/'active';shutil.copyfile(temp/'base',path);path.chmod(0o755);inode=path.stat().st_ino
     bins={t:(temp/t).read_bytes() for t in ('base','candidate')};bins['duplicate']=bins['base']
     current=None

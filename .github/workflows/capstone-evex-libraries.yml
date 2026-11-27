@@ -1,7 +1,7 @@
-name: Measure paired memory immediates in real SQL, compression and build tools
+name: Measure single-digit WebAssembly operands on three real applications
 on:
   push:
-    branches: [codex/wasm-short-memory-pairs]
+    branches: [codex/wasm-small-operand-width]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: short-memory-pairs-${{ matrix.host }}-${{ matrix.cc }}
+          name: single-digit-operands-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

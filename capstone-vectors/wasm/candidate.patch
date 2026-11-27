@@ -1,82 +1,18 @@
-diff --git a/arch/WASM/WASMDisassembler.c b/arch/WASM/WASMDisassembler.c
-index 063f9d9f..d1e3a35f 100644
---- a/arch/WASM/WASMDisassembler.c
-+++ b/arch/WASM/WASMDisassembler.c
-@@ -444,44 +444,47 @@ static bool read_varuint64(const uint8_t *code, size_t code_len,
- static bool read_memoryimmediate(const uint8_t *code, size_t code_len,
- 				 uint16_t *param_size, MCInst *MI)
- {
--	size_t tmp, len = 0;
--	uint32_t data[2];
--
--	if (MI->flat_insn->detail) {
--		MI->flat_insn->detail->wasm.op_count = 2;
-+	cs_detail *detail = MI->flat_insn->detail;
-+	size_t align_size, offset_size;
-+	uint32_t align, offset;
-+
-+	if (detail)
-+		detail->wasm.op_count = 2;
-+
-+	if (code_len >= 2 && ((code[0] | code[1]) & 0x80) == 0) {
-+		align = code[0];
-+		offset = code[1];
-+		align_size = offset_size = 1;
-+	} else {
-+		align = get_varuint32(code, code_len, &align_size);
-+		if (align_size == (size_t)-1)
-+			return false;
-+		offset = get_varuint32(code + align_size, code_len - align_size,
-+				       &offset_size);
- 	}
- 
--	data[0] = get_varuint32(code, code_len, &tmp);
--	if (tmp == -1) {
--		return false;
-+	if (detail) {
-+		cs_wasm_op *op = &detail->wasm.operands[0];
-+		op->type = WASM_OP_VARUINT32;
-+		op->size = (uint32_t)align_size;
-+		op->varuint32 = align;
- 	}
--
--	if (MI->flat_insn->detail) {
--		MI->flat_insn->detail->wasm.operands[0].type =
--			WASM_OP_VARUINT32;
--		MI->flat_insn->detail->wasm.operands[0].size = tmp;
--		MI->flat_insn->detail->wasm.operands[0].varuint32 = data[0];
--	}
--
--	len = tmp;
--	data[1] = get_varuint32(&code[len], code_len - len, &tmp);
--	if (tmp == -1) {
-+	/* A malformed offset still leaves the decoded alignment in detail. */
-+	if (offset_size == (size_t)-1)
+diff --git a/arch/WASM/WASMInstPrinter.c b/arch/WASM/WASMInstPrinter.c
+index d7db69c3..117790c1 100644
+--- a/arch/WASM/WASMInstPrinter.c
++++ b/arch/WASM/WASMInstPrinter.c
+@@ -23,6 +23,13 @@ static bool printHexOperands32(SStream *out, const uint32_t *values,
+ 	    out->index >= SSTREAM_BUF_LEN - 1)
  		return false;
--	}
  
--	if (MI->flat_insn->detail) {
--		MI->flat_insn->detail->wasm.operands[1].type =
--			WASM_OP_VARUINT32;
--		MI->flat_insn->detail->wasm.operands[1].size = tmp;
--		MI->flat_insn->detail->wasm.operands[1].varuint32 = data[1];
-+	if (detail) {
-+		cs_wasm_op *op = &detail->wasm.operands[1];
-+		op->type = WASM_OP_VARUINT32;
-+		op->size = (uint32_t)offset_size;
-+		op->varuint32 = offset;
- 	}
- 
--	len += tmp;
--	MI->wasm_data.size = len;
-+	MI->wasm_data.size = align_size + offset_size;
- 	MI->wasm_data.type = WASM_OP_IMM;
--	MI->wasm_data.immediate[0] = data[0];
--	MI->wasm_data.immediate[1] = data[1];
--	*param_size = len;
-+	MI->wasm_data.immediate[0] = align;
-+	MI->wasm_data.immediate[1] = offset;
-+	*param_size = (uint16_t)(align_size + offset_size);
- 
- 	return true;
- }
++	if (count == 1 && values[0] < 16) {
++		char token[] = "\t0x0";
++		token[3] = "0123456789abcdef"[values[0]];
++		SStream_concat0_n(out, token, sizeof(token) - 1);
++		return true;
++	}
++
+ 	char text[sizeof("\t0xffffffff, 0xffffffff")];
+ 	char *end = text + sizeof(text) - 1;
+ 	char *p = end;
