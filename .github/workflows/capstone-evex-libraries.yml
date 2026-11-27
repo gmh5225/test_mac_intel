@@ -1,7 +1,7 @@
-name: Share TEST and accumulator operand output through the existing i386 opcode switch
+name: Measure VEX clear and accumulator admission independently over six real programs and firmware
 on:
   push:
-    branches: [codex/i386-arithmetic-opcode-switch]
+    branches: [codex/i386-shared-clear-and-immediate-records]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a5c08759df756b179578e97670e148fa7629e88c
+          ref: 3af4f18baa8c88ed070a71f48c53e28bb38f8fc7
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 061f0f78ec080fa7861f43b17bccf8e2204005cd
+          ref: 11a3c5a17d18214b1902318ca4d70fa9ebe8740b
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-immediate-switch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: i386-vex-clear-switch-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
