@@ -1,7 +1,7 @@
-name: Measure one vector memory field writer for base, RIP and indexed operands on native real programs
+name: Check packed VEX memory at the existing vector dispatch with ordinary ELF linking
 on:
   push:
-    branches: [codex/real-vex-memory-field-writer]
+    branches: [codex/vex-memory-ordinary-code-sections]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1145966d56390a5e3f454ad1b22068a97d484a0a
+          ref: 52729b06a14c31d4b224dc651ce085da46769782
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: operand-memory-output-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-ordinary-sections-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

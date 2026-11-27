@@ -33,207 +33,77 @@ index eedf177c..221d3c37 100644
  };
 +#endif
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index dceebc42..453fac47 100644
+index dceebc42..fb768406 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -21,6 +21,9 @@ struct PaddingOutput {
- };
- 
- #include "X86GenVectorOutput.inc"
-+#ifdef X86_SHARED_VEX3_MEMORY
-+#include "X86GenVexBaseMemory.inc"
-+#endif
- #include "X86VectorRegisterOutput.h"
- 
- #ifndef CAPSTONE_X86_EVEX_MEMORY_OUTPUT
-@@ -74,46 +77,79 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -429,6 +429,12 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  				    0x40 | (w << 3) | rxb, ll, regs, 3);
  }
  
--/* VEX packed loads and FMA with an ordinary base, index and optional disp8.
-- * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
-+/* The VEX prefix selects the instruction record. ModR/M and SIB
-+ * select the registers used by both the text and detailed operand. */
- #if defined(_MSC_VER)
- __declspec(noinline)
- #elif defined(__GNUC__)
- __attribute__((noinline))
- #endif
--static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
-+static bool writeVexMemoryOutput(const uint8_t *code, size_t size,
- 				  cs_insn *insn, uint16_t *insn_size,
--				  const struct X86SimpleRegister *regs)
-+				  const struct X86SimpleRegister *regs, bool wide)
- {
- 	const bool fma = code[0] == 0xc4;
- 	const unsigned prefix = fma ? 3 : 2;
--	if (size < prefix + 3)
--		return false;
--	const uint8_t flags = code[prefix - 1];
--	if (fma) {
--		if ((code[1] & 0x1f) != 2 || (flags & 0x83) != 1 ||
--		    code[prefix] != 0xa8)
--			return false;
--	} else if ((flags & 0x7b) != 0x78 || code[prefix] != 0x28) {
-+	if (size < prefix + 2)
- 		return false;
--	}
- 	const unsigned modrm = code[prefix + 1];
--	const unsigned sib = code[prefix + 2];
--	const bool has_disp = (modrm & 0x40) != 0;
--	const unsigned len = prefix + 3 + has_disp;
--	if ((modrm & 0x87) != 4 || len > size || (!has_disp && (sib & 7) == 5))
--		return false;
-+	const unsigned flags = code[prefix - 1], ll = (flags >> 2) & 1;
- 	const unsigned rxb = (~(unsigned)code[1] >> 5) & (fma ? 7 : 4);
--	const unsigned index = ((rxb & 2) << 2) | ((sib >> 3) & 7);
--	if (index == 4)
--		return false;
--	const unsigned base = ((rxb & 1) << 3) | (sib & 7);
--	const unsigned scale = 1u << (sib >> 6);
--	const int disp = has_disp ? (int8_t)code[len - 1] : 0;
--	const unsigned ll = (flags >> 2) & 1;
- 	const unsigned dst = ((rxb & 4) << 1) | ((modrm >> 3) & 7);
--	const unsigned src = (~(unsigned)flags >> 3) & 15;
--	const struct VectorOutputRow *row = &vex_indexed_rows[fma][ll];
-+	const unsigned src = (~flags >> 3) & 15;
-+	const struct X86SimpleRegister *base, *index = NULL;
-+	const struct VectorOutputRow *row;
-+	unsigned sib = 0, scale = 1, len, disp_size, w = 0;
-+	int32_t disp;
 +#ifdef X86_SHARED_VEX3_MEMORY
-+	if (wide && fma && (modrm & 7) != 4) {
-+		const unsigned map = code[1] & 31;
-+		if (!map || map > 3 || (flags & 3) != 1 || modrm >= 0xc0)
-+			return false;
-+		w = flags >> 7;
-+		const unsigned plan = vex_register_plans[map - 1][code[3]];
-+		const unsigned id = vex_register_widths[plan][w * 2 + ll];
-+		if (!(vex_base_register_mask[id >> 3] & (1u << (id & 7))))
-+			return false;
-+		row = &vex_register_rows[id];
-+		const unsigned mod = modrm >> 6, rm = modrm & 7;
-+		const bool relative = mod == 0 && rm == 5;
-+		disp_size = relative || mod == 2 ? 4 : mod;
-+		len = prefix + 2 + disp_size;
-+		if (size < len)
-+			return false;
-+		const uint8_t *bytes = code + prefix + 2;
-+		disp = disp_size == 4 ? X86_readDisp32(bytes) :
-+		       disp_size == 1 ? (int8_t)*bytes : 0;
-+		static const struct X86SimpleRegister rip = { X86_REG_RIP, 3, "rip" };
-+		base = relative ? &rip : &regs[rm | ((rxb & 1) << 3)];
-+	} else
++#pragma clang section text = ".cs_x86_vex64_memory_text"
++#include "X86VexBaseMemory.h"
++#pragma clang section text = ""
 +#endif
-+	{
-+		if (size < prefix + 3)
-+			return false;
-+		if (fma) {
-+			if ((code[1] & 31) != 2 || (flags & 0x83) != 1 ||
-+			    code[prefix] != 0xa8)
-+				return false;
-+		} else if ((flags & 0x7b) != 0x78 || code[prefix] != 0x28) {
-+			return false;
-+		}
-+		sib = code[prefix + 2];
-+		disp_size = (modrm >> 6) & 1;
-+		len = prefix + 3 + disp_size;
-+		if ((modrm & 0x87) != 4 || len > size ||
-+		    (!disp_size && (sib & 7) == 5))
-+			return false;
-+		const unsigned ix = ((rxb & 2) << 2) | ((sib >> 3) & 7);
-+		if (ix == 4)
-+			return false;
-+		index = &regs[ix];
-+		base = &regs[((rxb & 1) << 3) | (sib & 7)];
-+		scale = 1u << (sib >> 6);
-+		disp = disp_size ? (int8_t)code[len - 1] : 0;
-+		row = &vex_indexed_rows[fma][ll];
-+	}
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
- 	memcpy(insn->bytes, code, len);
-@@ -128,17 +164,23 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
- 	memcpy(out, ", xmmword ptr [", 15);
- 	out[2] = "xy"[ll];
- 	out += 15;
--	memcpy(out, regs[base].name, sizeof(regs[base].name));
--	out += regs[base].length;
--	memcpy(out, " + ", 3);
--	out += 3;
--	memcpy(out, regs[index].name, sizeof(regs[index].name));
--	out += regs[index].length;
--	if (scale != 1) {
--		*out++ = '*';
--		*out++ = (char)('0' + scale);
-+	memcpy(out, base->name, sizeof(base->name));
-+	out += base->length;
-+	if (index) {
-+		memcpy(out, " + ", 3);
-+		out += 3;
-+		memcpy(out, index->name, sizeof(index->name));
-+		out += index->length;
-+		if (scale != 1) {
-+			*out++ = '*';
-+			*out++ = (char)('0' + scale);
-+		}
- 	}
-+#ifdef X86_SHARED_VEX3_MEMORY
-+	out = X86_writeDisplacement(out, disp);
-+#else
- 	out = X86_writeDisp8(out, disp);
-+#endif
- 	*out = ']';
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
-@@ -148,17 +190,19 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
- 		cs_x86 *x = &d->x86;
- 		memcpy(x->opcode, code, prefix);
- 		x->addr_size = 8;
--		x->rex = (uint8_t)(0x40 | rxb);
-+		x->rex = (uint8_t)(0x40 | (w << 3) | rxb);
- 		x->modrm = (uint8_t)modrm;
--		x->sib = (uint8_t)sib;
--		x->sib_base = (x86_reg)regs[base].reg;
--		x->sib_index = (x86_reg)regs[index].reg;
--		x->sib_scale = (int8_t)scale;
-+		if (index) {
-+			x->sib = (uint8_t)sib;
-+			x->sib_base = (x86_reg)base->reg;
-+			x->sib_index = (x86_reg)index->reg;
-+			x->sib_scale = (int8_t)scale;
-+		}
- 		x->disp = disp;
- 		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
--		if (has_disp) {
--			x->encoding.disp_offset = (uint8_t)(len - 1);
--			x->encoding.disp_size = 1;
-+		if (disp_size) {
-+			x->encoding.disp_offset = (uint8_t)(len - disp_size);
-+			x->encoding.disp_size = (uint8_t)disp_size;
- 		}
- 		x->op_count = (uint8_t)(2 + fma);
- 		const x86_reg first = ll ? X86_REG_YMM0 : X86_REG_XMM0;
-@@ -172,8 +216,8 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
- 		}
- 		cs_x86_op *op = &x->operands[reg_count];
- 		op->type = X86_OP_MEM;
--		op->mem.base = x->sib_base;
--		op->mem.index = x->sib_index;
-+		op->mem.base = (x86_reg)base->reg;
-+		op->mem.index = index ? (x86_reg)index->reg : X86_REG_INVALID;
- 		op->mem.scale = (int)scale;
- 		op->mem.disp = disp;
- 		op->size = (uint8_t)(16u << ll);
-@@ -449,7 +493,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
++
+ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			   uint16_t *insn_size,
+ 			   const struct X86SimpleRegister *regs, bool wide)
+@@ -449,6 +455,11 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
  					      prefix);
--	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
-+	return writeVexMemoryOutput(code, size, insn, insn_size, regs, wide);
++#ifdef X86_SHARED_VEX3_MEMORY
++	/* The register branch above has already handled ModR/M.mod == 3. */
++	if (wide && code[0] == 0xc4 && size >= 5 && (code[4] & 7) != 4)
++		return writeVexBaseMemory(code, size, 3, insn, insn_size, regs);
++#endif
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
-  * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
+diff --git a/arch/X86/X86VexBaseMemory.h b/arch/X86/X86VexBaseMemory.h
+index a8ea43f2..202d8b03 100644
+--- a/arch/X86/X86VexBaseMemory.h
++++ b/arch/X86/X86VexBaseMemory.h
+@@ -71,6 +71,9 @@ static bool writeVectorMemory(const uint8_t *code, cs_insn *insn,
+ }
+ 
+ /* The AMD64 fallback checked both prefix bytes and a memory ModR/M. */
++#ifdef X86_SHARED_VEX3_MEMORY
++__attribute__((noinline))
++#endif
+ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix,
+ 			    cs_insn *insn, uint16_t *insn_size,
+ 			    const struct X86SimpleRegister *regs)
+@@ -83,10 +86,19 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
+ 	const unsigned w = short_prefix ? 0 : flags >> 7;
+ 	const unsigned ll = (flags >> 2) & 1, wl = w * 2 + ll,
+ 		       opcode = code[prefix];
++#ifdef X86_SHARED_VEX3_MEMORY
++	const unsigned plan = vex_register_plans[map - 1][opcode];
++	const unsigned index = vex_register_widths[plan][wl];
++	if (!(vex_base_register_mask[index >> 3] & (1u << (index & 7))))
++		return false;
++	const struct VectorOutputRow *row = &vex_register_rows[index];
++#else
+ 	const unsigned plan = vex_base_plans[map - 1][opcode];
+ 	const unsigned index = vex_base_widths[plan][wl];
+ 	if (!index)
+ 		return false;
++	const struct VectorOutputRow *row = &vex_base_rows[index];
++#endif
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & (short_prefix ? 4 : 7);
+ 	const unsigned dst = ((code[prefix + 1] >> 3) & 7) | ((rxb & 4) << 1);
+ 	const unsigned mod = code[prefix + 1] >> 6;
+@@ -102,7 +114,7 @@ static bool writeVexBaseMemory(const uint8_t *code, size_t size, unsigned prefix
+ 			     disp_size == 1 ? (int8_t)code[offset] : 0;
+ 	const struct X86SimpleRegister *base =
+ 		rip ? &vector_rip : &regs[rm | ((rxb & 1) << 3)];
+-	return writeVectorMemory(code, insn, insn_size, &vex_base_rows[index],
++	return writeVectorMemory(code, insn, insn_size, row,
+ 				 prefix, ll, 0x40 | (w << 3) | rxb, dst,
+ 				 (~flags >> 3) & 15, base, disp_size, disp);
+ }
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
 index f0312e90..2a12f2ba 100644
 --- a/suite/synctools/x86_vector_output.cpp
