@@ -65,6 +65,11 @@ try:
     shared=FixedImage(image,images)
     select=shared.select
     inc=['-I',src,'-I',src/'include']
+    run('cmake','-S',src,'-B',build,'-DCAPSTONE_BUILD_CSTEST=ON')
+    run('cmake','--build',build,'--target','x86_att_access_generator','--parallel','4')
+    unit=get('ctest','--test-dir',build,'-R','^unit_x86_att_access_generator$','--no-tests=error','--output-on-failure')
+    assert '100% tests passed' in unit
+    save('access-unit',dict(output=unit))
     for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
     run('cargo','build','--release','--locked',cwd=ad)
@@ -78,6 +83,10 @@ try:
     for stage in ('base','initial','candidate'):
         run('clang++','-O3','-std=c++17',*inc,r/'driver.cpp',ice_lib,w/(stage+'.a'),'-ldl','-lpthread','-lm','-no-pie','-o',w/(stage+'-static'))
         assert 'libcapstone.so' not in get('ldd',w/(stage+'-static'))
+    run('clang','-O2',*inc,'-c',r/'count-access.c','-o',w/'count-access.o')
+    for stage in ('base','initial','candidate'):
+        run('clang++','-O2','-std=c++17',*inc,r/'driver.cpp',ice_lib,w/'count-access.o',w/(stage+'.a'),'-Wl,--wrap=X86_get_op_access','-ldl','-lpthread','-lm','-no-pie','-o',w/(stage+'-count'))
+    access_calls={}
     static=FixedImage(w/'measured-static',{k:(w/(k+'-static')).read_bytes() for k in ('base','initial','candidate')},executable=True)
     save('dedicated-static',{tag:dict(executable=sha(w/(tag+'-static')),archive=sha(w/(tag+'.a')))for tag in ('base','initial','candidate')})
     run('clang++','-O2','-std=c++17',*inc,r/'att-callback.cpp','-ldl','-o',w/'att-callback')
@@ -131,6 +140,19 @@ try:
             view=[list(map(int,line.split()))for line in get(w/'vectors',str(bits),f,intervals_file).splitlines()]
             assert len(view)==len(intervals);intervals=[x for x,j in zip(intervals,view)if j[1]>=8 and j[1]>=.15*j[0]];emit()
         assert sha(intervals_file)==spec['extent_sha256']
+        calls={}
+        for stage in ('base','initial','candidate'):
+            counts=[]
+            for route,mode in [('public-att',1),('public-att',2),('capstone',2)]:
+                res=sp.run([w/(stage+'-count'),route,str(mode),'1',f,intervals_file,str(bits)],check=True,text=True,capture_output=True)
+                tag='access_lookup_calls='
+                assert res.stderr.strip().startswith(tag)
+                count=int(res.stderr.strip()[len(tag):]);assert count%2==0
+                counts.append(count//2)
+            calls[stage]=counts
+        assert calls['base']==calls['initial'] and all(x[0]==0 for x in calls.values()) and calls['base'][1]>calls['candidate'][1] and calls['base'][2]==calls['candidate'][2]
+        access_calls[name]=calls;save('access-lookups',access_calls)
+
         audits=[]
         for stage in ('base','initial','candidate'):
             select(stage)
