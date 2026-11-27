@@ -1,7 +1,7 @@
-name: Measure one masked copy width against both shipping and scoped readers in the source-built NeverD product
+name: Validate VEX IFMA semantics and performance in the source-built NeverD product
 on:
   push:
-    branches: [codex/uniform-masked-product]
+    branches: [codex/vex-ifma-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 47d0a2f33b15c11295c9b80e50c238a92ac0f965
+          ref: 87e0b7d2303971e350f4ee3cb6923113154ef5cc
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: uniform-masked-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex-ifma-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

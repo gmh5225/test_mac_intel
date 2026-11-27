@@ -51,7 +51,7 @@ try:
     command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
     assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF'in (build/'CMakeCache.txt').read_text()
     targets=['NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','NeverDX86NoIndexAddressTests']
-    identities={};results={}
+    identities={};results={};recovered={}
     for stage in ('shipping','base','mask'):
         git(cs,'restore','--source','HEAD','--worktree','--staged','--','.')
         patches={'shipping':[],'base':['base'],'mask':['mask']}
@@ -76,6 +76,11 @@ try:
             views=[list(map(int,x.split()))for x in sp.check_output([t/'vectors','64',path,intervals],text=True).splitlines()]
             assert len(views)==len(spans)
             skip={tuple(s[:3]) for s in q['excluded_incompatible_extents']}
+            recovered_spans=[span for span in spans if tuple(span) in skip]
+            assert len(recovered_spans)==6 and sum(v[1] for v in recovered_spans)==19594
+            recovered_intervals=t/'openssl-ifma.tsv'
+            recovered_intervals.write_text(''.join('%d %d %d\n'%span for span in recovered_spans))
+            recovered_text=path
             chosen=[z for z,(total,vectors) in zip(spans,views)if tuple(z)not in skip and vectors>=8 and vectors>=.15*total]
             intervals.write_text(''.join('%d %d %d\n'%s for s in chosen));assert len(chosen)==320 and sha(intervals)==q['extent_sha256']
             cases.append(dict(name=name,selector=bits,path=str(path),intervals=str(intervals),text_sha256=q['text_sha256']))
@@ -84,6 +89,14 @@ try:
         assert len(cases)==14 and len({v['name'] for v in cases})==14
         assert sum(6 if c['selector'] in (32,64) else 3 for c in cases)==60
         shutil.copyfile(binary,t/(stage+'.exe'));(t/(stage+'.exe')).chmod(0o755)
+        runs={}
+        for mode in range(6):
+            values=list(map(int,sp.check_output([binary,recovered_text,'64',str(mode),'1',recovered_intervals],text=True).split()))
+            assert len(values)==5 and values[0]>0
+            if stage!='shipping':assert values[1:3]==[3277,0],(stage,mode,values)
+            runs[str(mode)]=values[1:]
+        if stage=='shipping':assert any(v[1]>0 for v in runs.values())
+        recovered[stage]=runs;save('recovered-neverd',recovered)
         rows={}
         for c in cases:
             sel=str(c['selector']) if c['selector'] in (32,64) else {0:'arm64',1:'arm',2:'riscv64',3:'ppc64el',4:'mips64el'}[c['selector']]
@@ -94,12 +107,13 @@ try:
                 rows[c['name']+'/'+str(mode)]=dict(text=c['text_sha256'],counts=values[1:3],boundary=values[3],score=values[4])
         assert len(rows)==60
         results[stage]=rows;save('products',identities);save('records',results)
+    assert recovered['base']==recovered['mask'] and len({v[2] for v in recovered['base'].values()})==1
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
     arm=os.uname().machine=='aarch64'
-    obj={'X86VectorFallback64.c.o'}
-    for before,after,expected in [('shipping','base',set() if arm else obj),
-        ('shipping','mask',obj),('base','mask',obj)]:
+    obj={'X86VectorOutput.c.o','X86DisassemblerDecoder.c.o'}
+    for before,after,expected in [('shipping','base',obj),('shipping','mask',obj),
+        ('base','mask',{'X86DisassemblerDecoder.c.o'})]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
