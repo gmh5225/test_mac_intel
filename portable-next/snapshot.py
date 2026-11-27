@@ -49,6 +49,20 @@ def snapshots(src, bench, build, temp, profile, label, run, linkage):
         for disp in (0,9,10,0x80,0x2345,0x7fffffff,0x80000000,0xffffffff):
             source.extend(bytes([0xff,m])+disp.to_bytes(4,'little'))
     source.extend(bytes.fromhex('c5 fb c2 da 06 62 f1 4c 0b c2 d0 a5 c5 f8 c2 c0 1f'))
+    # Masked EVEX register moves, memory loads/stores and displacements at
+    # formatting boundaries. The driver also starts at each interior byte.
+    masked = bytearray()
+    for ext in (0x01,0x91,0xf1):
+        for p2 in (0x09,0x2f,0x49,0xc9):
+            for op in (0x6f,0x7f):
+                word = bytes((0x62,ext,0x7f,p2,op))
+                for rm in (0xc0,0xd1,0xff,0x07):
+                    masked.extend(word + bytes((rm,)))
+                for sib in (0x77,0xed,0xff):
+                    masked.extend(word + bytes((0x44,sib,0x80)))
+                    for disp in (0,9,10,0x7fffffff,0x80000000,0xffffffff):
+                        masked.extend(word + bytes((0xbc,sib)) + disp.to_bytes(4,'little'))
+    source.extend(masked)
     sample=temp/'curated-x86.bin';sample.write_bytes(source)
     modes=[(0,0,0),(0,1,0)]
     if profile!='diet':modes.append((0,1,1))

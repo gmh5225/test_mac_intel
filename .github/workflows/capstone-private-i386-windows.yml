@@ -1,7 +1,7 @@
-name: Verify x86 fixed reader preconditions in full, reduced and DIET configurations
+name: Verify masked operand output in Windows, Linux and macOS Capstone builds
 on:
   push:
-    branches: [codex/verified-reader-mode-configurations]
+    branches: [codex/masked-operand-release-configs]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: fixed-mode-and-text-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: masked-suffix-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
