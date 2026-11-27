@@ -16,29 +16,37 @@ index a2a27faf..f338b97a 100644
      endif()
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
-diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..9a589082 100644
---- a/arch/X86/X86VectorFallback64.c
-+++ b/arch/X86/X86VectorFallback64.c
-@@ -168,6 +168,11 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
- }
- #endif
- 
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 3105a881..0637dc5c 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -90,6 +90,14 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 			      size_t size, cs_insn *insn, uint16_t *insn_size,
+ 			      const struct X86SimpleRegister regs[4][16],
+ 			      bool wide);
 +#ifdef X86_FIXED_VEX3_MEMORY
-+static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size);
++CAPSTONE_INTERNAL bool
++X86_writeVex3MemoryOrImmediate64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size,
++			      const struct X86SimpleRegister regs[4][16],
++			      bool wide);
 +#endif
 +
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -212,9 +217,14 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
+ CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index bc67e4c3..dd476f2e 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -212,9 +212,15 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
  	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
  	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
  		return true;
 +#ifdef X86_FIXED_VEX3_MEMORY
 +	if (code[0] == 0xc4 &&
-+	    writeVex3Output64(handle, code, size, insn, insn_size))
++	    X86_writeVex3MemoryOrImmediate64(handle, code, size, insn, insn_size,
++					     x86_simple_registers, true))
 +#else
  	if (code[0] == 0xc4 &&
  	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
@@ -47,29 +55,27 @@ index bc67e4c3..9a589082 100644
  		return true;
  	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
  		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
-@@ -269,5 +279,27 @@ fallback:
+@@ -269,5 +275,25 @@ fallback:
  #endif
  	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
-+
 +#ifdef X86_FIXED_VEX3_MEMORY
-+/* Keep the memory tables in the fixed AMD64 fallback, outside the shared
-+ * register-immediate handler used by the 32-bit iterator. */
-+#if defined(__ELF__) && defined(__clang__)
 +#pragma clang section text = ".cs_x86_vex64_memory_text" rodata = \
 +	".cs_x86_vex64_memory_rodata"
-+#endif
 +#include "X86VexBaseMemory.h"
 +
-+static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size)
++/* The fixed AMD64 caller forwards its register table to either writer. */
++CAPSTONE_INTERNAL __attribute__((noinline)) bool
++X86_writeVex3MemoryOrImmediate64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size,
++			      const struct X86SimpleRegister regs[4][16],
++			      bool wide)
 +{
 +	if (size >= 5 && code[4] < 0xc0)
 +		return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		       writeVexBaseMemory(code, size, 3, insn, insn_size,
-+					  x86_simple_registers[3]);
++		       writeVexBaseMemory(code, size, 3, insn, insn_size, regs[3]);
 +	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
-+					     x86_simple_registers, true);
++					     regs, wide);
 +}
 +#endif
 +

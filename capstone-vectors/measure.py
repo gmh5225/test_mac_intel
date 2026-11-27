@@ -75,7 +75,16 @@ try:
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
         from symbol_layout import symbols
-        section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
+        member='X86Vex3Memory64.c.o'
+        present=member in get('ar','t',lib).splitlines()
+        assert present==(os.uname().machine=='x86_64' and label=='outlined')
+        section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o') if x.name!=member or present}
+        old_object,=build.rglob('X86VectorFallback64.c.o')
+        with old_object.open('rb') as f:
+            elf=ELFFile(f)
+            sections={sec.name:[sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()]
+                for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+            save('fallback-object-'+label,sections)
         assert len(section_data)>=45
         save('code-'+label,dict(objects=section_data,functions=symbols(w/label)))
         from subprocess import check_output

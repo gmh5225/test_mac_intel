@@ -1,7 +1,7 @@
-name: Compare VEX3 base memory output against shipping Capstone and fork iced master on real binaries
+name: Verify VEX3 register forwarding, archive placement and PE32 addresses on the shipping decoder
 on:
   push:
-    branches: [codex/shipping-vex3-private-memory]
+    branches: [codex/vex3-memory-member-placement]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-vex3-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex3-member-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

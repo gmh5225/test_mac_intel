@@ -1,54 +1,99 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a2a27faf..b5feecb9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1088,10 +1088,12 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
+     target_compile_definitions(capstone_build_settings INTERFACE
+         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
+-    # Use the bounded masked-operand copies in the measured x86-64 static reader.
++    # Enable the measured masked and VEX3 memory writers in the x86-64 static reader.
+     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
++        set(capstone_native_vex3_memory ON)
+         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
+-            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>"
++                                "$<$<CONFIG:Release>:X86_FIXED_VEX3_MEMORY>")
+     endif()
+ endif()
+ add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+@@ -1154,6 +1156,13 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+         endif()
+         list(APPEND capstone_static_objects $<TARGET_OBJECTS:capstone_x86_native> ${capstone_static_tail})
+     endif()
++    if(capstone_native_vex3_memory)
++        add_library(capstone_x86_vex3_memory OBJECT EXCLUDE_FROM_ALL arch/X86/X86Vex3Memory64.c)
++        target_link_libraries(capstone_x86_vex3_memory PRIVATE capstone_build_settings)
++        target_compile_definitions(capstone_x86_vex3_memory PRIVATE X86_FIXED_VEX3_MEMORY)
++        set_target_properties(capstone_x86_vex3_memory PROPERTIES C_STANDARD 99 POSITION_INDEPENDENT_CODE ON)
++        list(APPEND capstone_static_objects "$<$<CONFIG:Release>:$<TARGET_OBJECTS:capstone_x86_vex3_memory>>")
++    endif()
+     add_library(capstone_static STATIC ${capstone_static_objects})
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+     set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 3105a881..0637dc5c 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -90,6 +90,14 @@ X86_writeVexRegisterImmediate(cs_struct *handle, const uint8_t *code,
+ 			      size_t size, cs_insn *insn, uint16_t *insn_size,
+ 			      const struct X86SimpleRegister regs[4][16],
+ 			      bool wide);
++#ifdef X86_FIXED_VEX3_MEMORY
++CAPSTONE_INTERNAL bool
++X86_writeVex3MemoryOrImmediate64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size,
++			      const struct X86SimpleRegister regs[4][16],
++			      bool wide);
++#endif
++
+ 
+ /* Six bytes, bare EVEX, register ModR/M and 64-bit mode were checked by the iterator. */
+ CAPSTONE_INTERNAL bool X86_writePlainEvexRegisters(cs_struct *handle,
 diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
-index bc67e4c3..f92024ba 100644
+index bc67e4c3..ad844285 100644
 --- a/arch/X86/X86VectorFallback64.c
 +++ b/arch/X86/X86VectorFallback64.c
-@@ -168,6 +168,9 @@ static bool writeMaskedByteMove(cs_struct *handle, const uint8_t *code,
- }
- #endif
- 
-+static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size);
-+
- /* The fixed-width AMD64 iterator has already tried its common records. */
- CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
- X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
-@@ -213,8 +216,7 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -212,9 +212,15 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
  	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
  		return true;
++#ifdef X86_FIXED_VEX3_MEMORY
++	if (code[0] == 0xc4 &&
++	    X86_writeVex3MemoryOrImmediate64(handle, code, size, insn, insn_size,
++					     x86_simple_registers, true))
++#else
  	if (code[0] == 0xc4 &&
--	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
--					  x86_simple_registers, true))
-+	    writeVex3Output64(handle, code, size, insn, insn_size))
+ 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
++#endif
  		return true;
  	if (size >= 4 && (code[0] == 0x66 || (code[0] & 0xfe) == 0xf2)) {
  		const uint8_t rex = (code[1] & 0xf0) == 0x40 ? code[1] : 0;
-@@ -269,5 +271,29 @@ fallback:
- #endif
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
+diff --git a/arch/X86/X86Vex3Memory64.c b/arch/X86/X86Vex3Memory64.c
+new file mode 100644
+index 00000000..1a395c2a
+--- /dev/null
++++ b/arch/X86/X86Vex3Memory64.c
+@@ -0,0 +1,21 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
 +
-+/* Keep the memory tables in the fixed AMD64 fallback, outside the shared
-+ * register-immediate handler used by the 32-bit iterator. */
-+#ifndef CAPSTONE_X86_ONLY
-+#if defined(__ELF__) && defined(__clang__)
 +#pragma clang section text = ".cs_x86_vex64_memory_text" rodata = \
 +	".cs_x86_vex64_memory_rodata"
-+#endif
++#include "X86OutputOptions.h"
 +#include "X86VexBaseMemory.h"
-+#endif
 +
-+static bool writeVex3Output64(cs_struct *handle, const uint8_t *code,
-+			      size_t size, cs_insn *insn, uint16_t *insn_size)
++/* The fixed AMD64 caller forwards its register table to either writer. */
++CAPSTONE_INTERNAL __attribute__((noinline)) bool
++X86_writeVex3MemoryOrImmediate64(cs_struct *handle, const uint8_t *code,
++			      size_t size, cs_insn *insn, uint16_t *insn_size,
++			      const struct X86SimpleRegister regs[4][16],
++			      bool wide)
 +{
-+#ifndef CAPSTONE_X86_ONLY
 +	if (size >= 5 && code[4] < 0xc0)
 +		return !X86_OUTPUT_UNSUPPORTED(handle, false) &&
-+		       writeVexBaseMemory(code, size, 3, insn, insn_size,
-+					  x86_simple_registers[3]);
-+#endif
++		       writeVexBaseMemory(code, size, 3, insn, insn_size, regs[3]);
 +	return X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
-+					     x86_simple_registers, true);
++					     regs, wide);
 +}
-+
- #endif
- #endif
