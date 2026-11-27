@@ -38,63 +38,79 @@ try:
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
     maps=rd(r/'source.json')
-    import shlex
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    entry=next(x for x in rd(build/'compile_commands.json') if x['file'].endswith('/SStream.c'))
-    args=shlex.split(entry['command'])
-    for option in ('-o','-c'):
-        i=args.index(option)
-        del args[i:i+2]
-    names=('shipping','first','outlined','printable','control')
-    objects=[]
-    units={}
-    for name in names:
-        run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-        tree=maps[name]
-        if name!='shipping':
-            patch=r/(name+'.patch')
-            assert sha(patch)==tree['sha256']
+    from training import fetch
+    foreign_rows=fetch(r,w);save('foreign-corpus',foreign_rows)
+    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    def link(label,reader):
+        for kind,driver,libs in [('x86',w/'driver.o',[lib,ice_lib,*flags]),('foreign',w/'foreign.o',[lib,'-no-pie'])]:
+            exe=w/(kind+'-'+label)
+            run('clang++',driver,*libs,'-o',exe)
+            if reader:
+                lines=get('nm','-an',exe).splitlines()
+                fn={z.split()[-1]:int(z.split()[0],16) for z in lines if z.split() and z.split()[-1].startswith('benchReader_')}
+                assert len(fn)==5 and len(set(fn.values()))==5 and all(x%64==0 for x in fn.values()),fn
+                images[exe.name]=dict(binary=sha(exe),inode=exe.stat().st_ino,code=fn,archive=sha(lib))
+        run('clang','-O2','-I',base,'-I',base/'include',r/'raw-timing.c',lib,'-no-pie','-o',w/('raw-'+label))
+    link('reference',False)
+    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
+    unit=base/'arch/X86/X86DisassemblerDecoder.c';lookup=unit.with_name('X86GenOperandRead.inc')
+    parts=[];units={};start='static int readOperands(struct InternalInstruction *insn)\n{';end='/*\n * checkEVEX'
+    for label in ('shipping','shift','triple','pair','both'):
+        run('git','-C',base,'restore','--staged','--worktree','--source','HEAD','--','.')
+        tree=maps[label]
+        if label!='shipping':
+            patch=r/(label+'.patch');assert sha(patch)==tree['sha256']
             run('git','-C',base,'apply','--index',patch)
         assert get('git','-C',base,'write-tree').strip()==tree['tree']
-        source=(base/'SStream.c').read_text()
-        header=source.split('#ifndef CAPSTONE_DIET\nstatic size_t SStream_remaining',1)[0]
-        assert len(header)<1500
-        code=source.split('ss->index = kept_len + repl_len;\n}',1)[1].split('/// Extract the mnemonic',1)[0]
-        assert code.count('void SStream_trimls(SStream *ss)')==1
-        symbol='benchTrim_'+name
-        src=w/(name+'.c')
-        src.write_text(header+code.replace('void SStream_trimls(SStream *ss)','__attribute__((aligned(64),noinline)) void '+symbol+'(SStream *ss)'))
-        obj=w/(name+'.o')
-        run(*args,'-I',base,'-c',src,'-o',obj,cwd=entry['directory'])
-        objects.append(obj)
-        units[name]=dict(body=hashlib.sha256(code.encode()).hexdigest(),unit=sha(obj),symbol=symbol)
-    run('git','-C',base,'restore','--source','HEAD','--staged','--worktree','--','.')
-    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
-    from training import fetch
-    foreign_rows=fetch(r,w)
-    save('foreign-corpus',foreign_rows)
-    for label,extras in [('timed',[]),('counted',['-DCOUNT_CALLS'])]:
-        shim=w/(label+'.o')
-        run(*args,*extras,'-I',base,'-c',r/'select.c','-o',shim,cwd=entry['directory'])
-        for engine,driver,libs in [('x86',w/'driver.o',[lib,ice_lib,*flags]),('foreign',w/'foreign.o',[lib,'-no-pie'])]:
-            exe=w/(engine+'-'+label)
-            run('clang++',driver,shim,*objects,*libs,'-Wl,--wrap=SStream_trimls','-o',exe)
-            rows={v.split()[-1]:int(v.split()[0],16) for v in get('nm','-an',exe).splitlines() if v.split() and v.split()[-1] in {x['symbol'] for x in units.values()}}
-            assert len(rows)==5 and len(set(rows.values()))==5 and all(x%64==0 for x in rows.values())
-            images[exe.name]=dict(binary=sha(exe),inode=exe.stat().st_ino,code=rows,archive=sha(lib))
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'x86-reference')
-    run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/'foreign-reference')
-    run('clang','-O2','-std=c99','-I',base,r/'trim-domain.c',w/'timed.o',*objects,lib,'-Wl,--wrap=SStream_trimls','-o',w/'domain')
-    checks=[int(get(w/'domain',env=dict(os.environ,CS_BENCH_TRIM=str(i)))) for i in range(6)]
-    assert len(set(checks))==1 and checks[0]>221184
-    save('images',images)
-    save('units',dict(functions=units,domain=checks))
-    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
+        source=unit.read_text();i=source.index(start);j=source.index(end,i)
+        body=source[i:j].replace('#include "X86GenOperandRead.inc"',lookup.read_text())
+        assert body.count(start)==1
+        parts.append(body.replace(start,'static __attribute__((aligned(64),noinline)) int benchReader_'+label+'(struct InternalInstruction *insn)\n{'))
+        units[label]=dict(body=hashlib.sha256(body.encode()).hexdigest(),source=tree)
+    assert len({v['body'] for v in units.values()})==len(units)
+    run('git','-C',base,'restore','--staged','--worktree','--source','HEAD','--','.')
+    source=unit.read_text();i=source.index(start);j=source.index(end,i)
+    new=source[:i]+'\n'.join(parts)+(r/'select.inc').read_text()+'\n'+source[j:]
+    for label in ('timed','counted'):
+        unit.write_text(('#define READER_COUNTS\n' if label=='counted' else '')+new)
+        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        link(label,True)
+    save('images',images);save('units',units)
+    raw_results={}
+    def raw_samples(key,args_for):
+        data=w/'capture.bin'
+        exe=w/'x86-counted'
+        run('setarch',os.uname().machine,'-R',exe,*args_for(1),env=dict(os.environ,CS_BENCH_READER='0',CS_BENCH_READ_TRACE=str(data)),capture_output=True)
+        content=data.read_bytes();data.unlink()
+        assert len(content)%40==0 and content[:len(content)//2]==content[len(content)//2:]
+        rows={k:bytearray() for k in ('double-shift','other-three','untargeted')}
+        for i in range(0,len(content)//2,20):
+            row=content[i:i+20];sid=int.from_bytes(row[:2],'little')
+            group='double-shift' if 196<=sid<=199 else 'other-three' if 44<=sid<=47 or 101<=sid<=106 or 192<=sid<=195 else 'untargeted'
+            rows[group]+=row
+        for group,region in rows.items():
+            if not region:continue
+            file=w/'cohort.bin';file.write_bytes(region);binary=w/'raw-timed'
+            def take(exe,sel,n):
+                return list(map(int,get('setarch',os.uname().machine,'-R',exe,file,str(n),env=dict(os.environ,CS_BENCH_READER=str(sel))).split()))
+            one=take(w/'raw-reference',0,1)
+            assert all(take(binary,j,1)[2:]==one[2:] for j in range(6))
+            reps=max(1,math.ceil(12e6/one[0]))
+            expected=take(w/'raw-reference',0,reps)[2:];order=list(range(6));rng=random.Random(key+group);blocks=[]
+            for _ in range(17):
+                rng.shuffle(order);row=[[0,0] for j in order]
+                for j in order+order[::-1]:
+                    v=take(binary,j,reps);assert v[2:]==expected and min(v[:2])>0
+                    for c in (0,1):row[j][c]+=v[c]
+                blocks.append(row)
+            raw_results[key+'/'+group]=dict(count=len(region)//20,sha=sha(file),checks=one[2:],reps=reps,pairs=blocks)
+            file.unlink();save('raw-cohorts',raw_results)
     observations={}
     def sample(key,kind,args_for):
         binary=w/(kind+'-timed')
         def launch(exe,sel,n):
-            return sp.run(['setarch',os.uname().machine,'-R',exe,*args_for(n)],env=dict(os.environ,CS_BENCH_TRIM=str(sel)),check=True,capture_output=True,text=True)
+            return sp.run(['setarch',os.uname().machine,'-R',exe,*args_for(n)],env=dict(os.environ,CS_BENCH_READER=str(sel)),check=True,capture_output=True,text=True)
         def take(i,n):return list(map(int,launch(binary,i,n).stdout.split()))
         ref=list(map(int,launch(w/(kind+'-reference'),0,1).stdout.split()))
         counted=launch(w/(kind+'-counted'),0,1)
@@ -103,7 +119,7 @@ try:
         assert 0<=indented<=calls and 0<=high<=calls-indented
         reps=max(1,math.ceil(25e6/ref[0]));expected=take(0,reps)[2:]
         assert all(take(i,1)[2:]==ref[2:] for i in range(6))
-        order=list(range(6));rng=random.Random('trim/'+key);blocks=[]
+        order=list(range(6));rng=random.Random('scalar-raw/'+key);blocks=[]
         for block in range(17):
             rng.shuffle(order);row=[[0,0] for _ in order]
             for i in order+order[::-1]:
@@ -133,6 +149,8 @@ try:
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
 
+        if name in ('putty-32-0.85','libssl3t64-i386','libmvec-amd64'):
+            raw_samples(name,lambda n:['private','1',str(n),f,path,str(bits)])
         for mode in range(3):
             for route in ('private','capstone'):
                 sample('/'.join((route,name,str(mode))),'x86',lambda n:[route,str(mode),str(n),f,path,str(bits)])
