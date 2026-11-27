@@ -29,6 +29,9 @@ try:
         units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
     if len(arches)>2:
         units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
+    if profile in ('full','gcc','clang'):
+        for name in ('x86_valign_access','x86_evex_move_access','x86_packed_move_access','x86_scalar_vector_access','x86_integer_vector_access','x86_reg_access','x86_bextr_flags'):
+            if name not in units:units.append(name)
     flags+=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON']
     run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
     rows={}
