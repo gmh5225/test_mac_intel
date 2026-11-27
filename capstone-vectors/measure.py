@@ -74,6 +74,14 @@ try:
         save('gpr-records-'+label,rows)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
+        names={'writeMaskedByteMove','X86_decodeOutputMiss64'}
+        syms={}
+        for line in get('nm','-S','--defined-only',w/label).splitlines():
+            parts=line.split()
+            if len(parts)==4 and parts[3] in names:
+                syms[parts[3]]=[int(parts[0],16),int(parts[1],16)]
+        assert 'X86_decodeOutputMiss64' in syms
+        save('masked-symbols-'+label,syms)
         from symbol_layout import symbols
         section_data = {str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         assert len(section_data)>=45
