@@ -11,7 +11,11 @@ if os.environ.get('SCAN_PROFILE')=='clang':os.environ.update(CC='clang',CXX='cla
 w=Path(tempfile.mkdtemp())
 try:
     git=lambda *args:get('git','-C',src,*args)
-    assert git('rev-parse','HEAD')==q['base']['commit']
+    assert git('rev-parse','HEAD')==q['checkout']
+    patch=sp.check_output(['git','-C',p,'cat-file','blob','HEAD:portable-next/base.patch'])
+    assert sha(patch)==q['base']['sha256'];basefile=w/'base.patch';basefile.write_bytes(patch)
+    run('git','-C',src,'apply','--index',basefile)
+    assert git('write-tree')==q['base']['tree']
     patch=sp.check_output(['git','-C',p,'cat-file','blob','HEAD:portable-next/candidate.patch']);assert sha(patch)==q['candidate']['sha256']
     patchfile=w/'update.patch';patchfile.write_bytes(patch)
     project=w/'project';project.mkdir();build=w/'build'
