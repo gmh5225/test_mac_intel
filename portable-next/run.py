@@ -1,96 +1,71 @@
+"""Time the AMD64 writer on each compiler profile where lifting it into a shared header changed machine code."""
+import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
 from pathlib import Path
-import hashlib,json,os,platform,shlex,shutil,subprocess as sp,tempfile
 from fixtures import fixtures,sha
-r=Path(__file__).resolve().parent;root=r.parent;src=root/'source';e=root/'evidence';e.mkdir(exist_ok=True)
-rd=lambda f:json.loads(f.read_text());q=rd(r/'source.json');m=rd(r/'experiment.json');profile=os.environ['SCAN_PROFILE']
-if os.name=='nt':
-    from preprocess_win import verify
-    verify(r)
-    raise SystemExit(0)
-if profile=='gcc':os.environ.update(CC='gcc',CXX='g++')
-if profile in ('clang','clang14'):os.environ.update(CC='clang',CXX='clang++')
-os.environ['ZERO_AR_DATE']='1'
-def save(name,z):(e/(name+'.json')).write_text(json.dumps(z,indent=2)+'\n')
-def get(*a):return sp.check_output(a,text=True).strip()
-def run(*a):sp.run(a,check=True)
-def git(*a):return get('git','-C',src,*a)
-system=platform.system()
-w=Path(tempfile.mkdtemp()).resolve()
-profiles={};checks={};measured=system=='Linux' and profile=='clang'
+r=Path(__file__).resolve().parent;root=r.parent;source=root/'source';e=root/'evidence';e.mkdir(exist_ok=True)
+def read(f):return json.loads(f.read_bytes())
+def save(k,v):(e/(k+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+def run(*args):sp.run(args,check=True)
+def get(*args):return sp.check_output(args,text=True).strip()
+kind=os.environ['PROBE_CONFIG'];q=read(r/'source.json');meta=read(r/'experiment.json')
+if platform.system()=='Linux':os.environ.update(CC='clang',CXX='clang++')
+w=Path(tempfile.mkdtemp());project=w/'project';build=w/'build';sources={};ident={};records={};timings={}
 try:
-    assert git('rev-parse','HEAD')==q['base']['commit']
-    inputs=list(fixtures(r,w,m));assert len(inputs)==6
-    for config in (['product','standalone','shared-mixed']if measured else ['product','standalone']):
-        project=w/config;project.mkdir();build=project/'build';multi=config!='standalone';expect='active' if measured and platform.machine()=='x86_64' and config=='product' else 'base'
-        normal=(r/'CMakeLists.txt').read_text()
-        prefix=normal[:normal.index('add_subdirectory')]
-        targets=normal[normal.index('foreach(linkage static shared)'):].replace('    add_executable','    if(NOT TARGET capstone_\u0024{linkage})\n        continue()\n    endif()\n    add_executable',1)
-        if config=='product':
-            fragment=(r/'product.cmake').read_text();assert fragment.count('add_subdirectory(third_party/capstone)')==1
-            fragment=fragment.replace('add_subdirectory(third_party/capstone)','add_subdirectory("\u0024{CAPSTONE_SOURCE}" capstone)')
-            (project/'cmake').mkdir();shutil.copyfile(r/'compiler-options.inc',project/'cmake/NeverDCapstoneCompilerOptions.inc')
-        else:fragment='add_subdirectory("\u0024{CAPSTONE_SOURCE}" capstone)\n'
-        (project/'CMakeLists.txt').write_text(prefix+fragment+targets)
-        shutil.copyfile(r/'probe.cpp',project/'probe.cpp');ident={};cc={};flagsets={};record={};exported={}
-        flags=['-G','Ninja','-S',project,'-B',build,'-DCAPSTONE_SOURCE='+str(src),'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON']
-        if multi:flags+=['-DCAPSTONE_'+isa+'_SUPPORT=ON' for isa in ('ARM','AARCH64','MIPS','PPC','RISCV')]
-        for tag in ('base','candidate'):
-            git('restore','--source=HEAD','--staged','--worktree','--','.')
-            if tag!='base':
-                buf=sp.check_output(['git','-C',root,'cat-file','blob','HEAD:portable-next/'+tag+'.patch']);assert sha(buf)==q[tag]['sha256']
-                patch=w/'candidate.patch';patch.write_bytes(buf);git('apply','--index',patch)
-            assert git('write-tree')==q[tag]['tree']
-            run('cmake',*flags)
-            names=['static']if config=='product'else['static','shared']
-            run('cmake','--build',build,'--parallel','4','--target',*['probe_'+kind for kind in names])
-            objs={str(f.relative_to(build)):sha(f.read_bytes()) for f in (build/'capstone').rglob('*.c.o')}
-            built={str((build/path).resolve()):path for path in objs}
-            rows={}
-            for z in rd(build/'compile_commands.json'):
-                if Path(z['file']).suffix!='.c':continue
-                tokens=shlex.split(z['command'])
-                output=z.get('output')or tokens[tokens.index('-o')+1]
-                path=str((Path(z['directory'])/output).resolve())
-                if path in built:rows[built[path]]=z['command']
-            assert set(rows)==set(objs) and len(objs)>20 and any('RISCVMapping.c' in k for k in objs)==multi,(config,len(rows),len(objs),set(objs)-set(rows))
-            flags_per={key:'X86_ACCUMULATOR_OUTPUT32' in cmd for key,cmd in rows.items()}
-            assert all(v==(tag=='candidate' and expect=='active' and Path(k).name in ('X86MemoryFallback32.c.o','X86RegisterFallback32.c.o')) for k,v in flags_per.items()),(config,tag,flags_per)
-            clear={Path(key).name for key,cmd in rows.items() if 'X86_VEX_CLEAR_OUTPUT32' in cmd}
-            assert clear==({'X86MemoryFallback32.c.o'} if tag=='candidate' and expect=='active' else set()),(config,tag,clear)
-            cc[tag]=len(objs);flagsets[tag]=sorted(k for k,v in flags_per.items()if v)
-            dest=project/tag;dest.mkdir()
-            for kind in names:shutil.copy2(build/('probe_'+kind),dest)
-            for f in (build/'capstone').rglob('libcapstone*'):
-                if f.is_file() and (f.name.startswith('libcapstone.so') or f.suffix in ('.dylib','.a')):shutil.copy2(f,dest/f.name)
-            images={f.name:sha(f.read_bytes())for f in dest.iterdir()};assert 'libcapstone.a' in images
-            if 'shared' in names:
-                assert Path(get(dest/'probe_shared','--library')).resolve().parent==dest
-            assert Path(get(dest/'probe_static','--library')).resolve()==dest/'probe_static'
-            ident[tag]=dict(objects=objs,images=images);rec={}
-            for stem,bits,file,spans in inputs:
-                for syntax,mode in [('intel',0),('intel',1),('intel',2),('att',1),('att',2)]:
-                    for kind in names:
-                        key='/'.join((kind,syntax,stem,str(mode)))
-                        rec[key]=list(map(int,get(dest/('probe_'+kind),'public-att' if syntax=='att' else 'capstone',str(mode),'1',file,spans,str(bits)).split()))[2:]
-            record[tag]=rec
-            save(config+'-identities',ident)
-        old,new=ident['base'],ident['candidate']
-        assert old['objects'].keys()==new['objects'].keys()
-        changed=sorted(Path(k).name for k,v in old['objects'].items() if new['objects'][k]!=v)
-        change_set=set(changed)
-        required={'X86MemoryFallback32.c.o','X86RegisterFallback32.c.o'} if expect=='active' else set()
-        assert required<=change_set<=required|{'X86Sse64Output.c.o'},(config,expect,changed)
-        assert old['images'].keys()==new['images'].keys()
-        if not change_set:assert old['images']==new['images'],config
-        if expect=='active':
-            assert old['images']['libcapstone.a']!=new['images']['libcapstone.a']
-            assert old['images']['probe_static']==new['images']['probe_static']
-            for tag in ('base','candidate'):
-                assert 'X86_disasmIterText' not in get('nm',project/tag/'probe_static')
-        assert all(rec==record['base']for rec in record.values())
-        profiles[config]=dict(expected=expect,object_counts=cc,flags=flagsets,records=len(record['candidate']),identities=ident)
-        checks[config]=record['base'];save('checks',checks);save('profiles',profiles)
-        shutil.rmtree(project)
-    save('complete',dict(complete=True,source=q,profile=profile,host=system,machine=platform.machine(),measured=measured,configs=list(profiles),checks={k:len(v)for k,v in checks.items()}))
+    assert kind in ('standalone','product','mixed') and platform.machine()=='x86_64'
+    assert get('git','-C',source,'rev-parse','HEAD')==q['base']['commit']
+    project.mkdir();normal=(r/'CMakeLists.txt').read_text();a=normal.index('add_subdirectory');b=normal.index('foreach(linkage static shared)')
+    fragment=normal[a:b]
+    if kind=='product':
+        fragment=(r/'product.cmake').read_text().replace('add_subdirectory(third_party/capstone)',fragment.strip())
+        (project/'cmake').mkdir();shutil.copyfile(r/'compiler-options.inc',project/'cmake/NeverDCapstoneCompilerOptions.inc')
+    targets=normal[b:].replace('    add_executable','    if(NOT TARGET capstone_\u0024{linkage})\n        continue()\n    endif()\n    add_executable',1)
+    (project/'CMakeLists.txt').write_text(normal[:a]+fragment+targets+'\nadd_executable(probe_native probe.cpp)\ntarget_compile_features(probe_native PRIVATE cxx_std_17)\ntarget_compile_definitions(probe_native PRIVATE REQUEST_NATIVE)\ntarget_link_libraries(probe_native PRIVATE capstone_static \u0024{CMAKE_DL_LIBS})\n')
+    shutil.copyfile(r/'probe.cpp',project/'probe.cpp')
+    targets=['probe_static','probe_native']+([] if kind=='product' else ['probe_shared'])
+    flags=['-G','Ninja','-S',project,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_SOURCE='+str(source),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON']
+    if kind=='mixed':flags+=['-DCAPSTONE_'+isa+'_SUPPORT=ON'for isa in ('ARM','AARCH64','MIPS','PPC','RISCV')]
+    for stage in ('base','candidate'):
+        if stage=='candidate':
+            patch=r/'candidate.patch';assert sha(patch.read_bytes())==q[stage]['sha256'];run('git','-C',source,'apply','--index',patch)
+        assert get('git','-C',source,'write-tree')==q[stage]['tree']
+        run('cmake',*flags);run('cmake','--build',build,'--parallel','4','--target',*targets)
+        assert all('X86_VEX_CLEAR_OUTPUT32' not in v['command'] and 'X86_ACCUMULATOR_OUTPUT32' not in v['command'] for v in read(build/'compile_commands.json'))
+        sources[stage]={str(f.relative_to(build)):sha(f.read_bytes())for f in (build/'capstone').rglob('*.c.o')}
+        dest=w/stage;dest.mkdir()
+        for name in targets:shutil.copy2(build/name,dest/name)
+        for f in (build/'capstone').rglob('libcapstone*'):
+            if f.is_file() and f.suffix!='.a':shutil.copy2(f,dest/f.name)
+        ident[stage]={f.name:sha(f.read_bytes())for f in dest.iterdir()}
+    changes=[Path(k).name for k,h in sources['base'].items()if h!=sources['candidate'][k]];assert changes==['X86Sse64Output.c.o'],changes
+    save('code',dict(source=q,objects=sources,changed=changes));assert ident['base'].keys()==ident['candidate'].keys()
+    for name,old in [('copy','base'),('candidate_copy','candidate')]:
+        shutil.copytree(w/old,w/name);ident[name]={f.name:sha(f.read_bytes())for f in (w/name).iterdir()};assert ident[name]==ident[old]
+    for name in targets:
+        for stage in ident:
+            actual=Path(get(w/stage/name,'--library')).resolve();assert actual.parent==w/stage and (actual==w/stage/name)==(name!='probe_shared')
+    save('images',ident)
+    if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    for prog,bits,code,ext in fixtures(r,w,meta):
+        for name in targets:
+            private=name=='probe_native';modes=[('intel',1),('intel',2),('att',1),('att',2)]
+            if not private:modes.insert(0,('intel',0))
+            for syntax,mode in modes:
+                engine=('private' if private else 'capstone') if syntax=='intel' else ('private-att' if private else 'public-att')
+                key='/'.join((name,syntax,prog,str(mode)))
+                def bench(stage,reps):return list(map(int,get(w/stage/name,engine,str(mode),str(reps),code,ext,str(bits)).split()))
+                once=bench('base',1);assert len(once)==6 and once[2]>0
+                assert all(bench(t,1)[2:]==once[2:]for t in ident);records[key]=once[2:]
+                loaded=name if name!='probe_shared' else next(k for k in ident['base']if(k.endswith('.dylib') or '.so' in k))
+                if ident['base'][loaded]==ident['candidate'][loaded]:
+                    timings[key]=dict(identical=True);continue
+                reps=max(1,math.ceil(24e6/once[1]));exp=bench('base',reps)[2:];labels=list(ident);blocks=[];rng=random.Random(key)
+                for _ in range(17):
+                    rng.shuffle(labels);v={t:[]for t in labels}
+                    for t in labels+labels[::-1]:
+                        sample=bench(t,reps);assert sample[2:]==exp;v[t].append(sample[:2])
+                    blocks.append({t:[sum(x[c]for x in v[t])for c in (0,1)]for t in v})
+                timings[key]=dict(reps=reps,blocks=blocks);save('timings',timings)
+    assert len(records)==6*(9 if kind=='product' else 14)
+    save('timings',timings);save('complete',dict(complete=True,records=records,source=q,config=kind,profile=os.environ['SCAN_PROFILE'],machine=platform.machine(),platform=platform.system(),compiler=get('clang','--version').splitlines()[0]))
 finally:
-    size=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=size))
+    used=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(bytes=used,removed=not w.exists()))

@@ -36,6 +36,10 @@
 
 #include <capstone/capstone.h>
 
+#ifdef REQUEST_NATIVE
+extern "C" bool X86_disasmIterText(csh, const uint8_t **, size_t *, uint64_t *, cs_insn *);
+#endif
+
 struct Result {
   uint64_t instructions = 0, rejected = 0;
   uint64_t boundaries = 0xcbf29ce484222325ULL, values = 0;
@@ -151,8 +155,8 @@ int main(int argc,char **argv) {
   }
   if(argc!=7) return 2;
   std::string engine=argv[1];
-  const bool att=engine=="public-att";
-  if(att) engine="capstone";
+  const bool att=engine=="public-att" || engine=="private-att";
+  if(att) engine=engine=="private-att"?"private":"capstone";
   unsigned mode=std::stoul(argv[2]), reps=std::stoul(argv[3]);
   if (mode>4 || !reps) return 2;
   std::ifstream file(argv[4],std::ios::binary), table(argv[5]);
@@ -171,12 +175,16 @@ int main(int argc,char **argv) {
      cs_option(handle,CS_OPT_TEXT,mode ? CS_OPT_ON : CS_OPT_OFF)!=CS_ERR_OK) return 4;
   if(att && cs_option(handle,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT)!=CS_ERR_OK) return 4;
   cs_insn *insn=cs_malloc(handle);
-  if(!insn || engine!="capstone") return 5;
+  if(!insn || (engine!="capstone" && engine!="private")) return 5;
   {
     auto run=[&](unsigned n) {
       Result all;
       for(unsigned i=0;i<n;++i) for(auto f:spans) {
         Result row;
+#ifdef REQUEST_NATIVE
+        if (engine=="private") row=cs_span<X86_disasmIterText>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
+        else
+#endif
         row=cs_span<cs_disasm_iter>(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);
         add_result(all,row,f);
       }
