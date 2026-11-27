@@ -1,7 +1,7 @@
-name: Compare two implicit-register callbacks and the original register walk on the same PE and ELF boundaries
+name: Attribute register access cost using the same executable and the original instruction stream
 on:
   push:
-    branches: [codex/short-implicit-register-callback]
+    branches: [codex/select-register-walk-at-open]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: short-list-registers-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: in-process-register-selection-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
