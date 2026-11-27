@@ -1,7 +1,7 @@
-name: Measure AVX-IFMA decode and generated register and memory output on real programs
+name: Measure AVX-IFMA opcode table, scan, formatted output and operand details on linked real programs
 on:
   push:
-    branches: [codex/vex-ifma-generated-programs]
+    branches: [codex/ifma-canonical-decoders]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 87e0b7d2303971e350f4ee3cb6923113154ef5cc
+          ref: cde65f0e4bf3344408847839283e4e48f39024ee
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/iced
-          ref: 8b8d90b13374fbf38e7279749e48c673f4ec243a
+          ref: 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31
           path: iced-source
           sparse-checkout: src/rust/iced-x86
           persist-credentials: false
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: generated-ifma-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: canonical-ifma-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
