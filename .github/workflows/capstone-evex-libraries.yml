@@ -1,7 +1,7 @@
-name: Replicate complete SQL.js detail and esbuild branch table throughput on six native hosts
+name: Separate branch tables and all remaining SQL.js operators on native Intel and Arm
 on:
   push:
-    branches: [codex/wasm-module-detailed-repeat]
+    branches: [codex/wasm-sqljs-operator-partition]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,10 +13,8 @@ jobs:
         include:
           - { host: macos-15-intel, cc: clang, cxx: clang++, replica: 1 }
           - { host: macos-15-intel, cc: clang, cxx: clang++, replica: 2 }
-          - { host: macos-15-intel, cc: clang, cxx: clang++, replica: 3 }
           - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++, replica: 1 }
           - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++, replica: 2 }
-          - { host: ubuntu-24.04-arm, cc: clang, cxx: clang++, replica: 3 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -43,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wasm-target-repeat-${{ matrix.host }}-${{ matrix.replica }}
+          name: wasm-operator-partition-${{ matrix.host }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

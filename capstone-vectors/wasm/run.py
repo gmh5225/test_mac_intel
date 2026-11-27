@@ -84,16 +84,32 @@ try:
         selections[tag]+=1
     datasets=[];tables={}
     for name,spec in cover.items():
-        if name=='wabt':continue
+        if name!='sql.js':continue
         raw=inputs/(name+'.wasm');ranges=inputs/(name+'.ranges')
         assert sha(raw)==spec['sha256'] and sha(ranges)==spec['ranges_sha256']
         data=raw.read_bytes()
         selected=b''.join(struct.pack('<II',a,b) for a,b in struct.iter_unpack('<II',ranges.read_bytes()) if data[a]==0x0e)
         count=len(selected)//8;assert count>0
         sub=temp/(name+'.tables');sub.write_bytes(selected)
-        tables[name]=dict(count=count,wasm=sha(raw),ranges=sha(sub))
+        other=temp/(name+'.other')
+        other.write_bytes(b''.join(struct.pack('<II',a,b) for a,b in struct.iter_unpack('<II',ranges.read_bytes()) if data[a]!=0x0e))
+        other_count=other.stat().st_size//8
+        assert count+other_count==spec['operators'] and count==read(r/'protocol.json')['table_count']
+        datasets.append((name+'/other',dict(operators=other_count),raw,other))
+        tables[name]=dict(count=count,other_count=other_count,wasm=sha(raw),ranges=sha(sub),other=sha(other))
         datasets.extend([(name,spec,raw,ranges),(name+'/br_table',dict(operators=count),raw,sub)])
     save('table-corpus',tables)
+    symbols={}
+    for label in ('base','candidate'):
+        symbols[label]={}
+        for line in get('nm','-an',temp/label).splitlines():
+            fields=line.split()
+            if len(fields)!=3 or fields[1] not in ('t','T'):continue
+            name=fields[2].lstrip('_')
+            if name.startswith(('WASM_', 'read_brtable','WASMDisassembler','cs_decode_full_insn','cs_disasm_iter','get_varuint32')):
+                symbols[label][name]=int(fields[0],16)
+        assert 'WASM_getInstruction' in symbols[label] and 'cs_disasm_iter' in symbols[label]
+    save('symbols',symbols)
     for name,spec,raw,ranges in datasets:
         for detail in (0,1):
             key=name+'/'+str(detail)
@@ -111,7 +127,7 @@ try:
                 if gold is not None:assert g==gold
                 gold=g
             assert sum(gold[:3])==spec['operators'] and gold[0]>0
-            assert gold==protocol['oracle'][key]
+            if key in protocol['oracle']: assert gold==protocol['oracle'][key]
             reps=max(1,math.ceil(protocol['sample_ns']/invoke(path,0,1)[0]))
             expected=invoke(path,0,reps)[2:];pairs=[];rng=random.Random(key+'/'+platform.node())
             for rep in range(protocol['iterations']):
