@@ -35,6 +35,12 @@ try:
     shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
+    lines=(w/'driver.cpp').read_text().splitlines()
+    keep=[line for line in lines if '(void)batch_span<true,X86_scanNativeBatch>' not in line and 'else if(engine=="private"' not in line]
+    assert len(keep)==len(lines)-3
+    (w/'public-only.cpp').write_text('\n'.join(keep)+'\n')
+    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'public-only.cpp','-o',w/'public-only.o')
+    assert 'X86_' not in get('nm','-u',w/'public-only.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
     maps=rd(r/'source.json')
@@ -74,20 +80,23 @@ try:
         save('gpr-records-'+label,rows)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/label)
         run('clang++',w/'foreign.o',lib,'-no-pie','-o',w/('foreign-'+label))
-        # Preserve the distinction between an executable that requests the fixed reader and one using only cs_disasm_iter.
-        reader='X86_disasmIterText'
-        resolved={}
-        for n,exe in [('native',w/label),('public_only',w/('foreign-'+label))]:
+        run('clang++',w/'public-only.o',lib,ice_lib,*flags,'-o',w/('ordinary-'+label))
+        names=('X86_disasmIterText','cs_decode_full_insn','X86_decodePublicRecord','cs_disasm_iter')
+        modes={}
+        for route,exe in [('native',w/label),('public_only',w/('ordinary-'+label)),('foreign',w/('foreign-'+label))]:
             with exe.open('rb') as fh:
-                tab=ELFFile(fh).get_section_by_name('.symtab')
-                resolved[n]=any(sym['st_shndx']!='SHN_UNDEF' and sym['st_size']>0 for sym in (tab.get_symbol_by_name(reader) or []))
-        obj,=build.rglob('X86DisassemblerDecoder.c.o')
-        with obj.open('rb') as fh:
-            tab=ELFFile(fh).get_section_by_name('.symtab')
-            symbols=tab.get_symbol_by_name(reader) or []
-            weak=any(sym['st_shndx']=='SHN_UNDEF' and sym['st_info']['bind']=='STB_WEAK' for sym in symbols)
-        assert resolved['native'] and weak==(label!='base' and os.uname().machine=='x86_64'),(label,resolved,weak)
-        save('link-mode-'+label,dict(resolved=resolved,weak=weak))
+                elf=ELFFile(fh);tab=elf.get_section_by_name('.symtab');symbols={}
+                for name in names:
+                    sym=next((x for x in (tab.get_symbol_by_name(name) or []) if x['st_shndx']!='SHN_UNDEF' and x['st_size']>0),None)
+                    if sym is not None:symbols[name]=[sym['st_value'],sym['st_info']['bind'],sym['st_other']['visibility']]
+                allocated={v.name:[v['sh_addr'],v['sh_size'],hashlib.sha256(v.data()).hexdigest()] for v in elf.iter_sections() if v['sh_flags']&2 and v['sh_type']!='SHT_NOBITS'}
+            resolved='X86_disasmIterText' in symbols;assert resolved==(route=='native'),(label,route,symbols)
+            active=os.uname().machine=='x86_64' and label!='base'
+            assert ('X86_decodePublicRecord' in symbols)==active
+            if active:
+                assert (symbols['X86_decodePublicRecord'][0]==symbols['cs_decode_full_insn'][0])==(route!='native'),(label,route,symbols)
+            modes[route]=dict(symbols=symbols,allocated=allocated)
+        save('link-mode-'+label,modes)
         from symbol_layout import symbols
         section_data={str(x.relative_to(build)):sha(x) for x in build.rglob('*.c.o')}
         for stem,unit in [('fallback','X86VectorFallback64.c.o'),('vector','X86VectorOutput.c.o'),('immediate','X86VexRegisterImmediate.c.o')]:
@@ -237,6 +246,13 @@ try:
             assert vals[0][2]==spec['bytes']
             records[name][lbl]=vals[0]
         save('extra-real',records)
+        ordinary=rd(e/'public-only-records.json') if (e/'public-only-records.json').exists() else {}
+        ordinary[name]={}
+        for stage in images:
+            ordinary[name][stage]=[list(map(int,get('setarch',os.uname().machine,'-R',w/('ordinary-'+stage),'capstone',str(mode),'1',f,path,str(bits)).split()))[2:]for mode in (0,1,2)]
+        assert ordinary[name]['base']==ordinary[name]['outlined']==ordinary[name]['candidate']
+        save('public-only-records',ordinary)
+
         for route in ('private','capstone'):
             def take(engine,mode,n):
                 other=engine in ('iced','fast')

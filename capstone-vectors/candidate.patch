@@ -1,53 +1,186 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..e899be96 100644
+index cea06480..39b1f91e 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1092,6 +1092,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+@@ -1092,6 +1092,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
      if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-+        set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_LINKED_PUBLIC_READER>")
++        set_property(SOURCE cs.c arch/X86/X86DisassemblerDecoder.c
++            arch/X86/X86Sse64Output.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_OPTIONAL_PUBLIC_RECORD>")
      endif()
  endif()
  add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index 709e1286..4784e330 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -53,6 +53,16 @@ CAPSTONE_INTERNAL bool X86_tryBatchOutput(cs_struct *handle, const uint8_t *code
+ #endif
+ #endif
+ 
++#if defined(X86_OPTIONAL_PUBLIC_RECORD) && defined(__ELF__) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_DIET) && \
++	!defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#define CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++#ifdef X86_ARCHIVE_FIXED_RECORD
++#define CAPSTONE_X86_DIRECT_PUBLIC_RECORD
++#endif
++#endif
++
+ #if defined(CAPSTONE_STATIC_X86_READERS) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 197453cb..1c13d889 100644
+index 197453cb..945e5724 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3753,6 +3753,23 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+@@ -3753,7 +3753,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
  					  cs_insn *insn, uint16_t *insn_size,
  					  bool batch);
  
-+#if defined(X86_LINKED_PUBLIC_READER) && !defined(CAPSTONE_DIET) && \
-+	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#define X86_HAS_LINKED_READER
-+/* A caller using only the public API need not extract the native readers. */
-+#pragma weak X86_disasmIterText
-+static inline bool hasLinkedIntelReader(const cs_struct *handle)
-+{
-+	return handle->arch == CS_ARCH_X86 && !handle->no_text &&
-+	       (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
-+	       (handle->syntax == CS_OPT_SYNTAX_DEFAULT ||
-+		handle->syntax == CS_OPT_SYNTAX_INTEL) &&
-+	       X86_disasmIterText != NULL;
-+}
-+#endif
-+
- #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD)
  #define CS_DECODE_OUTPUT_MISS X86_decodePublicRecord
  #elif defined(CAPSTONE_X86_PUBLIC_FIXED_RECORD)
-@@ -3800,6 +3817,11 @@ X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
- 				 uint64_t *address, cs_insn *insn)
- {
-+#ifdef X86_HAS_LINKED_READER
-+	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (*size && handle && hasLinkedIntelReader(handle))
-+		return X86_disasmIterText(ud, code, size, address, insn);
+ #define CS_PUBLIC_FIXED_RECORD
+diff --git a/arch/X86/X86PublicOutput.c b/arch/X86/X86PublicOutput.c
+index a03a42e9..8d606227 100644
+--- a/arch/X86/X86PublicOutput.c
++++ b/arch/X86/X86PublicOutput.c
+@@ -5,38 +5,5 @@
+ #include "X86ScanAdapter.h"
+ 
+ #ifdef CAPSTONE_X86_PUBLIC_OUTPUT
+-#if defined(__ELF__) && defined(__clang__)
+-#pragma clang section text = ".cs_x86_public_output_text"
+-#endif
+-CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
+-					    const uint8_t *code, size_t size,
+-					    cs_insn *insn, uint16_t *length,
+-					    bool batch)
+-{
+-#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
+-	/* The outer iterator owns detail visibility, skipdata and cursor updates.
+-	 * Its fixed text path only needs the decoded record and its length. */
+-	if (!batch && !handle->skipdata && !handle->no_text) {
+-		if (handle->mode == CS_MODE_32)
+-			return X86_decodeFixedRecord32(handle, code, size, insn,
+-						       length);
+-		if (handle->mode == CS_MODE_64)
+-			return X86_decodeFixedRecord64(handle, code, size, insn,
+-						       length);
+-	}
+-#else
+-	/* The caller owns skipdata callbacks, bulk boundaries and the public
+-	 * cursors. A fixed iterator can fill this one record using local cursors. */
+-	if (!batch && !handle->skipdata && !handle->no_text &&
+-	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
+-		uint64_t address = insn->address;
+-		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
+-					     &size, &address, insn);
+-		if (ok)
+-			*length = insn->size;
+-		return ok;
+-	}
+-#endif
+-	return cs_decode_full_insn(handle, code, size, insn, length, batch);
+-}
++#include "X86PublicOutputImpl.h"
+ #endif
+diff --git a/arch/X86/X86PublicOutputImpl.h b/arch/X86/X86PublicOutputImpl.h
+new file mode 100644
+index 00000000..14caac52
+--- /dev/null
++++ b/arch/X86/X86PublicOutputImpl.h
+@@ -0,0 +1,44 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++/* The outer public iterator owns cursor updates and skipdata handling. */
++#if defined(__ELF__) && defined(__clang__)
++#pragma clang section text = ".cs_x86_public_output_text"
 +#endif
- 	return cs_disasm_iter_core(ud, code, size, address, insn);
++CS_PRESERVE_MOST bool X86_decodePublicRecord(cs_struct *handle,
++					    const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *length,
++					    bool batch)
++{
++#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++	if (handle->arch != CS_ARCH_X86 ||
++	    (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
++	     handle->syntax != CS_OPT_SYNTAX_INTEL))
++		return cs_decode_full_insn(handle, code, size, insn, length, batch);
++#endif
++#ifdef CAPSTONE_X86_DIRECT_PUBLIC_RECORD
++	/* The outer iterator owns detail visibility, skipdata and cursor updates.
++	 * Its fixed text path only needs the decoded record and its length. */
++	if (!batch && !handle->skipdata && !handle->no_text) {
++		if (handle->mode == CS_MODE_32)
++			return X86_decodeFixedRecord32(handle, code, size, insn,
++						       length);
++		if (handle->mode == CS_MODE_64)
++			return X86_decodeFixedRecord64(handle, code, size, insn,
++						       length);
++	}
++#else
++	/* The caller owns skipdata callbacks, bulk boundaries and the public
++	 * cursors. A fixed iterator can fill this one record using local cursors. */
++	if (!batch && !handle->skipdata && !handle->no_text &&
++	    (handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64)) {
++		uint64_t address = insn->address;
++		bool ok = X86_disasmIterText((csh)(uintptr_t)handle, &code,
++					     &size, &address, insn);
++		if (ok)
++			*length = insn->size;
++		return ok;
++	}
++#endif
++	return cs_decode_full_insn(handle, code, size, insn, length, batch);
++}
+diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
+index 324fc05d..5f74f9ab 100644
+--- a/arch/X86/X86Sse64Output.c
++++ b/arch/X86/X86Sse64Output.c
+@@ -282,4 +282,8 @@ CAPSTONE_INTERNAL bool X86_disasmIterText(csh ud, const uint8_t **code,
+ #endif
+ 	return X86_disasmIter32(ud, code, size, address, insn);
+ }
++
++#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++#include "X86PublicOutputImpl.h"
++#endif
+ #endif
+diff --git a/cs.c b/cs.c
+index d0b8b045..1e1f4278 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1242,6 +1242,13 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	return true;
  }
  
++#ifdef CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD
++/* A public-only static link uses the generic decoder at the same address.
++ * Extracting the native reader supplies its strong internal implementation. */
++CAPSTONE_INTERNAL __typeof__(cs_decode_full_insn) X86_decodePublicRecord
++	__attribute__((weak, alias("cs_decode_full_insn")));
++#endif
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 08677417..97e6157d 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,7 +18,7 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
+-#ifdef CAPSTONE_X86_PUBLIC_OUTPUT
++#if defined(CAPSTONE_X86_PUBLIC_OUTPUT) || defined(CAPSTONE_X86_ARCHIVE_PUBLIC_RECORD)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ X86_decodePublicRecord(cs_struct *handle, const uint8_t *code, size_t size,
+ 		       cs_insn *insn, uint16_t *insn_size, bool batch);
