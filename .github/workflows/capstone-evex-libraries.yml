@@ -1,7 +1,7 @@
-name: Compare byte-memory TEST across native and public x86 and five other backends
+name: Compare corrected detail views and i386 TEST records with both iced formatters
 on:
   push:
-    branches: [codex/x86-memory-test-mixed-consumers]
+    branches: [codex/measure-detail-views-and-i386-against-iced]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: byte-test-mixed-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: current-views-and-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

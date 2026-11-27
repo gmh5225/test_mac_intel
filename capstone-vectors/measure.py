@@ -44,7 +44,7 @@ try:
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
     images={}
     maps=rd(r/'source.json')
-    assert maps['prefix']==q and maps['base']['commit']==q['parent']
+    assert maps['prefix']==q and maps['base']['commit']==q['patch_base']
     layout={}
     from elftools.elf.elffile import ELFFile
     for stem in ('real','states','guard'):
