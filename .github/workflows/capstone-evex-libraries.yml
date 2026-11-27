@@ -1,7 +1,7 @@
-name: Measure closed ARM alias printers on mapped executable code in static and shared libraries
+name: Measure early completion of text-only ARM aliases on the corrected detail views
 on:
   push:
-    branches: [codex/arm-canonical-alias-real-programs]
+    branches: [codex/arm-finish-text-only-alias]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b0009d26a8c617b2328833c96291ac8264036866
+          ref: 1d0673d2102cb4a31bc1f1d696d7fb7e8c29545f
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
+          ref: 2bb8205af8e667122c35fe0a13cf1cc198e4042e
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-closed-aliases-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: arm-open-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

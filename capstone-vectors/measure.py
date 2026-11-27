@@ -11,7 +11,9 @@ def out(*a):return sp.check_output(a,text=True).strip()
 def sha(f):return hashlib.sha256(f.read_bytes()).hexdigest()
 q=rd(r/'source.json');w=Path(tempfile.mkdtemp());proj=w/'project'
 try:
-    assert out('git','-C',src,'rev-parse','HEAD')==q['base']['commit'] and out('git','-C',nd,'rev-parse','HEAD')==q['neverd']
+    assert out('git','-C',src,'rev-parse','HEAD')==q['checkout'] and out('git','-C',nd,'rev-parse','HEAD')==q['neverd']
+    base_patch=r/'base.patch';assert sha(base_patch)==q['base']['sha256'];run('git','-C',src,'apply','--index',base_patch)
+    assert out('git','-C',src,'write-tree')==q['base']['tree']
     (proj/'third_party').mkdir(parents=True);(proj/'third_party/capstone').symlink_to(src);(proj/'cmake').mkdir()
     cm='cmake/NeverDCapstoneCompilerOptions.inc';(proj/cm).write_bytes((nd/cm).read_bytes())
     main=(nd/'CMakeLists.txt').read_text();(proj/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.22)\nproject(ARMFormat LANGUAGES C CXX)\n'+main[main.index('# --- Capstone (our fork'):main.index('# --- NeverD CMake helpers')])

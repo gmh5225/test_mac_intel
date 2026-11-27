@@ -1,26 +1,31 @@
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index 5a84376e..1fe38453 100644
+index 5a84376e..0eecec44 100644
 --- a/arch/ARM/ARMInstPrinter.c
 +++ b/arch/ARM/ARMInstPrinter.c
-@@ -2034,7 +2034,15 @@ add_real_detail:
+@@ -2032,8 +2032,20 @@ add_real_detail:
+ 	MCInst_setIsAlias(MI, isAlias);
+ 	if (!isAlias || !useAliasDetails) {
  		map_set_fill_detail_ops(MI, !(isAlias && useAliasDetails));
- 		if (isAlias)
- 			SStream_Close(O);
--		printInstruction(MI, Address, O);
+-		if (isAlias)
++		if (isAlias) {
 +#if defined(CAPSTONE_ARM_ONLY) && !defined(CAPSTONE_DIET) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+		/* The alias already supplied the spelling. Its canonical printer
-+		 * still owns real operand details and custom formatting calls. */
-+		if (!isAlias || map_fill_detail_ops(MI) ||
-+		    cs_vsnprintf != cs_default_vsnprintf)
++			/* The alias already supplied the text. A closed canonical
++			 * print is observable through real details or a custom formatter. */
++			if (!map_fill_detail_ops(MI) &&
++			    cs_vsnprintf == cs_default_vsnprintf) {
++				SStream_Open(O);
++				return;
++			}
 +#endif
-+			printInstruction(MI, Address, O);
+ 			SStream_Close(O);
++		}
+ 		printInstruction(MI, Address, O);
  		if (isAlias)
  			SStream_Open(O);
- 	}
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
-index c9c7b0ec..d43a9123 100644
+index c9c7b0ec..4b45a1de 100644
 --- a/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 +++ b/suite/auto-sync/src/autosync/cpptranslator/saved_patches.json
 @@ -3164,7 +3164,7 @@
@@ -28,7 +33,7 @@ index c9c7b0ec..d43a9123 100644
      "printInst": {
        "apply_type": "OLD",
 -      "old_hash": "7e3d78fc0453e27fc267c2a0777c754e6813278ddeba2003ca8f1c3e04cfa983",
-+      "old_hash": "1b107d65aa4c86683301b4265d75dc2928ba82015b4b1e7f96aef29dece8c0b9",
++      "old_hash": "4e7f6be0e48ad995aa5d559ed436c638ae8bd568d807e82c347af745b6acd1d1",
        "new_hash": "cdbf12c86ad23e78ca24d68a5ef2e72f098de3fcb9de7fc9f9f57e47e29f5399",
        "edit": ""
      },
