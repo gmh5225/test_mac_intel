@@ -1,3 +1,19 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 602ae735..ee7f3a6b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1088,6 +1088,11 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
+    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
+     target_compile_definitions(capstone_build_settings INTERFACE
+         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
++    # Reuse the AMD64 text iterator checks with the measured ELF reader alignment.
++    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
++        set_property(SOURCE arch/X86/X86Sse64Output.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_OUTPUT_PRECHECKED>")
++    endif()
+ endif()
+ add_library(capstone OBJECT ${ALL_SOURCES} ${capstone_storage_source} ${capstone_arm_char_source} ${ALL_HEADERS})
+ target_link_libraries(capstone PUBLIC capstone_build_settings)
 diff --git a/arch/X86/X86OutputOptions.h b/arch/X86/X86OutputOptions.h
 index 62d4288a..f0980db1 100644
 --- a/arch/X86/X86OutputOptions.h
@@ -43,22 +59,18 @@ index 21414e7a..dc92d198 100644
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86Sse64Output.c b/arch/X86/X86Sse64Output.c
-index 324fc05d..b47b2ad7 100644
+index 324fc05d..6f5a0e9f 100644
 --- a/arch/X86/X86Sse64Output.c
 +++ b/arch/X86/X86Sse64Output.c
-@@ -249,6 +249,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- }
+@@ -67,6 +67,11 @@ static bool writeExtend64(const uint8_t *code, size_t size, cs_insn *insn,
  
- #define X86_FIXED_ROUNDED writeRoundedRegisters
-+#define X86_FIXED_OUTPUT_PRECHECKED
- #define X86_FIXED_OUTPUT tryOutput64
- #define X86_FIXED_WIDE true
- #define X86_OUTPUT_MISS writeExtraOutput64
-@@ -256,6 +257,7 @@ static bool writeRoundedRegisters(const uint8_t *code, cs_insn *insn,
- #undef X86_OUTPUT_MISS
- #undef X86_FIXED_WIDE
- #undef X86_FIXED_OUTPUT
-+#undef X86_FIXED_OUTPUT_PRECHECKED
- #define CS_DECODE_OUTPUT_MISS X86_decodeOutputMiss64
- #define CS_DECODE_TRY_OUTPUT tryOutput64
- #include "../../cs_disasm_internal.h"
+ /* FF /2 and /4 have one explicit 64-bit target. The register and memory
+  * forms share their generated access, implicit register and group records. */
++/* Align the indirect branch writer independently of the scalar reader that
++ * precedes it in the AMD64 text section. */
++#if defined(X86_FIXED_OUTPUT_PRECHECKED) && defined(__x86_64__)
++__attribute__((aligned(32)))
++#endif
+ static bool writeIndirect64(const uint8_t *code, size_t size, cs_insn *insn,
+ 			    uint16_t *insn_size, uint8_t rex, uint8_t modrm)
+ {
