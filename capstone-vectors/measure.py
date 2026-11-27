@@ -38,7 +38,12 @@ try:
         run('cmake','--build',build,'--target','capstone_shared','capstone_static','--parallel','4')
         so=(build/'libcapstone.so').resolve()
         lib,=build.rglob('libcapstone.a')
-        shutil.copyfile(lib,w/(stage+'.a'))
+        make=w/'make';run('make','-C',src,'-j4','CC=clang','CAPSTONE_ARCHS=x86','CAPSTONE_STATIC=yes','CAPSTONE_SHARED=no','CAPSTONE_BUILD_CORE_ONLY=yes','BUILDDIR='+str(make))
+        static_lib=make/'libcapstone.a'
+        shutil.copyfile(static_lib,w/(stage+'.a'))
+        make_members={str(f.relative_to(make)):sha(f)for f in (make/'obj').rglob('*.o')}
+        assert len(make_members)>=30
+        save('make-'+stage,dict(archive=sha(static_lib),members=make_members))
         assert all('CAPSTONE_X86_ONLY' in x['command'] for x in read(build/'compile_commands.json'))
         dll=w/(stage+'.so');shutil.copyfile(so,dll);images[stage]=dll.read_bytes();sources[stage]=sha(dll);sizes[stage]=len(images[stage])
         syms=get('nm','-D','--defined-only','--format=posix',dll).splitlines()
@@ -52,7 +57,7 @@ try:
         save('static-product',static_images)
     for stage in ('initial','candidate'):
         a=static_images['base']['objects'];b=static_images[stage]['objects']
-        assert {Path(k).name for k in a if a[k]!=b[k]}==({'X86Mapping.c.o'} if stage=='candidate' else {'X86ATTInstPrinter.c.o'})
+        assert {Path(k).name for k in a if a[k]!=b[k]}==({'cs.c.o','X86MemoryFallback32.c.o'} if stage=='candidate' else {'cs.c.o'})
         assert static_images['base']['archive']!=static_images[stage]['archive']
     delta=dict(added=sorted(set(symbols['candidate'])-set(symbols['base'])),removed=sorted(set(symbols['base'])-set(symbols['candidate'])))
     save('identities',dict(source=q,images=sources,sizes=sizes,symbols=delta,objects=objects))
@@ -69,10 +74,6 @@ try:
     run('cmake','--build',build,'--target','x86_encoding_accuracy','--parallel','4')
     unit=get('ctest','--test-dir',build,'-R','^unit_x86_encoding_accuracy$','--no-tests=error','--output-on-failure')
     assert '100% tests passed' in unit
-    helper='X86_get_op_access'
-    obj=['objdump','-d','--disassemble='+helper]
-    for stage in ('base','initial','candidate'):
-        text=get(*obj,w/(stage+'.so'));start=text.index('<'+helper+'>:');(e/('access-'+stage+'.asm')).write_text(text[start:]+'\n')
     save('access-unit',dict(output=unit))
     for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
     (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
@@ -154,7 +155,7 @@ try:
                 count=int(res.stderr.strip()[len(tag):]);assert count%2==0
                 counts.append(count//2)
             calls[stage]=counts
-        assert calls['base']==calls['candidate'] and all(x[0]==0 for x in calls.values()) and calls['base'][1]>calls['initial'][1] and calls['base'][2]==calls['initial'][2]
+        assert calls['base']==calls['initial'] and all(x[0]==0 for x in calls.values())
         access_calls[name]=calls;save('access-lookups',access_calls)
 
         audits=[]
