@@ -1,7 +1,7 @@
-name: Measure complete generated VEX3 RIP records on real vector, scalar, PE32, firmware and non-x86 programs
+name: Measure the shipping six-ISA library against iced on real PE and ELF with timed hardware events
 on:
   push:
-    branches: [codex/vex3-rip-generated-fallback]
+    branches: [codex/shipping-iced-counter-windows]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: dd692166dbdd09f6e47021a5528ad9836a35d215
+          ref: 6ee08c9cfc7e104e240b50b97996c880e3bb5155
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 9132922fa5946d4fa918dd93c8589a269ace6d2e
+          ref: f197a097d0d559679ca3d3bb5159175e012b2d19
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex3-rip-fallback-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: release-fast-hardware-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

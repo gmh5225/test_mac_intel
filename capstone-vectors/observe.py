@@ -1,24 +1,39 @@
-"""Count real decoder entries per instruction in a separate, untimed library."""
-from pathlib import Path
-def build(tree,b,out,base,driver,run):
-    for file,functions in [('X86DisassemblerDecoder.c',[('decodeScanResultFallback(csh ud,',0),('decodeScanResultGeneric(csh ud,',1),('static bool decodeGenericScan(',2)]),
-                           ('X86Mapping.c',[('X86_decodeFeatureExtensionSlow(csh handle,',3)]),
-                           ('X86EvexScan.c',[]),('X86VexScan.c',[('X86_readVex32PublicPlan(const',5)]),('X86OutputIterator.c',[])]:
-        f=tree/'arch/X86'/file;s=f.read_text();s='extern unsigned profile_stages[9];\n'+s
-        for name,index in functions:
-            assert s.count(name)==1,name
-            a=s.index('\n{',s.index(name))+2
-            s=s[:a]+'\n\t++profile_stages['+str(index)+'];'+s[a:]
-        if file=='X86EvexScan.c':
-            tag='return X86_FEATURE_DECODED;';assert s.count(tag)==1
-            s=s.replace(tag,'++profile_stages[4];\n\t\t\t'+tag)
-        if file=='X86VexScan.c':
-            tag='return ((plan >> 3) << 8) | end;';assert s.count(tag)==1
-            s=s.replace(tag,'++profile_stages[6];\n\t'+tag)
-        if file=='X86OutputIterator.c':
-            tag='if (X86_trySimpleOutput(handle, code, size, insn, insn_size))\n\t\treturn true;'
-            assert s.count(tag)==1
-            s=s.replace(tag,'if (X86_trySimpleOutput(handle, code, size, insn, insn_size)) {\n\t\t++profile_stages[7];\n\t\treturn true;\n\t}\n\t++profile_stages[8];')
-        f.write_text(s)
-    run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-observed')
-    run(['clang++','-O2','-std=c++17','-I',tree/'include',driver,b/'libcapstone.a','-lm','-o',out],'link-observer')
+import math,os,random
+import subprocess as sp
+from probe import hardware
+
+def measure_all(r,w,cases,save):
+ exe=w/'runner';isa=os.uname().machine;prefix=['setarch',isa,'-R'];all_times={};all_counts={}
+ def args(case,label,n):
+  mode,blob,path,bits=case
+  return [exe,label.partition('+')[0],str(mode),str(n),blob,path,str(bits)]
+ def visit(case,label,n):return list(map(int,sp.check_output(prefix+args(case,label,n),text=True).split()))
+ with hardware(r,w,save) as (groups,pmu):
+  for name,case in cases.items():
+   mode=case[0];tags=['capstone','private','iced','iced+copy'] if mode==0 else ['capstone','private','private+copy','iced','fast','fast+copy']
+   warm={t:visit(case,t,1)for t in tags};assert all(len(v)==6 and v[2:5]==warm['private'][2:5] for v in warm.values())
+   n=max(1,math.ceil(15e6/min(v[0]for v in warm.values())));signatures={t:visit(case,t,n)[2:]for t in tags}
+   def blocks(labels,count,reader,seed):
+    series=[];order=list(labels);rng=random.Random(name+'/'+seed)
+    for _ in range(count):
+     rng.shuffle(order);block={}
+     for t in order+order[::-1]:
+      v=reader(t)
+      if t in block:
+       for k,value in v.items():block[t][k]+=value
+      else:block[t]=v
+     series.append(block)
+    return series
+   def time(t):
+    got=visit(case,t,n);assert got[2:]==signatures[t];return dict(cpu=got[0],wall=got[1])
+   tm=blocks(tags,17,time,'elapsed')
+   all_times[name]=dict(reps=n,attempts=sum(warm['private'][2:4]),checks=signatures,blocks=tm);save('real-times',all_times)
+   if mode and name.split('/')[0]in ('putty-32-0.85','libmvec-amd64'):
+    data={}
+    for group,events in groups.items():
+     def read(t):
+      ok,counts,stdout,diag=pmu(events,args(case,t,n));assert ok and list(map(int,stdout.split()))[2:]==signatures[t],(name,t,group,diag)
+      return counts
+     data[group]=blocks(['private','capstone','fast','fast+copy'],13,read,group)
+    all_counts[name]=dict(reps=n,attempts=all_times[name]['attempts'],events=data);save('hardware-events',all_counts)
+ assert len(all_times)==18 and len(all_counts)==4
