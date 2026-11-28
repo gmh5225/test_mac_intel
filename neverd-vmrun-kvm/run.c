@@ -136,10 +136,21 @@ int main(int argc, char **argv) {
   KVM(cpu, KVM_SET_SREGS, &s);
   struct kvm_regs regs = {.rip = entry, .rflags = 2, .rax = 0x2badb002};
   KVM(cpu, KVM_SET_REGS, &regs);
-  const char *events[] = {"before_vmrun", "after_vmexit", "before_addr32"};
+  const char *events[] = {"before_vmrun", "after_vmexit", "before_addr32", "after_addr32"};
+  const unsigned event_count = sizeof(events) / sizeof(events[0]);
+  const uint8_t addr32_opcode[] = {0x67, 0x0f, 0x01, 0xd8};
+  unsigned long addr32_pc = strtoul(argv[5], NULL, 0);
+  if (addr32_pc >= RamBytes - sizeof(addr32_opcode) ||
+      memcmp(ram + addr32_pc, addr32_opcode, sizeof(addr32_opcode))) {
+    fputs("The selected addr32 VMRUN does not match the loaded guest bytes\n", stderr);
+    return 2;
+  }
   struct kvm_guest_debug debug = {.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_HW_BP};
-  for (unsigned i = 0; i < 3; ++i) {
-    debug.arch.debugreg[i] = strtoul(argv[3 + i], NULL, 0);
+  debug.arch.debugreg[0] = strtoul(argv[3], NULL, 0);
+  debug.arch.debugreg[1] = strtoul(argv[4], NULL, 0);
+  debug.arch.debugreg[2] = addr32_pc;
+  debug.arch.debugreg[3] = addr32_pc + sizeof(addr32_opcode);
+  for (unsigned i = 0; i < event_count; ++i) {
     debug.arch.debugreg[7] |= 1ULL << (2 * i);
   }
   debug.arch.debugreg[7] |= 0x400;
@@ -148,9 +159,9 @@ int main(int argc, char **argv) {
     KVM(cpu, KVM_RUN, 0);
     if (run->exit_reason == KVM_EXIT_DEBUG) {
       unsigned slot = 0;
-      while (slot < 3 && run->debug.arch.pc != debug.arch.debugreg[slot])
+      while (slot < event_count && run->debug.arch.pc != debug.arch.debugreg[slot])
         ++slot;
-      if (slot == 3)
+      if (slot == event_count)
         break;
       record_state(events[slot], cpu, ram, vmcb, run->exit_reason);
       debug.arch.debugreg[7] &= ~(1ULL << (2 * slot));
