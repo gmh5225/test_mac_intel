@@ -18,7 +18,7 @@ sys.path.insert(0, str(root / "model/neverd-cpta"))
 from run import model_session
 
 with tempfile.TemporaryDirectory() as parent, model_session(Path(parent), reports) as model:
-    for source, destination in (("joins", "joined-execution"), ("previous", "previous-execution"), ("guests", "execution"), ("legacy", "legacy-execution")):
+    for source, destination in (("joins", "joined-execution"), ("scratch-free", "scratch-free-execution"), ("previous", "previous-execution"), ("guests", "execution"), ("legacy", "legacy-execution")):
         subprocess.run([sys.executable, str(inputs / "verify_arm64e_return_model.py"), "run",
                         "--model", str(model), "--guests", str(inputs / source),
                         "--output", str(reports / destination)], check=True)
@@ -28,3 +28,5 @@ shutil.copyfile(inputs / "legacy/guests.json", reports / "legacy-guests.json")
 shutil.copyfile(inputs / "inputs.def", reports / "inputs.json")
 
 shutil.copyfile(inputs / "previous/guests.json", reports / "previous-guests.json")
+
+shutil.copyfile(inputs / "scratch-free/guests.json", reports / "scratch-free-guests.json")
