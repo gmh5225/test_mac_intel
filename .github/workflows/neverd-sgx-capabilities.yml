@@ -23,7 +23,7 @@ on:
       neverd_revision:
         description: NeverD source revision for the Linux software tests
         type: string
-        default: 7a0f218965a75d714b5196c06003affc5818ffc0
+        default: af8723f12adc2ac3f907cfebadcd7759dd3d7dc5
 
 permissions:
   contents: read
@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ${{ inputs.neverd_revision || '7a0f218965a75d714b5196c06003affc5818ffc0' }}
+          ref: ${{ inputs.neverd_revision || 'af8723f12adc2ac3f907cfebadcd7759dd3d7dc5' }}
           path: NeverD
           persist-credentials: false
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
@@ -103,7 +103,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverC
-          ref: 4f3e6b9ed8d3a2f1b4b6f680bbe9bf9b87cc78c0
+          ref: 5a70f355ef14d30454128ff29b867044f7b9c583
           path: NeverC
           persist-credentials: false
       - name: Install the x64 build tools
@@ -192,6 +192,7 @@ jobs:
           python neverd-sgx-capabilities/prepare_neverc.py --source NeverC --compiler NeverC/build-portable/bin/neverc --output compiler-check
           mkdir -p software-evidence
           cp compiler-check/compiler.json software-evidence/
+          python neverd-sgx-capabilities/translation_targets.py --source NeverC --compiler NeverC/build-portable/bin/neverc --output software-evidence/translation-targets.json
       - name: Retain the verified portable x64 compiler
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
