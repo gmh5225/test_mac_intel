@@ -1,7 +1,7 @@
-name: Measure the shipping six-ISA library against iced on real PE and ELF with timed hardware events
+name: Compare the published Capstone and NeverD revisions directly with the iced fork on four hosts
 on:
   push:
-    branches: [codex/shipping-iced-counter-windows]
+    branches: [codex/published-rip-iced-comparison]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6ee08c9cfc7e104e240b50b97996c880e3bb5155
+          ref: ea546fe8c9d7b05be844398dd5301dd4735d0eb2
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: f197a097d0d559679ca3d3bb5159175e012b2d19
+          ref: f9c00d8a7f0148bff18d1fbfa879bf7ce8c407a0
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: release-fast-hardware-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: published-rip-hardware-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
