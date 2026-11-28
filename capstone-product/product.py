@@ -110,7 +110,7 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first={'X86Disassembler.c.o'};arm=os.uname().machine=='aarch64';between=first if arm else set();second=set() if arm else first
+    first={'X86BatchScan.c.o'};arm=os.uname().machine=='aarch64';between=first if arm else set();second=set() if arm else first
     for before,after,expected in [('shipping','base',first),
         ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]

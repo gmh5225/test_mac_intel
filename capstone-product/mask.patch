@@ -1,62 +1,40 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d8f51cb9..50da9212 100644
+index 50da9212..e8a38826 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -1099,6 +1099,8 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
-     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-         set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
+@@ -1101,6 +1101,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
-+        set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CHECK_EVEX_WRITEMASK>")
+         set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY
+             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CHECK_EVEX_WRITEMASK>")
++        # The x86-64 batch scanner needs the instruction address only on fallback.
++        set_property(SOURCE arch/X86/X86BatchScan.c APPEND PROPERTY
++            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_BATCH_FALLBACK_ADDRESS>")
          set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
              COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
      endif()
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..639b4745 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -626,6 +626,24 @@ bool X86_completeScan(MCInst *instr, InternalInstruction *insn, uint16_t *size)
- #define X86_BACKEND_INLINE static inline
- #endif
- 
-+X86_BACKEND_INLINE bool hasDecodedWritemask(const InternalInstruction *insn)
-+{
-+#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
-+	return x86HasWritemaskOperand(insn->instructionID);
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..65b9cbe8 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -280,7 +280,11 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 		uint32_t packed = wide ? readFirst64(code, size) :
+ 					 readFirst32(code, size);
+ 		if (!packed) {
++#ifdef X86_BATCH_FALLBACK_ADDRESS
++			insn.address = address + batch.bytes;
 +#else
-+#ifdef X86_CHECK_EVEX_WRITEMASK
-+	/* readMaskRegister rejects writemask operands outside EVEX. */
-+	if (insn->vectorExtensionType != TYPE_EVEX)
-+		return false;
+ 			insn.address = address;
 +#endif
-+	for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+		if (insn->operands[i].encoding == ENCODING_WRITEMASK)
-+			return true;
-+	}
-+	return false;
+ 			X86ScanResult result;
+ 			if (!X86_getInstructionScanResult(ud, code, size, &insn,
+ 							  &result))
+@@ -294,7 +298,9 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 		batch.bytes += length;
+ 		code += length;
+ 		size -= length;
++#ifndef X86_BATCH_FALLBACK_ADDRESS
+ 		address += length;
 +#endif
-+}
-+
- X86_BACKEND_INLINE bool
- getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			      MCInst *instr, uint16_t *size,
-@@ -702,18 +720,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (insn.hasLockPrefix)
- 				Flags |= X86_IP_HAS_LOCK;
- 
--#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
--			if (x86HasWritemaskOperand(insn.instructionID))
-+			if (hasDecodedWritemask(&insn))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
--#else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
--				}
--			}
--#endif
- 
- 			instr->flags = Flags;
- 		}
+ 	}
+ 	return batch;
+ }

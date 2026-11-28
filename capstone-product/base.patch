@@ -1,141 +1,21 @@
-diff --git a/arch/Sparc/SparcInstPrinter.c b/arch/Sparc/SparcInstPrinter.c
-index f5100f32..640c9b34 100644
---- a/arch/Sparc/SparcInstPrinter.c
-+++ b/arch/Sparc/SparcInstPrinter.c
-@@ -86,7 +86,6 @@ static void printInst(MCInst *MI, uint64_t Address, SStream *O)
- {
- 	bool isAlias = false;
- 	bool useAliasDetails = map_use_alias_details(MI);
--	MI->flat_insn->usesAliasDetails = useAliasDetails;
- 	map_set_fill_detail_ops(MI, useAliasDetails);
- 
- 	if (!printAliasInstr(MI, Address, O) && !printSparcAliasInstr(MI, O)) {
-diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
-index c0272615..d4e2f344 100644
---- a/arch/Sparc/SparcMapping.c
-+++ b/arch/Sparc/SparcMapping.c
-@@ -33,22 +33,15 @@ const insn_map sparc_insns[] = {
- 
- void Sparc_set_instr_map_data(MCInst *MI)
- {
--	const unsigned opcode = MCInst_getOpcode(MI);
--	if (opcode >= ARR_SIZE(sparc_insns)) {
--		map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
--		return;
--	}
--	/* TableGen emits one mapping row per opcode in enum order. */
--	const insn_map *row = &sparc_insns[opcode];
--	MI->flat_insn->id = row->mapid;
--#ifndef CAPSTONE_DIET
--	if (!MI->flat_insn->detail)
--		return;
-+	map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
- 	map_implicit_reads(MI, sparc_insns);
- 	map_implicit_writes(MI, sparc_insns);
- 	map_groups(MI, sparc_insns);
--	Sparc_get_detail(MI)->format = row->suppl_info.sparc.form;
--#endif
-+	const sparc_suppl_info *suppl_info =
-+		map_get_suppl_info(MI, sparc_insns);
-+	if (suppl_info) {
-+		Sparc_get_detail(MI)->format = suppl_info->form;
-+	}
+diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
+index b56826b0..e4c849e6 100644
+--- a/arch/X86/X86BatchScan.c
++++ b/arch/X86/X86BatchScan.c
+@@ -280,7 +280,7 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 		uint32_t packed = wide ? readFirst64(code, size) :
+ 					 readFirst32(code, size);
+ 		if (!packed) {
+-			insn.address = address;
++			insn.address = address + batch.bytes;
+ 			X86ScanResult result;
+ 			if (!X86_getInstructionScanResult(ud, code, size, &insn,
+ 							  &result))
+@@ -294,7 +294,6 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
+ 		batch.bytes += length;
+ 		code += length;
+ 		size -= length;
+-		address += length;
+ 	}
+ 	return batch;
  }
- 
- /// Adds details which are not defined consistently as LLVM operands like
-@@ -313,6 +306,7 @@ void Sparc_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- {
- 	MCRegisterInfo *MRI = (MCRegisterInfo *)info;
- 	MI->MRI = MRI;
-+	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
- 	Sparc_LLVM_printInst(MI, MI->address, "", O);
- 
- #ifndef CAPSTONE_DIET
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..920ed025 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* readMaskRegister accepts only EVEX operands. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
- #endif
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 46b55d85..72d7b188 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -25,9 +25,6 @@ if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPP
-     add_test(NAME unit_alias_mnemonic_trie_generator
-         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_trie.py" --check)
- endif()
--if(CAPSTONE_SPARC_SUPPORT)
--    list(APPEND UNIT_TEST_SOURCES sparc_mapping_index.c)
--endif()
- if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
-     add_test(NAME unit_sparc_state_register_names_generator
-         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/sparc_state_register_names.py" --check)
-diff --git a/tests/unit/sparc_mapping_index.c b/tests/unit/sparc_mapping_index.c
-deleted file mode 100644
-index d86fb72e..00000000
---- a/tests/unit/sparc_mapping_index.c
-+++ /dev/null
-@@ -1,44 +0,0 @@
--/* SPDX-License-Identifier: BSD-3-Clause */
--
--#include "../../Mapping.h"
--#include "../../arch/Sparc/SparcMapping.h"
--#include <limits.h>
--#include <stdio.h>
--
--static const insn_map rows[] = {
--#include "../../arch/Sparc/SparcGenCSMappingInsn.inc"
--};
--
--int main(void)
--{
--	if (ARR_SIZE(rows) != INSTRUCTION_LIST_END)
--		return 1;
--	cs_struct handle = { 0 };
--	handle.detail_opt = CS_OPT_ON;
--	cs_insn record = { 0 };
--	MCInst inst = { 0 };
--	inst.csh = &handle;
--	inst.flat_insn = &record;
--	for (unsigned op = 0; op < ARR_SIZE(rows); ++op) {
--		MCInst_setOpcode(&inst, op);
--		record.id = UINT_MAX;
--		record.detail = NULL;
--		Sparc_set_instr_map_data(&inst);
--		if (rows[op].id != op || record.id != rows[op].mapid) {
--			fprintf(stderr, "Wrong SPARC mapping row for opcode %u\n", op);
--			return 1;
--		}
--#ifndef CAPSTONE_DIET
--		cs_detail detail = { 0 };
--		record.id = UINT_MAX;
--		record.detail = &detail;
--		Sparc_set_instr_map_data(&inst);
--		if (record.id != rows[op].mapid ||
--		    detail.sparc.format != rows[op].suppl_info.sparc.form) {
--			fprintf(stderr, "Wrong SPARC mapping detail for opcode %u\n", op);
--			return 1;
--		}
--#endif
--	}
--	return 0;
--}
