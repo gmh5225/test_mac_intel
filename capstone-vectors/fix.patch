@@ -46,36 +46,65 @@ index bc315806..8f05e235 100644
  	1089, // X86_INT1
  	1122, // X86_INT3
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 735660ea..029fe21a 100644
+index 735660ea..7c8fb98f 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10308,6 +10308,25 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+@@ -10308,6 +10308,54 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
  #include "X86GenMappingCounts.inc"
  #endif
  
 +#ifndef CAPSTONE_DIET
-+static void adjust_string_indices(cs_detail *detail)
++/* The mapping rows use ESI and EDI as canonical string indices. A source
++ * row reads ESI even when its segment override selects the destination segment. */
++static bool map_string_indices(uint16_t *regs, unsigned count, x86_reg si,
++			       x86_reg di)
 +{
-+	unsigned int width = detail->x86.addr_size;
-+	if (width == 4)
-+		return;
-+	x86_reg si = width == 2 ? X86_REG_SI : X86_REG_RSI;
-+	x86_reg di = width == 2 ? X86_REG_DI : X86_REG_RDI;
-+	arr_replace(detail->regs_read, detail->regs_read_count, X86_REG_ESI,
-+		    si);
-+	arr_replace(detail->regs_write, detail->regs_write_count, X86_REG_ESI,
-+		    si);
-+	arr_replace(detail->regs_read, detail->regs_read_count, X86_REG_EDI,
-+		    di);
-+	arr_replace(detail->regs_write, detail->regs_write_count, X86_REG_EDI,
-+		    di);
++	bool source = false;
++	for (unsigned i = 0; i < count; ++i) {
++		if (regs[i] == X86_REG_ESI) {
++			regs[i] = si;
++			source = true;
++		} else if (regs[i] == X86_REG_EDI) {
++			regs[i] = di;
++		}
++	}
++	return source;
++}
++
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static void map_string_registers(cs_detail *detail, cs_mode mode)
++{
++	unsigned width = detail->x86.addr_size;
++	x86_reg si = width == 2 ? X86_REG_SI :
++		     width == 4 ? X86_REG_ESI :
++				  X86_REG_RSI;
++	x86_reg di = width == 2 ? X86_REG_DI :
++		     width == 4 ? X86_REG_EDI :
++				  X86_REG_RDI;
++	bool source = map_string_indices(detail->regs_read,
++					 detail->regs_read_count, si, di);
++	if (width != 4)
++		map_string_indices(detail->regs_write, detail->regs_write_count,
++				   si, di);
++	if (source) {
++		uint8_t prefix = detail->x86.prefix[1];
++		x86_reg segment = prefix ? apx_segment_register(prefix) :
++					   X86_REG_DS;
++		if (mode != CS_MODE_64 || segment == X86_REG_FS ||
++		    segment == X86_REG_GS)
++			detail->regs_read[detail->regs_read_count++] = segment;
++	}
 +}
 +#endif
 +
  // given internal insn id, return public instruction info
  void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  {
-@@ -10465,32 +10484,6 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10465,32 +10513,6 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			case X86_INS_LODSD:
  			case X86_INS_LODSQ:
  			case X86_INS_LODSW:
@@ -108,7 +137,7 @@ index 735660ea..029fe21a 100644
  			case X86_INS_SCASB:
  			case X86_INS_SCASD:
  			case X86_INS_SCASW:
-@@ -10499,32 +10492,6 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10499,32 +10521,6 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			case X86_INS_STOSD:
  			case X86_INS_STOSQ:
  			case X86_INS_STOSW:
@@ -141,7 +170,7 @@ index 735660ea..029fe21a 100644
  			case X86_INS_CMPSB:
  			case X86_INS_CMPSD:
  			case X86_INS_CMPSQ:
-@@ -10533,46 +10500,13 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10533,47 +10529,14 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			case X86_INS_MOVSW:
  			case X86_INS_MOVSD:
  			case X86_INS_MOVSQ:
@@ -185,20 +214,23 @@ index 735660ea..029fe21a 100644
 -						X86_REG_ESI, X86_REG_RSI);
 -					break;
 -				}
+-				break;
 +			case X86_INS_INSB:
 +			case X86_INS_INSW:
 +			case X86_INS_INSD:
 +			case X86_INS_OUTSB:
 +			case X86_INS_OUTSW:
 +			case X86_INS_OUTSD:
-+				adjust_string_indices(insn->detail);
- 				break;
++				map_string_registers(insn->detail, mode);
++				goto implicit_registers_done;
  
  			case X86_INS_ENTER:
-@@ -10618,63 +10552,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			case X86_INS_LEAVE:
+@@ -10617,94 +10580,11 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 						X86_REG_ESP, X86_REG_RSP);
  				}
  				break;
- 
+-
 -			case X86_INS_INSB:
 -			case X86_INS_INSW:
 -			case X86_INS_INSD:
@@ -227,7 +259,7 @@ index 735660ea..029fe21a 100644
 -					break;
 -				}
 -				break;
- 
+-
 -			case X86_INS_OUTSB:
 -			case X86_INS_OUTSW:
 -			case X86_INS_OUTSD:
@@ -259,36 +291,23 @@ index 735660ea..029fe21a 100644
  			}
  
  			switch (insn->id) {
-@@ -10682,28 +10560,33 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			default:
  				break;
- 			case X86_INS_LODSB:
- 			case X86_INS_LODSD:
-+			case X86_INS_LODSQ:
- 			case X86_INS_LODSW:
- 			case X86_INS_CMPSB:
- 			case X86_INS_CMPSD:
-+			case X86_INS_CMPSQ:
- 			case X86_INS_CMPSW:
- 			case X86_INS_MOVSB:
-+			case X86_INS_MOVSQ:
- 			case X86_INS_MOVSW:
- 			case X86_INS_MOVSD:
- 			case X86_INS_OUTSB:
- 			case X86_INS_OUTSW:
+-			case X86_INS_LODSB:
+-			case X86_INS_LODSD:
+-			case X86_INS_LODSW:
+-			case X86_INS_CMPSB:
+-			case X86_INS_CMPSD:
+-			case X86_INS_CMPSW:
+-			case X86_INS_MOVSB:
+-			case X86_INS_MOVSW:
+-			case X86_INS_MOVSD:
+-			case X86_INS_OUTSB:
+-			case X86_INS_OUTSW:
 -			case X86_INS_OUTSD:
 -				switch (mode) {
 -				default:
-+			case X86_INS_OUTSD: {
-+				/* The decoder supplies the selected source segment.
-+				 * Legacy strings default to DS. In 64-bit mode
-+				 * only FS and GS have a segment base. */
-+				uint8_t prefix = insn->detail->x86.prefix[1];
-+				x86_reg seg = apx_segment_register(prefix);
-+				if (mode != CS_MODE_64 && !prefix)
-+					seg = X86_REG_DS;
-+				if (mode == CS_MODE_64 && seg != X86_REG_FS &&
-+				    seg != X86_REG_GS)
- 					break;
+-					break;
 -				case CS_MODE_16:
 -				case CS_MODE_32: {
 -					int pos = insn->detail->regs_read_count;
@@ -297,14 +316,12 @@ index 735660ea..029fe21a 100644
 -					insn->detail->regs_read_count += 1;
 -				} break;
 -				}
-+				insn->detail->regs_read
-+					[insn->detail->regs_read_count++] = seg;
- 				break;
-+			}
- 
+-				break;
+-
  			case X86_INS_JMP:
  			case X86_INS_LJMP:
-@@ -11678,9 +11561,9 @@ static void add_cx(MCInst *MI)
+ 				switch (mode) {
+@@ -11678,9 +11558,9 @@ static void add_cx(MCInst *MI)
  	if (MI->csh->detail_opt) {
  		x86_reg cx;
  
@@ -316,7 +333,7 @@ index 735660ea..029fe21a 100644
  			cx = X86_REG_ECX;
  		else // 64-bit
  			cx = X86_REG_RCX;
-@@ -12047,7 +11930,9 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -12047,7 +11927,9 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
  			break;
  		case X86_OP_MEM:
  			// registers appeared in memory references always being read

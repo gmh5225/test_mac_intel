@@ -1,7 +1,7 @@
-name: Measure corrected string register access on real PE and ELF with independent register and timing checks
+name: Test single-pass implicit string registers against independent ISA cases and eleven PE or ELF inputs
 on:
   push:
-    branches: [codex/string-register-real-samples]
+    branches: [codex/row-string-registers]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: string-register-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: row-string-real-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

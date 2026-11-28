@@ -55,6 +55,15 @@ try:
     changed=[Path(k).name for k,v in images['base']['objects'].items()if images['fixed']['objects'][k]!=v]
     assert 'X86Mapping.c.o' in changed and set(changed)<={'X86Mapping.c.o','X86Disassembler.c.o','X86DisassemblerDecoder.c.o'},changed
     save('linked',dict(images=images,changed=changed,source=fix,dev=dev,iced=m['iced_revision']))
+    check=r/'string-cases.c';fixture=(r/'cases.tsv').read_bytes()
+    expected=rd(r/'expected.json');assert len(expected)==len(fixture.splitlines())==3584
+    run('clang','-O2','-I',base/'include',check,lib,'-o',w/'check-registers')
+    rows=sp.check_output([w/'check-registers'],input=fixture).splitlines();assert len(rows)==14336
+    for pos,row in enumerate(rows):
+        i,a,t,size,ident,ops,mn,rr,ww,dup=map(int,row.split())
+        assert (i,a,t)==(pos//4,(pos//2)%2,pos%2) and size>0 and ident and dup==0
+        assert [rr,ww]==(expected[i][:2] if t else expected[i][2:])
+    save('string-encodings',dict(count=len(expected),checks=len(rows),digest=hashlib.sha256(b'\n'.join(rows)).hexdigest()))
     os.link(w/'x86-base',w/'runner')
     for route in ('public','fixed'):run('clang++','-O2','-std=c++17','-I',base/'include',r/('records-'+route+'.cpp'),'-ldl','-o',w/('records-'+route))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
