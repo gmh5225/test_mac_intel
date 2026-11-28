@@ -1,7 +1,7 @@
-name: Retest PE32 and foreign workloads with in-process CPU and elapsed clocks
+name: Verify negative logical byte extension on 69 workloads with the original batch section extent
 on:
   push:
-    branches: [codex/neverd-pe32-matched-clock-repeat]
+    branches: [codex/group1-negative-width-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 88dd020a8c3682a41d7ea7559e99b2aab3a3413a
+          ref: a7746e80b32f3b4a5b9954b95309d658f7560954
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: matched-pe32-clock-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: group1-negative-width-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
