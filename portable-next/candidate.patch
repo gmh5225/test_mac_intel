@@ -1,49 +1,117 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d6f3ff5f..d36460a3 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -174,6 +174,10 @@ if(capstone_enabled_architectures STREQUAL "SYSTEMZ")
-     add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING)
- endif()
+diff --git a/arch/Sparc/SparcInstPrinter.c b/arch/Sparc/SparcInstPrinter.c
+index 640c9b34..f5100f32 100644
+--- a/arch/Sparc/SparcInstPrinter.c
++++ b/arch/Sparc/SparcInstPrinter.c
+@@ -86,6 +86,7 @@ static void printInst(MCInst *MI, uint64_t Address, SStream *O)
+ {
+ 	bool isAlias = false;
+ 	bool useAliasDetails = map_use_alias_details(MI);
++	MI->flat_insn->usesAliasDetails = useAliasDetails;
+ 	map_set_fill_detail_ops(MI, useAliasDetails);
  
-+if(capstone_enabled_architectures STREQUAL "SPARC")
-+    add_compile_definitions(CAPSTONE_SPARC_ONLY)
+ 	if (!printAliasInstr(MI, Address, O) && !printSparcAliasInstr(MI, O)) {
+diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
+index d4e2f344..c0272615 100644
+--- a/arch/Sparc/SparcMapping.c
++++ b/arch/Sparc/SparcMapping.c
+@@ -33,15 +33,22 @@ const insn_map sparc_insns[] = {
+ 
+ void Sparc_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
++	const unsigned opcode = MCInst_getOpcode(MI);
++	if (opcode >= ARR_SIZE(sparc_insns)) {
++		map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
++		return;
++	}
++	/* TableGen emits one mapping row per opcode in enum order. */
++	const insn_map *row = &sparc_insns[opcode];
++	MI->flat_insn->id = row->mapid;
++#ifndef CAPSTONE_DIET
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, sparc_insns);
+ 	map_implicit_writes(MI, sparc_insns);
+ 	map_groups(MI, sparc_insns);
+-	const sparc_suppl_info *suppl_info =
+-		map_get_suppl_info(MI, sparc_insns);
+-	if (suppl_info) {
+-		Sparc_get_detail(MI)->format = suppl_info->form;
+-	}
++	Sparc_get_detail(MI)->format = row->suppl_info.sparc.form;
++#endif
+ }
+ 
+ /// Adds details which are not defined consistently as LLVM operands like
+@@ -306,7 +313,6 @@ void Sparc_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ {
+ 	MCRegisterInfo *MRI = (MCRegisterInfo *)info;
+ 	MI->MRI = MRI;
+-	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
+ 	Sparc_LLVM_printInst(MI, MI->address, "", O);
+ 
+ #ifndef CAPSTONE_DIET
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 72d7b188..46b55d85 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -25,6 +25,9 @@ if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPP
+     add_test(NAME unit_alias_mnemonic_trie_generator
+         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_trie.py" --check)
+ endif()
++if(CAPSTONE_SPARC_SUPPORT)
++    list(APPEND UNIT_TEST_SOURCES sparc_mapping_index.c)
 +endif()
+ if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
+     add_test(NAME unit_sparc_state_register_names_generator
+         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/sparc_state_register_names.py" --check)
+diff --git a/tests/unit/sparc_mapping_index.c b/tests/unit/sparc_mapping_index.c
+new file mode 100644
+index 00000000..d86fb72e
+--- /dev/null
++++ b/tests/unit/sparc_mapping_index.c
+@@ -0,0 +1,44 @@
++/* SPDX-License-Identifier: BSD-3-Clause */
 +
- if(capstone_enabled_architectures STREQUAL "LOONGARCH")
-     add_compile_definitions(CAPSTONE_LOONGARCH_DEDICATED_MAPPING)
- endif()
-diff --git a/Makefile b/Makefile
-index 8118f71d..f225ca2c 100644
---- a/Makefile
-+++ b/Makefile
-@@ -135,6 +135,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),systemz)
- CFLAGS += -DCAPSTONE_SYSTEMZ_DEDICATED_MAPPING
- endif
- 
-+ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
-+CFLAGS += -DCAPSTONE_SPARC_ONLY
-+endif
++#include "../../Mapping.h"
++#include "../../arch/Sparc/SparcMapping.h"
++#include <limits.h>
++#include <stdio.h>
 +
- ifeq ($(sort $(CAPSTONE_ARCHS)),loongarch)
- CFLAGS += -DCAPSTONE_LOONGARCH_DEDICATED_MAPPING
- endif
-diff --git a/cs.c b/cs.c
-index b84486e0..65ae1a9d 100644
---- a/cs.c
-+++ b/cs.c
-@@ -93,6 +93,14 @@
- #define CS_PRIVATE_DECODER LoongArch_getInstruction
- #define CS_PRIVATE_PRINTER LoongArch_printer
- #define CS_KNOWN_PRINTER_EXTENT
-+#elif defined(CAPSTONE_SPARC_ONLY) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#include "arch/Sparc/SparcMapping.h"
-+#define CS_PRIVATE_ARCH CS_ARCH_SPARC
-+#define CS_PRIVATE_DECODER Sparc_getInstruction
-+#define CS_PRIVATE_PRINTER Sparc_printer
-+#define CS_KNOWN_PRINTER_EXTENT
- #endif
- #include "arch/TMS320C64x/TMS320C64xModule.h"
- #include "arch/TriCore/TriCoreModule.h"
++static const insn_map rows[] = {
++#include "../../arch/Sparc/SparcGenCSMappingInsn.inc"
++};
++
++int main(void)
++{
++	if (ARR_SIZE(rows) != INSTRUCTION_LIST_END)
++		return 1;
++	cs_struct handle = { 0 };
++	handle.detail_opt = CS_OPT_ON;
++	cs_insn record = { 0 };
++	MCInst inst = { 0 };
++	inst.csh = &handle;
++	inst.flat_insn = &record;
++	for (unsigned op = 0; op < ARR_SIZE(rows); ++op) {
++		MCInst_setOpcode(&inst, op);
++		record.id = UINT_MAX;
++		record.detail = NULL;
++		Sparc_set_instr_map_data(&inst);
++		if (rows[op].id != op || record.id != rows[op].mapid) {
++			fprintf(stderr, "Wrong SPARC mapping row for opcode %u\n", op);
++			return 1;
++		}
++#ifndef CAPSTONE_DIET
++		cs_detail detail = { 0 };
++		record.id = UINT_MAX;
++		record.detail = &detail;
++		Sparc_set_instr_map_data(&inst);
++		if (record.id != rows[op].mapid ||
++		    detail.sparc.format != rows[op].suppl_info.sparc.form) {
++			fprintf(stderr, "Wrong SPARC mapping detail for opcode %u\n", op);
++			return 1;
++		}
++#endif
++	}
++	return 0;
++}

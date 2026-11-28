@@ -31,14 +31,16 @@ try:
     (project/'CMakeLists.txt').write_text('\n'.join(lines)+'\n')
     cfg=['cmake','-G','Ninja','-S',project,'-B',b,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SPARC_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     if win:cfg+=['-DCMAKE_C_COMPILER=cl','-DCMAKE_CXX_COMPILER=cl','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded']
+    if platform.system()=='Linux':cfg+=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++','-DCAPSTONE_PPC_SUPPORT=ON']
     if profile=='diet':cfg.append('-DCAPSTONE_BUILD_DIET=ON')
     variants={}
     for stage in ('base','candidate'):
         if stage=='candidate':
             patch=t/'source.patch';patch.write_bytes(sp.check_output(['git','-C',d.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];g('apply','--index',str(patch));assert g('write-tree')==q['tree']
         units=[]if profile=='diet'else ['register_descriptors','mcinst']
+        if stage=='candidate':units.append('sparc_mapping_index')
         cmd('configure-'+stage,cfg);cmd('build-'+stage,['cmake','--build',b,'--parallel','4','--target','records_static','records_shared',*units])
-        if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(register_descriptors|mcinst)$'])
+        if units:cmd('units-'+stage,['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'])
         env=dict(os.environ)
         if win:
             dll,=[f for f in b.rglob('*.dll')if 'capstone' in f.name.lower()];env['PATH']=str(dll.parent)+os.pathsep+env['PATH']

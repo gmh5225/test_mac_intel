@@ -1,7 +1,7 @@
-name: Verify SPARC operand construction on Windows and macOS with four real programs
+name: Verify SPARC opcode indices and public records on MSVC, Apple Clang and mixed GCC libraries
 on:
   push:
-    branches: [codex/portable-sparc-operand-storage]
+    branches: [codex/portable-sparc-opcode-row]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,6 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { host: ubuntu-24.04, arch: x86_64, profile: full }
+          - { host: ubuntu-24.04, arch: x86_64, profile: diet }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: full }
+          - { host: ubuntu-24.04-arm, arch: arm64, profile: diet }
           - { host: windows-2022, arch: amd64, profile: full }
           - { host: windows-2022, arch: amd64, profile: diet }
           - { host: windows-2022, arch: amd64_x86, profile: full }
@@ -29,7 +33,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a19fb997d94b4f285afe905aa0d9ccaa98139651
+          ref: e37f14ea3b6eb5f3b52b96a6e78a2923d061a1f3
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -43,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: sparc-operand-records-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: sparc-opcode-rows-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
