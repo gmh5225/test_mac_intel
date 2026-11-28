@@ -41,6 +41,10 @@ TESTS = {
         "X86ModeSgxThreadTest.EnclaveNotificationResumeAndDecrementSelectCorrectFrames",
         "X86ModeSgxThreadTest.DebugOptInSelectsTrapAndBreakpointState",
         "X86ModeSgxThreadTest.NestedHandlerRepairsDivideAtOriginalInstruction",
+        "X86ModeSgxThreadTest.PendingVirtualInterruptRestartsEnclaveExit",
+        "X64PagedExecutionTest.PagedEntriesEndAtPrefixFaults",
+        "X64PagedExecutionTest.PrefixLengthFaultAuthenticatesOnlyTheFirst15Bytes",
+        "X64PagedExecutionBreakpointTest.PrefixLengthFaultWithUnboundPriority",
         "X86ModeSgxTest.SoftwareEnclaveResumesFromSSAAfterIRQAndInstructionFaults",
     ],
     "NeverDX86LegacySourceTests": [
