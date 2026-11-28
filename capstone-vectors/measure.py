@@ -73,7 +73,7 @@ BASELINE
         txt=original[:lo]+fork+original[hi:]
         marker='static inline void fill_insn('
         anchor=txt.index('/* Keep the generic copy specialized')
-        txt=txt[:anchor]+('#define COUNT_SPLITS\\n' if tag=='count' else '')+monitor+'\\n'+txt[anchor:]
+        txt=txt[:anchor]+('#define COUNT_SPLITS\n' if tag=='count' else '')+monitor+'\n'+txt[anchor:]
         source.write_text(txt)
         run('cmake','--build',build,'--target','capstone_static','--parallel','4');link(tag,lib)
     assert sha(w/'switch')!=sha(w/'count')
