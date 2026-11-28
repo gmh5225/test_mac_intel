@@ -1,8 +1,20 @@
 {
-  "revision": "18f92112fa90d7f1612230197e2bd09742a92d1e",
+  "revision": "3e97208726c57cb1c807eeaa194b2f0d61f8e653",
   "image_target": "NeverDArm64eLiftedImageTests",
   "unwind_target": "NeverDArm64eUnwindRecoveryTests",
   "main_min": 224,
   "other_count": 63,
-  "unwind_count": 44
+  "unwind_count": 45,
+  "discovery_target": "NeverDImageAnalysisBoundaryTests",
+  "discovery_filter": "FunctionDiscoveryAlignment.*",
+  "discovery_count": 34,
+  "required_image_properties": {
+    "AArch64LiftedImage.JoinedSigningModifiersFollowEachIncomingPath": {
+      "verified_distant_signing_islands": 28,
+      "refused_signing_address_cases": 20
+    },
+    "AArch64LiftedImage.EmbeddedLiteralAndJumpTablesSurviveAutomaticRelifting": {
+      "verified_mixed_unwind_frames": 4
+    }
+  }
 }
