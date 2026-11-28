@@ -110,13 +110,12 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first={'X86BatchScan.c.o'};arm=os.uname().machine=='aarch64';between=first if arm else set();second=set() if arm else first
-    for before,after,expected in [('shipping','base',first),
-        ('shipping','mask',second),('base','mask',between)]:
+    first={'X86VectorFallback64.c.o'}
+    for before,after in [('shipping','base'),('shipping','mask'),('base','mask')]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
-        assert delta<=first and (before!='shipping' or after!='base' or delta==first),(before,after,delta)
+        assert delta==first,(before,after,delta)
         assert (a['exe']!=b['exe'])==bool(delta) and (a['archive']!=b['archive'])==bool(delta)
         comparisons[before+'/'+after]=sorted(delta)
     save('checked-objects',comparisons)
@@ -154,8 +153,8 @@ try:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             key=c['name']+'/'+str(mode)
             first,_=execute('base',c,mode,1)
-            reps=max(1,round(30000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
-            focus=c['name'].startswith('ppc64el-') or c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
+            reps=max(1,round(15000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
+            focus=c['name'].startswith('ppc64el-') or c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386','libmvec-amd64','jpeg-avx2-i386')
             count=35 if focus else 17;cycles=[]
             for rep in range(count):
                 order=list(blobs);rng.shuffle(order);trial={k:[]for k in order}

@@ -1,21 +1,67 @@
-diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..e4c849e6 100644
---- a/arch/X86/X86BatchScan.c
-+++ b/arch/X86/X86BatchScan.c
-@@ -280,7 +280,7 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
- 		uint32_t packed = wide ? readFirst64(code, size) :
- 					 readFirst32(code, size);
- 		if (!packed) {
--			insn.address = address;
-+			insn.address = address + batch.bytes;
- 			X86ScanResult result;
- 			if (!X86_getInstructionScanResult(ud, code, size, &insn,
- 							  &result))
-@@ -294,7 +294,6 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
- 		batch.bytes += length;
- 		code += length;
- 		size -= length;
--		address += length;
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index bc67e4c3..5d33ecf5 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -27,9 +27,7 @@
+ #endif
+ 
+ #include "X86GenSimpleOutput.inc"
+-#ifdef CAPSTONE_X86_ONLY
+ #include "X86VexBaseMemory.h"
+-#endif
+ #define X86_LEGACY_PACKED_MEMORY
+ #include "X86PackedMemoryOutput.h"
+ #undef X86_LEGACY_PACKED_MEMORY
+@@ -255,6 +253,12 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 				       x86_simple_registers[3]))
+ 			return true;
  	}
- 	return batch;
++#else
++	if (size >= 9 && code[0] == 0xc4 && (code[4] & 0xc7) == 5 &&
++	    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++	    writeVexBaseMemory(code, size, 3, insn, insn_size,
++			       x86_simple_registers[3]))
++		return true;
+ #endif
+ fallback:
+ #if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && \
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 7a66d1f6..f81cdc74 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1310,6 +1310,27 @@ static bool check_extend32(csh handles[2])
+ 	return true;
  }
+ 
++static bool check_vex3_rip_arithmetic(csh handles[2])
++{
++	const uint8_t opcodes[] = { 0x98, 0xa8, 0xb8, 0xfe };
++	for (unsigned map = 1; map <= 3; ++map) {
++		for (size_t op = 0; op < sizeof(opcodes); ++op) {
++			for (unsigned flags = 0; flags < 256; ++flags) {
++				const uint8_t b[] = {
++					0xc4, (uint8_t)(((flags & 7) << 5) | map),
++					(uint8_t)flags, opcodes[op],
++					(uint8_t)(((flags & 7) << 3) | 5),
++					0xbc, 0x9a, 0x78, 0x80
++				};
++				if (!compare(handles, b, sizeof(b), flags) ||
++				    !compare(handles, b, flags % sizeof(b), map))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_vex_packed_memory(csh handles[2])
+ {
+ 	const uint8_t opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x51, 0x6f, 0x7f };
+@@ -1710,6 +1731,7 @@ static bool check_mode(cs_mode mode)
+ 			!check_legacy_memory(handles, 0xf2) ||
+ 			!check_legacy_memory(handles, 0xf3) ||
+ 			!check_vex_sib_transfers(handles) ||
++			!check_vex3_rip_arithmetic(handles) ||
+ 			!check_vex_packed_memory(handles))))) ||
+ 		    !check_rex_stack(handles) ||
+ 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||

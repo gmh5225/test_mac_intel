@@ -1,7 +1,7 @@
-name: Build NeverD from the LLVM fork and test mixed batch-address changes on four native products
+name: Build NeverD and LLVM from source and compare two VEX3 dispatch locations on seventeen binaries
 on:
   push:
-    branches: [codex/neverd-scoped-batch-address]
+    branches: [codex/vex3-rip-neverd-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -34,7 +34,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: e9bbbe3ae1369087b57c82bb0f8474416e4ea57a
+          ref: f197a097d0d559679ca3d3bb5159175e012b2d19
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -76,6 +76,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scoped-batch-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
+          name: vex3-rip-product-${{ matrix.replica }}-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

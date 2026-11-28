@@ -1,40 +1,68 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 50da9212..e8a38826 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -1101,6 +1101,9 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
-             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
-         set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY
-             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CHECK_EVEX_WRITEMASK>")
-+        # The x86-64 batch scanner needs the instruction address only on fallback.
-+        set_property(SOURCE arch/X86/X86BatchScan.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_BATCH_FALLBACK_ADDRESS>")
-         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
-             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-     endif()
-diff --git a/arch/X86/X86BatchScan.c b/arch/X86/X86BatchScan.c
-index b56826b0..65b9cbe8 100644
---- a/arch/X86/X86BatchScan.c
-+++ b/arch/X86/X86BatchScan.c
-@@ -280,7 +280,11 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
- 		uint32_t packed = wide ? readFirst64(code, size) :
- 					 readFirst32(code, size);
- 		if (!packed) {
-+#ifdef X86_BATCH_FALLBACK_ADDRESS
-+			insn.address = address + batch.bytes;
-+#else
- 			insn.address = address;
+diff --git a/arch/X86/X86VectorFallback64.c b/arch/X86/X86VectorFallback64.c
+index bc67e4c3..8911b815 100644
+--- a/arch/X86/X86VectorFallback64.c
++++ b/arch/X86/X86VectorFallback64.c
+@@ -27,9 +27,7 @@
+ #endif
+ 
+ #include "X86GenSimpleOutput.inc"
+-#ifdef CAPSTONE_X86_ONLY
+ #include "X86VexBaseMemory.h"
+-#endif
+ #define X86_LEGACY_PACKED_MEMORY
+ #include "X86PackedMemoryOutput.h"
+ #undef X86_LEGACY_PACKED_MEMORY
+@@ -212,6 +210,13 @@ X86_decodeOutputMiss64(cs_struct *handle, const uint8_t *code, size_t size,
+ 	if (size >= 10 && code[0] == 0x62 && (code[5] & 0xc7) == 5 &&
+ 	    X86_writeEvexRipMemory(handle, code, insn, insn_size))
+ 		return true;
++#ifndef CAPSTONE_X86_ONLY
++	if (size >= 9 && code[0] == 0xc4 && (code[4] & 0xc7) == 5 &&
++	    !X86_OUTPUT_UNSUPPORTED(handle, false) &&
++	    writeVexBaseMemory(code, size, 3, insn, insn_size,
++			       x86_simple_registers[3]))
++		return true;
 +#endif
- 			X86ScanResult result;
- 			if (!X86_getInstructionScanResult(ud, code, size, &insn,
- 							  &result))
-@@ -294,7 +298,9 @@ CS_DECODE_INLINE X86ScanBatchResult scanBatch(csh ud, const uint8_t *code,
- 		batch.bytes += length;
- 		code += length;
- 		size -= length;
-+#ifndef X86_BATCH_FALLBACK_ADDRESS
- 		address += length;
-+#endif
- 	}
- 	return batch;
+ 	if (code[0] == 0xc4 &&
+ 	    X86_writeVexRegisterImmediate(handle, code, size, insn, insn_size,
+ 					  x86_simple_registers, true))
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 7a66d1f6..f81cdc74 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -1310,6 +1310,27 @@ static bool check_extend32(csh handles[2])
+ 	return true;
  }
+ 
++static bool check_vex3_rip_arithmetic(csh handles[2])
++{
++	const uint8_t opcodes[] = { 0x98, 0xa8, 0xb8, 0xfe };
++	for (unsigned map = 1; map <= 3; ++map) {
++		for (size_t op = 0; op < sizeof(opcodes); ++op) {
++			for (unsigned flags = 0; flags < 256; ++flags) {
++				const uint8_t b[] = {
++					0xc4, (uint8_t)(((flags & 7) << 5) | map),
++					(uint8_t)flags, opcodes[op],
++					(uint8_t)(((flags & 7) << 3) | 5),
++					0xbc, 0x9a, 0x78, 0x80
++				};
++				if (!compare(handles, b, sizeof(b), flags) ||
++				    !compare(handles, b, flags % sizeof(b), map))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_vex_packed_memory(csh handles[2])
+ {
+ 	const uint8_t opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x51, 0x6f, 0x7f };
+@@ -1710,6 +1731,7 @@ static bool check_mode(cs_mode mode)
+ 			!check_legacy_memory(handles, 0xf2) ||
+ 			!check_legacy_memory(handles, 0xf3) ||
+ 			!check_vex_sib_transfers(handles) ||
++			!check_vex3_rip_arithmetic(handles) ||
+ 			!check_vex_packed_memory(handles))))) ||
+ 		    !check_rex_stack(handles) ||
+ 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
