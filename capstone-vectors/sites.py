@@ -51,29 +51,56 @@ def make(normal,lib,commands,root,link):
     shutil.rmtree(diag)
     return sites,proof
 def parse(profile,sites):
-    symbols={};fn='';edge=False;by=defaultdict(Counter);summed=defaultdict(Counter)
-    with profile.open()as f:
-        for line in f:
-            line=line.strip()
-            if line.startswith('positions:'):positions=line.split()[1:];assert positions==['instr','line']
+    pcmap={}
+    for name,table in sites.items():
+        for pc in table:
+            assert pc not in pcmap
+            pcmap[pc]=name
+    fn='';obj='';edge=False
+    by=defaultdict(Counter);contexts=defaultdict(Counter);outside=defaultdict(Counter)
+    all_events=Counter();exe_events=Counter();under_names=defaultdict(Counter)
+    with profile.open() as stream:
+        for raw in stream:
+            line=raw.strip()
+            if line.startswith('cmd:'):exe=line.split()[1]
+            elif line.startswith('positions:'):assert line.split()[1:]==['instr','line']
             elif line.startswith('events:'):events=line.split()[1:]
+            elif line.startswith('totals:'):expected=Counter(dict(zip(events,map(int,line.split()[1:]))))
+            elif line.startswith('ob='):obj=line[3:]
             elif line.startswith('fn='):
-                fn=re.sub(r"'\d+$",'',line[3:]);edge=False
+                fn=re.sub(r"'\d+$",'',line[3:])
+                edge=False
             elif line.startswith(('calls=','jump=','jcnd=')):edge=True
             elif line.startswith('0x'):
                 skip=edge;edge=False
-                if skip or fn not in sites:continue
-                pc,_,*v=line.split();pc=int(pc,16)
-                assert pc in sites[fn],(fn,hex(pc))
-                events_at=dict(zip(events,map(int,v)))
-                by[fn,pc].update(events_at);summed[fn].update(events_at)
+                if skip:continue
+                position,_,*counts=line.split()
+                pc=int(position,16);values=dict(zip(events,map(int,counts)));all_events.update(values)
+                if obj!=exe:continue
+                exe_events.update(values);name=pcmap.get(pc)
+                if fn in sites:under_names[fn].update(values)
+                if name:
+                    by[name,pc].update(values)
+                    contexts[name][fn]+=values.get('Ir',0)
+                elif fn in sites:outside[fn].update(values)
+    assert all_events==expected,(all_events,expected)
     result={}
-    for fn,total in summed.items():
-        rows=[(pc,v)for (n,pc),v in by.items()if n==fn];lines=defaultdict(Counter)
-        for pc,v in rows:lines[sites[fn][pc][2]or '(assembler)'].update(v)
-        order=sorted(rows,key=lambda x:-x[1]['Ir'])
-        result[fn]=dict(total=dict(total),lines=[(k,dict(v))for k,v in sorted(lines.items(),key=lambda x:-x[1]['Ir'])],
-                        sites=[dict(offset=sites[fn][pc][0],instruction=sites[fn][pc][1],line=sites[fn][pc][2],events=dict(v))for pc,v in order[:24]])
-        assert sum(x['Ir']for x in lines.values())==total['Ir']
+    for name in sites:
+        rows=[(pc,v)for (fn,pc),v in by.items()if fn==name]
+        if not rows:continue
+        lines=defaultdict(Counter);total=Counter()
+        for pc,v in rows:
+            lines[sites[name][pc][2] or '(assembler)'].update(v)
+            total.update(v)
+        result[name]=dict(total=dict(total),lines=[(k,dict(v))for k,v in sorted(lines.items(),key=lambda it:-it[1]['Ir'])],
+                         sites=[dict(offset=sites[name][pc][0],instruction=sites[name][pc][1],line=sites[name][pc][2],events=dict(v)) for pc,v in sorted(rows,key=lambda it:-it[1]['Ir'])[:24]],
+                         logical_contexts=dict(contexts[name]))
+        assert total['Ir']==sum(contexts[name].values())==sum(x['Ir']for x in lines.values())
     assert {'cs_decode_full_insn','X86_getInstruction','X86_Intel_printInst'}<=result.keys()
+    for fn,v in under_names.items():
+        assert v['Ir']==outside[fn]['Ir']+sum(z.get(fn,0) for z in contexts.values())
+    mapped=sum(z['total']['Ir'] for z in result.values())
+    assert 0<mapped<=exe_events['Ir']<=all_events['Ir']
+    result['_accounting']=dict(all_events=dict(all_events),executable_events=dict(exe_events),target_instructions=mapped,
+                               named_outside_targets={n:dict(v)for n,v in outside.items()},logical={n:dict(v)for n,v in under_names.items()})
     return result

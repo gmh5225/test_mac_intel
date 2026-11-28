@@ -1,7 +1,7 @@
-name: Map formatter and detail costs to native instructions and source lines in unchanged executable sections
+name: Identify physical instruction costs in the public-record finalizer on the two native host ISAs
 on:
   push:
-    branches: [codex/exact-general-printer-source-sites]
+    branches: [codex/physical-elf-printer-costs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-printer-cost-sites-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: physical-printer-cost-sites-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
