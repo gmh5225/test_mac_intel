@@ -116,6 +116,19 @@ jobs:
           if test -c /dev/kvm && ! test -w /dev/kvm; then
             sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           fi
+      - name: Configure with the LLVM release pinned by NeverD
+        working-directory: NeverD
+        run: |
+          cmake -S . -B build-check -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DNEVERD_LLVM_PREBUILT=ON -DBUILD_TESTING=ON \
+            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_BUILD_GUI=OFF -DNEVERD_BUILD_PLUGINS=OFF
+      - name: Build the production execution, paging and generated C test owners
+        working-directory: NeverD
+        run: python scripts/build.py build-check --parallel 4 --target NeverDX64PagedExecutionTests NeverDX64ContinuationExportTests NeverDX86PagingTests NeverDX86LegacySourceTests neverd
       - name: Configure current NeverC for the portable x64 host ISA
         working-directory: NeverC
         run: |
@@ -131,6 +144,17 @@ jobs:
         working-directory: NeverC
         run: |
           cmake --build build-portable --parallel 4 --target neverc
+      - name: Wait for the referenced compiler receipt
+        if: ${{ inputs.verified_compiler_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMPILER_RUN: ${{ inputs.verified_compiler_run }}
+        run: |
+          while true; do
+            state=$(gh run view "$COMPILER_RUN" --json status --jq .status)
+            if test "$state" = completed; then break; fi
+            sleep 45
+          done
       - name: Restore the verified compiler
         if: ${{ inputs.verified_compiler_run }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -175,19 +199,6 @@ jobs:
           path: NeverC/build-portable/bin/neverc
           if-no-files-found: error
           retention-days: 2
-      - name: Configure with the LLVM release pinned by NeverD
-        working-directory: NeverD
-        run: |
-          cmake -S . -B build-check -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O1 -DNDEBUG" \
-            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DNEVERD_LLVM_PREBUILT=ON -DBUILD_TESTING=ON \
-            -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF \
-            -DNEVERD_BUILD_GUI=OFF -DNEVERD_BUILD_PLUGINS=OFF
-      - name: Build the production execution, paging and generated C test owners
-        working-directory: NeverD
-        run: python scripts/build.py build-check --parallel 4 --target NeverDX64PagedExecutionTests NeverDX64ContinuationExportTests NeverDX86PagingTests NeverDX86LegacySourceTests neverd
       - name: Execute mixed-mode, SMM, SGX and asynchronous event regressions
         run: python neverd-sgx-capabilities/software_semantics.py --source NeverD --build NeverD/build-check --output software-evidence
       - name: Retain execution receipts
