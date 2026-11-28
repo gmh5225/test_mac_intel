@@ -25,7 +25,10 @@ def run_programs(r,w,cases,foreign,save):
   for route in ('private','capstone'):
    args=lambda t,n:[w/('x86-'+t),route,str(mode),str(n),blob,ext,str(bits)]
    freq=35 if name in ('libmvec-amd64','putty-32-0.85','jpeg-avx2-i386')else 17
-   row=measure(route+'/'+key,args,freq)
+   regular=args
+   frozen=lambda t,n:[w/('controlled-x86-'+t),route,str(mode),str(n),blob,ext,str(bits)]
+   for t in ('base','fixed'):assert list(map(int,sp.check_output(frozen(t,1)).split()))[2:]==list(map(int,sp.check_output(regular(t,1)).split()))[2:]
+   row=measure(route+'/'+key,frozen,freq)
    if mode!=2:assert row['checks']['base']==row['checks']['fixed']
    if row['checks']['base']!=row['checks']['fixed']:
     assert any(records[name]['fixed'if route=='private'else'public']['corrections'][1][:2])
@@ -33,6 +36,8 @@ def run_programs(r,w,cases,foreign,save):
  for f in foreign:
   for mode in (0,1,2):
    name='foreign/'+f['name']+'/'+str(mode);args=lambda t,n:[w/('foreign-'+t),f['arch'],w/(f['name']+'.text'),str(mode),str(n)]
-   row=measure(name,args,17);assert row['checks']['base']==row['checks']['fixed'];timing[name]=row;save('timings',timing)
+   frozen=lambda t,n:[w/('controlled-foreign-'+t),f['arch'],w/(f['name']+'.text'),str(mode),str(n)]
+   for t in ('base','fixed'):assert list(map(int,sp.check_output(frozen(t,1)).split()))[2:]==list(map(int,sp.check_output(args(t,1)).split()))[2:]
+   row=measure(name,frozen,17);assert row['checks']['base']==row['checks']['fixed'];timing[name]=row;save('timings',timing)
  assert len(timing)==51
 

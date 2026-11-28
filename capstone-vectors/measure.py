@@ -42,7 +42,20 @@ try:
     ref=w/'native.c';ref.write_text('#include "arch/X86/X86ScanAdapter.h"\n__attribute__((used)) static __typeof__(&X86_disasmIterText) const keep = X86_disasmIterText;\n')
     run('clang','-O2','-I',base,'-I',base/'include','-c',ref,'-o',w/'ref.o')
     fix=rd(r/'fix.json');assert fix['parent']==q['commit'] and sha(r/'fix.patch')==fix['sha256']
+    from elftools.elf.elffile import ELFFile
     images={};string_outputs=[];unit_results={}
+    script=w/'access.ld'
+    script.write_text('SECTIONS { .cs_bench_access ALIGN(64) : { KEEP(*(.bench_access_body)) . = 2048; } } INSERT AFTER .text;'+chr(10))
+    link_option='-Wl,-T,'+str(script);controls={}
+    def observe(path):
+        with path.open('rb') as inp:
+            elf=ELFFile(inp);tab=elf.get_section_by_name('.symtab')
+            syms=sorted([x.name,x['st_value'],x['st_size']] for x in tab.iter_symbols() if x['st_info']['type']=='STT_FUNC' and x['st_size'])
+            func,=[v for v in syms if v[0]=='X86_reg_access']
+            peer=[v for v in syms if v!=func]
+            sections={sec.name:[sec['sh_addr'],sec['sh_size'],hashlib.sha256(sec.data()).hexdigest()] for sec in elf.iter_sections() if sec['sh_flags']&2 and sec['sh_type']!='SHT_NOBITS'}
+            assert func[1]==sections['.cs_bench_access'][0] and 0<func[2]<2048 and sections['.cs_bench_access'][1]==2048
+            return dict(access=func,peer_count=len(peer),peers_sha256=hashlib.sha256(json.dumps(peer).encode()).hexdigest(),sections=sections)
     for tag in ('base','fixed'):
         if tag=='fixed':
             run('git','-C',base,'apply','--index',r/'fix.patch');assert get('git','-C',base,'write-tree').strip()==fix['tree']
@@ -59,6 +72,23 @@ try:
         run('clang','-fPIC','-shared','-I',base/'include',r/'export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(tag+'.so'))
         objs={str(p.relative_to(build)):sha(p)for p in build.rglob('*.c.o')};assert len(objs)>=60
         images[tag]=dict(x86=sha(w/('x86-'+tag)),foreign=sha(w/('foreign-'+tag)),archive=sha(lib),objects=objs)
+        path=base/'arch/X86/X86Mapping.c';old_source=path.read_text()
+        marker='void X86_reg_access(const cs_insn *insn';assert old_source.count(marker)==1
+        path.write_text(old_source.replace(marker,'__attribute__((section(".bench_access_body")))'+chr(10)+marker))
+        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang++',w/'driver.o',lib,ice_lib,*flags,link_option,'-o',w/('controlled-x86-'+tag))
+        run('clang++',w/'foreign.o',w/'ref.o',lib,*flags,link_option,'-o',w/('controlled-foreign-'+tag))
+        controls[tag]={kind:observe(w/('controlled-'+kind+'-'+tag)) for kind in ('x86','foreign')}
+        save('controlled-layout',controls)
+        for kind,z in controls[tag].items():
+            before=controls['base'][kind];assert z['peers_sha256']==before['peers_sha256'] and z['access'][1]==before['access'][1]
+            for n,section in z['sections'].items():
+                if n.startswith(('.text','.cs_x86_','.cs_alias_')) or n in ('.init','.fini','.plt','.rodata'):
+                    assert section==before['sections'][n],(kind,n)
+            if tag=='fixed':assert z['sections']['.cs_bench_access'][2]!=before['sections']['.cs_bench_access'][2]
+        path.write_text(old_source);run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        assert sha(lib)==images[tag]['archive']
+
     changed=[Path(k).name for k,v in images['base']['objects'].items()if images['fixed']['objects'][k]!=v]
     assert changed==['X86Mapping.c.o'],changed
     base_cases,fix_cases=string_outputs
