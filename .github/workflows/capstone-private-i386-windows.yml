@@ -1,7 +1,7 @@
-name: Verify VEX3 RIP memory operands in nineteen release and reduced configurations
+name: Check the exact compiler and host scope of the VEX3 source-memory reader
 on:
   push:
-    branches: [codex/vex3-rip-portable-records]
+    branches: [codex/arm-hosted-vex3-configurations]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: portable-vex3-rip-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: portable-arm-host-rip-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7

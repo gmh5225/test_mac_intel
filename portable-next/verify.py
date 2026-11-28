@@ -98,6 +98,10 @@ try:
             rows[name]['batch_address']=active 
             rows[name]['evex_only']=active
             rows[name]['cached_access']=active
+            vex=next(c['command']for c in commands if Path(c['file']).name=='X86VectorFallback64.c')
+            arm18=platform.machine().lower() in ('aarch64','arm64') and re.search(r'clang version 18[.]',clang_ver) is not None
+            assert ('-DX86_VEX3_RIP_MEMORY' in vex)==(arm18 and name=='search')
+            rows[name]['arm_vex3_memory']=arm18 and name=='search'
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
             rows[name]['static_only']=result
