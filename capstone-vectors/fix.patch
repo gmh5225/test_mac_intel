@@ -1,0 +1,521 @@
+diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
+index a56ed486..baa47870 100644
+--- a/arch/X86/X86DisassemblerTranslator.h
++++ b/arch/X86/X86DisassemblerTranslator.h
+@@ -225,6 +225,10 @@ static bool translateSrcIndex(MCInst *mcInst, InternalInstruction *insn,
+ 		baseRegNo = insn->hasAdSize ? X86_ESI : X86_SI;
+ 	}
+ 
++	/* Mapping runs before the printer copies the normalized prefixes. */
++	if (emitOperands && mcInst->csh->detail_opt)
++		mcInst->flat_insn->detail->x86.prefix[1] = insn->prefix1;
++
+ 	createRegisterOperand(mcInst, baseRegNo, emitOperands);
+ 
+ 	createRegisterOperand(mcInst, segmentRegnums[insn->segmentOverride],
+diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
+index bc315806..8f05e235 100644
+--- a/arch/X86/X86GenMappingCounts.inc
++++ b/arch/X86/X86GenMappingCounts.inc
+@@ -517,9 +517,9 @@ static const uint16_t x86_mapping_counts[] = {
+ 	32, // X86_INC8r
+ 	0, // X86_INCSSPD
+ 	0, // X86_INCSSPQ
+-	16418, // X86_INSB
++	16419, // X86_INSB
+ 	16419, // X86_INSL
+-	16418, // X86_INSW
++	16419, // X86_INSW
+ 	1122, // X86_INT
+ 	1089, // X86_INT1
+ 	1122, // X86_INT3
+@@ -2446,13 +2446,13 @@ static const uint16_t x86_mapping_counts[] = {
+ 	32, // X86_INC8r
+ 	0, // X86_INCSSPD
+ 	0, // X86_INCSSPQ
+-	16418, // X86_INSB
++	16419, // X86_INSB
+ 	1024, // X86_INSERTPSrm
+ 	1024, // X86_INSERTPSrr
+ 	1024, // X86_INSERTQ
+ 	1024, // X86_INSERTQI
+ 	16419, // X86_INSL
+-	16418, // X86_INSW
++	16419, // X86_INSW
+ 	1122, // X86_INT
+ 	1089, // X86_INT1
+ 	1122, // X86_INT3
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 735660ea..029fe21a 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10308,6 +10308,25 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+ #include "X86GenMappingCounts.inc"
+ #endif
+ 
++#ifndef CAPSTONE_DIET
++static void adjust_string_indices(cs_detail *detail)
++{
++	unsigned int width = detail->x86.addr_size;
++	if (width == 4)
++		return;
++	x86_reg si = width == 2 ? X86_REG_SI : X86_REG_RSI;
++	x86_reg di = width == 2 ? X86_REG_DI : X86_REG_RDI;
++	arr_replace(detail->regs_read, detail->regs_read_count, X86_REG_ESI,
++		    si);
++	arr_replace(detail->regs_write, detail->regs_write_count, X86_REG_ESI,
++		    si);
++	arr_replace(detail->regs_read, detail->regs_read_count, X86_REG_EDI,
++		    di);
++	arr_replace(detail->regs_write, detail->regs_write_count, X86_REG_EDI,
++		    di);
++}
++#endif
++
+ // given internal insn id, return public instruction info
+ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ {
+@@ -10465,32 +10484,6 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			case X86_INS_LODSD:
+ 			case X86_INS_LODSQ:
+ 			case X86_INS_LODSW:
+-				switch (mode) {
+-				default:
+-					break;
+-				case CS_MODE_16:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_ESI, X86_REG_SI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_ESI, X86_REG_SI);
+-					break;
+-				case CS_MODE_64:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_ESI, X86_REG_RSI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_ESI, X86_REG_RSI);
+-					break;
+-				}
+-				break;
+-
+ 			case X86_INS_SCASB:
+ 			case X86_INS_SCASD:
+ 			case X86_INS_SCASW:
+@@ -10499,32 +10492,6 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			case X86_INS_STOSD:
+ 			case X86_INS_STOSQ:
+ 			case X86_INS_STOSW:
+-				switch (mode) {
+-				default:
+-					break;
+-				case CS_MODE_16:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_EDI, X86_REG_DI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_EDI, X86_REG_DI);
+-					break;
+-				case CS_MODE_64:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_EDI, X86_REG_RDI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_EDI, X86_REG_RDI);
+-					break;
+-				}
+-				break;
+-
+ 			case X86_INS_CMPSB:
+ 			case X86_INS_CMPSD:
+ 			case X86_INS_CMPSQ:
+@@ -10533,46 +10500,13 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			case X86_INS_MOVSW:
+ 			case X86_INS_MOVSD:
+ 			case X86_INS_MOVSQ:
+-				switch (mode) {
+-				default:
+-					break;
+-				case CS_MODE_16:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_EDI, X86_REG_DI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_EDI, X86_REG_DI);
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_ESI, X86_REG_SI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_ESI, X86_REG_SI);
+-					break;
+-				case CS_MODE_64:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_EDI, X86_REG_RDI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_EDI, X86_REG_RDI);
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_ESI, X86_REG_RSI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_ESI, X86_REG_RSI);
+-					break;
+-				}
++			case X86_INS_INSB:
++			case X86_INS_INSW:
++			case X86_INS_INSD:
++			case X86_INS_OUTSB:
++			case X86_INS_OUTSW:
++			case X86_INS_OUTSD:
++				adjust_string_indices(insn->detail);
+ 				break;
+ 
+ 			case X86_INS_ENTER:
+@@ -10618,63 +10552,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 				}
+ 				break;
+ 
+-			case X86_INS_INSB:
+-			case X86_INS_INSW:
+-			case X86_INS_INSD:
+-				switch (mode) {
+-				default:
+-					break;
+-				case CS_MODE_16:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_EDI, X86_REG_DI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_EDI, X86_REG_DI);
+-					break;
+-				case CS_MODE_64:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_EDI, X86_REG_RDI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_EDI, X86_REG_RDI);
+-					break;
+-				}
+-				break;
+ 
+-			case X86_INS_OUTSB:
+-			case X86_INS_OUTSW:
+-			case X86_INS_OUTSD:
+-				switch (mode) {
+-				default:
+-					break;
+-				case CS_MODE_64:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_ESI, X86_REG_RSI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_ESI, X86_REG_RSI);
+-					break;
+-				case CS_MODE_16:
+-					arr_replace(
+-						insn->detail->regs_read,
+-						insn->detail->regs_read_count,
+-						X86_REG_ESI, X86_REG_SI);
+-					arr_replace(
+-						insn->detail->regs_write,
+-						insn->detail->regs_write_count,
+-						X86_REG_ESI, X86_REG_SI);
+-					break;
+-				}
+-				break;
+ 			}
+ 
+ 			switch (insn->id) {
+@@ -10682,28 +10560,33 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 				break;
+ 			case X86_INS_LODSB:
+ 			case X86_INS_LODSD:
++			case X86_INS_LODSQ:
+ 			case X86_INS_LODSW:
+ 			case X86_INS_CMPSB:
+ 			case X86_INS_CMPSD:
++			case X86_INS_CMPSQ:
+ 			case X86_INS_CMPSW:
+ 			case X86_INS_MOVSB:
++			case X86_INS_MOVSQ:
+ 			case X86_INS_MOVSW:
+ 			case X86_INS_MOVSD:
+ 			case X86_INS_OUTSB:
+ 			case X86_INS_OUTSW:
+-			case X86_INS_OUTSD:
+-				switch (mode) {
+-				default:
++			case X86_INS_OUTSD: {
++				/* The decoder supplies the selected source segment.
++				 * Legacy strings default to DS. In 64-bit mode
++				 * only FS and GS have a segment base. */
++				uint8_t prefix = insn->detail->x86.prefix[1];
++				x86_reg seg = apx_segment_register(prefix);
++				if (mode != CS_MODE_64 && !prefix)
++					seg = X86_REG_DS;
++				if (mode == CS_MODE_64 && seg != X86_REG_FS &&
++				    seg != X86_REG_GS)
+ 					break;
+-				case CS_MODE_16:
+-				case CS_MODE_32: {
+-					int pos = insn->detail->regs_read_count;
+-					insn->detail->regs_read[pos] =
+-						X86_REG_DS;
+-					insn->detail->regs_read_count += 1;
+-				} break;
+-				}
++				insn->detail->regs_read
++					[insn->detail->regs_read_count++] = seg;
+ 				break;
++			}
+ 
+ 			case X86_INS_JMP:
+ 			case X86_INS_LJMP:
+@@ -11678,9 +11561,9 @@ static void add_cx(MCInst *MI)
+ 	if (MI->csh->detail_opt) {
+ 		x86_reg cx;
+ 
+-		if (x86_has_feature(MI->csh->mode, CS_MODE_16))
++		if (MI->flat_insn->detail->x86.addr_size == 2)
+ 			cx = X86_REG_CX;
+-		else if (x86_has_feature(MI->csh->mode, CS_MODE_32))
++		else if (MI->flat_insn->detail->x86.addr_size == 4)
+ 			cx = X86_REG_ECX;
+ 		else // 64-bit
+ 			cx = X86_REG_RCX;
+@@ -12047,7 +11930,9 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			break;
+ 		case X86_OP_MEM:
+ 			// registers appeared in memory references always being read
+-			if ((op->mem.segment != X86_REG_INVALID)) {
++			if (op->mem.segment != X86_REG_INVALID &&
++			    !arr_exist_inline(regs_read, read_count,
++					      op->mem.segment)) {
+ 				regs_read[read_count] = op->mem.segment;
+ 				read_count++;
+ 			}
+diff --git a/arch/X86/X86MappingInsn.inc b/arch/X86/X86MappingInsn.inc
+index 42c2a56c..5c15e6b8 100644
+--- a/arch/X86/X86MappingInsn.inc
++++ b/arch/X86/X86MappingInsn.inc
+@@ -6229,7 +6229,7 @@
+ {
+ 	X86_INSB, X86_INS_INSB, 0,
+ #ifndef CAPSTONE_DIET
+-	{ X86_REG_DX, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
++	{ X86_REG_DX, X86_REG_EDI, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+@@ -6271,7 +6271,7 @@
+ {
+ 	X86_INSW, X86_INS_INSW, 0,
+ #ifndef CAPSTONE_DIET
+-	{ X86_REG_DX, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
++	{ X86_REG_DX, X86_REG_EDI, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+@@ -17835,7 +17835,7 @@
+ {
+ 	X86_STOSQ, X86_INS_STOSQ, 0,
+ #ifndef CAPSTONE_DIET
+-	{ X86_REG_RAX, X86_REG_RDI, X86_REG_EFLAGS, 0 }, { X86_REG_RDI, 0 }, { 0 }, 0, 0
++	{ X86_REG_RAX, X86_REG_EDI, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+diff --git a/arch/X86/X86MappingInsn_reduce.inc b/arch/X86/X86MappingInsn_reduce.inc
+index d55e55ac..fb855273 100644
+--- a/arch/X86/X86MappingInsn_reduce.inc
++++ b/arch/X86/X86MappingInsn_reduce.inc
+@@ -3590,7 +3590,7 @@
+ {
+ 	X86_INSB, X86_INS_INSB, 0,
+ #ifndef CAPSTONE_DIET
+-	{ X86_REG_DX, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
++	{ X86_REG_DX, X86_REG_EDI, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+@@ -3604,7 +3604,7 @@
+ {
+ 	X86_INSW, X86_INS_INSW, 0,
+ #ifndef CAPSTONE_DIET
+-	{ X86_REG_DX, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
++	{ X86_REG_DX, X86_REG_EDI, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+@@ -9302,7 +9302,7 @@
+ {
+ 	X86_STOSQ, X86_INS_STOSQ, 0,
+ #ifndef CAPSTONE_DIET
+-	{ X86_REG_RAX, X86_REG_RDI, X86_REG_EFLAGS, 0 }, { X86_REG_RDI, 0 }, { 0 }, 0, 0
++	{ X86_REG_RAX, X86_REG_EDI, X86_REG_EFLAGS, 0 }, { X86_REG_EDI, 0 }, { 0 }, 0, 0
+ #endif
+ },
+ 
+diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
+index d9dd18e2..e9d46b5d 100644
+--- a/tests/unit/x86_reg_access.c
++++ b/tests/unit/x86_reg_access.c
+@@ -607,6 +607,114 @@ static bool check_vector_compare_flags(void)
+ 	return true;
+ }
+ 
++/* Source and destination indices and the REP count use address size. */
++static bool check_string_registers(csh h, cs_mode mode)
++{
++	static const struct {
++		uint8_t opcode;
++		bool source;
++		bool destination;
++	} forms[] = { { 0x6c, false, true }, { 0x6e, true, false },
++		      { 0xa4, true, true },  { 0xa6, true, true },
++		      { 0xaa, false, true }, { 0xac, true, false },
++		      { 0xae, false, true }, { 0x6d, false, true },
++		      { 0xab, false, true } };
++	const uint8_t prefixes[] = { 0, 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 };
++	const x86_reg segments[] = { X86_REG_DS, X86_REG_ES, X86_REG_CS,
++				     X86_REG_SS, X86_REG_DS, X86_REG_FS,
++				     X86_REG_GS };
++	for (unsigned addr = 0; addr < 2; ++addr) {
++		unsigned width = mode == CS_MODE_64 ? (addr ? 4 : 8) :
++				 mode == CS_MODE_32 ? (addr ? 2 : 4) :
++						      (addr ? 4 : 2);
++		x86_reg si = width == 2 ? X86_REG_SI :
++			     width == 4 ? X86_REG_ESI :
++					  X86_REG_RSI;
++		x86_reg di = width == 2 ? X86_REG_DI :
++			     width == 4 ? X86_REG_EDI :
++					  X86_REG_RDI;
++		x86_reg cx = width == 2 ? X86_REG_CX :
++			     width == 4 ? X86_REG_ECX :
++					  X86_REG_RCX;
++		for (unsigned p = 0; p < sizeof(prefixes); ++p) {
++			for (unsigned i = 0; i < sizeof(forms) / sizeof(*forms);
++			     ++i) {
++				uint8_t bytes[5];
++				unsigned len = 0;
++				if (addr)
++					bytes[len++] = 0x67;
++				if (prefixes[p])
++					bytes[len++] = prefixes[p];
++				bytes[len++] = 0xf3;
++				if (forms[i].opcode == 0xab &&
++				    mode == CS_MODE_64)
++					bytes[len++] = 0x48;
++				bytes[len++] = forms[i].opcode;
++				cs_insn *insn;
++				if (cs_disasm(h, bytes, len, 0, 1, &insn) != 1)
++					return false;
++				cs_regs reads, writes;
++				uint8_t nr = 0, nw = 0;
++				bool ok = cs_regs_access(h, insn, reads, &nr,
++							 writes,
++							 &nw) == CS_ERR_OK;
++				const x86_reg tracked[] = {
++					X86_REG_SI, X86_REG_ESI, X86_REG_RSI,
++					X86_REG_DI, X86_REG_EDI, X86_REG_RDI,
++					X86_REG_CX, X86_REG_ECX, X86_REG_RCX,
++					X86_REG_ES, X86_REG_CS,	 X86_REG_SS,
++					X86_REG_DS, X86_REG_FS,	 X86_REG_GS
++				};
++				for (unsigned j = 0;
++				     j < sizeof(tracked) / sizeof(*tracked);
++				     ++j) {
++					x86_reg reg = tracked[j];
++					bool index = (forms[i].source &&
++						      reg == si) ||
++						     (forms[i].destination &&
++						      reg == di) ||
++						     reg == cx;
++					bool segment = (forms[i].source &&
++							reg == segments[p] &&
++							(mode != CS_MODE_64 ||
++							 p >= 5)) ||
++						       (forms[i].destination &&
++							reg == X86_REG_ES &&
++							mode != CS_MODE_64);
++					unsigned r = 0, w = 0;
++					for (unsigned k = 0; k < nr; ++k)
++						r += reads[k] == reg;
++					for (unsigned k = 0; k < nw; ++k)
++						w += writes[k] == reg;
++					ok &= r == (unsigned)(index ||
++							      segment) &&
++					      w == (unsigned)index;
++				}
++				if (forms[i].destination) {
++					unsigned implicit_di = 0;
++					for (unsigned k = 0;
++					     k < insn->detail->regs_read_count;
++					     ++k)
++						implicit_di +=
++							insn->detail
++								->regs_read[k] ==
++							di;
++					ok &= implicit_di == 1;
++				}
++				cs_free(insn, 1);
++				if (!ok) {
++					fprintf(stderr,
++						"string registers mode=%u addr=%u segment=%x opcode=%x\n",
++						mode, addr, prefixes[p],
++						forms[i].opcode);
++					return false;
++				}
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_scalar_segment_reads(void)
+ {
+ 	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
+@@ -635,6 +743,10 @@ static bool check_scalar_segment_reads(void)
+ 				ok = false;
+ 				break;
+ 			}
++			if (!check_string_registers(h, modes[mode])) {
++				ok = false;
++				break;
++			}
+ 			const uint8_t strings[][3] = {
+ 				{ 0xa4 },	{ 0xa5 },	{ 0xa6 },
+ 				{ 0xa7 },	{ 0x66, 0xa5 }, { 0x66, 0xa7 },

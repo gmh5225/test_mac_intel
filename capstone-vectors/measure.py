@@ -36,8 +36,27 @@ try:
     flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
     run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'runner')
-    save('linked',dict(archive=sha(lib),program=sha(w/'runner'),drivers=m['drivers'],compiler=get('clang','--version'),rust=get('rustc','--version'),source=q,neverd=dev,iced=m['iced_revision']))
+    from training import fetch
+    foreign=fetch(r,w);assert len(foreign)==5;save('foreign-corpus',foreign)
+    run('clang++','-O3','-std=c++17','-I',base/'include','-c',r/'foreign.cpp','-o',w/'foreign.o')
+    ref=w/'native.c';ref.write_text('#include "arch/X86/X86ScanAdapter.h"\n__attribute__((used)) static __typeof__(&X86_disasmIterText) const keep = X86_disasmIterText;\n')
+    run('clang','-O2','-I',base,'-I',base/'include','-c',ref,'-o',w/'ref.o')
+    fix=rd(r/'fix.json');assert fix['parent']==q['commit'] and sha(r/'fix.patch')==fix['sha256']
+    images={}
+    for tag in ('base','fixed'):
+        if tag=='fixed':
+            run('git','-C',base,'apply','--index',r/'fix.patch');assert get('git','-C',base,'write-tree').strip()==fix['tree']
+            run(sys.executable,'-B',base/'suite/synctools/x86_mapping_counts.py','--check');run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/('x86-'+tag))
+        run('clang++',w/'foreign.o',w/'ref.o',lib,*flags,'-o',w/('foreign-'+tag))
+        run('clang','-fPIC','-shared','-I',base/'include',r/'export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(tag+'.so'))
+        objs={str(p.relative_to(build)):sha(p)for p in build.rglob('*.c.o')};assert len(objs)>=60
+        images[tag]=dict(x86=sha(w/('x86-'+tag)),foreign=sha(w/('foreign-'+tag)),archive=sha(lib),objects=objs)
+    changed=[Path(k).name for k,v in images['base']['objects'].items()if images['fixed']['objects'][k]!=v]
+    assert 'X86Mapping.c.o' in changed and set(changed)<={'X86Mapping.c.o','X86Disassembler.c.o','X86DisassemblerDecoder.c.o'},changed
+    save('linked',dict(images=images,changed=changed,source=fix,dev=dev,iced=m['iced_revision']))
+    os.link(w/'x86-base',w/'runner')
+    for route in ('public','fixed'):run('clang++','-O2','-std=c++17','-I',base/'include',r/('records-'+route+'.cpp'),'-ldl','-o',w/('records-'+route))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cases={}
@@ -63,8 +82,8 @@ try:
         for mode in (0,1,2):
             cases[name+'/'+str(mode)]=(mode,f,path,str(bits))
     assert len(cases)==18
-    from observe import measure_all
-    measure_all(r,w,cases,save)
-    save('complete',dict(complete=True,source=q,neverd=dev,iced=m['iced_revision'],cpu=get('lscpu'),cases=list(cases)))
+    from compare import run_programs
+    run_programs(r,w,cases,foreign,save)
+    save('complete',dict(complete=True,source=fix,neverd=dev,iced=m['iced_revision'],cpu=get('lscpu'),cases=list(cases)))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
