@@ -1,14 +1,14 @@
 name: MIPS native Release CLI comparison
 on:
   push:
-    branches: [codex/mips-validation-release-pairs]
+    branches: [codex/mips-r17-release-cli-pairs]
 permissions:
   contents: read
 env:
-  BASE_PROJECT: a6f3f30c40c8e99b3b254a0136fb1e17d12922f0
-  NEW_PROJECT: ac3ff65c4ef7173de58dc92a3319f3ff704a9bfd
-  BASE_LLVM: 6947b7db63e913244e0aa6de087d1ad2e791e86f
-  NEW_LLVM: 54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00
+  BASE_PROJECT: e059d2b10b272791e3950401f9516e31b1660f4a
+  NEW_PROJECT: 022f5d4fbf224c9f5d91026b4789ea68fe138c87
+  BASE_LLVM: 66bcb9e672583193b1b725cccd0cee96f1b2b105
+  NEW_LLVM: 93a7e578d2b105139e938d1da8b502d0689a25a0
 jobs:
   compare:
     strategy:
@@ -80,10 +80,10 @@ jobs:
           suffix=
           if [[ "$RUNNER_OS" == Windows ]]; then suffix=.exe; fi
           if [[ "$RUNNER_OS" == Linux ]]; then extra+=('-DCMAKE_CXX_FLAGS=--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/14'); fi
-          for release in r12 r15; do
+          for release in r16 r17; do
             rev="$BASE_PROJECT"
             fork="$BASE_LLVM"
-            if [[ "$release" == r15 ]]; then rev="$NEW_PROJECT"; fork="$NEW_LLVM"; fi
+            if [[ "$release" == r17 ]]; then rev="$NEW_PROJECT"; fork="$NEW_LLVM"; fi
             git -C project checkout --detach "$rev"
             git -C project submodule update --init --depth 1 third_party/capstone third_party/unicorn signatures
             git -C llvm-src checkout --detach "$fork"
@@ -113,8 +113,8 @@ jobs:
           if [[ "$RUNNER_OS" == macOS ]]; then rounds=96; fi
           cp .github/scripts/neverd-relink-bench.py "$dest/bench.py"
           cp .github/scripts/neverd_windows_child_cpu.py "$dest/"
-          mv pair-installs/r12 "$dest/slot-0"
-          mv pair-installs/r15 "$dest/slot-1"
+          mv pair-installs/r16 "$dest/slot-0"
+          mv pair-installs/r17 "$dest/slot-1"
           python "$dest/bench.py" "$rounds" pairs-0.json "$dest/slot-0" "$dest/slot-1"
           mv "$dest/slot-0" "$dest/staged"
           mv "$dest/slot-1" "$dest/slot-0"

@@ -30,8 +30,8 @@ windows = sys.platform == "win32"
 suffix = ".exe" if windows else ""
 locations = [Path(arg).resolve() for arg in sys.argv[3:5]]
 if not locations:
-    locations = [p / "r12-bin", p / "r15-bin"]
-toolchains = dict(zip(("r12", "r15"), locations, strict=True))
+    locations = [p / "r16-bin", p / "r17-bin"]
+toolchains = dict(zip(("r16", "r17"), locations, strict=True))
 full_pair = os.environ.get("NEVERD_PAIR_FULL_INSTALLATIONS") == "1"
 cli = p.parent / "bin" / ("neverd" + suffix)
 clis = {label: folder / ("neverd" + suffix) if full_pair else cli for label, folder in toolchains.items()}
@@ -58,8 +58,8 @@ for label, executable in clis.items():
         assert any(str(folder) in line and "libneverd" in line for line in probe.stderr.splitlines())
     cli_envs[executable] = env
     provenance[label] = record
-if full_pair and "neverd" in provenance["r12"]:
-    assert provenance["r12"]["dependencies"] == provenance["r15"]["dependencies"]
+if full_pair and "neverd" in provenance["r16"]:
+    assert provenance["r16"]["dependencies"] == provenance["r17"]["dependencies"]
 rng = random.Random(20261126)
 rounds = int(sys.argv[1]) if len(sys.argv) > 1 else 32
 receipt = sys.argv[2] if len(sys.argv) > 2 else "perf.json"
@@ -103,13 +103,13 @@ def measure(commands):
 def report(rows):
     result = {}
     for key in ("cpu", "wall"):
-        ratios = [(r["r15"][key] / r["r12"][key] - 1) * 100 for r in rows]
+        ratios = [(r["r17"][key] / r["r16"][key] - 1) * 100 for r in rows]
         estimates = sorted(
             stats.median(rng.choices(ratios, k=len(ratios))) for _ in range(6000)
         )
         result[key] = {
-            "r12_s": stats.median(r["r12"][key] for r in rows),
-            "r15_s": stats.median(r["r15"][key] for r in rows),
+            "r16_s": stats.median(r["r16"][key] for r in rows),
+            "r17_s": stats.median(r["r17"][key] for r in rows),
             "paired_pct": stats.median(ratios),
             "median_95_pct": [estimates[149], estimates[5849]],
             "iqr_pct": [stats.quantiles(ratios)[0], stats.quantiles(ratios)[2]],
@@ -145,7 +145,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
     for pf in matrix:
         folder = base / pf.name
         folder.mkdir()
-        old = toolchains["r12"]
+        old = toolchains["r16"]
         args = SimpleNamespace(mc=old / ("llvm-mc" + suffix), llc=old / ("llc" + suffix))
         objects = (
             m.build_linkage_objects(args, folder, pf, m.run)
@@ -280,6 +280,14 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
             know[key] = h
     if windows or full_pair:
         kinds = public_kinds
+    if windows:
+        # Windows accounts child CPU in scheduler ticks. Batch each shape so
+        # the small programs also span multiple ticks per paired observation.
+        for kind in kinds:
+            for label in toolchains:
+                batch = commands[kind][label]
+                repetitions = (8 + len(batch) - 1) // len(batch)
+                commands[kind][label] = batch * repetitions
     rows = {k: [] for k in kinds}
     same_rows = {k: [] for k in kinds}
     for k in kinds:
@@ -298,7 +306,7 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
             for control in ((True, False) if reverse_modes else (False, True)):
                 row = {"order": order, "reverse_modes": reverse_modes}
                 for label in order:
-                    row[label] = measure(commands[k]["r15" if control else label])
+                    row[label] = measure(commands[k]["r17" if control else label])
                 (same_rows if control else rows)[k].append(row)
     for path, wanted in references.items():
         assert m.digest(Path(path)) == wanted, path
@@ -312,14 +320,14 @@ with TemporaryDirectory(prefix="paired-mips-", dir=p) as tmp:
         cli_sha256={label: m.digest(path) for label, path in clis.items()} if full_pair else m.digest(cli),
         sources=provenance,
         programs=know,
-        cli_commands_per_trial=sum(len(commands[k]["r12"]) for k in public_kinds),
+        cli_commands_per_trial=sum(len(commands[k]["r16"]) for k in public_kinds),
         installations={label: folder.name for label, folder in toolchains.items()},
         rounds=rounds,
         summary={k: report(v) for k, v in rows.items()},
         samples=rows,
         same_installation_samples=same_rows,
         same_installation_summary={k: report(values) for k, values in same_rows.items()},
-        commands_per_shape={k: len(commands[k]["r12"]) for k in public_kinds},
+        commands_per_shape={k: len(commands[k]["r16"]) for k in public_kinds},
     )
     m.encode(p / receipt, result)
     print(json.dumps(result["summary"], indent=2))
