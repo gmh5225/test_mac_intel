@@ -31,7 +31,7 @@ try:
   pkg.unlink()
  builds={};observations={};measure={};archs={'ARM':101,'AARCH64':102,'SPARC':106,'LOONGARCH':108,'mixed':0}
  if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
- archs['sparc-diet']=0;archs['sparc-debug']=0
+ archs['sparc-diet']=106;archs['sparc-debug']=106
  for arch,sel in archs.items():
   b=w/'build';images={};builds[arch]={};records={}
   for tag in ('base','candidate'):
@@ -42,24 +42,26 @@ try:
    run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
    lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
    builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
-   if arch!='SPARC':continue
+   if arch not in ('SPARC','sparc-diet','sparc-debug'):continue
    shutil.copyfile(so,w/(tag+'-sparc-library'))
    texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
    images[tag]=texe.read_bytes()
    exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
-   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs[arch].items()for opt in range(5)}
+   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs['SPARC'].items()for opt in range(5)}
    assert all(row[0]>0 for row in records[tag].values())
   put('compilation',builds)
-  if arch!='SPARC':
+  if arch not in ('SPARC','sparc-diet','sparc-debug'):
    assert builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
-  enabled=not darwin and isa=='x86_64'
-  assert (builds[arch]['base']!=builds[arch]['candidate'])==enabled and (images['base']!=images['candidate'])==enabled
+  maps=builds[arch]
+  changed=[key for key,h in maps['base']['objects'].items() if maps['candidate']['objects'][key]!=h]
+  assert set(Path(key).name for key in changed)<={'SparcMapping.c.o','SparcInstPrinter.c.o'}
   assert records['base']==records['candidate'];observations[arch]=records['base'];put('public-records',observations)
   guard={}
-  for name in ('guard','callback'):
+  for name in (('guard',) if arch=='sparc-diet' else ('guard','callback')):
    compare=w/name;run('c++','-std=c++17','-O2','-I',src/'include',r/('sparc-'+name+'.cpp'),*([] if darwin else ['-ldl']),'-o',compare)
    guard[name]=out(compare,w/'base-sparc-library',w/'candidate-sparc-library');assert guard[name]
-  put('sparc-domain',guard)
+  put('domain-'+arch,guard)
+  if arch!='SPARC':shutil.rmtree(b);continue
   exe=w/'timed';image=FixedImage(exe,images,True)
   for name,(path,ranges) in inputs[arch].items():
    for mode in range(3):
