@@ -1,12 +1,12 @@
 name: NeverSight LLVM MIPS packages
 on:
   push:
-    branches: [codex/mips-mnemonic-final-native]
+    branches: [codex/mips16-c-abi-native]
     paths: ['.github/workflows/neverd-mips-llvm-packages.yml']
 permissions:
   contents: read
 env:
-  LLVM_REVISION: 54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00
+  LLVM_REVISION: 66bcb9e672583193b1b725cccd0cee96f1b2b105
 jobs:
   build:
     name: build ${{ matrix.name }}
@@ -465,7 +465,7 @@ jobs:
       - name: Install the instruction counter
         if: runner.os == 'Linux'
         run: sudo apt-get install --yes valgrind
-      - name: Compare the candidate SDK with the published r13 and r14 SDKs
+      - name: Compare the candidate SDK with the published r14 and r15 SDKs
         env:
           PACKAGE_NAME: ${{ matrix.pkg }}
         run: python cost-harness/.github/scripts/mips-mnemonic/run.py

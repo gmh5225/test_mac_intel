@@ -10,16 +10,16 @@ import tempfile
 
 from compare import compare, digest, inputs
 
-REVISIONS = {"r13": "24ced447e1718432292dc9d54b6eb229323409d1",
-             "r14": "6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312",
-             "candidate": "54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00"}
+REVISIONS = {"r14": "6c769154fbe9db2fe9e2e2dc1b04bebfe64e1312",
+             "r15": "54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00",
+             "candidate": "66bcb9e672583193b1b725cccd0cee96f1b2b105"}
 ARCHIVES = {
-    "Linux": ["9c48f639fa51c5de8d1482ea9e23409d215fc6d6022873cff5899154862c8672",
-              "8bdcf7289ada160858c35ccb6dbf848c46c75161063c65b5653954b3e4d4d2bd"],
-    "Darwin": ["c29df29cf1c9dcad48576752e312b89032a18de2cde6a6a1022869cf5c504476",
-               "b8e70c79d2a44ba0dfd49803fa958b6408037960930fbeb2cb5f0bc60b98ac54"],
-    "Windows": ["ba36aec4b41c0f8075cddfee2d924946156a5eb343ddb838eda2a1afb60388fe",
-                "2f23b21740c23036f33c7cf6d5cc19486b9d6cf25bc882795f86dd41482f2184"],
+    "Linux": ["8bdcf7289ada160858c35ccb6dbf848c46c75161063c65b5653954b3e4d4d2bd",
+              "527eb1cc928ef53316d79ea3fb986719a8334a6f62a1f59238a48aad289c7b3f"],
+    "Darwin": ["b8e70c79d2a44ba0dfd49803fa958b6408037960930fbeb2cb5f0bc60b98ac54",
+               "fab08ae7c4dd67263c1180f211f928d0612cc828bd0a67942f5c0c4f0f099b97"],
+    "Windows": ["2f23b21740c23036f33c7cf6d5cc19486b9d6cf25bc882795f86dd41482f2184",
+                "e572879e578b074de06e0b51d6f7148e4d4cbeec01cae526478a2386e8b001d9"],
 }
 
 

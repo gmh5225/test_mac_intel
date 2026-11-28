@@ -1,4 +1,4 @@
-"""Compare classic MIPS source assembly on r13, r14, and the single-lookup candidate."""
+"""Compare classic MIPS source assembly on r14, r15, and the MIPS16 code generation candidate."""
 from pathlib import Path
 import hashlib
 import json
@@ -84,8 +84,8 @@ def compare(releases, destination, original_refs=None):
         assert outputs["branches"]=="4adfb3d63922c3d460e5bde74e9fff5557101e58955621aab25263c30079936f"
         if original_refs:
             assert outputs["branches"]==original_refs["branches"] and outputs["arithmetic"]==original_refs["arithmetic"]
-        results={k:{name:stats(rows,a,b) for name,a,b in [("r14_vs_r13","r14","r13"),("candidate_vs_r13","candidate","r13"),
-                 ("candidate_vs_r14","candidate","r14")]} for k,rows in samples.items()}
+        results={k:{name:stats(rows,a,b) for name,a,b in [("r15_vs_r14","r15","r14"),("candidate_vs_r14","candidate","r14"),
+                 ("candidate_vs_r15","candidate","r15")]} for k,rows in samples.items()}
         report={"pairs":48,"drivers":{k:digest(p) for k,p in releases.items()},"objects":outputs,"samples":samples,"result":results}
         destination.write_text(json.dumps(report,indent=2)+"\n")
         for kind,r in results.items():print(kind,{n:[round(c["cpu"]["median_pct"],2),[round(v,2) for v in c["cpu"]["ci95_pct"]]] for n,c in r.items()})
