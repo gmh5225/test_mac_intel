@@ -1,99 +1,90 @@
-"""Measure dedicated alias printers and verify the six-architecture consumer is byte identical."""
 from pathlib import Path
-import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
-from corpus import deb_binary,elf_text
-from arm_corpus import prepare as arm_extents
-from elftools.elf.elffile import ELFFile
-from fixed_image import FixedImage
 from io import BytesIO
-r=Path(__file__).resolve().parent;src=r.parent/'source';e=r.parent/'evidence';e.mkdir(exist_ok=True)
-read=lambda f:json.loads(f.read_bytes())
-def put(k,v):
- f=e/(k+'.json');p=f.with_suffix('.tmp');p.write_text(json.dumps(v,indent=1)+'\n');p.replace(f)
-def run(*args):sp.run(args,check=True)
-def out(*args):return sp.check_output(args,text=True).strip()
-def sha(data):return hashlib.sha256(data).hexdigest()
-def dig(path):return sha(path.read_bytes())
-q=read(r/'source.json');w=Path(tempfile.mkdtemp());samples=read(r/'samples.json');isa=platform.machine();darwin=platform.system()=='Darwin';os.environ['ZERO_AR_DATE']='1'
+import hashlib,json,math,os,platform,random,shutil,subprocess as sp,tempfile
+from elftools.elf.elffile import ELFFile
+from corpus import deb_binary,elf_text
+from fixed_image import FixedImage
+r=Path(__file__).resolve().parent;src=r.parent/'source';ev=r.parent/'evidence';ev.mkdir(exist_ok=True)
+rd=lambda f:json.loads(f.read_bytes());digest=lambda b:hashlib.sha256(b).hexdigest()
+def save(k,v):
+ f=ev/(k+'.json');tmp=f.with_suffix('.temp');tmp.write_text(json.dumps(v,indent=1)+'\n');tmp.replace(f)
+def run(*a):sp.run(a,check=True)
+def get(*a):return sp.check_output(a,text=True).strip()
+q=rd(r/'source.json');meta=rd(r/'samples.json');isa=platform.machine();mac=platform.system()=='Darwin'
+os.environ['ZERO_AR_DATE']='1';w=Path(tempfile.mkdtemp());tests={};coverage={};experiment={};compiled={};timed={}
 try:
- assert out('git','-C',src,'rev-parse','HEAD')==q['checkout']
- inputs={}
- for arch,meta in samples.items():
-  pkg=w/(arch+'.deb');run('curl','--http1.1','--retry-all-errors','--retry','3','--max-time','120','-fsSL',meta['url'],'-o',pkg)
-  assert dig(pkg)==meta['package_sha256'];inputs[arch]={}
-  for name,spec in meta['programs'].items():
-   elf=deb_binary(pkg,name);section=ELFFile(BytesIO(elf)).get_section_by_name('.text')
-   text=elf_text(elf);assert sha(text)==spec['section_sha256'] and text==section.data()
-   if 'elf_sha256'in spec:assert sha(elf)==spec['elf_sha256']
-   path=w/(arch+name+'.text');path.write_bytes(text);spans=path.with_suffix('.ranges');spans.write_text('0 %d %d\n'%(len(text),section['sh_addr']))
-   inputs[arch][name]=(path,spans)
-  pkg.unlink()
- builds={};observations={};measure={};archs={'HPPA':111,'mixed':0}
- if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
- archs['hppa-diet']=111;archs['hppa-debug']=111
- for arch,sel in archs.items():
-  b=w/'build';images={};builds[arch]={};records={}
-  for tag in ('shipping','base','candidate'):
+ assert get('git','-C',src,'rev-parse','HEAD')==q['parent'] and digest((r/'candidate.patch').read_bytes())==q['sha256']
+ pkg=w/'coreutils.deb'
+ for url in (meta['snapshot_url'],meta['url']):
+  v=sp.run(['curl','--retry','2','--http1.1','--fail','--silent','--show-error','--location','--max-time','70',url,'-o',pkg])
+  if not v.returncode and digest(pkg.read_bytes())==meta['package_sha256']:break
+ else:raise RuntimeError('Both locations failed to supply the pinned Debian package.')
+ for n,z in meta['programs'].items():
+  el=deb_binary(pkg,n);assert digest(el)==z['elf_sha256'];sec=ELFFile(BytesIO(el)).get_section_by_name('.text');text=sec.data()
+  assert text==elf_text(el) and digest(text)==z['section_sha256'] and len(text)==z['bytes'] and sec['sh_addr']==z['text_address']
+  (w/(n+'.text')).write_bytes(text);(w/(n+'.ranges')).write_text('0 %d %d\n'%(len(text),z['text_address']))
+ pkg.unlink()
+ for name in ('records','views'):
+  run('c++','-std=c++17','-O2','-I',src/'include',r/(name+'.cpp'),*([] if mac else ['-ldl']),'-o',w/name)
+ project=w/'project';(project/'third_party').mkdir(parents=True);(project/'third_party/capstone').symlink_to(src);(project/'cmake').mkdir()
+ shutil.copyfile(r/'consumer.cmake',project/'CMakeLists.txt');shutil.copyfile(r/'options.cmake',project/'cmake/NeverDCapstoneCompilerOptions.inc')
+ if not mac:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+ for prof in ('loongarch','debug','diet','mixed-loongarch','consumer'):
+  b=w/'build';diet=prof=='diet';compiled[prof]={};tests[prof]={};libs={}
+  for stage in ('base','fixed'):
    run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
-   patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch']
-   if patch.stat().st_size:run('git','-C',src,'apply','--index',patch)
-   assert out('git','-C',src,'write-tree')==q[tag]['tree']
-   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['HPPA'] if arch.startswith('hppa-') else [arch]
-   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='hppa-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='hppa-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST='+('OFF' if arch=='mixed' else 'ON'),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
-   run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
-   if arch!='mixed' and tag!='shipping':
-    run('cmake','--build',b,'--parallel','4','--target','hppa_register_detail')
-    check=out('ctest','--test-dir',b,'-R','^unit_hppa_register_detail$','--no-tests=error','--output-on-failure')
-    assert '100% tests passed' in check;put('detail-'+arch+'-'+tag,dict(cases=12,ctest=check))
-   lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
-   builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
-   if arch not in ('HPPA','hppa-diet','hppa-debug'):continue
-   if arch!='mixed':
-    exe=w/'name-check';run('cc','-I',src/'include',r/'names.c',lib,'-o',exe);run(exe)
-    check=w/'register-records';run('c++','-std=c++17','-O2','-I',src/'include',r/'register-records.cpp',lib,'-o',check)
-    verified={}
-    for name,(path,ranges) in inputs['HPPA'].items():
-     addr=samples['HPPA']['programs'][name]['text_address']
-     for option in range(5):
-      row=list(map(int,out(check,'0' if tag=='shipping' else '1',str(option),path,str(addr),name).split()))
-      assert len(row)==8 and 4*sum(row[:2])==path.stat().st_size
-      if tag!='shipping':assert row[-2:]==[0,0]
-      verified[f'{name}/{option}']=row
-    put('register-records-'+arch+'-'+tag,verified)
-   if tag=='shipping':continue
-   shutil.copyfile(so,w/(tag+'-hppa-library'))
-   texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
-   images[tag]=texe.read_bytes()
-   exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
-   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs['HPPA'].items()for opt in range(5)}
-   assert all(row[0]>0 for row in records[tag].values())
-  put('compilation',builds)
-  if arch not in ('HPPA','hppa-diet','hppa-debug'):
-   assert builds[arch]['shipping']==builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
-  maps=builds[arch]
-  changed=[key for key,h in maps['base']['objects'].items() if maps['candidate']['objects'][key]!=h]
-  assert set(Path(key).name for key in changed)<={'HPPAMapping.c.o','HPPAInstPrinter.c.o','HPPAModule.c.o'}
-  assert records['base']==records['candidate'];observations[arch]=records['base'];put('public-records',observations)
-  guard={}
-  for name in (('guard',) if arch=='hppa-diet' else ('guard','callback')):
-   compare=w/name;run('c++','-std=c++17','-O2','-I',src/'include',r/('hppa-'+name+'.cpp'),*([] if darwin else ['-ldl']),'-o',compare)
-   guard[name]=out(compare,w/'base-hppa-library',w/'candidate-hppa-library');assert guard[name]
-  put('domain-'+arch,guard)
-  if arch!='HPPA':shutil.rmtree(b);continue
-  exe=w/'timed';image=FixedImage(exe,images,True)
-  for name,(path,ranges) in inputs[arch].items():
-   for mode in range(4):
-    key=f'{arch}/{name}/{mode}'
-    def take(tag,n):
-     image.select(tag);return list(map(int,out(*([]if darwin else ['setarch',isa,'-R']),exe,str(sel),str(mode),path,'0',str(n),ranges).split()))
-    warm=take('base',1);reps=max(1,math.ceil(30e6/warm[0]));rng=random.Random(key);cycles=[];labels=['base','candidate','copy','repeat']
-    for _ in range(17):
-     rng.shuffle(labels);values={k:[]for k in labels}
-     for tag in labels+labels[::-1]:
-      z=take(tag,reps);assert z[2]==warm[2]and min(z[:2])>0;values[tag].append(z[:2])
-     cycles.append({k:[sum(t[i] for t in vs)for i in range(2)]for k,vs in values.items()})
-    measure[key]=dict(cycles=cycles,reps=reps,observed=warm[2],text=dig(path),extents=dig(ranges));put('timings',measure)
-  put('image-'+arch,image.receipt());exe.unlink();shutil.rmtree(b)
- put('complete',dict(complete=True,source=q,isa=isa,system=platform.system(),panels=len(measure),compiler=out('clang','--version').splitlines()[0]))
+   if stage=='fixed':
+    run('git','-C',src,'apply','--index',r/'candidate.patch');assert get('git','-C',src,'write-tree')==q['tree']
+   cfg=['cmake','-G','Ninja','-S',project if prof=='consumer' else src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if prof=='debug' else 'Release'),'-DCMAKE_EXPORT_COMPILE_COMMANDS=ON']
+   if mac:cfg+=['-DCAPSTONE_BUILD_MACOS_THIN=ON']
+   if prof!='consumer':
+    cfg+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_LOONGARCH_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_DIET='+('ON' if diet else 'OFF')]
+    if prof=='mixed-loongarch':cfg+=['-DCAPSTONE_MIPS_SUPPORT=ON']
+   run(*cfg);targets=['capstone_static']
+   if prof!='consumer':targets+=['capstone_shared','register_descriptors']+(['loongarch_register_detail'] if stage=='fixed' and not diet else [])
+   run('cmake','--build',b,'--target',*targets,'--parallel','4')
+   lib,=b.rglob('libcapstone.a')
+   if prof!='consumer':
+    so,=[f for f in b.glob('libcapstone*.dylib' if mac else 'libcapstone.so.*') if not f.is_symlink()]
+    dll=w/(stage+'-library');shutil.copyfile(so,dll);libs[stage]=dll
+    result=get('ctest','--test-dir',b,'-R','^unit_(register_descriptors|loongarch_register_detail)$','--no-tests=error','--output-on-failure')
+    assert '100% tests passed' in result;tests[prof][stage]=dict(ctest=result)
+    if stage=='base' and not diet:
+     exe=w/'red';run('cc','-I',src/'include',r/'regression.c',lib,'-o',exe);red=sp.run([exe],text=True,capture_output=True)
+     assert red.returncode==1 and 'read 1 of 2 registers' in red.stderr and '$f27, $r13, $r31' in red.stderr
+     tests[prof][stage]['red']=red.stderr
+   if prof in ('loongarch','consumer'):
+    exe=w/'timed';run('c++','-O3','-std=c++17','-I',src/'include',r/'time.cpp',lib,*([] if mac else ['-no-pie']),'-o',exe)
+    compiled[prof][stage]=dict(objects={str(f.relative_to(b)):digest(f.read_bytes())for f in b.rglob('*.c.o')},lib=digest(lib.read_bytes()),exe=digest(exe.read_bytes()))
+    if prof=='loongarch':timed[stage]=exe.read_bytes()
+    if prof=='consumer':
+     assert not any('/arch/LoongArch/' in c['file'] for c in rd(b/'compile_commands.json'));shutil.rmtree(b)
+  if prof=='consumer':
+   assert compiled[prof]['base']==compiled[prof]['fixed'];continue
+  coverage[prof]={}
+  for name,spec in meta['programs'].items():
+   res={}
+   for tool,num in [('records',16),('views',2)]:
+    lines=[list(map(int,z.split()))for z in get(w/tool,libs['base'],libs['fixed'],w/(name+'.text'),str(spec['text_address']),str(int(diet))).splitlines()]
+    assert len(lines)==num and all(s[1]*4==spec['bytes'] for s in lines)
+    res[tool]=lines
+   coverage[prof][name]=res
+  save('coverage',coverage);shutil.rmtree(b)
+ assert coverage['loongarch']==coverage['mixed-loongarch']==coverage['debug']
+ # Mode 3 consumes corrected register read counts. Only compare unchanged default work for this check.
+ image=FixedImage(w/'same-file',{'base':timed['base'],'candidate':timed['fixed']},True)
+ for name in meta['programs']:
+  for mode in range(3):
+   key=name+'/'+str(mode)
+   def take(tag,n):
+    image.select(tag);return list(map(int,get(*([] if mac else ['setarch',isa,'-R']),image.path,'108',str(mode),w/(name+'.text'),'0',str(n),w/(name+'.ranges')).split()))
+   warm=take('base',1);reps=max(1,math.ceil(18e6/warm[0]));rng=random.Random(key);cycles=[];tags=['base','candidate','copy','repeat']
+   for _ in range(17):
+    rng.shuffle(tags);pair={k:[]for k in tags}
+    for t in tags+tags[::-1]:
+     z=take(t,reps);assert z[2]==warm[2] and min(z[:2])>0;pair[t].append(z[:2])
+    cycles.append({k:[sum(d[i] for d in v)for i in (0,1)]for k,v in pair.items()})
+   experiment[key]=dict(reps=reps,records=warm[2],cycles=cycles);save('times',experiment)
+ save('builds',compiled);save('tests',tests);save('complete',dict(complete=True,tree=q,system=platform.system(),isa=isa,compiler=get('cc','--version').splitlines()[0],image=image.receipt(),samples=meta,consumer=rd(r/'consumer.json')))
 finally:
- size=sum(p.stat().st_size for p in w.rglob('*')if p.is_file() and not p.is_symlink());shutil.rmtree(w);put('cleanup',dict(removed=not w.exists(),bytes=size))
+ n=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
