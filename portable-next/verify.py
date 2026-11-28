@@ -8,7 +8,11 @@ def save(name,v):(e/(name+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def sha(b):return hashlib.sha256(b).hexdigest()
 w=Path(tempfile.mkdtemp());b=w/'build';data=(r/'cases.tsv').read_bytes();cases=len(data.splitlines());expected=json.loads((r/'expected.json').read_bytes());assert cases==len(expected)==3584
 try:
- assert git('rev-parse','HEAD')==q['parent'] and sha((r/'candidate.patch').read_bytes())==q['sha256']
+ assert git('rev-parse','HEAD')==q['parent']
+ blob=sp.check_output(['git','-C',r.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']);assert sha(blob)==q['sha256']
+ worktree=(r/'candidate.patch').read_bytes()
+ assert worktree.replace(b'\r\n',b'\n')==blob
+ save('patch-input',dict(blob_sha256=sha(blob),checkout_sha256=sha(worktree),crlf_checkout=blob!=worktree,parent=git('rev-parse','HEAD')))
  arches=['X86','ARM','AARCH64','MIPS','PPC','RISCV']if profile not in('reduced','diet')else['X86','PPC']
  flags=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arches],'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON']
  flags+=dict(gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'],full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'])[profile]

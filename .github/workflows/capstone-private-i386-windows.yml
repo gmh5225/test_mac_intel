@@ -1,7 +1,7 @@
-name: Check effective x86 string addressing across nineteen compilers and both linkages
+name: Verify x86 string register metadata on Windows x64 and x86 from the Git blob
 on:
   push:
-    branches: [codex/effective-string-operands]
+    branches: [codex/string-registers-windows-blob]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -11,9 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, arch: x86_64, profile: gcc }
-          - { host: ubuntu-24.04, arch: x86_64, profile: clang }
-          - { host: ubuntu-24.04-arm, arch: arm64, profile: clang }
           - { host: windows-2022, arch: amd64, profile: full }
           - { host: windows-2022, arch: amd64, profile: diet }
           - { host: windows-2022, arch: amd64, profile: reduced }
@@ -22,14 +19,6 @@ jobs:
           - { host: windows-2022, arch: amd64_x86, profile: diet }
           - { host: windows-2022, arch: amd64_x86, profile: reduced }
           - { host: windows-2022, arch: amd64_x86, profile: noatt }
-          - { host: macos-15, arch: arm64, profile: full }
-          - { host: macos-15, arch: arm64, profile: diet }
-          - { host: macos-15, arch: arm64, profile: reduced }
-          - { host: macos-15, arch: arm64, profile: noatt }
-          - { host: macos-15-intel, arch: x86_64, profile: full }
-          - { host: macos-15-intel, arch: x86_64, profile: diet }
-          - { host: macos-15-intel, arch: x86_64, profile: reduced }
-          - { host: macos-15-intel, arch: x86_64, profile: noatt }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 175
     steps:
