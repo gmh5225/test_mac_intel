@@ -1,7 +1,7 @@
-name: Measure dedicated SPARC alias view construction with the real coreutils and guarded records
+name: Measure SPARC instruction mapping without optional detail on release products and exact debug and diet records
 on:
   push:
-    branches: [codex/sparc-alias-views-real-coreutils]
+    branches: [codex/sparc-only-map-requested-details]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: dedicated-sparc-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: sparc-detail-mapping-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14
