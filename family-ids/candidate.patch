@@ -1,679 +1,94 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index cea06480..d8f51cb9 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -182,6 +182,13 @@ endif()
+diff --git a/arch/Alpha/AlphaMapping.c b/arch/Alpha/AlphaMapping.c
+index a2d5d133..dcc4ec3d 100644
+--- a/arch/Alpha/AlphaMapping.c
++++ b/arch/Alpha/AlphaMapping.c
+@@ -171,10 +171,20 @@ void Alpha_printInst(MCInst *MI, SStream *O, void *Info)
  
- if(capstone_enabled_architectures STREQUAL "ARM")
-     add_compile_definitions(CAPSTONE_ARM_ONLY CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
-+    # These two callers select real or alias operands during each ARM print.
-+    if(NOT CAPSTONE_BUILD_DIET AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID STREQUAL "Clang"
-+       AND CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 18 AND CMAKE_C_COMPILER_VERSION VERSION_LESS 19
-+       AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
-+        set_property(SOURCE arch/ARM/ARMInstPrinter.c arch/ARM/ARMMapping.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_ARM_INLINE_ALIAS_DETAILS>")
-+    endif()
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "MIPS")
-@@ -1088,8 +1095,10 @@ if(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;PPC;X86;RISCV"
-    AND CMAKE_SIZEOF_VOID_P EQUAL 8 AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64|aarch64|arm64|ARM64)$")
-     target_compile_definitions(capstone_build_settings INTERFACE
-         "$<$<CONFIG:Release>:CAPSTONE_X86_COMPACT_SCALAR_ROWS>")
--    # Use the bounded masked-operand copies in the measured x86-64 static reader.
-+    # Use cached access IDs and bounded masked-operand copies in the x86-64 static reader.
-     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-+        set_property(SOURCE arch/X86/X86Mapping.c APPEND PROPERTY
-+            COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_CACHED_OPERAND_ACCESS>")
-         set_property(SOURCE arch/X86/X86VectorFallback64.c APPEND PROPERTY
-             COMPILE_DEFINITIONS "$<$<CONFIG:Release>:X86_FIXED_MASKED_SUFFIX>")
-     endif()
-diff --git a/Makefile b/Makefile
-index 9772a084..cd1d5aba 100644
---- a/Makefile
-+++ b/Makefile
-@@ -491,7 +491,8 @@ endif
- API_MAJOR=$(shell echo `grep -e CS_API_MAJOR include/capstone/capstone.h | grep -v = | awk '{print $$3}'` | awk '{print $$1}')
- VERSION_EXT =
- 
--IS_APPLE := $(shell $(CC) -dM -E - < /dev/null 2> /dev/null | grep __APPLE__ | wc -l | tr -d " ")
-+capstone_cc_macros := $(shell $(CC) -dM -E - < /dev/null 2>/dev/null)
-+IS_APPLE := $(if $(filter __APPLE__,$(capstone_cc_macros)),1,0)
- ifeq ($(IS_APPLE),1)
- # on MacOS, do not build in Universal format by default
- MACOS_UNIVERSAL ?= no
-@@ -588,7 +589,8 @@ else
- endif
- endif
- 
--$(LIBOBJ): config.mk
-+$(LIBOBJ): Makefile config.mk functions.mk
-+$(OBJDIR)/Mapping.o: MappingAliasDetails.inc
- 
- $(LIBOBJ_ARM): $(DEP_ARM)
- $(LIBOBJ_AARCH64): $(DEP_AARCH64)
-@@ -633,8 +635,22 @@ else
- 	$(generate-pkgcfg)
- endif
- 
--# create a list of auto dependencies
--AUTODEPS:= $(patsubst %.o,%.d, $(LIBOBJ))
-+# Record headers during compilation. Each slice of a universal build can
-+# include different target headers and needs its own dependency file.
-+AUTODEPS := $(LIBOBJ:.o=.d)
-+ifneq ($(filter __GNUC__ __clang__,$(capstone_cc_macros)),)
-+ifeq ($(IS_APPLE):$(MACOS_UNIVERSAL),1:yes)
-+capstone_dependency_archs := $(LIBARCHS)
-+endif
-+ifneq ($(strip $(capstone_dependency_archs)),)
-+AUTODEPS := $(foreach arch,$(capstone_dependency_archs),$(LIBOBJ:.o=.$(arch).d))
-+capstone_depflags = $(foreach arch,$(capstone_dependency_archs), \
-+	-Xarch_$(arch) -MMD -Xarch_$(arch) -MP \
-+	-Xarch_$(arch) -MF$(@:.o=.$(arch).d) -Xarch_$(arch) -MT$@)
-+else
-+capstone_depflags = -MMD -MP -MF $(@:.o=.d) -MT $@
-+endif
-+endif
- 
- # include by auto dependencies
- -include $(AUTODEPS)
-diff --git a/Mapping.c b/Mapping.c
-index 996fd61f..11d08ff4 100644
---- a/Mapping.c
-+++ b/Mapping.c
-@@ -430,29 +430,9 @@ DEFINE_get_detail_op_at(bpf, BPF, BPF);
- DEFINE_get_detail_op_at(arc, ARC, ARC);
- DEFINE_get_detail_op_at(sparc, Sparc, SPARC);
- 
--/// Returns true if for this architecture the
--/// alias operands should be filled.
--/// TODO: Replace this with a proper option.
--/// 			So it can be toggled between disas() calls.
--bool map_use_alias_details(const MCInst *MI)
--{
--	assert(MI);
--	return (MI->csh->detail_opt & CS_OPT_ON) &&
--	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
--}
--
--/// Sets the setDetailOps flag to @p Val.
--/// If detail == NULLit refuses to set the flag to true.
--void map_set_fill_detail_ops(MCInst *MI, bool Val)
--{
--	CS_ASSERT_RET(MI);
--	if (!detail_is_set(MI)) {
--		MI->fillDetailOps = false;
--		return;
--	}
--
--	MI->fillDetailOps = Val;
--}
-+#define CS_ALIAS_DETAIL_LINKAGE
-+#include "MappingAliasDetails.inc"
-+#undef CS_ALIAS_DETAIL_LINKAGE
- 
- /// Sets the instruction alias flags and the given alias id.
- void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias)
-diff --git a/Mapping.h b/Mapping.h
-index 277c4ef3..5137d8fc 100644
---- a/Mapping.h
-+++ b/Mapping.h
-@@ -324,7 +324,15 @@ static inline cs_detail *get_detail(const MCInst *MI)
- 			return; \
- 	} while (0)
- 
-+#ifdef CAPSTONE_ARM_INLINE_ALIAS_DETAILS
-+/* The dedicated printer uses both decisions while selecting alias operands. */
-+#define CS_ALIAS_DETAIL_LINKAGE static inline
-+#include "MappingAliasDetails.inc"
-+#undef CS_ALIAS_DETAIL_LINKAGE
-+#else
-+bool map_use_alias_details(const MCInst *MI);
- void map_set_fill_detail_ops(MCInst *MI, bool Val);
-+#endif
- 
- static inline bool map_fill_detail_ops(MCInst *MI)
+ void Alpha_set_instr_map_data(MCInst *MI)
  {
-@@ -334,8 +342,6 @@ static inline bool map_fill_detail_ops(MCInst *MI)
- 
- void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias);
- 
--bool map_use_alias_details(const MCInst *MI);
--
- void map_set_alias_id(MCInst *MI, const SStream *O,
- 		      const name_map *alias_mnem_id_map, int map_size);
- 
-diff --git a/MappingAliasDetails.inc b/MappingAliasDetails.inc
-new file mode 100644
-index 00000000..eae4a051
---- /dev/null
-+++ b/MappingAliasDetails.inc
-@@ -0,0 +1,21 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+CS_ALIAS_DETAIL_LINKAGE bool map_use_alias_details(const MCInst *MI)
-+{
-+	assert(MI);
-+	return (MI->csh->detail_opt & CS_OPT_ON) &&
-+	       !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
-+}
-+
-+/* Collect operands only for an instruction with active detail storage. */
-+CS_ALIAS_DETAIL_LINKAGE void map_set_fill_detail_ops(MCInst *MI, bool Val)
-+{
-+	CS_ASSERT_RET(MI);
-+	if (!detail_is_set(MI)) {
-+		MI->fillDetailOps = false;
-+		return;
-+	}
-+
-+	MI->fillDetailOps = Val;
-+}
-diff --git a/arch/Sparc/SparcInstPrinter.c b/arch/Sparc/SparcInstPrinter.c
-index 640c9b34..f5100f32 100644
---- a/arch/Sparc/SparcInstPrinter.c
-+++ b/arch/Sparc/SparcInstPrinter.c
-@@ -86,6 +86,7 @@ static void printInst(MCInst *MI, uint64_t Address, SStream *O)
- {
- 	bool isAlias = false;
- 	bool useAliasDetails = map_use_alias_details(MI);
-+	MI->flat_insn->usesAliasDetails = useAliasDetails;
- 	map_set_fill_detail_ops(MI, useAliasDetails);
- 
- 	if (!printAliasInstr(MI, Address, O) && !printSparcAliasInstr(MI, O)) {
-diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
-index d4e2f344..c0272615 100644
---- a/arch/Sparc/SparcMapping.c
-+++ b/arch/Sparc/SparcMapping.c
-@@ -33,15 +33,22 @@ const insn_map sparc_insns[] = {
- 
- void Sparc_set_instr_map_data(MCInst *MI)
- {
--	map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
+-	map_cs_id(MI, insns, ARR_SIZE(insns));
 +	const unsigned opcode = MCInst_getOpcode(MI);
-+	if (opcode >= ARR_SIZE(sparc_insns)) {
-+		map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
++	if (opcode >= ARR_SIZE(insns)) {
++		map_cs_id(MI, insns, ARR_SIZE(insns));
 +		return;
 +	}
-+	/* TableGen emits one mapping row per opcode in enum order. */
-+	const insn_map *row = &sparc_insns[opcode];
-+	MI->flat_insn->id = row->mapid;
++	/* TableGen emits the mapping rows in opcode order. */
++	MI->flat_insn->id = insns[opcode].mapid;
 +#ifndef CAPSTONE_DIET
 +	if (!MI->flat_insn->detail)
 +		return;
- 	map_implicit_reads(MI, sparc_insns);
- 	map_implicit_writes(MI, sparc_insns);
- 	map_groups(MI, sparc_insns);
--	const sparc_suppl_info *suppl_info =
--		map_get_suppl_info(MI, sparc_insns);
--	if (suppl_info) {
--		Sparc_get_detail(MI)->format = suppl_info->form;
--	}
-+	Sparc_get_detail(MI)->format = row->suppl_info.sparc.form;
+ 	map_implicit_reads(MI, insns);
+ 	map_implicit_writes(MI, insns);
+ 	map_groups(MI, insns);
 +#endif
  }
  
- /// Adds details which are not defined consistently as LLVM operands like
-@@ -306,7 +313,6 @@ void Sparc_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- {
- 	MCRegisterInfo *MRI = (MCRegisterInfo *)info;
- 	MI->MRI = MRI;
--	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
- 	Sparc_LLVM_printInst(MI, MI->address, "", O);
- 
- #ifndef CAPSTONE_DIET
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 79adee8d..735660ea 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -10286,10 +10286,20 @@ unsigned int find_insn(unsigned int id)
- 	return -1;
- }
- 
-+static inline bool cached_insn_mapping(const cs_struct *h, unsigned int id,
-+				       uint32_t *mapping)
-+{
-+	if (!h || !h->x86_insn_lut || id > h->x86_insn_lut_max)
-+		return false;
-+	*mapping = h->x86_insn_lut[id];
-+	return true;
-+}
-+
- static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
- {
--	if (h && h->x86_insn_lut && id <= h->x86_insn_lut_max)
--		return (unsigned int)(int16_t)(uint16_t)h->x86_insn_lut[id];
-+	uint32_t mapping;
-+	if (cached_insn_mapping(h, id, &mapping))
-+		return (unsigned int)(int16_t)(uint16_t)mapping;
- 
- 	return find_insn(id);
- }
-@@ -11951,32 +11961,48 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
- 		*eflags = 0;
- 		return ud1_access;
- 	}
--	unsigned int i = find_insn_h(h, id);
--	if (i != -1) {
--		*eflags = insn_ops[i].flags;
--		/* Compare-exchange reads and conditionally replaces its destination;
--		 * memory destinations receive a write cycle even on mismatch. */
--		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
--							  CS_AC_READ, 0 };
--		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
--		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
--		switch (insns[i].mapid) {
--		case X86_INS_BOUND:
--			/* BOUND compares the index without modifying it or EFLAGS. */
--			*eflags = 0;
--			return bound_access;
--		case X86_INS_CMPXCHG:
--			return compare_access;
--		case X86_INS_CMPXCHG8B:
--		case X86_INS_CMPXCHG16B:
--			return pair_access;
--		default:
--			break;
--		}
--		return insn_ops[i].access;
-+	unsigned int i, public_id;
-+#ifdef X86_CACHED_OPERAND_ACCESS
-+	uint32_t mapping;
-+	if (cached_insn_mapping(h, id, &mapping)) {
-+		if (mapping == UINT32_MAX)
-+			return NULL;
-+		/* The cache also contains the public ID used by access overrides. */
-+		i = (uint16_t)mapping;
-+		public_id = mapping >> 16;
-+	} else {
-+		i = find_insn(id);
-+		if (i == (unsigned int)-1)
-+			return NULL;
-+		public_id = insns[i].mapid;
- 	}
--
--	return NULL;
-+#else
-+	i = find_insn_h(h, id);
-+	if (i == (unsigned int)-1)
-+		return NULL;
-+	public_id = insns[i].mapid;
-+#endif
-+	*eflags = insn_ops[i].flags;
-+	/* Compare-exchange reads and conditionally replaces its destination;
-+	 * memory destinations receive a write cycle even on mismatch. */
-+	static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
-+						  CS_AC_READ, 0 };
-+	static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
-+	static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
-+	switch (public_id) {
-+	case X86_INS_BOUND:
-+		/* BOUND compares the index without modifying it or EFLAGS. */
-+		*eflags = 0;
-+		return bound_access;
-+	case X86_INS_CMPXCHG:
-+		return compare_access;
-+	case X86_INS_CMPXCHG8B:
-+	case X86_INS_CMPXCHG16B:
-+		return pair_access;
-+	default:
-+		break;
-+	}
-+	return insn_ops[i].access;
- }
- 
- void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
-diff --git a/arch/X86/X86MemoryFallback32.c b/arch/X86/X86MemoryFallback32.c
-index cffc4e81..e4628bf3 100644
---- a/arch/X86/X86MemoryFallback32.c
-+++ b/arch/X86/X86MemoryFallback32.c
-@@ -20,11 +20,11 @@
- #include "X86GenSimpleOutput.inc"
- #include "../../cs_disasm_internal.h"
- #define X86_MEMORY32_OUTPUT
--#define X86_MEMORY_IMMEDIATE writeCompare32
-+#define X86_MEMORY_IMMEDIATE writeGroup1Memory32
- #define X86_IMMEDIATE_WIDE 0
--#define X86_COMPARE_IMMEDIATE
-+#define X86_GROUP1_IMMEDIATE
- #include "X86MemoryOutputImpl.h"
--#undef X86_COMPARE_IMMEDIATE
-+#undef X86_GROUP1_IMMEDIATE
- #undef X86_MEMORY_IMMEDIATE
- #undef X86_IMMEDIATE_WIDE
- 
-@@ -68,12 +68,13 @@ X86_decodeOutputMiss32(cs_struct *handle, const uint8_t *code, size_t size,
- 	case 0x80:
- 	case 0x81:
- 	case 0x83:
--		if (size >= 2 && code[1] < 0xc0 && (code[1] & 0x38) == 0x38 &&
-+		if (size >= 2 && code[1] < 0xc0 &&
- 		    !X86_OUTPUT_UNSUPPORTED(handle, false)) {
--			const unsigned row =
--				x86_simple_plans[0][0][0x38 | (opcode & 1)] >>
--				2;
--			if (writeCompare32(code, size, insn, insn_size,
-+			/* The ModRM group selects the corresponding register ALU
-+			 * opcode; its row owns operand access and flag effects. */
-+			const unsigned reg_opcode = (code[1] & 0x38) | (opcode & 1);
-+			const unsigned row = x86_simple_plans[0][0][reg_opcode] >> 2;
-+			if (writeGroup1Memory32(code, size, insn, insn_size,
- 					   &x86_simple_outputs[row],
- 					   x86_simple_registers))
- 				return true;
-diff --git a/arch/X86/X86MemoryOutputImpl.h b/arch/X86/X86MemoryOutputImpl.h
-index 11582041..38add9f0 100644
---- a/arch/X86/X86MemoryOutputImpl.h
-+++ b/arch/X86/X86MemoryOutputImpl.h
-@@ -45,7 +45,7 @@ bool X86_writeMemoryOutput(
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
- #ifdef X86_MEMORY_IMMEDIATE
--#ifdef X86_COMPARE_IMMEDIATE
-+#ifdef X86_GROUP1_IMMEDIATE
- 	const unsigned imm_size = opcode == 0x81 ? 4 : 1;
- #else
- 	const unsigned imm_size = (opcode & 1) ? 4 : 1;
-@@ -187,13 +187,15 @@ bool X86_writeMemoryOutput(
- 	const uint32_t encoded =
- 		imm_size == 1 ? code[imm_offset] :
- 				(uint32_t)X86_readDisp32(code + imm_offset);
--#ifdef X86_COMPARE_IMMEDIATE
--	/* 83 /7 sign-extends imm8. REX.W 81 /7 sign-extends imm32. */
-+#ifdef X86_GROUP1_IMMEDIATE
- 	int64_t value = encoded;
--	if (opcode == 0x83)
-+	if (opcode == 0x83) {
-+		/* The Intel printer renders logical masks at destination width. */
-+		const unsigned group = (modrm >> 3) & 7;
- 		value = (int8_t)encoded;
--	else if (imm_size == 4 && row->ops[0].size == 8)
--		value = (int32_t)encoded;
-+		if (group == 1 || group == 4 || group == 6)
-+			value = (uint32_t)value;
-+	}
- 	memcpy(out, ", ", 2);
- 	out += 2;
- 	if (value < 0)
-diff --git a/cs.c b/cs.c
-index d0b8b045..0bfa1c8b 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1413,12 +1413,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 		return CS_ERR_OK;
- 
- 	case CS_OPT_DETAIL:
--		// CS_OPT_OFF turns detail off.  Any other value adds its flags
--		// (CS_OPT_ON, CS_OPT_DETAIL_REAL) to those already set.
--		if (value == CS_OPT_OFF)
--			handle->detail_opt = CS_OPT_OFF;
--		else
--			handle->detail_opt |= (cs_opt_value)value;
-+		/* A requested view enables detail and preserves earlier view flags. */
-+		if (value != CS_OPT_OFF)
-+			value |= handle->detail_opt | CS_OPT_ON;
-+		handle->detail_opt = (cs_opt_value)value;
- #ifdef CAPSTONE_MIPS_SCAN_BY_OPTION
- 		Mips_selectScanDecoder(handle);
- #endif
-diff --git a/functions.mk b/functions.mk
-index 2a22b8ce..c2ba0d98 100644
---- a/functions.mk
-+++ b/functions.mk
-@@ -2,10 +2,7 @@
- # Common functions used by Makefile & tests/Makefile
- 
- define compile
--	$(ifeq ($(MACOS_UNIVERSAL),no),
--		@$(CC) -MM -MP -MT $@ -MT $(@:.o=.d) $(CFLAGS) $< > $(@:.o=.d)
--	)
--	${CC} ${CFLAGS} -c $< -o $@
-+	$(CC) $(CFLAGS) $(capstone_depflags) -c $< -o $@
- endef
- 
- 
+ bool Alpha_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 1d2a80c3..46b55d85 100644
+index 46b55d85..9c6de90b 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
-@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.15)
- 
- enable_testing()
- set(UNIT_TEST_SOURCES sstream.c utils.c api.c instruction_bytes.c mcinst.c mapping.c feature_mode.c)
-+if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_PPC_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
-+    list(APPEND UNIT_TEST_SOURCES detail_views.c)
-+endif()
- if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
-    OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_PPC_SUPPORT
-    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
-@@ -22,6 +25,9 @@ if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPP
+@@ -25,6 +25,9 @@ if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPP
      add_test(NAME unit_alias_mnemonic_trie_generator
          COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_trie.py" --check)
  endif()
-+if(CAPSTONE_SPARC_SUPPORT)
-+    list(APPEND UNIT_TEST_SOURCES sparc_mapping_index.c)
++if(CAPSTONE_ALPHA_SUPPORT)
++    list(APPEND UNIT_TEST_SOURCES alpha_mapping_index.c)
 +endif()
- if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
-     add_test(NAME unit_sparc_state_register_names_generator
-         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/sparc_state_register_names.py" --check)
-diff --git a/tests/unit/detail_views.c b/tests/unit/detail_views.c
+ if(CAPSTONE_SPARC_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES sparc_mapping_index.c)
+ endif()
+diff --git a/tests/unit/alpha_mapping_index.c b/tests/unit/alpha_mapping_index.c
 new file mode 100644
-index 00000000..1adadf31
+index 00000000..8fb674de
 --- /dev/null
-+++ b/tests/unit/detail_views.c
-@@ -0,0 +1,77 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#include <capstone/capstone.h>
-+#include <stdio.h>
-+#include <string.h>
-+
-+struct sample {
-+	cs_arch arch;
-+	cs_mode mode;
-+	uint8_t bytes[4];
-+	size_t length;
-+};
-+
-+static bool decode_view(csh handle, const struct sample *sample,
-+			size_t flags, cs_insn *insn, cs_detail *detail)
-+{
-+	const uint8_t *code = sample->bytes;
-+	size_t size = sample->length;
-+	uint64_t address = 0x1000;
-+
-+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_OFF) != CS_ERR_OK ||
-+	    cs_option(handle, CS_OPT_DETAIL, flags) != CS_ERR_OK)
-+		return false;
-+	memset(insn, 0, sizeof(*insn));
-+	memset(detail, 0, sizeof(*detail));
-+	insn->detail = detail;
-+	return cs_disasm_iter(handle, &code, &size, &address, insn) &&
-+	       size == 0 && address == 0x1000 + sample->length;
-+}
-+
-+int main(void)
-+{
-+	static const struct sample samples[] = {
-+		{ CS_ARCH_ARM, CS_MODE_ARM, { 0x10, 0x40, 0x2d, 0xe9 }, 4 },
-+		{ CS_ARCH_ARM, CS_MODE_THUMB, { 0x10, 0xb5 }, 2 },
-+		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN,
-+		  { 0xe0, 0x03, 0x01, 0xaa }, 4 },
-+		{ CS_ARCH_PPC, CS_MODE_32 | CS_MODE_BIG_ENDIAN,
-+		  { 0x7c, 0x64, 0x1b, 0x78 }, 4 },
-+		{ CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCV_C,
-+		  { 0x85, 0x00 }, 2 },
-+	};
-+	static const cs_opt_value views[] = { CS_OPT_DETAIL_REAL,
-+					      CS_OPT_DETAIL_UNCOMPRESSED_REAL,
-+					      CS_OPT_DETAIL_ALIAS };
-+	for (size_t i = 0; i < sizeof(samples) / sizeof(samples[0]); ++i) {
-+		const struct sample *sample = &samples[i];
-+		if (!cs_support(sample->arch))
-+			continue;
-+		csh handle;
-+		if (cs_open(sample->arch, sample->mode, &handle) != CS_ERR_OK)
-+			return 1;
-+		for (size_t j = 0; j < sizeof(views) / sizeof(views[0]); ++j) {
-+			cs_insn implicit, explicit_on;
-+			cs_detail first, second;
-+			bool ok = decode_view(handle, sample, views[j],
-+					      &implicit, &first) &&
-+				  decode_view(handle, sample, views[j] | CS_OPT_ON,
-+					      &explicit_on, &second);
-+			if (!ok || implicit.id != explicit_on.id ||
-+			    implicit.alias_id != explicit_on.alias_id ||
-+			    implicit.usesAliasDetails != explicit_on.usesAliasDetails ||
-+			    strcmp(implicit.mnemonic, explicit_on.mnemonic) ||
-+			    strcmp(implicit.op_str, explicit_on.op_str) ||
-+			    memcmp(&first, &second, sizeof(first))) {
-+				fprintf(stderr, "detail view %u differs on architecture %u, mode %u\n",
-+					(unsigned)views[j], (unsigned)sample->arch,
-+					(unsigned)sample->mode);
-+				cs_close(&handle);
-+				return 1;
-+			}
-+		}
-+		cs_close(&handle);
-+	}
-+	return 0;
-+}
-diff --git a/tests/unit/sparc_mapping_index.c b/tests/unit/sparc_mapping_index.c
-new file mode 100644
-index 00000000..d86fb72e
---- /dev/null
-+++ b/tests/unit/sparc_mapping_index.c
-@@ -0,0 +1,44 @@
++++ b/tests/unit/alpha_mapping_index.c
+@@ -0,0 +1,48 @@
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#include "../../Mapping.h"
-+#include "../../arch/Sparc/SparcMapping.h"
++#include "../../utils.h"
++#include "../../arch/Alpha/AlphaMapping.h"
 +#include <limits.h>
 +#include <stdio.h>
++#include <string.h>
 +
-+static const insn_map rows[] = {
-+#include "../../arch/Sparc/SparcGenCSMappingInsn.inc"
-+};
++#define GET_INSTRINFO_ENUM
++#include "../../arch/Alpha/AlphaGenInstrInfo.inc"
 +
 +int main(void)
 +{
-+	if (ARR_SIZE(rows) != INSTRUCTION_LIST_END)
++	if (Alpha_insn_count != INSTRUCTION_LIST_END)
 +		return 1;
-+	cs_struct handle = { 0 };
-+	handle.detail_opt = CS_OPT_ON;
 +	cs_insn record = { 0 };
 +	MCInst inst = { 0 };
-+	inst.csh = &handle;
 +	inst.flat_insn = &record;
-+	for (unsigned op = 0; op < ARR_SIZE(rows); ++op) {
++	for (unsigned op = 0; op < Alpha_insn_count; ++op) {
++		const insn_map *row = &Alpha_insns[op];
 +		MCInst_setOpcode(&inst, op);
 +		record.id = UINT_MAX;
 +		record.detail = NULL;
-+		Sparc_set_instr_map_data(&inst);
-+		if (rows[op].id != op || record.id != rows[op].mapid) {
-+			fprintf(stderr, "Wrong SPARC mapping row for opcode %u\n", op);
++		Alpha_set_instr_map_data(&inst);
++		if (row->id != op || record.id != row->mapid) {
++			fprintf(stderr, "Wrong Alpha mapping row for opcode %u\n", op);
 +			return 1;
 +		}
 +#ifndef CAPSTONE_DIET
 +		cs_detail detail = { 0 };
-+		record.id = UINT_MAX;
 +		record.detail = &detail;
-+		Sparc_set_instr_map_data(&inst);
-+		if (record.id != rows[op].mapid ||
-+		    detail.sparc.format != rows[op].suppl_info.sparc.form) {
-+			fprintf(stderr, "Wrong SPARC mapping detail for opcode %u\n", op);
++		record.id = UINT_MAX;
++		Alpha_set_instr_map_data(&inst);
++		if (record.id != row->mapid ||
++		    memcmp(detail.regs_read, row->regs_use, sizeof(row->regs_use)) ||
++		    memcmp(detail.regs_write, row->regs_mod, sizeof(row->regs_mod)) ||
++		    memcmp(detail.groups, row->groups, sizeof(row->groups)) ||
++		    detail.regs_read_count != count_positive(row->regs_use) ||
++		    detail.regs_write_count != count_positive(row->regs_mod) ||
++		    detail.groups_count != count_positive8(row->groups)) {
++			fprintf(stderr, "Wrong Alpha mapping details for opcode %u\n", op);
 +			return 1;
 +		}
 +#endif
 +	}
 +	return 0;
 +}
-diff --git a/tests/unit/x86_encoding_accuracy.c b/tests/unit/x86_encoding_accuracy.c
-index 75f57364..fe50e9e9 100644
---- a/tests/unit/x86_encoding_accuracy.c
-+++ b/tests/unit/x86_encoding_accuracy.c
-@@ -14,6 +14,7 @@
- #include "../../arch/X86/X86DisassemblerDecoder.h"
- #include "../../arch/X86/X86Disassembler.h"
- #include "../../arch/X86/X86Mapping.h"
-+#include "../../arch/X86/X86InstPrinterCommon.h"
- #define GET_INSTRINFO_ENUM
- #ifdef CAPSTONE_X86_REDUCE
- #include "../../arch/X86/X86GenInstrInfo_reduce.inc"
-@@ -163,6 +164,26 @@ static bool check_internal_scan_mode(void)
- 	return true;
- }
- 
-+#ifndef CAPSTONE_DIET
-+static bool check_operand_access_cache(cs_struct *arch, unsigned int id)
-+{
-+	uint64_t cached_flags = UINT64_MAX, fallback_flags = UINT64_MAX;
-+	const uint8_t *cached = X86_get_op_access(arch, id, &cached_flags);
-+	const uint8_t *fallback = X86_get_op_access(NULL, id, &fallback_flags);
-+	if (cached_flags != fallback_flags)
-+		return false;
-+	if (!cached || !fallback)
-+		return cached == fallback && cached_flags == UINT64_MAX;
-+	for (unsigned int i = 0; i < CS_X86_MAXIMUM_OPERAND_SIZE; ++i) {
-+		if (cached[i] != fallback[i])
-+			return false;
-+		if (!cached[i])
-+			break;
-+	}
-+	return true;
-+}
-+#endif
-+
- /* Cache allocation is optional: every ID and hole must agree with the
-  * original binary-search mapping when the cache is unavailable. */
- static bool check_id_cache(void)
-@@ -174,6 +195,13 @@ static bool check_id_cache(void)
- 	uint32_t *cache = arch->x86_insn_lut;
- 	bool ok = cache != NULL;
- 	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
-+#ifndef CAPSTONE_DIET
-+		if (!check_operand_access_cache(arch, id)) {
-+			fprintf(stderr, "Operand access cache differs at %u\n", id);
-+			ok = false;
-+			break;
-+		}
-+#endif
- 		cs_insn cached = { 0 }, fallback = { 0 };
- 		cached.id = fallback.id = UINT32_MAX;
- 		X86_get_insn_id(arch, &cached, id);
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index de30cf93..7a66d1f6 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -1654,6 +1654,21 @@ static bool check_legacy_memory(csh handles[2], uint8_t mandatory)
- 	return true;
- }
- 
-+static bool check_group1_memory_immediates(csh handles[2])
-+{
-+	for (unsigned group = 0; group < 8; ++group) {
-+		const uint8_t opcodes[] = { 0x80, 0x81, 0x83 };
-+		for (unsigned i = 0; i < sizeof(opcodes); ++i) {
-+			uint8_t code[] = { opcodes[i], (uint8_t)(0x44 | group << 3),
-+					   0x8b, 0xf8, 0x80, 0xff, 0xff, 0xff };
-+			for (size_t n = 1; n <= sizeof(code); ++n)
-+				if (!compare(handles, code, n, 0x8000u + group))
-+					return false;
-+		}
-+	}
-+	return true;
-+}
-+
- static bool check_mode(cs_mode mode)
- {
- 	csh handles[2] = { 0 };
-@@ -1672,6 +1687,7 @@ static bool check_mode(cs_mode mode)
- 		if (!check_branches(handles) || !check_memory(handles, mode) ||
- 		    !check_lea(handles, mode) ||
- 		    !check_mov_disp32(handles, mode) ||
-+		    !check_group1_memory_immediates(handles) ||
- 		    !check_group1(handles, mode) ||
- 		    !check_push_immediates(handles) ||
- 		    !check_shift_immediate(handles, mode) ||

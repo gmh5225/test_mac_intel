@@ -1,7 +1,7 @@
-name: Measure directly indexed SPARC records and single alias selection on six hosts
+name: Verify Alpha opcode mapping and measure four distribution programs on two Linux ISAs and macOS
 on:
   push:
-    branches: [codex/sparc-map-opcode-and-alias-view]
+    branches: [codex/alpha-public-opcode-map]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 1d0673d2102cb4a31bc1f1d696d7fb7e8c29545f
+          ref: faf7731bf057eedcf902cc299f3efe2b456fb7e3
           path: source
           persist-credentials: false
       - run: |
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: sparc-opcode-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: alpha-opcode-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

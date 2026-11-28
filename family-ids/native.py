@@ -17,8 +17,7 @@ def dig(path):return sha(path.read_bytes())
 q=read(r/'source.json');w=Path(tempfile.mkdtemp());samples=read(r/'samples.json');isa=platform.machine();darwin=platform.system()=='Darwin';os.environ['ZERO_AR_DATE']='1'
 try:
  assert out('git','-C',src,'rev-parse','HEAD')==q['checkout']
- armin=read(r/'arm.json');assert arm_extents(w,armin)==armin
- inputs={'ARM':{k[4:]:(w/(k+'.text'),w/(k+'.ranges'))for k in armin['fixtures']}}
+ inputs={}
  for arch,meta in samples.items():
   pkg=w/(arch+'.deb');run('curl','--retry','3','--max-time','120','-fsSL',meta['url'],'-o',pkg)
   assert dig(pkg)==meta['package_sha256'];inputs[arch]={}
@@ -29,42 +28,48 @@ try:
    path=w/(arch+name+'.text');path.write_bytes(text);spans=path.with_suffix('.ranges');spans.write_text('0 %d %d\n'%(len(text),section['sh_addr']))
    inputs[arch][name]=(path,spans)
   pkg.unlink()
- builds={};observations={};measure={};archs={'ARM':101,'AARCH64':102,'SPARC':106,'LOONGARCH':108,'mixed':0}
+ builds={};observations={};measure={};archs={'ALPHA':110,'mixed':0}
  if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
- archs['sparc-diet']=106;archs['sparc-debug']=106
+ archs['alpha-diet']=110;archs['alpha-debug']=110
  for arch,sel in archs.items():
   b=w/'build';images={};builds[arch]={};records={}
   for tag in ('base','candidate'):
    run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
-   patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch'];run('git','-C',src,'apply','--index',patch);assert out('git','-C',src,'write-tree')==q[tag]['tree']
-   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['SPARC'] if arch.startswith('sparc-') else [arch]
-   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='sparc-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='sparc-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
+   patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch']
+   if patch.stat().st_size:run('git','-C',src,'apply','--index',patch)
+   assert out('git','-C',src,'write-tree')==q[tag]['tree']
+   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['ALPHA'] if arch.startswith('alpha-') else [arch]
+   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='alpha-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='alpha-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST='+('OFF' if arch=='mixed' else 'ON'),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
    run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
+   if tag=='candidate' and arch!='mixed':
+    run('cmake','--build',b,'--parallel','4','--target','alpha_mapping_index')
+    log=out('ctest','--test-dir',b,'-R','^unit_alpha_mapping_index$','--no-tests=error','--output-on-failure')
+    assert '100% tests passed' in log;put('mapping-rows-'+arch,dict(rows=506,test=log))
    lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
    builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
-   if arch not in ('SPARC','sparc-diet','sparc-debug'):continue
-   shutil.copyfile(so,w/(tag+'-sparc-library'))
+   if arch not in ('ALPHA','alpha-diet','alpha-debug'):continue
+   shutil.copyfile(so,w/(tag+'-alpha-library'))
    texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
    images[tag]=texe.read_bytes()
    exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
-   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs['SPARC'].items()for opt in range(5)}
+   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs['ALPHA'].items()for opt in range(5)}
    assert all(row[0]>0 for row in records[tag].values())
   put('compilation',builds)
-  if arch not in ('SPARC','sparc-diet','sparc-debug'):
+  if arch not in ('ALPHA','alpha-diet','alpha-debug'):
    assert builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
   maps=builds[arch]
   changed=[key for key,h in maps['base']['objects'].items() if maps['candidate']['objects'][key]!=h]
-  assert set(Path(key).name for key in changed)<={'SparcMapping.c.o','SparcInstPrinter.c.o'}
+  assert set(Path(key).name for key in changed)<={'AlphaMapping.c.o'}
   assert records['base']==records['candidate'];observations[arch]=records['base'];put('public-records',observations)
   guard={}
-  for name in (('guard',) if arch=='sparc-diet' else ('guard','callback')):
-   compare=w/name;run('c++','-std=c++17','-O2','-I',src/'include',r/('sparc-'+name+'.cpp'),*([] if darwin else ['-ldl']),'-o',compare)
-   guard[name]=out(compare,w/'base-sparc-library',w/'candidate-sparc-library');assert guard[name]
+  for name in (('guard',) if arch=='alpha-diet' else ('guard','callback')):
+   compare=w/name;run('c++','-std=c++17','-O2','-I',src/'include',r/('alpha-'+name+'.cpp'),*([] if darwin else ['-ldl']),'-o',compare)
+   guard[name]=out(compare,w/'base-alpha-library',w/'candidate-alpha-library');assert guard[name]
   put('domain-'+arch,guard)
-  if arch!='SPARC':shutil.rmtree(b);continue
+  if arch!='ALPHA':shutil.rmtree(b);continue
   exe=w/'timed';image=FixedImage(exe,images,True)
   for name,(path,ranges) in inputs[arch].items():
-   for mode in range(3):
+   for mode in range(4):
     key=f'{arch}/{name}/{mode}'
     def take(tag,n):
      image.select(tag);return list(map(int,out(*([]if darwin else ['setarch',isa,'-R']),exe,str(sel),str(mode),path,'0',str(n),ranges).split()))

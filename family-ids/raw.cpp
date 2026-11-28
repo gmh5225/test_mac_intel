@@ -27,6 +27,7 @@ int main(int argc,char **argv){
  case 107: arch=CS_ARCH_SYSTEMZ;mode=cs_mode(CS_MODE_BIG_ENDIAN|CS_MODE_SYSTEMZ_Z16);record_size=sizeof(cs_systemz);alignment=2;break;
  case 108: arch=CS_ARCH_LOONGARCH;mode=CS_MODE_LOONGARCH64;record_size=sizeof(cs_loongarch);alignment=4;break;
  case 109: arch=CS_ARCH_XTENSA;mode=CS_MODE_XTENSA_ESP8266;record_size=sizeof(cs_xtensa);alignment=1;break;
+ case 110: arch=CS_ARCH_ALPHA;mode=CS_MODE_LITTLE_ENDIAN;record_size=sizeof(cs_alpha);alignment=4;break;
  default:return 3;
  }
  csh h=0;if(cs_open(arch,mode,&h))return 3;
