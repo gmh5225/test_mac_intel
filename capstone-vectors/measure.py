@@ -27,6 +27,7 @@ try:
     run('cmake','-G','Ninja','-S',project,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
     files={Path(c['file']).name for c in rd(build/'compile_commands.json')};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c'}<=files and 'X86PublicOutput.c' not in files
+    run('clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors')
     counters=[]
     markers=[('arch/X86/X86Disassembler.c','bool X86_getInstruction(csh'),('arch/X86/X86IntelInstPrinter.c','void X86_Intel_printInst(MCInst'),('arch/X86/X86IntelInstPrinter.c','static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)\n{'),('arch/X86/X86IntelInstPrinter.c','static void printMemReference(MCInst *MI, unsigned Op, SStream *O)\n{'),('arch/X86/X86Mapping.c','unsigned short X86_register_map(unsigned short id)\n{'),('arch/X86/X86Mapping.c','const uint8_t *X86_get_op_access(cs_struct *h'),('SStream.c','void(SStream_concat0)(SStream *ss, const char *s)\n{'),('arch/X86/X86Mapping.c','void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)\n{')]
     for tag in ('clean','instrumented'):
@@ -38,7 +39,6 @@ try:
         run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'counters.cpp',lib,'-o',w/tag);counters.append(sha(lib))
     assert counters[0]!=counters[1];save('archives',dict(clean=counters[0],instrumented=counters[1],markers=markers))
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cases={};counts={}
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
