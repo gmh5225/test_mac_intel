@@ -1,0 +1,22 @@
+name: Compile WMF calendar and theme Swift ABI examples
+on:
+  push:
+    branches: [codex/wmf-calendar-theme-swift-abi]
+permissions:
+  contents: read
+jobs:
+  collect:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile authored examples for the arm64 iOS Simulator ABI
+        run: python3 -B collect.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: swift-ios-compiler-evidence
+          path: compiler-evidence/
+          if-no-files-found: error
+          retention-days: 14
