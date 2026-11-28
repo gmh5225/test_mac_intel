@@ -19,7 +19,7 @@ try:
  assert out('git','-C',src,'rev-parse','HEAD')==q['checkout']
  inputs={}
  for arch,meta in samples.items():
-  pkg=w/(arch+'.deb');run('curl','--retry','3','--max-time','120','-fsSL',meta['url'],'-o',pkg)
+  pkg=w/(arch+'.deb');run('curl','--http1.1','--retry-all-errors','--retry','3','--max-time','120','-fsSL',meta['url'],'-o',pkg)
   assert dig(pkg)==meta['package_sha256'];inputs[arch]={}
   for name,spec in meta['programs'].items():
    elf=deb_binary(pkg,name);section=ELFFile(BytesIO(elf)).get_section_by_name('.text')
@@ -28,9 +28,9 @@ try:
    path=w/(arch+name+'.text');path.write_bytes(text);spans=path.with_suffix('.ranges');spans.write_text('0 %d %d\n'%(len(text),section['sh_addr']))
    inputs[arch][name]=(path,spans)
   pkg.unlink()
- builds={};observations={};measure={};archs={'ALPHA':110,'mixed':0}
+ builds={};observations={};measure={};archs={'HPPA':111,'mixed':0}
  if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
- archs['alpha-diet']=110;archs['alpha-debug']=110
+ archs['hppa-diet']=111;archs['hppa-debug']=111
  for arch,sel in archs.items():
   b=w/'build';images={};builds[arch]={};records={}
   for tag in ('shipping','base','candidate'):
@@ -38,51 +38,48 @@ try:
    patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch']
    if patch.stat().st_size:run('git','-C',src,'apply','--index',patch)
    assert out('git','-C',src,'write-tree')==q[tag]['tree']
-   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['ALPHA'] if arch.startswith('alpha-') else [arch]
-   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='alpha-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='alpha-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST='+('OFF' if arch=='mixed' else 'ON'),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
+   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['HPPA'] if arch.startswith('hppa-') else [arch]
+   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='hppa-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='hppa-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST='+('OFF' if arch=='mixed' else 'ON'),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
    run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
    if arch!='mixed' and tag!='shipping':
-    run('cmake','--build',b,'--parallel','4','--target','alpha_branch_detail')
-    check=out('ctest','--test-dir',b,'-R','^unit_alpha_branch_detail$','--no-tests=error','--output-on-failure')
-    assert '100% tests passed' in check;put('transfer-detail-'+arch+'-'+tag,dict(states=26496,ctest=check))
-   if tag=='candidate' and arch!='mixed':
-    run('cmake','--build',b,'--parallel','4','--target','alpha_mapping_index')
-    log=out('ctest','--test-dir',b,'-R','^unit_alpha_mapping_index$','--no-tests=error','--output-on-failure')
-    assert '100% tests passed' in log;put('mapping-rows-'+arch,dict(rows=506,test=log))
+    run('cmake','--build',b,'--parallel','4','--target','hppa_register_detail')
+    check=out('ctest','--test-dir',b,'-R','^unit_hppa_register_detail$','--no-tests=error','--output-on-failure')
+    assert '100% tests passed' in check;put('detail-'+arch+'-'+tag,dict(cases=12,ctest=check))
    lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
    builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
-   if arch not in ('ALPHA','alpha-diet','alpha-debug'):continue
-   if arch!='alpha-debug' or tag!='shipping':
-    check=w/'transfer-records';run('c++','-std=c++17','-O2','-I',src/'include',r/'transfer-records.cpp',lib,'-o',check)
+   if arch not in ('HPPA','hppa-diet','hppa-debug'):continue
+   if arch!='mixed':
+    exe=w/'name-check';run('cc','-I',src/'include',r/'names.c',lib,'-o',exe);run(exe)
+    check=w/'register-records';run('c++','-std=c++17','-O2','-I',src/'include',r/'register-records.cpp',lib,'-o',check)
     verified={}
-    for name,(path,ranges) in inputs['ALPHA'].items():
-     addr=samples['ALPHA']['programs'][name]['text_address']
+    for name,(path,ranges) in inputs['HPPA'].items():
+     addr=samples['HPPA']['programs'][name]['text_address']
      for option in range(5):
       row=list(map(int,out(check,'0' if tag=='shipping' else '1',str(option),path,str(addr),name).split()))
       assert len(row)==8 and 4*sum(row[:2])==path.stat().st_size
       if tag!='shipping':assert row[-2:]==[0,0]
       verified[f'{name}/{option}']=row
-    put('transfer-records-'+arch+'-'+tag,verified)
+    put('register-records-'+arch+'-'+tag,verified)
    if tag=='shipping':continue
-   shutil.copyfile(so,w/(tag+'-alpha-library'))
+   shutil.copyfile(so,w/(tag+'-hppa-library'))
    texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
    images[tag]=texe.read_bytes()
    exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
-   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs['ALPHA'].items()for opt in range(5)}
+   records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs['HPPA'].items()for opt in range(5)}
    assert all(row[0]>0 for row in records[tag].values())
   put('compilation',builds)
-  if arch not in ('ALPHA','alpha-diet','alpha-debug'):
+  if arch not in ('HPPA','hppa-diet','hppa-debug'):
    assert builds[arch]['shipping']==builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
   maps=builds[arch]
   changed=[key for key,h in maps['base']['objects'].items() if maps['candidate']['objects'][key]!=h]
-  assert set(Path(key).name for key in changed)<={'AlphaMapping.c.o'}
+  assert set(Path(key).name for key in changed)<={'HPPAMapping.c.o','HPPAInstPrinter.c.o','HPPAModule.c.o'}
   assert records['base']==records['candidate'];observations[arch]=records['base'];put('public-records',observations)
   guard={}
-  for name in (('guard',) if arch=='alpha-diet' else ('guard','callback')):
-   compare=w/name;run('c++','-std=c++17','-O2','-I',src/'include',r/('alpha-'+name+'.cpp'),*([] if darwin else ['-ldl']),'-o',compare)
-   guard[name]=out(compare,w/'base-alpha-library',w/'candidate-alpha-library');assert guard[name]
+  for name in (('guard',) if arch=='hppa-diet' else ('guard','callback')):
+   compare=w/name;run('c++','-std=c++17','-O2','-I',src/'include',r/('hppa-'+name+'.cpp'),*([] if darwin else ['-ldl']),'-o',compare)
+   guard[name]=out(compare,w/'base-hppa-library',w/'candidate-hppa-library');assert guard[name]
   put('domain-'+arch,guard)
-  if arch!='ALPHA':shutil.rmtree(b);continue
+  if arch!='HPPA':shutil.rmtree(b);continue
   exe=w/'timed';image=FixedImage(exe,images,True)
   for name,(path,ranges) in inputs[arch].items():
    for mode in range(4):

@@ -28,6 +28,7 @@ int main(int argc,char **argv){
  case 108: arch=CS_ARCH_LOONGARCH;mode=CS_MODE_LOONGARCH64;record_size=sizeof(cs_loongarch);alignment=4;break;
  case 109: arch=CS_ARCH_XTENSA;mode=CS_MODE_XTENSA_ESP8266;record_size=sizeof(cs_xtensa);alignment=1;break;
  case 110: arch=CS_ARCH_ALPHA;mode=CS_MODE_LITTLE_ENDIAN;record_size=sizeof(cs_alpha);alignment=4;break;
+ case 111: arch=CS_ARCH_HPPA;mode=cs_mode(CS_MODE_HPPA_20|CS_MODE_BIG_ENDIAN);record_size=sizeof(cs_hppa);alignment=4;break;
  default:return 3;
  }
  csh h=0;if(cs_open(arch,mode,&h))return 3;
@@ -35,7 +36,7 @@ int main(int argc,char **argv){
  const size_t det=opt==2?CS_OPT_ON|CS_OPT_DETAIL_REAL:opt==3?CS_OPT_ON|CS_OPT_DETAIL_ALIAS:opt?CS_OPT_ON:CS_OPT_OFF;
  if(cs_option(h,CS_OPT_DETAIL,det)!=CS_ERR_OK)return 4;
  if(opt==4&&cs_option(h,CS_OPT_TEXT,CS_OPT_OFF)!=CS_ERR_OK)return 5;
- cs_insn i;cs_detail detail;std::memset(&i,0xa5,sizeof(i));std::memset(&detail,0xa5,sizeof(detail));i.detail=with_detail?&detail:nullptr;
+ cs_insn i;cs_detail detail;std::memset(&i,0xa5,sizeof(i));std::memset(&detail,0xa5,sizeof(detail));i.illegal=i.is_alias=i.usesAliasDetails=false;i.alias_id=0;i.detail=with_detail?&detail:nullptr;
  struct Extent { size_t offset, length; uint64_t address; };
  std::ifstream ranges(argv[4]);std::vector<Extent> spans;Extent extent;
  while (ranges >> extent.offset >> extent.length >> extent.address) {

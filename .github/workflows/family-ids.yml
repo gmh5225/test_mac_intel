@@ -1,7 +1,7 @@
-name: Validate the released x86 baseline against corrected Alpha transfers and isolate dense lookup on real programs
+name: Compare HPPA operand records, indexed printing and complete register sets on real Debian programs
 on:
   push:
-    branches: [codex/alpha-control-transfer-on-next]
+    branches: [codex/hppa-operand-records-and-tables]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6111c58334b1abdebaabe4db0577ba5fee520f60
+          ref: 41218db649cb33ebf60615f7c277f0480b87bd9b
           path: source
           persist-credentials: false
       - run: |
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alpha-next-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: hppa-printed-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

@@ -16,6 +16,7 @@ int main(int argc,char **argv){
  std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)),{});
  cs_arch arch=CS_ARCH_X86;cs_mode cm=bits==64?CS_MODE_64:CS_MODE_32;unsigned align=1;
  switch(bits){
+ case 111:arch=CS_ARCH_HPPA;cm=cs_mode(CS_MODE_HPPA_20|CS_MODE_BIG_ENDIAN);align=4;break;
  case 110:arch=CS_ARCH_ALPHA;cm=CS_MODE_LITTLE_ENDIAN;align=4;break;
  case 101:arch=CS_ARCH_ARM;cm=CS_MODE_ARM;align=4;break;
  case 102:arch=CS_ARCH_AARCH64;cm=CS_MODE_LITTLE_ENDIAN;align=4;break;
@@ -54,6 +55,7 @@ int main(int argc,char **argv){
        if(mode)values+=uint8_t(i->mnemonic[0])+uint8_t(i->op_str[0]);
        if(mode>=2){
          switch(arch){
+           case CS_ARCH_HPPA:values+=i->detail->hppa.op_count;break;
            case CS_ARCH_ALPHA:values+=i->detail->alpha.op_count;break;
            case CS_ARCH_ARM:values+=i->detail->arm.op_count;break;
            case CS_ARCH_AARCH64:values+=i->detail->aarch64.op_count;break;
