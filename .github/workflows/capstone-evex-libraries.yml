@@ -1,7 +1,7 @@
-name: Compare the published Capstone and NeverD revisions directly with the iced fork on four hosts
+name: Compare cold block splitting and PGO in three Capstone decoder and printer objects on held-out programs
 on:
   push:
-    branches: [codex/published-rip-iced-comparison]
+    branches: [codex/profile-split-x86-decoding-and-printing]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: published-rip-hardware-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: profiled-decoder-blocks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
