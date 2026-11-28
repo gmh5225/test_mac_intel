@@ -41,6 +41,10 @@ try:
    aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['ALPHA'] if arch.startswith('alpha-') else [arch]
    run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='alpha-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='alpha-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST='+('OFF' if arch=='mixed' else 'ON'),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
    run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
+   if arch!='mixed':
+    run('cmake','--build',b,'--parallel','4','--target','alpha_branch_detail')
+    check=out('ctest','--test-dir',b,'-R','^unit_alpha_branch_detail$','--no-tests=error','--output-on-failure')
+    assert '100% tests passed' in check;put('transfer-detail-'+arch+'-'+tag,dict(states=26496,ctest=check))
    if tag=='candidate' and arch!='mixed':
     run('cmake','--build',b,'--parallel','4','--target','alpha_mapping_index')
     log=out('ctest','--test-dir',b,'-R','^unit_alpha_mapping_index$','--no-tests=error','--output-on-failure')

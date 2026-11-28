@@ -1,0 +1,445 @@
+diff --git a/arch/Alpha/AlphaGenCSMappingInsn.inc b/arch/Alpha/AlphaGenCSMappingInsn.inc
+index f6704ecf..347d11e1 100644
+--- a/arch/Alpha/AlphaGenCSMappingInsn.inc
++++ b/arch/Alpha/AlphaGenCSMappingInsn.inc
+@@ -2015,7 +2015,7 @@
+   #endif
+ },
+ {
+-  /* br $$31,$DISP */
++  /* br $RA,$DISP */
+   ALPHA_BR /* 283 */, ALPHA_INS_BR,
+   #ifndef CAPSTONE_DIET
+     { 0 }, { 0 }, { ALPHA_GRP_JUMP, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
+@@ -2023,10 +2023,10 @@
+   #endif
+ },
+ {
+-  /* bsr $$26,$$$DISP ..ng */
++  /* bsr $RA,$DISP */
+   ALPHA_BSR /* 284 */, ALPHA_INS_BSR,
+   #ifndef CAPSTONE_DIET
+-    { ALPHA_REG_R29, 0 }, { ALPHA_REG_R0, ALPHA_REG_R1, ALPHA_REG_R2, ALPHA_REG_R3, ALPHA_REG_R4, ALPHA_REG_R5, ALPHA_REG_R6, ALPHA_REG_R7, ALPHA_REG_R8, ALPHA_REG_R16, ALPHA_REG_R17, ALPHA_REG_R18, ALPHA_REG_R19, ALPHA_REG_R20, ALPHA_REG_R21, ALPHA_REG_R22, ALPHA_REG_R23, ALPHA_REG_R24, ALPHA_REG_R25, ALPHA_REG_R26, ALPHA_REG_R27, ALPHA_REG_R28, ALPHA_REG_R29, ALPHA_REG_F0, ALPHA_REG_F1, ALPHA_REG_F10, ALPHA_REG_F11, ALPHA_REG_F12, ALPHA_REG_F13, ALPHA_REG_F14, ALPHA_REG_F15, ALPHA_REG_F16, ALPHA_REG_F17, ALPHA_REG_F18, ALPHA_REG_F19, ALPHA_REG_F20, ALPHA_REG_F21, ALPHA_REG_F22, ALPHA_REG_F23, ALPHA_REG_F24, ALPHA_REG_F25, ALPHA_REG_F26, ALPHA_REG_F27, ALPHA_REG_F28, ALPHA_REG_F29, ALPHA_REG_F30, 0 }, { ALPHA_GRP_CALL, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
++    { 0 }, { 0 }, { ALPHA_GRP_CALL, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
+ 
+   #endif
+ },
+@@ -2930,7 +2930,7 @@
+   /* jsr $$26,($$27),0 */
+   ALPHA_JSR /* 397 */, ALPHA_INS_JSR,
+   #ifndef CAPSTONE_DIET
+-    { ALPHA_REG_R27, ALPHA_REG_R29, 0 }, { ALPHA_REG_R0, ALPHA_REG_R1, ALPHA_REG_R2, ALPHA_REG_R3, ALPHA_REG_R4, ALPHA_REG_R5, ALPHA_REG_R6, ALPHA_REG_R7, ALPHA_REG_R8, ALPHA_REG_R16, ALPHA_REG_R17, ALPHA_REG_R18, ALPHA_REG_R19, ALPHA_REG_R20, ALPHA_REG_R21, ALPHA_REG_R22, ALPHA_REG_R23, ALPHA_REG_R24, ALPHA_REG_R25, ALPHA_REG_R26, ALPHA_REG_R27, ALPHA_REG_R28, ALPHA_REG_R29, ALPHA_REG_F0, ALPHA_REG_F1, ALPHA_REG_F10, ALPHA_REG_F11, ALPHA_REG_F12, ALPHA_REG_F13, ALPHA_REG_F14, ALPHA_REG_F15, ALPHA_REG_F16, ALPHA_REG_F17, ALPHA_REG_F18, ALPHA_REG_F19, ALPHA_REG_F20, ALPHA_REG_F21, ALPHA_REG_F22, ALPHA_REG_F23, ALPHA_REG_F24, ALPHA_REG_F25, ALPHA_REG_F26, ALPHA_REG_F27, ALPHA_REG_F28, ALPHA_REG_F29, ALPHA_REG_F30, 0 }, { ALPHA_GRP_CALL, 0 }, 0, 0, {{ 0 }},
++    { 0 }, { 0 }, { ALPHA_GRP_CALL, 0 }, 0, 0, {{ 0 }},
+ 
+   #endif
+ },
+@@ -3322,7 +3322,7 @@
+   /* ret $$31,($$26),1 */
+   ALPHA_RETDAG /* 446 */, ALPHA_INS_RET,
+   #ifndef CAPSTONE_DIET
+-    { ALPHA_REG_R26, 0 }, { 0 }, { 0 }, 0, 0, {{ 0 }},
++    { 0 }, { 0 }, { 0 }, 0, 0, {{ 0 }},
+ 
+   #endif
+ },
+diff --git a/arch/Alpha/AlphaGenCSMappingInsnOp.inc b/arch/Alpha/AlphaGenCSMappingInsnOp.inc
+index 602f68b2..09267eec 100644
+--- a/arch/Alpha/AlphaGenCSMappingInsnOp.inc
++++ b/arch/Alpha/AlphaGenCSMappingInsnOp.inc
+@@ -934,13 +934,15 @@
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* dst */
+   { 0 }
+ }},
+-{ /* ALPHA_BR (283) - ALPHA_INS_BR - br $$31,$DISP */
++{ /* ALPHA_BR (283) - ALPHA_INS_BR - br $RA,$DISP */
+ {
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RA */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+-{ /* ALPHA_BSR (284) - ALPHA_INS_BSR - bsr $$26,$$$DISP ..ng */
++{ /* ALPHA_BSR (284) - ALPHA_INS_BSR - bsr $RA,$DISP */
+ {
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RA */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+@@ -1725,21 +1727,21 @@
+ }},
+ { /* ALPHA_JMP (396) - ALPHA_INS_JMP - jmp $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+ { /* ALPHA_JSR (397) - ALPHA_INS_JSR - jsr $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+ }},
+ { /* ALPHA_JSR_COROUTINE (398) - ALPHA_INS_JSR_COROUTINE - jsr_coroutine $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+@@ -2069,7 +2071,7 @@
+ }},
+ { /* ALPHA_RETDAG (446) - ALPHA_INS_RET - ret $RD,($RS),$DISP */
+ {
+-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
+   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
+   { 0 }
+diff --git a/arch/Alpha/AlphaGenCSMappingInsnOpDiet.inc b/arch/Alpha/AlphaGenCSMappingInsnOpDiet.inc
+index 35e3116d..283fb136 100644
+--- a/arch/Alpha/AlphaGenCSMappingInsnOpDiet.inc
++++ b/arch/Alpha/AlphaGenCSMappingInsnOpDiet.inc
+@@ -1,17 +1,17 @@
+ /* Capstone Disassembly Engine */
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ /* Generated by suite/synctools/mapping_diet_types.py; do not edit. */
+-/* Source SHA256: 6ccef0ae80963a09f97d3613521a5d9c37d1897c8e63971a064725df3741fe6a */
++/* Source SHA256: b42dc7b85215db9ace3a40762ac5491494b311fc9c821dc3d8f9faeee60bfdf8 */
+ 
+ static const uint8_t insn_operand_types[][MAX_NO_INSN_MAP_OPS] = {
+ 	{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 0 */
+ 	{ 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 1 */
+ 	{ 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 2 */
+ 	{ 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 3 */
+-	{ 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 4 */
+-	{ 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 5 */
+-	{ 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 6 */
+-	{ 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 7 */
++	{ 1, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 4 */
++	{ 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 5 */
++	{ 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 6 */
++	{ 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 7 */
+ 	{ 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 8 */
+ 	{ 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 9 */
+ 	{ 1, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, /* 10 */
+@@ -36,19 +36,19 @@ static const uint16_t insn_operand_type_index[] = {
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 224 */
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, /* 240 */
+ 	0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 2, 2, 1, 2, 3, /* 256 */
+-	3, 3, 1, 2, 1, 2, 3, 3, 3, 3, 3, 4, 4, 5, 6, 5, /* 272 */
+-	6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 5, 6, 2, 1, 2, /* 288 */
+-	1, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 7, 4, 2, /* 304 */
++	3, 3, 1, 2, 1, 2, 3, 3, 3, 3, 3, 3, 3, 4, 5, 4, /* 272 */
++	5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 2, 1, 2, /* 288 */
++	1, 2, 1, 2, 1, 2, 2, 2, 2, 2, 1, 2, 1, 6, 7, 2, /* 304 */
+ 	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 8, 8, 8, 8, 8, 8, /* 320 */
+ 	8, 8, 2, 2, 8, 1, 2, 0, 2, 1, 2, 1, 2, 1, 2, 1, /* 336 */
+-	2, 1, 2, 1, 2, 1, 3, 3, 3, 3, 3, 3, 6, 6, 6, 6, /* 352 */
+-	6, 6, 6, 6, 6, 6, 6, 6, 8, 8, 8, 8, 2, 1, 2, 1, /* 368 */
++	2, 1, 2, 1, 2, 1, 3, 3, 3, 3, 3, 3, 5, 5, 5, 5, /* 352 */
++	5, 5, 5, 5, 5, 5, 5, 5, 8, 8, 8, 8, 2, 1, 2, 1, /* 368 */
+ 	2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 8, 8, 1, 1, 1, 0, /* 384 */
+ 	9, 9, 10, 9, 10, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, /* 400 */
+ 	9, 9, 9, 9, 9, 9, 0, 2, 1, 2, 1, 2, 1, 2, 1, 2, /* 416 */
+ 	1, 2, 1, 2, 1, 1, 2, 1, 2, 2, 2, 1, 2, 11, 1, 0, /* 432 */
+ 	8, 11, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, /* 448 */
+-	1, 2, 8, 8, 1, 2, 8, 8, 1, 2, 1, 2, 9, 9, 9, 5, /* 464 */
+-	9, 9, 5, 9, 9, 9, 9, 9, 9, 9, 9, 1, 2, 1, 2, 2, /* 480 */
++	1, 2, 8, 8, 1, 2, 8, 8, 1, 2, 1, 2, 9, 9, 9, 4, /* 464 */
++	9, 9, 4, 9, 9, 9, 9, 9, 9, 9, 9, 1, 2, 1, 2, 2, /* 480 */
+ 	2, 0, 1, 2, 8, 8, 0, 1, 2, 1, /* 496 */
+ };
+diff --git a/arch/Alpha/AlphaMapping.c b/arch/Alpha/AlphaMapping.c
+index a2d5d133..1ab674d8 100644
+--- a/arch/Alpha/AlphaMapping.c
++++ b/arch/Alpha/AlphaMapping.c
+@@ -219,7 +219,9 @@ void Alpha_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 				regs_read[read_count] = (uint16_t)op->reg;
+ 				read_count++;
+ 			}
++			/* Integer and floating-point register 31 discard writes. */
+ 			if ((op->access & CS_AC_WRITE) &&
++			    op->reg != ALPHA_REG_R31 && op->reg != ALPHA_REG_F31 &&
+ 			    !arr_exist_inline(regs_write, write_count,
+ 					      op->reg)) {
+ 				regs_write[write_count] = (uint16_t)op->reg;
+diff --git a/suite/auto-sync/inc_patches/Alpha/02_control_transfer_operands.patch b/suite/auto-sync/inc_patches/Alpha/02_control_transfer_operands.patch
+new file mode 100644
+index 00000000..f3b3a6da
+--- /dev/null
++++ b/suite/auto-sync/inc_patches/Alpha/02_control_transfer_operands.patch
+@@ -0,0 +1,103 @@
++# Alpha Architecture Handbook, sections 4.3.2 and 4.3.3. The physical
++# instructions write the encoded Ra and use an explicit target or Rb.
++# The calling convention describes additional compiler-level effects.
++diff --git a/arch/Alpha/AlphaGenCSMappingInsn.inc b/arch/Alpha/AlphaGenCSMappingInsn.inc
++index f6704ecf..347d11e1 100644
++--- a/arch/Alpha/AlphaGenCSMappingInsn.inc
+++++ b/arch/Alpha/AlphaGenCSMappingInsn.inc
++@@ -2015,7 +2015,7 @@
++   #endif
++ },
++ {
++-  /* br $$31,$DISP */
+++  /* br $RA,$DISP */
++   ALPHA_BR /* 283 */, ALPHA_INS_BR,
++   #ifndef CAPSTONE_DIET
++     { 0 }, { 0 }, { ALPHA_GRP_JUMP, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
++@@ -2023,10 +2023,10 @@
++   #endif
++ },
++ {
++-  /* bsr $$26,$$$DISP ..ng */
+++  /* bsr $RA,$DISP */
++   ALPHA_BSR /* 284 */, ALPHA_INS_BSR,
++   #ifndef CAPSTONE_DIET
++-    { ALPHA_REG_R29, 0 }, { ALPHA_REG_R0, ALPHA_REG_R1, ALPHA_REG_R2, ALPHA_REG_R3, ALPHA_REG_R4, ALPHA_REG_R5, ALPHA_REG_R6, ALPHA_REG_R7, ALPHA_REG_R8, ALPHA_REG_R16, ALPHA_REG_R17, ALPHA_REG_R18, ALPHA_REG_R19, ALPHA_REG_R20, ALPHA_REG_R21, ALPHA_REG_R22, ALPHA_REG_R23, ALPHA_REG_R24, ALPHA_REG_R25, ALPHA_REG_R26, ALPHA_REG_R27, ALPHA_REG_R28, ALPHA_REG_R29, ALPHA_REG_F0, ALPHA_REG_F1, ALPHA_REG_F10, ALPHA_REG_F11, ALPHA_REG_F12, ALPHA_REG_F13, ALPHA_REG_F14, ALPHA_REG_F15, ALPHA_REG_F16, ALPHA_REG_F17, ALPHA_REG_F18, ALPHA_REG_F19, ALPHA_REG_F20, ALPHA_REG_F21, ALPHA_REG_F22, ALPHA_REG_F23, ALPHA_REG_F24, ALPHA_REG_F25, ALPHA_REG_F26, ALPHA_REG_F27, ALPHA_REG_F28, ALPHA_REG_F29, ALPHA_REG_F30, 0 }, { ALPHA_GRP_CALL, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
+++    { 0 }, { 0 }, { ALPHA_GRP_CALL, ALPHA_GRP_BRANCH_RELATIVE, 0 }, 1, 0, {{ 0 }},
++
++   #endif
++ },
++@@ -2930,7 +2930,7 @@
++   /* jsr $$26,($$27),0 */
++   ALPHA_JSR /* 397 */, ALPHA_INS_JSR,
++   #ifndef CAPSTONE_DIET
++-    { ALPHA_REG_R27, ALPHA_REG_R29, 0 }, { ALPHA_REG_R0, ALPHA_REG_R1, ALPHA_REG_R2, ALPHA_REG_R3, ALPHA_REG_R4, ALPHA_REG_R5, ALPHA_REG_R6, ALPHA_REG_R7, ALPHA_REG_R8, ALPHA_REG_R16, ALPHA_REG_R17, ALPHA_REG_R18, ALPHA_REG_R19, ALPHA_REG_R20, ALPHA_REG_R21, ALPHA_REG_R22, ALPHA_REG_R23, ALPHA_REG_R24, ALPHA_REG_R25, ALPHA_REG_R26, ALPHA_REG_R27, ALPHA_REG_R28, ALPHA_REG_R29, ALPHA_REG_F0, ALPHA_REG_F1, ALPHA_REG_F10, ALPHA_REG_F11, ALPHA_REG_F12, ALPHA_REG_F13, ALPHA_REG_F14, ALPHA_REG_F15, ALPHA_REG_F16, ALPHA_REG_F17, ALPHA_REG_F18, ALPHA_REG_F19, ALPHA_REG_F20, ALPHA_REG_F21, ALPHA_REG_F22, ALPHA_REG_F23, ALPHA_REG_F24, ALPHA_REG_F25, ALPHA_REG_F26, ALPHA_REG_F27, ALPHA_REG_F28, ALPHA_REG_F29, ALPHA_REG_F30, 0 }, { ALPHA_GRP_CALL, 0 }, 0, 0, {{ 0 }},
+++    { 0 }, { 0 }, { ALPHA_GRP_CALL, 0 }, 0, 0, {{ 0 }},
++
++   #endif
++ },
++@@ -3322,7 +3322,7 @@
++   /* ret $$31,($$26),1 */
++   ALPHA_RETDAG /* 446 */, ALPHA_INS_RET,
++   #ifndef CAPSTONE_DIET
++-    { ALPHA_REG_R26, 0 }, { 0 }, { 0 }, 0, 0, {{ 0 }},
+++    { 0 }, { 0 }, { 0 }, 0, 0, {{ 0 }},
++
++   #endif
++ },
++diff --git a/arch/Alpha/AlphaGenCSMappingInsnOp.inc b/arch/Alpha/AlphaGenCSMappingInsnOp.inc
++index 602f68b2..09267eec 100644
++--- a/arch/Alpha/AlphaGenCSMappingInsnOp.inc
+++++ b/arch/Alpha/AlphaGenCSMappingInsnOp.inc
++@@ -934,13 +934,15 @@
++   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* dst */
++   { 0 }
++ }},
++-{ /* ALPHA_BR (283) - ALPHA_INS_BR - br $$31,$DISP */
+++{ /* ALPHA_BR (283) - ALPHA_INS_BR - br $RA,$DISP */
++ {
+++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RA */
++   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* DISP */
++   { 0 }
++ }},
++-{ /* ALPHA_BSR (284) - ALPHA_INS_BSR - bsr $$26,$$$DISP ..ng */
+++{ /* ALPHA_BSR (284) - ALPHA_INS_BSR - bsr $RA,$DISP */
++ {
+++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RA */
++   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_Other, CS_DATA_TYPE_LAST },  }, /* DISP */
++   { 0 }
++ }},
++@@ -1725,21 +1727,21 @@
++ }},
++ { /* ALPHA_JMP (396) - ALPHA_INS_JMP - jmp $RD,($RS),$DISP */
++ {
++-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
++   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
++   { 0 }
++ }},
++ { /* ALPHA_JSR (397) - ALPHA_INS_JSR - jsr $RD,($RS),$DISP */
++ {
++-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
++   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
++   { 0 }
++ }},
++ { /* ALPHA_JSR_COROUTINE (398) - ALPHA_INS_JSR_COROUTINE - jsr_coroutine $RD,($RS),$DISP */
++ {
++-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
++   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
++   { 0 }
++@@ -2069,7 +2071,7 @@
++ }},
++ { /* ALPHA_RETDAG (446) - ALPHA_INS_RET - ret $RD,($RS),$DISP */
++ {
++-  { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
+++  { CS_OP_REG, CS_AC_WRITE, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RD */
++   { CS_OP_REG, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* RS */
++   { CS_OP_IMM, CS_AC_READ, { CS_DATA_TYPE_i64, CS_DATA_TYPE_LAST },  }, /* DISP */
++   { 0 }
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 46b55d85..21fb8d2b 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -25,6 +25,9 @@ if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPP
+     add_test(NAME unit_alias_mnemonic_trie_generator
+         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_trie.py" --check)
+ endif()
++if(CAPSTONE_ALPHA_SUPPORT)
++    list(APPEND UNIT_TEST_SOURCES alpha_branch_detail.c)
++endif()
+ if(CAPSTONE_SPARC_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES sparc_mapping_index.c)
+ endif()
+diff --git a/tests/unit/alpha_branch_detail.c b/tests/unit/alpha_branch_detail.c
+new file mode 100644
+index 00000000..b3b7c7e5
+--- /dev/null
++++ b/tests/unit/alpha_branch_detail.c
+@@ -0,0 +1,148 @@
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <inttypes.h>
++#include <stdio.h>
++
++static bool decode(csh handle, cs_insn *insn, cs_mode mode, uint32_t word,
++		   uint64_t address)
++{
++	uint8_t bytes[4];
++	for (unsigned i = 0; i < 4; ++i)
++		bytes[mode == CS_MODE_BIG_ENDIAN ? 3 - i : i] =
++			(uint8_t)(word >> (8 * i));
++	const uint8_t *code = bytes;
++	size_t size = sizeof(bytes);
++	return cs_disasm_iter(handle, &code, &size, &address, insn) && !size;
++}
++
++static bool reg_operand(const cs_alpha_op *op, unsigned reg, cs_ac_type access)
++{
++	return op->type == ALPHA_OP_REG && op->reg == reg &&
++	       op->access == access;
++}
++
++static bool check_transfer(csh handle, cs_insn *insn, cs_mode mode,
++			   uint32_t word, uint64_t pc, unsigned id, int64_t imm,
++			   bool indirect)
++{
++	unsigned ra = ALPHA_REG_R0 + ((word >> 21) & 31);
++	unsigned rb = ALPHA_REG_R0 + ((word >> 16) & 31);
++	bool diet = cs_support(CS_SUPPORT_DIET);
++	cs_ac_type read = diet ? CS_AC_INVALID : CS_AC_READ;
++	cs_ac_type write = diet ? CS_AC_INVALID : CS_AC_WRITE;
++	if (!decode(handle, insn, mode, word, pc) || insn->id != id)
++		return false;
++	const cs_alpha *alpha = &insn->detail->alpha;
++	const cs_alpha_op *target = &alpha->operands[indirect ? 2 : 1];
++	if (alpha->op_count != (indirect ? 3 : 2) ||
++	    !reg_operand(&alpha->operands[0], ra, write) ||
++	    (indirect && !reg_operand(&alpha->operands[1], rb, read)) ||
++	    target->type != ALPHA_OP_IMM || target->imm != imm ||
++	    target->access != read || insn->detail->regs_read_count ||
++	    insn->detail->regs_write_count)
++		return false;
++	if (diet)
++		return true;
++	cs_regs reads, writes;
++	uint8_t nread, nwrite;
++	return cs_regs_access(handle, insn, reads, &nread, writes, &nwrite) ==
++		       CS_ERR_OK &&
++	       nread == (unsigned)indirect && (!nread || reads[0] == rb) &&
++	       nwrite == (ra != ALPHA_REG_R31) && (!nwrite || writes[0] == ra);
++}
++
++static bool check_mode(csh handle, cs_insn *insn, cs_mode mode)
++{
++	static const unsigned jump_ids[] = { ALPHA_INS_JMP, ALPHA_INS_JSR,
++					     ALPHA_INS_RET,
++					     ALPHA_INS_JSR_COROUTINE };
++	static const int32_t disps[] = { -1048576, -1, 0, 1, 1048575 };
++	static const uint64_t pcs[] = { 0, UINT64_C(0x120001004),
++					UINT64_MAX - 3 };
++	static const uint32_t hints[] = { 0, 1, 0x3fff };
++	uint32_t word = 0;
++	for (unsigned ra = 0; ra < 32; ++ra) {
++		for (unsigned call = 0; call < 2; ++call) {
++			for (size_t i = 0; i < sizeof(disps) / sizeof(disps[0]);
++			     ++i) {
++				int32_t disp = disps[i];
++				word = ((call ? 0x34u : 0x30u) << 26) |
++				       (ra << 21) | ((uint32_t)disp & 0x1fffff);
++				for (size_t j = 0;
++				     j < sizeof(pcs) / sizeof(pcs[0]); ++j) {
++					uint64_t target =
++						pcs[j] + 4 + (int64_t)disp * 4;
++					if (!check_transfer(
++						    handle, insn, mode, word,
++						    pcs[j],
++						    call ? ALPHA_INS_BSR :
++							   ALPHA_INS_BR,
++						    (int64_t)target, false))
++						goto failed;
++				}
++			}
++		}
++		for (unsigned rb = 0; rb < 32; ++rb) {
++			for (unsigned func = 0; func < 4; ++func) {
++				for (size_t j = 0;
++				     j < sizeof(hints) / sizeof(hints[0]);
++				     ++j) {
++					word = (0x1au << 26) | (ra << 21) |
++					       (rb << 16) | (func << 14) |
++					       hints[j];
++					if (!check_transfer(handle, insn, mode,
++							    word, pcs[1],
++							    jump_ids[func],
++							    hints[j], true))
++						goto failed;
++				}
++			}
++		}
++	}
++	/* Both integer and floating-point register 31 discard writes. */
++	if (!cs_support(CS_SUPPORT_DIET)) {
++		static const uint32_t opcodes[] = { 0x10,
++						    0x17 }; /* ADDQ, CPYS */
++		for (size_t i = 0; i < sizeof(opcodes) / sizeof(opcodes[0]);
++		     ++i) {
++			cs_regs reads, writes;
++			uint8_t nread, nwrite;
++			word = (opcodes[i] << 26) | (1u << 21) | (2u << 16) |
++			       (0x20u << 5) | 31u;
++			if (!decode(handle, insn, mode, word, pcs[1]) ||
++			    cs_regs_access(handle, insn, reads, &nread, writes,
++					   &nwrite) != CS_ERR_OK ||
++			    nwrite || nread != 2)
++				goto failed;
++		}
++	}
++	return true;
++failed:
++	fprintf(stderr,
++		"Wrong Alpha detail for word 0x%08" PRIx32 " in mode %u\n",
++		word, (unsigned)mode);
++	return false;
++}
++
++int main(void)
++{
++	static const cs_mode modes[] = { CS_MODE_LITTLE_ENDIAN,
++					 CS_MODE_BIG_ENDIAN };
++	for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i) {
++		csh handle;
++		if (cs_open(CS_ARCH_ALPHA, modes[i], &handle) != CS_ERR_OK)
++			return 1;
++		if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK) {
++			cs_close(&handle);
++			return 1;
++		}
++		cs_insn *insn = cs_malloc(handle);
++		bool ok = insn && check_mode(handle, insn, modes[i]);
++		cs_free(insn, 1);
++		cs_close(&handle);
++		if (!ok)
++			return 1;
++	}
++	return 0;
++}
