@@ -1,7 +1,7 @@
-name: Attribute general and dedicated formatter work with the original Debian package pinned by content
+name: Identify general formatter entries by operand shape and machine bytes at the verified real offsets
 on:
   push:
-    branches: [codex/paired-format-work-debian-snapshot]
+    branches: [codex/general-formatter-encoded-families]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: frozen-format-path-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: real-formatter-operand-families-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

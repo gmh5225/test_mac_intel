@@ -157,6 +157,7 @@ def main(w):
             run(['cmake','--build',build,'--target','capstone_static','--parallel','4'],'build-path-recorder')
             assert sha(lib)!=pristine
             run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'cohorts.cpp',lib,'-o',w/'cohorts'],'build-cohorts')
+            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'record-families.cpp',lib,'-o',w/'record-families'],'build-record-families')
             save('path-recorder.json',dict(clean_library=pristine,instrumented_library=sha(lib),timed_executable=measured,cohorts_source=sha(r/'cohorts.cpp')))
         finally:
             printer.write_text(source)
@@ -179,18 +180,18 @@ def main(w):
         assert len(views)==len(trace)==len(spans)
         selected=[a[:3]for a,v in zip(trace,views)if a[1]==a[5] and (m['samples'][name]!='simd-functions' or (v[1]>=8 and v[1]>=.15*v[0]))]
         emit(selected);assert sha(intervals)==expected['extent_sha256']
-        from profiles import measure
-        tags=w/(name+'.tags')
-        modes={};groups={}
-        for mode in (1,2):
-            counts=list(map(int,sp.check_output([w/'cohorts',str(bits),f,intervals,tags,str(mode)]).split()))
-            assert len(counts)==3 and tags.stat().st_size==9*sum(counts) and min(counts[1:])>0
-            groups[mode]=dict(counts=counts,mask=sha(tags))
-            modes[mode]=measure(bins['mixed_base'],mode,bits,f,intervals,tags,counts,w,evidence,name)
-        assert groups[1]['counts'][0]==groups[2]['counts'][0] and sum(groups[1]['counts'])==sum(groups[2]['counts'])
-        results.append((name,dict(input=sha(f),extent=sha(intervals),groups=groups,modes=modes)))
-        save('regions.json',dict(results))
-        tags.unlink()
+        lines=sp.check_output([w/'record-families',f,intervals,str(bits)],text=True).splitlines()
+        header=lines.pop(0).split('\t');assert header[0]=='total';header=list(map(int,header[1:]))
+        families={}
+        for line in lines:
+            v=line.split('\t');assert len(v) in (15,17)
+            key='/'.join(v[:2]);assert key not in families
+            families[key]=dict(count=int(v[2]),general=list(map(int,v[11:15])),example=v[15:])
+        assert sum(v['count']for v in families.values())==header[0]
+        from itertools import chain
+        assert all(0<=n<=v['count'] for v in families.values() for n in v['general'])
+        results.append((name,dict(input=sha(f),extent=sha(intervals),header=header,families=families)))
+        save('record-families.json',dict(results))
     assert len(results)==2
     save('complete.json',dict(done=True,source=m,iced=iced,cases=len(results)))
 w=Path(tempfile.mkdtemp(prefix='capstone-portable-vector-'))
