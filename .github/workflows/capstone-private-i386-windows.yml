@@ -1,7 +1,7 @@
-name: Check effective x86 string addressing across nineteen compilers and both linkages
+name: Validate unique memory segment reads on Linux Windows and macOS with both library linkages
 on:
   push:
-    branches: [codex/effective-string-operands]
+    branches: [codex/segment-register-access-platforms]
     paths: [portable-next/**, .github/workflows/capstone-private-i386-windows.yml]
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6ee08c9cfc7e104e240b50b97996c880e3bb5155
+          ref: ea546fe8c9d7b05be844398dd5301dd4735d0eb2
           path: source
           persist-credentials: false
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
@@ -54,6 +54,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: effective-string-registers-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
+          name: unique-segment-platforms-${{ matrix.host }}-${{ matrix.arch }}-${{ matrix.profile }}
           path: evidence
           retention-days: 7
