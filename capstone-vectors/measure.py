@@ -40,6 +40,8 @@ try:
     save('linked',dict(archive=sha(lib),program=sha(w/'runner'),drivers=m['drivers'],compiler=get('clang','--version'),rust=get('rustc','--version'),source=q,neverd=dev,iced=m['iced_revision']))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+    from placement import train
+    products=train(r,w,lib,ice_lib,flags,project,w/'runner',save)
     cases={}
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
@@ -63,8 +65,8 @@ try:
         for mode in (0,1,2):
             cases[name+'/'+str(mode)]=(mode,f,path,str(bits))
     assert len(cases)==18
-    from observe import measure_all
-    measure_all(r,w,cases,save)
+    from timings import measure
+    measure(w,cases,products,save)
     save('complete',dict(complete=True,source=q,neverd=dev,iced=m['iced_revision'],cpu=get('lscpu'),cases=list(cases)))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
