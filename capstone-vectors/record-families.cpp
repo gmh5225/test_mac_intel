@@ -58,7 +58,8 @@ int main(int argc, char **argv) {
                 const auto *start = &bytes[begin+offset], *ptr = start;
                 size_t left = length-offset;
                 uint64_t ip = address+offset, before = profile_full_decodes;
-                const auto prior_decode=profile_decodes, prior_print=seen_general;
+                const uint64_t prior_decode=profile_decodes;
+                const unsigned prior_print=seen_general;
                 bool ok = r.step(r.handle,&ptr,&left,&ip,r.out);
                 fallback[i] = unsigned(profile_full_decodes-before);
                 decodes[i]=unsigned(profile_decodes-prior_decode);prints[i]=unsigned(seen_general-prior_print);
