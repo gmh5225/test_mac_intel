@@ -1,7 +1,7 @@
-name: Verify ARM-only alias details against real ARM and Thumb records and compare the mixed and other backends byte for byte
+name: Measure dedicated SPARC alias view construction with the real coreutils and guarded records
 on:
   push:
-    branches: [codex/arm-printer-verified-library-scope]
+    branches: [codex/sparc-alias-views-real-coreutils]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: scoped-arm-printer-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: dedicated-sparc-alias-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

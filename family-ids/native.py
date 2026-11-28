@@ -31,35 +31,35 @@ try:
   pkg.unlink()
  builds={};observations={};measure={};archs={'ARM':101,'AARCH64':102,'SPARC':106,'LOONGARCH':108,'mixed':0}
  if not darwin:os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+ archs['sparc-diet']=0;archs['sparc-debug']=0
  for arch,sel in archs.items():
   b=w/'build';images={};builds[arch]={};records={}
-  for tag in (('base','reference','candidate') if arch=='ARM' else ('base','candidate')):
+  for tag in ('base','candidate'):
    run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
    patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch'];run('git','-C',src,'apply','--index',patch);assert out('git','-C',src,'write-tree')==q[tag]['tree']
-   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed'else [arch]
-   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE=Release',*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
+   aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['SPARC'] if arch.startswith('sparc-') else [arch]
+   run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='sparc-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='sparc-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
    run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
    lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
    builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
-   if arch!='ARM':continue
-   shutil.copyfile(so,w/(tag+'-arm-library'))
+   if arch!='SPARC':continue
+   shutil.copyfile(so,w/(tag+'-sparc-library'))
    texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
    images[tag]=texe.read_bytes()
    exe=w/'observe';run('c++','-std=c++17','-O2','-I',src/'include',r/'raw.cpp',lib,'-o',exe)
    records[tag]={f'{name}/{opt}':list(map(int,out(exe,str(sel),path,str(opt),ranges).split()))for name,(path,ranges)in inputs[arch].items()for opt in range(5)}
    assert all(row[0]>0 for row in records[tag].values())
   put('compilation',builds)
-  if arch!='ARM':
+  if arch!='SPARC':
    assert builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
-  target='base' if darwin else 'reference'
-  assert builds[arch]['base']!=builds[arch]['reference']
-  assert builds[arch][target]==builds[arch]['candidate'] and images[target]==images['candidate']
-  assert records['base']==records['candidate']==records['reference']
-  observations[arch]=records['base'];put('public-records',observations)
-  compare=w/'compare';run('c++','-std=c++17','-O2','-I',src/'include',r/'domain.cpp',*([] if darwin else ['-ldl']),'-o',compare)
-  states=json.loads(out(compare,w/'base-arm-library',w/'candidate-arm-library',w));assert states['cases']>=589824 and states['accepted']>300000 and states['real']>50000 and not states['real_rejected']
-  put('arm-domain',states)
-  del images['reference']
+  enabled=not darwin and isa=='x86_64'
+  assert (builds[arch]['base']!=builds[arch]['candidate'])==enabled and (images['base']!=images['candidate'])==enabled
+  assert records['base']==records['candidate'];observations[arch]=records['base'];put('public-records',observations)
+  guard={}
+  for name in ('guard','callback'):
+   compare=w/name;run('c++','-std=c++17','-O2','-I',src/'include',r/('sparc-'+name+'.cpp'),*([] if darwin else ['-ldl']),'-o',compare)
+   guard[name]=out(compare,w/'base-sparc-library',w/'candidate-sparc-library');assert guard[name]
+  put('sparc-domain',guard)
   exe=w/'timed';image=FixedImage(exe,images,True)
   for name,(path,ranges) in inputs[arch].items():
    for mode in range(3):
