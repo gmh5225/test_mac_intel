@@ -16,10 +16,14 @@ on:
         description: Check native SGX availability on the three runners
         type: boolean
         default: false
+      verified_compiler_run:
+        description: Optional prior run with the same NeverC revision and its compiler receipt
+        type: string
+        default: ''
       neverd_revision:
         description: NeverD source revision for the Linux software tests
         type: string
-        default: 69b82f8a98cf730663748824343408e008739b56
+        default: 7a0f218965a75d714b5196c06003affc5818ffc0
 
 permissions:
   contents: read
@@ -86,7 +90,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ${{ inputs.neverd_revision || '69b82f8a98cf730663748824343408e008739b56' }}
+          ref: ${{ inputs.neverd_revision || '7a0f218965a75d714b5196c06003affc5818ffc0' }}
           path: NeverD
           persist-credentials: false
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
@@ -123,9 +127,42 @@ jobs:
             -DNEVERC_ENABLE_PYTHON_PLUGINS=OFF -DNEVERC_BUNDLE_PYTHON_RUNTIME=OFF \
             -C neverc/cmake/caches/NeverC.cmake
       - name: Build current NeverC for the portable x64 host ISA
+        if: ${{ !inputs.verified_compiler_run }}
         working-directory: NeverC
         run: |
           cmake --build build-portable --parallel 4 --target neverc
+      - name: Restore the verified compiler
+        if: ${{ inputs.verified_compiler_run }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: ${{ inputs.verified_compiler_run }}
+          github-token: ${{ github.token }}
+          name: neverc-portable-linux-x64
+          path: NeverC/build-portable/bin
+      - name: Restore its source and binary receipt
+        if: ${{ inputs.verified_compiler_run }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          run-id: ${{ inputs.verified_compiler_run }}
+          github-token: ${{ github.token }}
+          name: neverd-x86-software
+          path: previous-software
+      - name: Check the compiler revision and digest, and build its headers
+        if: ${{ inputs.verified_compiler_run }}
+        run: |
+          python - <<'PYTHON'
+          import hashlib, json, subprocess
+          from pathlib import Path
+          receipt = json.loads(Path("previous-software/compiler.json").read_text())
+          actual = subprocess.check_output(["git", "-C", "NeverC", "rev-parse", "HEAD"], text=True).strip()
+          compiler = Path("NeverC/build-portable/bin/neverc")
+          with compiler.open("rb") as stream:
+              digest = hashlib.file_digest(stream, "sha256").hexdigest()
+          if actual != receipt["source_commit"] or digest != receipt["binary_sha256"]:
+              raise SystemExit("Restored compiler differs from its checked source or binary receipt")
+          compiler.chmod(0o755)
+          PYTHON
+          cmake --build NeverC/build-portable --parallel 4 --target neverc-resource-headers
       - name: Verify the running x64 compiler and generated code
         run: |
           python neverd-sgx-capabilities/prepare_neverc.py --source NeverC --compiler NeverC/build-portable/bin/neverc --output compiler-check
@@ -150,7 +187,7 @@ jobs:
             -DNEVERD_BUILD_GUI=OFF -DNEVERD_BUILD_PLUGINS=OFF
       - name: Build the production execution, paging and generated C test owners
         working-directory: NeverD
-        run: python scripts/build.py build-check --parallel 4 --target NeverDX64PagedExecutionTests NeverDX86PagingTests NeverDX86LegacySourceTests neverd
+        run: python scripts/build.py build-check --parallel 4 --target NeverDX64PagedExecutionTests NeverDX64ContinuationExportTests NeverDX86PagingTests NeverDX86LegacySourceTests neverd
       - name: Execute mixed-mode, SMM, SGX and asynchronous event regressions
         run: python neverd-sgx-capabilities/software_semantics.py --source NeverD --build NeverD/build-check --output software-evidence
       - name: Retain execution receipts

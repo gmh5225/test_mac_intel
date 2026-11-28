@@ -14,6 +14,9 @@ TESTS = {
         "X86LegacyExecutionTest.UD1FaultsWithoutReadingItsAddress",
         "X86LegacyExecutionTest.UD0FetchProfileSelectsTheOriginalFault",
     ],
+    "NeverDX64ContinuationExportTests": [
+        "X64ContinuationExportTest.SgxTransferRetainsPrefixedInstructionSites",
+    ],
     "NeverDX64PagedExecutionTests": [
         MODE + "TaskGateAndNestedIretPublishBothTaskBanks",
         MODE + "PartiallyLoadedIncomingTaskResumesTheOriginalTransfer",
@@ -42,6 +45,9 @@ TESTS = {
         "X86ModeSgxThreadTest.DebugOptInSelectsTrapAndBreakpointState",
         "X86ModeSgxThreadTest.NestedHandlerRepairsDivideAtOriginalInstruction",
         "X86ModeSgxThreadTest.PendingVirtualInterruptRestartsEnclaveExit",
+        "X86ModeSgxThreadTest.PrefixedTransfersPreserveNextPCAndFullOperands",
+        "X86ModeSgxThreadTest.EncluEncodingFaultsPrecedeLeafAndOperandAccess",
+        "X86ModeSgxThreadTest.EnclaveKeyAndReportFaultBeforePrivateOperands",
         "X64PagedExecutionTest.PagedEntriesEndAtPrefixFaults",
         "X64PagedExecutionTest.PrefixLengthFaultAuthenticatesOnlyTheFirst15Bytes",
         "X64PagedExecutionBreakpointTest.PrefixLengthFaultWithUnboundPriority",
