@@ -26,7 +26,7 @@ try:
     flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
     units=['mapping','mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_evex_vpcmp_id','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
     if profile not in ('diet','reduced'):
-        units+=['x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
+        units+=['x86_vex_legacy_prefix','x86_evex_detail','x86_evex_vpcmp_mask_size','x86_evex_mask_conversion_access','x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
     if len(arches)>2:
         units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
     if profile in ('full','gcc','clang'):
@@ -89,8 +89,11 @@ try:
             access=next(c['command']for c in commands if Path(c['file']).name=='X86Mapping.c')
             import re
             clang_ver=sp.check_output(['clang','--version'],text=True)
-            active=(name in ('search','uniform') and platform.machine().lower() in ('amd64','x86_64') and re.search(r'clang version 18[.]',clang_ver) is not None)
+            active=(platform.machine().lower() in ('amd64','x86_64') and re.search(r'clang version 18[.]',clang_ver) is not None)
             assert ('-DX86_CACHED_OPERAND_ACCESS' in access)==active
+            dis=next(c['command']for c in commands if Path(c['file']).name=='X86Disassembler.c')
+            assert ('-DX86_CHECK_EVEX_WRITEMASK' in dis)==(active and name=='search')
+            rows[name]['evex_only']=active and name=='search'
             rows[name]['cached_access']=active
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
