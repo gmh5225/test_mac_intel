@@ -1,7 +1,7 @@
-name: Measure public mnemonic splitting on PE32, PE64, vector libraries, firmware and non-x86 programs
+name: Separate mnemonic classification from link layout for scan, format and detail on Linux
 on:
   push:
-    branches: [codex/classified-mnemonic-real-programs]
+    branches: [codex/split-cost-same-executable]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: classified-mnemonic-records-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: same-image-mnemonic-splitting-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
