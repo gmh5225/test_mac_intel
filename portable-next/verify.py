@@ -1,109 +1,62 @@
-from snapshot import snapshots
 from pathlib import Path
-import hashlib,json,os,platform,shutil,subprocess as sp,tempfile
-p=Path(__file__).resolve().parent
-s=p.parent/'source'
-e=p.parent/'evidence'
-e.mkdir(exist_ok=True)
-q=json.loads((p/'source.json').read_text())
-profile=os.environ['SCAN_PROFILE']
-def save(name,v):
-    (e/(name+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def git(*args):
-    return sp.check_output(['git','-C',s,*args],text=True).strip()
-def run(label,*args):
-    with (e/(label+'.log')).open('wb') as log:
-        ret=sp.run(args,stdout=log,stderr=sp.STDOUT)
-    if ret.returncode:
-        print((e/(label+'.log')).read_text(errors='replace')[-3200:],flush=True)
-        ret.check_returncode()
-t=Path(tempfile.mkdtemp())
-b=t/'build'
+import collections,hashlib,json,os,shutil,subprocess as sp,tempfile
+r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir(exist_ok=True);s=r.parent/'source'
+q=json.loads((r/'source.json').read_bytes());profile=os.environ['SCAN_PROFILE']
+git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
+def run(*a):sp.run(a,check=True)
+def save(name,v):(e/(name+'.json')).write_text(json.dumps(v,indent=2)+'\n')
+def sha(b):return hashlib.sha256(b).hexdigest()
+w=Path(tempfile.mkdtemp());b=w/'build';data=(r/'cases.tsv').read_bytes();cases=len(data.splitlines());expected=json.loads((r/'expected.json').read_bytes());assert cases==len(expected)==3584
 try:
-    assert git('rev-parse','HEAD')==q['base'] and git('status','--porcelain')==''
-    arches=['X86','AARCH64','ARM','MIPS','PPC','RISCV'] if profile not in ('diet','reduced') else ['X86','PPC']
-    flags=['-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in arches]]
-    flags+=dict(full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'],gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'])[profile]
-    units=['mapping','mcinst','x86_reg_access','x86_buffer_bounds','x86_scan_batch','x86_mapping_counts','x86_evex_vpcmp_id','x86_bound_access','x86_exchange_access','x86_encoding_accuracy']
-    if profile not in ('diet','reduced'):
-        units+=['x86_vex_legacy_prefix','x86_evex_detail','x86_evex_vpcmp_mask_size','x86_evex_mask_conversion_access','x86_simple_output','x86_integer_vector_access','x86_scalar_vector_access','x86_evex_move_access','x86_legacy_address_size']
-    if len(arches)>2:
-        units+=['aarch64_scan','aarch64_postprocess','arm_private_stream','arm_reg_access','riscv_scan_options','riscv_reg_access','mips_scan','mips_single']
-    if profile in ('full','gcc','clang'):
-        for name in ('x86_valign_access','x86_evex_move_access','x86_packed_move_access','x86_scalar_vector_access','x86_integer_vector_access','x86_reg_access','x86_bextr_flags'):
-            if name not in units:units.append(name)
-    flags+=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_X86_NEAR_INDIRECT_OUTPUT=ON']
-    run('configure','cmake','-G','Ninja','-S',s,'-B',b,*flags)
-    rows={}
-    ordinary_units=tuple(units)
-    for name,tree in [('base',None),*q['variants'].items()]:
-        units=list(ordinary_units)
-        if tree:
-            git('restore','--staged','--worktree','--source=HEAD','--','.')
-            patch=t/(name+'.patch')
-            patch.write_bytes(sp.check_output(['git','-C',p.parent,'cat-file','blob','HEAD:portable-next/'+name+'.patch']))
-            assert hashlib.sha256(patch.read_bytes()).hexdigest()==tree['sha256']
-            git('apply','--index',patch)
-            assert git('write-tree')==tree['tree']
-            units.append('detail_views')
-        run(name+'-typed-register-mappings',os.sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check')
-        run(name+'-register-projection',os.sys.executable,'-B',s/'suite/synctools/x86_register_name_sizes.py','--check')
-        run(name+'-printer-projection',os.sys.executable,'-B',s/'suite/synctools/x86_printer_dispatch.py','--check')
-        run(name+'-alias-projection',os.sys.executable,'-B',s/'suite/synctools/alias_mnemonic_trie.py','--check')
-        run(name+'-build','cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared',*units)
-        run(name+'-units','ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
-        log=(e/(name+'-units.log')).read_text(errors='replace')
-        assert '100% tests passed' in log and all('unit_'+n in log for n in units)
-        rows[name]=dict(units=units,skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line])
-        for linkage in ('static','shared'):
-            result=snapshots(s,p,b,t,profile,name+'-'+linkage,run,linkage)
-            rows[name][linkage]=result
-            if profile not in ('diet','reduced') and name in ('base','search','uniform'):
-                from spelling_link import spelling
-                rows[name].setdefault('spelling',{})[linkage]=spelling(s,p,b,t,profile,name+'-'+linkage,run,linkage)
-                assert rows[name]['spelling'][linkage]==rows['base']['spelling'][linkage]
-            if name.startswith('mips'):run(name+'-mips-projection',os.sys.executable,'-B',s/'suite/synctools/mips_register_names.py','--check')
-
-            baseline=rows['base'][linkage]['snapshots']
-            base_ids=rows['base'][linkage]['comparisons']
-            assert base_ids.keys()==result['comparisons'].keys()
-            assert result['comparisons']==base_ids
-            assert baseline.keys()==result['snapshots'].keys()
-            for key,entry in result['snapshots'].items():
-                assert entry['counts']==baseline[key]['counts']
-                if key.startswith('powerpc/') or profile=='diet':assert entry==baseline[key]
-            if name!='base':
-                assert result['snapshots']==rows['base'][linkage]['snapshots'],(name,linkage,profile)
-        assert rows[name]['static']['snapshots']==rows[name]['shared']['snapshots']
-        mac = platform.system()=='Darwin' and profile in ('full','noatt')
-        linux = platform.system()=='Linux' and profile=='clang'
-        win = platform.system()=='Windows' and profile in ('full','noatt')
-        if linux:
-            solo=t/'static-only'
-            run(name+'-static-config','cmake','-G','Ninja','-S',s,'-B',solo,*flags,'-DCAPSTONE_BUILD_SHARED_LIBS=OFF')
-            run(name+'-static-build','cmake','--build',solo,'--parallel','4','--target','capstone_static',*units)
-            run(name+'-static-units','ctest','--test-dir',solo,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$')
-            commands=json.loads((solo/'compile_commands.json').read_text())
-            amd=next(c['command']for c in commands if Path(c['file']).name=='X86Sse64Output.c')
-            assert 'CAPSTONE_X86_NEAR_INDIRECT_OUTPUT' in amd
-            access=next(c['command']for c in commands if Path(c['file']).name=='X86Mapping.c')
-            import re
-            clang_ver=sp.check_output(['clang','--version'],text=True)
-            active=(platform.machine().lower() in ('amd64','x86_64') and re.search(r'clang version 18[.]',clang_ver) is not None)
-            assert ('-DX86_CACHED_OPERAND_ACCESS' in access)==active
-            dis=next(c['command']for c in commands if Path(c['file']).name=='X86Disassembler.c')
-            assert ('-DX86_CHECK_EVEX_WRITEMASK' in dis)==active
-            batch=next(c['command']for c in commands if Path(c['file']).name=='X86BatchScan.c')
-            assert ('-DX86_BATCH_FALLBACK_ADDRESS' in batch)==active
-            rows[name]['batch_address']=active 
-            rows[name]['evex_only']=active
-            rows[name]['cached_access']=active
-            result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
-            assert result['snapshots']==rows[name]['static']['snapshots']
-            rows[name]['static_only']=result
-        save('results',rows)
-    save('complete',dict(complete=True,source=q,profile=profile,architectures=arches,results=rows))
+ assert git('rev-parse','HEAD')==q['parent'] and sha((r/'candidate.patch').read_bytes())==q['sha256']
+ arches=['X86','ARM','AARCH64','MIPS','PPC','RISCV']if profile not in('reduced','diet')else['X86','PPC']
+ flags=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arches],'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON']
+ flags+=dict(gcc=['-DCMAKE_C_COMPILER=gcc','-DCMAKE_CXX_COMPILER=g++'],clang=['-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++'],full=[],noatt=['-DCAPSTONE_X86_ATT_DISABLE=ON'],diet=['-DCAPSTONE_BUILD_DIET=ON'],reduced=['-DCAPSTONE_X86_REDUCE=ON'])[profile]
+ run('cmake','-G','Ninja','-S',s,'-B',b,*flags);units=['x86_reg_access','x86_mapping_counts','x86_buffer_bounds','text_option']
+ if profile not in('diet','reduced'):units+=['x86_simple_output','x86_evex_detail','x86_vex_legacy_prefix']
+ if len(arches)>2:units+=['arm_reg_access','aarch64_scan','mips_scan','riscv_reg_access']
+ rows={};hashes={}
+ for tag in ('base','fixed'):
+  if tag=='fixed':
+   patch=w/'candidate.patch';patch.write_bytes(sp.check_output(['git','-C',r.parent,'cat-file','blob','HEAD:portable-next/candidate.patch']));assert sha(patch.read_bytes())==q['sha256'];git('apply','--index',patch);assert git('write-tree')==q['tree']
+  run(os.sys.executable,'-B',s/'suite/synctools/x86_mapping_counts.py','--check')
+  run('cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4')
+  result=sp.run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_('+'|'.join(units)+')$'],text=True,capture_output=True);(e/(tag+'-ctest.txt')).write_text(result.stdout+result.stderr)
+  if result.returncode:print(result.stdout+result.stderr,flush=True);result.check_returncode()
+  form=(r/'access.c').read_text();src=w/'driver.c'
+  nsyntax=1 if profile=='noatt'else 2
+  if profile=='diet':
+   src.write_bytes((r/'diet.c').read_bytes());nsyntax=1
+  else:src.write_text(form.replace('a<2','a<'+str(nsyntax)))
+  links={}
+  for typ in ('static','shared'):
+   win=os.name=='nt';exe=(b if win and typ=='shared'else w)/('check.exe'if win else 'check')
+   if win:
+    runtime='/MT' if 'CAPSTONE_BUILD_STATIC_MSVC_RUNTIME:BOOL=ON'in(b/'CMakeCache.txt').read_text() else '/MD'
+    lib=b/('capstone_static.lib'if typ=='static'else'capstone.lib')
+    run('cl','/nologo','/std:c11','/O2',runtime,'/I'+str(s/'include'),src,lib,'/Fo:'+str(w/'driver.obj'),'/Fe:'+str(exe))
+   else:
+    lib=b/('libcapstone.a'if typ=='static'else ('libcapstone.dylib'if os.sys.platform=='darwin'else 'libcapstone.so'))
+    run('gcc' if profile=='gcc'else 'clang','-std=c11','-O2','-I',s/'include',src,lib,'-Wl,-rpath,'+str(b),'-o',exe)
+   raw=sp.check_output([exe],input=data);rec=[list(map(int,line.split()))for line in raw.splitlines()]
+   if profile=='diet':
+    assert len(rec)==cases and all(row[0]==i and row[-1]==1 for i,row in enumerate(rec));metadata=sha(raw);bad=duplicate=0
+   else:
+    assert len(rec)==cases*2*nsyntax
+    signature=hashlib.sha256();bad=duplicate=0
+    for index,z in enumerate(rec):
+     i,a,t,size,insn,ops,strings,rr,ww,dup=z
+     assert (i,a,t)==(index//(2*nsyntax),(index//2)%nsyntax,index%2) and size>0 and insn>0
+     signature.update(('%d %d %d %d %d %d %d\n'%(i,a,t,size,insn,ops,strings)).encode())
+     want=expected[i][:2]if t else expected[i][2:];bad+=([rr,ww]!=want);duplicate+=(dup>0)
+    metadata=signature.hexdigest()
+    if tag=='fixed':assert bad==duplicate==0,(profile,typ,bad,duplicate)
+    else:assert bad>0 and duplicate>0
+   links[typ]=dict(metadata=metadata,all=sha(raw),attempts=len(rec),incorrect=bad,duplicate=duplicate,library=sha(lib.read_bytes()))
+  assert links['static']['all']==links['shared']['all']
+  rows[tag]=links;save('results',rows)
+ for typ in links:assert rows['base'][typ]['metadata']==rows['fixed'][typ]['metadata']
+ save('complete',dict(complete=True,source=q,profile=profile,units=units,rows=rows,architectures=arches))
 finally:
-    n=sum(f.stat().st_size for f in t.rglob('*') if f.is_file() and not f.is_symlink())
-    shutil.rmtree(t)
-    save('cleanup',dict(removed=not t.exists(),bytes=n))
+ n=sum(f.stat().st_size for f in w.rglob('*')if f.is_file()and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(bytes=n,removed=not w.exists()))
+
