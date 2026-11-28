@@ -14,7 +14,10 @@ with tempfile.TemporaryDirectory(dir=r) as temp:
         entry=next(e for e in lzma.decompress(data).decode().split('\n\n') if e.startswith('Package: libc6\n'))
         header=dict(row.split(': ',1) for row in entry.splitlines() if ': ' in row and not row.startswith(' '))
         meta=dict(package='libc6',version=header['Version'],url=server+header['Filename'],package_sha256=header['SHA256'],index_sha256=h)
-    get(meta['url'],w/'lib.deb');assert sha((w/'lib.deb').read_bytes())==meta['package_sha256']
+    url=meta['url']
+    if meta['package_sha256']=='967aa62605721081c3eb2a17650611a792aa802d76a6511d1840242623d204c9':
+        url='https://snapshot.debian.org/file/27904cc1b58dd79f0768ba6aa6dd993edc411b97'
+    get(url,w/'lib.deb');assert sha((w/'lib.deb').read_bytes())==meta['package_sha256']
     name=next(v for v in sp.check_output(['ar','t',w/'lib.deb'],text=True).splitlines() if v.startswith('data.tar.'))
     tar=w/name
     with tar.open('wb') as out:sp.run(['ar','p',w/'lib.deb',name],stdout=out,check=True)
