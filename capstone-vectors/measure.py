@@ -27,20 +27,20 @@ try:
     run('cmake','-G','Ninja','-S',project,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON')
     run('cmake','--build',build,'--target','capstone_static','--parallel','4');lib,=build.rglob('libcapstone.a')
     files={Path(c['file']).name for c in rd(build/'compile_commands.json')};assert {'MipsMapping.c','AArch64Mapping.c','ARMMapping.c','X86Sse64Output.c'}<=files and 'X86PublicOutput.c' not in files
-    ad.mkdir()
-    for f in ('Cargo.lock','iced.rs'):shutil.copyfile(r/f,ad/f)
-    (ad/'Cargo.toml').write_text((r/'Cargo.toml').read_text().replace('ICED_ROOT',str(ice)))
-    run('cargo','build','--release','--locked',cwd=ad)
-    ice_lib=ad/'target/release/libiced_compare.a'
-    shutil.copyfile(r/'driver.cpp',w/'driver.cpp')
-    flags=['-lpthread','-lm']+(['-framework','Security','-framework','CoreFoundation','-liconv']if sys.platform=='darwin'else['-ldl','-no-pie'])
-    run('clang++','-O3','-DNDEBUG','-std=c++17','-I',base,'-I',base/'include','-c',w/'driver.cpp','-o',w/'driver.o')
+    counters=[]
+    markers=[('arch/X86/X86Disassembler.c','bool X86_getInstruction(csh'),('arch/X86/X86IntelInstPrinter.c','void X86_Intel_printInst(MCInst'),('arch/X86/X86IntelInstPrinter.c','static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)\n{'),('arch/X86/X86IntelInstPrinter.c','static void printMemReference(MCInst *MI, unsigned Op, SStream *O)\n{'),('arch/X86/X86Mapping.c','unsigned short X86_register_map(unsigned short id)\n{'),('arch/X86/X86Mapping.c','const uint8_t *X86_get_op_access(cs_struct *h'),('SStream.c','void(SStream_concat0)(SStream *ss, const char *s)\n{'),('arch/X86/X86Mapping.c','void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)\n{')]
+    for tag in ('clean','instrumented'):
+        if tag=='instrumented':
+            for i,(f,v) in enumerate(markers):
+                src=base/f;txt=src.read_text();assert txt.count(v)==1,(f,v,txt.count(v));at=txt.index('{',txt.index(v))+1
+                txt=txt[:at]+'\n\textern uint64_t path_counts[8];\n\t++path_counts['+str(i)+'];\n'+txt[at:];src.write_text(txt)
+            run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang++','-std=c++17','-O2','-I',base,'-I',base/'include',r/'counters.cpp',lib,'-o',w/tag);counters.append(sha(lib))
+    assert counters[0]!=counters[1];save('archives',dict(clean=counters[0],instrumented=counters[1],markers=markers))
     for f in ('frozen_deb.py','jpeg_archive.py','pe_panels.py','pdata.py','pe-images.json','inputs.json','vectors.cpp','libmvec.py','libmvec.json'):shutil.copyfile(r/f,w/f)
-    run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/'runner')
-    save('linked',dict(archive=sha(lib),program=sha(w/'runner'),drivers=m['drivers'],compiler=get('clang','--version'),rust=get('rustc','--version'),source=q,neverd=dev,iced=m['iced_revision']))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
     os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-    cases={}
+    cases={};counts={}
     inputs=rd(w/'inputs.json');(w/'inputs.json').write_text(json.dumps({n:v for n,v in inputs.items()if n in m['samples']}))
     sys.path.insert(0,str(w));import pe_panels,frozen_deb
     run(sys.executable,'-B',w/'libmvec.py');raw=rd(w/'libmvec.json')
@@ -58,13 +58,12 @@ try:
             assert len(view)==len(selected)
             selected=[s for s,x in zip(selected,view)if x[1]>=8 and x[1]>=.15*x[0]];emit(selected)
         assert sha(path)==spec['extent_sha256']
-        checks=[list(map(int,row.split()))for row in get(w/'runner','audit','0','1',f,path,str(bits)).splitlines()]
-        assert len(checks)==len(selected) and all(z[3]==z[4] and z[1]==z[5] for z in checks)
-        for mode in (0,1,2):
-            cases[name+'/'+str(mode)]=(mode,f,path,str(bits))
-    assert len(cases)==18
-    from observe import measure_all
-    measure_all(r,w,cases,save)
-    save('complete',dict(complete=True,source=q,neverd=dev,iced=m['iced_revision'],cpu=get('lscpu'),cases=list(cases)))
+        for mode in (1,2):
+            v={tag:list(map(int,get(w/tag,str(bits),f,path,str(mode)).split()))for tag in ('clean','instrumented')}
+            assert len(v['clean'])==len(v['instrumented'])==32 and v['clean'][:7]==v['instrumented'][:7]
+            assert sum(v['clean'][7:23])==0 and sum(v['instrumented'][23:])==v['clean'][0] and v['instrumented'][8]>0
+            counts[name+'/'+str(mode)]=v;save('counts',counts)
+    assert len(counts)==12
+    save('complete',dict(complete=True,source=q,neverd=dev))
 finally:
     n=sum(f.stat().st_size for f in w.rglob('*') if f.is_file() and not f.is_symlink());shutil.rmtree(w);save('cleanup',dict(removed=not w.exists(),bytes=n))
