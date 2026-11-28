@@ -34,7 +34,7 @@ jobs:
           cp "$sample/Makefile" .
           cp "$sample/Enclave/Enclave.config.xml" "$sample/Enclave/Enclave.lds" Enclave/
           make -j2 SGX_SDK="$RUNNER_TEMP/sgxsdk" SGX_ARCH=x64 SGX_MODE=SIM
-      - name: Check signed enclave entry, divide fault, register repair and resume
+      - name: Check divide recovery, raw key statuses and a self-addressed report
         working-directory: ${{ runner.temp }}/exception-reference
         run: |
           export LD_LIBRARY_PATH="$RUNNER_TEMP/sgxsdk/lib64:$RUNNER_TEMP/sgxsdk/sdk_libs"
@@ -42,7 +42,7 @@ jobs:
           set -o pipefail
           timeout 30 ./app | tee "$GITHUB_WORKSPACE/software-reference/receipts.txt"
           sha256sum app enclave.signed.so "$RUNNER_TEMP/sgxsdk/lib64/libsgx_urts_sim.so" > "$GITHUB_WORKSPACE/software-reference/artifacts.sha256"
-          echo 'Intel SDK simulation passed three x64 calls to one signed enclave, including two divide faults resumed at the original instruction.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Intel SDK simulation checked two original-site divide retries, five raw EGETKEY errors and a self-addressed report with 64 bytes of caller data.' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: intel-sgx-simulation-reference

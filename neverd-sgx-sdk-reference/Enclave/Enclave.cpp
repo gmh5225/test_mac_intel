@@ -1,5 +1,7 @@
 #include "Enclave_t.h"
 #include "sgx_trts_exception.h"
+#include "sgx_utils.h"
+#include <string.h>
 
 extern "C" const unsigned char divide_site[];
 static uint64_t captured[7];
@@ -37,4 +39,39 @@ int check_divide(uint32_t divisor, uint64_t *receipt) {
         receipt[i] = captured[i];
     receipt[7] = dividend;
     return 0;
+}
+
+// The tRTS entry returns the instruction status. The public sgx_get_key
+// wrapper intentionally randomizes the caller's buffer on errors.
+extern "C" int do_egetkey(const sgx_key_request_t *, sgx_key_128bit_t *);
+
+int check_key_errors(uint32_t *status, uint32_t *intact) {
+    const uint16_t names[] = {SGX_KEYSELECT_EINITTOKEN, SGX_KEYSELECT_PROVISION,
+                              SGX_KEYSELECT_PROVISION_SEAL, 5, 0xffff};
+    *intact = 0;
+    for (unsigned i = 0; i < 5; ++i) {
+        alignas(512) sgx_key_request_t request = {};
+        alignas(16) sgx_key_128bit_t output;
+        request.key_name = names[i];
+        memset(output, 0xa5, sizeof(output));
+        status[i] = do_egetkey(&request, &output);
+        for (const auto byte : output)
+            if (byte != 0xa5)
+                return 1;
+        ++*intact;
+    }
+    return 0;
+}
+
+int check_local_report(uint32_t *data_match) {
+    sgx_target_info_t target = {};
+    sgx_report_data_t data = {};
+    sgx_report_t report = {};
+    for (unsigned i = 0; i < sizeof(data.d); ++i)
+        data.d[i] = static_cast<uint8_t>(3 * i + 1);
+    if (sgx_self_target(&target) != SGX_SUCCESS ||
+        sgx_create_report(&target, &data, &report) != SGX_SUCCESS)
+        return 1;
+    *data_match = memcmp(report.body.report_data.d, data.d, sizeof(data.d)) == 0;
+    return sgx_verify_report(&report) == SGX_SUCCESS ? 0 : 2;
 }

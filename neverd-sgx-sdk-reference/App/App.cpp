@@ -29,5 +29,21 @@ int main() {
                           receipt[5] != 0 || receipt[6] != 0x1122334455667788ULL)))
             return 2;
     }
+    uint32_t instruction_status[5] = {}, intact = 0, data_match = 0;
+    int result = -1;
+    status = check_key_errors(enclave, &result, instruction_status, &intact);
+    std::printf("key_errors=%u,%u,%u,%u,%u intact_outputs=%u result=%d status=%u\n",
+                instruction_status[0], instruction_status[1], instruction_status[2],
+                instruction_status[3], instruction_status[4], intact, result, status);
+    if (status != SGX_SUCCESS || result || intact != 5 ||
+        instruction_status[0] != 2 || instruction_status[1] != 2 ||
+        instruction_status[2] != 2 || instruction_status[3] != 256 ||
+        instruction_status[4] != 256)
+        return 4;
+    status = check_local_report(enclave, &result, &data_match);
+    std::printf("self_report_verified=%u reportdata_match=%u result=%d status=%u\n",
+                status == SGX_SUCCESS && result == 0, data_match, result, status);
+    if (status != SGX_SUCCESS || result || !data_match)
+        return 5;
     return sgx_destroy_enclave(enclave) == SGX_SUCCESS ? 0 : 3;
 }
