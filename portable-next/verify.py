@@ -92,8 +92,11 @@ try:
             active=(platform.machine().lower() in ('amd64','x86_64') and re.search(r'clang version 18[.]',clang_ver) is not None)
             assert ('-DX86_CACHED_OPERAND_ACCESS' in access)==active
             dis=next(c['command']for c in commands if Path(c['file']).name=='X86Disassembler.c')
-            assert ('-DX86_CHECK_EVEX_WRITEMASK' in dis)==(active and name=='search')
-            rows[name]['evex_only']=active and name=='search'
+            assert ('-DX86_CHECK_EVEX_WRITEMASK' in dis)==active
+            batch=next(c['command']for c in commands if Path(c['file']).name=='X86BatchScan.c')
+            assert ('-DX86_BATCH_FALLBACK_ADDRESS' in batch)==(active and name=='search')
+            rows[name]['batch_address']=active and name=='search' 
+            rows[name]['evex_only']=active
             rows[name]['cached_access']=active
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
             assert result['snapshots']==rows[name]['static']['snapshots']
