@@ -1,7 +1,7 @@
-name: Compare cold block splitting and PGO in three Capstone decoder and printer objects on held-out programs
+name: Isolate compiler-training gains by replacing one Capstone object at a time on real programs
 on:
   push:
-    branches: [codex/profile-split-x86-decoding-and-printing]
+    branches: [codex/attribute-trained-printer-and-decoder]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: profiled-decoder-blocks-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: isolated-printer-decoder-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

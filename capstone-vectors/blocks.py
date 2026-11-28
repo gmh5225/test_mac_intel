@@ -100,8 +100,34 @@ def prepare(r,w,build,base,stock,ice,flags,save):
     desc=output(prof,'show',data,text=True)
     assert 'IR' in desc and 'Total functions' in desc
     use=['-fprofile-use='+str(data),'-Werror=profile-instr-out-of-date']
-    for tag,opt in [('trained',['-fno-split-machine-functions']),('split',['-fsplit-machine-functions'])]:
-        lib=compile_units(tag,[*use,*opt]);link_normal(tag,lib)
+    opts=[*use,'-fno-split-machine-functions']
+    compile_units('trained',opts)
+    forms={'printer':'X86IntelInstPrinter.c','decoder':'X86DisassemblerDecoder.c','translator':'X86Disassembler.c'}
+    for tag,name in forms.items():
+        member=name+'.o'
+        directory=w/tag;directory.mkdir();lib=directory/stock.name;shutil.copyfile(stock,lib)
+        run('ar','r',lib,w/'trained'/member)
+        assert output('ar','t',lib,text=True).splitlines()==members
+        after=contents(lib);changed=[m for m in members if after[m]!=baseline[m]]
+        assert changed==[member] and after[member]==reports['trained']['objects'][member]
+        codes=reports['stock']['layout'].copy();codes[name]=reports['trained']['layout'][name]
+        reports[tag]=dict(options=opts,changed=changed,objects=after,layout=codes,warnings={},archive=digest(lib.read_bytes()))
+        link_normal(tag,lib)
+    # Capture just the printer's successful inlining decisions. Diagnostics are
+    # compiled separately; timed images above use the original compiler options.
+    printer=forms['printer'];cwd,original,obj=commands[printer]
+    diagnostics={}
+    for tag,extra in [('stock',[]),('trained',opts)]:
+        can=w/('remarks-'+tag+'.o');args=original.copy();args[args.index('-o')+1]=str(can)
+        job=sp.run([*args,*extra,'-Rpass=inline'],cwd=cwd,stdout=sp.PIPE,stderr=sp.STDOUT,text=True)
+        if job.returncode:raise RuntimeError(job.stdout)
+        def exec_sections(path):
+            with path.open('rb') as f:
+                return {s.name:(s['sh_size'],digest(s.data())) for s in ELFFile(f).iter_sections() if s['sh_flags'] & 4}
+        match=exec_sections(can)==exec_sections(w/tag/obj.name)
+        rows=[line.split(': remark: ',1)[-1].split(' [-Rpass',1)[0] for line in job.stdout.splitlines() if ': remark: ' in line and 'inlined into' in line]
+        diagnostics[tag]=dict(matches_timed_code=match,inlining=rows);can.unlink()
+    save('printer-remarks',diagnostics)
     info=dict(training=training,inputs=zstd,profile_summary=desc,profile_bytes=data.stat().st_size,profile_sha=digest(data.read_bytes()),stock_archive=digest(stock.read_bytes()),reports=reports,images=images,tools=dict(clang=str(clang),profdata=str(prof)))
     save('code-layout',info)
     for f in [*profiles.values(),tx,data]:f.unlink()
@@ -118,7 +144,7 @@ def measure(w,cases,foreign,save):
         if mode:continue
         proof={}
         for route in ('public','fixed'):
-            for tag in ('trained','split'):
+            for tag in ('printer','decoder','translator'):
                 out=output(w/('records-'+route),w/'stock.so',w/(tag+'.so'),code,extent,bits,text=True)
                 counts=[list(map(int,l.split())) for l in out.splitlines()]
                 assert len(counts)==4 and all(x==counts[0] and x[1]>0 for x in counts)
@@ -126,7 +152,7 @@ def measure(w,cases,foreign,save):
         recorded[name]=proof
     save('records',recorded)
     def clock(key,cmd,rival=None):
-        names=['stock','stock+copy','trained','trained+copy','split','split+copy']+([rival] if rival else [])
+        names=[tag+copy for tag in ('stock','printer','decoder','translator') for copy in ('','+copy')]+([rival] if rival else [])
         def take(t,n):
             return list(map(int,output('setarch',os.uname().machine,'-R',*cmd(t.partition('+')[0],n)).split()))
         warm={t:take(t,1) for t in names}
@@ -134,7 +160,7 @@ def measure(w,cases,foreign,save):
         n=max(1,math.ceil(12e6/min(v[0] for v in warm.values())))
         checks={t:take(t,n)[2:] for t in names}
         assert all(z==checks['stock'] for t,z in checks.items() if t!=rival)
-        order=names[:];rng=random.Random('three-units/'+key);series=[]
+        order=names[:];rng=random.Random('one-trained-unit/'+key);series=[]
         for _ in range(17):
             rng.shuffle(order);pair={}
             for t in order+order[::-1]:
