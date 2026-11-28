@@ -1,7 +1,7 @@
-name: Isolate the cost of segment register deduplication at the same function address with unchanged peer code
+name: Verify the restored source tree between same-address segment-register experiments
 on:
   push:
-    branches: [codex/measure-segment-reads-at-identical-address]
+    branches: [codex/segment-read-matched-elf]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: segment-read-same-address-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: segment-read-matched-vma-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

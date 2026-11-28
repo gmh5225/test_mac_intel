@@ -86,7 +86,12 @@ try:
                 if n.startswith(('.text','.cs_x86_','.cs_alias_')) or n in ('.init','.fini','.plt','.rodata'):
                     assert section==before['sections'][n],(kind,n)
             if tag=='fixed':assert z['sections']['.cs_bench_access'][2]!=before['sections']['.cs_bench_access'][2]
-        path.write_text(old_source);run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        rel=path.relative_to(base).as_posix()
+        run('git','-C',base,'restore','--worktree','--',rel)
+        assert get('git','-C',base,'hash-object',rel).strip()==get('git','-C',base,'rev-parse',':'+rel).strip()
+        run('git','-C',base,'update-index','--refresh','--',rel)
+        assert get('git','-C',base,'write-tree').strip()==(q if tag=='base' else fix)['tree']
+        run('cmake','--build',build,'--target','capstone_static','--parallel','4')
         assert sha(lib)==images[tag]['archive']
 
     changed=[Path(k).name for k,v in images['base']['objects'].items()if images['fixed']['objects'][k]!=v]
