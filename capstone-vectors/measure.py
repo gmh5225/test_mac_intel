@@ -148,6 +148,10 @@ def main(w):
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
         measured=sha(exe)
         pristine=sha(lib)
+        from sites import make
+        from profiles import set_sites
+        cost_sites,debug=make(exe,lib,db,w,['clang++',w/'driver.o',*flags,lib,ad/'target/release/libiced_compare.a',*syslibs,'-o',exe])
+        set_sites(cost_sites);save('line-coverage.json',debug)
         printer=base/'arch/X86/X86IntelInstPrinter.c'
         source=printer.read_text()
         entry='void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)\n{'

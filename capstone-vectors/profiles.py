@@ -1,6 +1,11 @@
 from pathlib import Path
 import os,re,subprocess as sp
 from self_cost import read
+from sites import parse
+import json
+def set_sites(s):
+    global source_sites
+    source_sites=s
 def measure(exe,mode,bits,path,spans,tagfile,counts,work,out,case):
     selected={}
     for engine in ('x86_all_','fast____'):
@@ -23,6 +28,9 @@ def measure(exe,mode,bits,path,spans,tagfile,counts,work,out,case):
                     if line.startswith('events:'):events=line.split()[1:]
                     if line.startswith('totals:'):values=list(map(int,line.split()[1:]))
             self=read(profile,out,case+'-'+str(mode)+'-'+engine+'-'+str(bucket))
+            if engine=='x86_all_' and bucket==2:
+                exact=parse(profile,source_sites)
+                (out/(case+'-'+str(mode)+'-cost-sites.json')).write_text(json.dumps(dict(records=count,functions=exact),indent=1)+'\n')
             profile.unlink()
             values+= [0]*(len(events)-len(values));totals=dict(zip(events,values))
             assert {'Ir','Dr','Dw','Bc','Bcm','Bi','Bim'}<=totals.keys() and totals['Ir']>0

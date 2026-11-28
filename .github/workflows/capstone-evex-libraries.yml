@@ -1,7 +1,7 @@
-name: Attribute general and dedicated formatter work with the original Debian package pinned by content
+name: Map formatter and detail costs to native instructions and source lines in unchanged executable sections
 on:
   push:
-    branches: [codex/paired-format-work-debian-snapshot]
+    branches: [codex/exact-general-printer-source-sites]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,13 +25,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: faf7731bf057eedcf902cc299f3efe2b456fb7e3
+          ref: 625c2075460b873e0e5186e9e9d5882ce973fea6
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 67e6a5ef6026c3a1c63b0aa87f811b2caccdf35e
+          ref: e9bbbe3ae1369087b57c82bb0f8474416e4ea57a
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: frozen-format-path-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: verified-printer-cost-sites-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
