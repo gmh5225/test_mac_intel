@@ -1,7 +1,7 @@
-name: Verify corrected Alpha branch details and isolate opcode lookup on four distribution programs
+name: Validate the released x86 baseline against corrected Alpha transfers and isolate dense lookup on real programs
 on:
   push:
-    branches: [codex/alpha-branches-mapping-real]
+    branches: [codex/alpha-control-transfer-on-next]
     paths: [family-ids/**, .github/workflows/family-ids.yml]
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: faf7731bf057eedcf902cc299f3efe2b456fb7e3
+          ref: 6111c58334b1abdebaabe4db0577ba5fee520f60
           path: source
           persist-credentials: false
       - run: |
@@ -43,5 +43,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           path: evidence/
-          name: alpha-branch-and-row-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
+          name: alpha-next-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.flavor }}
           retention-days: 14

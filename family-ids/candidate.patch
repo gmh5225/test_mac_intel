@@ -313,10 +313,10 @@ index 46b55d85..002a0613 100644
  endif()
 diff --git a/tests/unit/alpha_branch_detail.c b/tests/unit/alpha_branch_detail.c
 new file mode 100644
-index 00000000..b3b7c7e5
+index 00000000..e382d30d
 --- /dev/null
 +++ b/tests/unit/alpha_branch_detail.c
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,152 @@
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#include <capstone/capstone.h>
@@ -457,7 +457,11 @@ index 00000000..b3b7c7e5
 +			return 1;
 +		}
 +		cs_insn *insn = cs_malloc(handle);
-+		bool ok = insn && check_mode(handle, insn, modes[i]);
++		if (!insn) {
++			cs_close(&handle);
++			return 1;
++		}
++		bool ok = check_mode(handle, insn, modes[i]);
 +		cs_free(insn, 1);
 +		cs_close(&handle);
 +		if (!ok)

@@ -33,7 +33,7 @@ try:
  archs['alpha-diet']=110;archs['alpha-debug']=110
  for arch,sel in archs.items():
   b=w/'build';images={};builds[arch]={};records={}
-  for tag in ('base','candidate'):
+  for tag in ('shipping','base','candidate'):
    run('git','-C',src,'restore','--source','HEAD','--staged','--worktree','--','.')
    patch=r/(tag+'.patch');assert dig(patch)==q[tag]['patch']
    if patch.stat().st_size:run('git','-C',src,'apply','--index',patch)
@@ -41,7 +41,7 @@ try:
    aset=['ARM','AARCH64','MIPS','PPC','X86','RISCV'] if arch=='mixed' else ['ALPHA'] if arch.startswith('alpha-') else [arch]
    run('cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_BUILD_TYPE='+('Debug' if arch=='alpha-debug' else 'Release'),'-DCAPSTONE_BUILD_DIET='+('ON' if arch=='alpha-diet' else 'OFF'),*(['-DCAPSTONE_BUILD_MACOS_THIN=ON'] if darwin else []),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST='+('OFF' if arch=='mixed' else 'ON'),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in aset])
    run('cmake','--build',b,'--parallel','4','--target','capstone_static','capstone_shared')
-   if arch!='mixed':
+   if arch!='mixed' and tag!='shipping':
     run('cmake','--build',b,'--parallel','4','--target','alpha_branch_detail')
     check=out('ctest','--test-dir',b,'-R','^unit_alpha_branch_detail$','--no-tests=error','--output-on-failure')
     assert '100% tests passed' in check;put('transfer-detail-'+arch+'-'+tag,dict(states=26496,ctest=check))
@@ -52,6 +52,18 @@ try:
    lib=b/'libcapstone.a';so=next(f for f in b.glob('libcapstone.*.dylib' if darwin else 'libcapstone.so.*')if not f.is_symlink())
    builds[arch][tag]={'static':dig(lib),'shared':dig(so),'objects':{str(p.relative_to(b)):dig(p)for p in (b/'CMakeFiles/capstone.dir').rglob('*.c.o')}}
    if arch not in ('ALPHA','alpha-diet','alpha-debug'):continue
+   if arch!='alpha-debug' or tag!='shipping':
+    check=w/'transfer-records';run('c++','-std=c++17','-O2','-I',src/'include',r/'transfer-records.cpp',lib,'-o',check)
+    verified={}
+    for name,(path,ranges) in inputs['ALPHA'].items():
+     addr=samples['ALPHA']['programs'][name]['text_address']
+     for option in range(5):
+      row=list(map(int,out(check,'0' if tag=='shipping' else '1',str(option),path,str(addr),name).split()))
+      assert len(row)==8 and 4*sum(row[:2])==path.stat().st_size
+      if tag!='shipping':assert row[-2:]==[0,0]
+      verified[f'{name}/{option}']=row
+    put('transfer-records-'+arch+'-'+tag,verified)
+   if tag=='shipping':continue
    shutil.copyfile(so,w/(tag+'-alpha-library'))
    texe=w/'timed-link';run('c++','-std=c++17','-O3',*([] if darwin else ['-no-pie']),'-I',src/'include',r/'time.cpp',lib,'-o',texe)
    images[tag]=texe.read_bytes()
@@ -60,7 +72,7 @@ try:
    assert all(row[0]>0 for row in records[tag].values())
   put('compilation',builds)
   if arch not in ('ALPHA','alpha-diet','alpha-debug'):
-   assert builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
+   assert builds[arch]['shipping']==builds[arch]['base']==builds[arch]['candidate'],(arch,isa);shutil.rmtree(b);continue
   maps=builds[arch]
   changed=[key for key,h in maps['base']['objects'].items() if maps['candidate']['objects'][key]!=h]
   assert set(Path(key).name for key in changed)<={'AlphaMapping.c.o'}
