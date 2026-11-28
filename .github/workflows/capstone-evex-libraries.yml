@@ -1,7 +1,7 @@
-name: Compare corrected detail views and i386 TEST records with both iced formatters
+name: Check legacy and SIMD vector-source decoding on PE32, ELF and firmware
 on:
   push:
-    branches: [codex/measure-detail-views-and-i386-against-iced]
+    branches: [codex/vector-source-prefix-family-reads]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,13 +27,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b0009d26a8c617b2328833c96291ac8264036866
+          ref: 41218db649cb33ebf60615f7c277f0480b87bd9b
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 4fb4a2035432ad494b49259eb76d04e3f3faba59
+          ref: f4c3d44b1d31b52685daf55764d94a4c88901ea8
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-views-and-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-source-real-programs-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
