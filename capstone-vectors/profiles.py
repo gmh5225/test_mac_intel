@@ -8,7 +8,7 @@ def measure(exe,mode,bits,path,spans,tagfile,counts,work,out,case):
         ref=list(map(int,sp.check_output(argv).split()))[2:]
         assert ref[0]==sum(counts[1:]) and ref[1]==counts[0],(case,engine,ref,counts)
         rows={}
-        for bucket,count in [(12,sum(counts)),*enumerate(counts)]:
+        for bucket,count in [(3,sum(counts)),*enumerate(counts)]:
             if not count:continue
             profile=work/'current.callgrind';env=dict(os.environ,CG_COHORT=str(bucket),CG_COHORT_FILE=str(tagfile))
             job=sp.run(['valgrind','--tool=callgrind','--collect-atstart=no','--dump-instr=yes','--compress-strings=no','--compress-pos=no','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(profile),*argv],capture_output=True,text=True,env=env)

@@ -1,7 +1,7 @@
-name: Attribute the released Capstone and fork iced FastFormatter costs to scalar memory, control flow, and SIMD on the same real instruction offsets
+name: Measure dedicated and general printer work against fork iced at identical instruction offsets on two host ISAs
 on:
   push:
-    branches: [codex/current-iced-scalar-vector-cost]
+    branches: [codex/paired-private-and-general-format-work]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
+          - { host: ubuntu-24.04-arm, cc: clang, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 105
     env:
@@ -25,13 +25,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 96d63971a2801bb17b4ade6a9697c19722e0438d
+          ref: faf7731bf057eedcf902cc299f3efe2b456fb7e3
           path: source
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 1ce76ca04872ceaea731c9a15e8a9224ceb29764
+          ref: 67e6a5ef6026c3a1c63b0aa87f811b2caccdf35e
           path: neverd-config
           sparse-checkout: |
             CMakeLists.txt
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-iced-format-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: private-and-general-format-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -126,7 +126,6 @@ def main(w):
         units=['x86_simple_output','x86_scan_batch','x86_buffer_bounds','x86_reg_access','x86_exchange_access','text_option']
         run(['cmake','--build',build,'--parallel','4','--target','capstone_static',*(units if not mixed  else [])],'build-'+key)
         lib,=build.rglob('libcapstone.a')
-        run(['clang++','-O2','-std=c++17','-I',base/'include',r/'cohorts.cpp',lib,'-o',w/'cohorts'],'build-cohorts')
         run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'build-verify-vectors')
         members=sp.check_output(['ar','t',lib],text=True).splitlines()
         assert len(members)>=49 and 'X86VectorOutput.c.o' in members
@@ -147,6 +146,21 @@ def main(w):
         save('linked-'+key+'.json',linked)
         if key=='base':
             run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',lib,'-o',w/'vectors'],'compile-vectors')
+        measured=sha(exe)
+        pristine=sha(lib)
+        printer=base/'arch/X86/X86IntelInstPrinter.c'
+        source=printer.read_text()
+        entry='void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)\n{'
+        assert source.count(entry)==1
+        printer.write_text(source.replace(entry,entry+'\n\textern unsigned seen_general;\n\t++seen_general;'))
+        try:
+            run(['cmake','--build',build,'--target','capstone_static','--parallel','4'],'build-path-recorder')
+            assert sha(lib)!=pristine
+            run(['clang++','-O2','-std=c++17','-I',base,'-I',base/'include',r/'cohorts.cpp',lib,'-o',w/'cohorts'],'build-cohorts')
+            save('path-recorder.json',dict(clean_library=pristine,instrumented_library=sha(lib),timed_executable=measured,cohorts_source=sha(r/'cohorts.cpp')))
+        finally:
+            printer.write_text(source)
+        assert sha(exe)==measured
         shutil.rmtree(build)
     import pe_panels,frozen_deb,itertools
     for f in ('libmvec.py','libmvec.json'):shutil.copy2(r/f,w/f)
@@ -167,12 +181,14 @@ def main(w):
         emit(selected);assert sha(intervals)==expected['extent_sha256']
         from profiles import measure
         tags=w/(name+'.tags')
-        counts=list(map(int,sp.check_output([w/'cohorts',str(bits),f,intervals,tags]).split()))
-        assert len(counts)==12 and tags.stat().st_size==9*sum(counts)
-        modes={}
+        modes={};groups={}
         for mode in (1,2):
+            counts=list(map(int,sp.check_output([w/'cohorts',str(bits),f,intervals,tags,str(mode)]).split()))
+            assert len(counts)==3 and tags.stat().st_size==9*sum(counts) and min(counts[1:])>0
+            groups[mode]=dict(counts=counts,mask=sha(tags))
             modes[mode]=measure(bins['mixed_base'],mode,bits,f,intervals,tags,counts,w,evidence,name)
-        results.append((name,dict(input=sha(f),extent=sha(intervals),counts=counts,mask=sha(tags),modes=modes)))
+        assert groups[1]['counts'][0]==groups[2]['counts'][0] and sum(groups[1]['counts'])==sum(groups[2]['counts'])
+        results.append((name,dict(input=sha(f),extent=sha(intervals),groups=groups,modes=modes)))
         save('regions.json',dict(results))
         tags.unlink()
     assert len(results)==2
