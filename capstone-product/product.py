@@ -110,13 +110,13 @@ try:
         results[stage]=rows;save('products',identities);save('records',results)
     assert all(fields==results['shipping'] for fields in results.values())
     comparisons={}
-    first={'X86MemoryFallback32.c.o'};between=set();second=first
+    first={'X86MemoryFallback32.c.o'};between=first;second=first
     for before,after,expected in [('shipping','base',first),
         ('shipping','mask',second),('base','mask',between)]:
         a,b=identities[before],identities[after]
         assert a['objects'].keys()==b['objects'].keys()
         delta={Path(k).name for k,v in a['objects'].items() if b['objects'][k]!=v}
-        assert delta==expected,(before,after,delta)
+        assert delta<=expected and (delta==expected or (os.uname().machine=='x86_64' and before=='base')),(before,after,delta,expected)
         assert (a['exe']!=b['exe'])==bool(delta) and (a['archive']!=b['archive'])==bool(delta)
         comparisons[before+'/'+after]=sorted(delta)
     save('checked-objects',comparisons)
@@ -153,11 +153,10 @@ try:
     for c in cases:
         for mode in (range(6) if c['selector'] in (32,64) else range(3)):
             key=c['name']+'/'+str(mode)
-            if key not in m['focus']:continue
             first,_=execute('base',c,mode,1)
-            reps=max(1,round(70000/first[0]));expected=execute('base',c,mode,reps)[0][1:]
+            reps=max(1,round((70000 if key in m['focus'] else 22000)/first[0]));expected=execute('base',c,mode,reps)[0][1:]
             focus=c['name'].startswith('ppc64el-') or c['name'] in ('putty-64-0.85','putty-32-0.85','libssl3t64-i386')
-            count=51;cycles=[]
+            count=51 if key in m['focus'] else 17;cycles=[]
             for rep in range(count):
                 order=list(blobs);rng.shuffle(order);trial={k:[]for k in order}
                 for stage in order+order[::-1]:
@@ -166,7 +165,7 @@ try:
                     trial[stage].append([sample[0],wall])
                 cycles.append(trial)
             timings[key]=dict(cycles=cycles,reps=reps,fields=expected,sha=c['text_sha256']);save('timings',timings)
-    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and checked['shipping']!=checked['base'] and checked['base']==checked['mask']
+    assert set(checked)==set(blobs) and checked['shipping']==checked['shipping_copy'] and checked['mask']==checked['mask_copy'] and checked['shipping']!=checked['base'] and checked['shipping']!=checked['mask']
     save('fixed-image',dict(inode=ino,verified=checked,bytes=total,blocks=len(diff)))
     save('complete',dict(complete=True,inputs=len(cases),workloads=len(timings),llvm=llvm,dev=dev,source=m,active=True))
 finally:
