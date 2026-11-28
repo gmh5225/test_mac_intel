@@ -42,18 +42,31 @@ try:
     ref=w/'native.c';ref.write_text('#include "arch/X86/X86ScanAdapter.h"\n__attribute__((used)) static __typeof__(&X86_disasmIterText) const keep = X86_disasmIterText;\n')
     run('clang','-O2','-I',base,'-I',base/'include','-c',ref,'-o',w/'ref.o')
     fix=rd(r/'fix.json');assert fix['parent']==q['commit'] and sha(r/'fix.patch')==fix['sha256']
-    images={}
+    images={};string_outputs=[];unit_results={}
     for tag in ('base','fixed'):
         if tag=='fixed':
             run('git','-C',base,'apply','--index',r/'fix.patch');assert get('git','-C',base,'write-tree').strip()==fix['tree']
             run(sys.executable,'-B',base/'suite/synctools/x86_mapping_counts.py','--check');run('cmake','--build',build,'--target','capstone_static','--parallel','4')
+        run('clang','-O2','-I',base/'include',r/'access.c',lib,'-o',w/'string-insns')
+        rows=sp.check_output([w/'string-insns'],input=(r/'cases.tsv').read_bytes()).splitlines()
+        string_outputs.append([list(map(int,z.split())) for z in rows])
+        run('clang','-O2','-I',base/'include',r/'reg-access-unit.c',lib,'-o',w/'new-unit')
+        check=sp.run([w/'new-unit'],text=True,capture_output=True)
+        assert (check.returncode==0)==(tag=='fixed') and (tag=='fixed' or 'MOVSB segment' in check.stderr),(tag,check)
+        unit_results[tag]=dict(status=check.returncode,stderr=check.stderr)
         run('clang++',w/'driver.o',lib,ice_lib,*flags,'-o',w/('x86-'+tag))
         run('clang++',w/'foreign.o',w/'ref.o',lib,*flags,'-o',w/('foreign-'+tag))
         run('clang','-fPIC','-shared','-I',base/'include',r/'export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(tag+'.so'))
         objs={str(p.relative_to(build)):sha(p)for p in build.rglob('*.c.o')};assert len(objs)>=60
         images[tag]=dict(x86=sha(w/('x86-'+tag)),foreign=sha(w/('foreign-'+tag)),archive=sha(lib),objects=objs)
     changed=[Path(k).name for k,v in images['base']['objects'].items()if images['fixed']['objects'][k]!=v]
-    assert 'X86Mapping.c.o' in changed and set(changed)<={'X86Mapping.c.o','X86Disassembler.c.o','X86DisassemblerDecoder.c.o'},changed
+    assert changed==['X86Mapping.c.o'],changed
+    base_cases,fix_cases=string_outputs
+    assert len(base_cases)==len(fix_cases)==14336
+    assert all(a[:-1]==b[:-1] and b[-1]==0 for a,b in zip(base_cases,fix_cases))
+    repeats=sum(row[-1] for row in base_cases);affected=sum(row[-1]!=0 for row in base_cases)
+    assert repeats>=affected>0
+    save('encodings',dict(encodings=3584,observations=len(base_cases),old_with_duplicates=affected,removed_duplicates=repeats,remaining_duplicates=0,unit=unit_results))
     save('linked',dict(images=images,changed=changed,source=fix,dev=dev,iced=m['iced_revision']))
     os.link(w/'x86-base',w/'runner')
     for route in ('public','fixed'):run('clang++','-O2','-std=c++17','-I',base/'include',r/('records-'+route+'.cpp'),'-ldl','-o',w/('records-'+route))
