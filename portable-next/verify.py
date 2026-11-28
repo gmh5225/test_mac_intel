@@ -94,8 +94,8 @@ try:
             dis=next(c['command']for c in commands if Path(c['file']).name=='X86Disassembler.c')
             assert ('-DX86_CHECK_EVEX_WRITEMASK' in dis)==active
             batch=next(c['command']for c in commands if Path(c['file']).name=='X86BatchScan.c')
-            assert ('-DX86_BATCH_FALLBACK_ADDRESS' in batch)==(active and name=='search')
-            rows[name]['batch_address']=active and name=='search' 
+            assert ('-DX86_BATCH_FALLBACK_ADDRESS' in batch)==active
+            rows[name]['batch_address']=active 
             rows[name]['evex_only']=active
             rows[name]['cached_access']=active
             result=snapshots(s,p,solo,t,profile,name+'-only',run,'static')
