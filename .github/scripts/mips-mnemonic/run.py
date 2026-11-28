@@ -12,7 +12,7 @@ from compare import compare, digest, inputs
 
 REVISIONS = {"r15": "54143a8d7c037ee4c22f1f238bd4d50ca9a5fd00",
              "r16": "66bcb9e672583193b1b725cccd0cee96f1b2b105",
-             "candidate": "61d63fba8ff09884824576035351d34946b272ea"}
+             "candidate": "93a7e578d2b105139e938d1da8b502d0689a25a0"}
 ARCHIVES = {
     "Linux": ["527eb1cc928ef53316d79ea3fb986719a8334a6f62a1f59238a48aad289c7b3f",
               "663c9c7b01f484466fd459958eb8bcd487e3b2eb446d2b9b367db9d3710565ca"],
