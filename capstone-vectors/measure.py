@@ -51,10 +51,17 @@ try:
         run('clang++',w/'foreign.o',w/'ref.o',lib,*flags,'-o',w/('foreign-'+tag))
         run('clang','-fPIC','-shared','-I',base/'include',r/'export.c','-Wl,--whole-archive',lib,'-Wl,--no-whole-archive','-o',w/(tag+'.so'))
         objs={str(p.relative_to(build)):sha(p)for p in build.rglob('*.c.o')};assert len(objs)>=60
+        dest=w/(tag+'-objects');dest.mkdir()
+        for name in ('X86Mapping.c.o','X86Disassembler.c.o','X86DisassemblerDecoder.c.o'):
+            src,=build.rglob(name);shutil.copyfile(src,dest/name)
         images[tag]=dict(x86=sha(w/('x86-'+tag)),foreign=sha(w/('foreign-'+tag)),archive=sha(lib),objects=objs)
     changed=[Path(k).name for k,v in images['base']['objects'].items()if images['fixed']['objects'][k]!=v]
     assert 'X86Mapping.c.o' in changed and set(changed)<={'X86Mapping.c.o','X86Disassembler.c.o','X86DisassemblerDecoder.c.o'},changed
     save('linked',dict(images=images,changed=changed,source=fix,dev=dev,iced=m['iced_revision']))
+    from control import build_pairs
+    b={Path(k).name:v for k,v in images['base']['objects'].items()};f={Path(k).name:v for k,v in images['fixed']['objects'].items()}
+    assert all(n in b for n in changed)
+    build_pairs(w,lib,ice_lib,flags,b,f,save)
     os.link(w/'x86-base',w/'runner')
     for route in ('public','fixed'):run('clang++','-O2','-std=c++17','-I',base/'include',r/('records-'+route+'.cpp'),'-ldl','-o',w/('records-'+route))
     run('clang++','-O2','-I',base/'include',w/'vectors.cpp',lib,'-o',w/'vectors')
