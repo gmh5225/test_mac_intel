@@ -1,7 +1,7 @@
-name: Measure dedicated and general printer work against fork iced at identical instruction offsets on two host ISAs
+name: Attribute general and dedicated formatter work with the original Debian package pinned by content
 on:
   push:
-    branches: [codex/paired-private-and-general-format-work]
+    branches: [codex/paired-format-work-debian-snapshot]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: private-and-general-format-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: frozen-format-path-work-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
